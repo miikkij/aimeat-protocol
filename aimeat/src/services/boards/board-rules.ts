@@ -16,7 +16,7 @@
  *   v1.0.0 — 2026-11-13 — Moved from routes/boards.ts and mcp/boards.ts, which each held a copy of the
  *     keeper rule (structure programme 2026-11, unit 2b).
  */
-import { operatorOverride, type OperatorAuth } from '../operator-override.js';
+import { operatorOverride, type OperatorAuth } from '../operator/override.js';
 import { setBoardRules, type BoardRulesResult, type BoardWriteDeps } from '../board-write.js';
 
 /** Replace the board's rules when this caller keeps the board, or say why not. */

@@ -91,7 +91,7 @@ import {
 import { buildExtensionRecordFromManifest } from '../../services/extension/manifest.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { hasExtWritePermission, mayManageInstalledExt, extWriteRefusalText, codeWriteRefusalText } from './permissions.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 import { codeHoldRefusal, takeHoldOff } from '../../services/extension/code-hold.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';

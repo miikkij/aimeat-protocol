@@ -44,7 +44,7 @@ import { signInGateOf, SIGN_IN_REFUSAL, type AppReader } from '../../services/ap
 import { isNodeAccount } from '../../services/audience.js';
 import { appIsPaced } from '../../services/app/pacing.js';
 import { appAccessGranted, appShotGranted, generateAppAccessToken, generateAppShotToken } from '../../services/app/access-token.js';
-import { operatorOverride } from '../../services/operator-override.js';
+import { operatorOverride } from '../../services/operator/override.js';
 import { appAccessTarget } from '../../services/organism-join-requests/access-targets.js';
 import { validateBody } from '../../models/schemas.js';
 import { AccessRequestBody } from '../../models/write-body-schemas.js';

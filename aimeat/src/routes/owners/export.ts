@@ -74,7 +74,7 @@ import { presentMemories } from '../../services/classification/present-memory.js
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { scopeOrganism } from '../../services/classification/policy.js';
-import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
+import { isOperatorCaller, operatorOverride } from '../../services/operator/override.js';
 import { exportExtraSections, exportAgentMessages } from './export-sections.js';
 import { appendRequest } from '../../services/compliance/docs.js';
 import { logger } from '../../utils/logger.js';

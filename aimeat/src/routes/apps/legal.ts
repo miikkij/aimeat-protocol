@@ -79,7 +79,7 @@ import { appReviewedBy } from '../../services/app/marks.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import type { CanonicalOwner } from './helpers.js';
-import { operatorOverride } from '../../services/operator-override.js';
+import { operatorOverride } from '../../services/operator/override.js';
 
 export function registerLegalRoutes(
   router: Router,

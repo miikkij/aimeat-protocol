@@ -1153,19 +1153,19 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/operator-confirm.ts :: let :: _privateKey": {
+    "src/services/operator/confirm.ts :: let :: _privateKey": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/operator-confirm.ts :: let :: _publicKey": {
+    "src/services/operator/confirm.ts :: let :: _publicKey": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/operator-confirm.ts :: map :: usedTokens": {
+    "src/services/operator/confirm.ts :: map :: usedTokens": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/operator-place.ts :: let :: codeByLocalName": {
+    "src/services/operator/place.ts :: let :: codeByLocalName": {
       "count": 1,
       "reason": "DEBT"
     },

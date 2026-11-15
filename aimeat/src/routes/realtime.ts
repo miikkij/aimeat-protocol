@@ -39,7 +39,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
 import { OwnerRoomLimitError, type RealtimeManager } from '../services/realtime-manager.js';
 import type { PeerInfo } from '../services/federation.js';
-import { operatorOverride } from '../services/operator-override.js';
+import { operatorOverride } from '../services/operator/override.js';
 import { turnEntryFor, type IceServer } from '../services/turn-credentials.js';
 import { callerOf } from '../middleware/caller.js';
 import { resolveIdentity } from '../utils/gaii.js';

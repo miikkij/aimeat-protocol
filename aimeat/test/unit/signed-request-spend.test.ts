@@ -7,7 +7,7 @@
  *   padding, the URL alphabet and whitespace all decode to the same 64 bytes, so a spend keyed on the
  *   text let one signature through once per spelling (secaudit2026nov08,
  *   aimeat/src/auth/signed-request.ts:spendSignature:signature-text-spend-key). Also the operator's
- *   propose-then-confirm token (services/operator-confirm.ts): it is spent once by its id, in the
+ *   propose-then-confirm token (services/operator/confirm.ts): it is spent once by its id, in the
  *   node's storage, so a second process or a second spelling of the token does not apply it again.
  * @usage cd aimeat && pnpm exec vitest run test/unit/signed-request-spend.test.ts
  * @version-history
@@ -17,7 +17,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPair as joseKeyPair } from 'jose';
 import { generateKeyPair, sign, verify } from '../../src/auth/keypair.js';
 import { spendSignature } from '../../src/auth/signed-request.js';
-import { initConfirmTokenKeys, mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../../src/services/operator-confirm.js';
+import { initConfirmTokenKeys, mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../../src/services/operator/confirm.js';
 
 /** The same bytes in the URL-safe alphabet with no padding. */
 function urlSpelling(b64: string): string {

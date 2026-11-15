@@ -32,7 +32,7 @@ import type { Storage } from '../../storage/interface.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { installRoleRefusal } from '../../services/extension/install-role.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 import { canManageExtensionAs, type ExtensionCaller, type ExtensionAct } from '../../services/extension-access/manage.js';
 
 /** The caller of an Express request in the ExtensionCaller shape, or null without a session. */

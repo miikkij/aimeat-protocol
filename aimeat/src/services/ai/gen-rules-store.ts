@@ -34,7 +34,7 @@ import { isGEAI, parseGAII } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
 import { updateRecord } from '../record-cas.js';
-import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator-confirm.js';
+import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator/confirm.js';
 import { AiCompletionError } from './errors.js';
 import {
   GEN_RULES, GEN_RULE_MEDIA, arrivalMarks, directiveText, isGenRuleMedia,

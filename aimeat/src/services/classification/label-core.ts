@@ -48,7 +48,7 @@ export interface LabelActor {
   /** An app credential's app id (`owner/file.html`), named in the exceptions it records. */
   app?: string;
   /** The credential's granted words, for the node level: something acting for the operator passes
-   *  only on "operator:admin" (askOperator in services/operator-principal.ts). */
+   *  only on "operator:admin" (askOperator in services/operator/principal.ts). */
   scopes?: string[];
 }
 

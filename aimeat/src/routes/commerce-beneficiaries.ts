@@ -66,7 +66,7 @@ const PossiblePayoutArrivedSchema = z.object({
   reference: z.string().trim().min(1).max(300),
 });
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
-import { operatorOverride } from '../services/operator-override.js';
+import { operatorOverride } from '../services/operator/override.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 function entryView(e: BeneficiaryEntry & { trackingCode: string }): Record<string, unknown> {

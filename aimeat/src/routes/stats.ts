@@ -34,7 +34,7 @@ import type { StatsCollector } from '../services/stats.js';
 import { success, error } from '../middleware/envelope.js';
 import { isSignedInCaller } from '../auth/middleware.js';
 import { buildStatsSnapshot } from '../services/stats-page.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 
 export function statsRouter(
   config: AimeatConfig,

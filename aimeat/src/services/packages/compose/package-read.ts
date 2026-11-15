@@ -35,11 +35,11 @@
 import type { Storage, PackageRecord, PackageFilter, PackageInstanceRecord } from '../../../storage/interface.js';
 import { parseAudience, audienceAllows, isNodeAccount, type AudienceAuth } from '../../audience.js';
 import { readAccountSale, activePurchase } from '../sale/package-account-entitlement.js';
-import { operatorOverride, type OperatorAuth } from '../../operator-override.js';
+import { operatorOverride, type OperatorAuth } from '../../operator/override.js';
 import type { AimeatConfig } from '../../../config.js';
 
 /**
- * What the operator trail needs (services/operator-override.ts). A read path that passes it admits
+ * What the operator trail needs (services/operator/override.ts). A read path that passes it admits
  * the operator to a sold private package and writes the read to the author's account; a path that
  * does not pass it never admits the operator there (ruled by Jouni on 2026-10-31).
  */

@@ -69,7 +69,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
+import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator/confirm.js';
 import { logger } from '../utils/logger.js';
 import { checkScopeAddition, recordScopeAddition } from '../services/agent/scope-add.js';
 import { resolveMcpWriteTarget } from '../services/write-target.js';

@@ -78,7 +78,7 @@ import type { PeerInfo } from '../../services/federation.js';
 import { deriveTierFlags } from '../../services/federation/tiers.js';
 import { performKeyExchange } from '../../services/federation/helpers.js';
 import { logger } from '../../utils/logger.js';
-import { recordOperatorAction, recordOperatorAccess } from '../../services/operator-access-audit.js';
+import { recordOperatorAction, recordOperatorAccess } from '../../services/operator/access-audit.js';
 import { resolveIdentity, ownerGhiiOf, isOwnerInPerson } from '../../utils/gaii.js';
 import { readerFor } from '../../services/classification/reader.js';
 import type { VerifiedToken } from '../../auth/jwt.js';
@@ -98,7 +98,7 @@ export function adminMonitoringRouter(
 ): Router {
     const router = Router();
 
-    /** The operator trail for an operator role given or taken (services/operator-access-audit.ts). */
+    /** The operator trail for an operator role given or taken (services/operator/access-audit.ts). */
     const recordRoleChange = async (auth: VerifiedToken, owner: string, action: 'grant' | 'revoke'): Promise<void> => {
         const actorGaii = resolveIdentity(auth, config.nodeId);
         await recordOperatorAction(storage, config, {
@@ -435,7 +435,7 @@ export function adminMonitoringRouter(
         }
 
         // The operator trail: one export line for each person whose entries the file holds, with the
-        // count, before the answer (services/operator-access-audit.ts; the operator's own write none).
+        // count, before the answer (services/operator/access-audit.ts; the operator's own write none).
         const actorGaii = resolveIdentity(req.auth!, config.nodeId);
         for (const [ownerOf, count] of carried) {
             await recordOperatorAccess(storage, config, { operatorGhii: ownerGhiiOf(actorGaii), actorGaii, ownerOf, action: 'export', count });

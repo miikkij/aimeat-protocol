@@ -19,7 +19,7 @@
  *                          agent the organism does not admit (agentAccess 'listed'). Same exclusions.
  *
  *   An operator gets no pass here: reading another person's organisation content is an operator
- *   override (services/operator-override.ts), decided and written down where it happens.
+ *   override (services/operator/override.ts), decided and written down where it happens.
  *
  *   The audience is written as one string wherever a kind stores it: 'private' | 'members' | 'public'
  *   or 'organism:<id>'. parseAudience reads it back and refuses anything else.

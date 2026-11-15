@@ -18,7 +18,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { reencryptStatus, startReencrypt } from '../../services/key-reencrypt/job.js';
-import { recordOperatorNodeAct } from '../../services/operator-access-audit.js';
+import { recordOperatorNodeAct } from '../../services/operator/access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 
 export function adminKeyReencryptRouter(config: AimeatConfig, storage: Storage): Router {

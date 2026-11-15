@@ -114,7 +114,7 @@ import { NS_INSTALL_SETS } from './set-trust.js';
 import { claimRun, finishRun, releaseRun, type RunClaim } from './set-run.js';
 import { writeAppWorkspaceLinks, type AppWorkspaceLink } from '../app/workspaces.js';
 import { grantInstalledApps, landingPath, type AppGrantStep } from './set-grants.js';
-import { recordOperatorAction } from '../operator-access-audit.js';
+import { recordOperatorAction } from '../operator/access-audit.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 
 // The namespace lives with the trust check (install-set-trust.ts), which package-pull.ts reads

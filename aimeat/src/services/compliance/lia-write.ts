@@ -44,7 +44,7 @@ import { LIA_QUESTION_IDS } from '../../data/compliance-lia.js';
 import { stableStringify } from '../../utils/stable-json.js';
 import { logger } from '../../utils/logger.js';
 import { notify } from '../notify.js';
-import { actsForSomeone, type OperatorCaller } from '../operator-principal.js';
+import { actsForSomeone, type OperatorCaller } from '../operator/principal.js';
 import { patchDocItem, readDoc, type ComplianceScope } from './docs.js';
 import { DOC_SCHEMAS, type ComplianceDocs } from './docs-schemas.js';
 import { factAnswers, liaFacts } from './lia-draft.js';

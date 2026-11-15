@@ -42,7 +42,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { MemoryWriteCaller } from '../memory/write.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { operatorOverride, type OperatorAuth } from '../operator-override.js';
+import { operatorOverride, type OperatorAuth } from '../operator/override.js';
 import { appListingOf, type AppRecord } from '../../storage/types/apps.js';
 import { readAppDataMap, writeAppDataMap } from './data-map-store.js';
 import { checkMap, stampFor, type MapCheck } from './data-map-check.js';

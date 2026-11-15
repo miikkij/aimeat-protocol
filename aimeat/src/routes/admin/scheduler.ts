@@ -23,7 +23,7 @@ import { Router, type Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { ScheduledJobRecord } from '../../storage/types/organisms-federation.js';
-import { recordOperatorAction } from '../../services/operator-access-audit.js';
+import { recordOperatorAction } from '../../services/operator/access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import type { Scheduler } from '../../services/scheduler.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
@@ -36,7 +36,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
 
   /**
    * The operator trail for an act on a person's job: a line on that person's account feed and a usage
-   * row for the operator (services/operator-access-audit.ts). The person is the job's ownerScope, or
+   * row for the operator (services/operator/access-audit.ts). The person is the job's ownerScope, or
    * for an extension cron the account that installed the extension. A core job, and a job of the
    * operator's own account, write none (secaudit2026oct22, operator-cross-account-writes).
    */

@@ -42,7 +42,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { askOperator } from '../operator-principal.js';
+import { askOperator } from '../operator/principal.js';
 
 export interface ComplianceCaller {
   /** The principal as it identifies itself: a GAII, a GEAI, or a bare owner GHII. */
@@ -64,7 +64,7 @@ export async function complianceRefusal(
   if (!ownerName) {
     return 'This is for whoever runs this installation, and this session has no identity to check.';
   }
-  // The operator question, asked the one way every door asks it (services/operator-principal.ts):
+  // The operator question, asked the one way every door asks it (services/operator/principal.ts):
   // the account first, then the exact word from anything acting for it. A delegated principal, an
   // agent (GAII) or an ecosystem app (GEAI), must carry the word however short its grant list; only
   // the bare owner GHII is the operator in person.

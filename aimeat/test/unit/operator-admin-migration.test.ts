@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { migrateOperatorAdminOnce, OPERATOR_ADMIN_MIGRATION_KEY } from '../../src/services/operator-admin-migration.js';
+import { migrateOperatorAdminOnce, OPERATOR_ADMIN_MIGRATION_KEY } from '../../src/services/operator/admin-migration.js';
 import { OPERATOR_ADMIN_SCOPE as WORD } from '../../src/utils/scope-coverage.js';
 
 const NODE = 'test-node-001';

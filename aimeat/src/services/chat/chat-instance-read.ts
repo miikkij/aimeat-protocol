@@ -5,7 +5,7 @@
  * @description Who may read one chat instance, and the read. GET /v1/chat-instances/:id, the MCP tool
  *   aimeat_instance_status and the MCP resource aimeat://instances/{id} each read the record and
  *   compared its owner with the caller's account. The route then asked operatorOverride, as the
- *   operator ruling of 2026-10-05 says every operator check does (services/operator-override.ts); the
+ *   operator ruling of 2026-10-05 says every operator check does (services/operator/override.ts); the
  *   tool and the resource did not, so the operator's agent holding operator:admin read another
  *   owner's instance on REST and was refused on MCP (structure programme 2026-11, unit 2b, B11).
  *
@@ -24,7 +24,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { ChatInstanceRecord } from '../../storage/types/identity.js';
 import type { CallerContext } from '../caller-context.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { operatorOverride } from '../operator-override.js';
+import { operatorOverride } from '../operator/override.js';
 
 export type ChatInstanceRead =
     | { status: 'ok'; record: ChatInstanceRecord }

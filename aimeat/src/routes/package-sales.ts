@@ -50,7 +50,7 @@ import { requireAuth, requireScope, requireLocalSession, requireOperatorPrincipa
 import { success, error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
-import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator/override.js';
 import { CLAIM_PURPOSE } from '../services/packages/sale/package-sale-auth.js';
 import { listSellers, addSeller, removeSeller } from '../services/packages/sale/package-sellers.js';
 import { acceptCredential, credentialOf } from '../auth/credential-strategies.js';

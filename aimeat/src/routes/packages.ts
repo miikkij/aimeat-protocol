@@ -111,7 +111,7 @@ import { registerPackageAccountSaleRoutes } from './package-account-sales.js';
 import { listForSale, listingFor, saleView } from '../services/packages/sale/package-account-sale.js';
 import { readAccountSale, listedSaleRefusal } from '../services/packages/sale/package-account-entitlement.js';
 import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 import { readRemoteTemplates } from '../services/federation/remote-templates.js';
 
 // The version generator, the content hash and the per-author ceiling used to live here, one copy

@@ -7,7 +7,7 @@
  *   request and reads where it stands and what has been done on the place; the operator's fleet
  *   service takes the request to the build queue, reads the place's whole trail, and tells the owner
  *   once when something happened. Every operation is in services/builder/with-you.ts,
- *   services/place-trail.ts and services/operator-notify-owner.ts, which the MCP tools call too.
+ *   services/place-trail.ts and services/operator/notify-owner.ts, which the MCP tools call too.
  *
  *   THE OPERATOR'S CREDENTIAL. An operator JWT (isOperatorCaller: the operator in person, or the
  *   operator's agent holding operator:admin), or the node's admin password in X-Admin-Password, as
@@ -44,7 +44,7 @@ import { validateBody } from '../models/schemas.js';
 import { INPUT_LIMITS } from '../models/input-limits.js';
 import { BuildError, operatorHandOp, operatorPendingOp, readOp, submitOp } from '../services/builder/with-you.js';
 import { readOwnTrail, readTrail, TrailError } from '../services/place-trail.js';
-import { NotifyOwnerError, notifyOwnerOnce } from '../services/operator-notify-owner.js';
+import { NotifyOwnerError, notifyOwnerOnce } from '../services/operator/notify-owner.js';
 import { checkAdminPasswordOnNode, adminPasswordLimitedMessage } from '../services/admin-password.js';
 
 const field = z.string().trim().min(1).max(INPUT_LIMITS.line);

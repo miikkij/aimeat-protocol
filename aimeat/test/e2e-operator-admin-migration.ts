@@ -1,7 +1,7 @@
 /**
  * @file e2e-operator-admin-migration.ts
  * @description The one-time boot migration that hands operator:admin to the operator's full-access
- *   agents (services/operator-admin-migration.ts), proven across three real boots of one database.
+ *   agents (services/operator/admin-migration.ts), proven across three real boots of one database.
  *
  *   WHY IT OWNS ITS SERVER. The migration runs at boot and records that it ran, so the only honest
  *   test is a node that is stopped and started again on the same data. It follows the runner's
@@ -51,7 +51,7 @@ const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
 const WORD = 'operator:admin';
-/** Where the node records that the migration ran: services/operator-admin-migration.ts. Phase 2
+/** Where the node records that the migration ran: services/operator/admin-migration.ts. Phase 2
  *  asserts the record exists under this key, so a rename there fails here rather than passing hollow. */
 const MARKER_KEY = 'migrations.operator-admin';
 const SYSTEM = `system@${NODE_ID}`;

@@ -27,7 +27,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { appSlug, localAccountName } from '../../utils/gaii.js';
-import type { OperatorCaller } from '../operator-principal.js';
+import type { OperatorCaller } from '../operator/principal.js';
 import { complianceDocAccess } from './docs-access.js';
 import { listDocs, readDoc, scopeAllows, type ComplianceScope } from './docs.js';
 import { derivedProcessors, frameworkVerdicts, processorsView, transfersOf } from './derived.js';

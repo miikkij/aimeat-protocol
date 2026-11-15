@@ -60,7 +60,7 @@ import { inferCsmFromSample } from './csm/infer.js';
 import { parseAudience, formatAudience, isOrganismMember } from './audience.js';
 import { isRegisteringAccount, csmMayReadAs, csmLockHiddenFrom } from './csm/readers.js';
 import { csmVisibilityDefault } from './content-defaults.js';
-import { operatorOverride } from './operator-override.js';
+import { operatorOverride } from './operator/override.js';
 import { emitChange } from './event-bus.js';
 import { notify } from './notify.js';
 import { stableStringify } from '../utils/stable-json.js';

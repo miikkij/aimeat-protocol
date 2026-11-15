@@ -110,7 +110,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { ADMIN_LOGIN_HTML, ADMIN_SETUP_HTML } from './admin/setup-html.js';
 import { registerSetupRegisterRoute } from './admin/setup-register.js';
 import { logger } from '../utils/logger.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config/security.js';
 import { noteDeprecatedUse, removedFrom } from '../services/deprecation.js';

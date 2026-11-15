@@ -33,7 +33,7 @@ import { parseMsm, validateMsm } from '../services/msm-parser.js';
 import { emitChange } from '../services/event-bus.js';
 import type { MsmDefinition } from '../services/msm-parser.js';
 import { logger } from '../utils/logger.js';
-import { operatorOverride } from '../services/operator-override.js';
+import { operatorOverride } from '../services/operator/override.js';
 
 /**
  * The auth keys the public read must not carry, in BOTH spellings.

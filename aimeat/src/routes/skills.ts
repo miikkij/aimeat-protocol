@@ -80,7 +80,7 @@ import { ProvenanceScopeError } from '../services/ai/provenance.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import { provenanceWriteEcho } from '../services/ai/provenance-echo.js';
 import { readerFor } from '../services/classification/reader.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 import {
   publishSkill, deleteSkill, listSkills, listSkillLibrary, resolveSkillRef,
   listSkillsByBinding, setSkillVisibility, SkillAccessError, type SkillAccessor, type SkillScope,

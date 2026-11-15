@@ -126,7 +126,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { writeMemoryRecord } from '../services/memory/write.js';
 import { exchangeOutcome, type ReconcileReport } from '../services/exchange/projection.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { resolveOperatorAgentName } from '../services/operator-principal.js';
+import { resolveOperatorAgentName } from '../services/operator/principal.js';
 import { appToolManifestIds } from '../services/app-tools/manifest-read.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -621,7 +621,7 @@ export function registerCommerceTools(
             annotations: annotationsFor('aimeat_commerce_beneficiary_approve'),
         },
         async ({ ghii, state, method, subject, evidence }) => {
-            // The question the admin tools ask (services/operator-principal.ts): an operator
+            // The question the admin tools ask (services/operator/principal.ts): an operator
             // account's agent holding operator:admin. The owner record alone handed both branches
             // below to every agent of an operator holding wallet:read.
             const isOperator = (await resolveOperatorAgentName(storage, agentGaii, sessionScopes)) !== null;

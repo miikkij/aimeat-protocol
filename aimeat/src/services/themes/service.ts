@@ -67,7 +67,7 @@ import type { ContrastResult } from './contrast.js';
 import type { ConfigProvenance } from '../config/provenance.js';
 import { applyConfigChanges } from '../config/apply.js';
 import { isSealed, sealRefusal } from '../config/sealing.js';
-import { operatorName, type OperatorCaller } from '../operator-principal.js';
+import { operatorName, type OperatorCaller } from '../operator/principal.js';
 import { THEME_WRITE_SCOPE } from '../../utils/scope-coverage.js';
 
 export const THEME_KEY_PREFIX = 'ui.theme.';
@@ -311,7 +311,7 @@ export class ThemeService {
 
     /**
      * Whether the PRINCIPAL acting here may make this node's themes: the operator in person, or an
-     * operator account's agent holding site:theme-write (services/operator-principal.ts). The HTTP
+     * operator account's agent holding site:theme-write (services/operator/principal.ts). The HTTP
      * doors ask the same question through requireOperatorPrincipal; the tool surface asks here.
      */
     async callerIsOperator(caller: OperatorCaller): Promise<boolean> {

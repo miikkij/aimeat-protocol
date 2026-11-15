@@ -33,7 +33,7 @@
 import type { Storage } from '../../storage/interface.js';
 import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
-import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator-confirm.js';
+import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator/confirm.js';
 import { isObj } from './provider-common.js';
 import { AiCompletionError } from './errors.js';
 import { FALLBACK_CLASSES, type FailureClass } from './health.js';

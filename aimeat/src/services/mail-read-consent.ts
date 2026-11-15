@@ -30,7 +30,7 @@
  *
  *   ONCE. A marker record under the node's own system identity (`system@<node>`, a reserved name no
  *   account can take), key MAIL_READ_CONSENT_KEY, says the run happened: the place every run-once boot
- *   migration records itself (services/operator-admin-migration.ts does the same). It is claimed
+ *   migration records itself (services/operator/admin-migration.ts does the same). It is claimed
  *   before the first notice, so two processes booting together do not both send. A claim left by a
  *   run that stopped half way is taken over after STALE_CLAIM_MS, and an owner who already holds a
  *   notice is not sent that notice again.

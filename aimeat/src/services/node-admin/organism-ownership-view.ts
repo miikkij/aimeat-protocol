@@ -8,7 +8,7 @@
  *   (structure programme 2026-11, unit 2b).
  *
  *   WHO. The node operator in person, or the operator's agent holding the organism-repair word. Both
- *   surfaces ask the one shared question for that, services/operator-principal.ts askOperator (the
+ *   surfaces ask the one shared question for that, services/operator/principal.ts askOperator (the
  *   route through requireOperatorPrincipal, the tool through resolveOperatorAgentName with the same
  *   word), before they call this.
  * @structure organismOwnershipView(storage, organismId) → view | null

@@ -1,6 +1,6 @@
 /**
  * @file test/unit/operator-place.test.ts
- * @description Where the privacy and terms pages say the operator is (services/operator-place.ts):
+ * @description Where the privacy and terms pages say the operator is (services/operator/place.ts):
  *   a private person's pages give the email only, never the postal address, even when one is
  *   configured; a company's pages keep the address; the Finnish pages inflect the country
  *   correctly; and no template still reads the removed {{operatorAddress}}.
@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { countryName, operatorPlaceVars } from '../../src/services/operator-place.js';
+import { countryName, operatorPlaceVars } from '../../src/services/operator/place.js';
 import { missingOperatorConfig } from '../../src/config/operator.js';
 import type { OperatorConfig } from '../../src/config-types.js';
 import type { Locale } from '../../src/i18n.js';

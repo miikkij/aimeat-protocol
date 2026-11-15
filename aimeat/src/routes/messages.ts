@@ -136,7 +136,7 @@ import { loadServedProvenance, provenanceItemBlock } from '../services/ai/proven
 import { mintMessageProvenance, withMessageProvenance } from '../services/message/provenance.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message/broadcast.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner/mailbox-reads.js';
 import { createMessagesInboxService } from '../services/db/messages-inbox-db-service.js';

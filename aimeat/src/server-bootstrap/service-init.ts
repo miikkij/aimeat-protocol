@@ -161,7 +161,7 @@ import { runOnceOnlyKeepSteps } from './once-only-keep-steps.js';
 import { flagOrphanPeerApprovalsOnce } from '../services/federation/orphan-approvals.js';
 import { peerInfoFromRow } from '../services/federation/peer-reload.js';
 import { startNodeBusRelay } from './bus-relay-start.js';
-import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
+import { migrateOperatorAdminOnce } from '../services/operator/admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app/tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
 import { seedBuiltinSkills } from '../services/skill/seeds.js';
@@ -383,7 +383,7 @@ export async function initializeServices(
   // the tightening that bites live apps exactly as dangerous as it was. Idempotent.
   //
   // Then, once per node, the operator's full-access agents get operator:admin and keep the admin
-  // tools (services/operator-admin-migration.ts). Chained AFTER the vocabulary, never beside it: both
+  // tools (services/operator/admin-migration.ts). Chained AFTER the vocabulary, never beside it: both
   // rewrite an agent's whole scope list, and side by side one could write over the other.
   bootSeeds.track(migrateScopeVocabulary(storage, config.nodeId)
     .then(({ agents, appGrants }) => {

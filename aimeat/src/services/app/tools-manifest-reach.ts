@@ -21,7 +21,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { operatorOverride, type OperatorAuth } from '../operator-override.js';
+import { operatorOverride, type OperatorAuth } from '../operator/override.js';
 
 /** The app filename a key `apps.<filename>.tools` names, or null for any other key. */
 export function appOfToolsKey(key: string): string | null {

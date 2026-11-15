@@ -21,7 +21,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { appListingOf, type AppRecord } from '../../storage/types/apps.js';
-import { operatorOverride, type OperatorAuth } from '../operator-override.js';
+import { operatorOverride, type OperatorAuth } from '../operator/override.js';
 
 /** The caller asking, in the terms the rule needs. */
 export interface AppViewer {

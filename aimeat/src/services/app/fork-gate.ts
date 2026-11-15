@@ -9,7 +9,7 @@
  *   the tool refused a hidden source to everybody, its owner included, and held that "agents are never
  *   operators here", so the operator's agent holding operator:admin was refused on a source the route
  *   let it fork (structure programme 2026-11, unit 2b, B9). The operator ruling of 2026-10-05
- *   (services/operator-override.ts) asks one operator question on both surfaces.
+ *   (services/operator/override.ts) asks one operator question on both surfaces.
  *
  *   THE GATES, in order. A source the operator hid is not found for anyone but its owner and the
  *   operator. A source not open for forking refuses everyone but its owner and the operator. A source
@@ -31,7 +31,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
-import { operatorOverride, type OperatorAuth } from '../operator-override.js';
+import { operatorOverride, type OperatorAuth } from '../operator/override.js';
 import { appIsPaced, appToll } from './pacing.js';
 import { currentAppRow } from './served-protection.js';
 

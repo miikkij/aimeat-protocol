@@ -22,7 +22,7 @@ import type { Request } from 'express';
 import type { CortexCaller } from '../../services/cortex/lifecycle.js';
 import type { Storage } from '../../storage/interface.js';
 import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 
 /**
  * `req.auth!.owner` is the bare owner name for an owner session and for that owner's agents alike,
@@ -53,7 +53,7 @@ export async function cortexCallerOf(req: Request, nodeId: string, storage: Stor
     gaii: req.auth!.sub,
     identity: resolveIdentity(req.auth!, nodeId),
     // The operator in person, or the operator's agent holding operator:admin: the answer the MCP
-    // tools give (services/operator-override.ts).
+    // tools give (services/operator/override.ts).
     isOperator: await isOperatorCaller(storage, req.auth),
   };
 }

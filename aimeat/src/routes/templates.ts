@@ -53,7 +53,7 @@ import { requireAuth, requireOperator, requireScope } from '../auth/middleware.j
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
-import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator/override.js';
 
 const VALID_SORTS = ['rating', 'installs', 'newest'] as const;
 

@@ -43,7 +43,7 @@ import { emitChange } from '../services/event-bus.js';
 import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
-import { operatorOverride } from '../services/operator-override.js';
+import { operatorOverride } from '../services/operator/override.js';
 
 /**
  * The anchors of this process, one at a time. The slot checks read every anchored node and the insert

@@ -32,7 +32,7 @@ import {
 import { mayManageInstalledExt } from './permissions.js';
 import { canSeeExtensionInstanceAs } from '../../services/extension-access/manage.js';
 import { findExtension } from '../../services/component-address.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerExtensionInstanceRoutes(router: Router, config: AimeatConfig, storage: Storage): void {

@@ -1,5 +1,5 @@
 /**
- * @file src/services/operator-admin-migration.ts
+ * @file src/services/operator/admin-migration.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Once per node: every agent of the node operator that holds "Full access" (`*`) is
@@ -45,14 +45,14 @@
  *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-25 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
-import { isOperatorAccount } from '../utils/operator-account.js';
-import { recordAccountEvent } from './account-events.js';
-import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
-import { changeScopeList } from './scope-list-swap.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { OPERATOR_ADMIN_SCOPE } from '../../utils/scope-coverage.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
+import { recordAccountEvent } from '../account-events.js';
+import { logger } from '../../utils/logger.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
+import { changeScopeList } from '../scope-list-swap.js';
 
 /** The record that says this node has run the migration, under `system@<nodeId>`. */
 export const OPERATOR_ADMIN_MIGRATION_KEY = 'migrations.operator-admin';

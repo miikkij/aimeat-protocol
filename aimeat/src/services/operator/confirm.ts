@@ -1,5 +1,5 @@
 /**
- * @file operator-confirm.ts
+ * @file src/services/operator/confirm.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Propose-then-confirm tokens for operator config-enactment MCP tools.
@@ -14,7 +14,7 @@
  *   - verifyConfirmToken(token, sub, action, payload) — signature/expiry/single-use/binding
  *   - ConfirmTokenError — typed error with code
  * @usage
- *   import { mintConfirmToken, verifyConfirmToken } from '../services/operator-confirm.js';
+ *   import { mintConfirmToken, verifyConfirmToken } from './confirm.js';
  * @version-history
  *   v1.0.0 -- 2026-07-05 -- Initial (Skills feature Phase 3 — operator enactment)
  *   v1.1.0 -- 2026-11-04 -- Signed with the confirm purpose's own key (auth/node-signer.ts); a token
@@ -25,9 +25,9 @@
  *     no longer applies it again (secaudit2026nov08 round 14).
  */
 import { SignJWT } from 'jose';
-import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
+import { signFor, verifyFor, TokenPurposeError } from '../../auth/node-signer.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { spendOnce } from './ephemeral-claims.js';
+import { spendOnce } from '../ephemeral-claims.js';
 
 let _privateKey: CryptoKey | null = null;
 let _publicKey: CryptoKey | null = null;

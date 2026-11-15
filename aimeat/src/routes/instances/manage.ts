@@ -51,7 +51,7 @@ import { listInstancesFor } from '../../services/packages/compose/package-read.j
 import { approvalOf, forgetApproval, INSTALL_CODE_SCOPE } from '../../services/packages/install/package-approvals.js';
 import { isOwnerInPerson } from '../../auth/effective-scopes.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
-import { operatorOverride } from '../../services/operator-override.js';
+import { operatorOverride } from '../../services/operator/override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 // ── Register instance management routes ───────────────────────────────

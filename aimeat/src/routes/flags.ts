@@ -38,7 +38,7 @@ import {
     resolveOrganismForFlag,
     activeReporterCount,
 } from '../services/moderation-flags.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 
 const VALID_REVIEW_STATUSES = ['dismissed', 'actioned'] as const;
 

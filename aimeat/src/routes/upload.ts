@@ -179,7 +179,7 @@ import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '.
 import { handleStorageUpload, declaredFromMeta, completeDirectStorageUpload } from './upload-storage.js';
 import { handleSkillUpload } from './upload-skill.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
-import { operatorName } from '../services/operator-principal.js';
+import { operatorName } from '../services/operator/principal.js';
 import { publishApp } from '../services/app/publish.js';
 import { publishAskFromMeta, publishAskedFields, askedStatus } from '../services/app/publish-gate.js';
 import { servedMarksResponse } from '../services/app/serve-marks-strip.js';
@@ -463,7 +463,7 @@ async function livePublishAsk(
 /**
  * Is the principal an upload token names an operator? A presigned token carries neither roles nor
  * scopes, so the question is asked of the principal it names with the grant its own record holds now:
- * an agent passes only while it holds operator:admin (services/operator-principal.ts).
+ * an agent passes only while it holds operator:admin (services/operator/principal.ts).
  */
 async function uploaderIsOperator(storage: Storage, sub: string): Promise<boolean> {
     const agent = sub.includes('#') ? await storage.getAgent(sub) : null;

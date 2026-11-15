@@ -74,7 +74,7 @@ beforeAll(async () => {
   (await import('../../src/services/upload-token.js')).initUploadTokenKeys(privateKey, publicKey);
   (await import('../../src/services/share-token.js')).initShareTokenKeys(privateKey, publicKey);
   (await import('../../src/services/draft-token.js')).initDraftTokenKeys(privateKey, publicKey);
-  (await import('../../src/services/operator-confirm.js')).initConfirmTokenKeys(privateKey, publicKey);
+  (await import('../../src/services/operator/confirm.js')).initConfirmTokenKeys(privateKey, publicKey);
   (await import('../../src/services/parties/token.js')).initPartyTokenKeys(privateKey, publicKey);
   (await import('../../src/services/page-frame-token.js')).initPageFrameTokenKeys(privateKey, publicKey);
   (await import('../../src/services/design-book/preview-token.js')).initDesignBookPreviewTokenKeys(privateKey, publicKey);
@@ -154,7 +154,7 @@ describe('the short purpose tokens still verify', () => {
   });
 
   it('an operator confirmation', async () => {
-    const { verifyConfirmToken } = await import('../../src/services/operator-confirm.js');
+    const { verifyConfirmToken } = await import('../../src/services/operator/confirm.js');
     await expect(verifyConfirmToken(T.operatorConfirm, OWNER, 'config.set', { path: 'node.name', value: 'x' })).resolves.toBeUndefined();
   });
 

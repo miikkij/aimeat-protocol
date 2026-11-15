@@ -143,7 +143,7 @@ import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } f
 import { tagsInUseOnNode } from '../services/visibility/visibility-settings.js';
 import { ownerAnalyticsNotice } from '../services/visibility/privacy-notice.js';
 import { aiRegionNotice } from '../services/privacy-ai-region.js';
-import { operatorPlaceVars } from '../services/operator-place.js';
+import { operatorPlaceVars } from '../services/operator/place.js';
 import { renderPolicyNotSetPage } from './portal-policy-not-set.js';
 
 /**
@@ -195,7 +195,7 @@ function templateVars(config: AimeatConfig, locale: Locale): Record<string, stri
           es: `, identificación fiscal ${config.operator.businessId}` }[locale]
       : '',
     // The country in the page's language and the postal address, which a private person's pages
-    // leave out: the email is their contact, never their home address (services/operator-place.ts).
+    // leave out: the email is their contact, never their home address (services/operator/place.ts).
     ...operatorPlaceVars(config.operator, locale),
     operatorEmail: config.operator.email,
     operatorSecurityEmail: config.operator.securityEmail || config.operator.email,

@@ -57,7 +57,7 @@ import { TEMPLATE_IDS, SUPPORTED_LOCALES, getDefaultTemplate, seedDefaultTemplat
 import type { TemplateId } from '../../services/notification-templates.js';
 import { LOCALES } from '../../i18n.js';
 import { msmHosts, msmActionIds } from '../../services/msm-parser.js';
-import { recordOperatorAction } from '../../services/operator-access-audit.js';
+import { recordOperatorAction } from '../../services/operator/access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { deleteCsmAs } from '../../services/csm-service.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -127,7 +127,7 @@ export function adminFeaturesRouter(
     }));
 
     // The operator trail for an act in another person's identity record: a line on their account feed
-    // and a usage row for the operator (services/operator-access-audit.ts). An act on the operator's
+    // and a usage row for the operator (services/operator/access-audit.ts). An act on the operator's
     // own record writes none (secaudit2026oct22, operator-cross-account-writes).
     const identityTrail = async (req: Request, ghii: string, action: string, data?: Record<string, string>): Promise<void> => {
         const actorGaii = resolveIdentity(req.auth!, config.nodeId);

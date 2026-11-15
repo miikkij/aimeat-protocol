@@ -9,7 +9,7 @@
  *   all three surfaces. Both ask this file, so the rules below are written once.
  *
  *   WHO. An operator: the operator in person, or the operator's agent holding the operator:admin
- *   permission (services/operator-principal.ts). A sealed setting is refused before anything else.
+ *   permission (services/operator/principal.ts). A sealed setting is refused before anything else.
  *
  *   WHAT WAITS FOR A PERSON. Turning classification off, or from every owner's content (all) to
  *   each owner's choice (owner), gives protection away. An AI credential (reader-kind.ts: an agent,
@@ -45,7 +45,7 @@ import { applyConfigChanges } from '../config/apply.js';
 import { settingLoosens, looseningRefusal } from '../config/strictness.js';
 import { isSealed, sealRefusal } from '../config/sealing.js';
 import { emitChange } from '../event-bus.js';
-import { askOperator } from '../operator-principal.js';
+import { askOperator } from '../operator/principal.js';
 import { callerPrincipal } from '../../utils/gaii.js';
 import {
   ClassificationError, offerDefaultCapsWhenSwitchedOn, readerKindOf, recordClassificationAudit,

@@ -120,7 +120,7 @@ import {
 } from '../services/board-write.js';
 import { setBoardVisibility } from '../services/board-visibility.js';
 import { callerOf } from '../middleware/caller.js';
-import { operatorOverride, rolesWithOperator } from '../services/operator-override.js';
+import { operatorOverride, rolesWithOperator } from '../services/operator/override.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,

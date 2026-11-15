@@ -156,7 +156,7 @@ export type AccountEventKind =
   // `data.action` says which of the four, so one kind carries them; the per-call record of the same
   // act is the operator's own UsageCall row, which names you as the account inspected.
   | 'memory_accessed_by_operator'
-  // The operator did something else in your account (services/operator-access-audit.ts
+  // The operator did something else in your account (services/operator/access-audit.ts
   // recordOperatorAction): `data.area` and `data.action` say what, `data.set` names an install set.
   | 'operator_acted'
   // Permissions and limits

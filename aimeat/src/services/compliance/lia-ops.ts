@@ -27,7 +27,7 @@ import type { Storage } from '../../storage/interface.js';
 import { LIA_SECTIONS, type LiaLang } from '../../data/compliance-lia.js';
 import { NOT_LEGAL_ADVICE } from '../../data/compliance-questionnaire.js';
 import type { CallerContext } from '../caller-context.js';
-import type { OperatorCaller } from '../operator-principal.js';
+import type { OperatorCaller } from '../operator/principal.js';
 import { fileAsk, publishRequestedBody, requesterOf } from '../publish-requests/ask.js';
 import { complianceDocAccess } from './docs-access.js';
 import { patchDocItem, type ComplianceScope } from './docs.js';

@@ -58,7 +58,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { isAnonymousPrincipal, refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { isValidRegion, isValidTimeZone } from '../../services/display-prefs.js';
 import { emitChange } from '../../services/event-bus.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 import { readAdult, NOT_VERIFIED } from '../../services/adult-assurance.js';
 import { callerOf } from '../../middleware/caller.js';
 import { readAvatarsOrEmpty } from '../../services/agent/avatar.js';

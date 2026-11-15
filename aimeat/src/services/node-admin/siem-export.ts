@@ -10,7 +10,7 @@
  *   WHAT GOES OUT, by kind (`siem.events`, comma-separated):
  *   - `refusal`: every request the node turned away at the door (services/auth-audit.ts), the same
  *     fields as the refusal log line: never the credential, only a short digest of it.
- *   - `operator`: an operator's act on the node or on a person's data (services/operator-access-audit.ts).
+ *   - `operator`: an operator's act on the node or on a person's data (services/operator/access-audit.ts).
  *   - `incident`: a security incident opened (services/security-incident.ts).
  *   - `team`: a team's approval gate held an AI's delete, send or payment, and a lead decided it
  *     (services/team/action-gate.ts and the approval route).

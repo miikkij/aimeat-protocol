@@ -143,7 +143,7 @@ export interface MemoryBinRequest {
   /**
    * The caller's roles. The organism namespace check below reads them, and an operator who named
    * `ownerOverride` skips that check the way the admin route always has. A caller that passes
-   * `ownerOverride` computes this list with rolesWithOperator (services/operator-override.ts), so
+   * `ownerOverride` computes this list with rolesWithOperator (services/operator/override.ts), so
    * 'operator' in it is isOperatorCaller's answer: the operator, or the operator's agent holding
    * operator:admin, as on MCP. Absent means "no roles", which is the safe reading: an unnamed caller
    * is not an operator.

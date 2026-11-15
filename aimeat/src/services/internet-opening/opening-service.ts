@@ -28,7 +28,7 @@
 import type { AppRecord } from '../../storage/interface.js';
 import { appAccessOf } from '../app/access.js';
 import { recordAppAudit } from '../app/audit.js';
-import { recordOperatorAction } from '../operator-access-audit.js';
+import { recordOperatorAction } from '../operator/access-audit.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { readOpening, updateOpening, updateOpeners, activeOpeners, withEvent, UNCHANGED, type OpeningCtx } from './opening-store.js';

@@ -23,7 +23,7 @@ import type { Storage, AppRecord } from '../../storage/interface.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import { appNeedsSignIn, mayOpenApp } from './access.js';
 import { isNodeAccount, type AudienceAuth } from '../audience.js';
-import { operatorOverride } from '../operator-override.js';
+import { operatorOverride } from '../operator/override.js';
 import type { CallerContext } from '../caller-context.js';
 
 /** The caller of an app read, in the form both the REST routes and the MCP tool can give. */

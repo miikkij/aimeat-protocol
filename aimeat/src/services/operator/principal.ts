@@ -1,5 +1,5 @@
 /**
- * @file src/services/operator-principal.ts
+ * @file src/services/operator/principal.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Is THIS PRINCIPAL the node operator? The one question every operator check asks,
@@ -41,10 +41,10 @@
  *     resolveOperatorAgentName and OPERATOR_AGENT_REFUSAL moved here from owner-lifecycle.ts, which
  *     re-exports them, and resolveOperatorName, which asked the account alone, is gone.
  */
-import type { Storage } from '../storage/interface.js';
-import { ECO_PREFIX, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
-import { isOperatorAccount } from '../utils/operator-account.js';
-import { OPERATOR_ADMIN_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
+import type { Storage } from '../../storage/interface.js';
+import { ECO_PREFIX, isForeignPrincipal, localAccountName } from '../../utils/gaii.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
+import { OPERATOR_ADMIN_SCOPE, scopeIsCovered } from '../../utils/scope-coverage.js';
 
 /** A principal as any door can describe it. */
 export interface OperatorCaller {

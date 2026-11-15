@@ -30,7 +30,7 @@ import { deny401, deny403 } from './deny.js';
 import { isAnonymousPrincipal } from './anonymous-principal.js';
 import { isForeignPrincipal } from '../utils/gaii.js';
 import { credentialKind } from '../services/caller-facts.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 
 const REFUSAL = 'Setting or removing a structure lock needs the account holder, an agent of theirs holding memory:write, or the operator.';
 

@@ -98,7 +98,7 @@ export const RULES: Rule[] = [
   },
   {
     id: 'operator-role',
-    label: 'An operator check asks isOperatorCaller or operatorOverride (services/operator-override.ts), so the operator\'s agent holding operator:admin passes on REST as on MCP and a pass in another person\'s account writes the operator trail (C2)',
+    label: 'An operator check asks isOperatorCaller or operatorOverride (services/operator/override.ts), so the operator\'s agent holding operator:admin passes on REST as on MCP and a pass in another person\'s account writes the operator trail (C2)',
     pattern: /roles\)?\??\.includes\(['"]operator['"]\)/,
     // utils/operator-account.ts is the account-record question, isOperatorAccount.
     skipDirs: ['src/auth/', 'src/utils/operator-account.ts'],

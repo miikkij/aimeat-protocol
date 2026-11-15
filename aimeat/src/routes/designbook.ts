@@ -90,7 +90,7 @@ import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
 import { getAppTemplates } from '../data/app-templates.js';
 import { grownGenreFramePage, grownGenrePage, isGrownGenreBody } from '../services/design-book/grown-genre.js';
 import { resolveAppUrls } from './apps/helpers.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 import { designBookPreviewToken, designBookPreviewTokenOpens } from '../services/design-book/preview-token.js';
 import { DesignBookKits } from '../services/design-book/kit-defaults.js';
 import { kitReach, kitReadable } from '../services/design-book/kit.js';

@@ -269,7 +269,7 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 ## Admin credentials
 
 - The first operator is created through the setup code flow above. An operator gives the operator role to another account and takes it back (`POST /v1/admin/roles/grant`, `POST /v1/admin/roles/revoke`); the last operator and the operator themselves cannot be revoked, and each change is recorded (`aimeat/src/routes/admin/monitoring.ts`).
-- An agent of an operator account acts as operator only for the exact words the operator ticks for it, such as `operator:admin` (`aimeat/src/services/operator-principal.ts`). An agent holding `operator:admin` passes every operator REST route and MCP admin tool, by design (`aimeat/src/auth/operator-gate.ts`).
+- An agent of an operator account acts as operator only for the exact words the operator ticks for it, such as `operator:admin` (`aimeat/src/services/operator/principal.ts`). An agent holding `operator:admin` passes every operator REST route and MCP admin tool, by design (`aimeat/src/auth/operator-gate.ts`).
 - Turn on TOTP or a passkey for every operator account ([Deployment checklist](../security/deployment-checklist.md)), and set `AIMEAT_TWO_STEP_REQUIRED=operators` so that the node enforces it (`aimeat/src/services/sign-in-policy.ts`).
 
 ## Limits

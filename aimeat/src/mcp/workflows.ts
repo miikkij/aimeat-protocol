@@ -66,7 +66,7 @@ import {
 } from '../services/workflow/store.js';
 import { syncWorkflowTriggers } from '../services/workflow/lifecycle.js';
 import { clearRefusal } from '../services/workflow/trigger-authority.js';
-import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
+import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator/confirm.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 

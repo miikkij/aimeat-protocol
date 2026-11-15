@@ -866,7 +866,7 @@ await test('B17 REFUSED: alice\'s agent without memory:write-reserved, and bob\'
 });
 
 // B10: alice's private capability, read by bob's agent and the operator's agent. The operator's pass
-// into another person's account writes a line on that person's account feed (services/operator-override.ts).
+// into another person's account writes a line on that person's account feed (services/operator/override.ts).
 let pbCap = '';
 const capReadTrail = async (): Promise<number> => {
     const r = await call('GET', '/v1/account/events?limit=200', pbAlice.token);

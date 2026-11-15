@@ -65,7 +65,7 @@ export function operatorFromEnv(env: NodeJS.ProcessEnv): OperatorConfig {
  * must not ship the upstream author's name and address as a default.
  */
 export function missingOperatorConfig(operator: OperatorConfig): string[] {
-  // A private person's pages give the email only, not an address (services/operator-place.ts), so
+  // A private person's pages give the email only, not an address (services/operator/place.ts), so
   // only a company, an organisation or an association must give one.
   const required: Array<keyof OperatorConfig> = [
     'name',

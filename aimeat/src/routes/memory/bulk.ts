@@ -149,7 +149,7 @@ import { discoverMemory } from '../../services/memory/discover.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 import { signedInOnly } from '../../config/visibility.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 import { teamDeleteGate } from '../../services/team/action-gate.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {

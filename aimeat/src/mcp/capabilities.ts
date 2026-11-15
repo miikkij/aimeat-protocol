@@ -60,7 +60,7 @@ import { capabilityFor } from '../services/capabilities/capability-for.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { resolveOperatorAgentName } from '../services/operator-principal.js';
+import { resolveOperatorAgentName } from '../services/operator/principal.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerCapabilitiesTools(
@@ -90,7 +90,7 @@ export function registerCapabilitiesTools(
      * which door made it. That is an ownership decision rather than a copied line, so it is reported
      * in the August 2026 audit and left exactly as it stands.
      *
-     * Operator-ness is asked of THIS AGENT (services/operator-principal.ts): an operator account's
+     * Operator-ness is asked of THIS AGENT (services/operator/principal.ts): an operator account's
      * agent holding operator:admin. The role lives on the human, and reading it off the owner record
      * handed it to every agent of the operator. mcp/boards.ts asks the same question the same way.
      */

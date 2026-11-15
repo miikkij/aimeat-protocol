@@ -30,7 +30,7 @@ import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import { getAppConfig, setAppConfig } from '../../services/app/config.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 
 export function registerAppConfigRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
     router.get('/v1/apps/:owner/:filename/config', optionalAuth(), async (req, res) => {

@@ -19,7 +19,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { reencryptStatus, startReencrypt } from '../services/key-reencrypt/job.js';
-import { recordOperatorNodeAct } from '../services/operator-access-audit.js';
+import { recordOperatorNodeAct } from '../services/operator/access-audit.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 
 export function registerKeyReencryptTool(mcp: McpServer, config: AimeatConfig, storage: Storage, caller: () => CallerContext): void {

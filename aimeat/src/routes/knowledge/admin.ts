@@ -49,7 +49,7 @@ import { firstPackageCopy, type KnowledgeHelpers } from './helpers.js';
 import { validateManifest } from './manifest-validator.js';
 import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowledge/overview.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { holdsOldestPackageCopy } from '../../services/knowledge/review-reach.js';
 

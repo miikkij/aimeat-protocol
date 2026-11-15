@@ -49,7 +49,7 @@ import { storeAppIcon } from '../../services/app/icon-store.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { localAccountName } from '../../utils/gaii.js';
 import type { AppTargetFor } from './helpers.js';
-import { operatorOverride } from '../../services/operator-override.js';
+import { operatorOverride } from '../../services/operator/override.js';
 
 /** Defence in depth against a traversal in the filename segment, as every app route applies it. */
 function badFilename(filename: string): boolean {

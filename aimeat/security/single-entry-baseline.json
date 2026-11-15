@@ -197,7 +197,7 @@
         "count": 1,
         "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
       },
-      "src/services/operator-principal.ts": {
+      "src/services/operator/principal.ts": {
         "count": 2,
         "why": "askOperator itself: the operator in person is read off the session's roles."
       },
@@ -289,7 +289,7 @@
         "count": 1,
         "why": "Asks whether the caller is an agent session."
       },
-      "src/services/operator-principal.ts": {
+      "src/services/operator/principal.ts": {
         "count": 1,
         "why": "askOperator itself: whether a role list acts for someone."
       },
@@ -473,7 +473,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/operator-admin-migration.ts": {
+      "src/services/operator/admin-migration.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
@@ -539,7 +539,7 @@
         "count": 1,
         "why": "readerForAgent, the reader for MCP call sites that hold only the agent's GAII. The reader reads no scopes; it moves onto caller() when those call sites do."
       },
-      "src/services/operator-principal.ts": {
+      "src/services/operator/principal.ts": {
         "count": 1,
         "why": "resolveOperatorAgentName, the operator answer for MCP call sites that hold the agent's GAII and the session scopes (admin-*.ts and others); it moves onto caller().operator() when those call sites do. One count is the @usage line."
       }

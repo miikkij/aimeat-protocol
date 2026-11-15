@@ -9,7 +9,7 @@
  *   its members, and the operator who runs the node is not one by running it.
  *
  *   GET /v1/admin/teams and aimeat_admin_teams both read it here. Both ask the operator question
- *   (services/operator-principal.ts) before they call this.
+ *   (services/operator/principal.ts) before they call this.
  * @structure AdminTeamRow · nodeTeamsView(storage, opts) → { teams, count, complete }
  * @usage const view = await nodeTeamsView(storage, { now: Date.now(), reader: operatorName });
  * @version-history

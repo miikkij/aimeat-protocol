@@ -80,7 +80,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { disputedAmount, takeBackFromProvider } from '../services/morsel.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 import { refreshTrustScore } from '../services/trust.js';
 import { appendAuditEntry, resolveDisputeOnce, ACTIVE_DISPUTE, DISPUTED_WORK } from '../services/disputes/audit.js';
 import { listOperatorDisputes, getOperatorDispute, ruleDispute, DISPUTE_LIST_STATUSES, type DisputeListStatus } from '../services/disputes/operator.js';

@@ -123,8 +123,8 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | AUTHZ-06 | met | Password `aimeat/src/routes/ghii/recovery.ts:510`; TOTP `aimeat/src/routes/totp.ts:62`; sessions `aimeat/src/routes/auth.ts:692-771`; agent approval `aimeat/src/routes/agents-v2/agent-proposals.ts:179,448`; delete `aimeat/src/routes/owners.ts:321`; export `aimeat/src/routes/owners/export.ts:110`; AI keys `aimeat/src/routes/ai-providers.ts:97-126` | 64 code uses of `requireOwnerPrincipal` in routes. The same-owner agent approval of AUTH-09 is the exception the requirement names. |
 | AUTHZ-07 | met | `aimeat/src/auth/account-security.ts:88-105,152-170` | |
 | AUTHZ-08 | met | `aimeat/src/routes/setup.ts:233-255`; `aimeat/src/routes/ghii/register-login.ts:274-277`; `aimeat/src/routes/ghii/owner-session.ts:110-151` | |
-| AUTHZ-09 | met | `aimeat/src/auth/operator-gate.ts:55-96`; `aimeat/src/services/operator-principal.ts:14-19` | |
-| AUTHZ-10 | met | `aimeat/src/services/operator-override.ts:1-27` (used in 25 files, for example `aimeat/src/services/consent/consent-read.ts:85`) | Not verified that every operator act on another owner's data goes through it. |
+| AUTHZ-09 | met | `aimeat/src/auth/operator-gate.ts:55-96`; `aimeat/src/services/operator/principal.ts:14-19` | |
+| AUTHZ-10 | met | `aimeat/src/services/operator/override.ts:1-27` (used in 25 files, for example `aimeat/src/services/consent/consent-read.ts:85`) | Not verified that every operator act on another owner's data goes through it. |
 | AUTHZ-11 | met | `aimeat/src/services/consent-write.ts:409`; operator path `aimeat/src/services/consent/consent-read.ts:85` | |
 | AUTHZ-12 | met | `aimeat/src/storage/providers/sqlite/methods/consent.ts:108-129` | |
 | AUTHZ-13 | met | `aimeat/src/routes/consent.ts:132-177`; `aimeat/src/services/consent.ts:158-160`; retention 365 days `aimeat/src/config/data-access.ts:48` | |

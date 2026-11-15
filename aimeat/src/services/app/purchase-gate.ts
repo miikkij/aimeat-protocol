@@ -25,7 +25,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
 import { appNeedsSignIn, mayOpenApp } from './access.js';
-import { operatorOverride } from '../operator-override.js';
+import { operatorOverride } from '../operator/override.js';
 
 export type PurchaseGate =
   | { kind: 'ok'; withholdContent: boolean }

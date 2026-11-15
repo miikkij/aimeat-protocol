@@ -31,7 +31,7 @@ import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.j
 import { success, error } from '../../middleware/envelope.js';
 import { pullPackage, listRepositoryPackages } from '../../services/packages/peer/package-pull.js';
 import { getPackageFor, getPackageVersionFor } from '../../services/packages/compose/package-read.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 import { attestationFor } from '../../services/packages/peer/package-attest-serve.js';
 import { resolveNodeRead } from '../../services/packages/sale/package-entitlements.js';
 

@@ -8,7 +8,7 @@
  *   (structure programme 2026-11, unit 2b).
  *
  *   WHO. The node operator in person, or the operator's agent holding operator:admin. Both surfaces ask
- *   the one shared question for that, services/operator-principal.ts askOperator (the route through
+ *   the one shared question for that, services/operator/principal.ts askOperator (the route through
  *   requireOperator, the tool through resolveOperatorAgentName), before they call this; this function
  *   takes that answer as given and is never reached by anyone else.
  * @structure nodeActivity(storage, now?) → { agents, actions, boards, allWork, activeAgents24h }

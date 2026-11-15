@@ -34,13 +34,13 @@ import {
 import { adoptPendingPeer } from '../services/packages/peer/package-peer-register.js';
 import { verifyPackageNode } from '../services/packages/peer/package-node-auth.js';
 import { packageConfigNeeds } from '../services/packages/compose/package-config-needs.js';
-import { isOperatorCaller, type OperatorAuth } from '../services/operator-override.js';
+import { isOperatorCaller, type OperatorAuth } from '../services/operator/override.js';
 
 export function registerPackageEntitlementRoutes(
     router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>,
 ): void {
     // isOperator is the operator in person, or the operator's agent holding operator:admin: the
-    // answer the MCP tool gets (services/operator-override.ts).
+    // answer the MCP tool gets (services/operator/override.ts).
     const callerOf = async (req: { auth?: OperatorAuth & { owner: string } }) =>
         ({ owner: req.auth!.owner, isOperator: await isOperatorCaller(storage, req.auth) });
 

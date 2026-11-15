@@ -1,5 +1,5 @@
 /**
- * @file src/services/operator-access-audit.ts
+ * @file src/services/operator/access-audit.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The record an operator leaves when they reach into another person's account: one
@@ -43,13 +43,13 @@
  *     `operator_acted`.
  *   v1.0.0 — 2026-09-24 — Initial (security audit A8-2), for the four admin memory doors.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { ownerGhiiOf, isValidGHII } from '../utils/gaii.js';
-import { recordUsageCall } from './usage/usage-buffer.js';
-import { recordAccountEvent } from './account-events.js';
-import { logger } from '../utils/logger.js';
-import { siemEmit } from './node-admin/siem-export.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { ownerGhiiOf, isValidGHII } from '../../utils/gaii.js';
+import { recordUsageCall } from '../usage/usage-buffer.js';
+import { recordAccountEvent } from '../account-events.js';
+import { logger } from '../../utils/logger.js';
+import { siemEmit } from '../node-admin/siem-export.js';
 
 /** What the operator did, as the person's feed names it. */
 export type OperatorAccessAction = 'read' | 'search' | 'delete' | 'restore' | 'export';

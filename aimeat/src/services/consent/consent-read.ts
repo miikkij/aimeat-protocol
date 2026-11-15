@@ -5,7 +5,7 @@
  * @description Who may read one consent record, and the read. GET /v1/consent/:id and the MCP
  *   resource aimeat://consent/{id} each read the record and asked accountHoldsConsent
  *   (services/consent-write.ts). The route then asked operatorOverride, as the operator ruling of
- *   2026-10-05 says every operator check does (services/operator-override.ts); the resource did not,
+ *   2026-10-05 says every operator check does (services/operator/override.ts); the resource did not,
  *   so the operator's agent holding operator:admin read another owner's consent on REST and was
  *   refused on MCP (structure programme 2026-11, unit 2b, B13).
  *
@@ -36,7 +36,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { ConsentRecord } from '../../storage/types/auth.js';
 import type { CallerContext } from '../caller-context.js';
 import { accountHoldsConsent, listAccountConsents } from '../consent-write.js';
-import { operatorOverride } from '../operator-override.js';
+import { operatorOverride } from '../operator/override.js';
 import { CONSENT_READ_AS_OWNER_SCOPE } from '../../utils/scope-coverage.js';
 
 export { CONSENT_READ_AS_OWNER_SCOPE };

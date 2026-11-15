@@ -37,7 +37,7 @@ import { COMPLIANCE_FRAMEWORKS } from '../../data/compliance-frameworks.js';
 import { NOT_LEGAL_ADVICE } from '../../data/compliance-questionnaire.js';
 import { readNodePolicy } from '../classification/policy.js';
 import { packStatus } from '../classification/packs.js';
-import type { OperatorCaller } from '../operator-principal.js';
+import type { OperatorCaller } from '../operator/principal.js';
 import { complianceDocAccess } from './docs-access.js';
 import { patchDocItem, readDoc, scopeAllows, writeDoc, SCOPES_OF, type ComplianceScope } from './docs.js';
 import { applyDomainFloors } from './domain-floor.js';

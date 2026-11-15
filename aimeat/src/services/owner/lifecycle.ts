@@ -57,12 +57,12 @@
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import type { AimeatConfig } from '../../config.js';
-import { recordOperatorAction } from '../operator-access-audit.js';
+import { recordOperatorAction } from '../operator/access-audit.js';
 import { nodeContext } from '../node/context.js';
 import { inSavepoint } from '../tolerant-step.js';
 
 // The operator tools import the question from here; its one home is operator-principal.ts.
-export { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../operator-principal.js';
+export { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../operator/principal.js';
 
 export interface OwnerLifecycleResult {
   sessionsRevoked: number;

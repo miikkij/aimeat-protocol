@@ -1,6 +1,6 @@
 /**
  * @file test/unit/operator-agent-gate.test.ts
- * @description The one operator question every door asks (services/operator-principal.ts): is THIS
+ * @description The one operator question every door asks (services/operator/principal.ts): is THIS
  *   PRINCIPAL the node operator. The operator in person passes; anything acting for an operator
  *   account (an agent, an app grant, an ecosystem app) passes only on the exact word; a session from
  *   another node never passes.
@@ -18,7 +18,7 @@
  *   v1.0.0 -- 2026-09-24 -- Initial (security audit A8-1).
  */
 import { describe, it, expect } from 'vitest';
-import { askOperator, resolveOperatorAgentName } from '../../src/services/operator-principal.js';
+import { askOperator, resolveOperatorAgentName } from '../../src/services/operator/principal.js';
 import { SurfaceLayoutService } from '../../src/services/surface-layout/service.js';
 import { ThemeService } from '../../src/services/themes/service.js';
 import type { AimeatConfig } from '../../src/config.js';

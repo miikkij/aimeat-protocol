@@ -88,7 +88,7 @@ import { logger } from '../../utils/logger.js';
 import { appSeoState } from '../../services/app/seo.js';
 import { stripLegalContent } from '../../services/app/legal.js';
 import { dependencyIndex, appRef as depAppRef } from '../../services/dependency-map.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 import { callerOf } from '../../middleware/caller.js';
 import { removeComplianceDocs } from '../../services/compliance/docs.js';
 import { listedScreenshotUrl } from './open.js';

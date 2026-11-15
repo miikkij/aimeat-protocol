@@ -21,7 +21,7 @@ import { logger } from '../utils/logger.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE, OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
 import { deny401, deny403, denyScope403 } from './deny.js';
 import { isAnonymousPrincipal } from './anonymous-principal.js';
-import { askOperator } from '../services/operator-principal.js';
+import { askOperator } from '../services/operator/principal.js';
 
 /**
  * Require the NODE OPERATOR, or something the operator explicitly sent. For the break-glass doors
@@ -49,7 +49,7 @@ import { askOperator } from '../services/operator-principal.js';
  * Federated sessions are refused for the same reason requireRole('operator') refuses them: operator
  * power stops at this node's own front door.
  *
- * THE DECISION IS askOperator() (services/operator-principal.ts), the one operator question every door
+ * THE DECISION IS askOperator() (services/operator/principal.ts), the one operator question every door
  * asks, tool surface included; this gate keeps its own refusals and their codes.
  */
 export function requireOperatorPrincipal(storage: Storage, scope: string = OPERATOR_ORGANISM_REPAIR_SCOPE) {

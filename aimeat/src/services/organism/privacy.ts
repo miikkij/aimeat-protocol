@@ -27,7 +27,7 @@
 import type { Storage, OrganismRecord, AgentRecord } from '../../storage/interface.js';
 import { isOrganismOwner } from './ownership.js';
 import { agentBarred } from './agent-access.js';
-import { isOperatorCaller, type OperatorAuth } from '../operator-override.js';
+import { isOperatorCaller, type OperatorAuth } from '../operator/override.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 
 export type MemberVisibility = NonNullable<OrganismRecord['memberVisibility']>;

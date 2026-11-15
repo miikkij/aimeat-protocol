@@ -6,7 +6,7 @@
  *   caller: which accounts are operators (to list them, mail them, find the first one), and which
  *   roles a sign-in mints from the record.
  *
- *   WHY ITS OWN NAME. "Is this caller the operator" is askOperator (services/operator-principal.ts),
+ *   WHY ITS OWN NAME. "Is this caller the operator" is askOperator (services/operator/principal.ts),
  *   which asks the principal and the operator:admin word. Both questions were written
  *   `roles.includes('operator')`, so a reader could not tell a record read from a caller check, and
  *   the October 2026 audit found caller checks among them that refused the operator's agent on REST

@@ -61,7 +61,7 @@ import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
-import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/operator-principal.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/operator/principal.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
@@ -111,7 +111,7 @@ export function registerSkillsTools(
     });
 
     // Node scope is the operator's, asked of THIS AGENT: an operator account's agent holding
-    // operator:admin (services/operator-principal.ts), never the owner record alone.
+    // operator:admin (services/operator/principal.ts), never the owner record alone.
     // The shared anonymous principal reads as a reader with no account, as routes/skills.ts accessorOf
     // reads it on REST: 'members' means this node's accounts, and that principal is not one of them.
     const accessor = async (): Promise<SkillAccessor> => refusesAnonymous ? {

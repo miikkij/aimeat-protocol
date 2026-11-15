@@ -73,7 +73,7 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
-import { resolveOperatorAgentName } from '../services/operator-principal.js';
+import { resolveOperatorAgentName } from '../services/operator/principal.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { createBoardReply, boardPostPrice } from '../services/board-post.js';
@@ -148,7 +148,7 @@ export function registerBoardsTools(
     const agentGaii = getAgentGaii();
 
     /** Whether THIS AGENT may use the operator's reach: an operator account's agent holding
-     *  operator:admin (services/operator-principal.ts). The account alone is not enough. */
+     *  operator:admin (services/operator/principal.ts). The account alone is not enough. */
     async function isOperator(): Promise<boolean> {
         return (await resolveOperatorAgentName(storage, agentGaii, scopes)) !== null;
     }

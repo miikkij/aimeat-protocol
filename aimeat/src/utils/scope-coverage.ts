@@ -163,7 +163,7 @@ export const OPERATOR_ORGANISM_REPAIR_SCOPE = 'operator:organism-repair';
  * Out of every wildcard for the reason the repair word is: "Full access" is one click, and nobody
  * clicking it is deciding that an agent may administer the node. The boot-time grandfathering in
  * services/scope-vocabulary-migration.ts has no entry for it. Once per node,
- * services/operator-admin-migration.ts gave it to the operator's agents that held `*` on the day it
+ * services/operator/admin-migration.ts gave it to the operator's agents that held `*` on the day it
  * ran (the developer's ruling of 2026-09-25), because until the day before every agent of an
  * operator reached these tools; every other agent, and every agent made later, needs the tick in the
  * agent editor.

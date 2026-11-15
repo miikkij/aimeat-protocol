@@ -345,7 +345,7 @@
     "src/services/openrouter-settings-migration.ts": {
       "listOwners": 1
     },
-    "src/services/operator-admin-migration.ts": {
+    "src/services/operator/admin-migration.ts": {
       "listAgents": 1
     },
     "src/services/operators.ts": {

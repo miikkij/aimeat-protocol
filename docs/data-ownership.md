@@ -139,7 +139,7 @@ The MCP tool `aimeat_organism_leave` does the same as the route (`leaveOrganism(
 **Limits today.** Erasure has no MCP tool and no page; a
 person calls the route from their own signed-in session, or asks the operator, who can erase on their
 behalf (an operator acting on another person's account writes the operator-access trail,
-`aimeat/src/services/operator-access-audit.ts`).
+`aimeat/src/services/operator/access-audit.ts`).
 
 ## 7. Secrets stay secret
 
@@ -155,7 +155,7 @@ node with no encryption key (503 `NO_ENCRYPTION_KEY`) rather than stored in plai
 **Promise.** An operator can help, and what they do in a person's account is recorded.
 
 **How.** An operator's read or delete of another person's records writes the operator-access trail
-(`aimeat/src/services/operator-access-audit.ts`). Data classification, when the operator turns it
+(`aimeat/src/services/operator/access-audit.ts`). Data classification, when the operator turns it
 on, adds levels that decide what an AI may read and what may leave a group, with its own audit
 ([data classification](data-classification.md)).
 

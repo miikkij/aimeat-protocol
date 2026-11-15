@@ -44,7 +44,7 @@ import { writeExtensionRecord, activateExtension } from './extension/lifecycle.j
 import { BUILTIN_EXTENSIONS, type BuiltinExtension } from '../data/builtin-extensions/index.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
-import { isOperatorCaller } from './operator-override.js';
+import { isOperatorCaller } from './operator/override.js';
 import { recordSecurityIncident, SECURITY_INCIDENT_PREFIX, securityOwner } from './security-incident.js';
 
 /** The owner a shipped extension is recorded under. Not a sign-in account. */

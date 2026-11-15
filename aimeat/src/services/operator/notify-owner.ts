@@ -1,5 +1,5 @@
 /**
- * @file src/services/operator-notify-owner.ts
+ * @file src/services/operator/notify-owner.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One notice from the operator to an owner of this node, sent once per code: the
@@ -15,11 +15,11 @@
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi", part D).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { notify } from './notify.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { notify } from '../notify.js';
+import { logger } from '../../utils/logger.js';
 
 const KEY = 'operator.notify-owner.sent';
 const CODE = /^[a-z0-9][a-z0-9._-]{0,63}$/;

@@ -26,7 +26,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { isForeignPrincipal, localAccountName } from '../../utils/gaii.js';
 import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, scopeIsCovered } from '../../utils/scope-coverage.js';
-import { actsForSomeone, type OperatorCaller } from '../operator-principal.js';
+import { actsForSomeone, type OperatorCaller } from '../operator/principal.js';
 import { complianceDocAccess } from './docs-access.js';
 import type { Agreement } from './agreements-schemas.js';
 import { heldSince } from '../account-instance.js';

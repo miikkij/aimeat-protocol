@@ -4,7 +4,7 @@
  *   thing's own owner or the operator admits the operator's agent holding operator:admin, as the MCP
  *   tools do, refuses the operator's agent without it, and writes the operator trail in the other
  *   person's account feed when the operator acts there. The board rules route stands for every route
- *   moved to services/operator-override.ts.
+ *   moved to services/operator/override.ts.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-operator-override
  * @version-history
  *   v1.1.0 — 2026-10-10 — An operator's schema write refused for its semantic context leaves no

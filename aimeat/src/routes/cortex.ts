@@ -73,7 +73,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { cortexCallerOf } from './cortex/caller.js';
-import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator/override.js';
 import {
   installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex,
 } from '../services/cortex/lifecycle.js';

@@ -160,7 +160,7 @@ import { geoFromHeaders } from '../../utils/geo-headers.js';
 import { countVisit } from '../../services/visibility/visibility-counter.js';
 import { visitSignals } from '../../utils/visit-signals.js';
 import { ownerTagsFor, withOwnerTags } from '../../services/visibility/analytics-tags.js';
-import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
+import { isOperatorCaller, operatorOverride } from '../../services/operator/override.js';
 import { callerOf } from '../../middleware/caller.js';
 import { appIsPaced, appToll } from '../../services/app/pacing.js';
 import { appNeedsSignIn } from '../../services/app/access.js';

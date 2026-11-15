@@ -31,7 +31,7 @@ import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
-import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator-confirm.js';
+import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator/confirm.js';
 import { AiCompletionError } from './errors.js';
 import { allowedModelsOf, modelsLocked } from './node-model-rules.js';
 import {
@@ -167,7 +167,7 @@ const POLICY_ACTION = 'ai_policy';
 /**
  * Change the owner's model policy. The owner in person writes at once. An agent proposes first and
  * gets a token bound to the exact change; the same call again with the token applies it, within ten
- * minutes (the pattern of aimeat_operator_ai_config, services/operator-confirm.ts). The AI shows the
+ * minutes (the pattern of aimeat_operator_ai_config, services/operator/confirm.ts). The AI shows the
  * proposal to the owner between the two calls, so a loosening or a tightening the owner never saw
  * does not happen by one tool call.
  */

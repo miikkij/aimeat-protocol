@@ -47,7 +47,7 @@ import { validateSchemaItself, removeFromCache } from '../services/schema-valida
 import { SchemaSetSchema } from '../models/schemas.js';
 import { semanticContextErrors } from '../utils/onto-context.js';
 import { emitChange } from '../services/event-bus.js';
-import { operatorOverride } from '../services/operator-override.js';
+import { operatorOverride } from '../services/operator/override.js';
 import { schemaLockRefusal, csmLockRemovalRefusal } from '../services/schema-lock-rule.js';
 import { csmLockShownTo } from '../services/csm-service.js';
 import { callerOf } from '../middleware/caller.js';

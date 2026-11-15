@@ -1,6 +1,6 @@
 # 03 Shared responsibility
 
-> Checked against AIMEAT node 4.3.1 (commit 776f8fa94) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 9913309bd) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page says who does what when an organisation runs AIMEAT as its own system. It is for the security officer, the architect and the DPO who must sign off the split before go-live. Each row names what the software does by itself, what the operator (the organisation's IT) must provide, what organism admins decide, and what each user decides. The detail for each row is on pages 04 to 18; this page is the map. When the organisation runs more than one node (per unit, partner or person), each node has its own operator and this split applies per node ([18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#many-nodes)).
 
@@ -40,9 +40,9 @@ This page says who does what when an organisation runs AIMEAT as its own system.
 - Owns the host, the network, the reverse proxy, TLS, the database server and the file store, and everything below them: OS patches, disk encryption, backups, monitoring.
 - Owns the node configuration: `.env` and the admin Config page (`aimeat/src/services/config/schema.ts`). A setting that must take a deploy to change can be sealed with `AIMEAT_SEALED_CONFIG_KEYS`, and then no operator session can change it (`aimeat/.env.example`).
 - Owns the trust decisions the node cannot make: which identity provider, which tenants, which AI providers, which outside MCP servers, which apps open to the internet.
-- Holds the operator role, which is a role on the account. An agent of an operator acts as operator only for the words the operator ticks for that agent, such as `operator:admin` (`aimeat/src/services/operator-principal.ts`, `aimeat/src/utils/scope-coverage.ts`).
+- Holds the operator role, which is a role on the account. An agent of an operator acts as operator only for the words the operator ticks for that agent, such as `operator:admin` (`aimeat/src/services/operator/principal.ts`, `aimeat/src/utils/scope-coverage.ts`).
 - Is the controller's technical arm for GDPR: runs the export and erasure on request, keeps the processing record current (14).
-- Keeps the last access to the content of the node, because the operator answers for what the node holds. Each read, search, delete, restore or export of another person's records is recorded in the operator's usage stream and on that person's account feed (`aimeat/src/services/operator-access-audit.ts`). Content that must stay out of the operator's reach belongs on a node its owner runs ([18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#operator-access-is-a-design-decision)).
+- Keeps the last access to the content of the node, because the operator answers for what the node holds. Each read, search, delete, restore or export of another person's records is recorded in the operator's usage stream and on that person's account feed (`aimeat/src/services/operator/access-audit.ts`). Content that must stay out of the operator's reach belongs on a node its owner runs ([18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#operator-access-is-a-design-decision)).
 
 ## Organism admins
 

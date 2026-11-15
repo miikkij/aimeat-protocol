@@ -63,7 +63,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { cortexUploadOffer } from '../services/cortex/upload-offer.js';
-import { resolveOperatorAgentName } from '../services/operator-principal.js';
+import { resolveOperatorAgentName } from '../services/operator/principal.js';
 import {
     installCortex, activateCortex, deactivateCortex, deleteCortex,
     type CortexCaller, type CortexRefusal,
@@ -117,7 +117,7 @@ export function registerCortexTools(
      * operator managing somebody else's cortex does it through the HTTP door. Install passes the
      * operator answer instead, because the namespace claim is the one place this surface has always
      * honoured it: asked of THIS AGENT, so it is an operator account's agent holding operator:admin
-     * (services/operator-principal.ts). The two doors still disagree about operators on the
+     * (services/operator/principal.ts). The two doors still disagree about operators on the
      * lifecycle three, which is a live question for the developer rather than something to settle
      * by extraction.
      */

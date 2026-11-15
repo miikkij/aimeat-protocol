@@ -24,7 +24,7 @@
  */
 import type { CallerContext } from '../caller-context.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { operatorOverride } from '../operator-override.js';
+import { operatorOverride } from '../operator/override.js';
 import { setBoardMembers, type BoardMembersResult, type BoardWriteDeps } from '../board-write.js';
 
 /** Change the reader list when this caller may, or say why not. */

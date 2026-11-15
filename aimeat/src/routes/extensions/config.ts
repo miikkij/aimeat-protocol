@@ -27,7 +27,7 @@ import { setExtensionConfig, mayChooseSecretHost } from '../../services/extensio
 import { capabilitiesOfRecord } from '../../services/extension/capability-declaration.js';
 import { mayManageInstalledExt } from './permissions.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
+import { isOperatorCaller } from '../../services/operator/override.js';
 import { callerOf } from '../../middleware/caller.js';
 import { findExtension } from '../../services/component-address.js';
 import { requesterOf } from '../../services/publish-requests/ask.js';

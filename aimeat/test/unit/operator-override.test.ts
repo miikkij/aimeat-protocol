@@ -1,6 +1,6 @@
 /**
  * @file test/unit/operator-override.test.ts
- * @description services/operator-override.ts (secaudit 2026-10, C2): the operator check REST routes
+ * @description services/operator/override.ts (secaudit 2026-10, C2): the operator check REST routes
  *   ask for another person's thing gives the answer askOperator gives the MCP tools, and writes the
  *   operator trail exactly when it admits.
  * @usage pnpm test -- operator-override
@@ -11,11 +11,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Storage } from '../../src/storage/interface.js';
 
 const recorded: unknown[] = [];
-vi.mock('../../src/services/operator-access-audit.js', () => ({
+vi.mock('../../src/services/operator/access-audit.js', () => ({
   recordOperatorAction: async (_s: unknown, _c: unknown, act: unknown) => { recorded.push(act); },
 }));
 
-const { isOperatorCaller, operatorOverride, rolesWithOperator } = await import('../../src/services/operator-override.js');
+const { isOperatorCaller, operatorOverride, rolesWithOperator } = await import('../../src/services/operator/override.js');
 
 const NODE = 'aimeat-local-001-dev';
 const config = { nodeId: NODE, accountEventWindow: 100 } as never;

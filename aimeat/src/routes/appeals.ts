@@ -37,7 +37,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator/override.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { archiveRoleOf } from '../services/archive.js';
 

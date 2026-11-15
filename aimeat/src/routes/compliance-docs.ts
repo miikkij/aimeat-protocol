@@ -33,7 +33,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE } from '../utils/scope-coverage.js';
-import type { OperatorCaller } from '../services/operator-principal.js';
+import type { OperatorCaller } from '../services/operator/principal.js';
 import { callerOf } from '../middleware/caller.js';
 import {
   ComplianceDocError, catalogOp, draftOp, gapsOp, patchItemOp, readDocOp, writeDocOp,

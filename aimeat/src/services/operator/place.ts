@@ -1,5 +1,5 @@
 /**
- * @file src/services/operator-place.ts
+ * @file src/services/operator/place.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where the privacy policy and the terms say the operator is. A company, an
@@ -23,10 +23,10 @@
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial: a private person's pages give the email only, not the address.
  */
-import type { OperatorConfig } from '../config-types.js';
-import type { Locale } from '../i18n.js';
-import { jurisdictionOf } from './mydata-receipt.js';
-import { escapeHtml } from '../utils/html-escape.js';
+import type { OperatorConfig } from '../../config-types.js';
+import type { Locale } from '../../i18n.js';
+import { jurisdictionOf } from '../mydata-receipt.js';
+import { escapeHtml } from '../../utils/html-escape.js';
 
 /** Region codes by their Finnish and Spanish names; English names are jurisdictionOf's. Built once. */
 let codeByLocalName: Map<string, string> | null = null;

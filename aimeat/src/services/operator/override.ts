@@ -1,5 +1,5 @@
 /**
- * @file src/services/operator-override.ts
+ * @file src/services/operator/override.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operator check for an endpoint that otherwise serves only the thing's own owner:
@@ -10,7 +10,7 @@
  *   person's account left no trace on most routes (secaudit 2026-10, C2).
  *
  *   THE RULE, ruled by Jouni on 2026-10-05: one question on every operator check of both surfaces,
- *   askOperator() (services/operator-principal.ts). The operator in person passes; an agent of the
+ *   askOperator() (services/operator/principal.ts). The operator in person passes; an agent of the
  *   operator passes while it holds operator:admin ("Agent must be capable of maintaining the system
  *   fully when using operator:admin rights"). A pass in another person's account writes the operator
  *   trail (recordOperatorAction): a usage row in the operator's stream and a line in that person's
@@ -27,12 +27,12 @@
  * @version-history
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C2).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { askOperator } from './operator-principal.js';
-import { recordOperatorAction } from './operator-access-audit.js';
-import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { askOperator } from './principal.js';
+import { recordOperatorAction } from './access-audit.js';
+import { OPERATOR_ADMIN_SCOPE } from '../../utils/scope-coverage.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 
 /** The session as a route holds it (`req.auth`), or the same fields a service was given. */
 export interface OperatorAuth {

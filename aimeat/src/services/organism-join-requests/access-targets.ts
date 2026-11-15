@@ -14,7 +14,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { isNodeAccount } from '../audience.js';
-import { operatorOverride, type OperatorAuth } from '../operator-override.js';
+import { operatorOverride, type OperatorAuth } from '../operator/override.js';
 import { resolvePublishedPortfolio } from '../portfolio/published.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import { localAccountName } from '../../utils/gaii.js';

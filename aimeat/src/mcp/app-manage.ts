@@ -80,7 +80,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { isSameAccount } from '../utils/same-account.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveAppTargetScope } from '../services/app/lifecycle.js';
-import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/operator-principal.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/operator/principal.js';
 import { ownerAppSeo } from '../services/app/seo.js';
 import { ownerAppMarks } from '../services/app/marks.js';
 import { ownerAppLegal } from '../services/app/legal.js';

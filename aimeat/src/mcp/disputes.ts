@@ -20,7 +20,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { emitChange } from '../services/event-bus.js';
-import { OPERATOR_AGENT_REFUSAL } from '../services/operator-principal.js';
+import { OPERATOR_AGENT_REFUSAL } from '../services/operator/principal.js';
 import {
   listOperatorDisputes, getOperatorDispute, ruleDispute, DISPUTE_LIST_STATUSES, type DisputeListStatus,
 } from '../services/disputes/operator.js';

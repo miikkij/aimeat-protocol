@@ -18,7 +18,7 @@
  *
  *   WHAT A READ LEAVES BEHIND. The search, the one-record read, the delete and the restore each
  *   reach another person's entry, so each writes the operator-access trail before it answers
- *   (services/operator-access-audit.ts): a usage row naming the account inspected, and a line on
+ *   (services/operator/access-audit.ts): a usage row naming the account inspected, and a line on
  *   that account's feed. The listing and the bin carry no values and write none.
  * @structure adminMemoryRouter · search · list · one record · delete · restore
  * @usage mounted by server-bootstrap/routes-loader.ts
@@ -54,8 +54,8 @@ import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../../services/memory/bin.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { recordOperatorAccess, type OperatorAccess } from '../../services/operator-access-audit.js';
-import { rolesWithOperator } from '../../services/operator-override.js';
+import { recordOperatorAccess, type OperatorAccess } from '../../services/operator/access-audit.js';
+import { rolesWithOperator } from '../../services/operator/override.js';
 
 /** How much of a value is scanned for the search excerpt. A megabyte value is legal; reading all of
  *  it to highlight one word is not worth the wall clock, and the hit is ranked by the index anyway. */

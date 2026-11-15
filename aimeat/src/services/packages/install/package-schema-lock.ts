@@ -28,7 +28,7 @@ import type { AimeatConfig } from '../../../config.js';
 import type { Storage } from '../../../storage/interface.js';
 import { schemaLockRefusal, type SchemaLockCaller } from '../../schema-lock-rule.js';
 import { cortexComponentsOf } from '../compose/package-component-collisions.js';
-import { isOperatorCaller } from '../../operator-override.js';
+import { isOperatorCaller } from '../../operator/override.js';
 import { isOperatorAccount } from '../../../utils/operator-account.js';
 import { isOwnerInPerson } from '../../../utils/gaii.js';
 

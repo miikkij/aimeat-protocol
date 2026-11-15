@@ -51,7 +51,7 @@ import type { ConfigProvenance } from './provenance.js';
 import { emitChange } from '../event-bus.js';
 import { CLASSIFICATION_MODE_PATH, recordSwitchChange, type SwitchCaller } from '../classification-run/switch.js';
 import { offerDefaultCapsWhenSwitchedOn } from '../classification/default-caps.js';
-import { recordOperatorNodeAct } from '../operator-access-audit.js';
+import { recordOperatorNodeAct } from '../operator/access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH, TOTP_ENABLED_PATH, passwordOffLockoutRefusal, twoStepWithoutTotpRefusal } from '../sign-in-policy.js';
 import { requestLooseningRefusal, resetRefusal, tightenOnlyRank, type TightenRefusal } from './strictness.js';

@@ -53,7 +53,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { isAdultByClaims, recordAdult } from '../services/adult-assurance.js';
 import { verifiedNameOfClaims, recordVerifiedName } from '../services/verified-name.js';
-import { operatorOverride } from '../services/operator-override.js';
+import { operatorOverride } from '../services/operator/override.js';
 
 export function verificationRouter(
   config: AimeatConfig,

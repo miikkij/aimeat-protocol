@@ -54,7 +54,7 @@ import type { ResolvedLayout, SurfaceId, SurfaceLayout } from './types.js';
 import { SURFACE_IDS } from './types.js';
 import { MAX_FREEFORM_BYTES, SLUG_RE, parseLayout, refuseMarkup, validateLayout } from './validate.js';
 import { freeformKey, layoutKey } from './keys.js';
-import { operatorName, type OperatorCaller } from '../operator-principal.js';
+import { operatorName, type OperatorCaller } from '../operator/principal.js';
 import { SURFACE_LAYOUT_WRITE_SCOPE } from '../../utils/scope-coverage.js';
 
 export { LAYOUT_KEY_PREFIX, FREEFORM_KEY_PREFIX, layoutKey, freeformKey, isReservedSurfaceKey } from './keys.js';
@@ -115,7 +115,7 @@ export class SurfaceLayoutService {
 
     /**
      * Whether the PRINCIPAL acting here may arrange this node's pages: the operator in person, or
-     * an operator account's agent holding site:layout-write (services/operator-principal.ts).
+     * an operator account's agent holding site:layout-write (services/operator/principal.ts).
      *
      * It lives in the service rather than in the tool that needs it, because a capability written
      * twice is how this surface and REST came to differ in 315 measured places. The HTTP door asks

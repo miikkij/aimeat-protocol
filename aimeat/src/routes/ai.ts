@@ -146,7 +146,7 @@ import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../servi
 import { updatePrivateRecord } from '../services/private-record.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 import { resolveWriteTarget } from '../services/write-target.js';
 import { parseGenRulesBypass } from '../services/ai/gen-rules.js';
 

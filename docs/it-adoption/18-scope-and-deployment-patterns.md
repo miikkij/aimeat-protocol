@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.3.1 (commit 68e698a8c) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 9913309bd) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -189,9 +189,9 @@ The operator answers for what the node holds: the organisation is the controller
 
 What the node does with that access is record it:
 
-- An operator's read, search, delete, restore or export of another person's records writes two records: a usage row in the operator's own stream that names the account, and a line on that person's account feed, both written before the answer is sent (`aimeat/src/services/operator-access-audit.ts`, [Data ownership, section 8](../data-ownership.md#8-the-operator-is-accountable)).
-- An operator's other acts in a person's account write the same trail (`operator_acted`), and an operator's change to a node setting writes a usage row and a log line (`aimeat/src/services/operator-access-audit.ts`).
-- An operator's agent acts as operator only for the permission words the operator gives it, such as `operator:admin` (`aimeat/src/services/operator-principal.ts`).
+- An operator's read, search, delete, restore or export of another person's records writes two records: a usage row in the operator's own stream that names the account, and a line on that person's account feed, both written before the answer is sent (`aimeat/src/services/operator/access-audit.ts`, [Data ownership, section 8](../data-ownership.md#8-the-operator-is-accountable)).
+- An operator's other acts in a person's account write the same trail (`operator_acted`), and an operator's change to a node setting writes a usage row and a log line (`aimeat/src/services/operator/access-audit.ts`).
+- An operator's agent acts as operator only for the permission words the operator gives it, such as `operator:admin` (`aimeat/src/services/operator/principal.ts`).
 
 What the organisation decides: who holds the operator role, how operator duties are separated, how often the trail is reviewed, and what the privacy notice tells people about operator access ([14 Compliance mapping](14-compliance-mapping.md)).
 

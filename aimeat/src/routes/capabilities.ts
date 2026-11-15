@@ -75,7 +75,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { resolveIdentity, callerPrincipal } from '../utils/gaii.js';
-import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator/override.js';
 import { capabilityFor } from '../services/capabilities/capability-for.js';
 
 /** A self-reported client-side call cannot legitimately claim to have taken longer than this, and

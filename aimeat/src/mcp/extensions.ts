@@ -113,7 +113,7 @@ import { capabilitiesOfRecord } from '../services/extension/capability-declarati
 import { canManageExtensionAs, type ExtensionCaller } from '../services/extension-access/manage.js';
 import { installRoleRefusal } from '../services/extension/install-role.js';
 import { findExtension, placeExtensionInstall } from '../services/component-address.js';
-import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorCaller } from '../services/operator/override.js';
 import { codeHoldRefusal, takeHoldOff } from '../services/extension/code-hold.js';
 import {
     writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,

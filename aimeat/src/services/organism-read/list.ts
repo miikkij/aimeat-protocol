@@ -27,7 +27,7 @@ import type { VerifiedToken } from '../../auth/jwt.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { organismsAdmitting } from '../organism/agent-access.js';
-import { isOperatorCaller } from '../operator-override.js';
+import { isOperatorCaller } from '../operator/override.js';
 
 /** What a caller who is neither the member asked about nor an operator browses: the same two
  *  visibilities the directory indexes (services/directory.ts). */

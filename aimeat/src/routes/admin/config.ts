@@ -86,7 +86,7 @@ import type { ConsulConfigService } from '../../services/consul-config.js';
 import { applyConsulValues, consulValuesForCaller } from '../../services/consul-config.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { recordOperatorNodeAct } from '../../services/operator-access-audit.js';
+import { recordOperatorNodeAct } from '../../services/operator/access-audit.js';
 import { placeDefaultAfterSettings } from '../../services/place-agent-scopes.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 

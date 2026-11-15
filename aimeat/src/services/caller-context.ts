@@ -44,7 +44,7 @@
 import type { Storage } from '../storage/interface.js';
 import { isForeignPrincipal, isOwnerInPerson, resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { isOperatorCaller } from './operator-override.js';
+import { isOperatorCaller } from './operator/override.js';
 import {
     credentialKind, credentialVia, readerOf, principalCaller,
     type AiPayer, type CallerKind, type CallerVia, type ReaderKind,
