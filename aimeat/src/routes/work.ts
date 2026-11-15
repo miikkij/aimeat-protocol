@@ -12,6 +12,8 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   2026-11-15 — actsFor and isParty take the caller's auth, not the request, so the accept and
+ *     progress handlers stay bodyless routes for check:write-validation.
  *   2026-11-15 — The person whose agent requested or provides a work item acts for it in person
  *     (mayActOnAgent): accept, progress, reject and deliver for the provider, rate for the requester;
  *     the Work tab lists those items with their buttons and each answered 403.
@@ -111,10 +113,10 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
    * Who else acts as a party of a work item: the person whose agent it is, in person (mayActOnAgent).
    * The Work tab lists an owner's agents' work with its buttons, and each answered that person 403.
    */
-  const actsFor = (req: Request): ActsForParty => (gaii) => mayActOnAgent(req.auth, gaii, config.nodeId);
+  const actsFor = (auth: Request['auth']): ActsForParty => (gaii) => mayActOnAgent(auth, gaii, config.nodeId);
   /** The caller is this party of the work item, or acts for it (actsFor). */
-  const isParty = (req: Request, partyGaii: string): boolean =>
-    partyGaii === resolveIdentity(req.auth!, config.nodeId) || actsFor(req)(partyGaii);
+  const isParty = (auth: Request['auth'], partyGaii: string): boolean =>
+    partyGaii === resolveIdentity(auth!, config.nodeId) || actsFor(auth)(partyGaii);
   /** A work item's output record, for its two parties: the id and the record itself. */
   const outputProvenance = async (id: string | undefined) => (id
     ? { ai_provenance_id: id, ...provenanceItemBlock(await loadServedProvenance(storage, config, id)) }
@@ -310,7 +312,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   // POST /v1/work/:tc/accept — accept work (provider, agent auth)
   router.post('/v1/work/:tc/accept', requireAuth(), requireExternalPrincipal(), requireScope('work:accept'), async (req, res) => {
     const tc = param(req.params.tc);
-    const accepted = await acceptWork({ storage, config }, resolveIdentity(req.auth!, config.nodeId), tc, actsFor(req));
+    const accepted = await acceptWork({ storage, config }, resolveIdentity(req.auth!, config.nodeId), tc, actsFor(req.auth));
     if (!accepted.ok) {
       res.status(accepted.status).json(error(config.nodeId, accepted.code, accepted.message));
       return;
@@ -333,7 +335,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
       return;
     }
-    if (!isParty(req, work.providerGaii)) {
+    if (!isParty(req.auth, work.providerGaii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can update work status'));
       return;
     }
@@ -378,7 +380,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
       return;
     }
-    if (!isParty(req, work.providerGaii)) {
+    if (!isParty(req.auth, work.providerGaii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can reject work'));
       return;
     }
@@ -419,7 +421,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     const tc = param(req.params.tc);
     const { output } = req.body ?? {};
 
-    const delivered = await deliverWork({ storage, config }, resolveIdentity(req.auth!, config.nodeId), tc, output, actsFor(req));
+    const delivered = await deliverWork({ storage, config }, resolveIdentity(req.auth!, config.nodeId), tc, output, actsFor(req.auth));
     if (!delivered.ok) {
       res.status(delivered.status).json(error(config.nodeId, delivered.code, delivered.message));
       return;
@@ -443,7 +445,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
       return;
     }
-    if (!isParty(req, work.requesterGaii)) {
+    if (!isParty(req.auth, work.requesterGaii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can rate work'));
       return;
     }
