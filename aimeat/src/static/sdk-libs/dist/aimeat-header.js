@@ -75,6 +75,10 @@
   function brandPath(signedIn) {
     return signedIn ? "/v1/home" : "/v1/portal";
   }
+  function signInTarget(origin, pathname) {
+    if (/^https?:\/\/[^.]+\.apps\./.test(origin)) return null;
+    return pathname === "/" ? "/v1/home" : null;
+  }
   function headerLinks(site, navConfig) {
     const s = site || {};
     const declared = PUBLIC_LINKS.map((l) => l.id);
@@ -421,7 +425,14 @@
             pillI18n.themeToLight = t["nav.themeToLight"] || NAV_FALLBACK["nav.themeToLight"];
             window.AIMEAT.auth.mountLoginButton("#headerAuth", {
               nameHref: nodeHref("/v1/home?settings=1"),
+              // A sign-in on the node's front page goes to the home (nav.js signInTarget); on any
+              // other page the bar redraws for the session and the person stays.
               onLogin: function() {
+                var target = signInTarget(location.origin, location.pathname);
+                if (target) {
+                  location.assign(target);
+                  return;
+                }
                 window.dispatchEvent(new Event("aimeat-auth-change"));
               },
               onLogout: function() {

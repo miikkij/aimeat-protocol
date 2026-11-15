@@ -14,6 +14,9 @@
  *   The links themselves are data in ./nav.js.
  * @usage <div id="aimeat-header"></div><script src="/v1/libs/aimeat-header.js"></script>
  * @version-history
+ *   v1.5.1 — 2026-11-15 — A sign-in through the pill on the node's front page (/) goes to /v1/home,
+ *     as the static front page does; the operator's template left the person on the front page.
+ *     Elsewhere, and for a visitor who arrives signed in, nothing changes.
  *   v1.5.0 — 2026-11-14 — The bar is the shell's bar again. A signed-in person gets Home, Messages,
  *     Agents and Chat (in the shell since 2026-10-18 and never here), Apps opens /v1/appcat in the
  *     same tab (it opened the old /app-catalog.html in a new one), and the wordmark takes them home.
@@ -39,7 +42,7 @@
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-header.ts (SDK-libs migration Phase 1).
  */
 import { readLang as resolveLang, writeLang } from '../_core/lang.js';
-import { headerLinks, linkShown, brandPath } from './nav.js';
+import { headerLinks, linkShown, brandPath, signInTarget } from './nav.js';
 
 if (!window.__AIMEAT_HEADER_MOUNTED__) {
   window.__AIMEAT_HEADER_MOUNTED__ = true;
@@ -335,7 +338,13 @@ function main() {
           pillI18n.themeToLight = t['nav.themeToLight'] || NAV_FALLBACK['nav.themeToLight'];
           window.AIMEAT.auth.mountLoginButton('#headerAuth', {
             nameHref: nodeHref('/v1/home?settings=1'),
-            onLogin: function () { window.dispatchEvent(new Event('aimeat-auth-change')); },
+            // A sign-in on the node's front page goes to the home (nav.js signInTarget); on any
+            // other page the bar redraws for the session and the person stays.
+            onLogin: function () {
+              var target = signInTarget(location.origin, location.pathname);
+              if (target) { location.assign(target); return; }
+              window.dispatchEvent(new Event('aimeat-auth-change'));
+            },
             onLogout: function () { window.dispatchEvent(new Event('aimeat-auth-change')); },
             i18n: pillI18n,
           });

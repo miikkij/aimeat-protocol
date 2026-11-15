@@ -10,6 +10,7 @@
  *   added to the shell's bar, removed from it or sent elsewhere fails here until nav.js follows.
  * @usage cd aimeat && pnpm exec vitest run test/unit/sdk-header-nav.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-15 — signInTarget: a sign-in on the node's front page goes to the home.
  *   v1.0.0 — 2026-11-14 — Initial. The signed-in comparison fails on the library as it was (three
  *     links against the shell's seven, and /app-catalog.html against /v1/appcat).
  */
@@ -17,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { PUBLIC_LINKS, SIGNED_IN_LINKS, headerLinks, linkShown, brandPath } from '../../src/static/sdk-libs/header/nav.js';
+import { PUBLIC_LINKS, SIGNED_IN_LINKS, headerLinks, linkShown, brandPath, signInTarget } from '../../src/static/sdk-libs/header/nav.js';
 import { headerPrelude } from '../../src/routes/libs/sdk-serve.js';
 import { PUBLIC_NAV_LINK_IDS } from '../../src/services/site.js';
 
@@ -105,6 +106,16 @@ describe('who sees which link', () => {
     expect(brandPath(true)).toBe('/v1/home');
     expect(brandPath(false)).toBe('/v1/portal');
     expect(spa).toContain("const brandPath = session ? '/v1/home' : '/v1/portal';");
+  });
+
+  it('a sign-in on the node\'s front page goes to the home; elsewhere the page stays', () => {
+    expect(signInTarget('https://aimeat.io', '/')).toBe('/v1/home');
+    expect(signInTarget('http://localhost:40050', '/')).toBe('/v1/home');
+    // Any other page that draws this bar keeps the person where they signed in.
+    expect(signInTarget('https://aimeat.io', '/front-start.html')).toBeNull();
+    expect(signInTarget('https://aimeat.io', '/v1/help')).toBeNull();
+    // On an app origin "/" is the app itself, not the node's front page.
+    expect(signInTarget('https://drum-news.apps.aimeat.io', '/')).toBeNull();
   });
 });
 

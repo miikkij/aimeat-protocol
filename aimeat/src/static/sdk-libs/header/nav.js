@@ -10,10 +10,12 @@
  *   The library had fallen behind: on 2026-11-14 a signed-in person on aimeat.io's front page had
  *   Help, Apps and Settings only (the shell had gained Home, Messages, Agents and Chat on
  *   2026-10-18), and Apps opened /app-catalog.html, the catalogue the shell left for /v1/appcat.
- * @structure PUBLIC_LINKS · SIGNED_IN_LINKS · brandPath(signedIn) · headerLinks(site, navConfig) ·
- *   linkShown(link, session)
- * @usage import { headerLinks, linkShown, brandPath } from './nav.js';
+ * @structure PUBLIC_LINKS · SIGNED_IN_LINKS · brandPath(signedIn) · signInTarget(origin, pathname) ·
+ *   headerLinks(site, navConfig) · linkShown(link, session)
+ * @usage import { headerLinks, linkShown, brandPath, signInTarget } from './nav.js';
  * @version-history
+ *   v1.1.0 — 2026-11-15 — signInTarget: a sign-in on the node's front page goes to the home. The
+ *     operator's template at / draws this bar, and its sign-in had left the person on the front page.
  *   v1.0.0 — 2026-11-14 — Initial: the shell's signed-in links (Home, Messages, Agents, Chat, Apps,
  *     Settings, Admin), the operator's order and hidden list for the public ones, Learn when the
  *     node has one, and the shorter bar of a customer's node and of a signed-in-only node.
@@ -54,6 +56,22 @@ export const SIGNED_IN_LINKS = [
  */
 export function brandPath(signedIn) {
   return signedIn ? '/v1/home' : '/v1/portal';
+}
+
+/**
+ * Where a fresh sign-in through the bar's login pill goes: the home when the person signed in on
+ * the node's front page (GET /, which serves the operator's template), and nowhere on any other
+ * page, which stays where the person was. The front page is for people who have not signed in;
+ * front-start.js does the same for the static front page. An app origin (`<app>.apps.<apex>`) is
+ * excluded, because its "/" is the app. A visitor who arrives already signed in is not moved: the
+ * pill's onLogin runs for a sign-in only, never for a restored session.
+ * @param {string} origin location.origin
+ * @param {string} pathname location.pathname
+ * @returns {string | null} the path to go to, or null to stay
+ */
+export function signInTarget(origin, pathname) {
+  if (/^https?:\/\/[^.]+\.apps\./.test(origin)) return null;
+  return pathname === '/' ? '/v1/home' : null;
 }
 
 /**
