@@ -3,7 +3,10 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Real HTTP batch writes and backup restores preserve provenance and per-item guards.
- * @version-history 1.0.0 2026-09-27 Added without changing existing E2E expectations.
+ * @version-history
+ *   1.1.0 2026-11-15 The import puts a refused entry (no key, a storage_ref to a missing file) under
+ *     failed[] and writes the rest; moved here from e2e-memory-doors, which is held at its length.
+ *   1.0.0 2026-09-27 Added without changing existing E2E expectations.
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -147,6 +150,25 @@ try {
     assert.equal(result.body.data.failed.length, 1);
     assert.match(result.body.data.failed[0].reason, /ARCHIVED/);
     assert.equal((await json(`/v1/memory/${encodeURIComponent(key)}`, ownerToken)).status, 404);
+  });
+
+  // The bulk write once refused a whole batch for one entry its contract did not describe (fd9776330).
+  // The import is the same kind of batch: an entry it refuses fails on its own and the rest is written.
+  await test('import: a refused entry lands in failed[] and the other entries are written', async () => {
+    const result = await json('/v1/memory/import', token, { mode: 'overwrite', entries: [
+      { value: 'no key at all' },
+      { key: 'batch.import.ref', value: { _type: 'storage_ref', storage_key: 'batch/no-such-file.txt' } },
+      { key: 'batch.import.ok', value: { kept: true } },
+    ] });
+    assert.equal(result.status, 200, JSON.stringify(result.body?.error ?? result.body?.data));
+    const failedEntries = (result.body.data?.failed ?? []) as { key: string; reason: string }[];
+    assert.equal(failedEntries.length, 2, JSON.stringify(failedEntries));
+    assert(failedEntries.some(f => f.reason === 'missing key'), 'the entry with no key fails');
+    assert(failedEntries.some(f => f.key === 'batch.import.ref' && f.reason.includes('storage file not found')), 'the dangling storage_ref fails');
+    assert.equal(result.body.data.created + result.body.data.updated, 1, 'one entry is written');
+    const kept = await read('batch.import.ok');
+    assert(kept.status === 200 && kept.body.data?.value?.kept === true, 'the good entry is stored');
+    assert.equal((await read('batch.import.ref')).status, 404, 'the refused entry is not stored');
   });
 } finally {
   await test('cleanup removes the test owner', async () => {
