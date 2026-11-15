@@ -7,6 +7,8 @@
  *
  *   Nodes: A 28275 aimeat-test-001-pola; P 28276 aimeat-test-001-polp.
  * @version-history
+ *   2026-11-15 -- Audit M175: test 5b sends an ordinary second owner on A to the policy PUT, the pull
+ *     and both promotes (403 each) and reads the policy version and the peer tier back unchanged.
  *   v1.2.1 -- 2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 --The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -34,7 +36,7 @@ import { audienceProof } from '../src/services/signed-node-request.js';
 import { recordHeartbeatOutcome } from '../src/services/federation-availability.js';
 import type { PeerInfo } from '../src/services/federation.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
-import { setupOperator } from './helpers/owner-login.js';
+import { setupOperator, registerOwner } from './helpers/owner-login.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -173,6 +175,26 @@ await test('5. a suspend advisory demotes a member back to visiting', async () =
   const peers = await A.json('/v1/federation/peers', { headers: auth(A.ownerToken) });
   const b = peers.body.data.peers.find((p: any) => p.node_id === 'aimeat-peer-001-polb');
   assert(b?.tier === 'visiting' && b.allow_routing === false, `expected demoted to visiting, got ${JSON.stringify(b)}`);
+});
+
+await test('5b. an ordinary owner on A cannot author or pull the policy, or promote a peer (403 each); nothing moves', async () => {
+  const plain = (await registerOwner(A.baseUrl, `polx${ts}`)).token;
+  const versionBefore = (await A.json('/v1/federation/network-policy')).body.data.policy.policy_version;
+  const calls: Array<[string, string, unknown]> = [
+    ['PUT', '/v1/federation/network-policy', { promotion_criteria: { min_availability_pct: 0, min_days_active: 0, min_successful_work: 0 } }],
+    ['POST', '/v1/federation/network-policy/pull', { source_url: P.baseUrl }],
+    ['POST', '/v1/federation/peers/aimeat-peer-001-polb/promote', {}],
+    ['POST', '/v1/federation/peers/aimeat-peer-001-polb/promote', { force: true }],
+  ];
+  for (const [method, path, body] of calls) {
+    const r = await A.json(path, { method, headers: auth(plain), body: JSON.stringify(body) });
+    assert(r.status === 403 && r.body.error?.code === 'ACCESS_DENIED', `${method} ${path} ${JSON.stringify(body)}: expected 403 ACCESS_DENIED, got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+  }
+  const versionAfter = (await A.json('/v1/federation/network-policy')).body.data.policy.policy_version;
+  assert(versionAfter === versionBefore, `the policy moved: ${versionBefore} → ${versionAfter}`);
+  const peers = await A.json('/v1/federation/peers', { headers: auth(A.ownerToken) });
+  const b = peers.body.data.peers.find((p: any) => p.node_id === 'aimeat-peer-001-polb');
+  assert(b?.tier === 'visiting', `the peer's tier moved: ${b?.tier}`);
 });
 
 console.log('\nPhase 4 — Cross-node policy pull + verify');

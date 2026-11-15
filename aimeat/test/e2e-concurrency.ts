@@ -6,6 +6,7 @@
  *   parallel settlement, and the wallet balances after each round, asserted exactly.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-concurrency
  * @version-history
+ *   2026-11-15 — Audit M097: test 3 needs exactly two escrow holds and one 402, not "at most two".
  *   v1.0.4 — 2026-10-20 — The three work agents are registered with the scopes they use (work,
  *     wallet, boards), so the suite runs on the production-settings lane, where an agent approved
  *     with no list gets the shipped default. Tests 12 to 14 (a 429 from the auth tier, its
@@ -251,11 +252,13 @@ await test('2. Submit two 40-morsel work requests in parallel', async () => {
     // (100 morsels, 44 cost each = max 2 can succeed)
 });
 
-await test('3. At most two succeed, at least one fails (402)', async () => {
+await test('3. Exactly two succeed and one fails (402)', async () => {
     const successes = escrowResults.filter(r => r.status === 201);
     const failures = escrowResults.filter(r => r.status === 402);
-    assert(successes.length <= 2, `too many successes: ${successes.length}`);
-    assert(failures.length >= 1, `no failures detected, expected at least 1`);
+    // 100 morsels pay for two 44-morsel holds and not a third. "At most two" also held at zero, which
+    // let a fully broken escrow pass this phase.
+    assert(successes.length === 2 && failures.length === 1,
+        `expected 2 successes and 1 refusal, got ${successes.length} and ${failures.length}: ${JSON.stringify(escrowResults.map(r => [r.status, r.body?.error?.code]))}`);
     if (failures.length > 0) {
         assert(failures[0].body.error?.code === 'INSUFFICIENT_MORSELS', `code: ${failures[0].body.error?.code}`);
     }

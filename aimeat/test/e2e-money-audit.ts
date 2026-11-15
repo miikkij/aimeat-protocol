@@ -13,6 +13,7 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   2026-11-15 — Audit M085: an anonymous POST /v1/capabilities/:id/invoke is 401 and moves no balance.
  *   2026-10-31 — BROKEN BINDING: a contracted call to a tool bound to a missing capability, or to another
  *     owner's, costs nothing on the REST door and its MCP twin (secaudit 2026-10-31 inv-05).
  *   2026-10-24 — CHAIN: the supplier's action reports the reseller as its caller, not the end user
@@ -385,9 +386,7 @@ await test('RAW · a name is a request, not an instruction — no talking onto a
     assert((await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(one.token), body: JSON.stringify({ offering_id: cheapOff.offeringId, cap_units: 60 }) })).status === 201, 'holds only `cheap`');
     const bb = await balance(one.token);
     // Naming `brief`, which they never contracted: they are neither served it nor billed for it.
-    const r = await json(`/v1/ext/${EXT}/work`, {
-        method: 'POST', headers: { ...auth(one.token), 'x-aimeat-app-tool': `${APP}/brief` }, body: JSON.stringify({ q: 'hi' }),
-    });
+    const r = await json(`/v1/ext/${EXT}/work`, { method: 'POST', headers: { ...auth(one.token), 'x-aimeat-app-tool': `${APP}/brief` }, body: JSON.stringify({ q: 'hi' }) });
     assert(r.status === 402, `an uncontracted name owes 402, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
     assert(await balance(one.token) === bb, `and takes nothing — moved ${bb - await balance(one.token)}`);
 });
@@ -522,15 +521,17 @@ await test('CAPABILITY · an uncontracted caller of a free paced product is serv
     const r = await json(`/v1/capabilities/${encodeURIComponent(SOLO)}/invoke`, { method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ input: { q: 'hi' } }) });
     assert(r.status === 200, `expected the free product to run, got ${r.status}: ${JSON.stringify(r.body).slice(0, 250)}`);
     assert(await balance(stranger.token) === sb - 8, `the caller pays the 8 morsels of pacing, moved ${sb - await balance(stranger.token)}`);
+    // No principal at all is refused before the provider's extension runs, and the provider's balance holds.
+    const pb = await balance(provider.token);
+    const anon = await json(`/v1/capabilities/${encodeURIComponent(SOLO)}/invoke`, { method: 'POST', body: JSON.stringify({ input: { q: 'hi' } }) });
+    assert(anon.status === 401 && anon.body?.error?.code === 'AUTH_REQUIRED' && await balance(provider.token) === pb, `an anonymous invoke: ${anon.status} ${anon.body?.error?.code}`);
 });
 
 // ── The scheduler door (who pays for a cron call?) ───────────────────────────────────────────────
 
 await test("SCHEDULER · a stranger cannot put another owner's priced action on a recurring schedule", async () => {
-    const r = await json('/v1/schedules', {
-        method: 'POST', headers: auth(consumer.token),
-        body: JSON.stringify({ kind: 'extension', name: 'free-forever', extension_name: EXT, action_id: 'work', cron: '*/5 * * * *', input: { q: 'cron' } }),
-    });
+    const r = await json('/v1/schedules', { method: 'POST', headers: auth(consumer.token),
+        body: JSON.stringify({ kind: 'extension', name: 'free-forever', extension_name: EXT, action_id: 'work', cron: '*/5 * * * *', input: { q: 'cron' } }) });
     assert(r.status === 403 || r.status === 404, `expected refusal, got ${r.status}: ${JSON.stringify(r.body?.data ?? r.body?.error).slice(0, 250)}`);
 });
 

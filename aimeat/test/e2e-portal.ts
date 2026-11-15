@@ -1,5 +1,6 @@
 // E2E test for AIMEAT Onboarding Portal
 // Run: cd aimeat && npx tsx test/e2e-portal.ts
+// 2026-11-15 — Audit L105: every platform must carry at least one variant.
 import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -254,6 +255,8 @@ await test('Platform variants have id, name, tier, path', async () => {
     const res = await fetch(`${BASE}/v1/portal/platforms`);
     const body = await res.json() as any;
     for (const platform of body.data.platforms) {
+        // A platform with no variant offers no way in, and the loop below would check nothing for it.
+        assert(Array.isArray(platform.variants) && platform.variants.length >= 1, `${platform.id}: no variants`);
         for (const variant of platform.variants) {
             assert(typeof variant.id === 'string', `${platform.id}: variant missing id`);
             assert(typeof variant.name === 'string', `${platform.id}: variant missing name`);

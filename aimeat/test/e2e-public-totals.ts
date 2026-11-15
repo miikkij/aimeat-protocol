@@ -19,6 +19,8 @@
  *     write (new public organism reflected before the 30s TTL).
  *   v1.2.0 — 2026-06-28 — Import a catalog-listed knowledge package as a fixture and assert
  *     knowledge_packages >= 1 (regression: the counter undercounted to 0 on busy nodes).
+ *   2026-11-15 — Audit M142, L113: an unlisted package leaves knowledge_packages unchanged, and one
+ *     real app fetch moves downloads by exactly 1.
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -145,6 +147,44 @@ await test('A PRIVATE organism does not move the public counter', async () => {
   const after = (await json('/v1/public/node-totals')).body?.data?.organisms ?? 0;
   assert(after === before,
     `a private organism moved the public counter ${before} → ${after}, which tells an anonymous caller it exists`);
+});
+
+const importPackage = (name: string, listed: boolean) => json('/v1/knowledge/import', ownerAuth({ method: 'POST', body: JSON.stringify({
+  package: { type: 'knowledge-package', name, content_type: 'research', tags: ['pt'], entries: [{ key: 'note', title: 'A note', visibility: 'public', value: { body: 'hello' } }] },
+  overrides: { catalog_listed: listed },
+}) }));
+
+// Neither a package import nor a download drops the 30 s cache entry, so a public organism is
+// created first: its change event drops every node-totals entry, and the read after it is fresh.
+let fresh = 0;
+async function freshTotals(): Promise<Record<string, number>> {
+  const org = await json('/v1/organisms', agentAuth({ method: 'POST', body: JSON.stringify({ name: `PT Org Fresh ${stamp}-${fresh++}`, visibility: 'public' }) }));
+  assert(org.status === 201, `org status ${org.status}`);
+  return (await json('/v1/public/node-totals')).body?.data ?? {};
+}
+
+// The same question for knowledge packages: an unlisted one must not move the public counter. The
+// listed import beside it is the control that the read is fresh, so "unchanged" is measured.
+await test('An UNLISTED knowledge package does not move the public counter; a listed one moves it by 1', async () => {
+  const before = (await freshTotals()).knowledge_packages ?? 0;
+  const hidden = await importPackage(`PT Hidden ${stamp}`, false);
+  assert(hidden.status === 201 && hidden.body.data?.catalog_listed === false, `unlisted import: ${hidden.status} ${JSON.stringify(hidden.body.data ?? hidden.body.error)}`);
+  const listed = await importPackage(`PT Listed ${stamp}`, true);
+  assert(listed.status === 201, `listed import: ${listed.status}`);
+  const after = (await freshTotals()).knowledge_packages ?? 0;
+  assert(after === before + 1, `knowledge_packages should rise by exactly the listed package: ${before} → ${after}`);
+});
+
+// A real download, read back through the counter. The count is written after the response, so
+// the fresh read is asked a few times.
+await test('downloads rises by exactly 1 after the fixture app is fetched once', async () => {
+  const before = (await freshTotals()).downloads ?? 0;
+  const got = await fetch(`${BASE}/v1/apps/${ownerName}/pt-app-${stamp}.html`);
+  assert(got.status === 200, `app fetch ${got.status}`);
+  await got.arrayBuffer();
+  let after = before;
+  for (let i = 0; i < 5 && after === before; i++) after = (await freshTotals()).downloads ?? 0;
+  assert(after === before + 1, `downloads should rise by exactly 1: ${before} → ${after}`);
 });
 
 await test('Endpoint is public — works with no Authorization header', async () => {

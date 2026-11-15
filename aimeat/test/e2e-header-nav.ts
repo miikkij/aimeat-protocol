@@ -11,6 +11,7 @@
  *            the off path is covered by e2e-secretary-disabled.ts (self-spawns a flag-off server).
  *   v1.2.0 — 2026-07-10 — Drop the features.secretary assertion; the Secretary feature was removed
  *            (the `features` map is now empty). Generic header-nav tests unchanged.
+ *   2026-11-15 — Audit M197: both refused saves read the config back and find the saved one kept.
  *   v1.3.1 — 2026-08-09 — The invalid-id fixture pairs 'bogus' with 'help' instead of 'try'. `try`
  *            left PUBLIC_NAV_LINK_IDS with the header slim-down, and a fixture of two unknown ids
  *            would still have passed while proving nothing about mixing a known one with an unknown.
@@ -148,6 +149,14 @@ await test('GET /v1/site/header-nav — reflects saved config', async () => {
 // ─── Validation ───
 console.log('\nValidation');
 
+// A refused save must leave the stored config as the round-trip above wrote it: the header every
+// visitor renders reads it, so a 422 that wrote first would be the worse bug.
+async function assertSavedConfigKept(): Promise<void> {
+    const { body } = await json('/v1/site/header-nav');
+    assert(JSON.stringify(body.data.order) === JSON.stringify(NEW_ORDER), `the refused save changed order: ${JSON.stringify(body.data.order)}`);
+    assert(JSON.stringify(body.data.hidden) === JSON.stringify(['business']), `the refused save changed hidden: ${JSON.stringify(body.data.hidden)}`);
+}
+
 await test('PUT /v1/site/header-nav with unknown id → 422', async () => {
     const { status, body } = await json('/v1/site/header-nav', authed({
         method: 'PUT',
@@ -155,14 +164,16 @@ await test('PUT /v1/site/header-nav with unknown id → 422', async () => {
     }));
     assert(status === 422, `expected 422, got ${status}`);
     assert(body.error?.code === 'HEADER_NAV_INVALID', `error code: ${body.error?.code}`);
+    await assertSavedConfigKept();
 });
 
 await test('PUT /v1/site/header-nav with unknown id in hidden → 422', async () => {
-    const { status } = await json('/v1/site/header-nav', authed({
+    const { status, body } = await json('/v1/site/header-nav', authed({
         method: 'PUT',
         body: JSON.stringify({ order: KNOWN, hidden: ['admin'] }),
     }));
-    assert(status === 422, `expected 422, got ${status}`);
+    assert(status === 422 && body.error?.code === 'HEADER_NAV_INVALID', `expected 422 HEADER_NAV_INVALID, got ${status} ${body.error?.code}`);
+    await assertSavedConfigKept();
 });
 
 // ─── Cleanup ───

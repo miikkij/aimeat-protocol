@@ -8,6 +8,9 @@
  *   would reach OpenRouter stops at NO_API_KEY. A real transcription is verified by hand with a key
  *   before the feature is called done — stated here rather than left for someone to assume.
  * @version-history
+ *   2026-11-15 -- Audit M069 (budget half), L019: the budget test no longer skips its 402 proof on a
+ *     503, and NO_STT_MODEL is pinned with a key and a text model in place. The oversized-audio half
+ *     stays loose: the JSON body limit answers 413 before the route's own guard (reported).
  *   v1.1.0 -- 2026-10-12 -- The budget test sets its transcription model and key on a provider of the
  *     owner's own (PUT /v1/ai/providers/:id, its key, PUT /v1/ai/routing) instead of PUT
  *     /v1/openrouter/settings, which node 4.0.0 removes (the 4.0.0 sweep). The budget itself stays on
@@ -184,16 +187,26 @@ await test("Another owner's storage key → 404, not 403 (existence is not discl
 console.log('\nPhase 3 — Model + size + budget');
 
 await test('No sttModel configured → 400 NO_STT_MODEL (never falls back to the text model)', async () => {
+  // A provider of the owner's own with a key and a TEXT model, but no transcription model: a missing
+  // key cannot be the refusal, and a fallback to the text model would have one to use.
+  const prov = await json('/v1/ai/providers/stt-own', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${alice.token}` },
+    body: JSON.stringify({ title: 'My OpenRouter', type: 'openrouter', auth: { type: 'key' }, capabilities: { text: { enabled: true, model: 'openai/gpt-4o-mini', pool: true } } }),
+  });
+  assert(prov.status === 200, `provider PUT: ${prov.status} ${JSON.stringify(prov.body)}`);
+  const key = await json('/v1/ai/providers/stt-own/key', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${alice.token}` },
+    body: JSON.stringify({ api_key: 'sk-or-v1-fake-for-test' }),
+  });
+  assert(key.status === 200, `key PUT: ${key.status} ${JSON.stringify(key.body)}`);
   const { status, body } = await json('/v1/ai/transcribe', {
     method: 'POST',
     headers: { Authorization: `Bearer ${alice.token}` },
     body: JSON.stringify({ storage_key: AUDIO_KEY }),
   });
-  // NO_API_KEY can win the race on a node with no encryption key configured; both are the same
-  // refusal-before-spending, and neither may be a silent fallback to the default text model.
-  assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
-  assert(['NO_STT_MODEL', 'NO_API_KEY', 'ENCRYPTION_NOT_CONFIGURED'].includes(body.error?.code),
-    `unexpected code: ${body.error?.code}`);
+  assert(status === 400 && body.error?.code === 'NO_STT_MODEL', `expected 400 NO_STT_MODEL, got ${status} ${body.error?.code}`);
 });
 
 await test('Oversized inline audio → 400 AUDIO_TOO_LARGE (before any provider call)', async () => {
@@ -209,6 +222,8 @@ await test('Oversized inline audio → 400 AUDIO_TOO_LARGE (before any provider 
   if (status === 400) {
     assert(body.error?.code === 'AUDIO_TOO_LARGE', `code: ${body.error?.code}`);
   }
+  // Audit M069 left open, 2026-11-15: the 5 MB JSON body limit answers 413 QUOTA_EXCEEDED before the route's 8 MB guard runs.
+  // assert(status === 400 && body.error?.code === 'AUDIO_TOO_LARGE', `expected 400 AUDIO_TOO_LARGE, got ${status} ${body.error?.code}`);
 });
 
 await test('Daily budget spent → 402, and the budget check precedes the provider', async () => {
@@ -226,7 +241,7 @@ await test('Daily budget spent → 402, and the budget check precedes the provid
     headers: { Authorization: `Bearer ${alice.token}` },
     body: JSON.stringify({ api_key: 'sk-or-v1-fake-for-test' }),
   });
-  if (put.status === 503) { console.log('    (Skipped — encryption not configured on this node)'); return; }
+  // The test env sets AIMEAT_ENCRYPTION_KEY, so a 503 here is a fault, not a reason to skip the 402 proof.
   assert(put.status === 200, `settings PUT: ${put.status} ${JSON.stringify(put.body)}`);
   const routed = await json('/v1/ai/routing', {
     method: 'PUT',

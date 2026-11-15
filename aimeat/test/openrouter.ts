@@ -4,6 +4,7 @@
  *   Tests save/retrieve/delete of encrypted API key and preferences,
  *   auth enforcement (401 without token), and validation errors on /complete.
  * @version-history
+ *   2026-11-15 -- Audit M011 (live half): the owner's own agent is refused POST /v1/openrouter/complete.
  *   v1.3.1 -- 2026-10-13 -- On 4.0.0 GET /v1/ai/settings serves stt_max_mb too, the other limit the
  *     legacy settings route served.
  *   v1.3.0 -- 2026-10-12 -- The subject is the settings, models and test routes, which node 4.0.0
@@ -24,6 +25,7 @@
 
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -359,6 +361,17 @@ await test('POST /v1/openrouter/complete with non-existent project → 404', asy
   });
   assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
   assert(body.error?.code === 'NOT_FOUND', `error code: ${body.error?.code}`);
+});
+
+await test('POST /v1/openrouter/complete with the owner\'s own agent token → 403 (owner role only)', async () => {
+  // The same request the owner gets a 404 for: an agent that passed the role gate would get that 404 too.
+  const agent = await connectAgentByDevice(BASE, { owner: ownerName, ownerToken, name: 'or-agent', scopes: ['*'] });
+  const { status, body } = await json('/v1/openrouter/complete', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${agent.token}` },
+    body: JSON.stringify({ projectId: 'nonexistent-project-xyz', prompt: 'hello world' }),
+  });
+  assert(status === 403 && body.error?.code === 'ACCESS_DENIED', `expected 403 ACCESS_DENIED, got ${status} ${body.error?.code}`);
 });
 
 // ─── Phase 5: Speech-to-text settings ───

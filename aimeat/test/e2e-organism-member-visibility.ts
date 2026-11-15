@@ -7,6 +7,8 @@
  *   GET /:id/members (accountability rows + true total), and GET /organisms list. Creator always
  *   sees the full roster; member_count never lies. Attribution is out of scope by design.
  * @version-history
+ *   2026-11-15 — Audit M198: test 10 also refuses a plain member's PUT of member_visibility and reads
+ *     the roster back hidden from an anonymous caller.
  *   v1.1.0 — 2026-10-17 — Test 9: a private organism is never listed to an anonymous caller or a
  *     signed-in outsider, whatever ?visibility= or ?member= they send. It asserts the hole closed in
  *     routes/organisms/crud.ts on the same day (it failed before the fix). Test 10: a signed-in
@@ -181,6 +183,11 @@ await test('10. A signed-in outsider cannot change who sees the roster or the or
     // would undo every redaction above in one call.
     const r = await json(`/v1/organisms/${orgId}`, { method: 'PUT', headers: auth(outsiderTok), body: JSON.stringify({ member_visibility: 'public' }) });
     assert(r.status === 403, `an outsider changed member_visibility: ${r.status} ${JSON.stringify(r.body)}`);
+    // A plain member is inside the organism and still not one who sets the tier.
+    const m = await json(`/v1/organisms/${orgId}`, { method: 'PUT', headers: auth(memberTok), body: JSON.stringify({ member_visibility: 'public' }) });
+    assert(m.status === 403 && m.body.error?.code === 'ACCESS_DENIED', `a plain member changed member_visibility: ${m.status} ${JSON.stringify(m.body.error ?? m.body.data)}`);
+    const anonRoster = await json(`/v1/organisms/${orgId}/members`);
+    assert(anonRoster.body.data.members_hidden === true, `the roster is world-readable after the refused PUTs: ${JSON.stringify(anonRoster.body.data)}`);
     const v = await json(`/v1/organisms/${privateOrgId}`, { method: 'PUT', headers: auth(outsiderTok), body: JSON.stringify({ visibility: 'public' }) });
     assert(v.status === 403 || v.status === 404, `an outsider made the private organism public: ${v.status}`);
     const still = await json(`/v1/organisms/${privateOrgId}`);

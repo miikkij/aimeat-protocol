@@ -6,6 +6,7 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   2026-11-15 — Audit L118: test 54b takes storage:write back mid-upload and the next chunk is refused.
  *   2026-11-04 — Tests 40e-40k: a group file with no group id is refused on every upload route and on
  *     both visibility routes, and a file that has a group goes private and back with it. 40e-40j are
  *     red before the change: they asserted the hole it closes (the file landed and opened to nobody).
@@ -117,11 +118,7 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
     const signature = await signMsg(privKey, gaii + timestamp);
-    const payload = { gaii, timestamp, signature };
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-    });
+    const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature }) });
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     return body.data.token;
 }
@@ -169,11 +166,8 @@ await test('Register owner 1', async () => {
 });
 
 await test('Register agent-A (owner 1)', async () => {
-    const { status, body } = await json('/v1/agents', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: 'st-agent-a', owner: ownerName, capabilities: ['storage'], model: 'gpt-4o' }),
-    });
+    const { status, body } = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'st-agent-a', owner: ownerName, capabilities: ['storage'], model: 'gpt-4o' }) });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     agentAGaii = body.data.agent.gaii;
     agentAPrivKey = body.data.private_key;
@@ -181,11 +175,8 @@ await test('Register agent-A (owner 1)', async () => {
 });
 
 await test('Register agent-B (owner 1)', async () => {
-    const { status, body } = await json('/v1/agents', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: 'st-agent-b', owner: ownerName, capabilities: ['storage'], model: 'gpt-4o' }),
-    });
+    const { status, body } = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'st-agent-b', owner: ownerName, capabilities: ['storage'], model: 'gpt-4o' }) });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     agentBGaii = body.data.agent.gaii;
     agentBPrivKey = body.data.private_key;
@@ -1308,6 +1299,14 @@ await test('54. Reading a foreign file does not imply deleting it (agent-D reads
         headers: { Authorization: `Bearer ${agentDToken}` },
     });
     assert(status === 404, `reading it must not make it deletable, got ${status}`);
+});
+
+await test('54b. An agent whose storage:write is taken back mid-upload cannot PUT a chunk (403 SCOPE_DENIED)', async () => {
+    const id = (await chunkInit(agentDToken, 'chunked-revoked.bin', 100, 1)).body.data.upload_id as string;
+    const narrowed = await json('/v1/agents/st-agent-d/scopes', { method: 'PATCH', headers: { Authorization: `Bearer ${owner2Token}` }, body: JSON.stringify({ scopes: ['storage:read'] }) });
+    assert(narrowed.status === 200 && !!id, `narrow: ${narrowed.status} ${JSON.stringify(narrowed.body.error)} upload ${id}`);
+    const put = await putChunk(agentDToken, id, 0, Buffer.alloc(10, 0x52));
+    assert(put.status === 403 && (await put.json() as any).error?.code === 'SCOPE_DENIED', `a chunk after the scope was taken back: ${put.status}`);
 });
 
 await test('55. Delete without auth → 401', async () => {

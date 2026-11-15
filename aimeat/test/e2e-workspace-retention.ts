@@ -9,6 +9,7 @@
  *   - One-shot compaction: POST /v1/admin/maintenance/compact-workspace-versions applies the same
  *     window to PRE-EXISTING bloat (operator-only; 403 for non-operators, 401 unauthenticated).
  * @version-history
+ *   2026-11-15 — Audit M211: the keep-all test publishes one revision past the node's default window.
  *   v1.1.0 — 2026-09-13 — Setup no longer matched production: the bloat was seeded into a workspace
  *     with no manifest, which UNDECLARED_SPACE now refuses. It is seeded under the same manifest with
  *     create_only off on shared.logs, then the real manifest is written and read back append-only.
@@ -50,7 +51,7 @@ const root = () => `organism.${orgId}.w.${WS}`;
 const auth = () => ({ Authorization: `Bearer ${opToken}` });
 
 async function versionKeys(base: string): Promise<string[]> {
-    const r = await json(`/v1/memory?prefix=${encodeURIComponent(`${base}.version.`)}`, { headers: auth() });
+    const r = await json(`/v1/memory?prefix=${encodeURIComponent(`${base}.version.`)}&limit=200`, { headers: auth() });
     assert(r.status === 200, `versionKeys ${r.status}`);
     return (r.body.data.items as any[]).map(i => i.key as string).sort();
 }
@@ -129,14 +130,17 @@ await test('Publishing 5 revisions with maxVersions:3 keeps only .version.3/4/5'
     assert(latest?.value?.title === 'rev 5', `latest is rev 5, got ${JSON.stringify(latest?.value)}`);
 });
 
-await test('maxVersions:0 keeps ALL history (4 publishes → 4 versions)', async () => {
+// One past the node's default window (AIMEAT_WS_MAX_VERSIONS, 20 unless set), so a 0 that fell back
+// to the default would drop the oldest snapshot and this count would show it.
+const KEEP_ALL_REVS = Number(process.env.AIMEAT_WS_MAX_VERSIONS ?? '20') + 1;
+await test(`maxVersions:0 keeps ALL history (${KEEP_ALL_REVS} publishes → ${KEEP_ALL_REVS} versions, past the default window)`, async () => {
     const base = `${root()}.shared.keeps.k1`;
-    for (let v = 1; v <= 4; v++) {
+    for (let v = 1; v <= KEEP_ALL_REVS; v++) {
         await writeMem(`${base}.draft`, { id: 'k1', title: `rev ${v}` });
         await publish('shared.keeps', 'k1');
     }
     const keys = await versionKeys(base);
-    assert(keys.length === 4, `expected all 4 versions kept, got ${keys.length}: ${keys.join(', ')}`);
+    assert(keys.length === KEEP_ALL_REVS, `expected all ${KEEP_ALL_REVS} versions kept, got ${keys.length}: ${keys.join(', ')}`);
 });
 
 // ── One-shot compaction ──
