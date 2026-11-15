@@ -10,8 +10,9 @@
  *   Config tab or through aimeat_admin_config_set applies at once, without a restart:
  *   - enforce (the default): every contract operation with an `application/json` body schema is
  *     enforced. A body that does not match is answered 400 VALIDATION_ERROR with the field named,
- *     before the route runs, for a caller with a session; a caller without one gets the route's own
- *     answer, as before. The routes in EXEMPT_BODY_ROUTES are observed instead.
+ *     just before the route's handler runs and after the route's own middleware, for a caller with a
+ *     session; a caller the route's middleware refuses, or one without a session, gets the route's
+ *     own answer, as before. The routes in EXEMPT_BODY_ROUTES are observed instead.
  *   - observe: every route is observed: a mismatch is logged and counted, and the request is
  *     answered as before. It is the way back when a working client turns out to send a body the
  *     contract does not describe.
@@ -24,6 +25,10 @@
  *   ExemptBodyRoute · EXEMPT_BODY_ROUTES
  * @usage import { EXEMPT_BODY_ROUTES, bodyCheckModeFrom } from '../data/openapi-body-modes.js';
  * @version-history
+ *   v2.2.0 — 2026-11-15 — Every exempt route validates its body itself and stays observed for good.
+ *     The three whose test expected only a middleware refusal leave the list, because the guard now
+ *     refuses after the route's middleware; eleven routes with their own refusal and the welcome mat,
+ *     whose handler counts a failed paste, join it (structure programme 2026-11, unit 1).
  *   v2.1.0 — 2026-11-14 — The exempt routes: every route an existing E2E test expects to answer a
  *     wrong body with its own refusal, until the developer decides (structure programme 2026-11, unit 1).
  *   v2.0.0 — 2026-11-14 — The per-route list of enforced routes is replaced by the node setting
@@ -50,13 +55,20 @@ export interface ExemptBodyRoute {
     readonly reason: string;
 }
 
-/** The reason of a route whose existing test asserts the route's own refusal of a body the guard refuses first. */
-const AWAITS_DEVELOPER = 'awaits the developer: the route\'s own refusal differs from the guard\'s';
+/** The reason of a route that answers a body it does not take with its own refusal. */
+const VALIDATES_ITSELF = 'the route validates its body itself; the guard observes it';
 
 /**
- * The routes an existing E2E test sends a wrong or incomplete body on purpose and expects the route's
- * own answer: its own error code or message, or its sign-in, role, scope or ownership refusal, which
- * runs after the guard. Each comment names the suite that asserts it.
+ * The routes that validate their body in the handler (or in a service it calls) and answer a wrong
+ * body with their own refusal: their own error code, message or status, which an existing E2E test
+ * asserts. They stay observed for good, so the route's answer is the one a client gets. Each comment
+ * names the suite that asserts it.
+ *
+ * A route whose test expected only its sign-in, role, scope or rate-limit refusal is not here: the
+ * guard refuses after the route's own middleware (middleware/openapi-body-guard.ts), so that refusal
+ * comes first. Authorization done inside a handler cannot come first that way; every route that does
+ * it and whose test sends a wrong body is here because it validates its body too, so no entry is here
+ * for that alone.
  */
 const ROUTE_OWN_REFUSAL: readonly string[] = [
     // Agents (e2e-account-doors, e2e-agent-tasks, e2e-agent-v2, e2e-agent-v2-messaging,
@@ -72,6 +84,9 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     'POST /v1/agents/{name}/tasks/{id}/rate',
     'PATCH /v1/agents/{name}/tasks/{id}/triage',
     'PUT /v1/agents/{name}/offers',
+    'PATCH /v1/agents/{name}/max-concurrent-tasks', // e2e-agent-tasks: 400 INVALID_INPUT for 0 and 99
+    'PATCH /v1/agents/{name}/run-mode', // e2e-agent-runtime-source, e2e-agent-v2: 400 INVALID_INPUT
+    'PATCH /v1/agents/{name}/runtime-source', // e2e-agent-runtime-source, e2e-own-key-roads: 400 INVALID_INPUT
     'POST /v1/agents/v2/agent-proposals',
     'POST /v1/agents/v2/messages',
     // AI and provenance (ai, e2e-ai-image, e2e-llm-proxy, openrouter, e2e-notebook-plan,
@@ -83,10 +98,11 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     'POST /v1/openrouter/complete',
     'POST /v1/librarian/plan',
     'POST /v1/provenance',
-    // Home, workflows, operator (e2e-remake-home, e2e-federated-visitor-names, e2e-build-with-you)
+    // Home, workflows (e2e-remake-home, e2e-federated-visitor-names)
     'POST /v1/home/room',
+    // e2e-remake-home: 400 WELCOME_MAT_UNREADABLE, and the handler counts the failed paste
+    'POST /v1/home/welcome-mat',
     'PUT /v1/workflows/{id}',
-    'POST /v1/operator/notify-owner',
     // Admin (e2e-admin-features, e2e-admin-doors, e2e-admin-doors-2, e2e-subdomains, e2e-usage-telemetry)
     'PUT /v1/admin/config',
     'PUT /v1/admin/ghii/{ghii}',
@@ -99,6 +115,7 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     'POST /v1/admin/subdomains',
     'PATCH /v1/admin/subdomains/{subdomain}', // e2e-app-origin: 400 INVALID_ORIGIN
     'POST /v1/admin/usage/archive/prune',
+    'PUT /v1/admin/extensions/available/{name}/scripts/{actionId}', // e2e-admin-doors: its own 400 for {}
     // Account, sign-in, secrets, settings (e2e-access-tokens, e2e-account-events, e2e-admin-stats-page,
     // e2e-account-doors: the registration rate limit counts the call, e2e-security, e2e-secrets,
     // e2e-ai-visibility, e2e-setup-and-verification, e2e-classification-audience-cap,
@@ -106,7 +123,9 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     'POST /v1/access/tokens',
     'POST /v1/account/events',
     'POST /v1/ghii',
+    'PUT /v1/ghii', // e2e-display-prefs: 400 INVALID_INPUT for a timezone
     'PUT /v1/ghii/cors',
+    'POST /v1/personal/anchor', // e2e-personal-tunnel: 400 AGENT_GAII_NOT_YOURS
     'POST /v1/push/subscribe',
     'PUT /v1/secrets/{name}',
     'PUT /v1/visibility/settings',
@@ -154,6 +173,7 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     'POST /v1/organisms/{id}/workspace/spaces/{space}/extensions',
     // Memory (e2e-memory-full, e2e-memory-doors, e2e-app-grants, e2e-federated-session,
     // e2e-memory-federation-remote)
+    'POST /v1/memory', // e2e-memory-full: key and visibility; its own INVALID_INPUT for provenance and storage_ref
     'PATCH /v1/memory/{key}',
     'POST /v1/memory/import',
     'POST /v1/memory/copy',
@@ -164,11 +184,14 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     // Realtime, chat instances, ecosystem, MCP servers, federation (e2e-realtime-rooms,
     // e2e-mcp-chat-instances, e2e-ecosystem-events, e2e-mcp-proxy, e2e-federation, federation-mesh)
     'POST /v1/realtime/rooms',
+    'POST /v1/realtime/relay', // e2e-realtime-rooms: 400 INVALID_INPUT
+    'DELETE /v1/realtime/relay', // e2e-realtime-rooms: 400 INVALID_INPUT
     'POST /v1/ws/ticket',
     'POST /v1/chat-instances',
     'POST /v1/ecosystem/subscriptions',
     'POST /v1/mcp-servers',
     'POST /v1/mcp-servers/node',
+    'POST /v1/mcp-servers/{id}/call', // e2e-mcp-proxy: 400 BAD_REQUEST for {}
     'POST /v1/federation/peers',
     'POST /v1/federation/peer/request',
     'POST /v1/federation/trust-advisory',
@@ -183,13 +206,12 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     'POST /v1/organisms/{id}/invitations/email', // 400 INVALID_INPUT for a locale with no template
     'POST /v1/ai/jobs', // 400 INVALID_BODY for an unknown op
     'PUT /v1/ai/decide/settings', // 400 INVALID_BODY for a policy that is not an object
-    'PUT /v1/memory/{key}', // 403 on a reserved key for a body without version
     'POST /v1/refinery/runs', // 400 INVALID_INPUT for a prefix that is not a definition name
     'POST /v1/schedules', // 400 INVALID_AI_JOB for an output_visibility that is no visibility
-    'POST /v1/workflows/{id}/run', // 403 for a visitor, whose probe body names no mode
+    'PATCH /v1/schedules/{id}', // e2e-agent-schedules: 400 INVALID_CRON, INVALID_INPUT, NO_PROMPT
     'PUT /v1/packages/{groupId}/entitlements/{nodeId}', // 400 INVALID_INPUT for an unknown channel
     'PUT /v1/ai/gen-rules', // 400 GEN_RULES_INVALID with every problem named
 ];
 
 /** Routes observed in enforce mode, each with its reason. */
-export const EXEMPT_BODY_ROUTES: readonly ExemptBodyRoute[] = ROUTE_OWN_REFUSAL.map(route => ({ route, reason: AWAITS_DEVELOPER }));
+export const EXEMPT_BODY_ROUTES: readonly ExemptBodyRoute[] = ROUTE_OWN_REFUSAL.map(route => ({ route, reason: VALIDATES_ITSELF }));

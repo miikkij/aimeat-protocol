@@ -37,6 +37,7 @@
  *   cd aimeat && pnpm check:write-validation --list   # every route and its class
  *   cd aimeat && pnpm check:write-validation --seed   # rewrite the baseline from today's code (ask first)
  * @version-history
+ *   v1.2.1 — 2026-11-15 — An exempt entry may name a DELETE route, whose body the guard checks too.
  *   v1.2.0 — 2026-11-14 — The per-route enforced list is gone (the guard's mode is a node setting);
  *     the exempt entries are held to the contract and the routes instead (structure programme
  *     2026-11, unit 1).
@@ -62,6 +63,8 @@ import { loadBodyContract, routeKey, type BodyContract } from '../src/services/o
 const AIMEAT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = path.join(AIMEAT, 'security', 'write-validation-baseline.json');
 const WRITES = new Set(['post', 'put', 'patch']);
+/** The methods whose body middleware/openapi-body-guard.ts checks, so an exempt entry may name. */
+const GUARDED = new Set([...WRITES, 'delete']);
 const SEED_REASON = 'UNREVIEWED — reads its body without a schema (seeded 2026-10-27).';
 
 export type WriteClass = 'schema' | 'contract' | 'no body' | 'by hand' | 'elsewhere';
@@ -90,11 +93,11 @@ function classOf(chain: readonly ts.Expression[], handler: ts.Expression, source
     return HANDS_REQ.test(body) ? 'elsewhere' : 'no body';
 }
 
-export function classify(file: string, source: ts.SourceFile): WriteRoute[] {
+export function classify(file: string, source: ts.SourceFile, methods: ReadonlySet<string> = WRITES): WriteRoute[] {
     const out: WriteRoute[] = [];
     const visit = (node: ts.Node): void => {
         if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
-            && WRITES.has(node.expression.name.text)
+            && methods.has(node.expression.name.text)
             && ts.isIdentifier(node.expression.expression) && /^(router|app)$/.test(node.expression.expression.text)) {
             const [first, ...rest] = node.arguments;
             const handler = rest[rest.length - 1];
@@ -141,11 +144,11 @@ export function enforcedProblems(routes: readonly WriteRoute[], enforced: readon
     return problems;
 }
 
-function allRoutes(): WriteRoute[] {
+function allRoutes(methods: ReadonlySet<string> = WRITES): WriteRoute[] {
     const routes: WriteRoute[] = [];
     for (const full of tsFiles(path.join(AIMEAT, 'src', 'routes'))) {
         const rel = path.relative(AIMEAT, full).split(path.sep).join('/');
-        routes.push(...classify(rel, ts.createSourceFile(full, readFileSync(full, 'utf-8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)));
+        routes.push(...classify(rel, ts.createSourceFile(full, readFileSync(full, 'utf-8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS), methods));
     }
     applyEnforced(routes);
     // The same method and path in two files (a route split, an alias) are two entries.
@@ -194,7 +197,8 @@ export function main(): boolean {
     console.log('');
     if (process.argv.includes('--list')) for (const r of routes) console.log(`    ${r.cls.padEnd(10)} ${r.id}  ${r.file}:${r.line}`);
 
-    const problems = enforcedProblems(routes, EXEMPT_BODY_ROUTES.map(e => e.route));
+    // The guard checks DELETE bodies too, so an exempt DELETE route is looked up among those.
+    const problems = enforcedProblems(allRoutes(GUARDED), EXEMPT_BODY_ROUTES.map(e => e.route));
     if (problems.length > 0) {
         console.error('✖ An exempt entry in src/data/openapi-body-modes.ts names no route the guard checks:');
         for (const p of problems) console.error(`    ${p}`);
