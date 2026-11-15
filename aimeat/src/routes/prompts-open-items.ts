@@ -35,7 +35,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { sendPlainText } from '../middleware/plain-text.js';
 import { optionalAuth } from '../auth/middleware.js';
 import { buildOpenItemsPrompt, OPEN_ITEMS_SKILL } from '../services/open-items-prompt.js';
-import { buildWelcomeMatPrompt } from '../services/welcome-mat-prompt.js';
+import { buildWelcomeMatPrompt } from '../services/welcome/mat-prompt.js';
 import { buildInstructionBlocks } from '../services/hello-mcp.js';
 import { listWorkspaces } from '../services/structure-overview.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';

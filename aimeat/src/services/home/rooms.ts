@@ -81,7 +81,7 @@ export const ROOMS: readonly RoomDef[] = [
     // not a starting state, it is the whole content. E11 forbids exactly that door.
     //
     // In practice a new account is never empty — the operator's welcome is delivered at
-    // registration (services/welcome-message.ts), so the card is there from the first render.
+    // registration (services/welcome/message.ts), so the card is there from the first render.
     // The check earns its keep on ACCOUNTS THAT ALREADY EXISTED when this shipped: nobody
     // welcomed them, and without the check every one of them would get a door into nothing.
     { id: 'messages', url: '/v1/profile?tab=messages', presence: 'has-content' },

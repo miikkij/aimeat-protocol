@@ -16,7 +16,7 @@ import {
     readWelcomeMatMeta,
     WELCOME_MAT_BEGIN,
     WELCOME_MAT_END,
-} from '../../src/services/welcome-mat-parse.js';
+} from '../../src/services/welcome/mat-parse.js';
 
 /** The page the prompt asks for, metadata and all. */
 const FULL_PAGE = `<!doctype html>

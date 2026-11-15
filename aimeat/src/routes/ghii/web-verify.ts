@@ -395,7 +395,7 @@ export function registerWebVerifyRoutes(
 
         // The operator's welcome into the new mailbox. Fire-and-forget: a greeting must never be
         // able to turn a signup into a 500.
-        void import('../../services/welcome-message.js')
+        void import('../../services/welcome/message.js')
             .then(m => m.sendOperatorWelcome(storage, config, username))
             .catch(err => logger.warn('ghii register-web: welcome message failed', { error: String(err) }));
 

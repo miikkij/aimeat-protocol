@@ -1,7 +1,7 @@
 /**
  * @file test/unit/link-preview-meta-scan.test.ts
  * @description The link preview (routes/unfurl.ts parseMeta) and the welcome-mat reader
- *   (services/welcome-mat-parse.ts readWelcomeMatMeta) read `<meta>` tags and the `<title>` in time
+ *   (services/welcome/mat-parse.ts readWelcomeMatMeta) read `<meta>` tags and the `<title>` in time
  *   that grows with the page, not with its square. A fetched page chosen by any signed-in caller full
  *   of `<meta` openers with no `>` cost seconds of event-loop time per pattern (secaudit2026oct31w2
  *   round 10, f-2026aug-dos-ratelimit-1). The usage half: real pages give the same preview as before.
@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { parseMeta } from '../../src/routes/unfurl.js';
-import { readWelcomeMatMeta } from '../../src/services/welcome-mat-parse.js';
+import { readWelcomeMatMeta } from '../../src/services/welcome/mat-parse.js';
 
 const URL_A = 'https://example.com/a';
 

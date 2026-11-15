@@ -55,7 +55,7 @@ import { readNotificationSettings, appendMailLog } from './notifications/setting
 import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail } from './mail-gate.js';
 import { ONBOARDING_KEYS } from './onboarding/markers.js';
-import { buildWelcomeMatPrompt } from './welcome-mat-prompt.js';
+import { buildWelcomeMatPrompt } from './welcome/mat-prompt.js';
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html-escape.js';
 

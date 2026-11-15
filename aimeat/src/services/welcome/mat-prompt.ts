@@ -1,5 +1,5 @@
 /**
- * @file src/services/welcome-mat-prompt.ts
+ * @file src/services/welcome/mat-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The welcome mat prompt (aimeat_remake/03-welcome-mat.md): the first thing a person
@@ -21,7 +21,7 @@
  *   copies people have already carried into their chats.
  *
  *   The full variant also asks for the interview's answers in a private block in the <head>
- *   (`<script type="application/json" id="aimeat-profile">`, services/welcome-mat-parse.ts
+ *   (`<script type="application/json" id="aimeat-profile">`, services/welcome/mat-parse.ts
  *   PROFILE_BLOCK_ID). The paste writes them into the person's `journey.state` and removes the
  *   block before the page is stored, so the copy-prompt road keeps the answers the connected road
  *   writes with aimeat_memory_write.
@@ -32,7 +32,7 @@
  *   copy-paste", not "your AI can follow a six-point spec".
  * @structure buildWelcomeMatPrompt(config, { lang, variant, displayName })
  * @usage
- *   import { buildWelcomeMatPrompt } from '../services/welcome-mat-prompt.js';
+ *   import { buildWelcomeMatPrompt } from './mat-prompt.js';
  *   const prompt = buildWelcomeMatPrompt(config, { lang: 'fi' });
  * @version-history
  *   v2.1.0 — 2026-10-03 — The full variant asks for the private profile block with the interview's
@@ -41,8 +41,8 @@
  *     a schema.org Person block and a "For AIs" section. Markers and ai-* fields unchanged.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
  */
-import type { AimeatConfig } from '../config.js';
-import { WELCOME_MAT_BEGIN, WELCOME_MAT_END, PROFILE_BLOCK_ID } from './welcome-mat-parse.js';
+import type { AimeatConfig } from '../../config.js';
+import { WELCOME_MAT_BEGIN, WELCOME_MAT_END, PROFILE_BLOCK_ID } from './mat-parse.js';
 
 type Lang = 'en' | 'fi' | 'es';
 const lang = (v?: string): Lang => (v === 'fi' || v === 'es' ? v : 'en');

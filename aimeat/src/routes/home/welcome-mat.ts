@@ -50,7 +50,7 @@ import { isOwnerInPerson } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { parseWelcomeMat } from '../../services/welcome-mat-parse.js';
+import { parseWelcomeMat } from '../../services/welcome/mat-parse.js';
 import {
     resolveAiClient, decideBranch, capabilityOf, aiClientVariantOptions, type BranchDecision, type AiClientResolution,
 } from '../../services/ai/tool-branch.js';

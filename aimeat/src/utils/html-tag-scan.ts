@@ -10,7 +10,7 @@
  *   collectAssetRefs:unclosed-tag-quadratic-scan). Moved out of app-artifact-lint.ts at its line limit.
  *
  *   metaTags and titleText read a fetched page's `<meta>` tags and its `<title>` for the link preview
- *   (routes/unfurl.ts) and the welcome-mat reader (services/welcome-mat-parse.ts). Their patterns ran
+ *   (routes/unfurl.ts) and the welcome-mat reader (services/welcome/mat-parse.ts). Their patterns ran
  *   `[^>]+` or `[^>]*?` from each `<meta`, so a page of many openers cost the square of its size per
  *   pattern (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-1).
  * @structure tagAttributes(html, name) · metaTags(html) · tagSpans(html, name) · metaContentOf(tags, attrs, key) · titleText(html)

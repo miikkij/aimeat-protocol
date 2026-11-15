@@ -334,7 +334,7 @@ export function registerRegisterLoginRoutes(
             .catch(err => logger.warn('ghii register: first feed row failed', { error: String(err) }));
 
         // The operator's welcome into the new mailbox. Same fire-and-forget contract as above.
-        void import('../../services/welcome-message.js')
+        void import('../../services/welcome/message.js')
             .then(m => m.sendOperatorWelcome(storage, config, username))
             .catch(err => logger.warn('ghii register: welcome message failed', { error: String(err) }));
 

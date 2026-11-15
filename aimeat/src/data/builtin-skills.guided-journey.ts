@@ -11,7 +11,7 @@
  *   (services/journey-state.ts journeyHandbookSection), so an AI that read only the handbook finds
  *   it. The stages and the record `journey.state` are defined in services/journey-state.ts; this
  *   text must agree with JOURNEY_STAGES, JOURNEY_ROADS and PROFILE_FIELDS there. The interview's
- *   questions are the same seven as the served welcome-mat prompt (services/welcome-mat-prompt.ts)
+ *   questions are the same seven as the served welcome-mat prompt (services/welcome/mat-prompt.ts)
  *   and the home's profile task (public/views/home/journey-prompts.js TASKS.profile).
  * @structure GUIDED_JOURNEY_SKILL_ENTRY
  * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';

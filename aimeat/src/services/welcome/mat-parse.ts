@@ -1,5 +1,5 @@
 /**
- * @file src/services/welcome-mat-parse.ts
+ * @file src/services/welcome/mat-parse.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Reading a welcome mat out of whatever the person pasted (aimeat_remake/
@@ -18,7 +18,7 @@
  *   - WELCOME_MAT_BEGIN / _END: the markers the prompt asks the model to emit
  *   - PROFILE_BLOCK_ID: the id of the private answers block
  * @usage
- *   import { parseWelcomeMat } from '../services/welcome-mat-parse.js';
+ *   import { parseWelcomeMat } from './mat-parse.js';
  *   const parsed = parseWelcomeMat(req.body.paste);
  * @version-history
  *   2026-10-31 — readWelcomeMatMeta reads the `<meta>` tags and the `<title>` in one linear pass
@@ -32,8 +32,8 @@
  *     removed as well and yields no profile.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
  */
-import { escapeHtml } from '../utils/html-escape.js';
-import { metaTags, metaContentOf, titleText, type MetaAttributes } from '../utils/html-tag-scan.js';
+import { escapeHtml } from '../../utils/html-escape.js';
+import { metaTags, metaContentOf, titleText, type MetaAttributes } from '../../utils/html-tag-scan.js';
 
 export const WELCOME_MAT_BEGIN = '<!-- AIMEAT WELCOME MAT BEGIN -->';
 export const WELCOME_MAT_END = '<!-- AIMEAT WELCOME MAT END -->';

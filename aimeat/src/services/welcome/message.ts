@@ -1,5 +1,5 @@
 /**
- * @file src/services/welcome-message.ts
+ * @file src/services/welcome/message.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The message the operator sends every new account, so the mailbox is not empty on the
@@ -21,7 +21,7 @@
  *   - splitSubjectAndBody(text) — first non-empty line + the rest (exported for the test)
  * @usage
  *   // At a registration door, fire-and-forget — a welcome must never fail a signup:
- *   void import('./welcome-message.js')
+ *   void import('./message.js')
  *     .then(m => m.sendOperatorWelcome(storage, config, owner.name))
  *     .catch(err => logger.warn('welcome message failed', { error: String(err) }));
  * @version-history
@@ -30,12 +30,12 @@
  *     minute must not leave the thirty-first without one.
  *   v1.0.0 — 2026-08-07 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { resolveOperatorFeeGhii } from './marketplace-fee.js';
-import { resolvePromptContent, substituteVariables } from './prompts/variables.js';
-import { sendDirectMessage } from './message/send.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { resolveOperatorFeeGhii } from '../marketplace-fee.js';
+import { resolvePromptContent, substituteVariables } from '../prompts/variables.js';
+import { sendDirectMessage } from '../message/send.js';
+import { logger } from '../../utils/logger.js';
 
 /** The seeded prompt that holds the operator's words. */
 export const WELCOME_PROMPT_ID = 'operator-welcome';

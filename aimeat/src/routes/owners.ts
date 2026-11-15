@@ -187,7 +187,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       .catch(err => logger.warn('owners register: first feed row failed', { error: String(err) }));
 
     // The operator's welcome into the new mailbox. Same fire-and-forget contract as above.
-    void import('../services/welcome-message.js')
+    void import('../services/welcome/message.js')
       .then(m => m.sendOperatorWelcome(storage, config, owner.name))
       .catch(err => logger.warn('owners register: welcome message failed', { error: String(err) }));
 

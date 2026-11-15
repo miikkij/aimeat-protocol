@@ -98,7 +98,7 @@ const SOURCES: string[] = [
     'aimeat/src/services/hello-mcp.ts',
     'aimeat/src/services/agent/connect-prompt.ts',
     'aimeat/src/services/agent/onboard-prompt.ts',
-    'aimeat/src/services/welcome-mat-prompt.ts',
+    'aimeat/src/services/welcome/mat-prompt.ts',
     'aimeat/src/services/draft-offer-prompt.ts',
     'aimeat/src/services/offerings-handbook.ts',
     'aimeat/src/services/ai/tool-setup.ts',
