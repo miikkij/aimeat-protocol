@@ -1,7 +1,14 @@
 """Tests for the interactive-message (federated AskUserQuestion) helpers."""
 import pytest
 
-from aimeat_crewai import AimeatMessagingError, answers_from_dm, ask, build_question, read_answers
+from aimeat_crewai import (
+    AimeatMessagingError,
+    answers_from_dm,
+    ask,
+    build_question,
+    open_group,
+    read_answers,
+)
 
 
 class _Resp:
@@ -115,3 +122,35 @@ def test_answers_from_dm_only_fetches_for_answer_wakes():
     # An answers wake fetches the structured picks.
     got = answers_from_dm(api, {"interactive": "answers", "conversationId": "c1"})
     assert got is not None and got["answers"]["q1"]["selected"] == ["a"]
+
+
+# ── open_group: the node's GroupCreateSchema (subject 1..200 after trim, a non-blank body) ──────
+
+
+def test_open_group_sends_members_subject_and_body():
+    api = _FakeApi(post_resp=_Resp(201, {"data": {"conversation_id": "g1"}}))
+    assert open_group(api, ["bob"], "Release plan", "Shall we ship on Friday?")["conversation_id"] == "g1"
+    assert api.posted == {"path": "/v1/messages/groups",
+                          "json": {"members": ["bob"], "subject": "Release plan", "body": "Shall we ship on Friday?"}}
+
+
+@pytest.mark.parametrize("subject", ["", "   "])
+def test_open_group_refuses_an_empty_subject_before_sending(subject):
+    api = _FakeApi()
+    with pytest.raises(AimeatMessagingError, match="needs a subject"):
+        open_group(api, ["bob"], subject, "hello")
+    assert api.posted is None
+
+
+def test_open_group_refuses_a_subject_over_200_characters():
+    api = _FakeApi()
+    with pytest.raises(AimeatMessagingError, match="at most 200 characters; this one has 201"):
+        open_group(api, ["bob"], "x" * 201, "hello")
+    assert api.posted is None
+
+
+def test_open_group_refuses_an_empty_first_message():
+    api = _FakeApi()
+    with pytest.raises(AimeatMessagingError, match="needs a body"):
+        open_group(api, ["bob"], "Release plan", "  ")
+    assert api.posted is None

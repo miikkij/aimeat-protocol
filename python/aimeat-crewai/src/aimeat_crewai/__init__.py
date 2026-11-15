@@ -26,6 +26,10 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.41.2 -- 2026-11-15 -- open_group() refuses an empty subject, a subject over 200 characters and an
+    empty first message, and decide.run_start() refuses an item that is not {subject, state}, both
+    before sending. The node refused the same calls with a 400, or, for a record with a "subject"
+    field of its own, decided it with no state.
   0.41.1 -- 2026-11-13 -- The crew daemon plans a queued task only when it carries no live plan
     (daemon._tasks_needing_plan). A spawned worker planned a task that waited for the owner's OK
     again at every start: a model call each time, and a repeated notice on a node built before
@@ -270,7 +274,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.41.1"
+__version__ = "0.41.2"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

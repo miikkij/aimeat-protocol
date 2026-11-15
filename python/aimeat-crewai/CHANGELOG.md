@@ -3,6 +3,20 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.41.2 - 2026-11-15
+
+A patch release: the calls below were already refused by the node, and now the package says why
+before it sends them.
+
+- **`open_group()` needs a subject and a first message.** An empty subject, a subject over 200
+  characters and a body of only spaces raise `AimeatMessagingError` with the reason. Before, the
+  node answered 400 and the message held only its field path.
+- **`decide.run_start()` takes items as `{"subject": ..., "state": ...}`.** A plain record, an item
+  with keys other than those two, or two items with one subject raise `DecideError`, and the message
+  shows how to wrap a record: `{"subject": record["id"], "state": record}`. Before, the node refused a
+  record without a `subject`, and decided a record with a `subject` field of its own (an email, for
+  example) with no state at all.
+
 ## 0.41.1 - 2026-11-13
 
 - **The daemon plans a waiting task once.** A task that already has a plan and waits for the

@@ -941,6 +941,36 @@ def settings(
 # ── many records at once ───────────────────────────────────────────────────────────────────────
 
 
+_RUN_ITEM_KEYS = frozenset({"subject", "state"})
+
+
+def _check_run_items(items: Any) -> None:
+    """The node's rule for ``items`` (services/decide/runs.ts startDecideRun), said before sending.
+
+    The node reads only ``subject`` and ``state`` from an item and refuses one without a subject, so
+    a plain record (a ticket, an email) sent as an item is refused, or, when it happens to carry a
+    ``subject`` field of its own, decided on with no state at all. Neither is guessed here.
+    """
+    if not isinstance(items, (list, tuple)):
+        raise DecideError('items must be a list of {"subject": ..., "state": ...}.')
+    seen: set[str] = set()
+    for i, item in enumerate(items):
+        if not isinstance(item, dict) or not isinstance(item.get("subject"), str) or not item["subject"]:
+            raise DecideError(
+                f'items[{i}] is not an item: each item is {{"subject": "<its name>", "state": <the record>}}. '
+                'Wrap a plain record, for example {"subject": record["id"], "state": record}.'
+            )
+        extra = sorted(set(item) - _RUN_ITEM_KEYS)
+        if extra:
+            raise DecideError(
+                f"items[{i}] has keys the node does not read ({', '.join(extra)}): an item holds only "
+                '"subject" and "state". Put the record under "state".'
+            )
+        if item["subject"] in seen:
+            raise DecideError(f'items[{i}] has the subject "{item["subject"]}", which another item already has.')
+        seen.add(item["subject"])
+
+
 def run_start(
     *,
     rule_id: str | None = None,
@@ -963,7 +993,20 @@ def run_start(
     Give the records as ``items``, or point at memory with ``keys`` or ``prefix`` (and ``fields`` to
     send only part of each record). The run keeps going after this call returns; read it with
     ``run_get``.
+
+    Each item is ``{"subject": str, "state": <the record>}``: ``subject`` is the item's own name in
+    the run (the results are keyed by it, so no two items share one) and ``state`` is what the
+    decision reads. A plain record is not an item, because the run cannot know which of its fields
+    names it::
+
+        run_start(rule_id="triage", items=[{"subject": t["id"], "state": t} for t in tickets])
+
+    An item without a ``subject``, with keys other than ``subject`` and ``state``, or with a
+    ``subject`` another item already has raises DecideError before anything is sent: the node
+    refuses the first and the third, and drops the extra keys of the second without a word.
     """
+    if items is not None:
+        _check_run_items(items)
     payload = {
         k: v
         for k, v in (

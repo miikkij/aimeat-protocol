@@ -48,6 +48,7 @@ from aimeat_crewai.decide import (
     review,
     rule_tools_data,
     rules,
+    run_start,
     scale,
     settings,
     yes_no,
@@ -856,3 +857,40 @@ def test_an_unreadable_line_does_not_hide_the_rest_of_the_log(_direct) -> None:
         encoding="utf-8",
     )
     assert [e["decision_id"] for e in read_direct_log()] == ["a", "b"]
+
+
+# ── run_start: the items the node reads (services/decide/runs.ts startDecideRun) ─────────────
+
+
+def test_a_run_sends_items_as_subject_and_state() -> None:
+    s = _StubSession(_ok({"id": "run-1", "state": "running"}))
+    items = [{"subject": "t-1", "state": {"title": "Printer on fire"}}, {"subject": "t-2"}]
+    assert run_start(rule_id="triage", items=items, **_node_kwargs(s))["id"] == "run-1"
+    assert s.calls[0]["json"]["items"] == items
+
+
+@pytest.mark.parametrize("items", [
+    [{"title": "Printer on fire", "id": "t-1"}],
+    [{"subject": "", "state": {}}],
+    ["t-1"],
+])
+def test_a_plain_record_is_not_sent_as_an_item(items: Any) -> None:
+    s = _StubSession(_ok({}))
+    with pytest.raises(DecideError, match=r'items\[0\] is not an item.*"subject": record\["id"\]'):
+        run_start(rule_id="triage", items=items, **_node_kwargs(s))
+    assert s.calls == [], "the node is not troubled with a body it refuses"
+
+
+def test_a_record_with_a_subject_field_of_its_own_is_not_decided_without_its_state() -> None:
+    # An email has a "subject": the node would take it as the item's name and drop the rest.
+    s = _StubSession(_ok({}))
+    with pytest.raises(DecideError, match=r"items\[0\] has keys the node does not read \(body, from\)"):
+        run_start(rule_id="triage", items=[{"subject": "Invoice", "from": "bob", "body": "..."}], **_node_kwargs(s))
+    assert s.calls == []
+
+
+def test_two_items_with_one_subject_are_refused_before_sending() -> None:
+    s = _StubSession(_ok({}))
+    with pytest.raises(DecideError, match=r'items\[1\] has the subject "t-1"'):
+        run_start(rule_id="triage", items=[{"subject": "t-1"}, {"subject": "t-1"}], **_node_kwargs(s))
+    assert s.calls == []

@@ -22,6 +22,8 @@ uses). Mirrors the node contract in aimeat/src/models/message-schemas.ts (the no
 mismatch).
 
 Changelog:
+  0.41.2 -- 2026-11-15 -- open_group() refuses an empty subject, a subject over 200 characters and an
+    empty body with AimeatMessagingError before it sends: the node refused all three with a 400.
   unreleased -- 2026-10-21 -- Group chat: open_group(), group_members(), change_group_members(),
     leave_group(), group_invitations() and answer_group_invitation() over /v1/messages/groups
     (a node release after 4.1.2).
@@ -240,9 +242,21 @@ def open_group(
     participants, invited) and `members`, one {identity, result} per name given, where result is
     "added", "invited" or "refused" (with code and message). Write in the group afterwards with
     POST /v1/messages and the conversation_id. `as_owner=True` opens it in your owner's name and needs
-    the messages:send-as-owner scope. Mirrors POST /v1/messages/groups (the node wins on a mismatch)."""
+    the messages:send-as-owner scope. Mirrors POST /v1/messages/groups (the node wins on a mismatch).
+
+    `subject` is the group's name: 1 to 200 characters once the spaces around it are taken off.
+    `body` is the first message and must hold more than spaces. The node refuses a group without
+    either (GroupCreateSchema), so this raises AimeatMessagingError before anything is sent."""
     if not members:
         raise AimeatMessagingError("open_group() needs at least one member")
+    if not isinstance(subject, str) or not subject.strip():
+        raise AimeatMessagingError("open_group() needs a subject: the group's name, 1 to 200 characters")
+    if len(subject.strip()) > 200:
+        raise AimeatMessagingError(
+            f"open_group() takes a subject of at most 200 characters; this one has {len(subject.strip())}"
+        )
+    if not isinstance(body, str) or not body.strip():
+        raise AimeatMessagingError("open_group() needs a body: a group opens with a first message")
     payload: dict[str, Any] = {"members": list(members), "subject": subject, "body": body}
     if ai_provenance:
         payload["ai_provenance"] = dict(ai_provenance)
