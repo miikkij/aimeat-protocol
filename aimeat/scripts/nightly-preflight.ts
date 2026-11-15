@@ -23,6 +23,7 @@
  *   makes sure the run is not spent finding what was already knowable.
  * @usage cd aimeat && pnpm nightly:preflight [--plan] [--full] [--since=<sha>] [--dispatch]
  * @version-history
+ *   v1.1.1 — 2026-11-15 — A suite deleted since the nightly is not planned (e2e-llm-proxy was).
  *   v1.1.0 — 2026-11-14 — No 4.0.0 steps: the nightly's release-4-0-0 job is gone.
  *   v1.0.0 — 2026-11-14 — Initial.
  */
@@ -68,6 +69,10 @@ if (base) {
         const tracked = execFileSync('git', ['diff', '--name-only', base], { encoding: 'utf8', cwd: repoRoot }).split('\n');
         const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { encoding: 'utf8', cwd: repoRoot }).split('\n');
         changed = [...new Set([...tracked, ...untracked].map(s => s.trim()).filter(Boolean))];
+        // A suite deleted since the nightly is in the diff too; the runner answers "Unknown test suite"
+        // for it and the whole step goes red. Other deleted files stay, because a deleted storage file
+        // is still a storage change.
+        changed = changed.filter(f => !/^aimeat\/test\/e2e-[^/]+\.ts$/.test(f) || existsSync(`${repoRoot}/${f}`));
         // A package.json change that touches only `scripts` changes nothing the package ships, and the
         // pack start costs about ten minutes here; drop it from what the plan reads.
         if (changed.includes('aimeat/package.json') && !manifestChangedBeyondScripts(base, repoRoot)) {
