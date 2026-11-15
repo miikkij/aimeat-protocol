@@ -243,7 +243,6 @@
       for (const [stage, method] of [["stt", "transcribe"], ["llm", "complete"], ["tts", "speak"]]) {
         if (config[stage].provider === "custom" && typeof adapters[method] !== "function") throw new TypeError(stage + " requires adapters." + method);
       }
-      if (config.tts.provider === "node" && !config.tts.model) throw new TypeError("tts.model is required for node speech synthesis");
     };
     validateAdapters();
     const api = {
@@ -917,7 +916,7 @@ registerProcessor('aimeat-voice-capture', AimeatVoiceCapture);
 
   // src/static/sdk-libs/voice/index.js
   attach("voice", {
-    version: "1.1.1",
+    version: "1.1.2",
     get defaults() {
       return structuredClone(defaults);
     },

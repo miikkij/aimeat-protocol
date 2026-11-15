@@ -9,6 +9,8 @@
  *   out, as the transcribe and complete adapters already do for their model.
  * @usage cd aimeat && pnpm exec vitest run test/unit/voice-speak-body.test.ts
  * @version-history
+ *   v1.1.0 - 2026-11-15 - A session created from the default configuration (session.js createSession)
+ *     speaks, and its speech request carries no model.
  *   v1.0.0 - 2026-11-15 - Initial: an empty model or voice is left out of the speech request.
  */
 import { describe, expect, it, vi, afterEach } from 'vitest';
@@ -47,6 +49,34 @@ describe('voice speak request body', () => {
     const body = await speakBody({ voice: '' });
     expect('voice' in body).toBe(false);
     expect(voiceSpeechSchema.safeParse(body).success).toBe(true);
+  });
+
+  it('a session on the default configuration speaks without a model, and the route takes the body', async () => {
+    const { createSession } = await import('../../src/static/sdk-libs/voice/session.js');
+    const { nodeAdapters } = await import('../../src/static/sdk-libs/voice/adapters.js');
+    const sent: Record<string, Record<string, unknown>> = {};
+    vi.stubGlobal('fetch', async (url: string, init: { body: string }) => {
+      const path = new URL(url).pathname; sent[path] = JSON.parse(init.body);
+      const frames = path === '/v1/ai/stream'
+        ? [{ type: 'text', text: 'Hello there.' }, { type: 'done' }]
+        : [{ type: 'start' }, { type: 'audio', data: 'AAA=' }, { type: 'done' }];
+      return new Response(frames.map(frame => JSON.stringify(frame)).join('\n') + '\n', { status: 200 });
+    });
+    const heard: number[] = [];
+    const player = { open: async () => {}, stop() {}, close: async () => {},
+      async play(stream: AsyncIterable<Uint8Array>) { for await (const bytes of stream) heard.push(bytes.byteLength); } };
+    // Only the input mode differs from the defaults, so the test needs no microphone.
+    const session = createSession({ appId: 'companion', input: { mode: 'text' } }, {}, { player: () => player, capture: () => null, adapters: nodeAdapters });
+    expect(session.config.tts).toMatchObject({ provider: 'node', model: '' });
+    await session.start();
+    const turn = await session.sendText('Question');
+    expect(turn.spoken).toBe('Hello there.');
+    expect(heard.length).toBeGreaterThan(0);
+    const body = sent['/v1/ai/speak'];
+    expect(body).toMatchObject({ input: 'Hello there.', app_id: 'companion', voice: 'alloy' });
+    expect('model' in body).toBe(false);
+    expect(voiceSpeechSchema.safeParse(body).success).toBe(true);
+    await session.close();
   });
 
   it('sends a model and a voice the app names', async () => {

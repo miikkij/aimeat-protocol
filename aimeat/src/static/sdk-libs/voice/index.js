@@ -2,8 +2,11 @@
  * @file voice/index.js
  * @description Reusable, configurable speech conversations for AIMEAT apps.
  * @structure Configuration and stage adapters feed the session coordinator and browser devices.
- * @usage AIMEAT.voice.createSession({ appId: 'companion', tts: { model: 'your-speech-model' } })
- * @version-history v1.0.0 - 2026-09-19 - Initial configurable OpenRouter-compatible voice pipeline.
+ * @usage AIMEAT.voice.createSession({ appId: 'companion' }), or name a model: tts: { model: 'your-speech-model' }
+ * @version-history
+ *   v1.1.2 - 2026-11-15 - createSession takes node speech without tts.model: the node's speech role
+ *     chooses the model (the owner's provider, the owner's default, then the node's default).
+ *   v1.0.0 - 2026-09-19 - Initial configurable OpenRouter-compatible voice pipeline.
  */
 import { attach } from '../_core/namespace.js';
 import { configure, defaults, presets } from './config.js';
@@ -13,7 +16,7 @@ import { createPlayer } from './player.js';
 import { nodeAdapters } from './adapters.js';
 
 attach('voice', {
-  version: '1.1.1',
+  version: '1.1.2',
   get defaults() { return structuredClone(defaults); },
   get presets() { return structuredClone(presets); },
   configure,

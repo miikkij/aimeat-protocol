@@ -1,7 +1,10 @@
 /**
  * @file voice-session.test.ts
  * @description Behavioral voice contracts: early playback, queue bounds, interruption and cleanup.
- * @version-history v1.0.0 - 2026-09-19 - Tests exercise delayed adapters rather than interface presence.
+ * @version-history
+ *   v1.1.0 - 2026-11-15 - Node speech without tts.model is accepted (the node's default model applies);
+ *     the atomic-rollback check now uses a node-speech session that lacks adapters.speak.
+ *   v1.0.0 - 2026-09-19 - Tests exercise delayed adapters rather than interface presence.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { createSession } from '../../src/static/sdk-libs/voice/session.js';
@@ -53,8 +56,14 @@ describe('voice session', () => {
   it('requires a custom adapter and validates reconfiguration atomically', async () => {
     expect(() => createSession(options, {}, {})).toThrow('transcribe');
     const { session } = setup();
-    expect(() => session.configure({ tts: { provider: 'node' } })).toThrow('tts.model');
-    expect(session.config.tts.provider).toBe('custom');
+    // Node speech without a model is a session that speaks with the node's default speech model
+    // (it threw "tts.model is required" until 2026-11-15). A patch the adapters cannot serve is
+    // still refused and leaves the configuration as it was.
+    expect(session.configure({ tts: { provider: 'node' } }).tts).toMatchObject({ provider: 'node', model: '' });
+    const nodeSpeech = createSession({ ...options, tts: { provider: 'node' } }, { transcribe: async () => '', async *complete() {} }, {});
+    expect(() => nodeSpeech.configure({ tts: { provider: 'custom' } })).toThrow('adapters.speak');
+    expect(nodeSpeech.config.tts.provider).toBe('node');
+    session.configure({ tts: { provider: 'custom' } });
     session.configure({ llm: { temperature: 0.2 } }); expect(session.config.llm.temperature).toBe(0.2);
     session.configure({ preset: 'patient', chunking: { maxChars: 300 } });
     expect(session.config.turn.silenceMs).toBe(1200);

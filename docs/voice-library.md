@@ -79,7 +79,7 @@ retained. history.maxTurns bounds memory; closing a session clears it.
 | turn | silenceMs 700; minSpeechMs 250; maxSpeechMs 30000; threshold 0.025 RMS; preRollMs 200; bargeIn false; interruptMs 200; resumeQuietMs 300 |
 | stt | provider node; model empty uses owner/node STT default; language empty uses session language; temperature 0 |
 | llm | provider node; model empty uses existing model selection; temperature 0.7; topP 1; maxTokens null (no default cap, optional explicit limit); reasoning null |
-| tts | provider node; explicit model required; voice alloy; format pcm; sampleRate 24000; channels 1; speed 1; instructions empty |
+| tts | provider node; model empty uses the owner's provider, then the owner's default, then the node's speech default; voice alloy; format pcm; sampleRate 24000; channels 1; speed 1; instructions empty |
 | chunking | mode sentence; minChars 24; maxChars 1200; maxWaitMs 350 (latency mode only) |
 | playback | bufferMs 80; maxBufferedMs 3000; maxPendingSegments 3; volume 1 |
 | history | maxTurns 12 |

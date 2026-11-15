@@ -3,6 +3,8 @@
  * @description Real node, owner/app grants and local protocol peer: stream, speech, scope isolation,
  *   app attribution and concurrent accounting. No external provider calls or paid AI settings.
  * @version-history
+ *   2026-11-15 - The voice library's default speech body, with no model, is answered 200 and the
+ *     provider is asked for the owner's speech model (aimeat-voice 1.1.2).
  *   2026-10-25 - /v1/ai/complete from an app grant is held to the owner's per-app cap and allowlist of
  *     the app the grant names, whatever app_id the body sends (secaudit2026oct22).
  *   2026-10-19 - An app session sends its bare file name as app_id to speak, stream and transcribe and is
@@ -22,6 +24,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 let passed = 0, failed = 0, providerCalls = 0;
+/** The model the last speech request named at the peer: proves which default the node chose. */
+let lastSpeechModel: unknown;
 async function test(name: string, fn: () => Promise<void>) {
   try { await fn(); passed++; console.log(`PASS ${name}`); }
   catch (error) { failed++; console.error(`FAIL ${name}: ${String(error)}`); }
@@ -77,6 +81,7 @@ const peer = createServer(async (req, res) => {
     res.end('data: ' + JSON.stringify({ choices: [{ delta: { content: 'Toinen lause.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 8, cost: 0.001 } }) + '\n\ndata: [DONE]\n\n');
   } else if (req.url === '/audio/speech') {
     const input = JSON.parse(Buffer.concat(chunks).toString());
+    lastSpeechModel = input.model;
     if (input.voice === 'error') { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":"bad voice"}'); return; }
     if (input.voice === 'refused-key') { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"User not found."}}'); return; }
     // The omnituinen case (2026-10-08): a model that does not make mp3 refuses every mp3 call.
@@ -189,6 +194,25 @@ try {
     const bytes = frames.filter(row => row.type === 'audio').reduce((sum, row) => sum + Buffer.from(row.data, 'base64').length, 0);
     assert(bytes === 4800 && frames.at(-1).syntheticAudio, result.text); assert(!result.text.includes('apiKey'), 'key leaked');
     assert(!frames.at(-1).provenance || JSON.stringify(frames.at(-1).provenance).includes(createHash('sha256').update(Buffer.alloc(4800)).digest('hex')), 'Provenance must identify the generated audio, not the input text');
+  });
+  await test('The voice library\'s default speech body has no model, and the node speaks with the owner\'s speech default', async () => {
+    // What voice/adapters.js speak() sends on the library's default configuration (unit:
+    // voice-speak-body.test.ts): no model, the default voice. The owner's provider names its speech
+    // model, so that model is the default the node applies.
+    const carol = await owner('voicec');
+    const provider = await call('/v1/ai/providers/voice-peer', {
+      title: 'Local protocol peer', type: 'openai-compatible', baseUrl: `http://127.0.0.1:${peerPort}`, auth: { type: 'none' },
+      capabilities: { speech: { enabled: true, model: 'speech-default' } },
+    }, carol.token, 'PUT');
+    assert(provider.status === 200, provider.text);
+    const routed = await call('/v1/ai/routing', { routing: { defaults: { speech: ['voice-peer'] }, rules: { onlyTested: false } } }, carol.token, 'PUT');
+    assert(routed.status === 200, routed.text);
+    const body = { input: 'Hei maailma', app_id: `${carol.name}/voice.html`, voice: 'alloy', response_format: 'pcm', speed: 1, instructions: '' };
+    lastSpeechModel = undefined;
+    const result = await call('/v1/ai/speak', body, carol.token); assert(result.status === 200, result.text);
+    const frames = result.text.trim().split('\n').map(line => JSON.parse(line));
+    assert(frames.at(-1).type === 'done' && frames.some(row => row.type === 'audio'), result.text);
+    assert(lastSpeechModel === 'speech-default', `the provider was asked for ${String(lastSpeechModel)}, not the owner's speech default`);
   });
   await test('Provider failures and incomplete streams never become successful turns', async () => {
     // A1/A2: a provider's 400 repeats on every retry, so it is 422 PROVIDER_REJECTED with the

@@ -3,13 +3,22 @@
  * @description A configurable STT/LLM/TTS turn coordinator. No content persists unless the app stores it.
  * @structure createSession with injected stage adapters and browser capture/playback factories
  * @usage const s = createSession(options, adapters); await s.start(); await s.sendText('Hello');
- * @version-history v1.0.0 - 2026-09-19 - Bounded queues, interruption, heard history and stage timing.
+ * @version-history
+ *   v1.1.2 - 2026-11-15 - Node speech takes no model: an empty tts.model is valid, the speech adapter
+ *     leaves it out of POST /v1/ai/speak, and the node's speech role chooses the model (the owner's
+ *     provider, the owner's default, then the node's default). A custom stage still needs its adapter.
+ *   v1.0.0 - 2026-09-19 - Bounded queues, interruption, heard history and stage timing.
  */
 import { configure } from './config.js';
 import { segments, abortable } from './segments.js';
 import { prefetchAudio } from './prefetch.js';
 
-/** @param {any} options @param {any} adapters @param {any} factories */
+/**
+ * A stage whose provider is 'node' needs no model: an empty stt.model, llm.model or tts.model is left
+ * out of the request, and the node's AI role for that stage chooses (the owner's provider, the owner's
+ * default, then the node's default). A stage whose provider is 'custom' needs its adapter method.
+ * @param {any} options @param {any} adapters @param {any} factories
+ */
 export function createSession(options, adapters, factories) {
   let config = configure(options);
   let state = 'idle', started = false, starting = null, closed = false, epoch = 0;
@@ -24,7 +33,6 @@ export function createSession(options, adapters, factories) {
     for (const [stage, method] of [['stt', 'transcribe'], ['llm', 'complete'], ['tts', 'speak']]) {
       if (config[stage].provider === 'custom' && typeof adapters[method] !== 'function') throw new TypeError(stage + ' requires adapters.' + method);
     }
-    if (config.tts.provider === 'node' && !config.tts.model) throw new TypeError('tts.model is required for node speech synthesis');
   };
   validateAdapters();
   const api = {
