@@ -27,7 +27,7 @@
  * @version-history
  *   v2.2.0 — 2026-11-15 — Every exempt route validates its body itself and stays observed for good.
  *     The three whose test expected only a middleware refusal leave the list, because the guard now
- *     refuses after the route's middleware; eleven routes with their own refusal and the welcome mat,
+ *     refuses after the route's middleware; twelve routes with their own refusal and the welcome mat,
  *     whose handler counts a failed paste, join it (structure programme 2026-11, unit 1).
  *   v2.1.0 — 2026-11-14 — The exempt routes: every route an existing E2E test expects to answer a
  *     wrong body with its own refusal, until the developer decides (structure programme 2026-11, unit 1).
@@ -135,6 +135,7 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     // Site, portfolio (api-full, e2e-portal, e2e-surface-layout, e2e-remake-home)
     'POST /v1/site/template',
     'POST /v1/site/layout/{surface}/restore',
+    'PUT /v1/site/layout/{surface}', // e2e-surface-layout: 422 for a contentsMenu that is not true or false
     'PUT /v1/portfolio/upload',
     // Apps (e2e-app-community, e2e-app-screenshot-access, e2e-app-agent-deploy, e2e-app-draft,
     // e2e-federated-visitor-names, e2e-app-design-spec)
