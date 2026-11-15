@@ -21,9 +21,13 @@
  *       that exits while the suite runs makes the suite red with NODE DIED.
  *     - SKIPS ARE COUNTED (P1-04, F7b-01). The suite's `K skipped` is read and shown in its own
  *       column; a suite with no test case is red (scripts/lib/e2e-results.ts decides the verdicts).
- * @structure SuiteResult · suiteTimeLimitMs() · runLane() · runTest() · endTree()
+ * @structure SuiteResult · suiteTimeLimitMs() · NO_RUNNER_NODE_BASE · runLane() · runTest() · endTree()
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.2.0 -- 2026-11-15 -- A suite on RUNNER_NODE_FREE gets its database emptied and no node started,
+ *     and its E2E_BASE points at a port nothing listens on (NO_RUNNER_NODE_BASE). With two targets a
+ *     lane boots the next suite's node on the second one while the current suite runs (`--preboot`);
+ *     cycleMs is then the time the lane waited for that node. E2E report of 2026-11-15, 4.2.1 and 4.2.3.
  *   v1.1.0 -- 2026-10-16 -- A red suite's result carries its first failed tests (failures), which the
  *     runner writes as GitHub annotations in CI (scripts/lib/e2e-github-report.ts).
  *   v1.0.0 -- 2026-10-16 -- Extracted from run-e2e-ci.ts, with a per-suite time limit, a retried
@@ -33,7 +37,7 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
-import { anonymousModeFor, cleanDatabase, pinnedEnv, startServer, stopServer, type RunnerTarget } from './run-e2e-server.js';
+import { anonymousModeFor, cleanDatabase, perSuiteCoverageEnv, pinnedEnv, startServer, stopServer, type RunnerTarget } from './run-e2e-server.js';
 import { acquirePortLocks, releasePortLocks, suiteOwnPorts } from '../scripts/lib/e2e-ports.js';
 import { classify, parseResults } from '../scripts/lib/e2e-results.js';
 import { failedTestLines } from '../scripts/lib/e2e-github-report.js';
@@ -80,26 +84,50 @@ export interface LaneOptions {
     session: string;
     /** Whether a suite is in the guard tier, where a skipped test is red. */
     isGuard: (name: string) => boolean;
+    /** Whether a suite talks to the runner's node; false for RUNNER_NODE_FREE (test/run-e2e-plan.ts). */
+    needsNode?: (name: string) => boolean;
 }
 
-export async function runLane(lane: number, target: RunnerTarget, suites: string[], stream: boolean, opts: LaneOptions): Promise<SuiteResult[]> {
+/**
+ * Where a suite that needs no runner node is pointed: a port nothing listens on (TCP 9, discard,
+ * which no test machine serves). A suite on RUNNER_NODE_FREE that reaches for the runner's node gets
+ * ECONNREFUSED and goes red, instead of passing against the previous suite's node.
+ */
+export const NO_RUNNER_NODE_BASE = 'http://127.0.0.1:9';
+
+/** One node position of a lane: its target (port and database) and the node running there now. */
+interface Slot { target: RunnerTarget; server: ChildProcess | null }
+
+/**
+ * Run one lane. `targets` holds one target, or two when the next suite's node is booted while the
+ * current suite runs (`--preboot`): the lane then alternates between the two ports and databases,
+ * and every suite still gets a node started for it alone on a database emptied for it alone.
+ */
+export async function runLane(lane: number, targets: RunnerTarget | RunnerTarget[], suites: string[], stream: boolean, opts: LaneOptions): Promise<SuiteResult[]> {
     const tag = stream ? '' : `[lane ${lane}] `;
     const results: SuiteResult[] = [];
-    let server: ChildProcess | null = null;
+    const slots: Slot[] = (Array.isArray(targets) ? targets : [targets]).map(target => ({ target, server: null }));
+    const external = slots[0].target.external;
+    const needsNode = opts.needsNode ?? (() => true);
 
-    /** Stop the previous node (if any), empty the database, start the next node: tried twice. */
-    async function cycle(name: string): Promise<void> {
+    /**
+     * Make `slot` ready for suite `name`: stop the node there (if any), empty its database, and start
+     * a node for the suite unless the suite needs none. Tried twice.
+     */
+    async function prepare(slot: Slot, name: string): Promise<void> {
         let lastError: unknown;
         for (let attempt = 1; attempt <= 2; attempt++) {
             try {
-                if (server) {
-                    await stopServer(server, target);
-                    server = null;
+                if (slot.server) {
+                    await stopServer(slot.server, slot.target);
+                    slot.server = null;
                 }
                 // The database is emptied BEFORE the first suite too, by the same call the loop makes
                 // between suites: a solo run of any suite used to start on the previous run's data.
-                await cleanDatabase(target);
-                server = await startServer(target, name);
+                // A suite that needs no runner node gets it emptied as well, because a node it starts
+                // itself may be handed the lane's database through the pinned environment.
+                await cleanDatabase(slot.target);
+                if (needsNode(name)) slot.server = await startServer(slot.target, name);
                 return;
             } catch (e) {
                 lastError = e;
@@ -109,19 +137,30 @@ export async function runLane(lane: number, target: RunnerTarget, suites: string
         throw lastError;
     }
 
+    // With two slots, suite i runs on slot i % 2 while slot (i + 1) % 2 is prepared for suite i + 1.
+    let ahead: Promise<void> | null = null;
+
     try {
         for (let i = 0; i < suites.length; i++) {
             const suite = suites[i];
             const name = basename(suite, '.ts');
+            const slot = slots[i % slots.length];
+            const target = slot.target;
             // The node starts per suite, because the suite decides its anonymous-mode setting
             // (ANONYMOUS_OFF_SUITES in run-e2e-server.ts). An external node has its own setting.
-            const anonymous = target.external ? 'external' : anonymousModeFor(name) === 'false' ? 'off' : 'on';
+            const anonymous = external ? 'external' : !needsNode(name) ? 'no node' : anonymousModeFor(name) === 'false' ? 'off' : 'on';
 
             let cycleMs = 0;
-            if (!target.external) {
+            if (!external) {
                 const c0 = Date.now();
                 try {
-                    await cycle(name);
+                    if (ahead) {
+                        // Prepared while the previous suite ran. A failure there is retried here,
+                        // in the foreground, before the suite is given up.
+                        try { await ahead; } catch { await prepare(slot, name); }
+                    } else {
+                        await prepare(slot, name);
+                    }
                 } catch (e) {
                     // The run goes on: this suite and the rest of the lane are reported NOT RUN with
                     // the reason, and the other lanes' results reach the summary (QA audit P1-09).
@@ -133,8 +172,15 @@ export async function runLane(lane: number, target: RunnerTarget, suites: string
                     }
                     break;
                 }
+                ahead = null;
                 if (i > 0) cycleMs = Date.now() - c0;
-                else console.log(`${tag}Server ready on :${target.port}.\n`);
+                else if (slot.server) console.log(`${tag}Server ready on :${target.port}.\n`);
+                // The next suite's node boots on the other slot while this suite runs. Its errors
+                // are caught where it is awaited; this keeps an early rejection from going unhandled.
+                if (slots.length > 1 && i + 1 < suites.length) {
+                    ahead = prepare(slots[(i + 1) % slots.length], basename(suites[i + 1], '.ts'));
+                    ahead.catch(() => { /* awaited and retried before the next suite */ });
+                }
             }
 
             if (stream) {
@@ -153,11 +199,12 @@ export async function runLane(lane: number, target: RunnerTarget, suites: string
             });
             const t0 = Date.now();
             let output: string, exitCode: number, timedOut: boolean;
-            try { ({ output, exitCode, timedOut } = await runTest(suite, name, target, stream)); }
+            const baseUrl = !external && !needsNode(name) ? NO_RUNNER_NODE_BASE : undefined;
+            try { ({ output, exitCode, timedOut } = await runTest(suite, name, target, stream, baseUrl)); }
             finally { releasePortLocks(held); }
             const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
             const parsed = parseResults(output);
-            const node: ChildProcess | null = server;
+            const node: ChildProcess | null = slot.server;
             const nodeDied = node && (node.exitCode !== null || node.signalCode !== null)
                 ? `exit ${node.exitCode ?? node.signalCode}` : undefined;
             const result: SuiteResult = { name, ...parsed, time: `${elapsed}s`, exitCode, lane, cycleMs, anonymous, timedOut, nodeDied };
@@ -181,10 +228,14 @@ export async function runLane(lane: number, target: RunnerTarget, suites: string
             results.push(result);
         }
     } finally {
-        if (server) {
+        // A node still booting on the other slot is waited for, so it is stopped below rather than
+        // left running after the lane ends.
+        if (ahead) await ahead.catch(() => { /* its node, if any, is stopped below */ });
+        for (const slot of slots) {
+            if (!slot.server) continue;
             // Reported, not thrown: a failure to shut down must not replace whatever error brought
             // us into this block, which is the thing the reader needs.
-            await stopServer(server, target).catch((e: unknown) => {
+            await stopServer(slot.server, slot.target).catch((e: unknown) => {
                 console.error(`${tag}Could not stop the test server: ${(e as Error).message}`);
             });
         }
@@ -214,15 +265,15 @@ function endTree(child: ChildProcess): void {
     }
 }
 
-/** Run one suite with the runner's pins, under its time limit. */
-export function runTest(suitePath: string, name: string, target: RunnerTarget, stream: boolean): Promise<{ output: string; exitCode: number; timedOut: boolean }> {
+/** Run one suite with the runner's pins, under its time limit. `baseUrl` overrides E2E_BASE. */
+export function runTest(suitePath: string, name: string, target: RunnerTarget, stream: boolean, baseUrl?: string): Promise<{ output: string; exitCode: number; timedOut: boolean }> {
     return new Promise((settle) => {
         // The suite gets the SAME pins as the server. A suite derives what it expects from its own
         // environment, so any pin it cannot see is a place where the two can disagree about what is
         // being tested: e2e-x402-testnet skips when the off-chain double is in use, could not see
         // that it was, and so ran its real-network acceptance cases against the double.
         const child = spawn('node', ['--import', 'tsx', suitePath], {
-            env: { ...process.env, ...pinnedEnv(target, name), E2E_BASE: target.baseUrl },
+            env: { ...process.env, ...pinnedEnv(target, name), ...perSuiteCoverageEnv(name), E2E_BASE: baseUrl ?? target.baseUrl },
             stdio: ['ignore', 'pipe', 'pipe'],
             cwd: process.cwd(),
             // Its own process group on POSIX, so the time limit can end the suite and every node or

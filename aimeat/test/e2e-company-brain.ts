@@ -24,6 +24,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { serverDbUrl, serverSqlitePath } from './helpers/server-db.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const GROUP = 'company-brain::system';
@@ -540,6 +541,25 @@ async function bulkPublish(namespace: string, records: Array<{ id: string; value
  * is the shape of check that certifies a store nobody looked at. `include=meta` alone returns
  * `total` from a live listing.
  */
+/** How many keys a principal holds, read in the database of the node under test (either backend). */
+async function extKeyCount(principal: string): Promise<number> {
+  const url = serverDbUrl();
+  if (url) {
+    const pg = (await import('pg')).default;
+    const client = new pg.Client(url);
+    await client.connect();
+    try {
+      const r = await client.query('SELECT COUNT(*)::int AS n FROM "Memory" WHERE "ownerGaii" = $1', [principal]);
+      return Number(r.rows[0].n);
+    } finally { await client.end(); }
+  }
+  const Database = (await import('better-sqlite3')).default;
+  const db = new Database(serverSqlitePath(), { readonly: true });
+  try {
+    return Number((db.prepare('SELECT COUNT(*) AS n FROM memory WHERE ownerGaii = ?').get(principal) as { n: number }).n);
+  } finally { db.close(); }
+}
+
 async function keyCount(prefix?: string): Promise<number> {
   const qs = `?include=meta&owner_scope=true${prefix ? `&prefix=${encodeURIComponent(prefix)}` : ''}`;
   const r = await json(`/v1/memory${qs}`, { headers: authed(A.token) });
@@ -627,7 +647,12 @@ await test('25. the caretaker’s own records do not grow with time or with the 
   // The register is ONE key holding every source, and the report is ONE key overwritten each run.
   // That is the difference between a brain that lasts a year and one that fills its owner's
   // keyspace: a weekly report written as its own key is 52 keys a year, per brain, forever.
-  const before = await keyCount(`ext:${extName}`);
+  // Counted in the node's database: the owner's memory list never shows an `ext:` namespace, so the
+  // owner-scoped count used here until 2026-11-15 was 0 before and 0 after whatever the extension
+  // wrote (report of 2026-11-15, 2.3). The register and the report already exist at this point, so a
+  // count that addresses the namespace starts above zero.
+  const before = await extKeyCount(`ext:${extName}`);
+  assert(before >= 2, `the count must address the extension's namespace (its register and report exist), got ${before}`);
   for (let i = 0; i < 12; i++) {
     await callBrain(A.token, {
       op: 'put_source',
@@ -635,7 +660,7 @@ await test('25. the caretaker’s own records do not grow with time or with the 
     });
   }
   for (let i = 0; i < 5; i++) await callBrain(A.token, { op: 'sweep' });
-  const after = await keyCount(`ext:${extName}`);
+  const after = await extKeyCount(`ext:${extName}`);
   assert(after === before,
     `twelve more sources and five more weekly checks must add no keys at all, but the count went ${before} -> ${after}`);
   const state = await callBrain(A.token, { op: 'state' });

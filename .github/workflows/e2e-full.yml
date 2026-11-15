@@ -19,7 +19,15 @@ permissions:
   contents: read
 
 jobs:
-  sweep:
+  # FOUR SHARDS PER BACKEND (2026-11-15). One job per backend took 46.5 min on SQLite and 59.1 min
+  # on PostgreSQL on 2026-11-14. The repository is public, so standard runners cost nothing, and
+  # each shard is a whole run of its own share of the suites: `--shard=i/4` splits the suites by
+  # their measured time (test/run-e2e-plan.ts, test/e2e-suite-times.json), the same way on every
+  # machine, so the four shards together run every suite exactly once. Every suite still starts on
+  # a node of its own and an emptied database. The `sweep (<backend>)` job below merges the shards
+  # back into the one job per backend that the issue job, Lifecycle Central's ci_sweep_ingest and
+  # `pnpm nightly:preflight` read.
+  shard:
     # Ubuntu 24.04, not ubuntu-latest: e2e-backup-restore runs pg_dump and pg_restore against the
     # postgres:16 service, as an operator does with the matching client. ubuntu-latest became 26.04
     # on 2026-10-25, whose pg_dump writes `SET transaction_timeout`, which a PostgreSQL 16 server
@@ -27,11 +35,12 @@ jobs:
     runs-on: ubuntu-24.04
     # A time limit per job (QA audit P1-06); the runner also limits each suite, so a hung suite is
     # one red row and not a job that runs until GitHub's six-hour default.
-    timeout-minutes: 120
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         backend: [sqlite, postgres-kysely]
+        shard: [1, 2, 3, 4]
     services:
       postgres:
         image: postgres:16
@@ -124,11 +133,24 @@ jobs:
         working-directory: aimeat
         run: pnpm build
 
-      - name: Full sweep (${{ matrix.backend }})
+      # The red suites are reported by the merge job, so this step writes no annotations of its own
+      # (AIMEAT_E2E_NO_ANNOTATIONS): a reader that counts a run's annotations sees each red suite
+      # once, from `sweep (<backend>)`.
+      - name: Full sweep (${{ matrix.backend }}, shard ${{ matrix.shard }} of 4)
         working-directory: aimeat
         env:
           AIMEAT_E2E_NODE_ENTRY: dist
-        run: pnpm test:e2e:${{ matrix.backend }}
+          AIMEAT_E2E_NO_ANNOTATIONS: '1'
+        run: pnpm test:e2e:${{ matrix.backend }} --shard=${{ matrix.shard }}/4 --results-out=test-results/e2e-shard/results-${{ matrix.backend }}-${{ matrix.shard }}.json
+
+      - name: Hand the shard's results to the merge job
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-results-${{ matrix.backend }}-${{ matrix.shard }}
+          path: aimeat/test-results/e2e-shard/
+          if-no-files-found: ignore
+          retention-days: 14
 
       # The node's own output for each red suite (the runner keeps it under test-results/e2e-node/
       # and prints its tail under the suite): a 500 or a crash leaves a stack here (QA audit P1-07).
@@ -136,10 +158,165 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: e2e-node-logs-${{ matrix.backend }}
+          name: e2e-node-logs-${{ matrix.backend }}-${{ matrix.shard }}
           path: aimeat/test-results/e2e-node/
           if-no-files-found: ignore
           retention-days: 14
+
+  # ONE RESULT PER BACKEND, under the name every reader of the nightly knows. It merges the four
+  # shards' results files (scripts/e2e-merge-shards.ts), writes the same `::error` annotations and
+  # job summary the runner wrote for a whole run, and fails when a suite is red or a shard wrote no
+  # results. It also publishes the measured suite times, which `pnpm e2e:nightly times` reads.
+  sweep:
+    needs: [shard]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [sqlite, postgres-kysely]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Collect the shards' results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: e2e-results-${{ matrix.backend }}-*
+          path: aimeat/test-results/e2e-shards/
+          merge-multiple: true
+
+      - name: Merge the shards (${{ matrix.backend }})
+        working-directory: aimeat
+        run: pnpm exec tsx scripts/e2e-merge-shards.ts --dir=test-results/e2e-shards --db=${{ matrix.backend }} --shards=4 --times-out=test-results/e2e-times-${{ matrix.backend }}.json
+
+      - name: Publish the measured suite times
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-times-${{ matrix.backend }}
+          path: aimeat/test-results/e2e-times-${{ matrix.backend }}.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # WHICH SUITE EXECUTES WHICH FUNCTION (2026-11-15). `pnpm gate` chooses the E2E suites a change can
+  # have reached from this map (scripts/lib/gate-coverage.ts). Every suite runs once more on SQLite,
+  # here with V8 coverage per suite: the runner starts one node per suite, so a node's coverage is
+  # that suite's (AIMEAT_COVERAGE_PER_SUITE, test/coverage-preload.mjs). Kept apart from the sweep,
+  # because the coverage preload delays every SIGTERM by its flush and the sweep measures the node as
+  # it ships. Nodes start through tsx here, so the coverage maps onto src/ directly. A red suite here
+  # decides nothing: the sweep above reports suites; this job reports only what they executed.
+  coverage-shard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare the E2E env file (from the committed example)
+        working-directory: aimeat
+        run: cp .env.test.sqlite.example .env.test.sqlite
+
+      - name: Every suite of shard ${{ matrix.shard }} under per-suite coverage
+        working-directory: aimeat
+        continue-on-error: true
+        env:
+          NODE_V8_COVERAGE: ${{ runner.temp }}/cov-runner
+          NODE_OPTIONS: --import file://${{ github.workspace }}/aimeat/test/coverage-preload.mjs
+          AIMEAT_COVERAGE_SRC: file://${{ github.workspace }}/aimeat/src/
+          AIMEAT_COVERAGE_PER_SUITE: ${{ runner.temp }}/cov
+          AIMEAT_E2E_NO_ANNOTATIONS: '1'
+        run: pnpm test:e2e:sqlite --shard=${{ matrix.shard }}/4
+
+      - name: The shard's part of the map
+        working-directory: aimeat
+        run: pnpm exec tsx scripts/e2e-coverage-map.ts build --raw=${{ runner.temp }}/cov --out=test-results/coverage-map-part-${{ matrix.shard }}.json
+
+      - name: Hand the part to the merge job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-coverage-part-${{ matrix.shard }}
+          path: aimeat/test-results/coverage-map-part-${{ matrix.shard }}.json
+          retention-days: 3
+
+  coverage-map:
+    needs: [coverage-shard]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Collect the parts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: e2e-coverage-part-*
+          path: aimeat/test-results/coverage-parts/
+          merge-multiple: true
+
+      - name: Merge the parts into one map
+        working-directory: aimeat
+        run: |
+          mkdir -p coverage-e2e
+          pnpm exec tsx scripts/e2e-coverage-map.ts merge --out=coverage-e2e/coverage-map.json test-results/coverage-parts/*.json
+
+      - name: Publish the map (pnpm e2e:nightly coverage reads it)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-coverage-map
+          path: aimeat/coverage-e2e/coverage-map.json
+          retention-days: 30
 
   # NO SEPARATE 4.0.0 RUN since 2026-11-14. From 2026-10-13 a job ran the version-aware suites and
   # the unit suite as node 4.0.0, while the package was still 3.x, so the 4.0.0 answers were proven

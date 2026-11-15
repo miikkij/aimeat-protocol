@@ -12,6 +12,15 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-15 -- The plan moves to test/run-e2e-plan.ts (E2E report of 2026-11-15, section 4):
+ *     lanes are balanced by measured time (test/e2e-suite-times.json) instead of putting every suite
+ *     with a port of its own into lane 0, which had made lane 0 the run's critical path; suites that
+ *     write a common port stay in one lane, and the machine-wide port locks (scripts/lib/e2e-ports.ts)
+ *     keep two lanes off one port whatever the plan says. `--shard=i/N` runs one of N equal shares of
+ *     the suites (the nightly runs four per backend). `--preboot` boots the next suite's node on a
+ *     second port and database while the current suite runs. RUNNER_NODE_FREE suites get no runner
+ *     node. `--results-out=<file>` writes every result as JSON for the job that merges the shards, and
+ *     AIMEAT_E2E_NO_ANNOTATIONS leaves the GitHub annotations to that job. e2e-llm-proxy is deleted.
  *   2026-11-14 -- e2e-mcp-admin-usage-reports.ts joins the list (not the guard tier): aimeat_admin_usage reads the node usage reports GET /v1/admin/usage/summary reads.
  *   2026-11-14 -- e2e-help.ts joins the list (not the guard tier): Ask someone who knows.
  *   2026-11-14 -- e2e-secret-shares.ts joins the list (not the guard tier): secret shares and secret requests (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
@@ -544,12 +553,15 @@ import {
     pinnedEnv,
     reportEnvLeaks,
     resolveTarget,
+    type RunnerTarget,
 } from './run-e2e-server.js';
 import { PRODUCTION_LANE_ENV, PRODUCTION_LANE_EXCEPTIONS } from './run-e2e-production-lane.js';
 import { holdBasePort, lanePortFor } from '../scripts/lib/e2e-ports.js';
 import { classify, formatHeader, formatRow } from '../scripts/lib/e2e-results.js';
 import { githubAnnotations, githubSummary } from '../scripts/lib/e2e-github-report.js';
 import { runLane, type SuiteResult } from './run-e2e-lane.js';
+import { checkRunnerNodeFree, laneWeight, needsRunnerNode, parseShard, planLanesBalanced, shardOf, suiteSeconds } from './run-e2e-plan.js';
+import { writeRunResults } from '../scripts/lib/e2e-run-results.js';
 import { clearNodeLogs, nodeLogDir } from './helpers/runner-node-log.js';
 import { adminUrlOf, dropDatabases, listE2eDatabases, liveBases, runDatabasesOf } from '../scripts/lib/e2e-databases.js';
 
@@ -1788,7 +1800,8 @@ const ALL_SUITES = [
     // own key, the shared chat key), read from the Authorization header a stand-in provider got.
     // Runs two nodes of its own (28350 and 28351) and the stand-in on 28352.
     'test/e2e-own-key-roads.ts',
-    'test/e2e-llm-proxy.ts',
+    // e2e-llm-proxy was deleted on 2026-11-15: e2e-ai-provider-stub and e2e-own-key-roads prove the
+    // same gate more deeply, and its two cases nothing else held moved into e2e-ai-provider-stub 1b.
     'test/e2e-message-transcript.ts',
     'test/ai.ts',
     'test/e2e-sharing-groups.ts',
@@ -2409,11 +2422,12 @@ function parseArgs(): string[] {
 // suites took 38 minutes of which 17.5 were the suites and 20 the restarts between them, and 241
 // of the 285 finish in under five seconds each — the restart was most of what a suite cost.
 //
-// Lane 0 keeps the base port and takes every suite that binds a port of its own (a second node, a
-// mesh, the fake connection provider on 28388): two lanes on one fixed port would collide, and the
-// runner cannot move a port a suite wrote down. Those are the heavier suites, so lane 0 gets fewer
-// of the rest. A lane's suite output is buffered and printed when the suite ends, whole; with one
-// lane it streams as before.
+// Lane 0 keeps the base port. Until 2026-11-15 it also took every suite that binds a port of its own
+// (a second node, a mesh, the fake connection provider on 28388), and so ran 34 of the run's 76 suite
+// minutes on SQLite while the other lanes waited. Those ports are taken under the machine-wide lock
+// now (scripts/lib/e2e-ports.ts), so the plan balances the lanes by measured time instead
+// (test/run-e2e-plan.ts). A lane's suite output is buffered and printed when the suite ends, whole;
+// with one lane it streams as before.
 
 function parseWorkers(): number {
     const arg = process.argv.find(a => a.startsWith('--workers='));
@@ -2541,27 +2555,33 @@ function lanePort(lane: number, taken: Set<number>): string {
     return String(p);
 }
 
-function planLanes(suites: string[], workers: number, pinned: Map<string, number[]>): string[][] {
-    if (workers <= 1) return [suites];
-    const lanes: string[][] = Array.from({ length: workers }, () => []);
-    const fixed = suites.filter(s => pinned.has(s));
-    lanes[0].push(...fixed);
-    // A fixed-port suite boots a node of its own and costs about three ordinary suites, so lane 0
-    // is weighted accordingly when the next suite looks for the shortest queue.
-    const weight = (k: number): number => lanes[k].length + (k === 0 ? 2 * fixed.length : 0);
-    for (const s of suites) {
-        if (pinned.has(s)) continue;
-        let best = 0;
-        for (let k = 1; k < workers; k++) if (weight(k) < weight(best)) best = k;
-        lanes[best].push(s);
+/**
+ * Whether the next suite's node is booted while the current suite runs (`--preboot`, or
+ * AIMEAT_E2E_PREBOOT=1). Each lane then holds two ports and two databases and alternates between
+ * them; a suite still gets a node started for it alone on a database emptied for it alone. Two
+ * slots per lane use two of the session's sixteen lane ports, so at most eight lanes.
+ *
+ * OFF BY DEFAULT, BY MEASUREMENT. On 2026-11-15 the guard tier ran with it on a 14-thread laptop
+ * and two suites went red on the load alone (e2e-auth-tarpit's first wrong password took 361 ms
+ * against its limit, e2e-connect-serve-loopback's daemon missed its 30 s start), both green without
+ * it. A machine with cores to spare may turn it on; nothing in the repository does.
+ */
+function parsePreboot(workers: number): boolean {
+    const on = process.argv.includes('--preboot') || process.env.AIMEAT_E2E_PREBOOT === '1';
+    if (on && workers > 8) {
+        console.error('--preboot gives each lane two ports, and a session has sixteen: use --workers=8 or fewer.');
+        process.exit(1);
     }
-    return lanes.filter(l => l.length > 0);
+    return on && !TARGET.external;
 }
+
+/** The node start a lane pays in front of a suite, in seconds, measured in the nightly of 2026-11-14. */
+const RESTART_SECONDS: Record<string, number> = { sqlite: 6.4, 'postgres-kysely': 8.6 };
 
 
 // ── Main ──
 async function main() {
-    const suites = parseArgs();
+    let suites = parseArgs();
     // parseArgs hands back the ALL_SUITES array itself when no --test was given, so identity is the
     // exact test for "this is the full sweep". If that ever becomes a copy, the check degrades to a
     // warning rather than to a false pass.
@@ -2611,30 +2631,59 @@ async function main() {
     }
 
     const workers = parseWorkers();
-    const pinned = fixedPorts(suites);
-    const lanes = planLanes(suites, workers, pinned);
-    console.log(`  Suites: ${suites.length}${lanes.length > 1 ? ` over ${lanes.length} lanes (${lanes.map(l => l.length).join(' + ')}; ${lanes[0].filter(s => pinned.has(s)).length} bind their own port and stay in lane 0)` : ''}`);
+    const preboot = parsePreboot(workers);
+    const allPinned = fixedPorts(suites);
+    // A suite on RUNNER_NODE_FREE whose source now reads the runner's node would be pointed at a
+    // port nothing listens on and fail with noise; stop before that and name it.
+    const wrongFree = checkRunnerNodeFree(suites);
+    if (wrongFree.length > 0) {
+        console.error(`\n  STOP: RUNNER_NODE_FREE (test/run-e2e-plan.ts) lists ${wrongFree.length} suite(s) whose source reads the runner's node: ${wrongFree.join(', ')}.`);
+        console.error('  Take them off the list, or take the E2E_BASE (or the helper that reads it) out of the suite.\n');
+        process.exit(1);
+    }
+    const restart = RESTART_SECONDS[TARGET.dbType] ?? 7;
+    // With preboot a suite costs its lane the longer of its own time and the next node's start.
+    const weight = (name: string): number => preboot
+        ? Math.max(suiteSeconds(name, TARGET.dbType), needsRunnerNode(name) ? restart : 0.5)
+        : laneWeight(name, TARGET.dbType, restart);
+    const shard = parseShard(process.argv);
+    if (shard) {
+        const before = suites.length;
+        suites = shardOf(suites, shard, allPinned, weight);
+        console.log(`  Shard ${shard.index + 1} of ${shard.count}: ${suites.length} of ${before} suites`);
+    }
+    const pinned = new Map([...allPinned].filter(([s]) => suites.includes(s)));
+    const lanes = planLanesBalanced(suites, workers, pinned, weight);
+    const free = suites.filter(s => !needsRunnerNode(basename(s, '.ts'))).length;
+    console.log(`  Suites: ${suites.length}${lanes.length > 1 ? ` over ${lanes.length} lanes (${lanes.map(l => l.length).join(' + ')}, balanced by measured time)` : ''}${free ? `; ${free} start no runner node` : ''}${preboot ? '; the next node boots while a suite runs' : ''}`);
     console.log(`${'='.repeat(50)}\n`);
 
     reportEnvLeaks(pinnedEnv(TARGET));
 
     // Lane 0 is the base target. Every other lane gets a port no suite has written down and a
-    // database of its own, created first for Postgres.
-    const taken = new Set<number>([Number(TARGET.port), ...[...pinned.values()].flat(), ...listeningPorts()]);
-    let targets = lanes.map((_, k) => k === 0 ? TARGET : laneTarget(TARGET, k, lanePort(k, taken)));
+    // database of its own, created first for Postgres. With preboot, lane k's second slot is lane
+    // number workers + k of the session's lane ports.
+    const taken = new Set<number>([Number(TARGET.port), ...[...allPinned.values()].flat(), ...listeningPorts()]);
+    const slotsFor = (k: number): RunnerTarget[] => {
+        const first = k === 0 ? TARGET : laneTarget(TARGET, k, lanePort(k, taken));
+        if (!preboot) return [first];
+        const j = lanes.length + k;
+        return [first, laneTarget(TARGET, j, lanePort(j, taken))];
+    };
+    let targets = lanes.map((_, k) => slotsFor(k));
     const wall0 = Date.now();
     let results: SuiteResult[] = [];
     try {
         if (!TARGET.external) {
             try {
-                for (let k = 1; k < targets.length; k++) await ensureDatabase(TARGET, targets[k]);
+                for (const t of targets.flat()) if (t !== TARGET) await ensureDatabase(TARGET, t);
             } catch (e) {
                 // A role without CREATEDB (the developer's local appuser, as opposed to CI's
                 // superuser) cannot have lane databases. One lane on the base database is still a
                 // correct run, only slower, so that is what happens, said out loud.
                 console.warn(`\n⚠ ${(e as Error).message}\n  Falling back to one lane.\n`);
                 lanes.splice(0, lanes.length, suites);
-                targets = [TARGET];
+                targets = [[TARGET]];
             }
         }
         if (!TARGET.external) clearNodeLogs(TARGET.dbType);
@@ -2644,7 +2693,7 @@ async function main() {
         // lane either way (QA audit P1-09).
         // A purpose suite is held to the guard tier's verdict: a skipped test in it is red.
         const guards = new Set([...GUARD_SUITES, ...PURPOSE_SUITES].map(g => basename(g, '.ts')));
-        const laneOpts = { session: RUN_SESSION, isGuard: (n: string) => guards.has(n) };
+        const laneOpts = { session: RUN_SESSION, isGuard: (n: string) => guards.has(n), needsNode: needsRunnerNode };
         const settled = await Promise.allSettled(lanes.map((s, k) => runLane(k, targets[k], s, lanes.length === 1, laneOpts)));
         results = settled.flatMap((s, k): SuiteResult[] => {
             if (s.status === 'fulfilled') return s.value;
@@ -2703,7 +2752,17 @@ async function main() {
     if (unregistered.length > 0) {
         console.log(`  ${unregistered.length} file(s) in test/ are on no list and ran nowhere: ${unregistered.join(', ')}`);
     }
-    if (process.env.GITHUB_ACTIONS === 'true') {
+    // `--results-out=<file>`: every suite's result and verdict as JSON, for the job that merges a
+    // sharded sweep (scripts/e2e-merge-shards.ts) and for the suite-time table.
+    const resultsOut = process.argv.find(a => a.startsWith('--results-out='))?.slice('--results-out='.length);
+    if (resultsOut) {
+        writeRunResults(resultsOut, {
+            dbType: TARGET.dbType, shard: shard ? `${shard.index + 1}/${shard.count}` : null, wallMs,
+            suites: results.map(r => ({ ...r, red: verdicts.get(r.name)!.red, note: verdicts.get(r.name)!.note })),
+        });
+    }
+    // A shard of the nightly leaves the annotations to the job that merges the shards.
+    if (process.env.GITHUB_ACTIONS === 'true' && process.env.AIMEAT_E2E_NO_ANNOTATIONS !== '1') {
         const red = results.filter(r => verdicts.get(r.name)!.red)
             .map(r => ({ name: r.name, passed: r.passed, total: r.total, note: verdicts.get(r.name)!.note, failures: r.failures ?? [] }));
         for (const line of githubAnnotations(red, TARGET.dbType)) console.log(line);

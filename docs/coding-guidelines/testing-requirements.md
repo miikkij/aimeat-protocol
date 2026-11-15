@@ -14,7 +14,7 @@ The rule itself is in [CLAUDE.md](../../CLAUDE.md), section "Gates": E2E on both
   pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=agent-onboarding --test=agent-skill-bundle
   ```
   For a change scoped to one layer (CLI only, one route, one view), say which suites you ran and why the others were not needed.
-- **Finish with `pnpm gate`, once.** It adds the PostgreSQL legs by itself for a storage, identity, route, MCP or runner change; `--postgres` forces them for any other. The full E2E sweep (`pnpm test:e2e:sqlite`, `pnpm test:e2e:postgres-kysely`, `pnpm test:e2e:all-backends`) takes about two hours and is never a routine step. In this repository it runs only when the maintainer asks for it.
+- **Finish with `pnpm gate`, once.** It adds the PostgreSQL legs by itself for a storage, identity, route, MCP or runner change; `--postgres` forces them for any other. It also runs the suites that executed a changed line of `src/`, chosen from the nightly's per-suite coverage map (`pnpm e2e:nightly coverage` fetches it; it needs `gh auth login`). The full E2E sweep is never a routine step. In this repository it runs only when the maintainer asks for it, and then on GitHub (`pnpm nightly:preflight --dispatch`), where each backend runs in four shards at once; on one machine the two backends in a row took about two hours.
 - **A failure in a suite you did not touch:** confirm it fails on `main` too, in a separate clean worktree with its own test port and database, report it as pre-existing, and leave it.
 - **Each worktree has its own test environment.** The `WorktreeCreate` hook, or `pnpm agent:worktree <name>`, runs `pnpm test:env:init` for it. Never copy `.env.test.*` from another checkout: the runner empties its database between suites, so two checkouts sharing one database wipe each other. `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force` takes a port you choose (40251 to 40499; any other is refused). Maintainer sessions take that port from their Lifecycle Central claim.
 - **A suite that starts a server of its own writes its port in 28000-29999** (or calls `suitePort()` in `test/helpers/free-port.ts` when the port must vary by lane). From 40000 up is the range the claims board hands out to sessions, for E2E base ports, app servers and sandboxes alike, and a claim is not a runner, so the runners' port locks never see it: on 2026-10-27 a claim on 40672 refused `e2e-secrets` with EADDRINUSE. `pnpm check:suite-ports` (in `pnpm gate`) refuses a fixed suite port outside the band and a port two suites share.
@@ -119,12 +119,12 @@ The Docker runner builds a fresh container and runs suites against it: `pnpm tes
 Copy **`test/e2e-model-suite.ts`**. It exists to be copied, and it shows every part a suite needs and nothing else:
 
 - **the node**: the runner starts it and sets `E2E_BASE` to its address; the suite reads `E2E_BASE` and `E2E_NODE_ID` (the `localhost:40251` fallback is only for running the file by hand against a node you started yourself);
-- its own `test()`, `assert()` and `json()` helpers;
+- the shared harness, `test/helpers/harness.ts`: `test()`, `assert()`, `json()` (which waits out a 429), `expectRefusal(res, status, code?)`, `skip()` and `finish()`;
 - **register**: two owners with `POST /v1/ghii` (`username`, `display_name`, `password`), with a `Date.now()` suffix on each name;
 - **sign in with the password**: `POST /v1/ghii/login` with `username` and `password` returns the session token in `data.token`;
-- **act**: one write and its read-back, then the refusals: `401` without a token, and another owner cannot read a private record;
+- **act**: one write and its read-back, then the refusals: `401` without a token, and another owner cannot read a private record, tried on that owner's real record with the owner's own read of the same address as the control;
 - **clean up**: each owner deletes itself with `DELETE /v1/owners/:name` and its own Bearer token (the route needs the account holder's local session);
-- an exit code the runner reads: `process.exit(failed > 0 ? 1 : 0)`.
+- `finish()`, which prints `N passed, M failed, K skipped` and exits with the code the runner reads.
 
 A suite that makes many owners uses **`test/helpers/owner-login.ts`** instead of writing the two calls again: `registerOwner(BASE, name)` registers with a password and signs in (it returns the token, the GHII and the key pair), `ownerSignIn(BASE, name, password)` answers `{ status, body }` like the suite's own `json()`, and `ownerToken(BASE, name, password)` returns the token. Until 2026-10-12 most suites signed an owner in with the owner key (a signature over `name + NODE_ID + timestamp` sent to `POST /v1/auth/token`). That sign-in is removed in 4.0.0, every suite now signs in with the password, and `test/unit/no-owner-key-sign-in.test.ts` refuses a file that brings it back. An agent still signs in with its own key on the same route. A suite that needs other helpers takes them from `test/helpers/` (for example `wait-for-server.ts`, `node-entry.ts`, `fake-ai-provider.ts`, `fake-smtp.ts`).
 
@@ -133,9 +133,18 @@ A suite that makes many owners uses **`test/helpers/owner-login.ts`** instead of
 1. **Self-contained**: each suite registers its own owners and agents and deletes its owners at the end.
 2. **Unique names**: a `Date.now()` suffix on owner and agent names avoids collisions.
 3. **Sequential**: tests run in order within a file.
-4. **Fetch-based**: all HTTP calls go through the suite's `json()` helper.
+4. **Fetch-based**: all HTTP calls go through the harness's `json()`.
 5. **Timing**: TTL tests use short durations (milliseconds or seconds).
-6. **Exit code**: `process.exit(failed > 0 ? 1 : 0)`.
+6. **Exit code**: `finish()` from the harness.
+7. **A refusal names its status and its code**: `expectRefusal(res, 403, 'FORBIDDEN')`. A check on the status alone also passes on the 403 of an unrelated rule; a check on the code alone (`body.error?.code !== 'X'`) passes on a 500; `status !== 200` passes on anything.
+8. **A refusal that protects someone else's data is tried on their real record**, never on an id that does not exist, and the record is read back afterwards to show nothing changed. Read the same address as its owner first: a path that addresses nothing answers 404 to everybody, and the refusal then proves nothing (`e2e-connect-tunnel-multiplex` 8b passed that way until 2026-11-15).
+9. **Read the quantity the claim is about.** A money refund is read on the money meter, not on the morsel balance; an extension's keys in the node's database, not in the owner's memory list; a delivery by the task in its payload, not by the frame id. Each of these held a check that could not fail until 2026-11-15.
+10. **A new test joins the area's existing suite** unless it needs node settings that suite does not run with. Every suite costs a node start (6 to 9 s) before its first test, and 429 suites took under 3 s of their own time in the nightly of 2026-11-14.
+11. **Setup comes from `test/helpers/`**: owners from `owner-login.ts` (`registerOwner`, `setupOperator`), agents from `agent-device.ts` (`connectAgentByDevice`), MCP from `mcp-session.ts`. A suite that tests one of those flows itself writes it out and says so with `// suite-hygiene: tests the device flow` (or `the oauth round`).
+
+`pnpm check:suite-hygiene` (in `pnpm gate` and CI) holds six counts per suite that may only fall: its own `test()`, the device flow or the MCP OAuth round written out, loose refusals, length past 800 lines and ESLint errors. A new suite starts at zero on all six; `--update` writes a count that fell into `aimeat/security/suite-hygiene-baseline.json`.
+
+A suite that starts every node it talks to itself, and never reads `E2E_BASE`, the runner's port or its database, belongs on `RUNNER_NODE_FREE` in `test/run-e2e-plan.ts`: the runner then starts no node in front of it and points its `E2E_BASE` at a port nothing listens on, so a wrong entry goes red at once.
 
 ### Adding a New E2E Suite
 

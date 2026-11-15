@@ -7,6 +7,9 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   2026-11-15 -- perSuiteCoverageEnv(): with AIMEAT_COVERAGE_PER_SUITE=<dir>, a suite's node and the
+ *     suite process write V8 coverage into <dir>/<suite>, for the per-suite coverage map the gate
+ *     selects suites from (scripts/e2e-coverage-map.ts).
  *   2026-11-10 -- QUERY_TRACE_SUITES: e2e-query-budget's node starts with the database trace preload
  *     and writes one line per request to queryTraceFile(port) (performance work 2026-11).
  *   2026-11-07 -- e2e-csm joins ANONYMOUS_OFF_SUITES (a private or members CSM refused to a caller with no
@@ -81,8 +84,8 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { requirePortFree, waitForExit } from './helpers/runner-ports.js';
 import { recordNodeOutput } from './helpers/runner-node-log.js';
-import { existsSync, readFileSync, unlinkSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -762,11 +765,25 @@ const PORT_FREE_TIMEOUT_MS = 15_000;
 // AIMEAT_E2E_SERVER_READY_MS raises it on a loaded machine, where a boot alone can pass a minute.
 const SERVER_READY_TIMEOUT_MS = Number(process.env.AIMEAT_E2E_SERVER_READY_MS ?? 60_000);
 
+/**
+ * With AIMEAT_COVERAGE_PER_SUITE=<dir> (the nightly's coverage shards), the coverage directory of
+ * one suite: its node, the suite process and every node the suite starts write there, so each
+ * directory is one suite's coverage (test/coverage-preload.mjs, scripts/e2e-coverage-map.ts).
+ * Nothing otherwise.
+ */
+export function perSuiteCoverageEnv(suite?: string): Record<string, string> {
+    const base = process.env.AIMEAT_COVERAGE_PER_SUITE;
+    if (!base || !suite) return {};
+    const dir = join(base, suite);
+    mkdirSync(dir, { recursive: true });
+    return { NODE_V8_COVERAGE: dir };
+}
+
 export async function startServer(target: RunnerTarget, suite?: string): Promise<ChildProcess> {
     await requirePortFree(Number(target.port), PORT_FREE_TIMEOUT_MS, 'the runner asked to start a server on it');
     authLogs.delete(target);
 
-    const env = { ...process.env, ...pinnedEnv(target, suite) };
+    const env = { ...process.env, ...pinnedEnv(target, suite), ...perSuiteCoverageEnv(suite) };
     const serverArgs = [...nodeEntryArgs(), 'start', '--db', target.dbType];
     // A suite that counts the database statements of each request gets the trace preload
     // (scripts/perf/trace-preload.mjs) and a trace file of its own, which it reads by the port.

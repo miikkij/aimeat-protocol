@@ -3,48 +3,22 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The model a new E2E suite is copied from (docs/coding-guidelines/testing-requirements.md).
- *   It shows every part a suite needs and nothing else: the node the runner started (E2E_BASE), two
- *   owners registered with a password and signed in with POST /v1/ghii/login, one action and its
- *   read-back, the refusals (no token, another owner), the owners deleted at the end, and an exit
- *   code the runner reads. It never uses the owner-key sign-in (a signature exchanged for a token):
- *   that is removed in 4.0.0, and most older suites still use it.
+ *   It shows every part a suite needs and nothing else: the shared harness (test/helpers/harness.ts),
+ *   the node the runner started (BASE, from E2E_BASE), two owners registered with a password and
+ *   signed in with POST /v1/ghii/login, one action and its read-back, the refusals held to their
+ *   status (expectRefusal), the cross-owner refusal tried on the other owner's REAL record with the
+ *   owner's own read of the same address as the control, the owners deleted at the end, and finish(),
+ *   which prints the line the runner reads.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=model-suite
  * @version-history
+ *   v1.1.0 - 2026-11-15 - On the shared harness; the cross-owner refusal has its control (the owner
+ *     reads the same address), so a path that addresses nothing can no longer pass it (E2E report of
+ *     2026-11-15, 5.2, 5.4 and 5.5).
  *   v1.0.0 - 2026-10-11 - Initial: the password-signed-in model for new suites.
  */
+import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
 
-// The runner starts the node and sets E2E_BASE to it. The fallback is for running this file by hand
-// against a node you started yourself.
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-
-let passed = 0;
-let failed = 0;
-
-async function test(name: string, fn: () => Promise<void>) {
-  try {
-    await fn();
-    passed++;
-    console.log(`  ✅ ${name}`);
-  } catch (err: any) {
-    failed++;
-    console.error(`  ❌ ${name}: ${err.message}`);
-  }
-}
-
-function assert(cond: boolean, msg: string) {
-  if (!cond) throw new Error(msg);
-}
-
-async function json(path: string, opts: RequestInit = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', ...opts.headers },
-  });
-  const ct = res.headers.get('content-type') ?? '';
-  const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
-  return { status: res.status, body };
-}
 
 // Unique names per run, so a rerun on a database the runner did not clear still starts clean.
 const stamp = Date.now();
@@ -77,12 +51,16 @@ await test('The owner writes a private record and reads it back', async () => {
 });
 
 await test('Without a token the write is refused', async () => {
-  const w = await json('/v1/memory', { method: 'POST', body: JSON.stringify({ key: KEY, value: { text: 'anyone' } }) });
-  assert(w.status === 401, `expected 401, got ${w.status}`);
+  expectRefusal(await json('/v1/memory', { method: 'POST', body: JSON.stringify({ key: KEY, value: { text: 'anyone' } }) }), 401);
 });
 
 await test("Another owner cannot read the private record", async () => {
-  const r = await json(`/v1/memory/${encodeURIComponent(`${A.name}@${NODE_ID}`)}/${KEY}`, { headers: auth(B.token) });
+  const path = `/v1/memory/${encodeURIComponent(`${A.name}@${NODE_ID}`)}/${KEY}`;
+  // The control first: the address names the record, because its owner reads it there. Without it a
+  // path that addresses nothing answers 404 to everybody and the refusal below proves nothing.
+  const own = await json(path, { headers: auth(A.token) });
+  assert(own.status === 200 && own.body.data?.value?.text === 'mine', `the owner reads the address, got ${own.status}`);
+  const r = await json(path, { headers: auth(B.token) });
   assert(r.status === 403 || r.status === 404, `expected 403 or 404, got ${r.status}`);
   assert(JSON.stringify(r.body).includes('mine') === false, 'the private value leaked');
 });
@@ -94,5 +72,4 @@ await test('Clean up: both owners are deleted', async () => {
   }
 });
 
-console.log(`\n=== Model suite: ${passed} passed, ${failed} failed ===\n`);
-process.exit(failed > 0 ? 1 : 0);
+finish();

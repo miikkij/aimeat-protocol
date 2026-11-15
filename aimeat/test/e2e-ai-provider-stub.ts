@@ -39,6 +39,9 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   2026-11-15 -- 1b also refuses the model list, and 1b2 refuses a chat call with no messages: the two
+ *     cases e2e-llm-proxy held that no other suite did, moved here when it was deleted (E2E report of
+ *     2026-11-15, 3.2).
  *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.7.0 -- 2026-10-12 -- Node 4.0.0 removes /v1/openrouter/settings and /v1/openrouter/models (the
  *     4.0.0 sweep). 1d's owner key is a provider of the owner's own at the stub (PUT /v1/ai/providers/:id,
@@ -295,8 +298,19 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
             method: 'POST', headers: auth(noAiAgent), body: JSON.stringify({ text: 'x' }),
         });
         assert(classify.status === 403, `/v1/librarian/classify: expected 403, got ${classify.status}`);
+        // The model list is behind the same word (moved here from e2e-llm-proxy, deleted 2026-11-15).
+        const models = await json('/v1/llm/models', { headers: auth(noAiAgent) });
+        assert(models.status === 403, `/v1/llm/models: expected 403, got ${models.status}`);
         assert(provider.requests.length === before,
             `a refusal must not reach the provider: ${provider.requests.length - before} request(s) arrived`);
+    });
+
+    await test('1b2. A chat call with no messages is refused 400 INVALID_BODY before the provider is asked', async () => {
+        // Moved here from e2e-llm-proxy (deleted 2026-11-15, E2E report of that day, 3.2).
+        const before = provider.requests.length;
+        const r = await json('/v1/llm/chat/completions', { method: 'POST', headers: auth(aiAgent), body: JSON.stringify({}) });
+        assert(r.status === 400 && r.body?.error?.code === 'INVALID_BODY', `expected 400 INVALID_BODY, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+        assert(provider.requests.length === before, 'the provider was not asked');
     });
 
     await test('1c. The agent that DOES hold ai:use is admitted, and its OWNER pays: the owner\'s settings, budget and usage', async () => {

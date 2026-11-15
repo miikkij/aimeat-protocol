@@ -8,29 +8,18 @@
  *   the person's list gets the CORS answer and one that is not gets none. Clearing puts everyone
  *   back on the default, and a bad origin, an unknown name and a non-operator are refused.
  * @version-history
+ *   v1.1.0 -- 2026-11-15 -- On the shared harness and the shared device-authorization helper (E2E
+ *     report of 2026-11-15, 5.2 and 5.3); the refusals name their status through expectRefusal.
  *   v1.0.0 -- 2026-09-08 -- Initial: the overview's gate and shape, the three lists, the door.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=admin-cors-page
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit = {}) {
-    const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-    const ct = res.headers.get('content-type') ?? '';
-    const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
-    return { status: res.status, body, headers: res.headers };
-}
-const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
-
+import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 import { registerOwner } from './helpers/owner-login.js';
+
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 async function registerAndToken(name: string): Promise<string> {
     return (await registerOwner(BASE, name)).token;
@@ -38,13 +27,7 @@ async function registerAndToken(name: string): Promise<string> {
 
 /** A device-auth agent (RFC 8628): the way agents are registered, and the one that mints roles=['agent']. */
 async function deviceAgent(agentName: string, owner: string, ownerToken: string, scopes: string[]): Promise<string> {
-    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner }) });
-    assert(da.status === 200 && da.body?.ok, `device-authorize ${da.status}: ${JSON.stringify(da.body?.error)}`);
-    const approve = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes, owner_token: ownerToken }) });
-    assert(approve.status === 200 && approve.body?.ok, `agent approve ${approve.status}: ${JSON.stringify(approve.body?.error)}`);
-    const poll = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
-    assert(poll.status === 200 && typeof poll.body?.token === 'string', `device-token ${poll.status}: ${JSON.stringify(poll.body)}`);
-    return poll.body.token;
+    return (await connectAgentByDevice(BASE, { owner, ownerToken, name: agentName, scopes })).token;
 }
 
 async function overview(token: string) {
@@ -74,10 +57,8 @@ await test('Setup: first owner is auto-operator; a second is not', async () => {
 });
 
 await test('The overview door refuses a stranger (401) and a non-operator (403)', async () => {
-    const anon = await json('/v1/admin/cors/overview');
-    assert(anon.status === 401, `anonymous expected 401, got ${anon.status}`);
-    const nonOp = await json('/v1/admin/cors/overview', { headers: auth(nonOpToken) });
-    assert(nonOp.status === 403, `non-operator expected 403, got ${nonOp.status}`);
+    expectRefusal(await json('/v1/admin/cors/overview'), 401);
+    expectRefusal(await json('/v1/admin/cors/overview', { headers: auth(nonOpToken) }), 403);
 });
 
 await test('The operator reads the page in one call, with every part present', async () => {
@@ -175,5 +156,4 @@ await test('Clearing puts the person and the agent back on the default', async (
     assert(back.headers.get('access-control-allow-origin') === 'https://other.example', `on the wildcard default the unlisted origin is answered again, got ${back.headers.get('access-control-allow-origin')}`);
 });
 
-console.log(`\n${passed} passed, ${failed} failed\n`);
-if (failed > 0) process.exit(1);
+finish();

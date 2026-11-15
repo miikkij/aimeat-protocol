@@ -173,8 +173,11 @@ await test('6. Offline agent gets no live deliver; only backlog carries it', asy
   const t = await TunnelClient.connect(BASE, agentToken);
   const bl = await t.waitForBacklog(1500);
   assert(backlogTaskIds(bl).includes(lateTaskId), 'late task delivered via backlog');
-  // No live deliver should have fired for it (it was queued before connect).
-  const liveForLate = t.delivers.some(d => d.id === lateTaskId);
+  // No live deliver should have fired for it (it was queued before connect). A deliver frame's id is
+  // the wake id `taskId:status:at` (task-rules.ts taskWakeId) since 2026-10-02, so the task is read
+  // from the payload: comparing the frame id with the task id could never match, and this check
+  // passed whatever was delivered (report of 2026-11-15, 2.3).
+  const liveForLate = t.delivers.some(d => (d.payload as { id?: string } | undefined)?.id === lateTaskId);
   assert(!liveForLate, 'no spurious live deliver for an offline-queued task');
   await t.close();
 });

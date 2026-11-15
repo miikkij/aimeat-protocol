@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-11-15 -- denialKinds also reads the shared harness's `expectRefusal(res, 403|401, …)`
+ *     (test/helpers/harness.ts), so a suite moved onto the harness keeps its refusal cases.
  *   2026-11-14 -- ROUTE_CEILING 440: GET /v1/ledger/usage/runs is refused to an agent without
  *     wallet:read by test/e2e-invoke-routes.ts.
  *   2026-11-13 -- ROUTE_CEILING 441: PATCH /v1/agents/{name}/tasks/{id}/todos/{todoId} is refused to
@@ -229,6 +231,11 @@ export function denialKinds(source: string): { second: boolean; anonymous: boole
             if (!isNegatedAt(condition, hit.index)) kinds.second = true;
         }
         if (kinds.second && kinds.anonymous) break;
+    }
+    // The shared harness's refusal helper (test/helpers/harness.ts) holds a status by itself:
+    // `expectRefusal(res, 403, …)` is the same assertion as `assert(res.status === 403 …)`.
+    for (const hit of source.matchAll(/\bexpectRefusal\s*\([^,]+,\s*40([13])\b/g)) {
+        if (hit[1] === '3') kinds.second = true; else kinds.anonymous = true;
     }
     return kinds;
 }

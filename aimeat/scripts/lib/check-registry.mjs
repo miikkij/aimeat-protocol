@@ -6,6 +6,7 @@
  *  - 2026-11-14: check:find-fields, every find field is one the autofill guard sees (type="search" or data-find); Edge on Android wrote the sign-in name into the App Catalog search.
  *  - 2026-11-10: check:owner-agent-reads, the direct getAgentsByOwner calls in src/services/ may only fall (performance work, architecture item 1).
  *  - 2026-11-10: check:blocked-names, no served file's address is blocked by EasyList, EasyPrivacy or uBlock Origin's Privacy list (EasyPrivacy's `/fingerprint.js^` took the admin page down on 2026-11-09).
+ *  - 2026-11-15: check:suite-hygiene, six per-suite counts that may only fall: own test harness, inline device flow, inline MCP OAuth, loose refusals, length past 800 lines, ESLint errors (E2E report of 2026-11-15, section 5).
  *  - 2026-11-05: check:services-flat, the number of flat files in src/services/ may only fall (codebase analysis 2026-11-03, item D-h).
  *  - 2026-11-04: check:pooler-safe, no session advisory lock and no LISTEN outside the event bus's own connection (codebase analysis 2026-11-03, item HA stage 3).
  *  - 2026-11-04: check:family-index, the classification index exports no file that reaches a module importing the family back (codebase analysis 2026-11-03, item D-g).
@@ -120,6 +121,7 @@ export const FAST_CHECKS = [
     // QA audit 2026-10-16, P1-02 and W11: a suite's own node follows the run's backend, and the
     // suites that still start a SQLite node of their own are counted and may only fall.
     { script: 'check:own-node-backend', label: 'A suite that starts its own node follows the run\'s backend, or is listed with its reason' },
+    { script: 'check:suite-hygiene', label: 'E2E suites: own harness, inline sign-in flows, loose refusals, length and lint errors may only fall' },
     { script: 'check:trusted-keys', label: 'Server-trusted memory keys are guarded, and each exemption says why' },
     // From the September 2026 audit's check of the fixes: a visitor from another node is named
     // `alice@their-node`, and a cut at the '@' anywhere in src/ made it the local account `alice`.

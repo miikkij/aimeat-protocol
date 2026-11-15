@@ -342,11 +342,15 @@ await test('Refund unwind: a call that fails after payment leaves no beneficiary
   const a = await accept(consumer.token, 'fails', { cap_units: 50_000_000 });
   assert(a.status === 201, `accept fails ${a.status}`);
 
-  const consumerBefore = await balance(consumer.token);
+  // The refund is read on the contract's money meter. The morsel balance read here until 2026-11-15
+  // is a quantity a money call never touches, so "refunded in full" could not fail (report of
+  // 2026-11-15, 2.3); the settled-call test above proves the meter moves by the price on a success.
+  const spendBefore = await contractSpend(consumer.token, EXT, 'fails');
   const alphaBefore = await accrued(alpha.token);
   const r = await invoke(consumer.token, 'fails');
   assert(r.status >= 400, `the failing action must not report success, got ${r.status}`);
-  assert(await balance(consumer.token) === consumerBefore, 'the consumer was refunded in full');
+  const spendAfter = await contractSpend(consumer.token, EXT, 'fails');
+  assert(spendAfter.spent === spendBefore.spent, `the consumer was refunded in full: the meter moved by ${spendAfter.spent - spendBefore.spent} ${spendAfter.currency}`);
   assert(await accrued(alpha.token) === alphaBefore, 'no share was booked against a call that never delivered');
 });
 
@@ -373,6 +377,10 @@ await test('Releasing to an UNVERIFIED beneficiary is refused → 409 BENEFICIAR
   assert(r.status === 409, `expected 409, got ${r.status}: ${JSON.stringify(r.body)}`);
   assert(r.body?.error?.code === 'BENEFICIARY_UNVERIFIED', `expected BENEFICIARY_UNVERIFIED, got ${JSON.stringify(r.body?.error)}`);
   assert(await balance(alpha.token) === alphaBalanceBefore, 'a refused release moves nothing');
+  // A release pays money, which the morsel balance above never shows: the obligation itself must
+  // still be accrued (report of 2026-11-15, 2.3).
+  const still = (await obligations(provider.token)).body.data.entries.find((e: any) => e.tracking_code === alphaTracking);
+  assert(still?.status === 'accrued', `a refused release leaves the obligation accrued, got ${JSON.stringify(still)}`);
 });
 
 await test('A non-operator cannot verify anyone, including themselves → 403', async () => {
@@ -994,6 +1002,8 @@ await test('A stranger cannot release someone else\'s obligation', async () => {
   });
   assert(r.status === 404, `a non-debtor has nothing to release; expected 404, got ${r.status}`);
   assert(await balance(alpha.token) === alphaBefore, 'nothing moved');
+  const still = (await obligations(provider.token)).body.data.entries.find((e: any) => e.tracking_code === entry.tracking_code);
+  assert(still?.status === 'accrued', `the stranger's attempt leaves the obligation accrued, got ${JSON.stringify(still)}`);
 });
 
 await test('A stranger sees only their own splits', async () => {

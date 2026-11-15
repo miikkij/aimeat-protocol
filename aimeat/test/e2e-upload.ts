@@ -6,6 +6,10 @@
  *   v1.0.0 — 2026-05-02 — Initial creation
  *   v1.1.0 -- 2026-05-29 -- Add Phase 3.5 regression tests for inline-upload
  *     base64 validation (POST /v1/apps with raw HTML / malformed input must 400).
+ *   v1.2.0 -- 2026-11-15 -- The uploaded bytes are read back, and a second owner's presigned upload
+ *     under the same file name leaves the first owner's app unchanged. The E2E report of 2026-11-15
+ *     proposed deleting this suite as covered elsewhere; five of its cases are not (the single-use
+ *     token, metadata carried forward, strict base64, the empty body and the bad token), so it stays.
  */
 
 import * as ed from '@noble/ed25519';
@@ -187,6 +191,33 @@ await test('Upload second version via presigned URL', async () => {
     const result = await res.json() as any;
     assert(result.version_number === 2, `version_number should be 2, got ${result.version_number}`);
     assert(result.is_update === true, 'is_update should be true');
+    // The bytes are read back, not only the answer (E2E report of 2026-11-15, 3.2): the node serves
+    // exactly what was PUT, and version 1 still serves its own.
+    const served = await (await fetch(`${BASE}/v1/apps/${ownerName}/upload-test.html`)).text();
+    assert(served.includes('Version 2'), `the node serves the uploaded version 2, got ${served.slice(0, 120)}`);
+    const first = await (await fetch(`${BASE}/v1/apps/${ownerName}/upload-test.html?version=1`)).text();
+    assert(first.includes('<h1>Upload Test</h1>'), `version 1 still serves its own bytes, got ${first.slice(0, 120)}`);
+});
+
+await test('Another owner cannot publish over this app through a presigned upload', async () => {
+    // A second owner asking for an upload under the same file name gets an upload of their OWN app
+    // (or a refusal), never a version of the first owner's: the first owner's app is unchanged.
+    const other = await registerOwner(BASE, `${ownerName}x`);
+    const { status, body } = await json('/v1/apps', {
+        method: 'POST', headers: { Authorization: `Bearer ${other.token}` },
+        body: JSON.stringify({ filename: 'upload-test.html', name: 'Not yours', mode: 'presigned' }),
+    });
+    if (status === 200 && body.data?.upload_url) {
+        const put = await fetch(body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: '<html><body>intruder</body></html>' });
+        await put.text();
+    }
+    const served = await (await fetch(`${BASE}/v1/apps/${ownerName}/upload-test.html`)).text();
+    assert(served.includes('Version 2') && !served.includes('intruder'), `the first owner's app is unchanged, got ${served.slice(0, 120)}`);
+    // The same second owner is refused the first owner's account itself, and the app stays served.
+    const del = await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${other.token}` } });
+    assert(del.status === 403 && del.body?.error?.code === 'ACCESS_DENIED', `another owner cannot delete this account: expected 403 ACCESS_DENIED, got ${del.status} ${JSON.stringify(del.body?.error)}`);
+    const still = await fetch(`${BASE}/v1/apps/${ownerName}/upload-test.html`);
+    assert(still.status === 200, `the first owner's app is still served after the refused delete, got ${still.status}`);
 });
 
 // A presigned UPDATE that omits metadata must never blank what the live app declares:

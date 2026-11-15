@@ -23,6 +23,9 @@
  *                   signal schemas or the shape allowlist changed; --full forces it. No uv fails.
  *     own suites    a registered E2E suite file that itself changed is run, including under --full;
  *                   SQLite always, PostgreSQL when the Postgres legs run
+ *     reaching      the suites the nightly's coverage map says executed a changed line of src/
+ *                   (scripts/lib/gate-coverage.ts), less those the tiers run anyway; up to 150, on
+ *                   the same backends as the own suites
  *     Postgres legs the guard tier, the changed suites and the unit files with a Postgres half run
  *                   on PostgreSQL by themselves when the change touches storage, identity, the
  *                   doors (src/routes, src/mcp, src/tool-catalog) or the runner; --postgres or
@@ -40,6 +43,8 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   2026-11-15 -- The suites that executed a changed line of src/ run too, chosen from the nightly's
+ *     per-suite coverage map (report of 2026-11-15, 4.2.6); the choice no longer rests on memory.
  *   2026-11-14 -- Unit files that fail in the parallel run are run again alone before the gate refuses,
  *     and the closing lines name the ones that passed alone (machine load); a package.json change
  *     that touches only `scripts` reaches no unit test, one beyond it runs the whole suite. The
@@ -67,11 +72,12 @@
  *     only when platform code that concerns it changed, not for every little thing."
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describeState, readCiState } from './lib/ci-runs.mjs';
 import { manifestChangedBeyondScripts } from './lib/package-manifest-change.js';
+import { COVERAGE_SUITE_CAP, coverageSelection, type GateCoverage } from './lib/gate-coverage.js';
 
 const args = process.argv.slice(2);
 const FULL = args.includes('--full');
@@ -95,6 +101,30 @@ function registeredSuites(): Set<string> {
     } catch {
         return new Set();
     }
+}
+
+/** The suites of one of the runner's tier lists (GUARD_SUITES, PURPOSE_SUITES), read as text like the above. */
+function tierSuites(list: string): Set<string> {
+    try {
+        const text = readFileSync(join(AIMEAT, 'test', 'run-e2e-ci.ts'), 'utf8');
+        const start = text.indexOf(`const ${list} = [`);
+        if (start < 0) return new Set();
+        const body = text.slice(start, text.indexOf('];', start));
+        return new Set([...body.matchAll(/'test\/([A-Za-z0-9_.-]+)\.ts'/g)].map(m => m[1]));
+    } catch {
+        return new Set();
+    }
+}
+
+/** A suite list for the runner: names on the command line, or in a file past 40 (see below). */
+function suiteSelection(names: string[]): string[] {
+    // Past a few dozen suites the names go in a file: one `--test=` each made a command line of
+    // about 13000 characters for 404 suites, and Windows refused it ("The command line is too
+    // long", 2026-10-12). The runner reads the file as if each line were a `--test=`.
+    if (names.length <= 40) return names.map(s => `--test=${s}`);
+    const list = join(mkdtempSync(join(tmpdir(), 'aimeat-gate-')), 'suites.txt');
+    writeFileSync(list, names.join('\n') + '\n');
+    return [`--tests-file=${list}`];
 }
 
 /**
@@ -173,15 +203,17 @@ function changedSince(base: string): { files: string[]; mergeBase: string } {
 /** `unit`: a vitest run whose failed files are run again alone before the gate refuses (runUnit). */
 interface Step { name: string; cmd: string[]; why: string; unit?: boolean }
 
-function plan(files: string[], mergeBase: string): Step[] {
+function plan(files: string[], mergeBase: string, coverage: GateCoverage): Step[] {
     const steps: Step[] = [];
     const unitReach = files.filter(f => UNIT_REACH.test(f));
     const guarded = files.filter(f => GUARDED.test(f));
     const postgresReason = postgresWhy(files);
     const POSTGRES = postgresReason !== null;
     const registered = registeredSuites();
+    // A deleted suite is in the diff too; asking the runner for it stops the run with "Unknown test
+    // suite", so only suites still on disk are run.
     const ownSuites = files
-        .filter(f => /^aimeat\/test\/[^/]+\.ts$/.test(f))
+        .filter(f => /^aimeat\/test\/[^/]+\.ts$/.test(f) && existsSync(join(ROOT, f)))
         .map(f => f.replace(/^aimeat\/test\//, '').replace(/\.ts$/, ''))
         .filter(name => registered.has(name) || name.startsWith('e2e-'));
 
@@ -213,19 +245,27 @@ function plan(files: string[], mergeBase: string): Step[] {
     }
 
     if (ownSuites.length > 0) {
-        // Past a few dozen suites the names go in a file: one `--test=` each made a command line of
-        // about 13000 characters for 404 suites, and Windows refused it ("The command line is too
-        // long", 2026-10-12). The runner reads the file as if each line were a `--test=`.
-        let selection = ownSuites.map(s => `--test=${s}`);
-        if (ownSuites.length > 40) {
-            const list = join(mkdtempSync(join(tmpdir(), 'aimeat-gate-')), 'suites.txt');
-            writeFileSync(list, ownSuites.join('\n') + '\n');
-            selection = [`--tests-file=${list}`];
-        }
+        const selection = suiteSelection(ownSuites);
         const shown = ownSuites.length > 40 ? `${ownSuites.length} suites` : ownSuites.join(', ');
         for (const backend of POSTGRES ? ['sqlite', 'postgres-kysely'] : ['sqlite']) {
             const label = backend === 'sqlite' ? 'SQLite' : 'Postgres';
             steps.push({ name: `own E2E suite(s), ${label}: ${shown}`, cmd: ['node', `--env-file=.env.test.${backend}`, '--import', 'tsx', 'test/run-e2e-ci.ts', ...selection], why: backend === 'sqlite' ? 'a suite that changed is run' : postgresReason ?? '' });
+        }
+    }
+
+    // The suites that executed a changed line of src/, by the nightly's coverage map (report of
+    // 2026-11-15, 4.2.6). Those the guard or purpose tier runs anyway, and the changed suites, are
+    // left out. Past COVERAGE_SUITE_CAP the change sits on a path nearly every suite runs, and the
+    // tiers stand in for the rest, which the nightly runs.
+    const guardTierRuns = FULL || guarded.length > 0;
+    const tiers = guardTierRuns ? new Set([...tierSuites('GUARD_SUITES'), ...tierSuites('PURPOSE_SUITES')]) : new Set<string>();
+    const reached = coverage.suites?.filter(s => registered.has(s) && !ownSuites.includes(s) && !tiers.has(s)) ?? [];
+    if (reached.length > 0 && reached.length <= COVERAGE_SUITE_CAP) {
+        const selection = suiteSelection(reached);
+        const shown = reached.length > 6 ? `${reached.length} suites` : reached.join(', ');
+        for (const backend of POSTGRES ? ['sqlite', 'postgres-kysely'] : ['sqlite']) {
+            const label = backend === 'sqlite' ? 'SQLite' : 'Postgres';
+            steps.push({ name: `suites reaching the change, ${label}: ${shown}`, cmd: ['node', `--env-file=.env.test.${backend}`, '--import', 'tsx', 'test/run-e2e-ci.ts', ...selection, '--workers=4'], why: backend === 'sqlite' ? `they executed a changed line (${coverage.note})` : postgresReason ?? '' });
         }
     }
 
@@ -277,7 +317,8 @@ function postgresWhy(files: string[]): string | null {
 
 async function main(): Promise<void> {
     const { files, mergeBase } = changedSince(BASE);
-    const steps = plan(files, mergeBase);
+    const coverage = coverageSelection(ROOT, AIMEAT, files, mergeBase, { refresh: true });
+    const steps = plan(files, mergeBase, coverage);
     console.log(`\n  gate: ${files.length} file(s) changed since ${BASE} (${mergeBase.slice(0, 9)})${FULL ? ', --full' : ''}`);
     console.log('  ' + '─'.repeat(62));
     for (const s of steps) console.log(`  • ${s.name.padEnd(44)} ${s.why}`);
@@ -287,6 +328,9 @@ async function main(): Promise<void> {
     if (!FULL && !files.some(f => SKILLS_STANDARD.test(f))) skipped.push('Agent Skills validator (no built-in skill, SKILL.md parser or check change)');
     if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard and purpose tiers (no server source, dependency or E2E machinery changed)');
     if (postgresWhy(files) === null) skipped.push('PostgreSQL legs (no storage, identity, door or runner change; --postgres forces them)');
+    if (coverage.suites === null) skipped.push(`suites reaching the change: ${coverage.note}`);
+    else if (coverage.suites.length > COVERAGE_SUITE_CAP) skipped.push(`suites reaching the change: ${coverage.suites.length} executed a changed line, more than ${COVERAGE_SUITE_CAP}, so the guard and purpose tiers stand in and the nightly runs the rest`);
+    if (coverage.unknown.length > 0) console.log(`  · the coverage map does not know ${coverage.unknown.length} changed file(s), new or run by no suite: ${coverage.unknown.slice(0, 3).join(', ')}${coverage.unknown.length > 3 ? ', …' : ''}`);
     for (const s of skipped) console.log(`  · skipped: ${s}`);
     console.log('');
     for (const line of await contextLines()) console.log(`  ${line}`);

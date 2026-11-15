@@ -30,8 +30,6 @@ ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-const PORT = Number(new URL(BASE).port || 80);
 
 let passed = 0;
 let failed = 0;
@@ -251,10 +249,16 @@ await test('8b. Sharing a socket does not share an OWNER: a cross-owner read is 
     agent: gaiisB[1], body: { key: priv, value: { secret: 'owner B only' }, visibility: 'private' },
   });
   assert(wrote.status === 200 || wrote.status === 201, `owner B write: ${wrote.status}`);
-  // Owner A's agent asks for it BY OWNER B's namespace, over the same socket.
-  const stolen = await hub!.request('GET', `/v1/memory/${encodeURIComponent(gaiisB[1].split('#')[1].split('@')[0] + '@' + NODE_ID)}/${priv}`, {
-    agent: gaiisA[1],
-  });
+  // The record is stored under the writing agent's own identity. The path below must address it,
+  // or the refusal proves nothing: until 2026-11-15 the read named owner B's account instead, where
+  // no such record was, so the route answered 404 for everybody and the check could not fail
+  // (report of 2026-11-15, 2.3). The writer reading the same path is the control.
+  const path = `/v1/memory/${encodeURIComponent(gaiisB[1])}/${priv}`;
+  const own = await hub!.request('GET', path, { agent: gaiisB[1] });
+  assert(own.status === 200 && JSON.stringify(own.body).includes('owner B only'),
+    `the path must address the record: its writer reads it, got ${own.status} ${JSON.stringify(own.body)}`);
+  // Owner A's agent asks for the same record by the same path, over the same socket.
+  const stolen = await hub!.request('GET', path, { agent: gaiisA[1] });
   assert(stolen.status === 403 || stolen.status === 404,
     `owner A must be refused owner B's private record, got ${stolen.status} ${JSON.stringify(stolen.body)}`);
 });

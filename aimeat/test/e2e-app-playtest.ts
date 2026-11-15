@@ -20,13 +20,20 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { isSkip, skip } from './helpers/skip.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
-let passed = 0, failed = 0;
+// A test that cannot ask its question without a browser is SKIPPED, not passed: until 2026-11-15
+// the bench's core tests returned early and counted green on a machine with no browser (report of
+// 2026-11-15, 2.3). The runner shows the count in its Skipped column.
+let passed = 0, failed = 0, skipped = 0;
 async function test(name: string, fn: () => Promise<void>) {
     try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
+    catch (err: any) {
+        if (isSkip(err)) { skipped++; console.log(`  ⏭ ${name}: ${err.message}`); return; }
+        failed++; console.error(`  ❌ ${name}: ${err.message}`);
+    }
 }
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
@@ -147,10 +154,7 @@ const CHECK_IDS = ['boots', 'paints', 'clean-console', 'resizes', 'audio-gated',
             ? Array.isArray(pt.checks) && pt.checks.length === CHECK_IDS.length
             : typeof pt.reason === 'string' && pt.reason.length > 20,
         `a run answers with ${CHECK_IDS.length} checks and an unavailable one with a reason, got ${JSON.stringify({ ran, reason: pt.reason, checks: pt.checks?.length })}`);
-        if (!ran) {
-            console.log(`     (no browser on this machine: "${pt.reason}")`);
-            return;
-        }
+        if (!ran) skip(`no browser on this machine: "${pt.reason}"`);
         for (const id of CHECK_IDS) {
             const c = pt.checks.find((x: any) => x.id === id);
             assert(!!c, `the ${id} check is present`);
@@ -168,7 +172,7 @@ const CHECK_IDS = ['boots', 'paints', 'clean-console', 'resizes', 'audio-gated',
     });
 
     await test('the bench can refuse: a canvas of one flat colour fails the black-screen check', async () => {
-        if (!ran) { console.log('     (skipped: no browser on this machine)'); return; }
+        if (!ran) skip('no browser on this machine');
         const r = await json(`/v1/apps/me/${dark}/audit?playtest=true`, { headers: auth(a.token) });
         assert(r.status === 200, `playtest ${r.status}`);
         const pt = r.body.data.live?.playtest;
@@ -184,10 +188,10 @@ const CHECK_IDS = ['boots', 'paints', 'clean-console', 'resizes', 'audio-gated',
     // service; the app asks it by fetch, by image and by frame, and it must hear nothing, while the
     // node's own origin still answers.
     await test('the app reaches the node\'s own origin and no private address (SSRF-1)', async () => {
-        if (!ran) { console.log('     (skipped: no browser on this machine)'); return; }
-        const ip = Object.values(networkInterfaces()).flat()
+        if (!ran) skip('no browser on this machine');
+        const ip =Object.values(networkInterfaces()).flat()
             .find(x => x && x.family === 'IPv4' && !x.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(x.address))?.address;
-        if (!ip) { console.log('     (skipped: this machine has no private network address to stand in for an intranet)'); return; }
+        if (!ip) skip('this machine has no private network address to stand in for an intranet');
         let hits = 0;
         const intranet = createServer((_req, res) => { hits++; res.setHeader('Access-Control-Allow-Origin', '*'); res.end('internal'); });
         await new Promise<void>(ok => intranet.listen(0, ip, () => ok()));
@@ -240,6 +244,6 @@ const CHECK_IDS = ['boots', 'paints', 'clean-console', 'resizes', 'audio-gated',
         }
     });
 
-    console.log(`\n${passed} passed, ${failed} failed\n`);
+    console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped\n`);
     process.exit(failed > 0 ? 1 : 0);
 })();

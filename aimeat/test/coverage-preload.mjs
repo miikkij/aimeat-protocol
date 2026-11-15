@@ -27,6 +27,11 @@
  *   Plain ESM on purpose: NODE_OPTIONS loads it before tsx is registered.
  * @usage `pnpm test:e2e:coverage --db=sqlite` (scripts/e2e-coverage.ts sets the environment).
  * @version-history
+ *   v1.1.0 — 2026-11-15 — AIMEAT_COVERAGE_PER_SUITE=<dir>: the runner gives every suite's node and
+ *     suite process a coverage directory of their own under <dir> (scripts/e2e-coverage-map.ts builds
+ *     the per-suite map from them), so the stop sentinels and the source maps live in <dir>/stop and
+ *     <dir>/smc, shared by all, instead of in each process's own directory, where a killer and its
+ *     child would no longer look in the same place and every suite would store every map again.
  *   v1.0.0 — 2026-09-07 — Initial.
  */
 /* global process, setInterval, setTimeout, clearTimeout */
@@ -34,10 +39,15 @@ import v8 from 'node:v8';
 import { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { findSourceMap } from 'node:module';
 import { join } from 'node:path';
 import { isMainThread } from 'node:worker_threads';
 
 const dir = process.env.NODE_V8_COVERAGE;
+// With per-suite directories the sentinels and the maps are shared (see v1.1.0 above).
+const perSuite = process.env.AIMEAT_COVERAGE_PER_SUITE ?? '';
+const stopDir = perSuite ? join(perSuite, 'stop') : dir;
+if (dir && perSuite) mkdirSync(stopDir, { recursive: true });
 const isNodeProcess = /src[\\/]index\.ts$/.test(process.argv[1] ?? '');
 const srcPrefix = process.env.AIMEAT_COVERAGE_SRC ?? '';
 const KILL_GRACE_MS = 4000;
@@ -58,7 +68,7 @@ function keep(url) {
 function flush(keepSnapshot) {
   try { v8.takeCoverage(); } catch { return; }
   const own = readdirSync(dir).filter(f => f.startsWith(`coverage-${process.pid}-`) && f.endsWith('.json'));
-  const smcDir = join(dir, 'smc');
+  const smcDir = perSuite ? join(perSuite, 'smc') : join(dir, 'smc');
   mkdirSync(smcDir, { recursive: true });
   const stored = new Set(readdirSync(smcDir));
   for (const file of own) {
@@ -82,6 +92,22 @@ function flush(keepSnapshot) {
       try { renameSync(tmp, target); } catch { try { unlinkSync(tmp); } catch { /* already gone */ } }
       stored.add(name);
     }
+    // The coverage file's source-map-cache held about half the scripts' maps on 2026-11-15 (1687 of
+    // 3141 on one node, src/routes/admin/cors.ts among the missing). The process still has the rest:
+    // module.findSourceMap() answers for any script loaded with a source map, so the gaps are filled
+    // from there, in the shape the cache uses ({ lineLengths, data }).
+    for (const s of result) {
+      const name = `${createHash('sha1').update(s.url).digest('hex')}.json`;
+      if (stored.has(name)) continue;
+      let sm;
+      try { sm = findSourceMap(s.url); } catch { sm = undefined; }
+      if (!sm?.payload || !Array.isArray(sm.lineLengths)) continue;
+      const target = join(smcDir, name);
+      const tmp = `${target}.${process.pid}.tmp`;
+      writeFileSync(tmp, JSON.stringify({ url: s.url, entry: { lineLengths: sm.lineLengths, data: sm.payload } }));
+      try { renameSync(tmp, target); } catch { try { unlinkSync(tmp); } catch { /* already gone */ } }
+      stored.add(name);
+    }
   }
 }
 
@@ -98,7 +124,7 @@ if (dir && !isMainThread) {
   try { v8.stopCoverage(); } catch { /* not started */ }
 } else if (dir) {
   if (isNodeProcess) {
-    const stopFile = join(dir, `stop-${process.pid}`);
+    const stopFile = join(stopDir, `stop-${process.pid}`);
     const snapshotMs = Number(process.env.AIMEAT_COVERAGE_SNAPSHOT_MS ?? '0');
     if (snapshotMs > 0) setInterval(() => flush(() => true), snapshotMs).unref();
     const startedAt = Date.now();
@@ -128,8 +154,8 @@ if (dir && !isMainThread) {
   ChildProcess.prototype.kill = function kill(signal) {
     const alive = this.exitCode === null && this.signalCode === null;
     if (!alive || signal === 'SIGKILL' || typeof signal === 'number' || !this.pid) return realKill.call(this, signal);
-    try { writeFileSync(join(dir, `stop-${this.pid}`), ''); } catch { return realKill.call(this, signal); }
-    const sentinel = join(dir, `stop-${this.pid}`);
+    try { writeFileSync(join(stopDir, `stop-${this.pid}`), ''); } catch { return realKill.call(this, signal); }
+    const sentinel = join(stopDir, `stop-${this.pid}`);
     const timer = setTimeout(() => {
       try { unlinkSync(sentinel); } catch { /* the child took it */ }
       if (this.exitCode === null && this.signalCode === null) realKill.call(this, signal);
