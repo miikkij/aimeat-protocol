@@ -82,7 +82,7 @@ import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.
 import { verify } from '../auth/keypair.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { registerOAuthMetadataRoutes } from './oauth-metadata.js';
-import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth-client-metadata.js';
+import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth/client-metadata.js';
 import { redirectUriRegistered } from './oauth-redirect.js';
 import { registerOAuthConsentInfo } from './oauth-consent-info.js';
 import { LOCALES } from '../i18n.js';

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description GET /v1/mcp/consent-info: what the MCP OAuth consent page shows about the app that
- *   asks, as this server checked it (services/oauth-consent-info.ts decides; this only answers). No
+ *   asks, as this server checked it (services/oauth/consent-info.ts decides; this only answers). No
  *   credential: the page reads it before anyone signs in, and it says nothing the caller of the
  *   authorize step was not already told (secaudit2026oct22,
  *   mcp-oauth:consent-identity-from-request-not-verified-client).
@@ -15,7 +15,7 @@
  */
 import { type Request, type Response, type Router } from 'express';
 import type { Storage } from '../storage/interface.js';
-import { oauthConsentInfo } from '../services/oauth-consent-info.js';
+import { oauthConsentInfo } from '../services/oauth/consent-info.js';
 import { isLoopbackRedirect, redirectUriRegistered } from './oauth-redirect.js';
 
 export function registerOAuthConsentInfo(router: Router, storage: Storage): void {

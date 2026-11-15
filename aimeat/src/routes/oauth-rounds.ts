@@ -35,7 +35,7 @@ import { requireAuth, requireOwnerPrincipal } from '../auth/middleware.js';
 import { callerOf } from '../middleware/caller.js';
 import { newRoundBinding, setRoundBinding, roundCookieKind } from '../middleware/oauth-round-cookie.js';
 import { buildOutboundProviders } from '../services/connections/providers.js';
-import { findOwnersRound, describeRound, bindRound, type OwnersRound } from '../services/oauth-rounds.js';
+import { findOwnersRound, describeRound, bindRound, type OwnersRound } from '../services/oauth/rounds.js';
 import { connectCallbackPath } from './connections-callback.js';
 
 const MCP_CALLBACK_PATH = '/v1/mcp-servers/callback';

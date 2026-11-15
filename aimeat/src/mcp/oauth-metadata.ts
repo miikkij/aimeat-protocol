@@ -58,7 +58,7 @@ export function registerOAuthMetadataRoutes(router: Router, config: AimeatConfig
             // who it is. Declared, because a client cannot try a mechanism it has no way to learn
             // about: without this line the only discoverable road in is the registration endpoint
             // above, which 2026-07-28 deprecates. Both work; this one stores nothing and goes stale
-            // for nobody. → services/oauth-client-metadata.ts
+            // for nobody. → services/oauth/client-metadata.ts
             client_id_metadata_document_supported: true,
             revocation_endpoint: `${baseUrl}/v1/mcp/token/revoke`,
             response_types_supported: ['code'],

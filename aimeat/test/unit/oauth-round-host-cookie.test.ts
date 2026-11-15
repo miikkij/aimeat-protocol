@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which cookie finishes an outside-account or remote MCP server round
- *   (secaudit2026oct31w2, W2-19, roundBindingHeld in services/oauth-round-secrets.ts). A round bound
+ *   (secaudit2026oct31w2, W2-19, roundBindingHeld in services/oauth/round-secrets.ts). A round bound
  *   over https records `bindCookie: 'host'` and finishes only with the `__Host-` cookie, which a
  *   same-site app, portfolio or company page cannot write; a round bound over plain http finishes
  *   only over plain http; a round written before `bindCookie` existed reads the plain cookie, so a
@@ -14,7 +14,7 @@
  *   v1.0.0 -- 2026-10-31 -- Initial (secaudit2026oct31w2 round 10, W2-19).
  */
 import { describe, it, expect } from 'vitest';
-import { bindingHash, roundBindingHeld } from '../../src/services/oauth-round-secrets.js';
+import { bindingHash, roundBindingHeld } from '../../src/services/oauth/round-secrets.js';
 
 const VALUE = 'the-starters-browser';
 const HASH = bindingHash(VALUE);

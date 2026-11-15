@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The browser half of binding an outside sign-in round to the browser that finishes it
- *   (secrets audit 2026-10-09, chapter 2; the stored half is services/oauth-round-secrets.ts).
+ *   (secrets audit 2026-10-09, chapter 2; the stored half is services/oauth/round-secrets.ts).
  *
  *   ONE COOKIE PER ROUND, httpOnly, SameSite=Lax, path = the callback's path, lifetime = the
  *   round's. Lax is the setting that works: the provider's redirect back is a cross-site top-level
@@ -33,7 +33,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { bindingHash, type RoundBindCookie, type RoundCookies } from '../services/oauth-round-secrets.js';
+import { bindingHash, type RoundBindCookie, type RoundCookies } from '../services/oauth/round-secrets.js';
 import { logger } from '../utils/logger.js';
 
 const COOKIE_PREFIX = 'aimeat_oauth_';

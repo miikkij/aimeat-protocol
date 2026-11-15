@@ -1,5 +1,5 @@
 /**
- * @file oauth-rounds.ts
+ * @file src/services/oauth/rounds.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner's confirmation of an outside sign-in round that was started outside their
@@ -25,13 +25,13 @@
  *   v1.1.0 — 2026-10-10 — bindRound refuses a round that is already bound (secaudit 2026-10-10 I6).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
  */
-import type { Storage } from '../storage/interface.js';
-import type { VerificationNonceRecord } from '../storage/types/auth.js';
-import type { OutboundProvider } from './connections/providers.js';
-import { findProvider } from './connections/providers.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import type { RoundBindCookie } from './oauth-round-secrets.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import type { VerificationNonceRecord } from '../../storage/types/auth.js';
+import type { OutboundProvider } from '../connections/providers.js';
+import { findProvider } from '../connections/providers.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import type { RoundBindCookie } from './round-secrets.js';
+import { logger } from '../../utils/logger.js';
 
 export type RoundKind = 'account' | 'mcp_server';
 

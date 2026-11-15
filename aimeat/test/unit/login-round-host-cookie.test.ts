@@ -24,7 +24,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { initNodeKeys } from '../../src/auth/jwt.js';
-import { bindingHash } from '../../src/services/oauth-round-secrets.js';
+import { bindingHash } from '../../src/services/oauth/round-secrets.js';
 import type { OidcClient } from '../../src/services/oidc-client.js';
 import { FAKE_IDP, buildSamlResponse, requestIdFromAuthorizeUrl } from '../helpers/fake-saml-idp.js';
 

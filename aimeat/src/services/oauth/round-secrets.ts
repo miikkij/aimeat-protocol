@@ -1,5 +1,5 @@
 /**
- * @file oauth-round-secrets.ts
+ * @file src/services/oauth/round-secrets.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The parts of an outside sign-in round (an outbound connection's, a remote MCP
@@ -30,9 +30,9 @@
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import { encryptBound, decryptBound } from './encryption.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import { encryptBound, decryptBound } from '../encryption.js';
+import { logger } from '../../utils/logger.js';
 
 /** What a round stores for a binding value: its SHA-256, hex. The value itself stays in the cookie. */
 export function bindingHash(value: string): string {

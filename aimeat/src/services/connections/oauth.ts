@@ -13,7 +13,7 @@
  *   THE STATE NAMES WHO, THE BINDING NAMES WHICH BROWSER. The state alone said whose connection the
  *   account becomes, and nothing said who approved it, so an authorize address handed to somebody
  *   else connected THEIR account to the starter. The callback now also needs the round's browser
- *   binding (services/oauth-round-secrets.ts): the starter's own browser, or the owner's after they
+ *   binding (services/oauth/round-secrets.ts): the starter's own browser, or the owner's after they
  *   confirmed a round an agent started (secrets audit 2026-10-09, chapter 2).
  *
  *   WHY THE STATE IS CONSUMED FIRST. `completeAuthorization` deletes the nonce BEFORE it exchanges
@@ -55,7 +55,7 @@ import { readJson } from '../../utils/read-capped.js';
  *  more than this to sign a person in (secaudit 2026-10, C6). */
 const OAUTH_ANSWER_MAX_BYTES = 256 * 1024;
 import { sealCredential, openCredential } from './credential.js';
-import { roundBindingHeld, roundApprovalUrl, sealRoundSecret, openRoundSecret, type RoundBindCookie, type RoundCookies } from '../oauth-round-secrets.js';
+import { roundBindingHeld, roundApprovalUrl, sealRoundSecret, openRoundSecret, type RoundBindCookie, type RoundCookies } from '../oauth/round-secrets.js';
 import { normalizeInstance, registerAtInstance, type InstanceClient } from './instance.js';
 import { findProvider, type OutboundProvider, tokenRequest } from './providers.js';
 import { finishSocialToken, SOCIAL_FINISH_PROVIDERS } from './social-finish.js';
@@ -79,7 +79,7 @@ interface StatePayload {
   instance: string | null;
   mode: ConnectionMode;
   /**
-   * SHA-256 of the cookie that binds the round to one browser (services/oauth-round-secrets.ts).
+   * SHA-256 of the cookie that binds the round to one browser (services/oauth/round-secrets.ts).
    * Absent until the owner confirms a round started outside their browser.
    */
   bind?: string;

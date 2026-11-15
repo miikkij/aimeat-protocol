@@ -1,5 +1,5 @@
 /**
- * @file oauth-client-metadata.ts
+ * @file src/services/oauth/client-metadata.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A client that is a URL: OAuth Client ID Metadata Documents.
@@ -35,10 +35,10 @@
  *   v1.0.0 — 2026-09-04 — Initial: MCP 2025-11-25's recommended registration, and the successor to
  *     the DCR endpoint 2026-07-28 deprecates.
  */
-import { safeFetch } from '../utils/url-validator.js';
-import { readBodyCapped } from '../utils/read-capped.js';
-import { cached, TTL } from './cache.js';
-import { logger } from '../utils/logger.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
+import { cached, TTL } from '../cache.js';
+import { logger } from '../../utils/logger.js';
 
 /** A client metadata document, in the fields this node acts on. */
 export interface ClientIdMetadata {

@@ -18,7 +18,7 @@
  *
  *   THE PKCE VERIFIER NEVER TRAVELS. It is written against the single-use `state` in a verification
  *   nonce, exactly as the outbound-connections round does it, sealed to that round with the node key
- *   together with a dynamic registration's client_secret (services/oauth-round-secrets.ts).
+ *   together with a dynamic registration's client_secret (services/oauth/round-secrets.ts).
  *
  *   THE STATE NAMES WHOSE SERVER, THE BINDING NAMES WHICH BROWSER. The owner on the nonce is always
  *   the server's owner, so comparing the two refused nothing: whoever saw a pending authorize address
@@ -74,7 +74,7 @@ import { sealMcpCredential, openMcpCredential, requireEncryptionKey } from './cr
 import { guardedFetch } from './transport.js';
 import { mcpClientPool } from './pool.js';
 import { logger } from '../../utils/logger.js';
-import { roundBindingHeld, roundApprovalUrl, sealRoundSecret, openRoundSecret, type RoundBindCookie } from '../oauth-round-secrets.js';
+import { roundBindingHeld, roundApprovalUrl, sealRoundSecret, openRoundSecret, type RoundBindCookie } from '../oauth/round-secrets.js';
 import { describeUpstreamError } from './upstream-error.js';
 import { LOCALES } from '../../i18n.js';
 

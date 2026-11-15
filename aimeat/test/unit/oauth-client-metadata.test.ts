@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-09-04 — Initial, with the feature.
  */
 import { describe, it, expect } from 'vitest';
-import { isClientIdUrl, parseClientDocument } from '../../src/services/oauth-client-metadata.js';
+import { isClientIdUrl, parseClientDocument } from '../../src/services/oauth/client-metadata.js';
 
 const SELF = 'https://client.test/mcp-client.json';
 const doc = (over: Record<string, unknown>) => JSON.stringify({

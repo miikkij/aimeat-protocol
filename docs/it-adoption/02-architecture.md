@@ -133,7 +133,7 @@ These calls go to addresses that a signed-in person, an agent or an outside clie
 | Destination | Why | Who chooses, and the control | Default | Source |
 |---|---|---|---|---|
 | Any public `http(s)` address | Link previews of a pasted link (`GET /v1/unfurl`), also the preview image, proxied | Any signed-in person | On | `aimeat/src/routes/unfurl.ts` |
-| The `client_id` URL of an MCP client | OAuth Client ID Metadata Documents: the node reads who the AI client is when it signs in | The AI client vendor | On | `aimeat/src/services/oauth-client-metadata.ts` |
+| The `client_id` URL of an MCP client | OAuth Client ID Metadata Documents: the node reads who the AI client is when it signs in | The AI client vendor | On | `aimeat/src/services/oauth/client-metadata.ts` |
 | Outside MCP servers | A person or a group attaches another MCP server to the node | Any signed-in person in their own session; an agent or token needs `mcp:manage`, which no wildcard carries. No node setting turns it off (`aimeat_mcp_attach`, `aimeat/src/routes/mcp-servers.ts`) | Possible | `aimeat/src/services/mcp-client/transport.ts` |
 | Webhook addresses | Action webhooks, agent webhooks, board subscribers, A2A push notifications (`aimeat_v2_push_set`) | The owner or agent that registers them | Possible | `aimeat/src/services/webhook-dispatcher.ts`, `aimeat/src/routes/agent-webhook.ts`, `aimeat/src/services/boards/subscribers.ts` |
 | Operator hooks | Actions bound to node events by the operator | The operator (`aimeat_admin_hook_set`) | None bound | `aimeat/src/services/hooks.ts` |

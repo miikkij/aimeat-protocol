@@ -60,7 +60,7 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
 });
 
 const { requestStorageGrant } = await import('../../src/services/attachment-duplication.js');
-const { resolveClientIdMetadata } = await import('../../src/services/oauth-client-metadata.js');
+const { resolveClientIdMetadata } = await import('../../src/services/oauth/client-metadata.js');
 
 const config = { nodeId: 'node-b', federationTimeoutMs: 5000 } as unknown as AimeatConfig;
 const peers = new Map<string, PeerInfo>([['peer', {

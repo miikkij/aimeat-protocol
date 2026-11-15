@@ -1,5 +1,5 @@
 /**
- * @file src/services/oauth-consent-info.ts
+ * @file src/services/oauth/consent-info.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What the MCP OAuth consent page shows about the app that asks, from data this server
@@ -26,8 +26,8 @@
  *   v1.1.0 — 2026-11-04 — `redirect_local`.
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
-import type { Storage } from '../storage/interface.js';
-import { resolveClientIdMetadata } from './oauth-client-metadata.js';
+import type { Storage } from '../../storage/interface.js';
+import { resolveClientIdMetadata } from './client-metadata.js';
 
 /** The OAuth routes' own redirect test (mcp/oauth-redirect.ts redirectUriRegistered), handed in: a service does not import mcp/. */
 export type RedirectMatcher = (registered: readonly string[], requested: string) => boolean;

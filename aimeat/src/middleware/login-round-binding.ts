@@ -38,7 +38,7 @@
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import { bindingMatches } from '../services/oauth-round-secrets.js';
+import { bindingMatches } from '../services/oauth/round-secrets.js';
 import { clearRoundBinding, cookieSecure, newRoundBinding, readRoundBinding, setRoundBinding } from './oauth-round-cookie.js';
 import { logger } from '../utils/logger.js';
 

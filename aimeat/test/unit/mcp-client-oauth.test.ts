@@ -41,7 +41,7 @@ import {
 } from '../../src/services/mcp-client/oauth.js';
 import { openMcpCredential, sealMcpCredential, requireEncryptionKey } from '../../src/services/mcp-client/credential.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
-import { bindingHash } from '../../src/services/oauth-round-secrets.js';
+import { bindingHash } from '../../src/services/oauth/round-secrets.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
