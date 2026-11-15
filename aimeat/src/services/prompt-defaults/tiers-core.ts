@@ -6,6 +6,7 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.2.1 — 2026-11-15 — The deliver example's output is a JSON object, as the node takes it now.
  *   v1.2.0 — 2026-10-11 — Work and services modules: an action's morsels are its pacing amount
  *     (`toll_morsels`; base_morsels / price_morsels are the deprecated 3.x names until 4.0.0), never a
  *     price, and a short balance is met with the daily allowance or the pacing pack.
@@ -466,7 +467,7 @@ POST /v1/work/{tracking_code}/progress
 
 POST /v1/work/{tracking_code}/deliver
   Deliver completed work. The pacing held in escrow is settled (morsels move to your owner).
-  body: { "output": "Here is the completed analysis: ...", "metadata": {} }
+  body: { "output": { "text": "Here is the completed analysis: ..." }, "metadata": {} }
 
 GET /v1/work/sent
   Work items YOU submitted as requester. Track status of your outbound requests.

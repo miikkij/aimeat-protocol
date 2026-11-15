@@ -11,6 +11,8 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-work.js"></script>
  *   const actions = await AIMEAT.work.catalogue();
  * @version-history
+ *   v1.0.1 — 2026-11-15 — JSDoc for request() and deliver(): input and output are JSON objects, as
+ *     the node takes them since 2026-11-15.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-work.ts (SDK-libs migration Phase 2).
  */
 import { NODE_URL } from '../_core/config.js';
@@ -76,7 +78,14 @@ const work = {
 
   // ── Work Requests (Tier 1, JWT auth) ──
 
-  // Submit a work request
+  /**
+   * Submit a work request.
+   * @param {string} actionId The action's id, as the catalogue lists it.
+   * @param {string} providerGaii The provider the catalogue lists for the action.
+   * @param {Record<string, any>} input A JSON object with the fields the action reads, for example
+   *   { text: '...' }. Text, a number, an array or null is refused with 400.
+   * @param {{ ttl_hours?: number, priority?: 'low'|'normal'|'high', callback_url?: string }} [opts]
+   */
   async request(actionId, providerGaii, input, opts) {
     const body = {
       action_id: actionId,
@@ -145,7 +154,13 @@ const work = {
     return res.data;
   },
 
-  // Deliver work output (provider)
+  /**
+   * Deliver work output (provider).
+   * @param {string} trackingCode The work item's tracking code.
+   * @param {Record<string, any>} output A JSON object, for example { text: '...' }. Text, a number,
+   *   an array or null is refused with 400.
+   * @param {any} [metadata] Anything the provider adds about the delivery.
+   */
   async deliver(trackingCode, output, metadata) {
     const body = /** @type {Record<string, any>} */ ({ output });
     if (metadata) body.metadata = metadata;

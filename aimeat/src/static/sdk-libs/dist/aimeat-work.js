@@ -103,7 +103,14 @@
       return res.data;
     },
     // ── Work Requests (Tier 1, JWT auth) ──
-    // Submit a work request
+    /**
+     * Submit a work request.
+     * @param {string} actionId The action's id, as the catalogue lists it.
+     * @param {string} providerGaii The provider the catalogue lists for the action.
+     * @param {Record<string, any>} input A JSON object with the fields the action reads, for example
+     *   { text: '...' }. Text, a number, an array or null is refused with 400.
+     * @param {{ ttl_hours?: number, priority?: 'low'|'normal'|'high', callback_url?: string }} [opts]
+     */
     async request(actionId, providerGaii, input, opts) {
       const body = {
         action_id: actionId,
@@ -166,7 +173,13 @@
       if (!res.ok) throw new Error(res.error?.message || "Failed to reject work");
       return res.data;
     },
-    // Deliver work output (provider)
+    /**
+     * Deliver work output (provider).
+     * @param {string} trackingCode The work item's tracking code.
+     * @param {Record<string, any>} output A JSON object, for example { text: '...' }. Text, a number,
+     *   an array or null is refused with 400.
+     * @param {any} [metadata] Anything the provider adds about the delivery.
+     */
     async deliver(trackingCode, output, metadata) {
       const body = (
         /** @type {Record<string, any>} */

@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.40.1 — 2026-11-15 — aimeat-work's aiDoc names request() and deliver() and says input and output
+ *     are JSON objects.
  *   v1.40.0 — 2026-11-15 — Changelog: aimeat-voice 1.2.0, tts.voice defaults to empty and is sent only
  *     when the app sets one; the aiDoc says which default voice applies and that NO_TTS_VOICE comes back
  *     when none is set.
@@ -426,7 +428,7 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.work',
-    aiDoc: 'Actions & work exchange: catalogue, work requests, inbox, deliver, rate, polling.',
+    aiDoc: 'Actions & work exchange: catalogue, work requests, inbox, deliver, rate, polling. request(actionId, providerGaii, input, opts) and deliver(trackingCode, output, metadata): input and output are JSON objects, such as { text: \'...\' }; text, a number, an array or null is refused with 400.',
     changelog: [],
     tierHint: 'T1',
     interviewTriggers: [],
