@@ -91,6 +91,14 @@ key**, which is what the configuration page already glossed it as. On a person's
 Three uses are not the metaphor and stay: a picture caption where a house is a house, an *auction
 house*, and *house style* (`talon tyyli`), which is its own idiom about whose style it is.
 
+**door / ovi / puerta for anything that is not a door.** `pnpm check:locales` refuses it, and
+`security/locale-door-baseline.json` lists the uses allowed, each with its reason. The word had
+become this codebase's name for a button, a link, a sign-in method, an endpoint and the way an agent
+connects, and on 2026-11-15 the developer saw "What this door does" over an admin section and could
+not tell what it meant. Name the thing itself: *the button*, *the link*, *sign-in* (*kirjautuminen*,
+*el acceso*), *the call* (*kutsu*, *la llamada*), *your agent is asking to connect*. A real door (a
+door code, a door sensor) and the idiom *showed X the door* stay.
+
 ## Register
 
 **Finnish.** Full sentences, not clipped slogans. The developer's own model, which beat a shorter

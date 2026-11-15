@@ -1,0 +1,8 @@
+{
+  "en:explain.concept.receiver.ex4": "A real door: a door sensor in Home Assistant sends the event.",
+  "fi:explain.concept.receiver.ex4": "A real door: a door sensor in Home Assistant sends the event.",
+  "es:explain.concept.receiver.ex4": "A real door: a door sensor in Home Assistant sends the event.",
+  "en:explain.concept.context.tip": "A real door: a door code is the example of a single fact to remember.",
+  "es:explain.concept.context.tip": "A real door: a door code is the example of a single fact to remember.",
+  "en:landing.wallIntroText": "An English idiom: a CRM that \"showed HubSpot the door\" replaced HubSpot."
+}

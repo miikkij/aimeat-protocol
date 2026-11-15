@@ -17,6 +17,10 @@
  * @usage  pnpm check:locales           (exit 1 on any violation)
  *         pnpm check:locales --list    (coverage only, always exit 0)
  * @version-history
+ *   v1.5.0 — 2026-11-15 — The same ratchet for "door" (fi "ovi", es "puerta"), with its own
+ *     baseline security/locale-door-baseline.json, a map from id to the reason a real door or an
+ *     idiom is allowed. The word had reached 64 English, 47 Finnish and 58 Spanish strings as a name
+ *     for buttons, sign-in methods and endpoints; they were rewritten in the same change.
  *   v1.4.1 — 2026-11-04 — Reads APP_GRANTABLE_SCOPES from src/services/app-grant-vocabulary.ts, where
  *     the file moved (codebase analysis 2026-11-03, item D-d).
  *   v1.4.0 — 2026-09-12 — missingBlockWords(): the Portal page prints a name and a sentence for
@@ -149,13 +153,34 @@ const JARGON_BY_LOCALE: Record<string, RegExp> = {
 };
 const JARGON_BASELINE = new URL('../security/locale-jargon-baseline.json', import.meta.url);
 
-function jargonOffenders(): { fresh: string[]; stale: string[] } {
+/**
+ * "door" was this codebase's own word for an endpoint, a button, a sign-in method or a way in, and it
+ * reached people: "What this door does", "Refused at the door", "the federation door". A reader
+ * cannot tell what it names. The strings were rewritten on 2026-11-15; this keeps a new one out.
+ * A real door (a door code, a door sensor) and an established idiom are allowed in the baseline,
+ * each with its reason. Finnish covers the inflected forms and the compounds the sweep found.
+ */
+const DOOR_BY_LOCALE: Record<string, RegExp> = {
+  fi: /(?<![\p{L}0-9])(?:kirjautumis|hakemisto|eväste|sopimus|etu|taka|pää|sivu|sisään)?ov(?:i|et|en|ea|elle|ella|elta|esta|essa|eksi|ia|ien|ille|illa|ilta|issa|ista|ineen)(?![\p{L}])/iu,
+  en: /\bdoor(?:s|way|ways)?\b/i,
+  es: /\bpuertas?\b/i,
+};
+const DOOR_BASELINE = new URL('../security/locale-door-baseline.json', import.meta.url);
+
+function jargonOffenders(
+  byLocale: Record<string, RegExp> = JARGON_BY_LOCALE,
+  baselineFile: URL = JARGON_BASELINE,
+): { fresh: string[]; stale: string[] } {
   let baseline: string[] = [];
-  try { baseline = JSON.parse(readFileSync(JARGON_BASELINE, 'utf-8')); } catch { baseline = []; }
+  try {
+    const raw: unknown = JSON.parse(readFileSync(baselineFile, 'utf-8'));
+    // A list of ids, or a map of id → the reason it is allowed.
+    baseline = Array.isArray(raw) ? raw as string[] : Object.keys(raw as Record<string, string>);
+  } catch { baseline = []; }
   const known = new Set(baseline);
   const current = new Set<string>();
   for (const tag of ['fi', 'en', 'es']) {
-    const re = JARGON_BY_LOCALE[tag];
+    const re = byLocale[tag];
     const loc = flatten(loadLocale(tag));
     for (const [key, value] of Object.entries(loc)) {
       const text = String(value).replace(/\{\{?[^}]*\}?\}/g, ''); // placeholders are not prose
@@ -208,6 +233,15 @@ for (const id of jargon.fresh) {
 }
 for (const id of jargon.stale) {
   failures.push(`✖ baseline entry no longer offends: ${id}\n      → remove it from security/locale-jargon-baseline.json — the ratchet only tightens`);
+}
+
+// The same ratchet for "door" / "ovi" / "puerta" used as a name for something that is not a door.
+const doors = jargonOffenders(DOOR_BY_LOCALE, DOOR_BASELINE);
+for (const id of doors.fresh) {
+  failures.push(`✖ [${id.split(':')[0]}] "door" names something a person cannot see: ${id.split(':').slice(1).join(':')}\n      → name the thing itself: the button, the link, sign-in, the call, the way an agent connects; a real door goes in security/locale-door-baseline.json with its reason`);
+}
+for (const id of doors.stale) {
+  failures.push(`✖ baseline entry no longer offends: ${id}\n      → remove it from security/locale-door-baseline.json — the ratchet only tightens`);
 }
 
 if (failures.length) {
