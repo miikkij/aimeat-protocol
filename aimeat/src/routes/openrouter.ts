@@ -108,7 +108,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { updatePrivateRecord } from '../services/private-record.js';
 import { logger } from '../utils/logger.js';
-import { recordAccountEvent } from '../services/account-events.js';
+import { recordAccountEvent } from '../services/account/events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
 import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../services/ai/completion.js';
 import { nodeFailureOf, providerFailureOf } from '../services/ai/errors.js';

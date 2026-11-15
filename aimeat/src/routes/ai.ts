@@ -122,10 +122,10 @@ import { aiCallerOf } from './ai-policy.js';
 import { callerOf } from '../middleware/caller.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { aiCallLimit } from '../middleware/ai-call-limit.js';
-import { retryAfterOf } from '../services/account-limits.js';
+import { retryAfterOf } from '../services/account/limits.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { recordAccountEvent } from '../services/account-events.js';
+import { recordAccountEvent } from '../services/account/events.js';
 import {
   completeForOwner, prepareAiCall, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
   DEFAULT_DAILY_BUDGET_USD,
@@ -165,7 +165,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   // workflows and the classifier also call, so the route counts the account (aiCallLimit).
   const aiRateLimit = rateLimit(config.rateLimits.openrouter);
   const completeLimit = aiCallLimit(config);
-  /** The account's AI call limit (services/account-limits.ts) says when to come back. */
+  /** The account's AI call limit (services/account/limits.ts) says when to come back. */
   const setAiRetryAfter = (res: Response, e: unknown): void => {
     const s = retryAfterOf(e);
     if (s !== undefined) res.setHeader('Retry-After', String(s));

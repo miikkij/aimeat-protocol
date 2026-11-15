@@ -31,7 +31,7 @@ import { generateKeyPair } from '../../src/auth/keypair.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { keepStorageReadForAppsOnce, APP_STORAGE_READ_KEEP_KEY } from '../../src/services/app/storage-read-keep-migration.js';
 import { readAppScopeAllowance, writeAppScopeAllowance, APP_SCOPE_ALLOWANCE_SPEC } from '../../src/services/app/scope-allowance-store.js';
-import { readAccountEvents } from '../../src/services/account-events.js';
+import { readAccountEvents } from '../../src/services/account/events.js';
 import { readAppAudit } from '../../src/services/app/audit.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 

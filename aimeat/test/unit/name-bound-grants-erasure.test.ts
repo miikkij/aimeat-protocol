@@ -5,7 +5,7 @@
  * @description An operator's beneficiary approval and an accountant grant name a person by
  *   `name@node`, and an erased name is released for reuse. Neither passes to the next person who
  *   registers the name: the erasure removes them (services/name-bound-grants-erasure.ts), and an
- *   entry an older erasure left is refused at the time of use (services/account-instance.ts). The
+ *   entry an older erasure left is refused at the time of use (services/account/instance.ts). The
  *   usage cases pass before and after: a live verified beneficiary stays payable, a live accountant
  *   reads the client's books, and the operator and the client can name the new holder explicitly.
  *   Runs on SQLite in memory, and on PostgreSQL too when DATABASE_URL is set.

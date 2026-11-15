@@ -59,7 +59,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { recordAccountEvent } from './account-events.js';
+import { recordAccountEvent } from './account/events.js';
 
 /** System namespace — server-side only, never surfaced to a client (mirrors `ext-pay-token`). */
 export const NS_ENTITLEMENT = 'metered-entitlement';

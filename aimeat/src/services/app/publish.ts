@@ -140,7 +140,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppManifest, AppManifestCortex } from '../../storage/interface.js';
 import { emitAppVersion } from '../event-bus.js';
 import { isAnnounceable, postAppBoardAnnouncement, recordAppActivity } from './announce.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { provenanceForWrite, provenanceDeclarationRefusal } from '../ai/provenance.js';
 import { sanitizeDescriptions } from './publish-helpers.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './ai-posture.js';

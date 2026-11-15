@@ -21,7 +21,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AccountEventKind } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 
 /**
  * EVERY remake funnel key, in one place (05-mittaus.md). Nothing outside this module spells one of

@@ -43,7 +43,7 @@ import { safeFetch } from '../utils/url-validator.js';
 import { readText } from '../utils/read-capped.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { recordAccountEvent } from '../services/account-events.js';
+import { recordAccountEvent } from '../services/account/events.js';
 import { getFeedSettings } from '../services/visibility/merchant-feed-settings.js';
 import { listOwnerProducts, resolveFeedId } from '../services/visibility/merchant-feed.js';
 import { recordPurchase } from '../services/visibility/visibility-counter.js';

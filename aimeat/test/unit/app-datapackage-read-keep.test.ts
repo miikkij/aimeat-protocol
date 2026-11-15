@@ -26,7 +26,7 @@ import { generateKeyPair } from '../../src/auth/keypair.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { keepDatapackageReadForAppsOnce, APP_DATAPACKAGE_READ_KEEP_KEY } from '../../src/services/app/datapackage-read-keep-migration.js';
 import { readAppScopeAllowance, writeAppScopeAllowance, APP_SCOPE_ALLOWANCE_SPEC } from '../../src/services/app/scope-allowance-store.js';
-import { readAccountEvents } from '../../src/services/account-events.js';
+import { readAccountEvents } from '../../src/services/account/events.js';
 import { undeclaredScopeFindings } from '../../src/services/app/scope-needs.js';
 
 const NODE_ID = 'aimeat-app-datapackage-read-keep';

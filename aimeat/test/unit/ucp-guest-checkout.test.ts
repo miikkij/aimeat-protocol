@@ -53,7 +53,7 @@ vi.mock('../../src/commerce/payment-handlers.js', () => ({
 class PaymentErrorStub extends Error { constructor(public code: string, public statusCode: number, m: string) { super(m); } }
 vi.mock('../../src/commerce/fulfillment.js', () => ({ createFulfillmentTask: async () => 'task-1' }));
 vi.mock('../../src/commerce/session-service.js', () => ({ bookSessionlessSale: async (_s: unknown, _c: unknown, a: { gross: number }) => ({ fee: Math.ceil(a.gross * 0.05), net: a.gross - Math.ceil(a.gross * 0.05) }) }));
-vi.mock('../../src/services/account-events.js', () => ({ recordAccountEvent: async () => undefined }));
+vi.mock('../../src/services/account/events.js', () => ({ recordAccountEvent: async () => undefined }));
 vi.mock('../../src/services/visibility/visibility-counter.js', () => ({
   recordPurchase: (_s: unknown, _c: unknown, p: unknown) => { purchases.push(p); },
   recordCheckoutStage: (_s: unknown, _c: unknown, p: { stage: string; code?: string | null }) => { stages.push({ stage: p.stage, code: p.code }); },

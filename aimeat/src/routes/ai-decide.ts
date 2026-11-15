@@ -55,7 +55,7 @@ import { testDecideKey } from '../services/decide/key-test.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-security.js';
 import { aiCallLimit } from '../middleware/ai-call-limit.js';
-import { retryAfterOf } from '../services/account-limits.js';
+import { retryAfterOf } from '../services/account/limits.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, isForeignPrincipal, callerPrincipal } from '../utils/gaii.js';
 import { isOwnerInPerson } from '../auth/effective-scopes.js';
@@ -143,7 +143,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
       const details = e instanceof DecideError ? e.details : undefined;
       const retry = (details as { retry_after_ms?: number } | undefined)?.retry_after_ms;
       if (retry) res.setHeader('Retry-After', String(Math.ceil(retry / 1000)));
-      // The account's AI call limit (services/account-limits.ts) says when to come back.
+      // The account's AI call limit (services/account/limits.ts) says when to come back.
       const limited = retryAfterOf(e);
       if (limited !== undefined) res.setHeader('Retry-After', String(limited));
       return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, details));

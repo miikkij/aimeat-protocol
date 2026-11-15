@@ -102,7 +102,7 @@ import { findWorkspaceRegistration, workspaceRegistrations } from './workspace/m
 import { isValidEmail } from '../utils/email-validator.js';
 import { LOCALES } from '../i18n.js';
 import { emailTemplateLang } from './email/templates.js';
-import { takeInviteEmailOnNode } from './account-limits.js';
+import { takeInviteEmailOnNode } from './account/limits.js';
 import { sendMail, type ThirdPartyCount } from './mail-gate.js';
 import { promotePendingLead } from './team/leads.js';
 import { readTeamRecord, teamDisplayName } from './team/record.js';
@@ -301,7 +301,7 @@ export async function createEmailInvitation(
   const emailHash = inviteEmailHash(cleanEmail);
 
   // The account's invitation allowance, counted here so the REST route and the MCP tool share one
-  // count for the owner and all their agents (services/account-limits.ts; secaudit 2026-10, C5).
+  // count for the owner and all their agents (services/account/limits.ts; secaudit 2026-10, C5).
   let count: ThirdPartyCount = { uncounted: 'The node\'s own work (sendLimit exempt): an install set inviting the people it names.' };
   if (input.sendLimit !== 'exempt') {
     const turn = await takeInviteEmailOnNode(input.inviterGhii.includes('@') ? input.inviterGhii : `${input.inviterGhii}@${config.nodeId}`);

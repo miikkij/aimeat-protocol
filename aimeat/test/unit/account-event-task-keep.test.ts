@@ -2,7 +2,7 @@
  * @file test/unit/account-event-task-keep.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The once-only step services/account-event-task-keep.ts (secaudit 2026-10, v89; the
+ * @description The once-only step services/account/event-task-keep.ts (secaudit 2026-10, v89; the
  *   developer's ruling of 2026-10-22), on a real store:
  *   - the step lists a live app grant made before it that holds memory:read and not task:read, and
  *     leaves alone a revoked grant, one that holds task:read or `*`, one without memory:read, one made
@@ -20,10 +20,10 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { callerFromAuth } from '../../src/services/caller-context.js';
-import { projectAccountEvent } from '../../src/services/account-event-view.js';
+import { projectAccountEvent } from '../../src/services/account/event-view.js';
 import {
     keepTaskContentForAppGrantsOnce, taskContentKept, accountEventReader, TASK_CONTENT_KEEP_KEY,
-} from '../../src/services/account-event-task-keep.js';
+} from '../../src/services/account/event-task-keep.js';
 
 const NODE_ID = 'keep-node';
 const OWNER = 'tara';

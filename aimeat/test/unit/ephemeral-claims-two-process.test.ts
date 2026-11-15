@@ -84,7 +84,7 @@ async function bootProcess(storage: Storage) {
     base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
     upload,
     signed: await import('../../src/services/signed-node-request.js'),
-    limits: await import('../../src/services/account-limits.js'),
+    limits: await import('../../src/services/account/limits.js'),
     admin: await import('../../src/services/admin-password.js'),
   };
 }

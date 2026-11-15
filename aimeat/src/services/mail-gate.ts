@@ -41,7 +41,7 @@
  */
 import type { EmailService, EmailAttachment } from './email.js';
 import type { GHIIRecord } from '../storage/interface.js';
-import type { AccountTurn } from './account-limits.js';
+import type { AccountTurn } from './account/limits.js';
 import type { InviteEmailArgs, KeyInviteEmailArgs, KeyCredentialsEmailArgs } from './email/templates.js';
 import { provenOwnerAddress } from './owner/mail-address.js';
 

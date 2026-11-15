@@ -2,7 +2,7 @@
  * @file src/middleware/ai-call-limit.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The account's AI call limit (services/account-limits.ts takeAiCall) as route
+ * @description The account's AI call limit (services/account/limits.ts takeAiCall) as route
  *   middleware, for the AI routes whose service no MCP tool calls: POST /v1/ai/complete, POST
  *   /v1/openrouter/complete, POST /v1/llm/chat/completions and the decision key tests. Those
  *   services (completeForOwner, the chat proxy, testDecideKey) also serve schedules, workflow steps,
@@ -24,7 +24,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { takeAiCallOnNode } from '../services/account-limits.js';
+import { takeAiCallOnNode } from '../services/account/limits.js';
 import { error } from './envelope.js';
 import { deny401 } from '../auth/deny.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';

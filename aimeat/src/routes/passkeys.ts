@@ -33,7 +33,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { recordAccountEvent } from '../services/account-events.js';
+import { recordAccountEvent } from '../services/account/events.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { beginRegistration, finishRegistration, beginLogin, finishLogin } from '../services/passkeys.js';

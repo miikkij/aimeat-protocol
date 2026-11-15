@@ -35,7 +35,7 @@ import { migrateRestScopeKeepWorkingOnce, APP_SCOPE_KEEP_WORKING_KEY, REST_SCOPE
 import { migrateRestScopeGatesOnce, migrateAgentReadGrantOnce } from '../../src/services/rest-scope-gates-migration.js';
 import { readAppScopeAllowance, readScopeAllowanceFor, removeScopeAllowanceFor } from '../../src/services/app/scope-allowance.js';
 import { narrowToDeclared } from '../../src/services/app/grant-scopes.js';
-import { readAccountEvents } from '../../src/services/account-events.js';
+import { readAccountEvents } from '../../src/services/account/events.js';
 import { readAppAudit } from '../../src/services/app/audit.js';
 
 const NODE_ID = 'aimeat-app-scope-allowance';

@@ -45,7 +45,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { emitChange } from '../event-bus.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { UNCHANGED } from '../record-cas.js';

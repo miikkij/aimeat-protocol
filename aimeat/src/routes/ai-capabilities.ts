@@ -29,7 +29,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { success, error } from '../middleware/envelope.js';
-import { retryAfterOf } from '../services/account-limits.js';
+import { retryAfterOf } from '../services/account/limits.js';
 import { callerOf } from '../middleware/caller.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
 import { aiCapabilitiesView } from '../services/ai/capabilities.js';

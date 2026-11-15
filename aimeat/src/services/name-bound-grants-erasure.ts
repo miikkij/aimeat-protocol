@@ -14,7 +14,7 @@
  *   A deleted account name is released for reuse (decision 2026-08-10), so each of these made the next
  *   person to register the name payable, a reader of someone's books, or a party to an agreement
  *   (secaudit2026oct26). The entries an older erasure left are refused at the time of use instead
- *   (services/account-instance.ts heldSince).
+ *   (services/account/instance.ts heldSince).
  * @structure eraseNameBoundGrants(storage, nodeId, name)
  * @usage const c = await eraseNameBoundGrants(storage, nodeId, name);   // services/owner/erasure.ts
  * @version-history

@@ -46,8 +46,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AccountEventKind } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { ONBOARDING_KEYS } from '../onboarding-funnel.js';
-import { readAccountEvents, recordAccountEvent } from '../account-events.js';
-import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from '../account-event-view.js';
+import { readAccountEvents, recordAccountEvent } from '../account/events.js';
+import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from '../account/event-view.js';
 import { isNodeResidentAgent } from '../node/resident-agent.js';
 import { displayPrefsFor, formatForPerson } from '../display-prefs.js';
 import { personZone, personLocale } from '../person-zone.js';
@@ -65,7 +65,7 @@ export interface FeedItem {
     link: string | null;
     /** Values the translated line interpolates (an agent's name, which room). */
     data?: Record<string, string>;
-    /** The `data` fields this reader may not see and that were taken out (services/account-event-view.ts). */
+    /** The `data` fields this reader may not see and that were taken out (services/account/event-view.ts). */
     withheld?: string[];
     /** `at` on the person's clock, in words of their chat's language ("tänään klo 4.10"), when the node knows their zone. */
     at_local?: string;
@@ -84,7 +84,7 @@ export async function readHomeFeed(
         pendingAgents?: number; limit?: number;
         /**
          * Who reads the feed. Each recorded row is projected for them before it loses its actor
-         * (services/account-event-view.ts): a task's title and reason only for the readers the task
+         * (services/account/event-view.ts): a task's title and reason only for the readers the task
          * route admits. GET /v1/home/feed always passes it; absent means a read made by the node for
          * the owner (the unit tests), and the rows are the owner's view.
          */

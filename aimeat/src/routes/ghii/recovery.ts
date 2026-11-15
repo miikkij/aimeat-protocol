@@ -81,7 +81,7 @@ import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app/member-invites.js';
 import { sendHeldKeyCredentials } from '../../services/key-credentials.js';
 import { generateKeyPair } from '../../auth/keypair.js';
-import { recordAccountEvent } from '../../services/account-events.js';
+import { recordAccountEvent } from '../../services/account/events.js';
 import { recordAuthFailure } from '../../services/auth-audit.js';
 import { auditContext } from '../../auth/deny.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';

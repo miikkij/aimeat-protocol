@@ -33,7 +33,7 @@ import { callerOf } from '../middleware/caller.js';
 import { error, success } from '../middleware/envelope.js';
 import { AiCompletionError } from '../services/ai/completion.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
-import { retryAfterOf } from '../services/account-limits.js';
+import { retryAfterOf } from '../services/account/limits.js';
 import { streamReply, streamSpeech } from '../services/ai/voice.js';
 import { logger } from '../utils/logger.js';
 import { voiceReplySchema as reply, voiceSpeechSchema as speech } from '../models/ai-voice-contract.js';

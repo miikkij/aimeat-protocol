@@ -37,7 +37,7 @@ import { getBehaviourSettings, nodeWatchesBehaviour } from './behaviour-settings
 import { completeForOwner } from '../ai/completion.js';
 import { AiCompletionError } from '../ai/errors.js';
 import { stageAppDraft } from '../app/lifecycle.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { withKeyLock } from '../signals/signal-service.js';
 import { localAccountOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';

@@ -107,7 +107,7 @@ import { recordDatapackageAudiencesOnce } from '../services/datapackage/audience
 import { recordPointerStateOnce } from '../services/datapackage/sale-terms-record.js';
 import { markExistingPortfolioPagesOnce } from '../services/portfolio/read-hold-keep.js';
 import { moveEcosystemSubscriptionsByOwnerOnce } from '../services/ecosystem/subscriptions-by-owner.js';
-import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
+import { keepTaskContentForAppGrantsOnce } from '../services/account/event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capabilities/extension-ref.js';
 import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain-site-origin-keep.js';
 import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js';
@@ -198,7 +198,7 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   await keepAppToolInvokeOnce(storage, config, { existedBefore: scopeStepsBegan })
     .catch(err => logger.error('Failed to keep the earlier app-tool callers; the next boot tries again', { error: String(err) }));
   // The app grants that read task titles and decline reasons in the event record on memory:read before
-  // that content asked task:read keep reading them (services/account-event-task-keep.ts). After the
+  // that content asked task:read keep reading them (services/account/event-task-keep.ts). After the
   // chain, which can write words onto grants, so the kept list is the one the grants hold from now on;
   // awaited, so no kept app meets the new rule first.
   await keepTaskContentForAppGrantsOnce(storage, config, { existedBefore: scopeStepsBegan })

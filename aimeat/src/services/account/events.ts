@@ -1,5 +1,5 @@
 /**
- * @file src/services/account-events.ts
+ * @file src/services/account/events.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one write door for "what has happened on this account". A curated set of call
@@ -34,12 +34,12 @@
  *   v1.0.0 — 2026-08-17 — Initial: account events as their own system.
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
+import type { AimeatConfig } from '../../config.js';
 import type {
   Storage, AccountEventInput, AccountEventRecord, AccountEventFilter,
-} from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
-import { logger } from '../utils/logger.js';
+} from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * How many events stay in the hot window when nobody has said otherwise.

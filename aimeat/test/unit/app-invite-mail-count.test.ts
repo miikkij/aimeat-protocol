@@ -18,7 +18,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { setMember } from '../../src/services/app/roster-write.js';
 import { listInvites } from '../../src/services/app/member-invites.js';
-import { INVITE_EMAIL_LIMIT } from '../../src/services/account-limits.js';
+import { INVITE_EMAIL_LIMIT } from '../../src/services/account/limits.js';
 import { provideNodeService } from '../../src/services/node/context.js';
 import type { EmailService } from '../../src/services/email.js';
 

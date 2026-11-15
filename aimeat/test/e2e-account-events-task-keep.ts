@@ -3,9 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description E2E: an app grant made before the update keeps reading a task's title and decline
- *   reason in the account's event record and the home feed (services/account-event-task-keep.ts).
+ *   reason in the account's event record and the home feed (services/account/event-task-keep.ts).
  *   Since secaudit 2026-10, v89, those fields reach only the owner in person, an app grant holding
- *   task:read and the task's own agent (services/account-event-view.ts). The developer's ruling,
+ *   task:read and the task's own agent (services/account/event-view.ts). The developer's ruling,
  *   2026-10-22: an app grant that existed before this update, holding memory:read but not task:read,
  *   keeps seeing them as before; a grant made after the update needs task:read. A published app's
  *   permissions change only when its author republishes it.

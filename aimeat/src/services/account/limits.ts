@@ -1,5 +1,5 @@
 /**
- * @file src/services/account-limits.ts
+ * @file src/services/account/limits.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How often one ACCOUNT may do an expensive thing, counted in the service every surface
@@ -42,11 +42,11 @@
  *   v1.1.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C5).
  */
-import type { RateLimitTier } from '../config-types.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { rateTakeOf, type RateTake } from './rate-buckets.js';
-import { AiCompletionError } from './ai/errors.js';
-import { windowCounter } from './ephemeral-claims.js';
+import type { RateLimitTier } from '../../config-types.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { rateTakeOf, type RateTake } from '../rate-buckets.js';
+import { AiCompletionError } from '../ai/errors.js';
+import { windowCounter } from '../ephemeral-claims.js';
 
 /** The answer when the account has used its allowance for this window. */
 export interface AccountLimitRefusal {

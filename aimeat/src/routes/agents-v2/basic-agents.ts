@@ -69,7 +69,7 @@ import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
 import { emitChange } from '../../services/event-bus.js';
 import { executeHooks } from '../../services/hooks.js';
 import { fireHook } from '../../utils/fire-hook.js';
-import { recordAccountEvent } from '../../services/account-events.js';
+import { recordAccountEvent } from '../../services/account/events.js';
 import { logger } from '../../utils/logger.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent/clearance.js';

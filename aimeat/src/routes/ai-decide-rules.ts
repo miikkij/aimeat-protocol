@@ -38,7 +38,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-security.js';
 import { success, error } from '../middleware/envelope.js';
-import { retryAfterOf } from '../services/account-limits.js';
+import { retryAfterOf } from '../services/account/limits.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { AiCompletionError } from '../services/ai/completion.js';
 import { decideForOwner, decisionStats, ruleCallerKind, DecideError } from '../services/decide/service.js';
@@ -67,7 +67,7 @@ export function decideRulesRouter(config: AimeatConfig, storage: Storage): Route
   const fail = (res: Response, e: unknown) => {
     if (e instanceof DecideError || e instanceof AiCompletionError) {
       const details = e instanceof DecideError ? e.details : undefined;
-      // The account's AI call limit (services/account-limits.ts) says when to come back.
+      // The account's AI call limit (services/account/limits.ts) says when to come back.
       const retryAfter = retryAfterOf(e);
       if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
       return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, details));

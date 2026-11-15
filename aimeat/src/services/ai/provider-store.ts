@@ -61,7 +61,7 @@ import { encrypt, decrypt, getEncryptionKey } from '../encryption.js';
 import { upsertPrivateRecord, updatePrivateRecord } from '../private-record.js';
 import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { readAgentKey } from '../agent/ai-keys.js';
 import { resolveModelFor, type ModelRole } from './model-defaults.js';
 import { logger } from '../../utils/logger.js';

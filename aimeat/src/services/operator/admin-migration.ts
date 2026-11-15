@@ -49,7 +49,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { OPERATOR_ADMIN_SCOPE } from '../../utils/scope-coverage.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { logger } from '../../utils/logger.js';
 import { claimOnceOnlyStep } from '../once-only-step.js';
 import { changeScopeList } from '../scope-list-swap.js';

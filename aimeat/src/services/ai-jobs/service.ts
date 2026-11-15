@@ -131,7 +131,7 @@ import { fireOnDone } from './on-done.js';
 import { aiOpOf, aiOpRefusal } from './op.js';
 import { runJobOp, assertAudioInReach, type JobOpOutcome } from './run-op.js';
 import { fileJobPictureRequest } from './picture-request.js';
-import { takeAiCallOnNode } from '../account-limits.js';
+import { takeAiCallOnNode } from '../account/limits.js';
 import { emitAiJobFinished } from './finished-listeners.js';
 import { findExtension, namespacedName } from '../component/address.js';
 import { markStopped } from './restart.js';
@@ -255,7 +255,7 @@ export class AiJobService implements AiJobStarter {
             ...input, op, ...(ctx.startedBy ? { started_by: ctx.startedBy } : {}), ...(ctx.readAs ? { read_as: ctx.readAs } : {}),
         });
 
-        // The account's AI call limit (services/account-limits.ts): POST /v1/ai/jobs and
+        // The account's AI call limit (services/account/limits.ts): POST /v1/ai/jobs and
         // aimeat_ai_job_start both arrive here and draw on one count per account, and so does
         // ctx.ai.start in an extension. Only a chain's continuation is 'exempt' (its first start was
         // counted); the run itself is not counted again (run-op.ts).

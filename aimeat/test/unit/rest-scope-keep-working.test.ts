@@ -64,7 +64,7 @@ import { REST_SCOPE_NEW_WORDS, AGENT_READ_WORDS } from '../../src/services/rest-
 import {
     REST_SCOPE_KEEP_WORKING_KEY, REST_SCOPE_KEEP_WORKING_WORDS, wordsToKeepWorking, migrateRestScopeKeepWorkingOnce,
 } from '../../src/services/rest-scope-keep-working-migration.js';
-import { readAccountEvents } from '../../src/services/account-events.js';
+import { readAccountEvents } from '../../src/services/account/events.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 
 const NODE_ID = 'aimeat-rest-scope-keep-working';

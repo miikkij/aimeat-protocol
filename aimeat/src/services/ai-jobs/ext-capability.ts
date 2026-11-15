@@ -185,7 +185,7 @@ export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCt
                     // Narrower than the owner only where the owner chose it or the code's writer
                     // runs it (readAs above); a refused input comes back as a decision, below.
                     ...(readAs ? { readAs } : {}),
-                    // The installer's AI call limit (services/account-limits.ts), the allowance
+                    // The installer's AI call limit (services/account/limits.ts), the allowance
                     // POST /v1/ai/jobs draws on: an action is a request anyone the extension admits
                     // can make, so its start is counted. A refusal comes back as a decision the
                     // extension can degrade on. The start that continues a chain is exempt: the chain's

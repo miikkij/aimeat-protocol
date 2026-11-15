@@ -48,7 +48,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { bookPayable } from './payable-book.js';
 import { settleEntryStatus, type BeneficiaryEntry } from './beneficiary-book.js';
-import { heldSince } from '../services/account-instance.js';
+import { heldSince } from '../services/account/instance.js';
 
 /** System namespace — an approval is a server-trusted fact, so never in a principal-writable space. */
 export const NS_BENEFICIARY_APPROVAL = 'beneficiary-approval';

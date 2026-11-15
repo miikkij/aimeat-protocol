@@ -33,7 +33,7 @@ import type { Storage, GHIIRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { emitChange } from '../../services/event-bus.js';
-import { recordAccountEvent } from '../../services/account-events.js';
+import { recordAccountEvent } from '../../services/account/events.js';
 import { setupTotp, generateBackupCodes, totpConfigOf, TotpEncryptionUnavailableError } from '../../services/totp.js';
 import { checkEnrolmentCode } from '../../services/password-check.js';
 import { twoStepArmed } from '../../services/passkeys.js';

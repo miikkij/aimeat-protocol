@@ -2,14 +2,14 @@
  * @file test/unit/account-event-view.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The projection of an account-event row for its reader (services/account-event-view.ts):
+ * @description The projection of an account-event row for its reader (services/account/event-view.ts):
  *   a task row's title and reason only for the readers the task route admits, every other kind
  *   unchanged (secaudit 2026-10, v89).
  * @version-history
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v89).
  */
 import { describe, it, expect } from 'vitest';
-import { projectAccountEvent, projectAccountEvents, type AccountEventReader } from '../../src/services/account-event-view.js';
+import { projectAccountEvent, projectAccountEvents, type AccountEventReader } from '../../src/services/account/event-view.js';
 
 const WORKER = 'worker#alice@node';
 const reader = (r: Partial<AccountEventReader> & { words?: string[] }): AccountEventReader => ({

@@ -465,7 +465,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
 
   /* POST /v1/organisms/:id/invitations/email — invite an external email (creator/admin only).
    * createEmailInvitation() counts the inviter's account allowance, which the MCP tool shares
-   * (services/account-limits.ts; C5), and holds the per-organism pending cap against accumulating
+   * (services/account/limits.ts; C5), and holds the per-organism pending cap against accumulating
    * spam invites. */
   router.post('/v1/organisms/:id/invitations/email', requireAuth(), requireScope('organism:invite'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;

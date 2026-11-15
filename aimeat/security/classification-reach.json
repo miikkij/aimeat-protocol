@@ -670,7 +670,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The provider's payout address."
     },
-    "src/services/account-event-task-keep.ts": {
+    "src/services/account/event-task-keep.ts": {
       "reads": {
         "getMemory": 1
       },

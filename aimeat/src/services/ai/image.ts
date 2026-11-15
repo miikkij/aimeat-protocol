@@ -90,7 +90,7 @@ import { contentHashOf } from './provenance.js';
 import type { CallerClass } from './policy.js';
 import type { RequestLanguage } from './ai-fix-words.js';
 import { logger } from '../../utils/logger.js';
-import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account/limits.js';
 import {
   fileRaiseAsk, fileFilePublishRequest, type StoragePublishGate, type FilePublishFiled,
 } from '../storage-file-publish.js';
@@ -150,7 +150,7 @@ export interface GenerateForOwnerOptions {
   /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
   role?: string;
   /** 'exempt' for node-internal work; absent, the call counts against the account's AI call limit
-   *  (services/account-limits.ts). */
+   *  (services/account/limits.ts). */
   limit?: AiCallLimitMark;
   /** Pictures the model works from (a character sheet, a setting, the previous page, a style
    *  sample), read by the caller with readImageInputs (services/ai/call-files.ts). */

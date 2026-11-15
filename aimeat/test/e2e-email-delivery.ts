@@ -951,7 +951,7 @@ async function run(): Promise<void> {
         const invite = (token: string, i: number) => json(`/v1/apps/${name}/club.html/members`, {
             method: 'POST', headers: bearer(token), body: JSON.stringify({ email: guest(i), role: 'member', locale: 'en' }),
         });
-        const MAX = 20; // services/account-limits.ts INVITE_EMAIL_LIMIT
+        const MAX = 20; // services/account/limits.ts INVITE_EMAIL_LIMIT
         for (let i = 0; i < MAX; i++) {
             const r = await invite(agentToken, i);
             assert(r.status === 201 && r.body.data.emailSent === true, `invitation ${i}: ${r.status} ${short(r.body)}`);

@@ -119,7 +119,7 @@ import { agentNameOf, readAgentKey, agentCapRefusal } from '../agent/ai-keys.js'
 import { ruleForCaller, type RuleCallerKind } from './rules.js';
 import { evaluateRule, fieldsOutside, type DecisionRule } from './rule-validate.js';
 import { gateSettingOf, gateApplies, openGateItem } from './gate.js';
-import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account/limits.js';
 import { noticeBareNameMatch } from '../ai/app-name-notice.js';
 
 export interface DecideCaller {
@@ -148,7 +148,7 @@ export interface DecideCaller {
    */
   readerAs?: { roles: readonly string[]; scopes: readonly string[] };
   /** 'exempt' for node-internal work (an item of a run, the classifier, a refinery batch); absent,
-   *  the decision counts against the account's AI call limit (services/account-limits.ts). Set by
+   *  the decision counts against the account's AI call limit (services/account/limits.ts). Set by
    *  the code that builds the caller, never read from a request body. */
   limit?: AiCallLimitMark;
 }

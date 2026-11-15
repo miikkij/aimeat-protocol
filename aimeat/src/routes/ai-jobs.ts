@@ -79,7 +79,7 @@ import type { AiJobState } from '../services/ai-jobs/types.js';
 export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: AiJobService): Router {
     const router = Router();
     const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
-    // No path limiter: startJob counts the account's AI call limit (services/account-limits.ts),
+    // No path limiter: startJob counts the account's AI call limit (services/account/limits.ts),
     // which aimeat_ai_job_start shares, and answers AiJobError RATE_LIMITED with a Retry-After.
 
     /** One place the four refusals become a status, a code and a Retry-After. */

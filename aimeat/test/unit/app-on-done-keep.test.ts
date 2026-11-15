@@ -32,7 +32,7 @@ import { setThisNodeId } from '../../src/utils/gaii.js';
 import { keepOnDoneForAppsOnce, APP_ON_DONE_KEEP_KEY } from '../../src/services/app/on-done-keep-migration.js';
 import { readAppScopeAllowance, writeAppScopeAllowance, APP_SCOPE_ALLOWANCE_SPEC } from '../../src/services/app/scope-allowance-store.js';
 import { undeclaredScopeNeeds } from '../../src/services/app/scope-needs.js';
-import { readAccountEvents } from '../../src/services/account-events.js';
+import { readAccountEvents } from '../../src/services/account/events.js';
 import { readAppAudit } from '../../src/services/app/audit.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 

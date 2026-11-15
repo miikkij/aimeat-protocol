@@ -41,7 +41,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { AgentRecord } from '../../storage/types/identity.js';
 import { PERMISSIONS_ADD_SCOPE, scopeIsCovered, uncoveredScopes } from '../../utils/scope-coverage.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { notify } from '../notify.js';
 import { agentPageUrl } from '../permission-ask.js';
 import { ownerGhiiOf, parseGAII } from '../../utils/gaii.js';

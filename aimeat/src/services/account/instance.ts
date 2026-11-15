@@ -1,5 +1,5 @@
 /**
- * @file src/services/account-instance.ts
+ * @file src/services/account/instance.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Whether the account that holds a name now is the account a record named earlier.
@@ -17,8 +17,8 @@
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26: beneficiary-release, accountant-access and
  *     compliance-agreements counterparty name reuse).
  */
-import type { Storage } from '../storage/interface.js';
-import { localAccountOf } from '../utils/gaii.js';
+import type { Storage } from '../../storage/interface.js';
+import { localAccountOf } from '../../utils/gaii.js';
 
 /**
  * True when the account that holds the name in `ghii` (`name@node`) now was registered at or before

@@ -60,7 +60,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { SessionRecord } from '../../storage/repositories/session.repository.js';
 import { issueJWT, AccountDisabledError } from '../../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../../auth/credential-age.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { issueFirstLoginKeyCredentials, owePendingKeyCredentials, type IssuedKeyCredentials } from '../key-credentials.js';
 import { logger } from '../../utils/logger.js';
 import { isExternalPrincipal } from '../../utils/gaii.js';

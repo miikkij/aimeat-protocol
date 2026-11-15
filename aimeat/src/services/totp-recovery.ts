@@ -39,7 +39,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { clearTotpAttempts } from './password-check.js';
-import { recordAccountEvent } from './account-events.js';
+import { recordAccountEvent } from './account/events.js';
 import { logger } from '../utils/logger.js';
 
 /**

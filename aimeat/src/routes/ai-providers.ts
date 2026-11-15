@@ -45,7 +45,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { isOwnerPrincipal, requireOwnerPrincipal } from '../auth/account-security.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { success, error } from '../middleware/envelope.js';
-import { retryAfterOf } from '../services/account-limits.js';
+import { retryAfterOf } from '../services/account/limits.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { callerOf } from '../middleware/caller.js';

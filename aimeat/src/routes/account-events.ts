@@ -47,11 +47,11 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
   recordAccountEvent, readAccountEvents, readAccountEventArchive, windowSize,
-} from '../services/account-events.js';
+} from '../services/account/events.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
 import { callerOf } from '../middleware/caller.js';
-import { projectAccountEvents, TASK_CONTENT_NOTE } from '../services/account-event-view.js';
-import { accountEventReader } from '../services/account-event-task-keep.js';
+import { projectAccountEvents, TASK_CONTENT_NOTE } from '../services/account/event-view.js';
+import { accountEventReader } from '../services/account/event-task-keep.js';
 
 /** A kind an app may spell: lower-case, short, no separators that would break the namespace. */
 const APP_KIND = /^[a-z][a-z0-9_]{1,39}$/;
@@ -135,8 +135,8 @@ export function accountEventsRouter(config: AimeatConfig, storage: Storage): Rou
     const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const limit = Number(req.query.limit);
     // Each row as this reader may see it: a task's title and reason only for the readers the task
-    // route admits (services/account-event-view.ts, secaudit 2026-10, v89).
-    // An app grant that existed before that rule keeps reading them (services/account-event-task-keep.ts).
+    // route admits (services/account/event-view.ts, secaudit 2026-10, v89).
+    // An app grant that existed before that rule keeps reading them (services/account/event-task-keep.ts).
     const { rows: events, withheld } = projectAccountEvents(await readAccountEvents(storage, ownerGhii, {
       limit: Number.isFinite(limit) ? limit : undefined,
     }, config), await accountEventReader(callerOf(req, config.nodeId, storage), req.auth!, storage, config.nodeId));

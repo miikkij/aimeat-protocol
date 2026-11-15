@@ -89,7 +89,7 @@ import { createFulfillmentTask } from './fulfillment.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { appSpendRefusal } from '../services/metered-access.js';
 import { isMoneyCurrency, percentFee, MONEY_CURRENCIES } from './money.js';
-import { recordAccountEvent } from '../services/account-events.js';
+import { recordAccountEvent } from '../services/account/events.js';
 import { logger } from '../utils/logger.js';
 import type { DynamicDesignation } from './beneficiary-split.js';
 import { settlePurchase, type BookingStep } from './settle-purchase.js';

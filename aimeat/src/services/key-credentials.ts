@@ -208,7 +208,7 @@ async function holdCredentials(storage: Storage, config: AimeatConfig, inv: Invi
  * The code invitation that provisioned the account holding `username` now, while it is still pending;
  * null otherwise. The invitation names the account by its bare name, which is released for reuse when
  * the account is erased, so the account must be the one the key made: registered at or before the
- * invitation, the test services/account-instance.ts heldSince makes. A later holder of the name is not
+ * invitation, the test services/account/instance.ts heldSince makes. A later holder of the name is not
  * the key's account, and a cancelled or expired key has no account any more (secaudit2026nov08 round
  * 14). A missing creation time on either side shows no change of person and keeps the invitation.
  */

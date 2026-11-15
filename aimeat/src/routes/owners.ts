@@ -180,7 +180,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     // track marker above is on both: an account created through this programmatic door would open
     // on an empty feed, which reads as broken rather than as new. Fire-and-forget — a feed row must
     // never be able to fail a registration.
-    void import('../services/account-events.js')
+    void import('../services/account/events.js')
       .then(m => m.recordAccountEvent(storage, {
         ownerGhii: ghii, kind: 'account_created', actorGaii: ghii, link: '/v1/home',
       }, config))

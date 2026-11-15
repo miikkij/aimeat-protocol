@@ -47,7 +47,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { ownerGhiiOf, isValidGHII } from '../../utils/gaii.js';
 import { recordUsageCall } from '../usage/usage-buffer.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { logger } from '../../utils/logger.js';
 import { siemEmit } from '../node-admin/siem-export.js';
 

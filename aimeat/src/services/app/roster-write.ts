@@ -38,7 +38,7 @@ import { rosterContext, rosterBucketOf, rosterAudit, type MembersCtx, type Roste
 import { MANAGER_ROLE_MSG, type AppRef } from './roster-ops.js';
 import { done, refuse, type AppOpOutcome } from './op-outcome.js';
 import { setPartyMember } from '../app-parties/owner.js';
-import { takeInviteEmailOnNode } from '../account-limits.js';
+import { takeInviteEmailOnNode } from '../account/limits.js';
 import { nodeContext } from '../node/context.js';
 import type { AccountTurnTaken } from '../mail-gate.js';
 

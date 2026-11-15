@@ -66,7 +66,7 @@ import { emitChange } from '../event-bus.js';
 import { appSpentToday, appQuotaFor } from './app-id.js';
 import type { CallerClass } from './policy.js';
 import { resolveTtsVoice } from './model-defaults.js';
-import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account/limits.js';
 
 function policyCallerOf(o: VoicePolicyCaller): VoicePolicyCaller {
   return {
@@ -92,7 +92,7 @@ export interface ReplyOptions extends VoicePolicyCaller {
   provider?: string;
   reasoning?: { enabled?: boolean; effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean } | null;
   /** 'exempt' for node-internal work; absent, the call counts against the account's AI call limit
-   *  (services/account-limits.ts). */
+   *  (services/account/limits.ts). */
   limit?: AiCallLimitMark;
 }
 export interface SpeakOptions extends VoicePolicyCaller {
@@ -102,7 +102,7 @@ export interface SpeakOptions extends VoicePolicyCaller {
   /** A provider id or type the call names (and the provider test uses): no fallback then. */
   provider?: string;
   /** 'exempt' for node-internal work (the provider test, which counts itself); absent, the call
-   *  counts against the account's AI call limit (services/account-limits.ts). */
+   *  counts against the account's AI call limit (services/account/limits.ts). */
   limit?: AiCallLimitMark;
 }
 

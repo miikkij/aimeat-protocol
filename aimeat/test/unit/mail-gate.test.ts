@@ -17,7 +17,7 @@
 import { createHash } from 'node:crypto';
 import { describe, it, expect, vi } from 'vitest';
 import { sendMail, senderLimitReached, type MailMessage } from '../../src/services/mail-gate.js';
-import { takeMailSend } from '../../src/services/account-limits.js';
+import { takeMailSend } from '../../src/services/account/limits.js';
 import type { EmailService } from '../../src/services/email.js';
 import { RULES, lineTexts } from '../../scripts/check-single-entry.js';
 

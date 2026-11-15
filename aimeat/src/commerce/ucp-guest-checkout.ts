@@ -71,7 +71,7 @@ import { openPspSecret } from './psp-secrets.js';
 import { localAccountOf } from '../utils/gaii.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
-import { recordAccountEvent } from '../services/account-events.js';
+import { recordAccountEvent } from '../services/account/events.js';
 import { recordPurchase, recordCheckoutStage, resolvePlaceOwner } from '../services/visibility/visibility-counter.js';
 import { getFeedSettings } from '../services/visibility/merchant-feed-settings.js';
 import { listOwnerProducts, resolveFeedId } from '../services/visibility/merchant-feed.js';

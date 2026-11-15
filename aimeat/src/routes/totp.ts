@@ -43,7 +43,7 @@ import { requireAuth, requireOwnerPrincipal } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { recordAccountEvent } from '../services/account-events.js';
+import { recordAccountEvent } from '../services/account/events.js';
 import { eraseTotp } from '../services/totp-recovery.js';
 import {
   setupTotp, validateTotpCode, generateBackupCodes, totpConfigOf, TotpEncryptionUnavailableError,

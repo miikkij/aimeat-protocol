@@ -35,7 +35,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { FinanceError } from './errors.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
-import { heldSince } from '../account-instance.js';
+import { heldSince } from '../account/instance.js';
 import { listAllMemoryPages } from '../../storage/memory-pages.js';
 import { localAccountOf } from '../../utils/gaii.js';
 

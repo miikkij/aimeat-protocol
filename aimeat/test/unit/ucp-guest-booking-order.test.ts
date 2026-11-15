@@ -41,7 +41,7 @@ vi.mock('../../src/commerce/session-service.js', () => ({
     return { fee: Math.ceil(a.gross * 0.05), net: a.gross - Math.ceil(a.gross * 0.05) };
   },
 }));
-vi.mock('../../src/services/account-events.js', () => ({ recordAccountEvent: async () => undefined }));
+vi.mock('../../src/services/account/events.js', () => ({ recordAccountEvent: async () => undefined }));
 vi.mock('../../src/services/visibility/visibility-counter.js', () => ({
   recordPurchase: () => undefined, recordCheckoutStage: () => undefined, resolvePlaceOwner: async () => 'shop@node-1',
 }));

@@ -29,7 +29,7 @@ vi.mock('../../src/commerce/fulfillment.js', () => ({
     return `task-${tasks.length}`;
   },
 }));
-vi.mock('../../src/services/account-events.js', () => ({ recordAccountEvent: async () => undefined }));
+vi.mock('../../src/services/account/events.js', () => ({ recordAccountEvent: async () => undefined }));
 vi.mock('../../src/services/visibility/visibility-counter.js', () => ({ recordPurchase: (_s: unknown, _c: unknown, p: Record<string, unknown>) => { purchases.push(p); } }));
 
 const { intakeAgentOrder, ACS_STRIPE_VERSION } = await import('../../src/commerce/agent-order-intake.js');

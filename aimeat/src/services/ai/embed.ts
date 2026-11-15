@@ -37,7 +37,7 @@ import { callCost } from './catalog/price.js';
 import type { AiCandidate } from './route-plan.js';
 import type { CallerClass } from './policy.js';
 import type { RequestLanguage } from './ai-fix-words.js';
-import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account/limits.js';
 
 /** One call's ceiling: enough for a page of notes, small enough to answer inside a request. */
 export const EMBED_LIMITS = { maxInputs: 256, maxTotalChars: 500_000 } as const;
@@ -58,7 +58,7 @@ export interface EmbedForOwnerOptions {
   role?: string;
   signal?: AbortSignal;
   /** 'exempt' for node-internal work; absent, the call counts against the account's AI call limit
-   *  (services/account-limits.ts). */
+   *  (services/account/limits.ts). */
   limit?: AiCallLimitMark;
 }
 

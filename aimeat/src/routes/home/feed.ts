@@ -31,7 +31,7 @@ import { ROOMS, openRooms } from '../../services/home/rooms.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 import { callerOf } from '../../middleware/caller.js';
-import { accountEventReader } from '../../services/account-event-task-keep.js';
+import { accountEventReader } from '../../services/account/event-task-keep.js';
 
 export function registerHomeFeedRoutes(router: Router, ctx: HomeRouteCtx): void {
     const { config, storage } = ctx;
@@ -54,8 +54,8 @@ export function registerHomeFeedRoutes(router: Router, ctx: HomeRouteCtx): void 
         async (req, res) => {
             // The rows that derive from agent_tasks carry a task's title and decline reason, which
             // only the readers the task route admits see; every other reader keeps the row
-            // (services/account-event-view.ts, secaudit 2026-10, v89).
-            // An app grant that existed before that rule keeps reading them (services/account-event-task-keep.ts).
+            // (services/account/event-view.ts, secaudit 2026-10, v89).
+            // An app grant that existed before that rule keeps reading them (services/account/event-task-keep.ts).
             // "An agent is knocking" is live state, read in the same answer (services/home/feed.ts).
             const reader = await accountEventReader(callerOf(req, config.nodeId, storage), req.auth!, storage, config.nodeId);
             res.json(success(config.nodeId, await homeFeedAnswer(storage, config, req.auth!.owner, reader)));

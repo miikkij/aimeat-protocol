@@ -75,7 +75,7 @@ import type { Storage, ConsentRecord } from '../storage/interface.js';
 import { auditDataAccess } from './consent.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
-import { recordAccountEvent } from './account-events.js';
+import { recordAccountEvent } from './account/events.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isSameOwner, localAccountName, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
 import {

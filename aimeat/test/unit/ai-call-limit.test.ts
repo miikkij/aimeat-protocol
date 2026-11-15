@@ -1,6 +1,6 @@
 /**
  * @file test/unit/ai-call-limit.test.ts
- * @description The account's AI call limit (services/account-limits.ts takeAiCall and
+ * @description The account's AI call limit (services/account/limits.ts takeAiCall and
  *   requireAiCallTurn): the limit from config.rateLimits.openrouter, counted per ACCOUNT, so the
  *   owner and every agent acting for them share one allowance, and the AI services refuse with
  *   RATE_LIMITED before they read or spend anything. A REST route and an MCP tool call the same
@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { takeAiCall, requireAiCallTurn, retryAfterOf } from '../../src/services/account-limits.js';
+import { takeAiCall, requireAiCallTurn, retryAfterOf } from '../../src/services/account/limits.js';
 import { AiCompletionError } from '../../src/services/ai/errors.js';
 import { embedForOwner } from '../../src/services/ai/embed.js';
 import { generateForOwner } from '../../src/services/ai/image.js';

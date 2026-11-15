@@ -104,7 +104,7 @@ import { respondMeteredRefusal } from '../services/extension-access/metered-resp
 import { mintInternalPass } from '../services/extension-access/internal-pass.js';
 import { logger } from '../utils/logger.js';
 import { recordCallDuration } from '../services/call-timing.js';
-import { recordAccountEvent, recordFirstUse } from '../services/account-events.js';
+import { recordAccountEvent, recordFirstUse } from '../services/account/events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { findBackingCapability } from '../services/component/address.js';
 import { buildAppAgentSurface } from '../services/app/agent-surface.js';

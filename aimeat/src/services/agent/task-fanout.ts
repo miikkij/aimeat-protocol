@@ -89,7 +89,7 @@ import { emitChange } from '../event-bus.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from '../ai/provenance.js';
 import { isOnboardingTestTask } from '../onboarding-test-task.js';
 import { logger } from '../../utils/logger.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { onUcpTaskDone } from '../../commerce/ucp-guest-checkout.js';
 import { shareFinishedWork } from './workplace.js';

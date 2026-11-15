@@ -22,7 +22,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, AccountEventKind } from '../../src/storage/interface.js';
 import {
   recordAccountEvent, readAccountEvents, readAccountEventArchive, KEEP_HOT, windowSize,
-} from '../../src/services/account-events.js';
+} from '../../src/services/account/events.js';
 
 const ALICE = 'alice@node';
 const BOB = 'bob@node';

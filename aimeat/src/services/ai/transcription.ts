@@ -61,7 +61,7 @@ import { logger } from '../../utils/logger.js';
 import { resolveSttLanguage } from './model-defaults.js';
 import type { CallerClass } from './policy.js';
 import type { RequestLanguage } from './ai-fix-words.js';
-import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account/limits.js';
 
 /** Shown when the owner has no `sttModel`. Lives in services/ai/unset-model.ts since the gate refuses
  *  it; re-exported so the route, the message route and the UI copy point at the same instruction. */
@@ -93,7 +93,7 @@ export interface TranscribeForOwnerOptions {
   /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
   role?: string;
   /** 'exempt' for node-internal work; absent, the call counts against the account's AI call limit
-   *  (services/account-limits.ts). */
+   *  (services/account/limits.ts). */
   limit?: AiCallLimitMark;
 }
 

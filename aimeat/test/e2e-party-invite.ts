@@ -299,7 +299,7 @@ async function run(): Promise<void> {
     });
 
     // Codebase analysis 2026-11-03, item A11: the link mails an address the caller names, so it counts
-    // against the account's mail allowance (services/account-limits.ts takeMailSend, 30 a minute), as
+    // against the account's mail allowance (services/account/limits.ts takeMailSend, 30 a minute), as
     // POST /v1/outbound/send and aimeat_mail_send do.
     await test('A share link counts against the account\'s mail allowance: 30 a minute go out, the 31st is refused with when to try again', async () => {
         const c = await registerOwner(BASE, `ivc${stamp}`);

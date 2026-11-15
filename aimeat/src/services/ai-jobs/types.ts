@@ -51,7 +51,7 @@
  */
 import type { AiOp } from './op.js';
 import type { warningsNote } from '../classification/reader.js';
-import type { AiCallLimitMark } from '../account-limits.js';
+import type { AiCallLimitMark } from '../account/limits.js';
 import type { MemoryRecord } from '../../storage/interface.js';
 
 export type { AiOp as AiJobOp } from './op.js';
@@ -302,7 +302,7 @@ export interface StartAiJobContext {
     onRefused?: (reason: AiJobChainStop) => void;
     /** 'exempt' for a start that continues a chain (ctx.ai.start in an on_done callback), whose first
      *  start was counted; absent, the start counts against the account's AI call limit
-     *  (services/account-limits.ts). */
+     *  (services/account/limits.ts). */
     limit?: AiCallLimitMark;
 }
 

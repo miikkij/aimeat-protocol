@@ -78,7 +78,7 @@ import { findConnector, setWanted, clearWanted, type ConnectorView } from '../..
 import { emitChange } from '../../services/event-bus.js';
 import { executeHooks } from '../../services/hooks.js';
 import { fireHook } from '../../utils/fire-hook.js';
-import { recordAccountEvent } from '../../services/account-events.js';
+import { recordAccountEvent } from '../../services/account/events.js';
 import { giveFirstRun } from '../../services/agent/first-run.js';
 import { withDefaultOffer, firstRequestOf } from '../../services/agent/default-offer.js';
 import { readerFor } from '../../services/classification/reader.js';

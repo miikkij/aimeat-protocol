@@ -83,7 +83,7 @@ import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { callerOf as callerContextOf } from '../middleware/caller.js';
 import { readsAsOwner } from '../services/owner/scope-read.js';
 import { readerFor } from '../services/classification/reader.js';
-import { recordAccountEvent } from '../services/account-events.js';
+import { recordAccountEvent } from '../services/account/events.js';
 import { emitChange } from '../services/event-bus.js';
 import {
   getWorkflow, listWorkflows, saveWorkflow, deleteWorkflow,

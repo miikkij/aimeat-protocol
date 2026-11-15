@@ -80,7 +80,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, OrganismRecord, OrganismMembershipRecord, JoinRequestRecord } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
 import { recordPublicActivity } from '../public-activity.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { updateOrganismStructure } from '../structure-snapshot.js';
 import { resolveShape, applyOrganismShape, type ShapedWorkspace, type ShapedWorkspaceFailure } from './shape-apply.js';
 import { getOrganismReadme, setOrganismReadme } from './readme.js';

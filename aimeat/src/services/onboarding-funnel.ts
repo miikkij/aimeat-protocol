@@ -74,7 +74,7 @@ import { outboundEmailHtml } from './email/templates.js';
 import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail } from './mail-gate.js';
 import { logger } from '../utils/logger.js';
-import { recordAccountEvent } from './account-events.js';
+import { recordAccountEvent } from './account/events.js';
 import {
     ONBOARDING_KEYS, ownerGhii, writeMarkerOnce, FEED_LINK_FOR_MARKER,
     type OnboardingTrack, type OnboardingBranch, type OnboardingRoom,

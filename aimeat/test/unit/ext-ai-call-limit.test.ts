@@ -1,7 +1,7 @@
 /**
  * @file test/unit/ext-ai-call-limit.test.ts
  * @description An extension's `ctx.ai.start` draws on the installer's AI call limit, the same
- *   allowance POST /v1/ai/jobs and aimeat_ai_job_start draw on (services/account-limits.ts). Only a
+ *   allowance POST /v1/ai/jobs and aimeat_ai_job_start draw on (services/account/limits.ts). Only a
  *   start that continues a chain is exempt: the chain's first start was counted, as a job's run is not
  *   counted again after its start (secaudit 2026-10 follow-up, A5). Before this, every extension start
  *   passed `limit: 'exempt'`, so an extension any visitor can call started AI work on the installer's

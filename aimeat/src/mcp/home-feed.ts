@@ -23,7 +23,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { homeFeedAnswer } from '../services/home/feed.js';
-import { accountEventReader } from '../services/account-event-task-keep.js';
+import { accountEventReader } from '../services/account/event-task-keep.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 

@@ -39,7 +39,7 @@ import { persistHealth } from './provider-store.js';
 import { providerIdOf } from './provider-common.js';
 import type { CallerClass } from './policy.js';
 import type { AiCapability } from './types.js';
-import { requireAiCallTurnOnNode } from '../account-limits.js';
+import { requireAiCallTurnOnNode } from '../account/limits.js';
 
 const TESTABLE: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'transcription', 'speech', 'embed'];
 const APP_ID = 'ai-provider-test';

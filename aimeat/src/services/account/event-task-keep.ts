@@ -1,5 +1,5 @@
 /**
- * @file src/services/account-event-task-keep.ts
+ * @file src/services/account/event-task-keep.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A once-per-node step: every app grant that existed before it, held memory:read and did
@@ -7,7 +7,7 @@
  *   account's event record (GET /v1/account/events, GET /v1/account/events/archive) and the home feed
  *   (GET /v1/home/feed).
  *
- *   WHY. secaudit 2026-10, v89 (services/account-event-view.ts) shows a task row's title and reason
+ *   WHY. secaudit 2026-10, v89 (services/account/event-view.ts) shows a task row's title and reason
  *   only to the readers the task route admits: the owner in person, an app grant holding task:read and
  *   the task's own agent. Until then an app grant read them on memory:read, and a published app's
  *   permissions change only when its author republishes it. The developer's ruling, 2026-10-22: an app
@@ -43,14 +43,14 @@
  *   2026-10-27 — secaudit2026oct26: the cutoff is never later than the rule's first try (keptBefore).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v89; the developer's ruling of 2026-10-22).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';
-import { isSharedAnonymous } from './rest-scope-gates-migration.js';
-import type { CallerContext } from './caller-context.js';
-import type { AccountEventReader } from './account-event-view.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { claimOnceOnlyStep, keptBefore } from '../once-only-step.js';
+import { isSharedAnonymous } from '../rest-scope-gates-migration.js';
+import type { CallerContext } from '../caller-context.js';
+import type { AccountEventReader } from './event-view.js';
 
 /** The record under `system@<nodeId>` that lists the kept app grants. */
 export const TASK_CONTENT_KEEP_KEY = 'migrations.account-event-task-content.keep';

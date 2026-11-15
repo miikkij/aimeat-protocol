@@ -194,7 +194,7 @@ function sendErr(res: Response, config: AimeatConfig, e: unknown, sees = true): 
 export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Request): string => `${req.auth!.owner}@${config.nodeId}`;
-  // The send's per-minute allowance is counted per account in sendOutbound (services/account-limits.ts),
+  // The send's per-minute allowance is counted per account in sendOutbound (services/account/limits.ts),
   // so this route and the MCP tool share it (secaudit 2026-10, C5).
 
   // ── Contacts ──────────────────────────────────────────────────────────────

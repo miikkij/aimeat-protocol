@@ -387,7 +387,7 @@ export function registerWebVerifyRoutes(
 
         // The first row in this person's record, as POST /v1/ghii writes it: this route wrote none, so
         // an account made here started with an empty feed (feature-list audit 19).
-        void import('../../services/account-events.js')
+        void import('../../services/account/events.js')
             .then(m => m.recordAccountEvent(storage, {
                 ownerGhii: ghii, kind: 'account_created', actorGaii: ghii, link: '/v1/home',
             }, config))

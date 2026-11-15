@@ -106,7 +106,7 @@ import {
   listMcpGrants, putMcpGrant, removeMcpGrant, grantCannotNarrow, invalidGrantExpiry, type McpGrant,
 } from '../services/mcp-client/grants.js';
 import { emitChange } from '../services/event-bus.js';
-import { recordAccountEvent } from '../services/account-events.js';
+import { recordAccountEvent } from '../services/account/events.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
 import { browserCanBind, browserRoundBinding, roundCookiesOf, endRoundBinding } from '../middleware/oauth-round-cookie.js';
 import { callerOf } from '../middleware/caller.js';

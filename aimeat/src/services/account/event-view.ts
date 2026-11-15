@@ -1,5 +1,5 @@
 /**
- * @file src/services/account-event-view.ts
+ * @file src/services/account/event-view.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One row of the account's event record as one reader may see it. GET /v1/account/events,
@@ -29,7 +29,7 @@
  *     (`taskContentKept`, services/account-event-task-keep.ts; the developer's ruling, 2026-10-22).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v89).
  */
-import type { CallerContext } from './caller-context.js';
+import type { CallerContext } from '../caller-context.js';
 
 /** The kinds whose `data` carries the content of an agent's task. */
 export const TASK_CONTENT_KINDS: ReadonlySet<string> = new Set(['agent_task_done', 'agent_task_failed', 'agent_task_declined']);
@@ -40,7 +40,7 @@ const TASK_CONTENT_FIELDS = ['title', 'reason'] as const;
 /**
  * The reader facts the projection needs (services/caller-context.ts). `taskContentKept` is true for an
  * app grant that existed before this rule and still holds what it held then
- * (services/account-event-task-keep.ts, accountEventReader).
+ * (services/account/event-task-keep.ts, accountEventReader).
  */
 export type AccountEventReader = Pick<CallerContext, 'principal' | 'kind' | 'inPerson' | 'has'> & { taskContentKept?: boolean };
 

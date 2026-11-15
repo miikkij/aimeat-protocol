@@ -14,7 +14,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { resolveSkillRef } from '../skills.js';
 import type { ResolvedSkill, SkillAccessor } from './types.js';
 import { getAgentSkillLinks, writeAgentSkillLinks, type AgentSkillLink } from './agent-link-records.js';

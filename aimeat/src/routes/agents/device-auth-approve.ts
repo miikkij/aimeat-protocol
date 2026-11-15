@@ -38,7 +38,7 @@ import type { Storage, DeviceAuthorizationRecord } from '../../storage/interface
 import { generateKeyPair } from '../../auth/keypair.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { executeHooks } from '../../services/hooks.js';
-import { recordAccountEvent } from '../../services/account-events.js';
+import { recordAccountEvent } from '../../services/account/events.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { issueJWT, generateSessionId } from '../../auth/jwt.js';
 import { emitChange } from '../../services/event-bus.js';

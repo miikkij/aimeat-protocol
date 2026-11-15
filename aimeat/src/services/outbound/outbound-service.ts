@@ -103,7 +103,7 @@ import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
 import { disclosureHeaders, isDeclared, type AiDisclosure } from './ai-disclosure.js';
 import { provenanceForWrite, storeHeldProvenance } from '../ai/provenance.js';
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
-import { takeMailSendOnNode } from '../account-limits.js';
+import { takeMailSendOnNode } from '../account/limits.js';
 import { sendMail } from '../mail-gate.js';
 import { teamAgentGate } from '../team/action-gate.js';
 
@@ -512,7 +512,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   }
   // The account's send allowance, here rather than on a route, so POST /v1/outbound/send, the MCP
   // tool aimeat_mail_send and a contact message draw on one count for the owner and all their agents
-  // (services/account-limits.ts; secaudit 2026-10, C5). Asked before anything is written.
+  // (services/account/limits.ts; secaudit 2026-10, C5). Asked before anything is written.
   // A mail sent by an agent that works for a team waits for a lead first (services/team/action-gate.ts,
   // T7): the principal decides, so a person's own send is never held, and a held one takes no turn.
   if (input.principal) {

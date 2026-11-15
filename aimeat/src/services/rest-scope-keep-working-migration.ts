@@ -93,7 +93,7 @@ import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../utils/rest-scope-release.js';
-import { recordAccountEvent } from './account-events.js';
+import { recordAccountEvent } from './account/events.js';
 import { recordSecurityIncident } from './security-incident.js';
 import { keepWorkingAppsOnce, type KeptApp } from './app/scope-allowance.js';
 import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';

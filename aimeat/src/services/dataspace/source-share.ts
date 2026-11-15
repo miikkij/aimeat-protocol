@@ -33,7 +33,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
-import { recordAccountEvent } from '../account-events.js';
+import { recordAccountEvent } from '../account/events.js';
 import { UNCHANGED } from '../record-cas.js';
 import { isLiveShare, onSharesEnded, shareMetaOf } from '../parties/shares.js';
 import { locatePid, withHistory, type NegotiationRecord } from './contract.js';

@@ -29,7 +29,7 @@ import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, scopeIsCovered } from '.
 import { actsForSomeone, type OperatorCaller } from '../operator/principal.js';
 import { complianceDocAccess } from './docs-access.js';
 import type { Agreement } from './agreements-schemas.js';
-import { heldSince } from '../account-instance.js';
+import { heldSince } from '../account/instance.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 

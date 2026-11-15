@@ -21,7 +21,7 @@
  *     name and written on all of that name's locks, as one erasure does. The lock keeps governing, no
  *     account matches its holder, and the operator still changes and removes it.
  *   - Asked: a lock whose holder's account exists now but was registered after the lock was set
- *     (the test of services/account-instance.ts heldSince). PostgreSQL keeps a lock's first set time
+ *     (the test of services/account/instance.ts heldSince). PostgreSQL keeps a lock's first set time
  *     when another holder saves it again, so this cannot be decided on evidence: nothing changes, and
  *     ONE incident on the Security page lists those locks, one entry each, with 'pseudonymise' (the
  *     lock was a previous holder's: it takes the pseudonym the incident drew for that name) or 'keep'
