@@ -1,0 +1,15 @@
+{
+  "en:landing.showPictureAlt": "A real picture: the alt text describes an illustration of a showroom opening.",
+  "fi:landing.showPictureAlt": "A real picture: the alt text describes an illustration of a showroom opening.",
+  "en:story.b3Alt": "A real picture: the alt text describes an illustration set in a showroom.",
+  "fi:story.b3Alt": "A real picture: the alt text describes an illustration set in a showroom.",
+  "en:connectStory.b1Alt": "A real picture: the alt text describes an illustration of a showroom counter.",
+  "fi:connectStory.b1Alt": "A real picture: the alt text describes an illustration of a showroom counter.",
+  "en:surface.blocks.portal.frame-hero.summary": "Names a real picture by what it shows: the front page's showroom illustration.",
+  "fi:surface.blocks.portal.frame-hero.summary": "Names a real picture by what it shows: the front page's showroom illustration.",
+  "en:appcat.structure.look.neon-dense.line": "Describes how an app looks: the look is styled after a control room console.",
+  "es:appcat.structure.look.neon-dense.line": "Describes how an app looks: the look is styled after a control room console.",
+  "en:appcat.structure.look.tdr.line": "Describes how an app looks: the look is styled after a machine room console.",
+  "fi:appcat.structure.look.tdr.line": "Describes how an app looks: the look is styled after a machine room console.",
+  "es:appcat.structure.look.tdr.line": "Describes how an app looks: the look is styled after a machine room console."
+}

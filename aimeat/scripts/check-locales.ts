@@ -201,6 +201,17 @@ const PICTURE_WORDS: PictureWord[] = [
     baseline: new URL('../security/locale-hand-baseline.json', import.meta.url),
     fix: 'say who does it: you revoke it yourself, your AI gets tools, it is the easiest button to find',
   },
+  {
+    // A realtime room is the industry's word for a live session and is not in the pattern.
+    word: 'machine room / showroom',
+    byLocale: {
+      en: /\b(?:machine room|engine room|control room|showrooms?)\b/i,
+      fi: /(?<![\p{L}])(?:konehuone\p{L}*|näyttelytila\p{L}*|näyttelykuva\p{L}*|näyttelytiski\p{L}*|näyttelysovellu\p{L}*|myyntihuone\p{L}*)|työtilat ovat (?:sen )?huoneet/iu,
+      es: /\b(?:sala de (?:máquinas|exhibición|control|venta)|sala estática|son sus salas)\b/i,
+    },
+    baseline: new URL('../security/locale-room-baseline.json', import.meta.url),
+    fix: 'name the page or the thing: the admin pages, a demo, a card, its documents and records',
+  },
 ];
 
 function jargonOffenders(
