@@ -75,9 +75,18 @@
       return res.data;
     },
     // ── Posts ──
-    // Post to a board
+    /**
+     * Post to a board. content is the text, or { title, body, category?, tags?, ttl_hours? }. The
+     * board post route requires a title, so a post without one gets the title the portal gives a
+     * text-only post (public/js/services/boards.js createPost): the trimmed text cut to 80
+     * characters, or 'Post'.
+     * @param {string} boardId
+     * @param {string | Record<string, any>} content
+     */
     async post(boardId, content) {
-      const body = typeof content === "string" ? { body: content } : content;
+      const fields = typeof content === "string" ? { body: content } : { ...content };
+      const titleOf = (text) => (typeof text === "string" ? text.trim().slice(0, 80) : "") || "Post";
+      const body = fields.title ? fields : { ...fields, title: titleOf(fields.body) };
       const res = await authFetch2("/v1/boards/" + encodeURIComponent(boardId) + "/posts", {
         method: "POST",
         body: JSON.stringify(body)

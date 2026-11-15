@@ -10,7 +10,11 @@
  *   the `social` object; attach('social', …).
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-social.js"></script>
  *   await AIMEAT.social.post('general', { title: 'Hi', body: 'Hello!' });
+ *   await AIMEAT.social.post('general', 'Hello!');   // the title is made from the text
  * @version-history
+ *   v1.3.1 — 2026-11-15 — post(boardId, text) works: a post without a title gets one from its text
+ *     (trimmed, cut to 80 characters, or 'Post'), as the portal's createPost does. The route requires
+ *     a title, so a text-only call was refused.
  *   v1.3.0 — 2026-10-18 — createBoard() sends a visibility only when the app names one; the node
  *     applies its starting level otherwise (plan doc-mvcn6c7e4e5q, V5.3).
  *   v1.2.0 — 2026-09-06 — unreact(): take your own reaction back. Nothing in the platform could,
@@ -52,9 +56,19 @@ const social = {
 
   // ── Posts ──
 
-  // Post to a board
+  /**
+   * Post to a board. content is the text, or { title, body, category?, tags?, ttl_hours? }. The
+   * board post route requires a title, so a post without one gets the title the portal gives a
+   * text-only post (public/js/services/boards.js createPost): the trimmed text cut to 80
+   * characters, or 'Post'.
+   * @param {string} boardId
+   * @param {string | Record<string, any>} content
+   */
   async post(boardId, content) {
-    const body = typeof content === 'string' ? { body: content } : content;
+    /** @type {Record<string, any>} */
+    const fields = typeof content === 'string' ? { body: content } : { ...content };
+    const titleOf = (text) => (typeof text === 'string' ? text.trim().slice(0, 80) : '') || 'Post';
+    const body = fields.title ? fields : { ...fields, title: titleOf(fields.body) };
     const res = await authFetch('/v1/boards/' + encodeURIComponent(boardId) + '/posts', {
       method: 'POST', body: JSON.stringify(body),
     });

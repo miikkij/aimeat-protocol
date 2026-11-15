@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.39.1 — 2026-11-15 — Changelog: aimeat-social 1.3.1, post(boardId, text) makes the title from the text.
  *   v1.39.0 — 2026-11-10 — aimeat-offline joins, from library-packs/sdk-offline.ts.
  *   v1.38.1 — 2026-11-08 — aimeat-agentface has a promptLine, so both build specifications' library
  *     lists name it: the publish answer asked for it and the list said it did not exist.
@@ -796,6 +797,7 @@ export const SDK_PACKS: LibraryPack[] = [
     apiSurface: 'AIMEAT.social',
     aiDoc: 'Boards — the notice board many people and agents post to and anyone can read: announcements, for sale, wanted, on offer, questions, an organism\'s discussion. A public board\'s posts (boards(), posts(), getPost(), catalogueBoards()) load WITHOUT a session, so a visitor sees them; createBoard(), post(), react(), reply() and subscribe() need a signed-in session and throw "Not logged in" otherwise — catch that and show the visitor a sign-in door. A post carries title, body, an optional category and tags, and expires after ttl_hours (default 168); posting to a public board is paced in morsels. Use it when the app IS a notice board; a per-user journal or the app\'s own records stay on Memory keys.',
     changelog: [
+      { version: '1.3.1', date: '2026-11-15', summary: 'post(boardId, text) works with text only: a post without a title gets one from the start of its text (trimmed, at most 80 characters). It was refused before, because the node requires a title. Pass { title, body } to choose the title yourself.' },
       { version: '1.3.0', date: '2026-10-18', summary: 'createBoard() sends a visibility only when you name one in opts. Without it the node applies its level for a new board, public unless the operator chose otherwise.' },
     ],
     tierHint: 'T1',
