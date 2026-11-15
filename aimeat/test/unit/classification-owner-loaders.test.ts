@@ -29,7 +29,7 @@ import { addComment, listComments } from '../../src/services/organism/comments.j
 import { setOrganismReadme, showOrganismReadme, getOrganismReadme } from '../../src/services/organism/readme.js';
 import { publishSkill, resolveSkillRef, listSkills } from '../../src/services/skills.js';
 import { manifestKey, fileKey } from '../../src/services/skill/refs.js';
-import { fetchComponentContent, fetchComponentContentForAi } from '../../src/services/component-content.js';
+import { fetchComponentContent, fetchComponentContentForAi } from '../../src/services/component/content.js';
 import { createNotebookService } from '../../src/services/db/notebook-db-service.js';
 import { createCalibratorDetailService } from '../../src/services/db/calibrator-detail-db-service.js';
 import { hideFromAiOnNode } from './classification-fixtures.js';

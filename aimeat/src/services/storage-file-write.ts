@@ -139,7 +139,7 @@ import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta, notePageKeyChange, t
 // Moved to storage-file-provenance.ts (800-line limit); re-exported so the importers are unchanged.
 export { storageProvenanceMintRefusal };
 export type { StorageProvenanceInput, ProvenanceRefusalCode };
-import { ownExtensionFileKey } from './component-address.js';
+import { ownExtensionFileKey } from './component/address.js';
 import { organismVisibilityRefusal } from './organism/visibility.js';
 import { unknownGroupRefusal } from '../storage/memory-sharing.js';
 import { emitChange } from './event-bus.js';
@@ -499,7 +499,7 @@ export type StorageFileDeleteResult =
 
 /**
  * The file `asked` names in `ownerGaii`'s namespace, without its bytes. The account's own extension's
- * file named by its short key is stored under the stored name (services/component-address.ts
+ * file named by its short key is stored under the stored name (services/component/address.ts
  * ownExtensionFileKey), tried only when the key as written names no file. With no file, `key` is `asked`.
  */
 async function heldFile(storage: Storage, ownerGaii: string, asked: string): Promise<{ key: string; file: StorageFileRecord | null }> {

@@ -564,7 +564,7 @@ const CREATE_APP_DISTINCT_ACTS: Record<string, string> = {
   'src/services/apps-backup-import.ts':
     'Restoring a backup replays rows that were already published; re-announcing a restore would '
     + 'spam the feed with history.',
-  'src/services/component-registrar.ts':
+  'src/services/component/registrar.ts':
     'Node-internal seeding of built-in components at boot, with no principal to attribute to.',
 };
 

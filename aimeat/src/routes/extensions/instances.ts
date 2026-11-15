@@ -31,7 +31,7 @@ import {
 } from '../../services/extension/secrets.js';
 import { mayManageInstalledExt } from './permissions.js';
 import { canSeeExtensionInstanceAs } from '../../services/extension-access/manage.js';
-import { findExtension } from '../../services/component-address.js';
+import { findExtension } from '../../services/component/address.js';
 import { isOperatorCaller } from '../../services/operator/override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
@@ -337,7 +337,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
   // ── GET /v1/extensions/:name/instances/:instanceId/translations — Public translations ──
   router.get('/v1/extensions/:name/instances/:instanceId/translations', async (req, res) => {
     try {
-      // Public: the stored name or the holder's alias, never a caller's own (services/component-address.ts).
+      // Public: the stored name or the holder's alias, never a caller's own (services/component/address.ts).
       const name = (await findExtension(storage, req.params.name as string))?.name ?? (req.params.name as string);
       const instanceId = req.params.instanceId as string;
       const locale = (req.query.locale as string) || 'en';

@@ -218,7 +218,7 @@ const ENTRY = /^[^/\s]+\/[^/\s]+$/;
 export function extensionMarker(installer: string, name: string): string {
     const who = installer.trim().toLowerCase(), what = name.trim().toLowerCase();
     // A name installed since 2026-10-25 already carries its installer (`<owner>/<name>`,
-    // services/component-address.ts), and is itself the marker; a bare one is prefixed as before.
+    // services/component/address.ts), and is itself the marker; a bare one is prefixed as before.
     return what.startsWith(`${who}/`) ? what : `${who}/${what}`;
 }
 

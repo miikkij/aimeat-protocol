@@ -28,7 +28,7 @@
 import type {
     Storage, PackageComponentType, PackageInstanceRecord, PackageRecord,
 } from '../../../storage/interface.js';
-import { fetchComponentContent, computeHash } from '../../component-registrar.js';
+import { fetchComponentContent, computeHash } from '../../component/registrar.js';
 import { forkedUpdateRefusal } from './package-managed.js';
 import { purchaseRefusal } from '../sale/package-account-entitlement.js';
 

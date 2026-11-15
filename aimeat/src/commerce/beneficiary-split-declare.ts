@@ -25,7 +25,7 @@
  *   v1.0.0 — 2026-10-16 — Moved out of routes/commerce-beneficiaries.ts and mcp/commerce.ts; the view names created_by (QA audit D2-08).
  */
 import type { Storage } from '../storage/interface.js';
-import { findExtension, isNamespacedName, namespacedName } from '../services/component-address.js';
+import { findExtension, isNamespacedName, namespacedName } from '../services/component/address.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
   putSplit, deleteSplit, BENEFICIARIES_MAX, type BeneficiarySplit, type BeneficiaryShare, type BeneficiaryRole,
@@ -159,7 +159,7 @@ export async function declareSplit(
   const action = typeof body.action === 'string' ? body.action.trim() : '';
   if (!named || !action) return refuse('Name the metered coordinate this split applies to: `ext` and `action`');
   // An extension of the provider's own is keyed by its stored name, `<owner>/<name>`
-  // (services/component-address.ts), which is the name a settled call carries.
+  // (services/component/address.ts), which is the name a settled call carries.
   const own = await findExtension(storage, named, localAccountName(who.providerGhii), 'manage');
   const ext = own && own.installedBy === localAccountName(who.providerGhii) ? own.name : named;
 

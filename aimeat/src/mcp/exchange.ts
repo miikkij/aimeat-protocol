@@ -75,7 +75,7 @@ import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { offeringExtAction } from '../services/exchange/offering-action.js';
-import { findExtension, addressSegment } from '../services/component-address.js';
+import { findExtension, addressSegment } from '../services/component/address.js';
 import { teamAgentGate } from '../services/team/action-gate.js';
 
 function ownerOf(gaii: string): string {
@@ -374,7 +374,7 @@ export function registerExchangeTools(
             const n = await getNeed(storage, need_id);
             if (!n) return fail(`NOT_FOUND: no such need "${need_id}"`);
             if (n.state !== 'open') return fail(`NEED_CLOSED: need is ${n.state}`);
-            // The bidder's own first (services/component-address.ts); the bid keeps the stored name.
+            // The bidder's own first (services/component/address.ts); the bid keeps the stored name.
             const extRec = await findExtension(storage, ext, owner, 'manage');
             if (!extRec || extRec.installedBy !== owner) return fail('FORBIDDEN: bid only with an action your extension owns');
             ext = extRec.name;

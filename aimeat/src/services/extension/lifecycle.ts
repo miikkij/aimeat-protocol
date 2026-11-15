@@ -85,12 +85,12 @@ import { getEncryptionKey } from '../encryption.js';
 import { emitChange } from '../event-bus.js';
 import { stableStringify } from '../../utils/stable-json.js';
 import { logger } from '../../utils/logger.js';
-import { snapshotExtensionVersion, forgetVersions, keptVersionRefusal, extensionCodeOf } from '../component-versions.js';
+import { snapshotExtensionVersion, forgetVersions, keptVersionRefusal, extensionCodeOf } from '../component/versions.js';
 import { managedChangeRefusal } from '../packages/install/package-managed.js';
 import { carryHostFieldValues } from './network-hosts.js';
 import { carryFirstUseKeep } from './first-use-keep.js';
-import { releaseBareName, settleReclaimed } from '../component-address.js';
-import { nodePrefixRefusal } from '../component-name-prefix.js';
+import { releaseBareName, settleReclaimed } from '../component/address.js';
+import { nodePrefixRefusal } from '../component/name-prefix.js';
 
 export interface ExtensionLifecycleDeps {
     storage: Storage;
@@ -189,7 +189,7 @@ export async function writeExtensionRecord(
         record.config = prepared;
 
         const created = await storage.createExtension(record);
-        // A bare name its holder installed again is no longer released (services/component-address.ts).
+        // A bare name its holder installed again is no longer released (services/component/address.ts).
         await settleReclaimed(storage, 'extension', created.name);
         // Every version is kept: this one too, so `name@<version>` keeps serving it after an update.
         await snapshotExtensionVersion(storage, created, ctx.actor)
@@ -223,7 +223,7 @@ export async function writeExtensionRecord(
         return { ok: true, record: existing, action: 'unchanged', reinitialized: false };
     }
 
-    // A kept version is immutable (services/component-versions.ts): `name@version` is an address
+    // A kept version is immutable (services/component/versions.ts): `name@version` is an address
     // apps pin, so other code under a version already kept is refused here, before anything is
     // written, and the author gives the change a new version. A change to config alone is not code
     // and goes through (secaudit 2026-09, A6-7).
@@ -361,7 +361,7 @@ export async function uninstallExtension(
     const holder = (await storage.getExtension(name))?.installedBy;
     const deleted = await storage.deleteExtension(name);
     // A bare name stays its holder's: written down so only they install under it again, and an old
-    // `/v1/ext/<name>/<instance>/…` address keeps reading as this extension's (services/component-address.ts).
+    // `/v1/ext/<name>/<instance>/…` address keeps reading as this extension's (services/component/address.ts).
     if (deleted && holder) await releaseBareName(storage, 'extension', name, holder);
     await forgetVersions(storage, 'extension', name)
         .catch(err => logger.warn('uninstallExtension: kept versions not dropped', { name, error: String(err) }));

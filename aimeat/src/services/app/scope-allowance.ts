@@ -56,7 +56,7 @@ import { equalAppId } from './record-keys.js';
 import { resolveAppTarget } from './dev-grant.js';
 import { changeScopeList } from '../scope-list-swap.js';
 import { recordAppAudit } from './audit.js';
-import { resolveCortexLib } from '../component-versions.js';
+import { resolveCortexLib } from '../component/versions.js';
 import { cortexLibRefs, undeclaredScopeNeeds } from './scope-needs.js';
 import { heldOwnerAdded } from './grant-scopes.js';
 import { emitChange } from '../event-bus.js';

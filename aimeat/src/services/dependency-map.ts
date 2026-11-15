@@ -40,7 +40,7 @@ import type { AppManifest } from '../storage/interface.js';
 import type { DependencyEdge, DependencyFromKind, DependencyToKind } from '../storage/types/dependencies.js';
 import { logger } from '../utils/logger.js';
 import { getLibraryPacks } from '../data/library-packs.js';
-import { findExtension, splitComponentAddress } from './component-address.js';
+import { findExtension, splitComponentAddress } from './component/address.js';
 
 export interface Dep { name: string; version: string | null; via: 'source' | 'manifest' }
 export interface ExtractedDependencies { cortex: Dep[]; extensions: Dep[]; packs: Dep[] }
@@ -86,7 +86,7 @@ function packNeedlesOnce(): Array<{ id: string; paths: string[] }> {
 
 // A cortex name may carry one slash ("owner/name"). An extension name carries one since 2026-10-25,
 // and in a path it is one encoded segment (`alice%2Fweather`), because the literal form shares its
-// shape with the instance address (services/component-address.ts). The version, when pinned,
+// shape with the instance address (services/component/address.ts). The version, when pinned,
 // follows an @ and runs to the next slash or quote. `%2F` is a slash a caller encoded.
 const CORTEX_RE = /\/v1\/cortex\/((?:[A-Za-z0-9._-]+(?:%2F|\/))?[A-Za-z0-9._-]+)(?:@([0-9][A-Za-z0-9.+-]*))?\/(?:libs|prompts|ontology|export)(?:[/?"'`\s)]|$)/g;
 const EXT_RE = /\/v1\/ext\/((?:[a-z0-9-]+%2F)?[A-Za-z0-9._-]+)(?:@([0-9][A-Za-z0-9.+-]*))?\//gi;
@@ -138,7 +138,7 @@ export const appRef = (ownerName: string, filename: string): string => `${ownerN
 
 /**
  * A bare extension name in an owner's own code means the bare record when there is one, else the
- * owner's own `<owner>/<name>` (services/component-address.ts), so the edge names what the call reaches.
+ * owner's own `<owner>/<name>` (services/component/address.ts), so the edge names what the call reaches.
  */
 async function withOwnNames(storage: Storage, found: ExtractedDependencies, ownerName: string | null): Promise<ExtractedDependencies> {
   if (!ownerName) return found;

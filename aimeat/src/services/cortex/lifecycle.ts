@@ -109,7 +109,7 @@ import { cortexInstallRefusal } from '../install/quotas.js';
 import { emitChange } from '../event-bus.js';
 import { activateExtension, activationRefusal, deactivateExtension, type CortexActor } from './activation.js';
 import { refreshCortexDependencies, forgetDependencies } from '../dependency-map.js';
-import { snapshotCortexVersion, forgetVersions } from '../component-versions.js';
+import { snapshotCortexVersion, forgetVersions } from '../component/versions.js';
 import { accountPrincipals } from '../db/owner-identity.js';
 import { logger } from '../../utils/logger.js';
 import { cortexPublishAsk, fileCortexAsk } from './visibility.js';
@@ -117,8 +117,8 @@ import type { DoorAsk, PublishGateInput } from '../publish-requests/door.js';
 import { accountGhii } from '../publish-requests/ask.js';
 import { settleRequestsForRemovedTarget } from '../publish-requests/store.js';
 import { bundledCortexNames } from './seeder.js';
-import { placeCortexInstall, releaseBareName, settleReclaimed, findCortex } from '../component-address.js';
-import { nodePrefixRefusal } from '../component-name-prefix.js';
+import { placeCortexInstall, releaseBareName, settleReclaimed, findCortex } from '../component/address.js';
+import { nodePrefixRefusal } from '../component/name-prefix.js';
 import { noteCortexHolderChange } from './holder-change.js';
 
 export interface CortexDeps {
@@ -342,7 +342,7 @@ export async function installCortex(
     }
 
     // The name stays the manifest's, as always; `<owner>/<name>` only when asked for in full or when
-    // another account released the bare name (services/component-address.ts). A manifest name
+    // another account released the bare name (services/component/address.ts). A manifest name
     // carrying another account's prefix is installed under the installer's own, with a warning.
     const placed = await placeCortexInstall(storage, caller.ownerName, ext);
     if (placed.warning) (result.warnings ??= []).push(placed.warning);
@@ -542,7 +542,7 @@ export async function deleteCortex(
  * versions. Returns whether a record was deleted.
  *
  * It asks no ownership question: each caller has answered it. deleteCortex answers it for the HTTP
- * and MCP uninstall; the package registrar (services/component-registrar.ts deleteComponent) removes
+ * and MCP uninstall; the package registrar (services/component/registrar.ts deleteComponent) removes
  * a cortex it installed, when the package goes or an install that failed later is rolled back.
  */
 export async function removeCortex(
@@ -581,7 +581,7 @@ export async function removeCortex(
 
     const removed = await storage.deleteCortexExtension(name);
     // A bare name stays its holder's: written down so only they install under it again
-    // (services/component-address.ts). A namespaced name needs nothing.
+    // (services/component/address.ts). A namespaced name needs nothing.
     if (removed) await releaseBareName(storage, 'cortex', name, ext.installedBy);
     await forgetDependencies(storage, 'cortex', name)
         .catch(err => logger.warn('removeCortex: dependency map not cleared', { name, error: String(err) }));

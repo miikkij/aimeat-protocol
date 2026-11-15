@@ -46,7 +46,7 @@ export interface ComponentVersionSummary {
 /**
  * A bare extension or cortex name an uninstall released. Names are stored as `<owner>/<name>` since
  * 2026-10-25; a bare name is one stored before that, or a shipped one. Only `holder` may install
- * under the bare name again (services/component-address.ts).
+ * under the bare name again (services/component/address.ts).
  */
 export interface ReleasedComponentNameRecord {
   kind: ComponentKind;
@@ -60,7 +60,7 @@ export interface ReleasedComponentNameRecord {
  * The holder prefix of a name freed by account erasure or the operator's held-name settlement:
  * `freed:<erasure pseudonym>`, which no account matches. Such a row records that the holder changed and
  * leaves the name free for the next install; an uninstall's row retires it instead
- * (services/component-address.ts, services/cortex/holder-change.ts; secaudit2026oct26 round 8c).
+ * (services/component/address.ts, services/cortex/holder-change.ts; secaudit2026oct26 round 8c).
  */
 export const FREED_RELEASE_PREFIX = 'freed:';
 

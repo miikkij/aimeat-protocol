@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner is ADDED to extension and cortex names, and every address that worked before
- *   works as before (services/component-address.ts; wish
+ *   works as before (services/component/address.ts; wish
  *   wish-cortex-and-extension-names-live-in-the-owner-s-namespace, secaudit2026oct22 leads 589 and
  *   2827). A name was a node-wide key: when its owner uninstalled it, the next owner to install the
  *   same name took over every app that loaded it, every consent that named it and every pinned

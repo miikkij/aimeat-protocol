@@ -117,7 +117,7 @@ import { makeExtensionDataPackage } from '../datapackage/ext-capability.js';
 import { makeLabelTrail } from '../datapackage/label-trail.js';
 import { installerActor, type PublishActor } from '../publish-actors.js';
 import { getEncryptionKey } from '../encryption.js';
-import { findExtension, extensionHoldersOf } from '../component-address.js';
+import { findExtension, extensionHoldersOf } from '../component/address.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './secrets.js';
 import type { EmailService } from '../email.js';
 import { deactivatedAccountSkip } from '../account-deactivated.js';
@@ -270,7 +270,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
     }
 
     // An unattended run calls only the owner's own extension, so a bare name is the owner's own first
-    // (services/component-address.ts): a schedule or a workflow step written as `weather` reaches
+    // (services/component/address.ts): a schedule or a workflow step written as `weather` reaches
     // `<owner>/weather`, and one stored before names carried an owner reaches its bare record.
     const ext = await findExtension(storage, extensionName, ownerName, 'manage');
     if (!ext) {

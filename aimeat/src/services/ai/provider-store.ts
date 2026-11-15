@@ -67,7 +67,7 @@ import { resolveModelFor, type ModelRole } from './model-defaults.js';
 import { logger } from '../../utils/logger.js';
 import { freeLastResortOf, freeModelOf, regionView } from './openrouter-region.js';
 import { isValidAgentName, localAccountName } from '../../utils/gaii.js';
-import { findExtension } from '../component-address.js';
+import { findExtension } from '../component/address.js';
 import { isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM } from './provider-common.js';
 import { AiCompletionError } from './errors.js';
 import { clearHealth } from './health.js';
@@ -493,7 +493,7 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
   const views = await Promise.all([...owner, ...node].map(async (p) => {
     const v = withStatus(p);
     if (p.type !== 'extension' || !p.extension) return v;
-    // The owner's own first (services/component-address.ts), as the provider's run reads it.
+    // The owner's own first (services/component/address.ts), as the provider's run reads it.
     const ext = await findExtension(storage, p.extension, localAccountName(ownerGhii), 'manage');
     const decl = ext ? aiProviderDeclarationOf(ext) : null;
     return decl

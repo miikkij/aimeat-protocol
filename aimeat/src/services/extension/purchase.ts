@@ -63,8 +63,8 @@ import { authoriseMeteredCall } from '../metered-access.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { logger } from '../../utils/logger.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../members-only.js';
-import { findBackingCapability } from '../component-address.js';
-import { resolveExtensionForCall } from '../component-versions.js';
+import { findBackingCapability } from '../component/address.js';
+import { resolveExtensionForCall } from '../component/versions.js';
 import { splitExtensionRef } from '../capability-extension-ref.js';
 
 /**
@@ -226,7 +226,7 @@ export async function buyForExtension(args: {
   // Resolved BEFORE the settle, deliberately. Money that has to be given back is a worse answer
   // than money never taken, and a buyer told "no contract" about a tool whose binding is broken
   // goes off to take a contract that could never have worked.
-  // The seller's own extension by a bare name is still theirs (services/component-address.ts).
+  // The seller's own extension by a bare name is still theirs (services/component/address.ts).
   const cap = await findBackingCapability(storage, toolDef.action_id, sellerOwner);
   if (!cap) {
     return { ok: false, code: 'CAPABILITY_NOT_FOUND', message: `Backing capability not found: ${toolDef.action_id}`, correlation };

@@ -53,7 +53,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AppRecord } from '../../storage/types/apps.js';
 import { runExtensionActionAsSystem } from '../extension/system-run.js';
 import { takeExtensionRunSlot } from '../extension/run-slots.js';
-import { findExtension } from '../component-address.js';
+import { findExtension } from '../component/address.js';
 import { logger } from '../../utils/logger.js';
 
 export interface FormatMdDeclaration { extension: string; action: string }
@@ -106,7 +106,7 @@ export function parseFormatMdMeta(html: string): FormatMdDeclaration | { error: 
 
 /** Why the declaration cannot be used for this owner, or null when it can. */
 export async function formatMdRefusal(storage: Storage, ownerName: string, decl: FormatMdDeclaration): Promise<string | null> {
-  // The owner's own first, as the unattended run reads it (services/component-address.ts).
+  // The owner's own first, as the unattended run reads it (services/component/address.ts).
   const ext = await findExtension(storage, decl.extension, ownerName, 'manage');
   if (!ext) return `the extension "${decl.extension}" is not installed on this node`;
   if (ext.installedBy !== ownerName) return `the extension "${decl.extension}" belongs to another owner; an app answers ?format=md only with its owner's own extension`;

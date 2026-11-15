@@ -17,8 +17,8 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { canSeeCortex, type CortexCaller } from './lifecycle.js';
-import { listVersions } from '../component-versions.js';
-import { findCortex, withOwnerFields } from '../component-address.js';
+import { listVersions } from '../component/versions.js';
+import { findCortex, withOwnerFields } from '../component/address.js';
 
 export interface CortexReadRefusal { ok: false; status: 403 | 404; code: 'NOT_FOUND' | 'FORBIDDEN'; message: string }
 
@@ -40,7 +40,7 @@ export async function cortexDetail(
         ok: true,
         status: ext.status,
         data: {
-            // `name` as the manifest gives it, plus `owner` and `full_name` (services/component-address.ts).
+            // `name` as the manifest gives it, plus `owner` and `full_name` (services/component/address.ts).
             ...(({ name: shown, owner, full_name }) => ({ name: shown, owner, full_name }))(withOwnerFields(ext)),
             namespace: ext.namespace,
             short_name: ext.shortName,

@@ -69,7 +69,7 @@
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage, PackageRecord, AppRecord, CortexExtensionRecord } from '../../../storage/interface.js';
 import { requirementsOf, appRef, extractDependencies } from '../../dependency-map.js';
-import { findCortex, AmbiguousComponentName } from '../../component-address.js';
+import { findCortex, AmbiguousComponentName } from '../../component/address.js';
 import {
     createPackageGroup, addPackageVersion, hashContent,
     type PackageWriteResult, type RawComponentInput,

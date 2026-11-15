@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Extension and cortex names that start with `aimeat-` belong to what the node ships
- *   (services/component-name-prefix.ts; secaudit2026oct26 round 8c, extensions-02). An account could
+ *   (services/component/name-prefix.ts; secaudit2026oct26 round 8c, extensions-02). An account could
  *   install under a name a coming release adds, because the running build does not know the name yet.
  *   Run against storage doubles: the cortex doors need no server. The extension doors are covered in
  *   test/e2e-component-namespaces.ts.
@@ -19,7 +19,7 @@ import { installCortex } from '../../src/services/cortex/lifecycle.js';
 import { upsertCortex } from '../../src/services/cortex/upsert.js';
 import { bundledCortexNames } from '../../src/services/cortex/seeder.js';
 import { BUILTIN_EXTENSIONS } from '../../src/data/builtin-extensions/index.js';
-import { nodePrefixRefusal, hasNodePrefix } from '../../src/services/component-name-prefix.js';
+import { nodePrefixRefusal, hasNodePrefix } from '../../src/services/component/name-prefix.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, CortexExtensionRecord } from '../../src/storage/interface.js';
 

@@ -1,5 +1,5 @@
 /**
- * @file src/services/component-name-prefix.ts
+ * @file src/services/component/name-prefix.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Extension and cortex names that start with `aimeat-` belong to what the node ships.
@@ -28,9 +28,9 @@
  *   v1.0.0 — 2026-10-29 — Initial (secaudit2026oct26 round 8c, extensions-02,
  *     routes/extensions/crud.ts:install-accepts-builtin-extension-name).
  */
-import type { Storage } from '../storage/interface.js';
-import type { ComponentKind } from '../storage/types/component-versions.js';
-import { isNamespacedName, shortNameOf } from './component-address.js';
+import type { Storage } from '../../storage/interface.js';
+import type { ComponentKind } from '../../storage/types/component-versions.js';
+import { isNamespacedName, shortNameOf } from './address.js';
 
 /** The prefix of every extension and cortex name the node ships from 2026-10-29 on. */
 export const NODE_NAME_PREFIX = 'aimeat-';

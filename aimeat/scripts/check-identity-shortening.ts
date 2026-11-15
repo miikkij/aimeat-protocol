@@ -300,7 +300,7 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   'src/services/app-parties/service.ts': {
     "email.slice(0, email.indexOf('@'))": 'The default display name of a person who signs up to an app with an e-mail address is the address\'s local part; it is shown on the owner\'s list and decides nothing, and the party\'s identity is its generated `ap-` name.',
   },
-  'src/services/component-address.ts': {
+  'src/services/component/address.ts': {
     "raw.slice(0, at) ← raw.lastIndexOf('@')": 'Takes the version pin off an extension name (`weather@1.0.0` is `weather`), the form splitPinnedName in component-versions.ts reads; an extension name holds no identity.',
   },
   // ── The connector CLI: it runs on the person's own machine, not on the node ──
@@ -351,7 +351,7 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   'src/routes/agent-integration.ts': {
     "since.substring(0, atIdx) ← since.lastIndexOf('@')": 'An inbox paging cursor, `timestamp@id`; not an identity.',
   },
-  'src/services/component-versions.ts': {
+  'src/services/component/versions.ts': {
     "raw.slice(0, at) ← raw.lastIndexOf('@')": 'A pinned component reference, `name@1.2.0`; not an identity.',
   },
   'src/utils/env-config/shared.ts': {

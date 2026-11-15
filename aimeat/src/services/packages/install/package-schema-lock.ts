@@ -7,7 +7,7 @@
  *
  *   WHY. A lock is found by its key pattern alone and governs every account's writes to a matching
  *   key. PUT /v1/memory/:key/schema and the cortex activation ask the rule; a package install and a
- *   package migration registered a cortex's locks through services/component-registrar.ts, which
+ *   package migration registered a cortex's locks through services/component/registrar.ts, which
  *   asked only whether the same pattern was already held by somebody else
  *   (package-component-collisions.ts). So an account's own package set a node-wide lock (`**`), a lock
  *   over another organism's records, or a lock under another account's lock (secaudit2026nov08

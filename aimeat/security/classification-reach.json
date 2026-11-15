@@ -1286,13 +1286,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's system compliance records."
     },
-    "src/services/component-content.ts": {
+    "src/services/component/content.ts": {
       "reads": {
         "getMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Content for a model prompt passes useForAi in fetchComponentContentForAi; the other callers only hash it."
     },
-    "src/services/component-registrar.ts": {
+    "src/services/component/registrar.ts": {
       "reads": {
         "getMemory": 1
       },

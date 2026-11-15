@@ -72,7 +72,7 @@ import type {
 } from '../../../storage/interface.js';
 import {
     registerComponent, validateComponentContent, deleteComponent, computeHash,
-} from '../../component-registrar.js';
+} from '../../component/registrar.js';
 import { registeredNameFor, codeWriterOf } from './package-install.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { planInstanceUpdate } from './package-update-plan.js';

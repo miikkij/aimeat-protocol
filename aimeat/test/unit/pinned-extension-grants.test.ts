@@ -19,7 +19,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
-import { resolveExtensionForCall, snapshotExtensionVersion } from '../../src/services/component-versions.js';
+import { resolveExtensionForCall, snapshotExtensionVersion } from '../../src/services/component/versions.js';
 
 const SQLITE_PATH = `./test/.pinned-grants-${process.pid}.db`;
 let storage: Storage;

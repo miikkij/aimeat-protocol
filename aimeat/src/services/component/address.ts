@@ -1,5 +1,5 @@
 /**
- * @file src/services/component-address.ts
+ * @file src/services/component/address.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner is ADDED to extension and cortex names; every address that worked before
@@ -53,9 +53,9 @@
  *     ones, for the readers that try them after the address as written found nothing.
  *   v1.0.0 — 2026-10-25 — Initial (owner namespaces wish; secaudit2026oct22 leads 589 and 2827).
  */
-import type { Storage, ExtensionRecord, CortexExtensionRecord, CapabilityRecord } from '../storage/interface.js';
-import { isFreedRelease, type ComponentKind } from '../storage/types/component-versions.js';
-import { bundledCortexNames } from './cortex/seeder.js';
+import type { Storage, ExtensionRecord, CortexExtensionRecord, CapabilityRecord } from '../../storage/interface.js';
+import { isFreedRelease, type ComponentKind } from '../../storage/types/component-versions.js';
+import { bundledCortexNames } from '../cortex/seeder.js';
 
 /** The namespace of what the node ships: bundled cortexes (system@<node>) and built-in extensions (system). */
 export const SYSTEM_NAMESPACE = 'system';

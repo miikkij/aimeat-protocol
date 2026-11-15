@@ -70,12 +70,12 @@ import { cortexPublishAsk, fileCortexAsk } from './visibility.js';
 import type { DoorAsk, PublishGateInput } from '../publish-requests/door.js';
 import {
   snapshotCortexVersion, keptVersionRefusal, cortexCodeOf, cortexLibsAfterDeploy,
-} from '../component-versions.js';
+} from '../component/versions.js';
 import { logger } from '../../utils/logger.js';
 import {
   findCortex, ownComponent, placeCortexInstall, settleReclaimed, splitComponentAddress, shortNameOf,
-} from '../component-address.js';
-import { nodePrefixRefusal } from '../component-name-prefix.js';
+} from '../component/address.js';
+import { nodePrefixRefusal } from '../component/name-prefix.js';
 import { noteCortexHolderChange } from './holder-change.js';
 
 /** What an upsert did. `record` carries what the answer and lib_urls are built from. */
@@ -171,7 +171,7 @@ export async function upsertCortex(
       `This add-on is filed under "${parsed.namespace}", which belongs to somebody else. File it under "${ownerName}" or under "community" instead.`);
   }
 
-  // Which record the address names (services/component-address.ts): `<owner>/<name>` as written (or
+  // Which record the address names (services/component/address.ts): `<owner>/<name>` as written (or
   // the alias of a bare record its holder holds); a bare name is the bare record, as before (the
   // owner check below refuses another account's), else the caller's own `<caller>/<name>`.
   let existing = splitComponentAddress(address)

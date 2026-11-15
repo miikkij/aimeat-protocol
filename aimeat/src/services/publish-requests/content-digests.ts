@@ -25,7 +25,7 @@ import type { CortexExtensionRecord, Storage } from '../../storage/interface.js'
 import { resolveSkillRef, formatSkillRef } from '../skills.js';
 import { SkillAccessError } from '../skill/types.js';
 import { SkillValidationError } from '../skill/md.js';
-import { servedCortexLibs } from '../component-versions.js';
+import { servedCortexLibs } from '../component/versions.js';
 import { memoryValueDigest, type PublishStoreCtx } from './store.js';
 
 /** A user skill's version and the digest of its files now, read as its owner; null when there is none. */

@@ -97,7 +97,7 @@ import { recordCallDuration } from '../call-timing.js';
 import { countCapabilityCall } from '../capability-record.js';
 import { getEncryptionKey } from '../encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './secrets.js';
-import { resolveExtensionForCall } from '../component-versions.js';
+import { resolveExtensionForCall } from '../component/versions.js';
 import { readAdult, NOT_VERIFIED } from '../adult-assurance.js';
 import { activeSubscriptions } from '../../commerce/subscriptions.js';
 import { takeExtensionRunSlot, createRunQueue, SELLER_RUNS_PER_RUN } from './run-slots.js';
@@ -222,7 +222,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
   // A person registered to an app: the surface verified it and names its app (services/app-parties/iam-gate.ts).
   const party = caller.kind === 'party' ? args.party ?? null : null;
   if (caller.kind === 'party' && (!party || instanceId)) return PARTY_NOT_FOR_EXTENSION;
-  // A bare name is the bare record, else the caller's own extension of that name (services/component-address.ts).
+  // A bare name is the bare record, else the caller's own extension of that name (services/component/address.ts).
   // A party has no extensions of its own: a bare name reads as the app owner's, whose app it signed in to.
   const resolved = await resolveExtensionForCall(storage, args.extRef, party ? party.appOwner : caller.kind === 'anonymous' ? null : caller.owner);
   const extName = resolved.name;

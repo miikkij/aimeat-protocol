@@ -87,8 +87,8 @@ import { enforcePaywall, APP_TOOL_HEADER } from '../../services/extension-access
 import type { EmailService } from '../../services/email.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { invokeExtensionAction } from '../../services/extension/invoke.js';
-import { resolveExtensionForCall } from '../../services/component-versions.js';
-import { extensionCallTarget, addressSegment } from '../../services/component-address.js';
+import { resolveExtensionForCall } from '../../services/component/versions.js';
+import { extensionCallTarget, addressSegment } from '../../services/component/address.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { visitorRunShareKey } from '../../services/extension/run-slots.js';
 import { appPartyForExtensionCall, partyBearer } from '../../services/app-parties/iam-gate.js';
@@ -158,7 +158,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
   };
 
   /**
-   * Which extension and instance a path names (services/component-address.ts). Two segments: the
+   * Which extension and instance a path names (services/component/address.ts). Two segments: the
    * extension (a namespaced name arrives as one encoded segment, `alice%2Fweather`) and the action.
    * Three: the instance form (an encoded namespaced name in the first segment) and the literal
    * `<owner>/<name>/<action>` share it, and extensionCallTarget reads it in an order where a bare

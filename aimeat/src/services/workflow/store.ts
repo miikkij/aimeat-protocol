@@ -81,7 +81,7 @@ import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import { buildGAII, parseGEAI } from '../../utils/gaii.js';
 import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES } from '../../utils/reserved-keys.js';
 import { template } from './engine-util.js';
-import { findExtension } from '../component-address.js';
+import { findExtension } from '../component/address.js';
 import { triggerErrors, eventVarNames } from './workflow-event.js';
 import { missingStepScopes, stepScopeRefusal, saverFromCaller, WORKFLOW_AUTHORITY_VERSION, type WorkflowCaller } from './step-authority.js';
 import { shownRun, withoutObservedValues } from './run-redaction.js';
@@ -360,7 +360,7 @@ export async function validateWorkflow(
         // Refused at SAVE so the author is told while they are writing it rather than at 06:00 in a
         // run log. It is checked again at run time (services/extension/system-run.ts): `installedBy`
         // is decided at install, and a delete-and-reinstall by a different owner outlives this gate.
-        // The owner's own first (services/component-address.ts), as the run reads it.
+        // The owner's own first (services/component/address.ts), as the run reads it.
         const ext = await findExtension(storage, a.extension, ownerName, 'manage');
         if (!ext || ext.installedBy !== ownerName) {
           // Same wording either way: which extensions exist is not a stranger's business.

@@ -45,7 +45,7 @@ import { openPackage, readAllRows } from '../datapackage/store.js';
 import { trustedPackageOf } from '../datapackage/audience-record.js';
 import { fileCopyTargets, packageCopyTargets } from '../datapackage/source-labels.js';
 import { atPath } from '../workflow/engine-step-rows.js';
-import { findExtension } from '../component-address.js';
+import { findExtension } from '../component/address.js';
 import { logger } from '../../utils/logger.js';
 import { descriptionsOfJson, fieldTypeOfJson } from './sources-memory.js';
 import {

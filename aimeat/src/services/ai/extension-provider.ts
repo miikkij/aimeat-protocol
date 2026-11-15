@@ -34,7 +34,7 @@ import type { AiCapability, AiOp, ExtensionOpRunner } from './types.js';
 import type { AiProvider } from './providers.js';
 import { aiProviderDeclarationOf, type ExtensionAiProviderDeclaration } from '../extension/ai-provider-declaration.js';
 import { runExtensionActionAsSystem } from '../extension/system-run.js';
-import { findExtension } from '../component-address.js';
+import { findExtension } from '../component/address.js';
 import { waitExtensionRunSlot } from '../extension/run-slots.js';
 import { extensionWallClockMs } from '../extension/run-deadline.js';
 
@@ -55,7 +55,7 @@ function reachableHosts(config: AimeatConfig, decl: ExtensionAiProviderDeclarati
  */
 export async function assertOwnExtensionProvider(storage: Storage, config: AimeatConfig, ownerGhii: string, p: AiProvider): Promise<void> {
   const name = p.extension ?? '';
-  // The owner's own first (services/component-address.ts), as the unattended run reads it.
+  // The owner's own first (services/component/address.ts), as the unattended run reads it.
   const ext = name ? await findExtension(storage, name, localAccountName(ownerGhii), 'manage') : null;
   if (!ext) throw new AiCompletionError('EXTENSION_NOT_FOUND', 404, `No extension '${name}' is installed on this node. Install it first.`);
   if (ext.installedBy !== localAccountName(ownerGhii)) {

@@ -95,7 +95,7 @@ import {
     deleteComponent,
     fetchComponentContent,
     computeHash,
-} from '../../component-registrar.js';
+} from '../../component/registrar.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { componentCollision } from '../compose/package-component-collisions.js';
 import { packageCapabilities, type PackageCapabilities } from './package-capabilities.js';

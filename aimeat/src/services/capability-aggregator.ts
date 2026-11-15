@@ -50,7 +50,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord, CortexLibComponent, CortexPromptComponent } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { cortexLibPath } from './component-address.js';
+import { cortexLibPath } from './component/address.js';
 import { AppToolsDocSchema, type AppToolsDoc } from '../models/app-tool-schemas.js';
 import { OffersDocSchema, normalizeOfferPacing, TOLL_MORSELS_MAX, type Offer, type OffersDoc } from '../models/offer-schemas.js';
 

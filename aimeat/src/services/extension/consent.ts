@@ -43,7 +43,7 @@ export async function extensionConsentHolds(
   const installedAt = Date.parse(ext.installedAt);
   const consents = await storage.listConsents(ownerGhii, { status: 'active' });
   // The consent names the extension by its stored name, or a bare one through its holder's
-  // namespace (`ext:<holder>/<name>`, the alias services/component-address.ts reads).
+  // namespace (`ext:<holder>/<name>`, the alias services/component/address.ts reads).
   const patterns = new Set([`ext:${extName}`]);
   if (!extName.includes('/') && ext.installedBy) patterns.add(`ext:${ext.installedBy}/${extName}`);
   return consents.some(c => c.purpose === purpose

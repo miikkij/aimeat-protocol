@@ -133,7 +133,7 @@ import { runJobOp, assertAudioInReach, type JobOpOutcome } from './run-op.js';
 import { fileJobPictureRequest } from './picture-request.js';
 import { takeAiCallOnNode } from '../account-limits.js';
 import { emitAiJobFinished } from './finished-listeners.js';
-import { findExtension, namespacedName } from '../component-address.js';
+import { findExtension, namespacedName } from '../component/address.js';
 import { markStopped } from './restart.js';
 import { reclaimJobs, ADOPT_MS, type ReclaimDeps } from './reclaim.js';
 import { runGate, stillHeld } from './run-gate.js';
@@ -776,7 +776,7 @@ export class AiJobService implements AiJobStarter {
                 `on_done names an extension action this account cannot call: ${extensionName}/${actionId}.`);
         };
         if (!extensionName || !actionId) refuse();
-        // The account's own first (services/component-address.ts), as the unattended run reads it.
+        // The account's own first (services/component/address.ts), as the unattended run reads it.
         const ext = await findExtension(this.storage, extensionName, ownerName, 'manage');
         if (!ext) refuse();
         if (ext!.installedBy !== ownerName) refuse();

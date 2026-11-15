@@ -76,7 +76,7 @@ import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled } from '../se
 import { migrateLegacyOfferings } from '../services/exchange/projection-migrate.js';
 import { proposeDeliversData, packageIfaceApp, DATAPACKAGE_ACTION } from '../services/exchange/datapackage.js';
 import { logger } from '../utils/logger.js';
-import { findExtension, addressSegment } from '../services/component-address.js';
+import { findExtension, addressSegment } from '../services/component/address.js';
 import { dataListingRefusal } from '../services/data-intermediation/gate.js';
 import { offeringExtAction } from '../services/exchange/offering-action.js';
 
@@ -329,7 +329,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     // ── kind: ext-action (default) — the raw data-service surface ──
     const extAddress = str(b.ext), action = str(b.action);
     if (!extAddress || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
-    // The provider's own first (services/component-address.ts); the listing keeps the stored name.
+    // The provider's own first (services/component/address.ts); the listing keeps the stored name.
     const extRec = await findExtension(storage, extAddress, owner, 'manage');
     if (!extRec) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${extAddress}" not found`));
     if (extRec.installedBy !== owner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the extension owner may list it'));

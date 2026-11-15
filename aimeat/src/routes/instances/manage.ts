@@ -40,7 +40,7 @@ import {
   deleteComponent,
   fetchComponentContent,
   computeHash,
-} from '../../services/component-registrar.js';
+} from '../../services/component/registrar.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { logger } from '../../utils/logger.js';
 import { planInstanceUpdate } from '../../services/packages/install/package-update-plan.js';

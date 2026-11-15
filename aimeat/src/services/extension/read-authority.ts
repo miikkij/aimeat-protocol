@@ -38,7 +38,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { ExtensionRecord } from '../../storage/interface.js';
 import { isGEAI } from '../../utils/gaii.js';
-import { findExtension } from '../component-address.js';
+import { findExtension } from '../component/address.js';
 
 /** The two answers, as the API and the MCP tool take them. */
 export const READ_AUTHORITIES = ['owner', 'installer'] as const;
@@ -117,7 +117,7 @@ function summaryOf(authority: ReadAuthority, kind: ReadAuthorityView['installedB
 export async function readAuthorityOf(
   deps: { storage: Storage },
   name: string,
-  /** The caller's account: a bare name names their own extension of that name first (services/component-address.ts, 'manage'). */
+  /** The caller's account: a bare name names their own extension of that name first (services/component/address.ts, 'manage'). */
   callerOwner?: string | null,
 ): Promise<{ ext: ExtensionRecord; view: ReadAuthorityView } | null> {
   const ext = await findExtension(deps.storage, name, callerOwner, 'manage');

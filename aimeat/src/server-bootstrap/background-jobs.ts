@@ -55,7 +55,7 @@ import { onMemoryWrittenEvent, isRemoteEvent } from '../services/event-bus.js';
 import { seedCoreScheduledJobs } from '../services/job-seeding.js';
 import { backfillExtensionJobOwnerScope } from '../services/extension/schedules.js';
 import { backfillDependencyMap } from '../services/dependency-map.js';
-import { backfillComponentVersions } from '../services/component-versions.js';
+import { backfillComponentVersions } from '../services/component/versions.js';
 import { resumeOutbox } from '../services/outbox.js';
 import { startProcessLease } from '../services/process-lease.js';
 

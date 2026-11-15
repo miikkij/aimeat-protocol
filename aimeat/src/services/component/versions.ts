@@ -1,5 +1,5 @@
 /**
- * @file src/services/component-versions.ts
+ * @file src/services/component/versions.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Kept versions of extensions and cortexes, and the pinned address. Every install and
@@ -39,10 +39,10 @@
  *     the kept snapshot for every pin; nextFreeVersion() is the new version a PATCH takes.
  *   v1.0.0 — 2026-09-03 — Initial (versions, slice 2; brief doc-mtkr34qa1dg1).
  */
-import type { Storage, ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
-import type { ComponentKind, ComponentVersionSummary } from '../storage/types/component-versions.js';
-import { stableStringify } from '../utils/stable-json.js';
-import { findExtension, findCortex } from './component-address.js';
+import type { Storage, ExtensionRecord, CortexExtensionRecord } from '../../storage/interface.js';
+import type { ComponentKind, ComponentVersionSummary } from '../../storage/types/component-versions.js';
+import { stableStringify } from '../../utils/stable-json.js';
+import { findExtension, findCortex } from './address.js';
 
 /** A version an address can pin: a digit first, then letters, digits, dots, plus and minus. */
 const PINNABLE_VERSION = /^[0-9][A-Za-z0-9.+-]*$/;
@@ -197,7 +197,7 @@ export type ExtensionCallResolution =
  */
 export async function resolveExtensionForCall(storage: Storage, raw: string, callerOwner?: string | null): Promise<ExtensionCallResolution> {
   const { name: address, version } = splitPinnedName(raw);
-  // The address names the record (services/component-address.ts): `<owner>/<name>`, the alias of a
+  // The address names the record (services/component/address.ts): `<owner>/<name>`, the alias of a
   // bare record its holder holds, or a bare name (the bare record, else the caller's own). Everything after uses the
   // stored name, which is the extension's memory namespace and the key of its kept versions.
   const live = await findExtension(storage, address, callerOwner);

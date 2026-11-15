@@ -215,7 +215,7 @@ import { readerFor as contentReaderFor } from '../services/classification/reader
 import { createOrganismHelpers, type OrganismHelpers } from './organisms/shared.js';
 import { sharedPageAdmitsFile } from './organisms/share-file-pass.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../services/content-defaults.js';
-import { ownExtensionFileKey } from '../services/component-address.js';
+import { ownExtensionFileKey } from '../services/component/address.js';
 import { storageFilesListRouter, storePlaceOf } from './storage-files-list.js';
 import { storageDeleteRouter } from './storage-files-delete.js';
 import { partyPubReader } from './pub-party-read.js';

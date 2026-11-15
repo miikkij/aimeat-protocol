@@ -2,7 +2,7 @@
  * @file e2e-package-components.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The two component types services/component-registrar.ts handles that nothing ever
+ * @description The two component types services/component/registrar.ts handles that nothing ever
  *   installed: `msm` and `memory`. Each has three arms — register, fetch (which is what the instance
  *   status route hashes to decide whether somebody has edited an installed component) and delete —
  *   and none of the six was reached by a suite, so a package carrying either was untested from the

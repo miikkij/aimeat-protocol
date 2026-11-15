@@ -175,7 +175,7 @@ import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { installCortex } from '../services/cortex/lifecycle.js';
 import { upsertCortex } from '../services/cortex/upsert.js';
-import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component-versions.js';
+import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component/versions.js';
 import { handleStorageUpload, declaredFromMeta, completeDirectStorageUpload } from './upload-storage.js';
 import { handleSkillUpload } from './upload-skill.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
@@ -201,9 +201,9 @@ import { uploadPrincipalRefusal } from '../services/upload-principal.js';
 import { cortexAskedFields } from '../services/cortex/visibility.js';
 import { carryFirstUseKeep } from '../services/extension/first-use-keep.js';
 import { installRoleRefusal } from './extensions/permissions.js';
-import { placeExtensionInstall, settleReclaimed, isNamespacedName, findCortex, ownComponent } from '../services/component-address.js';
+import { placeExtensionInstall, settleReclaimed, isNamespacedName, findCortex, ownComponent } from '../services/component/address.js';
 import type { DoorAsk } from '../services/publish-requests/door.js';
-import { nodePrefixRefusal } from '../services/component-name-prefix.js';
+import { nodePrefixRefusal } from '../services/component/name-prefix.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -511,7 +511,7 @@ async function handleExtensionUpload(
     const wantUpdate = meta.update === true;
     const wantActivate = meta.activate === true;
 
-    // The record under that name, as before (services/component-address.ts): the bare record, else
+    // The record under that name, as before (services/component/address.ts): the bare record, else
     // the owner's own `<owner>/<name>`; a new install keeps its bare name unless another account released it.
     const { existing } = await placeExtensionInstall(storage, ownerName, record);
     if (existing && !wantUpdate) {
@@ -538,7 +538,7 @@ async function handleExtensionUpload(
         return;
     }
     // A new name with the node's prefix is kept for what the node ships next, as on the inline doors
-    // (services/component-name-prefix.ts). The operator answer is asked as the cortex ZIP asks it.
+    // (services/component/name-prefix.ts). The operator answer is asked as the cortex ZIP asks it.
     if (!existing) {
         const prefixed = await nodePrefixRefusal(storage, 'extension', record.name, { ownerName, isOperator: await uploaderIsOperator(storage, sub) });
         if (prefixed) { res.status(prefixed.status).json({ success: false, error: prefixed.code, message: prefixed.message }); return; }
@@ -691,7 +691,7 @@ async function handleCortexUpload(
     // an inline manifest and is refused as a ZIP.
     const isOperator = await uploaderIsOperator(storage, sub);
 
-    // The cortex under that name (services/component-address.ts): `<owner>/<name>` as written, or for
+    // The cortex under that name (services/component/address.ts): `<owner>/<name>` as written, or for
     // a bare manifest name the bare record as before, else the uploader's own of that name.
     const existing = isNamespacedName(incoming.name)
         ? await findCortex(storage, incoming.name)

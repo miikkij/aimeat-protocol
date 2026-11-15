@@ -48,7 +48,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
-import { namespacedName } from './component-address.js';
+import { namespacedName } from './component/address.js';
 import { writeMemoryRecord, type MemoryWriteResult } from './memory/write.js';
 import { getTemplateProposal, templateProposalKey } from './app/template-proposals.js';
 import { CAS_ATTEMPTS } from './record-cas.js';
@@ -141,7 +141,7 @@ export async function attachContributionProof(
         // Owner gate: the community pack is the caller's own ACTIVE + PUBLIC cortex with a lib.
         const all = await storage.listCortexExtensions({ status: 'active' });
         // The owner names their own pack by its short name or its stored `<owner>/<name>`
-        // (services/component-address.ts); the ledger is keyed by the stored name, the pack's id.
+        // (services/component/address.ts); the ledger is keyed by the stored name, the pack's id.
         const ext = all.find(e => e.name === input.subjectId)
             ?? all.find(e => e.name === namespacedName(who.owner, input.subjectId));
         if (!ext || ext.visibility !== 'public' || !ext.components.some(c => c.type === 'lib')) {

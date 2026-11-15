@@ -75,7 +75,7 @@
       "digest": "sha256:9747814e64e873a3558a2e5d"
     },
     "06-ai-and-models.md": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/ai/adapters/index.ts",
         "aimeat/src/services/ai/adapters/sdk.ts",
@@ -84,7 +84,7 @@
         "aimeat/src/services/ai/openrouter-region.ts",
         "aimeat/src/services/ai/node-model-rules.ts"
       ],
-      "digest": "sha256:a62a036b467154d6f2ada06e"
+      "digest": "sha256:83ed49c991f52a003e3acd58"
     },
     "07-security.md": {
       "reviewedOn": "2026-11-15",
@@ -224,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:217b4e4e1415e39280915bca"
+      "digest": "sha256:87c1aecc2983667f1d01cc9d"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -331,7 +331,7 @@
       "aimeat/src/services/ai/adapters/index.ts": "65c67e56fbf43ea3",
       "aimeat/src/services/ai/adapters/sdk.ts": "b7c86872fb7946c4",
       "aimeat/src/services/ai/types.ts": "0f3be25098513231",
-      "aimeat/src/services/ai/providers.ts": "c29eccab82bab4cd",
+      "aimeat/src/services/ai/providers.ts": "8567ca45d7c6d5ad",
       "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c",
       "aimeat/src/services/ai/node-model-rules.ts": "270cb40ab665ef61"
     },
@@ -431,7 +431,7 @@
       "aimeat/src/mcp/legacy-sessions.ts": "00cf232e02a68804",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
-      "aimeat/src/services/ai-jobs/service.ts": "06340723df80d48f",
+      "aimeat/src/services/ai-jobs/service.ts": "65856dffde6f85af",
       "aimeat/src/services/config/apply.ts": "2c0879b78ab957cd",
       "aimeat/src/services/operator/access-audit.ts": "860e3714562dbd91",
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",

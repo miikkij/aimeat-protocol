@@ -73,7 +73,7 @@ import { integerMicros, percentFee } from './money.js';
 import { readSplit } from './beneficiary-split.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { membersOnlyRefusal, membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
-import { findBackingCapability, addressSegment } from '../services/component-address.js';
+import { findBackingCapability, addressSegment } from '../services/component/address.js';
 
 /** Core 'pacing-pack' kind (pacing-pack.ts), re-exported so the route loader registers every core kind from one module. */
 export { pacingPackSellableResolver } from './pacing-pack.js';
@@ -311,7 +311,7 @@ export function appToolSellableResolver(): SellableResolver {
             const { createFulfillmentTask } = await import('./fulfillment.js');
             return { taskId: await createFulfillmentTask(ctx.storage, session, item, taskAssignee) };
           }
-          // The seller's own extension by a bare name is still theirs (services/component-address.ts).
+          // The seller's own extension by a bare name is still theirs (services/component/address.ts).
           const cap = await findBackingCapability(ctx.storage, actionId, sellerOwner);
           if (!cap) {
             throw new CommerceError('CAPABILITY_NOT_FOUND', 404, `Backing capability not found: ${actionId}`);

@@ -474,7 +474,7 @@ export const EXT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
 
 /**
  * An extension's address: the name, or `<owner>/<name>`, which is how an install is stored since
- * names live in the owner's namespace (services/component-address.ts). The slash is the one
+ * names live in the owner's namespace (services/component/address.ts). The slash is the one
  * separator the address adds; `.` and `:` stay out, so the memory namespace keeps its meaning.
  */
 export const EXT_ADDRESS_PATTERN = /^(?:[a-z0-9][a-z0-9-]{0,62}[a-z0-9]\/)?[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;

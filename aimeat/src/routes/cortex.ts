@@ -85,8 +85,8 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { cortexDetail, cortexSource } from '../services/cortex/read.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { heldForRequest } from '../services/cortex/holder-change.js';
-import { resolveCortexLib, listVersions } from '../services/component-versions.js';
-import { findCortex } from '../services/component-address.js';
+import { resolveCortexLib, listVersions } from '../services/component/versions.js';
+import { findCortex } from '../services/component/address.js';
 import { cortexOntologyToSkos } from '../services/cortex/ontology-skos.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { callerOf as requestCaller } from '../middleware/caller.js';
@@ -500,7 +500,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // of that version, while the bare name keeps serving the latest. An app built against one version
   // keeps loading it after the cortex moves on.
   // `/v1/cortex/<owner>/<name>/libs/<file>` is the same file of a cortex named `<owner>/<name>`
-  // (services/component-address.ts): four segments, which no other cortex route has.
+  // (services/component/address.ts): four segments, which no other cortex route has.
   const serveLib = async (req: Request, res: Response, raw: string): Promise<void> => {
     const libFile = req.params.libFile as string;
 

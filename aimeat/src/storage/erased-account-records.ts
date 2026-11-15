@@ -98,7 +98,7 @@ export const ERASED_ACCOUNT_RECORDS: readonly ErasedAccountRecordRule[] = [
   { pg: 'RealtimeRoom', sqlite: 'realtime_rooms', column: 'createdBy', action: 'pseudonymise' },
   { pg: 'SubdomainSite', sqlite: 'subdomain_sites', column: 'createdBy', action: 'pseudonymise' },
   // A released bare extension or cortex name: only its holder reinstalls under it, so the next holder
-  // of the account name must not inherit it (services/component-address.ts).
+  // of the account name must not inherit it (services/component/address.ts).
   { pg: 'ReleasedComponentName', sqlite: 'released_component_names', column: 'holder', action: 'pseudonymise' },
 ];
 

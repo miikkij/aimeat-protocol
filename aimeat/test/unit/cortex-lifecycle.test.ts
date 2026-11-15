@@ -28,7 +28,7 @@ import { describe, it, expect } from 'vitest';
 import {
     installCortex, activateCortex, deactivateCortex, deleteCortex, libsWithoutContent,
 } from '../../src/services/cortex/lifecycle.js';
-import { deleteComponent } from '../../src/services/component-registrar.js';
+import { deleteComponent } from '../../src/services/component/registrar.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, CortexExtensionRecord } from '../../src/storage/interface.js';
 

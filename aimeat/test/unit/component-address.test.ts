@@ -2,7 +2,7 @@
  * @file component-address.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Extension and cortex names live in the owner's namespace (services/component-address.ts;
+ * @description Extension and cortex names live in the owner's namespace (services/component/address.ts;
  *   wish wish-cortex-and-extension-names-live-in-the-owner-s-namespace, secaudit2026oct22 leads 589
  *   and 2827). The node cannot make a bare name any more, so a bare record is written straight into
  *   storage here, as one installed before the change: its holder's namespace reaches it as an alias,
@@ -26,7 +26,7 @@ import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
 import {
     splitComponentAddress, findExtension, findCortex, installNameFor, placeExtensionInstall, extensionCallTarget,
     cortexLibPath, idStemOf, settleReclaimed, ownExtensionFileKey, ownExtensionMemoryOwner, withOwnerFields,
-} from '../../src/services/component-address.js';
+} from '../../src/services/component/address.js';
 import { uninstallExtension } from '../../src/services/extension/lifecycle.js';
 
 requirePostgresWhenAsked('component-address');

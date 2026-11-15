@@ -89,7 +89,7 @@ import { mergeOdpsExtras, mergeProvenance, inheritAiProvenance, offeringOdpsOver
 import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './source-terms.js';
 import type { ReconcileChange, ReconcileReport, DesiredListing } from './projection-types.js';
 import { logger } from '../../utils/logger.js';
-import { findExtension } from '../component-address.js';
+import { findExtension } from '../component/address.js';
 import { dataListingRefusal } from '../data-intermediation/gate.js';
 import { desiredFromDataPackages } from './projection-datapackage.js';
 import { proposeDeliversData } from './datapackage.js';

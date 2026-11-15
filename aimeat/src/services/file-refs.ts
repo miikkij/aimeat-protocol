@@ -58,7 +58,7 @@ import { generateDownloadToken } from './download-token.js';
 import { fileTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
 import { packageFileHiddenBySourceLabel } from './datapackage/source-labels.js';
-import { ownExtensionFileKey } from './component-address.js';
+import { ownExtensionFileKey } from './component/address.js';
 import { localAccountName } from '../utils/gaii.js';
 import type { MailboxReader } from './owner/mailbox-reads.js';
 import { mailboxAttachmentReadable } from './mailbox/attachment-read.js';
@@ -153,7 +153,7 @@ export async function resolveFileRef(
 
     let file = await storage.getStorageFile(gaii, key);
     // The account's own extension named by its short name (`ext/weather/...` for `alice/weather`) is
-    // stored under `ext/alice/weather/...` (services/component-address.ts). Read so for the account
+    // stored under `ext/alice/weather/...` (services/component/address.ts). Read so for the account
     // and its agents only, and only when the key as written names no file.
     const account = localAccountName(gaii);
     if (!file && accessor.owner === account) {

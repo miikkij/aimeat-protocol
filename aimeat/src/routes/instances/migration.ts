@@ -40,7 +40,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { fetchComponentContentForAi } from '../../services/component-content.js';
+import { fetchComponentContentForAi } from '../../services/component/content.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { ClassificationError } from '../../services/classification/labels.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';

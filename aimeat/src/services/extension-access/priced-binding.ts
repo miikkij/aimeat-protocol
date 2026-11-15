@@ -48,7 +48,7 @@ import type { Storage } from '../../storage/interface.js';
 import { AppToolsDocSchema, isToolOffered, isToolPriced, toolTollMorsels } from '../../models/app-tool-schemas.js';
 import { cached, TTL } from '../cache.js';
 import { logger } from '../../utils/logger.js';
-import { shortNameOf } from '../component-address.js';
+import { shortNameOf } from '../component/address.js';
 
 /** The app-tool an extension action is sold as. */
 export interface PricedBinding {
@@ -79,7 +79,7 @@ export async function pricedAppToolsFor(
 ): Promise<PricedBinding[]> {
   const binding = `ext:${extName}:${actionId}`;
   // The owner's own manifests may name their own namespaced extension by its short name: that binding
-  // sells the same action (services/component-address.ts findBackingCapability reads it so).
+  // sells the same action (services/component/address.ts findBackingCapability reads it so).
   const bindings = new Set([binding, `ext:${shortNameOf(extName)}:${actionId}`]);
   try {
     return await cached(`pricedbinding:${ownerGhii}:${binding}`, TTL.dashboard, async () => {

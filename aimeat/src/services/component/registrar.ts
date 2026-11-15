@@ -1,5 +1,5 @@
 /**
- * @file component-registrar.ts
+ * @file src/services/component/registrar.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Service for registering, deleting, and fetching package components
@@ -13,7 +13,7 @@
  *   - computeHash() — SHA-256 hash utility
  *   - ComponentRegistrationResult — result type
  * @usage
- *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
+ *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from './registrar.js';
  * @version-history
  *   2026-11-08 — A cortex component's schema parts ask the schema lock rule (package-schema-lock.ts)
  *     as the installer (`lockCaller`), before the first write and on a dry run (secaudit2026nov08 round 14).
@@ -87,34 +87,34 @@
  */
 
 import { createHash } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from './extension/manifest.js';
-import { aggregateExtensionNow } from './capability-aggregator.js';
+import type { AimeatConfig } from '../../config.js';
+import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from '../extension/manifest.js';
+import { aggregateExtensionNow } from '../capability-aggregator.js';
 import YAML from 'yaml';
-import type { Storage, PackageComponentType, CortexComponent, CortexActivationArtifacts } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
-import { parseBundledCrews } from './app/bundled-crews.js';
-import { validateCortexAgents } from '../models/crew-def-schemas.js';
-import { publishApp } from './app/publish.js';
-import { putProgramMap } from './data-map/data-map-access.js';
-import { installPackageAppTools } from './packages/install/package-app-tools.js';
-import { forgetDependencies, appRef } from './dependency-map.js';
-import { removeCortex } from './cortex/lifecycle.js';
-import { holdAppLabels } from './held-app-labels.js';
-import { odpsWriteRefusal, extensionOdpsKey } from './exchange/odps-write.js';
-import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './packages/install/package-memory-component.js';
-import { writeAppConfigValues, type AppConfigValues } from './app/config.js';
-import { mergeExtensionConfig } from './packages/compose/package-config.js';
-import { registerSkillComponent, deleteSkillComponent } from './packages/install/package-skill-component.js';
-import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from './packages/compose/package-component-collisions.js';
-import { cortexLockRuleRefusal, ownerLockCaller } from './packages/install/package-schema-lock.js';
-import type { SchemaLockCaller } from './schema-lock-rule.js';
-import { rewriteComponentRefs } from './component-ref-rewrite.js';
-import { releaseBareName } from './component-address.js';
-import { installRoleRefusal } from './extension/install-role.js';
-import { EXTENSION_CODE_HOLD_KEY, askOperatorsForExtensionCode, requesterFromPrincipal } from './extension/code-hold.js';
-import { csmVisibilityDefault } from './content-defaults.js';
+import type { Storage, PackageComponentType, CortexComponent, CortexActivationArtifacts } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { parseBundledCrews } from '../app/bundled-crews.js';
+import { validateCortexAgents } from '../../models/crew-def-schemas.js';
+import { publishApp } from '../app/publish.js';
+import { putProgramMap } from '../data-map/data-map-access.js';
+import { installPackageAppTools } from '../packages/install/package-app-tools.js';
+import { forgetDependencies, appRef } from '../dependency-map.js';
+import { removeCortex } from '../cortex/lifecycle.js';
+import { holdAppLabels } from '../held-app-labels.js';
+import { odpsWriteRefusal, extensionOdpsKey } from '../exchange/odps-write.js';
+import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from '../packages/install/package-memory-component.js';
+import { writeAppConfigValues, type AppConfigValues } from '../app/config.js';
+import { mergeExtensionConfig } from '../packages/compose/package-config.js';
+import { registerSkillComponent, deleteSkillComponent } from '../packages/install/package-skill-component.js';
+import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from '../packages/compose/package-component-collisions.js';
+import { cortexLockRuleRefusal, ownerLockCaller } from '../packages/install/package-schema-lock.js';
+import type { SchemaLockCaller } from '../schema-lock-rule.js';
+import { rewriteComponentRefs } from './ref-rewrite.js';
+import { releaseBareName } from './address.js';
+import { installRoleRefusal } from '../extension/install-role.js';
+import { EXTENSION_CODE_HOLD_KEY, askOperatorsForExtensionCode, requesterFromPrincipal } from '../extension/code-hold.js';
+import { csmVisibilityDefault } from '../content-defaults.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -788,4 +788,4 @@ export async function deleteComponent(
 }
 
 // ── Fetch component content ── moved to component-content.ts (max-file-lines), re-exported here
-export { fetchComponentContent } from './component-content.js';
+export { fetchComponentContent } from './content.js';

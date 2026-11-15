@@ -125,7 +125,7 @@ import { paceFreeToolUse } from '../commerce/app-tool-catalog.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { pacingReceipt } from '../services/metered-settlement.js';
 import { appToolBindingRefusal } from '../services/capability-invoke.js';
-import { findBackingCapability } from '../services/component-address.js';
+import { findBackingCapability } from '../services/component/address.js';
 
 /** An app tool's binding, resolved for one call: the capability it runs and the interface version it was pinned at. */
 interface BoundTool { cap: CapabilityRecord; pinnedVersion: number | undefined; providerGhii: string }
@@ -226,7 +226,7 @@ export function registerExchangeRunTools(
                 const iface = pinnedVersion ? await getInterfaceVersion(storage, providerGhii, app, tool, pinnedVersion) : null;
                 const binding = iface?.binding ?? toolDef.action_id ?? null;
                 if (!binding) return { statusCode: 422, code: 'TOOL_NOT_INVOKABLE', message: 'this tool has no capability binding to invoke' };
-                // A bare binding names the app owner's own extension (services/component-address.ts).
+                // A bare binding names the app owner's own extension (services/component/address.ts).
                 const cap = await findBackingCapability(storage, binding, ownerName);
                 if (!cap) return { statusCode: 404, code: 'CAPABILITY_NOT_FOUND', message: `backing capability not found (${binding})` };
                 const misbound = appToolBindingRefusal(cap, ownerName, `${ownerName}/${app}`, tool);

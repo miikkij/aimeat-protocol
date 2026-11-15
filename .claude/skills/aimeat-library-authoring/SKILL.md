@@ -15,7 +15,7 @@ mistake, so start by naming which one you are writing.
 | **Extension** | the node, QuickJS WASM sandbox | manifest + `scripts/` | `/v1/ext/<name>/<action>`, or exactly `/v1/ext/<owner>%2F<name>/<action>` |
 | **Library pack** | the browser (vendored third-party) | `public/lib/` + registry entry | `/lib/<name>@<major>.js` |
 
-**The owner is part of the address too** (since 2026-10-25, `src/services/component-address.ts`):
+**The owner is part of the address too** (since 2026-10-25, `src/services/component/address.ts`):
 every bare address keeps working, and answers keep `name` and add `owner` and `full_name`. A name
 another account removed is retired: the next install by someone else lands as `<owner>/<name>`, and
 only the full address reaches it. Two accounts holding the same name make the bare name answer 409

@@ -1,5 +1,5 @@
 /**
- * @file component-ref-rewrite.ts
+ * @file src/services/component/ref-rewrite.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Rewrite the hardcoded cortex and extension names in an app's HTML or a cortex lib's
@@ -7,7 +7,7 @@
  *   component-registrar.ts for both kinds of content at install time.
  *
  *   An author's own cortex or extension installed since 2026-10-25 is named `<owner>/<name>`
- *   (services/component-address.ts), so the author's app loads it as `/v1/cortex/<owner>/<name>/libs/`
+ *   (services/component/address.ts), so the author's app loads it as `/v1/cortex/<owner>/<name>/libs/`
  *   or `/v1/cortex/<owner>%2F<name>/...`, calls `/v1/ext/<owner>%2F<name>/...` or
  *   `/v1/ext/<owner>/<name>/<action>`, and reads `ext:<owner>/<name>`. The package carries the short
  *   name from the manifest, so each pattern takes an optional owner part before it, and the whole

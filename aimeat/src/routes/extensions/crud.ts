@@ -87,7 +87,7 @@ import { dependencyIndex, visibleAppRefs, usedBySummary } from '../../services/d
 import {
   listVersions, isPinnableVersion, nextFreeVersion, keptVersionRefusal, versionExistsRefusal, extensionCodeOf,
   snapshotExtensionVersion,
-} from '../../services/component-versions.js';
+} from '../../services/component/versions.js';
 import { buildExtensionRecordFromManifest } from '../../services/extension/manifest.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { hasExtWritePermission, mayManageInstalledExt, extWriteRefusalText, codeWriteRefusalText } from './permissions.js';
@@ -98,7 +98,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { workspaceDeclarationOf } from '../../services/extension/workspace-declaration.js';
 import {
   findExtension, ownComponent, placeExtensionInstall, installNameFor, splitComponentAddress, shortNameOf, addressSegment, withOwnerFields,
-} from '../../services/component-address.js';
+} from '../../services/component/address.js';
 
 /**
  * The record as a write door answers with it: secret config fields masked and the __secretKeys
@@ -107,7 +107,7 @@ import {
  */
 function shownExtension<T extends { name: string; installedBy?: string; config?: Record<string, unknown> } | null | undefined>(ext: T): T {
   if (!ext) return ext;
-  // `name` as the manifest gives it, plus `owner` and `full_name` (services/component-address.ts).
+  // `name` as the manifest gives it, plus `owner` and `full_name` (services/component/address.ts).
   return { ...withOwnerFields(ext), config: maskSecretFields(ext.config, getExtSecretKeys(ext as unknown as Parameters<typeof getExtSecretKeys>[0])) };
 }
 
@@ -135,7 +135,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const { visible } = await visibleAppRefs(storage, req.auth?.owner ? `${req.auth.owner}@${config.nodeId}` : undefined);
       res.json(success(config.nodeId, {
         extensions: extensions.map(ext => ({
-          // `name` as the manifest gives it, plus `owner` and `full_name` (services/component-address.ts).
+          // `name` as the manifest gives it, plus `owner` and `full_name` (services/component/address.ts).
           ...(({ name, owner, full_name }) => ({ name, owner, full_name }))(withOwnerFields(ext)),
           version: ext.version,
           description: ext.description,
@@ -232,7 +232,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
       const record = built.record;
 
-      // The stored name lives in the installer's namespace (services/component-address.ts): the
+      // The stored name lives in the installer's namespace (services/component/address.ts): the
       // owner's own extension of this name if they have one, else `<owner>/<name>`, or a bare name
       // they released and take back.
       // POST never replaces an installed extension; PUT is the door for a redeploy. The check stays
@@ -290,7 +290,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const { manifest: manifestYaml, scripts } = req.body as { manifest?: string; scripts?: Record<string, string> };
       // The record under that name, as before: a bare name is the bare record (whoever holds it; the
       // owner check below refuses another account's), else the caller's own `<caller>/<name>`; a full
-      // `<owner>/<name>` is that record or the alias of a bare one (services/component-address.ts).
+      // `<owner>/<name>` is that record or the alias of a bare one (services/component/address.ts).
       const callerOwner = req.auth!.owner as string;
       const target = splitComponentAddress(address);
       const existing = target

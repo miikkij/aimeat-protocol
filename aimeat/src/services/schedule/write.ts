@@ -112,7 +112,7 @@ import { scheduleFileDenial } from './file-access.js';
 import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './gate.js';
 import { scheduleIntervalRefusal, scheduleCountRefusal } from './load-limits.js';
 import { isKeptExtensionSchedule } from './extension-keep.js';
-import { findExtension } from '../component-address.js';
+import { findExtension } from '../component/address.js';
 import { aiScheduleInputRefusal } from './ai-read.js';
 import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './instruction-hold.js';
 import type { Scheduler, JobOutcome } from '../scheduler.js';
@@ -487,7 +487,7 @@ export async function createScheduleRecord(
         if (!extensionName || !actionId) {
             return { ok: false, status: 400, code: 'INVALID_EXTENSION_JOB', message: 'extension_name and action_id are required for extension schedules' };
         }
-        // The caller's own first (services/component-address.ts); the job keeps the stored name.
+        // The caller's own first (services/component/address.ts); the job keeps the stored name.
         const ext = await findExtension(storage, extensionName, caller.owner, 'manage');
         if (!ext) return { ok: false, status: 404, code: 'EXTENSION_NOT_FOUND', message: `Extension "${extensionName}" not found` };
         // Only the extension's own owner may put its actions on a clock. The scheduler runs an action as

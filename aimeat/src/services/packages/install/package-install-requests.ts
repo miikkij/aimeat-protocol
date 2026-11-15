@@ -58,7 +58,7 @@ import {
     applyInstanceMigration, updateInstanceToLatest, MIGRATION_ACTIONS,
     type MigrationRequest, type PackageMigrateInput, type PackageMigrateResult, type InstanceUpdateResult,
 } from './package-migrate.js';
-import { fetchComponentContent } from '../../component-registrar.js';
+import { fetchComponentContent } from '../../component/registrar.js';
 import { recordAccountEvent } from '../../account-events.js';
 import { emitChange } from '../../event-bus.js';
 import { resolveGhii } from '../../../utils/ghii-resolver.js';

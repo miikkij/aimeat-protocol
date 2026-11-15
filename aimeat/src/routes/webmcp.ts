@@ -106,7 +106,7 @@ import { logger } from '../utils/logger.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { recordAccountEvent, recordFirstUse } from '../services/account-events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
-import { findBackingCapability } from '../services/component-address.js';
+import { findBackingCapability } from '../services/component/address.js';
 import { buildAppAgentSurface } from '../services/app/agent-surface.js';
 import { appHiddenFromPublicSurfaces } from '../services/app/ai-use.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai/provenance-marks.js';
@@ -416,7 +416,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(422).json(error(config.nodeId, 'TOOL_NOT_INVOKABLE', 'This tool declares no price and no capability binding; nothing to invoke'));
         return;
       }
-      // The app owner's own extension by a bare name is still theirs (services/component-address.ts).
+      // The app owner's own extension by a bare name is still theirs (services/component/address.ts).
       const cap = await findBackingCapability(storage, tool.action_id, ownerName);
       if (!cap) {
         res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${tool.action_id}`));

@@ -40,7 +40,7 @@
  *     (Library Acceleration Program, Phase 1).
  */
 import { Router } from 'express';
-import { cortexLibPath } from '../services/component-address.js';
+import { cortexLibPath } from '../services/component/address.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';

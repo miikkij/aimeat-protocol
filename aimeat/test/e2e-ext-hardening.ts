@@ -422,7 +422,7 @@ async function run() {
 
   // ── 3c. The other door into the same room ──────────────────────────────────────────────────
   await test('a package migration cannot register an extension past the manifest gates', async () => {
-    // services/component-registrar.ts had its own manifest→ExtensionRecord builder, so a component
+    // services/component/registrar.ts had its own manifest→ExtensionRecord builder, so a component
     // registered through the package flow skipped everything routes/extensions/manifest.ts checks.
     // That was not only package content: apply-migration takes `content` from the request body under
     // `custom` and `replace`, gated on owning the INSTANCE and nothing about what is inside. So the

@@ -17,8 +17,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
-import { installNameFor } from '../../src/services/component-address.js';
-import { deleteComponent } from '../../src/services/component-registrar.js';
+import { installNameFor } from '../../src/services/component/address.js';
+import { deleteComponent } from '../../src/services/component/registrar.js';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { FREED_RELEASE_PREFIX } from '../../src/storage/types/component-versions.js';
 

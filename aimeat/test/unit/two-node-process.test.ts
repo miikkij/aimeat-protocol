@@ -299,7 +299,7 @@ vi.mock('../../src/services/extension/schedules.js', async (importOriginal) => (
 vi.mock('../../src/services/dependency-map.js', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), backfillDependencyMap: async () => {},
 }));
-vi.mock('../../src/services/component-versions.js', async (importOriginal) => ({
+vi.mock('../../src/services/component/versions.js', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), backfillComponentVersions: async () => {},
 }));
 

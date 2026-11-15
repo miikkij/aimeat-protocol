@@ -112,7 +112,7 @@ import { invokeExtensionAction } from '../services/extension/invoke.js';
 import { capabilitiesOfRecord } from '../services/extension/capability-declaration.js';
 import { canManageExtensionAs, type ExtensionCaller } from '../services/extension-access/manage.js';
 import { installRoleRefusal } from '../services/extension/install-role.js';
-import { findExtension, placeExtensionInstall } from '../services/component-address.js';
+import { findExtension, placeExtensionInstall } from '../services/component/address.js';
 import { isOperatorCaller } from '../services/operator/override.js';
 import { codeHoldRefusal, takeHoldOff } from '../services/extension/code-hold.js';
 import {
@@ -414,7 +414,7 @@ export function registerExtensionsTools(
             const record = built.record;
             const scheduler = nodeContext().scheduler;
 
-            // The record under that name, as before (services/component-address.ts): the bare record,
+            // The record under that name, as before (services/component/address.ts): the bare record,
             // whoever holds it (the owner check below refuses another account's), else the caller's
             // own `<owner>/<name>`; a new install keeps its bare name unless another account
             // released it.

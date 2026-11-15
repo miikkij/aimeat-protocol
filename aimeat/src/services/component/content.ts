@@ -1,9 +1,9 @@
 /**
- * @file services/component-content.ts
+ * @file src/services/component/content.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The current content of one installed package component, as the string its hash is
- *   taken over. Moved unchanged out of services/component-registrar.ts, which had reached the
+ *   taken over. Moved unchanged out of services/component/registrar.ts, which had reached the
  *   800-line limit, and re-exported from there so no importer changes.
  * @structure fetchComponentContent(storage, type, registeredAs, ownerGaii) ·
  *   componentContentTargets(storage, type, registeredAs, ownerGaii) ·
@@ -17,11 +17,11 @@
  *     fetchComponentContent is unchanged: its other callers only hash the content.
  *   v1.0.0 — 2026-09-28 — Pure extraction from services/component-registrar.ts (max-file-lines).
  */
-import type { Storage, PackageComponentType, ContentLabelTarget } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { memoryTarget } from './classification/labels.js';
-import type { ContentReader } from './classification/reader.js';
-import { fetchSkillComponentContent, skillFileTargets } from './packages/install/package-skill-component.js';
+import type { Storage, PackageComponentType, ContentLabelTarget } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { memoryTarget } from '../classification/labels.js';
+import type { ContentReader } from '../classification/reader.js';
+import { fetchSkillComponentContent, skillFileTargets } from '../packages/install/package-skill-component.js';
 
 // ── Fetch component content ──────────────────────────────────────────
 

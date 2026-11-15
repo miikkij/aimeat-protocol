@@ -93,7 +93,7 @@ import { ecosystemCallRefusal } from './eco-capability-approvals.js';
 import { personalSignInCapabilityRefusal } from './mcp-client/capability-consent.js';
 import { takesPersonalSignIn } from '../models/mcp-server-schemas.js';
 import { splitExtensionRef } from './capability-extension-ref.js';
-import { resolveExtensionForCall } from './component-versions.js';
+import { resolveExtensionForCall } from './component/versions.js';
 import { logger } from '../utils/logger.js';
 
 export interface InvokeResult {
@@ -245,7 +245,7 @@ export async function invokeCapability(
       // installed and are encoded into the path.
       const segments = splitExtensionRef(capability.source.ref);
       // The ref is the registrant's: a bare name in it is the bare record, else the registrant's own
-      // extension of that name (services/component-address.ts). The request below carries the stored
+      // extension of that name (services/component/address.ts). The request below carries the stored
       // name, so the route reads the same record and never the caller's own of that name.
       const resolved = segments
         ? await resolveExtensionForCall(storage, segments.pinned, localAccountName(registrantOwnerGhii(capability.ownerGhii, config.nodeId)))

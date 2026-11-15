@@ -30,7 +30,7 @@ import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { isSameAccount } from '../utils/same-account.js';
 import { getCarryPlan, getMember } from './app/members.js';
-import { findBackingCapability } from './component-address.js';
+import { findBackingCapability } from './component/address.js';
 
 /** What the caller is told, on every route. Nothing has been charged when it is said. */
 export const MEMBERS_ONLY_MESSAGE =

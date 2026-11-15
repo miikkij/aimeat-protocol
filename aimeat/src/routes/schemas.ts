@@ -57,7 +57,7 @@ import { resolveIdentity, parseGAII, isOwnerInPerson } from '../utils/gaii.js';
 /**
  * Whether the caller is the principal that set a lock. A lock set on this route stores the token's
  * `sub`, which is the bare account name for an owner in person; a lock a package installed in the
- * owner's name stores the GHII (services/component-registrar.ts). Both spellings are the same
+ * owner's name stores the GHII (services/component/registrar.ts). Both spellings are the same
  * person, so both are the caller's own. An agent's `sub` and resolved identity are the same GAII, so
  * an agent still matches only its own locks (DATA-15: the exact principal that set it).
  *

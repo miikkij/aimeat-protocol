@@ -34,7 +34,7 @@ import { requireOwnerPrincipal } from '../../auth/account-security.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { mayManageInstalledExt } from './permissions.js';
-import { findExtension } from '../../services/component-address.js';
+import { findExtension } from '../../services/component/address.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { describeReadAuthority, readAuthorityPayload, setReadAuthority, READ_AUTHORITIES, type ReadAuthority } from '../../services/extension/read-authority.js';
 

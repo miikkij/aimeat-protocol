@@ -56,7 +56,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { denyScope403 } from '../../auth/deny.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 import { isOrganismVisibilityWord } from '../../utils/visibility-words.js';
-import { ownExtensionMemoryOwner } from '../../services/component-address.js';
+import { ownExtensionMemoryOwner } from '../../services/component/address.js';
 import { toolsManifestHiddenFrom } from '../../services/app/tools-manifest-reach.js';
 
 export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): void {
@@ -87,7 +87,7 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
     }
 
     // A signed-in account that names its own extension's memory by the short name, `ext:weather`
-    // for `alice/weather`, reads `ext:alice/weather` (services/component-address.ts), as its calls do.
+    // for `alice/weather`, reads `ext:alice/weather` (services/component/address.ts), as its calls do.
     const signedIn = !!req.auth?.owner && !isAnonymousPrincipal(req.auth);
     const ownForm = signedIn ? await ownExtensionMemoryOwner(storage, gaii, req.auth!.owner as string) : null;
     const stored = await storage.getMemory(gaii, key) ?? (ownForm ? await storage.getMemory(ownForm, key) : null);

@@ -100,7 +100,7 @@ import { resolveGatedApp } from '../members-only.js';
 import { membersOnlyRefusal, MEMBERS_ONLY_MESSAGE } from '../members-only.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
-import { findBackingCapability } from '../component-address.js';
+import { findBackingCapability } from '../component/address.js';
 
 type ExtAction = ExtensionRecord['actions'][number];
 
@@ -238,7 +238,7 @@ async function coveringPass(
   const namesThisAction = async (binding: string | null | undefined): Promise<boolean> => {
     if (!binding) return false;
     if (binding === target) return true;
-    // A bare binding in the owner's manifest names their own extension (services/component-address.ts).
+    // A bare binding in the owner's manifest names their own extension (services/component/address.ts).
     return (await findBackingCapability(storage, binding, coordOwner))?.source.ref === target;
   };
 
