@@ -14,6 +14,8 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   2026-11-15 — The skills section puts aimeat-app-builder second after the Atelier skill, so the
+ *     cap of 25 never drops the Classic builder skill that builder_skill names.
  *   2026-11-07 — `microservices` (appdev/microservices.ts): the Microservices Central of the person or
  *     the node, and when an app's server-side work belongs in a service there instead of an extension.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -235,8 +237,12 @@ export async function buildAppdevOverview(
             listSkills(storage, config, 'node', accessor).catch(err => { logger.warn('title: continuing after a suppressed failure', { error: String(err) }); return []; }),
             owner ? listSkills(storage, config, 'user', accessor, owner).catch(err => { logger.warn('title: continuing after a suppressed failure', { error: String(err) }); return []; }) : Promise.resolve([]),
         ]);
-        const builderFirst = [...nodeSkills].sort((a, b) =>
-            (a.name === 'aimeat-app-builder-atelier' ? -1 : 0) - (b.name === 'aimeat-app-builder-atelier' ? -1 : 0));
+        // Both builder skills ahead of the cap: builder_skill below names them, and with more node
+        // skills than CAP the Classic one fell past the cut whenever the store listed it late, which
+        // PostgreSQL does in no fixed order (nightly 43700514021).
+        const BUILDERS = ['aimeat-app-builder-atelier', 'aimeat-app-builder'];
+        const rank = (n: string): number => { const i = BUILDERS.indexOf(n); return i < 0 ? BUILDERS.length : i; };
+        const builderFirst = [...nodeSkills].sort((a, b) => rank(a.name) - rank(b.name));
         out.skills = {
             builder_skill: 'node:aimeat-app-builder-atelier — load this FIRST (aimeat_skill_get) for a new app; node:aimeat-app-builder for an app already on the Classic track',
             node: capped(builderFirst.map(s => ({ ref: s.ref, description: s.description ?? null }))),

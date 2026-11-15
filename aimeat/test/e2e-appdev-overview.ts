@@ -7,6 +7,8 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-overview).
  * @version-history
+ *   v1.4.1 — 2026-11-15 — The node skills start with the Atelier and the Classic builder skill, in that
+ *     order; the Classic one had fallen past the cap of 25 on PostgreSQL (nightly 43700514021).
  *   v1.4.0 — 2026-11-07 — +`microservices`: none named for an owner without a Central; the owner's own
  *     `microservices.central` named over REST and MCP and never to another owner; an address with a
  *     password in it ignored without being repeated; a private record hidden from an agent without
@@ -127,6 +129,10 @@ await test('overview returns every section with caps + drill-downs', async () =>
     assert(d.app_templates.items.some((t: any) => t.tier === 'T1'), 'T1 shell missing');
     assert(/aimeat-app-builder/.test(d.skills.builder_skill), 'builder skill not surfaced first');
     assert(d.skills.node.items.some((s: any) => s.ref === 'node:aimeat-app-builder'), 'builder skill missing from node skills');
+    // Both builder skills lead, whatever order the store lists the node skills in: with more node
+    // skills than the cap, a builder skill left to the store's order can fall past the cut.
+    const lead = d.skills.node.items.slice(0, 2).map((s: any) => s.ref);
+    assert(JSON.stringify(lead) === JSON.stringify(['node:aimeat-app-builder-atelier', 'node:aimeat-app-builder']), `the builder skills lead the node skills: ${JSON.stringify(lead)}`);
     assert(d.pitfalls_curated.total >= 20 && d.pitfalls_curated.facets, 'curated pitfalls index missing');
 });
 
