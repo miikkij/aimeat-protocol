@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The "build it with you" tools on the CLI dispatch (`/local/call/<tool>`) and the
  *   connector MCP: a thin REST proxy over /v1/build-with-you/*, so the node decides everything
- *   (services/build-with-you.ts, services/place-trail.ts).
+ *   (services/builder/with-you.ts, services/place-trail.ts).
  * @version-history
  *   v1.1.0 — 2026-11-01 — aimeat_build_request_submit forwards `spec`, the four fields as one object.
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi").

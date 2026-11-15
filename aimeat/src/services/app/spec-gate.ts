@@ -41,8 +41,8 @@
  *   v1.0.0 — 2026-08-11 — initial.
  */
 import type { AimeatConfig } from '../../config.js';
-import { buildAppSpecToken } from '../build-app-prompt.js';
-import { buildAtelierSpecToken } from '../build-atelier-prompt.js';
+import { buildAppSpecToken } from '../builder/app-prompt.js';
+import { buildAtelierSpecToken } from '../builder/atelier-prompt.js';
 
 /** The skill that teaches the whole paved path for a new app, named in every non-ok answer. */
 export const ATELIER_BUILDER_SKILL_REF = 'node:aimeat-app-builder-atelier';

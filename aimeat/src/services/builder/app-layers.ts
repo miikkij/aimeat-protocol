@@ -1,5 +1,5 @@
 /**
- * @file build-app-layers.ts
+ * @file src/services/builder/app-layers.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The build specification in two layers: what every app needs, and the parts only
@@ -31,7 +31,7 @@
  *   - layeredBuildAppPrompt() — the whole core in one piece, for a reader over HTTP
  *   - buildAppPiece() — one part or one section by id, which is what the MCP door serves
  * @usage
- *   import { buildAppPiece } from './build-app-layers.js';
+ *   import { buildAppPiece } from './app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
  *   2026-11-15 — The section "Installing the app on a phone, and its home-screen icon" is on demand,

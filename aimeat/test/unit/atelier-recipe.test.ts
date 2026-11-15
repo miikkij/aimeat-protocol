@@ -1,6 +1,6 @@
 /**
  * @file test/unit/atelier-recipe.test.ts
- * @description The Atelier spec's recipe half (src/services/build-atelier-recipe.ts) held to the
+ * @description The Atelier spec's recipe half (src/services/builder/atelier-recipe.ts) held to the
  *   kit it describes. The customisation section names variants and per-component tokens by hand,
  *   which is the one thing in this prompt that is not rendered from a registry — so the guard is
  *   here: every variant the prompt promises exists in `sdk-libs/atelier/describe-data.js`
@@ -33,7 +33,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
   renderCustomisation, renderLiving, renderPatterns,
-} from '../../src/services/build-atelier-recipe.js';
+} from '../../src/services/builder/atelier-recipe.js';
 import { NODES } from '../../src/static/sdk-libs/living/describe-data.js';
 import { createGraph } from '../../src/static/sdk-libs/living/graph.js';
 

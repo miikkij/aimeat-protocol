@@ -112,7 +112,7 @@ export interface SiteLinksConfig {
   /**
    * The operator's build queue for "build it with you": the owner's one build request waits on the
    * node until the operator's fleet service hands it to this queue, and the node then asks its status
-   * at `<buildQueue>/getStatus` (services/build-with-you.ts). Set by the store's fleet service on a
+   * at `<buildQueue>/getStatus` (services/builder/with-you.ts). Set by the store's fleet service on a
    * node it sold. Empty: off.
    */
   buildQueue: string;

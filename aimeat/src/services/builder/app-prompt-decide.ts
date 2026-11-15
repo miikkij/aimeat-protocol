@@ -1,5 +1,5 @@
 /**
- * @file build-app-prompt-decide.ts
+ * @file src/services/builder/app-prompt-decide.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The build specification's section on the decision model (TARGET-080): when an app
@@ -12,7 +12,7 @@
  *   not to build a feature on the model when the answer is no. The app then gates the feature at
  *   runtime on `AIMEAT.decide.isAvailable()`, like every AI feature.
  *
- *   Its own file because services/build-app-prompt.ts is at the 800-line limit.
+ *   Its own file because services/builder/app-prompt.ts is at the 800-line limit.
  * @structure buildDecideSection(nodeUrl)
  * @usage body += buildDecideSection(nodeUrl);   // after the aimeat-ai section
  * @version-history

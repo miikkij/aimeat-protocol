@@ -1,6 +1,6 @@
 ---
 name: aimeat-app-building
-description: The research-first precondition for building any app on AIMEAT, and the repo-side rules for the app-building prompt system and the served browser SDK libs. Use when the task is to build, make, publish or fork an AIMEAT application (game or tool), or when editing src/services/build-app-prompt.ts or /v1/app-templates. Authoring a served SDK lib is skill aimeat-library-authoring.
+description: The research-first precondition for building any app on AIMEAT, and the repo-side rules for the app-building prompt system and the served browser SDK libs. Use when the task is to build, make, publish or fork an AIMEAT application (game or tool), or when editing src/services/builder/app-prompt.ts or /v1/app-templates. Authoring a served SDK lib is skill aimeat-library-authoring.
 ---
 
 # Building an AIMEAT application
@@ -39,7 +39,7 @@ Non-negotiables that flow enforces:
 - Include `<meta name="aimeat-scopes">`, and use only scopes that exist in the node's vocabulary. An invented scope means `INVALID_SCOPE` and nobody can log in.
 - AIMEAT SDK libs load from `/v1/libs/`; vendored styling from `/lib/`. Do not mix the two.
 - **Touch input goes through `aimeat-input`, never a hand-rolled `touchstart` listener.** `AIMEAT.input.tappable(el, fn)` for every button, card and row (built on `click`, so tap, mouse and Enter/Space each arrive once and a screen reader announces it); `AIMEAT.input.on(el, handlers, { axis })` when a click is not enough, declaring `axis` on anything that also scrolls. A hand-rolled touch listener fires twice, triggers mid-scroll, and locks out the keyboard. The mobile rules in the build-app prompt cover LAYOUT; this is the other half.
-- **Data on the node reaches the screen through an event, and a timer is the last resort.** `AIMEAT.live.subscribe(['agent-tasks'], …)`, the mosaic's `live` map (a `keyPrefix` for the owner's records, `domains` for the rest) and `AIMEAT.agents.watch` for one task. Both build specifications carry the rule, the domains an app may hear and the three places a timer belongs; the text and what happened without it are in `aimeat/src/services/build-events-first.ts`. An app built from this repo read an agent task's stage every 30 seconds and showed it 37 seconds late on aimeat.io (Jouni, 2026-10-11: "pollaamisen pitää olla viimeisin konsti käyttöliittymäpuolella").
+- **Data on the node reaches the screen through an event, and a timer is the last resort.** `AIMEAT.live.subscribe(['agent-tasks'], …)`, the mosaic's `live` map (a `keyPrefix` for the owner's records, `domains` for the rest) and `AIMEAT.agents.watch` for one task. Both build specifications carry the rule, the domains an app may hear and the three places a timer belongs; the text and what happened without it are in `aimeat/src/services/builder/events-first.ts`. An app built from this repo read an agent task's stage every 30 seconds and showed it 37 seconds late on aimeat.io (Jouni, 2026-10-11: "pollaamisen pitää olla viimeisin konsti käyttöliittymäpuolella").
 - Morsels are plain integers, never the meat emoji.
 - Check `aimeat_appdev_overview.apps` for an existing app or capability before building. Reuse beats duplicate.
 
@@ -70,8 +70,8 @@ Three habits keep them from being forgotten:
 
 There are two specifications, one per track, and both are **node-served**. Each one is canonical for its own track only.
 
-- **Atelier**, the track every new app is built on: `GET /v1/prompts/build-app-atelier` (over MCP `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts). Source of truth: `src/services/build-atelier-prompt.ts` and its siblings `build-atelier-*.ts`.
-- **Classic**, for an app already on Classic or when the owner asks for it by name: `GET /v1/prompts/build-app`. Source of truth: `src/services/build-app-prompt.ts`.
+- **Atelier**, the track every new app is built on: `GET /v1/prompts/build-app-atelier` (over MCP `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts). Source of truth: `src/services/builder/atelier-prompt.ts` and its siblings `build-atelier-*.ts`.
+- **Classic**, for an app already on Classic or when the owner asks for it by name: `GET /v1/prompts/build-app`. Source of truth: `src/services/builder/app-prompt.ts`.
 
 Consumers: the App Catalog's "Create" dialog (`public/views/appcat/dialogs/generate-prompt.js`) sends a connected AI to Atelier and keeps the long Classic prompt folded for an AI that cannot connect; the old `/app-catalog.html` (`src/static/app-catalog/js/cortex.js`, an offline fallback) takes the track of the app it improves and Atelier for a new one; the OpenHands app-builder (`tools/aimeat-openhands/`, via its `aimeat-app-builder` skill) fetches the spec of the track at runtime. Agent-facing discovery is `/llms.txt` plus the bootstrap `app_building` block.
 
@@ -92,7 +92,7 @@ interview's data map questions and "How the data map answers steer the build"); 
 `GET /v1/prompts/build-app`, section "If several people share it". Two things belong here as well,
 because they decide the work before any code is written.
 
-**Both build interviews ask the data map step, and nothing is built before a yes.** Three questions (who opens the app: just me, my organisation, anyone; for each kind of data, is it personal, shared by the team or public; who may change the shared data), then a two- or three-sentence scenario from the person's own idea with named people, which they confirm. Team data goes to one organism workspace (`AIMEAT.organism`, `workspacePicker`), never to per-user memory, which gives every person an empty copy (pitfall `team-data-in-personal-memory`; TaskGrid on orgnode.example was asked for one shared talent database and kept one per person). Who opens it is the app's `open_to` setting. The text is in `aimeat/src/services/build-data-map-step.ts`, included by both `build-app-prompt.ts` and `build-atelier-prompt.ts`; change it there, once.
+**Both build interviews ask the data map step, and nothing is built before a yes.** Three questions (who opens the app: just me, my organisation, anyone; for each kind of data, is it personal, shared by the team or public; who may change the shared data), then a two- or three-sentence scenario from the person's own idea with named people, which they confirm. Team data goes to one organism workspace (`AIMEAT.organism`, `workspacePicker`), never to per-user memory, which gives every person an empty copy (pitfall `team-data-in-personal-memory`; TaskGrid on orgnode.example was asked for one shared talent database and kept one per person). Who opens it is the app's `open_to` setting. The text is in `aimeat/src/services/builder/data-map-step.ts`, included by both `build-app-prompt.ts` and `build-atelier-prompt.ts`; change it there, once.
 
 **The data map is a deliverable, and the owner approves it before the first `set()`.** Columns: what
 · where it lives · who owns it · who can read it · what happens when a member leaves · is it

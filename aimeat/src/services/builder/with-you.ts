@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-with-you.ts
+ * @file src/services/builder/with-you.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description "Build it with you" ("Rakennamme kanssasi"; Jouni, 1.11 16.22): a place gets one build
@@ -53,19 +53,19 @@
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi", part B).
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import type { CallerContext } from './caller-context.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { emitChange, onChangeEvent, offChangeEvent, isRemoteEvent, type ChangeEvent } from './event-bus.js';
-import { onUsageRecorded } from './usage/usage-buffer.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { readJson } from '../utils/read-capped.js';
-import { INPUT_LIMITS } from '../models/input-limits.js';
-import { BUILD_CODE } from '../utils/build-code.js';
-import { logger } from '../utils/logger.js';
-import { callRemoteTool, statusForRemoteRefusal } from './mcp-client/invoke.js';
-import { attachedQueueServer, queueAnswerOf, answerText } from './build-with-you-send.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { CallerContext } from '../caller-context.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { emitChange, onChangeEvent, offChangeEvent, isRemoteEvent, type ChangeEvent } from '../event-bus.js';
+import { onUsageRecorded } from '../usage/usage-buffer.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { readJson } from '../../utils/read-capped.js';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
+import { BUILD_CODE } from '../../utils/build-code.js';
+import { logger } from '../../utils/logger.js';
+import { callRemoteTool, statusForRemoteRefusal } from '../mcp-client/invoke.js';
+import { attachedQueueServer, queueAnswerOf, answerText } from './with-you-send.js';
 
 export const BUILD_DOMAIN = 'build-with-you';
 const KEY = 'build-with-you.request';

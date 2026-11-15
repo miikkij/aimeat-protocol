@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-events-first.ts
+ * @file src/services/builder/events-first.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The rule both build specifications give an app builder about data that changes on
@@ -31,7 +31,7 @@
  *   workflows.ts, board-write.ts, direct-message-delete.ts, workspace-rows/row-service.ts,
  *   packages.ts, knowledge/); the live library's registry text names five of the seven read that do not.
  * @structure EVENTS_FIRST_DOMAINS · atelierEventsFirst() · classicLiveUpdatesSection()
- * @usage import { atelierEventsFirst, classicLiveUpdatesSection } from './build-events-first.js';
+ * @usage import { atelierEventsFirst, classicLiveUpdatesSection } from './events-first.js';
  * @version-history
  *   v1.2.0 — 2026-10-22 — `realtime-rooms` (social:read) joins the list: a lobby follows the
  *     realtime rooms through AIMEAT.live (Band Jam needed a Refresh to see a new room).

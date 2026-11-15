@@ -124,7 +124,7 @@ Every outbound call whose address is not a constant in the code goes through `sa
 | Your SIEM: a syslog collector (UDP or TCP) and an OTLP/HTTP logs endpoint | Security events as they happen: refusals, operator acts, security incidents, a team's approval decisions, and the trail of every call when named. Names, codes, routes and ids only | `AIMEAT_SIEM_SYSLOG`, `AIMEAT_SIEM_OTLP_URL`, `AIMEAT_SIEM_EVENTS` | `aimeat/src/services/node-admin/siem-export.ts`, [SIEM and Wazuh](../operations/siem-wazuh.md) |
 | Your Consul server | Central configuration | `AIMEAT_CONSUL_ENABLED`, `AIMEAT_CONSUL_URL` | `aimeat/src/services/consul-config.ts` |
 | An origin node | Mirror of another node's portal | `AIMEAT_SITE_LB_ENABLED`, `AIMEAT_SITE_LB_ORIGIN_URL` | `aimeat/.env.example` |
-| The operator's store and build queue addresses | Public price list and "build it with you" requests | `AIMEAT_SITE_STORE_URL`, `AIMEAT_SITE_BUILD_QUEUE_URL` | `aimeat/src/services/build-with-you.ts` |
+| The operator's store and build queue addresses | Public price list and "build it with you" requests | `AIMEAT_SITE_STORE_URL`, `AIMEAT_SITE_BUILD_QUEUE_URL` | `aimeat/src/services/builder/with-you.ts` |
 
 ### C. Destinations that people and agents choose
 

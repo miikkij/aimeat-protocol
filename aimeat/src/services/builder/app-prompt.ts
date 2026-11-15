@@ -1,5 +1,5 @@
 /**
- * @file build-app-prompt.ts
+ * @file src/services/builder/app-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The canonical "build an AIMEAT app" prompt — the SAME text the app-catalog's
@@ -12,7 +12,7 @@
  *     + design + rules [+ publish-back for mode 'new']) — what the app-catalog fetches.
  *   - full: language line + interview header (mode 'new') + body — what agents fetch.
  *   - buildAppSpecToken(config): the digest of this document, which the publish gate checks.
- * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
+ * @usage import { buildAppPrompt } from './app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
  *   2026-11-15 — ADDITIVE: "Installing the app on a phone, and its home-screen icon" (icon_upload, who can install).
@@ -174,22 +174,22 @@
  *     born from pitfall app/candy-palette-alone-is-not-a-game-look.
  */
 import { createHash } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
+import type { AimeatConfig } from '../../config.js';
 // The grantable scope vocabulary — imported so the prompt's scope list can NEVER drift from
 // what the authorize endpoint actually accepts (guessed scope names were an AEB-2 finding).
-import { APP_GRANTABLE_SCOPES } from './app/grant-vocabulary.js';
+import { APP_GRANTABLE_SCOPES } from '../app/grant-vocabulary.js';
 // The library-pack registry — the prompt's library sections are GENERATED from it so the
 // lists can never drift from /v1/libs, /v1/library-packs, bootstrap or llms.txt (Phase 1
 // of the Library Acceleration Program killed the 4-way hardcoded-list drift).
-import { buildPromptLibrarySections } from '../data/library-packs.js';
-import { buildPromptSessionSections } from './build-app-prompt-session.js';
-import { buildPromptDrivenSection } from './build-app-prompt-driven.js';
-import { buildDecideSection } from './build-app-prompt-decide.js';
-import { buildRenderedContentParagraphs, buildAgentDataSection, buildOutsideUsersParagraph } from './build-app-prompt-content.js';
-import { buildResearchStep, buildFinishChecklist } from './appdev-flow-constants.js';
-import { classicLiveUpdatesSection } from './build-events-first.js';
-import { buildDataMapStep } from './build-data-map-step.js';
-import { publishWalkthrough } from './build-app-publish-walkthrough.js';
+import { buildPromptLibrarySections } from '../../data/library-packs.js';
+import { buildPromptSessionSections } from './app-prompt-session.js';
+import { buildPromptDrivenSection } from './app-prompt-driven.js';
+import { buildDecideSection } from './app-prompt-decide.js';
+import { buildRenderedContentParagraphs, buildAgentDataSection, buildOutsideUsersParagraph } from './app-prompt-content.js';
+import { buildResearchStep, buildFinishChecklist } from '../appdev-flow-constants.js';
+import { classicLiveUpdatesSection } from './events-first.js';
+import { buildDataMapStep } from './data-map-step.js';
+import { publishWalkthrough } from './app-publish-walkthrough.js';
 
 export interface BuildAppPromptOptions {
   /** Conversation/UI language for the generated app. Only 'en' and 'fi' are localized. */
@@ -241,7 +241,7 @@ function composeAppPrompt(
   body += buildPromptLibrarySections(nodeUrl);
 
   // The session: signing a person in, and calling the node once they are. Both sections moved to
-  // services/build-app-prompt-session.ts verbatim when this file passed 800 lines.
+  // services/builder/app-prompt-session.ts verbatim when this file passed 800 lines.
   body += buildPromptSessionSections(nodeUrl);
 
   // App permissions — the scope vocabulary, generated from the authorize endpoint's own constant
@@ -404,7 +404,7 @@ function composeAppPrompt(
   body += '```\n';
   body += 'A space that does not name the app answers 403 and says so — show that sentence, and tell the person which organism admin can open it. Nothing else on the organism opens through this scope: no other space, no records, no documents. Put the space in the data map as `where: "organism-rows"`, and write `rowId` for anything that may be sent twice, so a retry replaces instead of duplicating.\n\n';
 
-  // Reading what the owner's AGENTS produced: services/build-app-prompt-content.ts (moved verbatim).
+  // Reading what the owner's AGENTS produced: services/builder/app-prompt-content.ts (moved verbatim).
   body += buildAgentDataSection() + buildOutsideUsersParagraph();
 
   // Public Intake — the ONLY way an anonymous (not-logged-in) visitor can submit data into an owner's
@@ -441,7 +441,7 @@ function composeAppPrompt(
   body += "The same rule covers the app's OWN pictures — logo, background, samples. An asset inlined as a data URI is carried in the source forever and re-uploaded on every publish; one app on this node reached 3.18 MB that way, of which 477 kB was base64 and one line was 294 490 characters long, and its author's small changes went from five minutes to forty. Past roughly 300 kB, keep the sources split behind a build step on your own machine that assembles the one HTML file: skill `node:aimeat-app-workstation`, starter `GET /v1/app-templates/workstation-project`. A file that an agent uploads over MCP (aimeat_storage_upload) is stored under the agent's GAII, not the owner's: use the `embed_url` the upload returns, and never build a `/v1/pub/<owner>/<key>` address for that file by hand.\n\n";
 
   // The prompt-driven workflow (aimeat-prompt.js): AI work done in the person's own chat. Its own
-  // file, services/build-app-prompt-driven.ts, because this one is at the 800-line limit.
+  // file, services/builder/app-prompt-driven.ts, because this one is at the 800-line limit.
   body += buildPromptDrivenSection(nodeUrl);
 
   // AI

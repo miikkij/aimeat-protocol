@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The `aimeat-extension-builder` built-in skill: how an AI builds, installs, prices and
  *   verifies a sandboxed server extension. The full `ctx` table and manifest reference stay in the
- *   node's served build prompt (GET /v1/prompts/build-extension, services/build-extension-prompt.ts);
+ *   node's served build prompt (GET /v1/prompts/build-extension, services/builder/extension-prompt.ts);
  *   this skill is the path through it and the rules a builder gets wrong.
  *
  *   WHY A BUILT-IN. Until 2026-10-11 the skill existed only as an operator-published copy on
@@ -17,7 +17,7 @@
  *   is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). A
  *   skill ships with every installation and seeds by hash (services/skill-seeds.ts).
  *
- *   WHAT IT MUST AGREE WITH. services/build-extension-prompt.ts (the canonical table it points
+ *   WHAT IT MUST AGREE WITH. services/builder/extension-prompt.ts (the canonical table it points
  *   to), services/extension/ctx-contract.ts (ctx members), services/extension/manifest.ts (manifest
  *   validation, tollMorsels, commercial, the 4.0.0 refusal of payMorsels), routes/extensions/
  *   paywall.ts and pacing.ts (who pays what per call), routes/extensions/crud.ts and instances.ts

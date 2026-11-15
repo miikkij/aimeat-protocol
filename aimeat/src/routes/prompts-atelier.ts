@@ -26,10 +26,10 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success, error } from '../middleware/envelope.js';
 import { sendPlainText } from '../middleware/plain-text.js';
-import { buildAtelierPrompt, buildAtelierSpecToken } from '../services/build-atelier-prompt.js';
+import { buildAtelierPrompt, buildAtelierSpecToken } from '../services/builder/atelier-prompt.js';
 import type { Storage } from '../storage/interface.js';
-import { ATELIER_PARTS, atelierPieceIds } from '../services/build-atelier-layers.js';
-import { atelierPieceWithBook } from '../services/build-atelier-book.js';
+import { ATELIER_PARTS, atelierPieceIds } from '../services/builder/atelier-layers.js';
+import { atelierPieceWithBook } from '../services/builder/atelier-book.js';
 
 /**
  * Register the Atelier build-spec route. Public for the same reason build-app is: build

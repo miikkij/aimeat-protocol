@@ -1,5 +1,5 @@
 /**
- * @file build-app-prompt-content.ts
+ * @file src/services/builder/app-prompt-content.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Two parts of the build specification about content the app did not write itself,
@@ -11,7 +11,7 @@
  *       core (build-app-layers.ts keys its table by heading).
  *     - buildAgentDataSection(): the section "Reading data your AGENTS produced".
  *   The provenance paragraph and the agents section moved here verbatim from
- *   services/build-app-prompt.ts when that file reached the 800-line limit; the text is unchanged.
+ *   services/builder/app-prompt.ts when that file reached the 800-line limit; the text is unchanged.
  *     - buildOutsideUsersParagraph(): users without an account register as outside parties (2026-11-01).
  * @structure buildRenderedContentParagraphs() · buildAgentDataSection() · buildOutsideUsersParagraph()
  * @usage

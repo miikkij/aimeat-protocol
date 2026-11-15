@@ -375,7 +375,7 @@ The GEAI addition matters: it lets a whole class of third-party apps act on an o
 
 ### 6.1 App-Building (current)
 
-App authoring is **AI-accelerated in a real coding environment**, not an in-portal wizard. The canonical build-app prompt is **node-served** at `GET /v1/prompts/build-app` (source `src/services/build-app-prompt.ts`): the app-catalog's **Create new app** flow fetches it, and the repo ships a preconfigured **OpenHands app-builder** (`tools/aimeat-openhands/`, via its `aimeat-app-builder` skill) that fetches the same spec at runtime, builds a single-file HTML app, and publishes it live over MCP. claude.ai / Claude Code driving the Core APIs is an equally supported path. Agent-facing discovery: `/llms.txt` + bootstrap `app_building` → the build prompt + `/v1/app-templates`.
+App authoring is **AI-accelerated in a real coding environment**, not an in-portal wizard. The canonical build-app prompt is **node-served** at `GET /v1/prompts/build-app` (source `src/services/builder/app-prompt.ts`): the app-catalog's **Create new app** flow fetches it, and the repo ships a preconfigured **OpenHands app-builder** (`tools/aimeat-openhands/`, via its `aimeat-app-builder` skill) that fetches the same spec at runtime, builds a single-file HTML app, and publishes it live over MCP. claude.ai / Claude Code driving the Core APIs is an equally supported path. Agent-facing discovery: `/llms.txt` + bootstrap `app_building` → the build prompt + `/v1/app-templates`.
 
 ### 6.2 Removed: Generator & Foundry
 

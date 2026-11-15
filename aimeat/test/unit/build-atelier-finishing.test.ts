@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import { buildAtelierPrompt } from '../../src/services/build-atelier-prompt.js';
+import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-test' } as unknown as AimeatConfig;
 const body = buildAtelierPrompt(config, { mode: 'new', lang: 'en' }).body;

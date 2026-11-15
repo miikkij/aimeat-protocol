@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-data-map-step.ts
+ * @file src/services/builder/data-map-step.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The DATA MAP STEP both build interviews include (Classic, build-app-prompt.ts, and
@@ -21,7 +21,7 @@
  *   answers pick the build) · buildDataMapStep(track) (what each interview includes; Classic carries
  *   the steer in its own section, CLASSIC_DATA_MAP_STEER_HEADING) · ATELIER_DATA_MAP_STEER (the team
  *   branch of Atelier's "Data, in short") · ATELIER_DATA_MAP_PROPOSAL_LINE (the proposal states it)
- * @usage import { buildDataMapStep } from './build-data-map-step.js';
+ * @usage import { buildDataMapStep } from './data-map-step.js';
  *   full += buildDataMapStep('classic');
  * @version-history
  *   v1.0.1 — 2026-10-18 — One sentence shorter, so part `start` stays under 24 000 characters.

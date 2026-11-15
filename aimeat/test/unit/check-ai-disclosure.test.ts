@@ -136,7 +136,7 @@ describe('drop a label on purpose and the build fails', () => {
   });
 
   it('[build-prompt] removing the disclose() instruction from the app-builder prompt', async () => {
-    breakFile('src/services/build-app-prompt.ts', (src) => src.replaceAll('AIMEAT.ai.disclose(', 'AIMEAT.ai.SOMETHINGELSE('));
+    breakFile('src/services/builder/app-prompt.ts',(src) => src.replaceAll('AIMEAT.ai.disclose(', 'AIMEAT.ai.SOMETHINGELSE('));
     const { code, out } = await runGate();
     expect(code).toBe(1);
     expect(out).toContain('no longer contains "AIMEAT.ai.disclose("');

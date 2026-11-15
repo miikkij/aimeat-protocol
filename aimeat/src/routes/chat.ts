@@ -78,7 +78,7 @@ import { readAllowance, remainingOf } from '../services/ai/allowance.js';
 import { allowanceShown } from '../services/ai/node-key-balance.js';
 import { ownKeyCoverage } from '../services/own-key-coverage.js';
 import { recordFirstChatTurn } from '../services/onboarding-funnel.js';
-import { openBuildOffer } from '../services/build-with-you.js';
+import { openBuildOffer } from '../services/builder/with-you.js';
 import { nodeOpenRouterKey } from '../services/ai/node-openrouter-key.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -293,7 +293,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
         const starterId = typeof starter === 'string' && /^[a-z-]{1,32}$/.test(starter) ? starter : undefined;
         void recordFirstChatTurn(storage, config, owner(req), starterId);
         // On a place bought from the store that runs on the store's AI key, the first chat turn opens
-        // the place's one "build it with you" offer (services/build-with-you.ts).
+        // the place's one "build it with you" offer (services/builder/with-you.ts).
         if ((config.siteLinks?.purchasePlan ?? '').trim() && nodeOpenRouterKey(config)) {
             void openBuildOffer({ storage, config }, 'chat', identity(req)).catch((e: Error) => logger.warn(`[chat] the build offer was not opened: ${e.message}`));
         }

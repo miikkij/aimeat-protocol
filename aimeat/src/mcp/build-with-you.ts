@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The node MCP surface for "build it with you": aimeat_build_request_submit,
  *   aimeat_build_request_status and aimeat_trail_list. Each calls the function the REST route calls
- *   (services/build-with-you.ts, services/place-trail.ts), so who may do what exists once. Nothing is
+ *   (services/builder/with-you.ts, services/place-trail.ts), so who may do what exists once. Nothing is
  *   decided in this file.
  * @structure registerBuildWithYouTools(mcp, storage, config, caller)
  * @usage registerBuildWithYouTools(mcp, storage, config, caller);   // mcp/register-all.ts
@@ -20,7 +20,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { withCaughtError } from './tool-fault.js';
-import { BuildError, readOp, submitOp } from '../services/build-with-you.js';
+import { BuildError, readOp, submitOp } from '../services/builder/with-you.js';
 import { readOwnTrail, TrailError } from '../services/place-trail.js';
 
 export function registerBuildWithYouTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {

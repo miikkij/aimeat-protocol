@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The app build instructions for an app that shows the work of ONE of the caller's
- *   agents: the agent section (services/build-app-agent-context.ts) in front of the build
- *   specification (services/build-app-prompt.ts), as one text a person hands to an AI.
+ *   agents: the agent section (services/builder/app-agent-context.ts) in front of the build
+ *   specification (services/builder/app-prompt.ts), as one text a person hands to an AI.
  *
  *   The specification itself is public. This route is not, because the agent section is read from
  *   the caller's own account: the agent's purpose and the structure of its latest result.
@@ -23,8 +23,8 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { readerFor } from '../services/classification/reader.js';
 import { success, error } from '../middleware/envelope.js';
 import { sendPlainText } from '../middleware/plain-text.js';
-import { buildAppPrompt, buildAppSpecToken } from '../services/build-app-prompt.js';
-import { buildAppAgentContext } from '../services/build-app-agent-context.js';
+import { buildAppPrompt, buildAppSpecToken } from '../services/builder/app-prompt.js';
+import { buildAppAgentContext } from '../services/builder/app-agent-context.js';
 
 export function registerBuildAppAgentPrompt(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/prompts/build-app/agent/:name — ?idea=<what the app should show>, ?lang, ?format=txt.

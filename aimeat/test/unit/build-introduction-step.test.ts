@@ -14,8 +14,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import { buildAtelierPrompt } from '../../src/services/build-atelier-prompt.js';
-import { atelierPiece, atelierPieceIds, MAX_PART_CHARS, splitAtelierSpec } from '../../src/services/build-atelier-layers.js';
+import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
+import { atelierPiece, atelierPieceIds, MAX_PART_CHARS, splitAtelierSpec } from '../../src/services/builder/atelier-layers.js';
 import { lookById } from '../../src/data/atelier-looks.js';
 import { CLEAN_LOOK_ID, INTRODUCTION_QUESTION } from '../../src/services/app-build/build-introduction-step.js';
 

@@ -19,8 +19,8 @@
 import { describe, it, expect } from 'vitest';
 import { MODEL_QUALITY_ADVICE } from '../../src/services/model-recommendation.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { buildAtelierPrompt } from '../../src/services/build-atelier-prompt.js';
-import { ATELIER_PARTS, atelierPiece, splitAtelierSpec, MAX_PART_CHARS } from '../../src/services/build-atelier-layers.js';
+import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
+import { ATELIER_PARTS, atelierPiece, splitAtelierSpec, MAX_PART_CHARS } from '../../src/services/builder/atelier-layers.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-test' } as unknown as AimeatConfig;
 const full = buildAtelierPrompt(config, { mode: 'new', lang: 'en' }).full;
@@ -96,7 +96,7 @@ describe('the Atelier specification in parts', () => {
   });
 
   it('lists every workbench piece in the component catalogue, each one an export of the kit', async () => {
-    const { ATELIER_COMPONENTS } = await import('../../src/services/build-atelier-prompt.js');
+    const { ATELIER_COMPONENTS } = await import('../../src/services/builder/atelier-prompt.js');
     const ids = ATELIER_COMPONENTS.map(c => c.id);
     const kit = await import('node:fs').then(fs => fs.readFileSync('src/static/sdk-libs/atelier/index.js', 'utf8'));
     for (const id of ['sideNav', 'statusBand', 'checkGrid', 'choiceCards', 'settingsGroup', 'progressFigure', 'callout']) {

@@ -1091,14 +1091,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Commerce attestation records in a system namespace."
     },
-    "src/services/build-app-agent-context.ts": {
+    "src/services/builder/app-agent-context.ts": {
       "reads": {
         "getMemory": 1,
         "listMemory": 1
       },
       "why": "Reviewed 2026-10-11: the latest finished result of the caller's own agent, read to describe its STRUCTURE in the build instructions. The record goes through presentMemory with the caller's classification reader before anything is derived from it, so a result the caller may not read is not described; what is derived is field names and value types only, with no text of the value."
     },
-    "src/services/build-with-you.ts": {
+    "src/services/builder/with-you.ts": {
       "reads": {
         "getMemory": 1
       },

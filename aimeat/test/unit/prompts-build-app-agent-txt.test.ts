@@ -30,7 +30,7 @@ vi.mock('../../src/auth/middleware.js', () => ({
     requireScope: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 vi.mock('../../src/services/classification/reader.js', () => ({ readerFor: () => ({}) }));
-vi.mock('../../src/services/build-app-agent-context.js', () => ({
+vi.mock('../../src/services/builder/app-agent-context.js', () => ({
     buildAppAgentContext: async (_deps: unknown, _owner: string, name: string) => ({
         ok: true,
         text: AGENT_TEXT,

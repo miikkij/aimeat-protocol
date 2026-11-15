@@ -881,12 +881,12 @@ When starting a new ext+cortex+app stack:
   boundaries spelled out, with code refs
 - Built-in skill `aimeat-ai-capabilities` (`aimeat_skill_get`) — using
   `AIMEAT.ai.complete()` from apps and cortex libs
-- `GET /v1/prompts/build-extension` (source `src/services/build-extension-prompt.ts`)
+- `GET /v1/prompts/build-extension` (source `src/services/builder/extension-prompt.ts`)
   and the built-in skill `aimeat-extension-builder` — the full `ctx` table,
   manifest, secrets, pacing and money price, install
-- `GET /v1/prompts/build-app-atelier` (source `src/services/build-atelier-prompt.ts`) —
+- `GET /v1/prompts/build-app-atelier` (source `src/services/builder/atelier-prompt.ts`) —
   the node-served specification for a new app. `GET /v1/prompts/build-app`
-  (source `src/services/build-app-prompt.ts`) is the Classic track's
+  (source `src/services/builder/app-prompt.ts`) is the Classic track's
 - `aimeat/src/routes/agent-tasks.ts` — every task API endpoint, listed in
   its header
 - `aimeat/src/services/extension/ctx-contract.ts` — what `ctx` contains,

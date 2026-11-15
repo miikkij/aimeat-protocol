@@ -11,7 +11,7 @@ import {
   nodeTemplateAnswer, nodeTemplateIndex, unknownTemplateMessage, splitAtLines, MAX_TEMPLATE_CONTENT_CHARS,
 } from '../../src/services/node-templates.js';
 import { getAppTemplates } from '../../src/data/app-templates.js';
-import { MAX_PART_CHARS } from '../../src/services/build-app-layers.js';
+import { MAX_PART_CHARS } from '../../src/services/builder/app-layers.js';
 
 describe('node templates', () => {
   it('returns the shell every build text names, with its file and how to start from it', () => {

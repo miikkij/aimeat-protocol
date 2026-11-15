@@ -170,9 +170,9 @@ function loadSandbox(): Sandbox {
  */
 /** Texts the node builds from code: an arm cannot reach them, and the PATCH answers 404. */
 const CODE_BUILT: Record<string, string> = {
-    'build-app': 'src/services/build-app-prompt.ts',
-    'build-app-atelier': 'src/services/build-atelier-prompt.ts (and its build-atelier-*.ts parts)',
-    'build-extension': 'src/services/build-extension-prompt.ts',
+    'build-app': 'src/services/builder/app-prompt.ts',
+    'build-app-atelier': 'src/services/builder/atelier-prompt.ts (and its atelier-*.ts parts)',
+    'build-extension': 'src/services/builder/extension-prompt.ts',
 };
 
 async function applyArm(s: Sandbox, armPath: string): Promise<{ name: string; ids: string[] }> {

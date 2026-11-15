@@ -148,7 +148,7 @@ import { unknownModelHints, provenanceModelFindings } from './ai-model-hints.js'
 import { lintAppArtifact, loadsAtelierKit, type AppArtifactFinding } from './artifact-lint.js';
 import { stripServedMarks, type ServedMarkRemoval } from './serve-marks-strip.js';
 import { evaluateSpecCheck, type AppSpecCheck } from './spec-gate.js';
-import { buildAtelierSpecToken } from '../build-atelier-prompt.js';
+import { buildAtelierSpecToken } from '../builder/atelier-prompt.js';
 import { trackDriftFindings } from './track-drift.js';
 import { oneLanguageFindings } from './language-default.js';
 import { genreForkFindings } from './genre-fork.js';

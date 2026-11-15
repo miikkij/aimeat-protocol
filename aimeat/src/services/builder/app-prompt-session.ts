@@ -1,9 +1,9 @@
 /**
- * @file build-app-prompt-session.ts
+ * @file src/services/builder/app-prompt-session.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two sections of the app-building prompt about the SESSION: how an app signs a
- *   person in, and how it calls the node once they are. Extracted from services/build-app-prompt.ts
+ *   person in, and how it calls the node once they are. Extracted from services/builder/app-prompt.ts
  *   by pure extraction when adding the second one took that file past 800 lines. The text is the
  *   text that was there; nothing was reworded in the move.
  * @structure buildPromptSessionSections(nodeUrl) → the markdown for both sections

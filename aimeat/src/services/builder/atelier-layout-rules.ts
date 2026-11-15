@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-atelier-layout-rules.ts
+ * @file src/services/builder/atelier-layout-rules.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The layout rules for a settings page and a work-queue page, as the paragraph the

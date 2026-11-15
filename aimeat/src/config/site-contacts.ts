@@ -33,7 +33,7 @@ import { BUILD_CODE } from '../utils/build-code.js';
 
 /**
  * AIMEAT_SITE_BUILD_CODE, kept only in the code's format; anything else is no code. Not in siteLinks,
- * which every anonymous visitor's page carries: the owner and their AI read it (services/build-with-you.ts).
+ * which every anonymous visitor's page carries: the owner and their AI read it (services/builder/with-you.ts).
  */
 export function buildCodeFromEnv(): string {
   const code = (process.env.AIMEAT_SITE_BUILD_CODE ?? '').trim().toUpperCase();

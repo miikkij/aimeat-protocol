@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-structure-step.ts
+ * @file src/services/builder/structure-step.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The section of the Atelier build interview that starts the app's plan and hands the

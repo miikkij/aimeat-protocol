@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-atelier-review.ts
+ * @file src/services/builder/atelier-review.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Atelier specification's section "What the review always catches", moved here
@@ -7,7 +7,7 @@
  *   data map step joined it (build-data-map-step.ts). The text is unchanged, so the spec token is
  *   unchanged by the move. Its history is in build-atelier-prompt.ts (v1.7.0, 2026-08-28).
  * @structure ATELIER_REVIEW_SECTION
- * @usage import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
+ * @usage import { ATELIER_REVIEW_SECTION } from './atelier-review.js';
  * @version-history
  *   v1.1.0 — 2026-11-09 — One top bar: the shell's on a shell app, the genre's masthead on a fork, with
  *     the node's pill as it comes, restyled only when the owner asks (Jouni). It said "the shell's

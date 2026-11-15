@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-atelier-people.ts
+ * @file src/services/builder/atelier-people.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Two sections of the Atelier build specification that are about the PERSON and not
@@ -22,7 +22,7 @@
  *   a browser at 390 px. The bar mounted, the switch moved `<html lang>`, the page's own strings
  *   and the bar's own label from English to Finnish and back, with no horizontal overflow.
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
- * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
+ * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './atelier-people.js';
  * @version-history
  *   v1.9.0 — 2026-11-09 — The fork says the genre's masthead is the only top bar and the node's pill
  *     sits in it as it comes (look and functions kept, restyled only when the owner asks).
@@ -52,8 +52,8 @@
  *     BRIDGE in genres.ts), so a form or an empty state is mounted and never hand-made.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
-import { ATELIER_DATA_MAP_PROPOSAL_LINE } from './build-data-map-step.js';
-import { ATELIER_DESIGNS_PROPOSAL_LINE, ATELIER_INTRODUCTION_PROPOSAL_LINE } from './app-build/build-introduction-step.js';
+import { ATELIER_DATA_MAP_PROPOSAL_LINE } from './data-map-step.js';
+import { ATELIER_DESIGNS_PROPOSAL_LINE, ATELIER_INTRODUCTION_PROPOSAL_LINE } from '../app-build/build-introduction-step.js';
 
 /**
  * The end of the mosaic section. WHY IT EXISTS: until 2026-09-20 the specification asked for two

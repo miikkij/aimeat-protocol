@@ -1,5 +1,5 @@
 /**
- * @file build-extension-prompt.ts
+ * @file src/services/builder/extension-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The canonical "build an AIMEAT server extension" prompt, served from the node so
@@ -15,7 +15,7 @@
  *   - body: the platform core (sandbox contract, manifest, scripts, secrets, files, commerce,
  *     install, verification) — what the Extensions tab fetches and wraps in its own header.
  *   - full: language line + framing + body — what an agent fetches and uses as-is.
- * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
+ * @usage import { buildExtensionPrompt } from './extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
  *   2026-11-15 — Words only (Jouni's ruling): "four ways (the columns below)" and "an unattended run", not roads.
@@ -97,8 +97,8 @@
  *     things it never said: the commercial block + exchange listing, the install route, secret
  *     config fields, and binary file I/O.
  */
-import type { AimeatConfig } from '../config.js';
-import { EXTENSION_FETCH_MAX_BYTES_CEILING, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
+import type { AimeatConfig } from '../../config.js';
+import { EXTENSION_FETCH_MAX_BYTES_CEILING, OUTBOUND_READ_MAX_BYTES } from '../../utils/read-capped.js';
 
 /** How much of one answer ctx.fetch reads, in the megabytes the prompt says it in. */
 const FETCH_READ_MB = OUTBOUND_READ_MAX_BYTES / (1024 * 1024);

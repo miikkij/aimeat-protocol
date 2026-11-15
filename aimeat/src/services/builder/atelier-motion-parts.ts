@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-atelier-motion-parts.ts
+ * @file src/services/builder/atelier-motion-parts.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The kit's controls that answer the hand (atelier 0.55.0), as the paragraph the

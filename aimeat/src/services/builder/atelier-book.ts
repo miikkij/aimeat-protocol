@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-atelier-book.ts
+ * @file src/services/builder/atelier-book.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Part `libraries` of the Atelier specification, with the Design Book's map in it.
@@ -17,10 +17,10 @@
  * @version-history
  *   v1.0.0 — 2026-09-19 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { atelierPiece, type AtelierPiece } from './build-atelier-layers.js';
-import { DesignBookService } from './design-book/service.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { atelierPiece, type AtelierPiece } from './atelier-layers.js';
+import { DesignBookService } from '../design-book/service.js';
 
 export async function atelierPieceWithBook(
   full: string, id: string, config: AimeatConfig, storage: Storage,

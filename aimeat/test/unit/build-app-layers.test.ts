@@ -13,10 +13,10 @@
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { buildAppPrompt, buildAppSpecToken } from '../../src/services/build-app-prompt.js';
+import { buildAppPrompt, buildAppSpecToken } from '../../src/services/builder/app-prompt.js';
 import {
   SECTION_TABLE, SPEC_PARTS, MAX_PART_CHARS, splitBuildAppSpec, layeredBuildAppPrompt, buildAppPiece, buildAppPieceIds,
-} from '../../src/services/build-app-layers.js';
+} from '../../src/services/builder/app-layers.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-example' } as never;
 const MODES = ['new', 'improve'] as const;

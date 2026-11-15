@@ -91,7 +91,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/build-app-prompt-session.ts": {
+      "src/services/builder/app-prompt-session.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },

@@ -215,7 +215,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   /**
    * The store's build code for this place (site.build_code, RK-XXXX-XXXX-XXXX), or ''. The owner and
    * their AI read it to send the place's one build request with their own account
-   * (services/build-with-you.ts). Kept out of siteLinks, which every visitor's page carries.
+   * (services/builder/with-you.ts). Kept out of siteLinks, which every visitor's page carries.
    */
   buildCode: string;
   /**

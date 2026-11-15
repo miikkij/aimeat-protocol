@@ -18,7 +18,7 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../src/config.js';
-import { buildAppPrompt } from '../src/services/build-app-prompt.js';
+import { buildAppPrompt } from '../src/services/builder/app-prompt.js';
 import { getLibraryPack } from '../src/data/library-packs.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

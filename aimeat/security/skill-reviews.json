@@ -192,22 +192,22 @@
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-15",
       "watches": [
-        "aimeat/src/services/build-app-layers.ts",
+        "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/services/node-templates.ts",
         "aimeat/src/services/app/spec-gate.ts"
       ],
-      "digest": "sha256:3ef4c6079e6b7ca25c8b120a",
+      "digest": "sha256:ff7b6b65b088c4268e299db9",
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
       "reviewedOn": "2026-11-15",
       "watches": [
-        "aimeat/src/services/build-atelier-prompt.ts",
-        "aimeat/src/services/build-atelier-layers.ts",
+        "aimeat/src/services/builder/atelier-prompt.ts",
+        "aimeat/src/services/builder/atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:691560693433efae330ed020"
+      "digest": "sha256:1e44f2aa1048995baaa2b81a"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -382,7 +382,7 @@
     "node:aimeat-extension-builder": {
       "reviewedOn": "2026-11-15",
       "watches": [
-        "aimeat/src/services/build-extension-prompt.ts",
+        "aimeat/src/services/builder/extension-prompt.ts",
         "aimeat/src/services/extension/ctx-contract.ts",
         "aimeat/src/services/extension/manifest.ts",
         "aimeat/src/services/extension-access/paywall.ts",
@@ -390,7 +390,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension/schedules.ts"
       ],
-      "digest": "sha256:a0bcf1c178d656234dad9efd"
+      "digest": "sha256:b33051c9f17ba4282a66ab81"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-15",
@@ -533,17 +533,17 @@
     "project:aimeat-app-building": {
       "reviewedOn": "2026-11-15",
       "watches": [
-        "aimeat/src/services/build-app-layers.ts",
+        "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/routes/app-templates.ts",
-        "aimeat/src/services/build-atelier-prompt.ts",
-        "aimeat/src/services/build-app-prompt.ts",
+        "aimeat/src/services/builder/atelier-prompt.ts",
+        "aimeat/src/services/builder/app-prompt.ts",
         "aimeat/src/services/app/publish.ts",
         "aimeat/src/services/app/bundled-crews.ts",
         "aimeat/src/services/app/agent-propose.ts",
         "aimeat/src/services/app/agent-deploy.ts",
-        "aimeat/src/services/build-data-map-step.ts"
+        "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:0570c7d6c26304c3b8d6917d",
+      "digest": "sha256:e657d64984fc55de5502e0af",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -565,9 +565,9 @@
         "aimeat/scripts/sandbox.ts",
         "aimeat/scripts/sandbox-machines.ts",
         "aimeat/scripts/ui-compare.ts",
-        "aimeat/src/services/build-app-prompt.ts"
+        "aimeat/src/services/builder/app-prompt.ts"
       ],
-      "digest": "sha256:8af4ee8b0e71c50a2e82e4bb",
+      "digest": "sha256:e52db78369300af8f8eba662",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -584,9 +584,9 @@
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
-        "aimeat/src/services/build-extension-prompt.ts"
+        "aimeat/src/services/builder/extension-prompt.ts"
       ],
-      "digest": "sha256:61e0570d5187b19940be2426"
+      "digest": "sha256:5624a1910e4515b568615abe"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-11-15",
@@ -665,7 +665,7 @@
         "docs/pitfalls.md",
         ".claude/skills/aimeat-organism-records/SKILL.md"
       ],
-      "digest": "sha256:b9ff3d5b6ba94d33b898bcb6",
+      "digest": "sha256:9ddbea56341629c46d47ac54",
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
@@ -712,13 +712,13 @@
       "aimeat/src/services/app/publish-next-steps.ts": "111fe660b7675c40"
     },
     "node:aimeat-app-builder": {
-      "aimeat/src/services/build-app-layers.ts": "659894596ba332f8",
+      "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
       "aimeat/src/services/node-templates.ts": "bcf0b92f35579c1e",
-      "aimeat/src/services/app/spec-gate.ts": "832747b6e31d4403"
+      "aimeat/src/services/app/spec-gate.ts": "b0a76f7baec1c192"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "eb4cd90c2d1438eb",
-      "aimeat/src/services/build-atelier-layers.ts": "44f4b6e45a9d8b9a",
+      "aimeat/src/services/builder/atelier-prompt.ts": "f22da130ddf9dcb3",
+      "aimeat/src/services/builder/atelier-layers.ts": "97b5f864705f517c",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "7cca5c1ee7fc64f9",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
@@ -828,15 +828,15 @@
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
     },
     "project:aimeat-app-building": {
-      "aimeat/src/services/build-app-layers.ts": "659894596ba332f8",
+      "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
       "aimeat/src/routes/app-templates.ts": "130c67847ddadf85",
-      "aimeat/src/services/build-atelier-prompt.ts": "eb4cd90c2d1438eb",
-      "aimeat/src/services/build-app-prompt.ts": "f1112b0f2b80c2c8",
-      "aimeat/src/services/app/publish.ts": "7a87b2d1057551f2",
+      "aimeat/src/services/builder/atelier-prompt.ts": "f22da130ddf9dcb3",
+      "aimeat/src/services/builder/app-prompt.ts": "e42d89e8ad0cee61",
+      "aimeat/src/services/app/publish.ts": "4cbd097437afec35",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
       "aimeat/src/services/app/agent-deploy.ts": "a18adfdc90b10062",
-      "aimeat/src/services/build-data-map-step.ts": "9c5831809dae4b13"
+      "aimeat/src/services/builder/data-map-step.ts": "481b3d008d189fcd"
     },
     "project:aimeat-design-language": {
       "aimeat/public/css/theme.css": "ffbbc71080bb57ca",
@@ -850,7 +850,7 @@
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
       "aimeat/scripts/ui-compare.ts": "a9f4b0a0d091a9ee",
-      "aimeat/src/services/build-app-prompt.ts": "f1112b0f2b80c2c8"
+      "aimeat/src/services/builder/app-prompt.ts": "e42d89e8ad0cee61"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3",
@@ -859,7 +859,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "bbefdfada0757d7f",
       ".githooks/pre-commit": "3ba3106c803ba291",
-      "aimeat/src/services/build-extension-prompt.ts": "9e6a8a3b49dbe66f"
+      "aimeat/src/services/builder/extension-prompt.ts": "91ab68a199b0d408"
     },
     "project:aimeat-organism-records": {
       "aimeat/src/services/exchange-odps.ts": "40876b1432ca4b0a",
@@ -929,7 +929,7 @@
       "aimeat/src/services/agent/task-rules.ts": "3d0abc3361b12a54"
     },
     "node:aimeat-extension-builder": {
-      "aimeat/src/services/build-extension-prompt.ts": "9e6a8a3b49dbe66f",
+      "aimeat/src/services/builder/extension-prompt.ts": "91ab68a199b0d408",
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
       "aimeat/src/services/extension/manifest.ts": "5eeca2c9f2a4ddd1",
       "aimeat/src/services/extension-access/paywall.ts": "8f57971f670133b8",
@@ -1059,7 +1059,7 @@
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
     "agent:note-writer": {
-      "docs/pitfalls.md": "18106f71237fb661",
+      "docs/pitfalls.md": "1f6e3892a12c7211",
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {

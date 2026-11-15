@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { FULL_HANDBOOK } from '../../src/services/handbooks/full.js';
 import { APPDEV_HANDBOOK } from '../../src/services/handbooks/appdev.js';
 import { MODEL_QUALITY_ADVICE } from '../../src/services/model-recommendation.js';
-import { buildAtelierPrompt } from '../../src/services/build-atelier-prompt.js';
+import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
 import { APP_BUILDER_SKILL_ENTRY } from '../../src/data/builtin-skills.app-builder.js';
 import type { AimeatConfig } from '../../src/config.js';
 

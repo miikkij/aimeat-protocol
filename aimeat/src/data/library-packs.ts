@@ -8,7 +8,7 @@
  *   surface derives from this registry so the lists can never drift again:
  *     - GET /v1/library-packs (+ /:id with the full aiDoc + changelog) — routes/library-packs.ts
  *     - GET /v1/libs catalogue — routes/libs.ts (buildLibsCatalogue)
- *     - the build-app prompt's library sections — services/build-app-prompt.ts (buildPromptLibrarySections)
+ *     - the build-app prompt's library sections — services/builder/app-prompt.ts (buildPromptLibrarySections)
  *     - bootstrap sdk_libraries — routes/bootstrap.ts (buildSdkLibrariesList)
  *     - llms-full.txt Client SDK Libraries table — {{LIBRARY_PACKS_TABLE}} token (buildLlmsPacksTable)
  *   A pack = include line(s) + version + per-library AI usage doc (aiDoc) + changelog + demo

@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-with-you-send.ts
+ * @file src/services/builder/with-you-send.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two pieces build-with-you.ts needs to send a store place's build request with the
@@ -17,9 +17,9 @@
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial.
  */
-import type { Storage } from '../storage/interface.js';
-import type { McpServerRecord } from '../models/mcp-server-schemas.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import type { McpServerRecord } from '../../models/mcp-server-schemas.js';
+import { logger } from '../../utils/logger.js';
 
 /** An address as origin and path without a trailing slash, so `…/v1/mcp/` and `…/v1/mcp` are one. */
 function sameAddress(u: string): string {

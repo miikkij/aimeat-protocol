@@ -5,7 +5,7 @@
  * @description Catalog metadata for "build it with you" ("Rakennamme kanssasi"): the place's one build
  *   request, sent and read by the owner's AI in conversation (aimeat_build_request_submit,
  *   aimeat_build_request_status), and the place's trail (aimeat_trail_list). The operations are in
- *   services/build-with-you.ts and services/place-trail.ts; REST: routes/build-with-you.ts.
+ *   services/builder/with-you.ts and services/place-trail.ts; REST: routes/build-with-you.ts.
  * @structure buildWithYouTools — the three definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history

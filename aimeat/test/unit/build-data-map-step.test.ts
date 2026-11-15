@@ -1,6 +1,6 @@
 /**
  * @file test/unit/build-data-map-step.test.ts
- * @description Both build interviews include the data map step (services/build-data-map-step.ts):
+ * @description Both build interviews include the data map step (services/builder/data-map-step.ts):
  *   the three questions, the scenario with named people that waits for a yes, the organism
  *   workspace for team data and the app's `open_to` setting. The interviews' existing questions are
  *   held word for word, because the step was added beside them and replaced nothing. The Atelier
@@ -11,10 +11,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import { buildAtelierPrompt } from '../../src/services/build-atelier-prompt.js';
-import { buildAppPrompt } from '../../src/services/build-app-prompt.js';
-import { buildAppPiece } from '../../src/services/build-app-layers.js';
-import { atelierPiece } from '../../src/services/build-atelier-layers.js';
+import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
+import { buildAppPrompt } from '../../src/services/builder/app-prompt.js';
+import { buildAppPiece } from '../../src/services/builder/app-layers.js';
+import { atelierPiece } from '../../src/services/builder/atelier-layers.js';
 import { getAppdevPitfalls } from '../../src/data/appdev-pitfalls.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-test' } as unknown as AimeatConfig;

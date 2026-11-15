@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-atelier-recipe.ts
+ * @file src/services/builder/atelier-recipe.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Atelier spec's RECIPE half: how a component that is nearly right is made right
@@ -21,7 +21,7 @@
  *   - renderLiving(base) — the record a calculation sheet is, and the seven node types
  *   - renderPatterns() — the six copy-paste patterns, each running as written on this node's kit
  * @usage
- *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
+ *   import { renderCustomisation, renderLiving, renderPatterns } from './atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
  *   v1.10.2 — 2026-11-15 — Words only (Jouni's ruling): four ways to customise, two ways a node

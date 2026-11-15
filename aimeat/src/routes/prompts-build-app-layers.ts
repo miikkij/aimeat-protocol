@@ -11,7 +11,7 @@
  *   GET /v1/prompts/build-app itself is not touched and keeps serving the whole text: the
  *   app catalog composes its prompt from it and agentic coders fetch it. These routes exist for
  *   the reader who cannot take 95 000 characters in one piece, which is every AI connected over
- *   MCP (the handbook tool reads the same service). Reasoning: services/build-app-layers.ts.
+ *   MCP (the handbook tool reads the same service). Reasoning: services/builder/app-layers.ts.
  *
  *   Public, like the full specification: build guidance, not a secret.
  *   Its own file because routes/prompts.ts is at 783 of 800 lines.
@@ -24,10 +24,10 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success, error } from '../middleware/envelope.js';
 import { sendPlainText } from '../middleware/plain-text.js';
-import { buildAppPrompt, buildAppSpecToken } from '../services/build-app-prompt.js';
+import { buildAppPrompt, buildAppSpecToken } from '../services/builder/app-prompt.js';
 import {
   layeredBuildAppPrompt, splitBuildAppSpec, buildAppPiece, buildAppPieceIds, SPEC_PARTS,
-} from '../services/build-app-layers.js';
+} from '../services/builder/app-layers.js';
 
 export function registerBuildAppLayerPrompts(router: Router, config: AimeatConfig): void {
   const fullFor = (query: Record<string, unknown>) => buildAppPrompt(config, {

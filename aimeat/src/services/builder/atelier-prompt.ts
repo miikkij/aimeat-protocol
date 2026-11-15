@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-atelier-prompt.ts
+ * @file src/services/builder/atelier-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Atelier track's build spec (TARGET-074) — the OTHER canonical app-building
@@ -25,7 +25,7 @@
  *   - composeAtelierPrompt(config, opts) — { full, body }
  *   - buildAtelierSpecToken(config) — digest of the body, for the publish spec gate
  * @usage
- *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
+ *   import { buildAtelierPrompt, buildAtelierSpecToken } from './atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
  *   v1.47.0 — 2026-11-15 — ADDITIVE: Finishing gains "Installing the app, and its home-screen icon"
@@ -175,25 +175,25 @@
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2 pulled forward: the track's own spec).
  */
 import { createHash } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import { LOOKS as LOOK_REGISTRY } from '../data/atelier-looks.js';
-import { getAppTemplateIndex } from '../data/app-templates.js';
-import { PATTERNS } from '../data/atelier-patterns.js';
-import { AMBIENTS } from '../data/atelier-ambients.js';
-import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
-import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
-import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_MOSAIC_IN_GENRE, ATELIER_PROPOSAL_SECTION } from './build-atelier-people.js';
-import { atelierEventsFirst } from './build-events-first.js';
-import { buildAtelierLibrarySection } from '../data/library-packs.js';
-import { atelierLayoutRules, ATELIER_WORKBENCH_COMPONENTS } from './build-atelier-layout-rules.js';
-import { atelierMotionParts } from './build-atelier-motion-parts.js';
-import { ATELIER_DATA_MAP_STEER, buildDataMapStep } from './build-data-map-step.js';
-import { INTRODUCTION_QUESTION, ATELIER_INTRODUCTION_SECTION } from './app-build/build-introduction-step.js';
-import { ATELIER_STRUCTURE_STEP } from './build-structure-step.js';
-import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
-import { ornamentsPromptPart } from '../data/atelier-ornaments.js';
-import { KIT_PROMPT_PARAGRAPH } from './design-book/kit.js';
-import { MODEL_QUALITY_ADVICE } from './model-recommendation.js';
+import type { AimeatConfig } from '../../config.js';
+import { LOOKS as LOOK_REGISTRY } from '../../data/atelier-looks.js';
+import { getAppTemplateIndex } from '../../data/app-templates.js';
+import { PATTERNS } from '../../data/atelier-patterns.js';
+import { AMBIENTS } from '../../data/atelier-ambients.js';
+import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../../data/atelier-effects.js';
+import { renderCustomisation, renderLiving, renderPatterns } from './atelier-recipe.js';
+import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_MOSAIC_IN_GENRE, ATELIER_PROPOSAL_SECTION } from './atelier-people.js';
+import { atelierEventsFirst } from './events-first.js';
+import { buildAtelierLibrarySection } from '../../data/library-packs.js';
+import { atelierLayoutRules, ATELIER_WORKBENCH_COMPONENTS } from './atelier-layout-rules.js';
+import { atelierMotionParts } from './atelier-motion-parts.js';
+import { ATELIER_DATA_MAP_STEER, buildDataMapStep } from './data-map-step.js';
+import { INTRODUCTION_QUESTION, ATELIER_INTRODUCTION_SECTION } from '../app-build/build-introduction-step.js';
+import { ATELIER_STRUCTURE_STEP } from './structure-step.js';
+import { ATELIER_REVIEW_SECTION } from './atelier-review.js';
+import { ornamentsPromptPart } from '../../data/atelier-ornaments.js';
+import { KIT_PROMPT_PARAGRAPH } from '../design-book/kit.js';
+import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';

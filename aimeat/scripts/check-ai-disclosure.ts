@@ -676,7 +676,7 @@ function checkLocaleParity(): void {
 // A literal presence check, so a future prompt edit cannot silently drop the one instruction that
 // puts a label into every app somebody builds on this node.
 
-const BUILD_PROMPT = 'src/services/build-app-prompt.ts';
+const BUILD_PROMPT = 'src/services/builder/app-prompt.ts';
 const BUILD_PROMPT_NON_NEGOTIABLES: Array<{ literal: string; why: string }> = [
   { literal: 'AIMEAT.ai.disclose(', why: 'the call that draws the label at first exposure' },
   { literal: 'AIMEAT.ai.declare()', why: 'attaching the record to anything the app stores or publishes' },

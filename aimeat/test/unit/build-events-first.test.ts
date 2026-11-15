@@ -1,7 +1,7 @@
 /**
  * @file test/unit/build-events-first.test.ts
  * @description Both build specifications tell an app builder that data on the node reaches the
- *   screen through an event and that a timer is the last resort (services/build-events-first.ts).
+ *   screen through an event and that a timer is the last resort (services/builder/events-first.ts).
  *   Three things are held here. The rule is in each specification, so neither can lose it in an
  *   edit. The list of change domains a builder is given names the same permission for each domain
  *   as the table the event stream enforces (auth/sse-domain-scopes.ts), so the text cannot promise
@@ -13,10 +13,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import { buildAtelierPrompt } from '../../src/services/build-atelier-prompt.js';
-import { buildAppPrompt } from '../../src/services/build-app-prompt.js';
-import { buildAppPiece } from '../../src/services/build-app-layers.js';
-import { EVENTS_FIRST_DOMAINS, classicLiveUpdatesSection } from '../../src/services/build-events-first.js';
+import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
+import { buildAppPrompt } from '../../src/services/builder/app-prompt.js';
+import { buildAppPiece } from '../../src/services/builder/app-layers.js';
+import { EVENTS_FIRST_DOMAINS, classicLiveUpdatesSection } from '../../src/services/builder/events-first.js';
 import { DOMAIN_SCOPE } from '../../src/auth/sse-domain-scopes.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-test' } as unknown as AimeatConfig;

@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-app-publish-walkthrough.ts
+ * @file src/services/builder/app-publish-walkthrough.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The classic app-building prompt's after-build publish walkthrough (new-app mode only):

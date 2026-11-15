@@ -63,7 +63,7 @@ is refused; it serves from the bare name.
 Server-side, sandboxed. `export default async function(ctx, input) { ... }` per action.
 
 **The full `ctx` table, and which run gets which member, is the node's build-extension prompt**
-(`GET /v1/prompts/build-extension`, source `src/services/build-extension-prompt.ts`).
+(`GET /v1/prompts/build-extension`, source `src/services/builder/extension-prompt.ts`).
 `test/unit/build-extension-prompt.test.ts` runs a script in the sandbox and fails when a member the
 guest receives is missing from that table, so change the table in the same commit as the sandbox.
 

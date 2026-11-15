@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description GET /v1/prompts/build-cortex — the canonical "build a cortex" prompt
- *   (services/build-cortex-prompt.ts): the manifest, the library, install and update, versions
+ *   (services/builder/cortex-prompt.ts): the manifest, the library, install and update, versions
  *   and pinning, the dependency map. Its own module for the same reason the Atelier and intent
  *   pool prompts have theirs: routes/prompts.ts is at the file-size limit, and a prompt's route is a
  *   coherent group. Public: build guidance, not a secret. ?lang, ?owner, ?idea, ?format=txt.
@@ -17,7 +17,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
 import { sendPlainText } from '../middleware/plain-text.js';
-import { buildCortexPrompt } from '../services/build-cortex-prompt.js';
+import { buildCortexPrompt } from '../services/builder/cortex-prompt.js';
 
 export function registerBuildCortexPrompt(router: Router, config: AimeatConfig): void {
   router.get('/v1/prompts/build-cortex', (req, res) => {

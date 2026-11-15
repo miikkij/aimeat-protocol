@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-cortex-prompt.ts
+ * @file src/services/builder/cortex-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The canonical "build a cortex" prompt, served at GET /v1/prompts/build-cortex. The
@@ -15,7 +15,7 @@
  *     wish, secaudit2026oct22; reworded 2026-10-26 when the owner became additive).
  *   v1.0.0 — 2026-09-03 — Initial: the tab's text moved here, plus versions, pinning and the map.
  */
-import type { AimeatConfig } from '../config.js';
+import type { AimeatConfig } from '../../config.js';
 
 export interface CortexPromptOpts {
   owner?: string;

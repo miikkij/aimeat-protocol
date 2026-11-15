@@ -1,12 +1,12 @@
 /**
- * @file src/services/build-app-agent-context.ts
+ * @file src/services/builder/app-agent-context.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The part of an app's build instructions that is about ONE agent: which agent's work
  *   the app shows, how to read that work, what its latest result looks like, and the data map row
  *   that ties the app to the agent.
  *
- *   WHY THE NODE WRITES IT. The build specification (services/build-app-prompt.ts) says how any app
+ *   WHY THE NODE WRITES IT. The build specification (services/builder/app-prompt.ts) says how any app
  *   reads what agents produce. It cannot say which agent, and the idea field holds one sentence. A
  *   builder told only "show my news agent's work" has to find the agent, guess what its results
  *   look like and remember to state the tie. This text gives all three as facts read from the
@@ -25,11 +25,11 @@
  * @version-history
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentTaskRecord } from '../storage/interface.js';
-import { buildGAII, isValidAgentName } from '../utils/gaii.js';
-import { presentMemory } from './classification/present-memory.js';
-import type { ContentReader } from './classification/reader.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
+import { buildGAII, isValidAgentName } from '../../utils/gaii.js';
+import { presentMemory } from '../classification/present-memory.js';
+import type { ContentReader } from '../classification/reader.js';
 
 export type AgentContextResult =
   | { ok: true; agent: { name: string; display_name: string; gaii: string }; has_result: boolean; text: string }

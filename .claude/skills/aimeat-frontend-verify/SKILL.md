@@ -80,7 +80,7 @@ Run all three and report the numbers.
 
 Then verify the **feature**, not the render: perform the real interaction and confirm the result appears and persists. "It didn't crash" is not a pass.
 
-The same gate is served to app builders in `src/services/build-app-prompt.ts` under "Before you call it done". Keep the two in step.
+The same gate is served to app builders in `src/services/builder/app-prompt.ts` under "Before you call it done". Keep the two in step.
 
 ## An Atelier app is accepted beside the genre it forked
 

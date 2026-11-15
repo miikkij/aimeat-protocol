@@ -5,7 +5,7 @@
  * @description Three prompt builders that had no suite of their own, each driven through the door a
  *   person or an agent actually reaches it by.
  *
- *   - services/build-cortex-prompt.ts through GET /v1/prompts/build-cortex: the ?owner= override and
+ *   - services/builder/cortex-prompt.ts through GET /v1/prompts/build-cortex: the ?owner= override and
  *     the authed-owner fallback behind it, ?idea=, ?lang= (the non-English preamble arm and the
  *     English one that omits it), and ?format=txt against the JSON envelope.
  *   - services/hello-mcp.ts buildOrganismSetupPrompt through GET /v1/prompts/organism-setup: Finnish

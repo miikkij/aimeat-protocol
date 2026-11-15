@@ -6,7 +6,7 @@
  *   kanssasi"; Jouni, 1.11 16.22). The owner, or the owner's own agent, sends the place's one build
  *   request and reads where it stands and what has been done on the place; the operator's fleet
  *   service takes the request to the build queue, reads the place's whole trail, and tells the owner
- *   once when something happened. Every operation is in services/build-with-you.ts,
+ *   once when something happened. Every operation is in services/builder/with-you.ts,
  *   services/place-trail.ts and services/operator-notify-owner.ts, which the MCP tools call too.
  *
  *   THE OPERATOR'S CREDENTIAL. An operator JWT (isOperatorCaller: the operator in person, or the
@@ -42,7 +42,7 @@ import { success, error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { validateBody } from '../models/schemas.js';
 import { INPUT_LIMITS } from '../models/input-limits.js';
-import { BuildError, operatorHandOp, operatorPendingOp, readOp, submitOp } from '../services/build-with-you.js';
+import { BuildError, operatorHandOp, operatorPendingOp, readOp, submitOp } from '../services/builder/with-you.js';
 import { readOwnTrail, readTrail, TrailError } from '../services/place-trail.js';
 import { NotifyOwnerError, notifyOwnerOnce } from '../services/operator-notify-owner.js';
 import { checkAdminPasswordOnNode, adminPasswordLimitedMessage } from '../services/admin-password.js';

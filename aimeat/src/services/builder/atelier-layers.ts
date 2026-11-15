@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-atelier-layers.ts
+ * @file src/services/builder/atelier-layers.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Atelier build specification in parts a chat can actually receive.
@@ -49,7 +49,7 @@
  *     against the 24 000 a result holds, and the section is about a library (AIMEAT.ai, the aide block).
  *   v1.0.0 — 2026-09-19 — Initial.
  */
-import { MAX_PART_CHARS } from './build-app-layers.js';
+import { MAX_PART_CHARS } from './app-layers.js';
 
 export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns' | 'look' | 'motion';
 

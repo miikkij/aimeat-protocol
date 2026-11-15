@@ -75,7 +75,7 @@
   "src/data/library-packs/sdk-ui.ts::door::7f3206aa868c": "A real door in a game: the D tile of a tile map.",
   "src/data/library-packs/sdk-ui.ts::doors::5ca8f555e67c": "History: an old library changelog entry, kept as it was written.",
   "src/mcp/apps-ui.ts::door::916095b28115": "A comment inside shipped source text (SQL, a package manifest, an app or a template): developers read it, never a person on a page.",
-  "src/services/build-atelier-recipe.ts::ovella::a261c4866848": "A real door: the sample sensor reads the air at a glasshouse door.",
+  "src/services/builder/atelier-recipe.ts::ovella::a261c4866848": "A real door: the sample sensor reads the air at a glasshouse door.",
   "src/services/design-book/preview-stages.ts::door::2f26f5339c4a": "Sample content of a Design Book preview: a theatre's doors, a bakery's oven.",
   "src/services/design-book/preview-stages.ts::doors::c19643eb17b5": "Sample content of a Design Book preview: a theatre's doors, a bakery's oven.",
   "src/services/design-book/preview-stages.ts::oven::08a893831067": "Sample content of a Design Book preview: a theatre's doors, a bakery's oven.",

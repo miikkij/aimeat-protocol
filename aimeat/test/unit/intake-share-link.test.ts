@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { COMP_PUBLIC_INTAKE } from '../../src/data/app-templates/components.js';
-import { buildAppPrompt } from '../../src/services/build-app-prompt.js';
+import { buildAppPrompt } from '../../src/services/builder/app-prompt.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-example' } as never;
 

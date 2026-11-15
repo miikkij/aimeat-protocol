@@ -65,7 +65,7 @@ import { initClassificationAudit } from '../services/classification/audit.js';
 import { initAgentRefusals } from '../services/agent/refusals.js';
 import { sendPermissionAsk } from '../services/permission-ask-notice.js';
 import { initScopeUse } from '../services/scope-use.js';
-import { startBuildWithYou } from '../services/build-with-you.js';
+import { startBuildWithYou } from '../services/builder/with-you.js';
 import { logger } from '../utils/logger.js';
 
 export interface ProcessBuffers {

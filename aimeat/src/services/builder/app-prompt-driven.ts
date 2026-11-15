@@ -1,5 +1,5 @@
 /**
- * @file build-app-prompt-driven.ts
+ * @file src/services/builder/app-prompt-driven.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The build specification's section on the prompt-driven workflow: AI work done in
@@ -11,7 +11,7 @@
  *   each built their own copy button and their own JSON digging. Item 10 of the instruction
  *   review of 2026-09-18, approved by the developer.
  *
- *   Its own file because services/build-app-prompt.ts is at the 800-line limit.
+ *   Its own file because services/builder/app-prompt.ts is at the 800-line limit.
  * @structure buildPromptDrivenSection(nodeUrl)
  * @usage body += buildPromptDrivenSection(nodeUrl);   // before the aimeat-ai section
  * @version-history

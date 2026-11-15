@@ -35,7 +35,7 @@ import type { AimeatConfig } from '../../src/config.js';
 import { lintAppArtifact } from '../../src/services/app/artifact-lint.js';
 import { genreKeptShare, ownClassNames } from '../../src/services/app/genre-fork.js';
 import { buildNotesDeclared } from '../../src/services/app/build-notes.js';
-import { ATELIER_COMPONENTS } from '../../src/services/build-atelier-prompt.js';
+import { ATELIER_COMPONENTS } from '../../src/services/builder/atelier-prompt.js';
 import { regexLiteral } from '../../src/utils/regex-literal.js';
 
 /** `app` is the shell every Atelier page calls, so it says nothing about what was used. */
