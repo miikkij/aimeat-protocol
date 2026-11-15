@@ -1,5 +1,5 @@
 /**
- * @file src/services/crew-model-ask.ts
+ * @file src/services/crews/model-ask.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A crew model choice with its own address, set by an app, waits for the owner's
@@ -22,10 +22,10 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, lead 228 reworked; the approval standard).
  */
-import { fileAsk, publishRequestedBody } from './publish-requests/ask.js';
-import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
-import { choiceAddresses } from './crew-llm-guard.js';
-import { logger } from '../utils/logger.js';
+import { fileAsk, publishRequestedBody } from '../publish-requests/ask.js';
+import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
+import { choiceAddresses } from './llm-guard.js';
+import { logger } from '../../utils/logger.js';
 
 /** The largest choice a request carries; a real one is a few hundred characters. */
 const MAX_CHOICE_CHARS = 4000;

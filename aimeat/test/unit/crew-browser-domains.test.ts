@@ -3,12 +3,12 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a proposal's crew definition must say when a member has the tool `browser`
- *   (services/crew-browser-domains.ts): the hostnames it may open, each a plain public hostname.
+ *   (services/crews/browser-domains.ts): the hostnames it may open, each a plain public hostname.
  * @version-history
  *   v1.0.0 — 2026-10-13 — Written before the function.
  */
 import { describe, it, expect } from 'vitest';
-import { browserDomainsError } from '../../src/services/crew-browser-domains.js';
+import { browserDomainsError } from '../../src/services/crews/browser-domains.js';
 
 const def = (tools: string[], domains?: unknown) => ({
   agents: [{ name: 'reader', role: 'Reader', tools }],

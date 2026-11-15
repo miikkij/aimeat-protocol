@@ -27,7 +27,7 @@
 import { logger } from '../../utils/logger.js';
 import { isLinkLocalHost } from '../../utils/url-validator.js';
 import { isLoopbackLiteral } from '../../utils/blocked-ip.js';
-import { keyEnvProblem } from '../crew-llm-guard.js';
+import { keyEnvProblem } from '../crews/llm-guard.js';
 
 export const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -58,7 +58,7 @@ export function providerIdOf(raw: unknown): string | null {
  * The name used to be any upper-case word, so a record could name DATABASE_URL or
  * AIMEAT_ENCRYPTION_KEY and send it anywhere; the first-run setup route could write such a record
  * into .env (secrets audit 2026-10-09, node configuration S1). An ALLOW-LIST, as for a crew's key
- * (services/crew-llm-guard.ts, Jouni 2026-10-02): a deny-list of today's secrets misses the next one.
+ * (services/crews/llm-guard.ts, Jouni 2026-10-02): a deny-list of today's secrets misses the next one.
  *
  * A key variable is one of three things: a name under the node's own prefix AIMEAT_AI_KEY_ (the
  * documented place for an operator's provider key), a vendor-style name ending in _API_KEY that does

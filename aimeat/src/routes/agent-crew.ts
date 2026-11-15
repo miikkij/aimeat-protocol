@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Crew tab's routes: a JSON crew definition for one of the caller's agents — read,
- *   draft, validate, try, publish, restore. Every handler is a thin door onto services/crew-ops.ts,
+ *   draft, validate, try, publish, restore. Every handler is a thin door onto services/crews/ops.ts,
  *   which the MCP tools (mcp/agent-crew.ts) call as well, so a chat session and the tab cannot
  *   drift. The node stores and versions the definition and never judges it: validation and the
  *   trial run are asked of the agent's OWN runtime over the connector tunnel (one validator,
@@ -59,8 +59,8 @@ import { callerOf as requestCaller } from '../middleware/caller.js';
 import {
   crewState, crewValidate, crewTryStart, crewTryPoll, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewSeed, crewData,
   resolveCrewAgent, type CrewCaller, type CrewRefusal,
-} from '../services/crew-ops.js';
-import { crewMenu, writeLlmChoice, effectiveLlmChoice } from '../services/crew-menu.js';
+} from '../services/crews/ops.js';
+import { crewMenu, writeLlmChoice, effectiveLlmChoice } from '../services/crews/menu.js';
 import { requesterOf } from '../services/publish-requests/ask.js';
 
 /** A crew definition as the request carries it. Shape only; the rules are the runtime's. */
@@ -85,7 +85,7 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
   // must match requireScopeUnlessSelf, which reads the parameter the same way (secaudit 2026-10-10 I0).
   const name = (req: Request) => req.params.name as string;
   const refuse = (res: Response, r: CrewRefusal) => { res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details)); };
-  /** The app that asks, when its model choice waits for the owner (services/crew-model-ask.ts). */
+  /** The app that asks, when its model choice waits for the owner (services/crews/model-ask.ts). */
   const askerOf = (req: Request) => requesterOf(deps, requestCaller(req, config.nodeId, storage), req.auth?.app);
   /**
    * A model choice's answer. `warning`: the owner's model policy leaves this model out; the choice is
@@ -182,7 +182,7 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
 
   // GET /v1/agents/:name/crew/llm — the choice that applies to this agent's crew now, for the
   // runtime: its own, the owner's default, this node (ai:use and a key to pay), or null for the
-  // machine's own providers (services/crew-menu.ts effectiveLlmChoice). A route rather than two memory
+  // machine's own providers (services/crews/menu.ts effectiveLlmChoice). A route rather than two memory
   // reads, because the answer depends on the agent's permissions and on whether the node can pay,
   // which no record holds. The agent itself reads its own with no word, as with its own tags (Jouni,
   // 2026-10-02): a crew agent may hold ai:use and nothing else.

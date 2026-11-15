@@ -1,5 +1,5 @@
 /**
- * @file src/services/crew-llm-guard.ts
+ * @file src/services/crews/llm-guard.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What an owner's model choice for an agent's crew may say: which environment variable
@@ -32,7 +32,7 @@
  *     check reads them, for the owner's approval of an address an app set (secaudit2026oct22).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { validateOutboundUrl } from '../../utils/url-validator.js';
 
 /** In words, for every refusal: what a key variable may be. */
 export const KEY_ENV_RULE =

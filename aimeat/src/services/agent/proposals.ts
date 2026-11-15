@@ -74,13 +74,13 @@ import { uncoveredScopes } from '../../utils/scope-coverage.js';
 import { withCrewRuntimeScopes } from '../../data/crew-runtime-scopes.js';
 import { addItem, listItems, closeItem } from '../open-items.js';
 import { basicAgentsApprovalUrl, residentRunnable } from '../basic-agents.js';
-import { ownerDefaultIsNode } from '../crew-menu.js';
+import { ownerDefaultIsNode } from '../crews/menu.js';
 import { findConnector, listConnectors } from '../connector-registry.js';
 import { logger } from '../../utils/logger.js';
-import { crewDefWarnings, type CrewDefWarning } from '../crew-def-warnings.js';
+import { crewDefWarnings, type CrewDefWarning } from '../crews/def-warnings.js';
 import { TASK_START_FLOOR } from './task-rules.js';
 import { offerSignalError } from './default-offer.js';
-import { browserDomainsError } from '../crew-browser-domains.js';
+import { browserDomainsError } from '../crews/browser-domains.js';
 import { withInvitesSentence } from './invites.js';
 import { isValidCron } from '../schedule/gate.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
@@ -177,7 +177,7 @@ export function proposalRunModeFor(owner: string, asked: string | undefined, ins
 /**
  * The scopes an agent is proposed and approved with: the job's, the crew runtime's
  * (data/crew-runtime-scopes.ts), and `ai:use` when the owner's crews think through this node
- * (services/crew-menu.ts ownerDefaultIsNode), because /v1/llm requires that word and an agent
+ * (services/crews/menu.ts ownerDefaultIsNode), because /v1/llm requires that word and an agent
  * approved onto the node road without it is refused on its first model call. Added after the
  * proposer's ceiling, like the runtime's scopes: they are what the agent needs to run at all, and
  * the owner sees the whole list before pressing. Ruled by Jouni on 2026-10-02.
@@ -221,7 +221,7 @@ export interface AgentProposal {
   schedule?: string | null;
   /**
    * What the definition would do that its author very likely did not intend
-   * (services/crew-def-warnings.ts). Empty when there is nothing to say; absent on a proposal
+   * (services/crews/def-warnings.ts). Empty when there is nothing to say; absent on a proposal
    * stored before 2026-10-11.
    */
   warnings?: CrewDefWarning[];

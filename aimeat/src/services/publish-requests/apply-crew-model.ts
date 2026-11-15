@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner allowed a crew model choice with its own address that an app set
- *   (services/crew-model-ask.ts filed it). The choice that was asked is written as the owner, through
+ *   (services/crews/model-ask.ts filed it). The choice that was asked is written as the owner, through
  *   writeLlmChoice, which checks it again: an address that is no longer public https, or a key
  *   variable that is not a provider key, ends the request `outdated` with the check's own words. An
  *   agent removed since ends it the same way.
@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, lead 228 reworked; the approval standard).
  */
 import { localAccountName } from '../../utils/gaii.js';
-import { writeLlmChoice } from '../crew-menu.js';
+import { writeLlmChoice } from '../crews/menu.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 export async function applyCrewModel(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

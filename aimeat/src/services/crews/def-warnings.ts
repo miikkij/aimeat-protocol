@@ -1,5 +1,5 @@
 /**
- * @file src/services/crew-def-warnings.ts
+ * @file src/services/crews/def-warnings.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a crew definition would do that its author very likely did not intend, said at

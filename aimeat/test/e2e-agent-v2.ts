@@ -1283,7 +1283,7 @@ async function run() {
     await test('a member with the tool browser needs the hostnames it may open: refused without them, with an address or a private name, taken with a public hostname', async () => {
         // The crew runtime opens only the hostnames a definition names and checks them when the agent
         // starts, after the owner approved. The proposal makes the same refusals, so the owner is never
-        // shown an agent with a browser and no limit (services/crew-browser-domains.ts).
+        // shown an agent with a browser and no limit (services/crews/browser-domains.ts).
         const propose = (name: string, extra: Record<string, unknown>) => json('/v1/agents/v2/agent-proposals', {
             method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
             body: JSON.stringify({

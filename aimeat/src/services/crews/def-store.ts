@@ -1,5 +1,5 @@
 /**
- * @file crew-def-store.ts
+ * @file src/services/crews/def-store.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where a JSON crew definition lives on the node, and the one publish sequence every
@@ -44,17 +44,17 @@
  *     definition under its own name — found in production, hidden for a day).
  *   v1.0.0 — 2026-08-28 — Initial (JSON-agent Crew tab, node side).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { writeMemoryRecord, type MemoryWriteResult } from './memory/write.js';
-import { listVersionRefs, versionNumberOf } from './workspace/versions.js';
-import { emitChange, emitDelivery } from './event-bus.js';
-import { logger } from '../utils/logger.js';
-import { ENVELOPE_VERSION, asObject, unwrapEnvelope, type CrewDefEnvelope } from './crews/def-envelope.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { writeMemoryRecord, type MemoryWriteResult } from '../memory/write.js';
+import { listVersionRefs, versionNumberOf } from '../workspace/versions.js';
+import { emitChange, emitDelivery } from '../event-bus.js';
+import { logger } from '../../utils/logger.js';
+import { ENVELOPE_VERSION, asObject, unwrapEnvelope, type CrewDefEnvelope } from './def-envelope.js';
 
 // The envelope and the two write rules live in crews/def-envelope.ts, which memory-write.ts imports
 // without importing this file; re-exported here for every importer of this file.
-export { misdirectedCrewKey, crewSitesWriteRefusal, type CrewDefEnvelope } from './crews/def-envelope.js';
+export { misdirectedCrewKey, crewSitesWriteRefusal, type CrewDefEnvelope } from './def-envelope.js';
 
 export const CREW_REGISTRY_PREFIX = 'crews.registry.';
 export const CREW_RUNTIME_PREFIX = 'crews.runtime.';

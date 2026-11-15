@@ -58,7 +58,7 @@ import { emitEcosystemMemoryWrite } from '../ecosystem/events.js';
 import { runAutomationRecipesForWrite } from '../ecosystem/automation.js';
 import { ecoMayWriteKey } from '../ecosystem/access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
-import { crewSitesWriteRefusal } from '../crew-def-store.js';
+import { crewSitesWriteRefusal } from '../crews/def-store.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../secret-records.js';
 import { presentMemory } from '../classification/present-memory.js';

@@ -64,7 +64,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { BASIC_AGENTS } from '../../data/basic-agents.js';
 import { describeBasicAgents, requestBasicAgents, daemonPrincipals } from '../../services/basic-agents.js';
-import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
+import { crewSeedAuthored, type CrewCaller } from '../../services/crews/ops.js';
 import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
 import { emitChange } from '../../services/event-bus.js';
 import { executeHooks } from '../../services/hooks.js';

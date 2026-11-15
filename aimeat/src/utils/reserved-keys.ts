@@ -255,7 +255,7 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // node does not own. The legitimate writers are the owner's own routes
   // (PUT /v1/agents/:name/crew/llm, PUT /v1/agents/llm-default), which do not pass through this gate.
   // `crews.llm.catalog` is NOT written here: the runtime publishes it into the agent's OWN namespace
-  // (services/crew-menu.ts), where this gate does not apply and no reserved grant is needed. An
+  // (services/crews/menu.ts), where this gate does not apply and no reserved grant is needed. An
   // agent writing into the owner's namespace does pass this gate, and memory:write-reserved would
   // hand it openrouter.settings and commerce.psp too. The prefix still covers the key here, so
   // nobody forges a catalogue in the owner's namespace; nothing reads it there. `crews.registry.` and

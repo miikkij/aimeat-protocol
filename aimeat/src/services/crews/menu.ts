@@ -1,5 +1,5 @@
 /**
- * @file src/services/crew-menu.ts
+ * @file src/services/crews/menu.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What an agent's runtime can actually do, asked instead of copied: the tool names its
@@ -63,27 +63,27 @@
  *   v1.0.0 — 2026-09-09 — Initial: the drift between this node's copy of the tool menu and the
  *     runtime's own, and the owner's model choice for an agent.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { askCrew, resolveCrewAgent, type CrewCaller, type CrewRefusal } from './crew-ops.js';
-import { writeMemoryRecord } from './memory/write.js';
-import { logger } from '../utils/logger.js';
-import { loadPolicyDecision } from './ai/policy-gate.js';
-import { isAllowed, parseModelRef } from './ai/policy.js';
-import { canonicalModelKey } from './ai/catalog/equivalence.js';
-import { AiCompletionError } from './ai/errors.js';
-import { crewChoiceProblem } from './crew-llm-guard.js';
-import { askOwnerForCrewModel, needsOwnerForChoice, type CrewModelAsk } from './crew-model-ask.js';
-import type { PublishRequester } from './publish-requests/store.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { askCrew, resolveCrewAgent, type CrewCaller, type CrewRefusal } from './ops.js';
+import { writeMemoryRecord } from '../memory/write.js';
+import { logger } from '../../utils/logger.js';
+import { loadPolicyDecision } from '../ai/policy-gate.js';
+import { isAllowed, parseModelRef } from '../ai/policy.js';
+import { canonicalModelKey } from '../ai/catalog/equivalence.js';
+import { AiCompletionError } from '../ai/errors.js';
+import { crewChoiceProblem } from './llm-guard.js';
+import { askOwnerForCrewModel, needsOwnerForChoice, type CrewModelAsk } from './model-ask.js';
+import type { PublishRequester } from '../publish-requests/store.js';
 
 /** What a choice an app made adds to the answer when it waits for the owner. */
 type CrewModelAskFields = {
   approval_request: Extract<CrewModelAsk, { approval_request: unknown }>['approval_request'];
   warnings: Extract<CrewModelAsk, { warnings: unknown }>['warnings'];
 };
-import { prepareAiCall } from './ai/completion.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import type { AgentRecord } from '../storage/types/identity.js';
+import { prepareAiCall } from '../ai/completion.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import type { AgentRecord } from '../../storage/types/identity.js';
 
 /** The owner's key for a default that covers every agent they have. */
 export const LLM_DEFAULT_KEY = 'crews.llm.default';
@@ -299,7 +299,7 @@ export async function writeLlmChoice(
   const valid = checked.choice;
 
   // A model address an app chose: the crew would send the owner's key there, so the owner allows it
-  // first and the crew keeps its model meanwhile (services/crew-model-ask.ts; secaudit2026oct22).
+  // first and the crew keeps its model meanwhile (services/crews/model-ask.ts; secaudit2026oct22).
   if (needsOwnerForChoice(caller.roles, valid)) {
     const asked = await askOwnerForCrewModel({ storage: deps.storage, config: deps.config }, {
       owner: caller.owner, agentName, key, choice: valid,

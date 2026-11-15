@@ -1457,14 +1457,14 @@
       },
       "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the once-only start step lists the credential records only to store each again, unchanged, so the search text is rebuilt without its value; nothing is shown to anyone."
     },
-    "src/services/crew-def-store.ts": {
+    "src/services/crews/def-store.ts": {
       "reads": {
         "getMemory": 5,
         "getMemoryByKeys": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's own crew configuration envelopes. Reviewed 2026-10-16 (QA audit F07b-02): crewSitesWriteRefusal reads the stored live definition's browser site list to compare it with a write; nothing is returned to the caller."
     },
-    "src/services/crew-menu.ts": {
+    "src/services/crews/menu.ts": {
       "reads": {
         "getMemory": 2
       },

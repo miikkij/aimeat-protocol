@@ -47,7 +47,7 @@ import { carryLabelToCopy, CopyLabelError } from '../../services/classification-
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { odpsWriteRefusal } from '../../services/exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
-import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
+import { crewSitesWriteRefusal } from '../../services/crews/def-store.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism/visibility.js';

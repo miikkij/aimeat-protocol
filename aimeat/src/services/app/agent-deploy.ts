@@ -71,7 +71,7 @@ import {
 } from '../agent/proposals.js';
 import { findOwnBundledAgent, type OwnBundledAgent } from '../app-agents/app-agent-link.js';
 import { setAgentStopped } from '../agent/stop.js';
-import { crewPublish, type CrewCaller } from '../crew-ops.js';
+import { crewPublish, type CrewCaller } from '../crews/ops.js';
 import { withDefaultOffer } from '../agent/default-offer.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { decideTaskStart, resolveAutoActivation, autoStartEvent, taskWakeId, type TaskStartDecision } from '../agent/task-rules.js';
@@ -319,7 +319,7 @@ async function actOnOwnAgent(
   }
 
   // The app declares a newer definition than the agent runs: publish it, validated by the agent's
-  // own runtime as every publish is (services/crew-ops.ts crewPublish).
+  // own runtime as every publish is (services/crews/ops.ts crewPublish).
   const publishRefusal = async (): Promise<AppAgentRefusal | null> => {
     if (!principal || !may('memory:write')) {
       return {

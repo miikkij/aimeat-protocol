@@ -18,7 +18,7 @@
  */
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { readCrewState, publishCrewDef } from './crew-def-store.js';
+import { readCrewState, publishCrewDef } from './crews/def-store.js';
 import { logger } from '../utils/logger.js';
 
 /** dropNotifyForDelivery for the agent a schedule targets, by its GAII; nothing when it is gone. */

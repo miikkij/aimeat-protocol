@@ -36,7 +36,7 @@ import { restoreWorkspace } from '../src/services/workspace/import.js';
 import { archiveOverflow } from '../src/services/chat/threads.js';
 import { createRequest, deleteRequest } from '../src/services/docsign/records.js';
 import { sha256Hex } from '../src/services/docsign/statement.js';
-import { publishCrewDef, crewKeysFor } from '../src/services/crew-def-store.js';
+import { publishCrewDef, crewKeysFor } from '../src/services/crews/def-store.js';
 import { foldIntoLog, logKeyFor } from '../src/services/ai-jobs/store.js';
 import type { AiJobRecord } from '../src/services/ai-jobs/types.js';
 import { mergeJourneyProfile, JOURNEY_KEY } from '../src/services/journey-state.js';

@@ -72,7 +72,7 @@ import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { buildGAII, resolveIdentity } from '../../utils/gaii.js';
-import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
+import { crewSeedAuthored, type CrewCaller } from '../../services/crews/ops.js';
 import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
 import { findConnector, setWanted, clearWanted, type ConnectorView } from '../../services/connector-registry.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -82,7 +82,7 @@ import { recordAccountEvent } from '../../services/account-events.js';
 import { giveFirstRun } from '../../services/agent/first-run.js';
 import { withDefaultOffer, firstRequestOf } from '../../services/agent/default-offer.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { checkLlmChoice, writeLlmChoice } from '../../services/crew-menu.js';
+import { checkLlmChoice, writeLlmChoice } from '../../services/crews/menu.js';
 import {
   proposeAgent, listProposals, readProposal, settleProposal, proposalApprovalUrl, proposalNextStep,
   proposalRunModeFor, proposalScopesFor, type ProposerPrincipal,

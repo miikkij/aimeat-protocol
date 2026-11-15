@@ -131,7 +131,7 @@ import { bulkDeleteKeyRefusal } from '../../services/memory/bin.js';
 import { callerOf } from '../../middleware/caller.js';
 import { odpsWriteRefusal } from '../../services/exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
-import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
+import { crewSitesWriteRefusal } from '../../services/crews/def-store.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';

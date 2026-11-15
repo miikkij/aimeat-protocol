@@ -22,7 +22,7 @@
  *
  *   THE DEFINITIONS ARE NOT VALIDATED BY A RUNTIME, and cannot be: there is no runtime yet, by
  *   definition. That is the whole justification for the seed door and it is written out beside it
- *   in services/crew-ops.ts. `aimeat_crew_publish` is NOT weakened — a definition that will replace
+ *   in services/crews/ops.ts. `aimeat_crew_publish` is NOT weakened — a definition that will replace
  *   an existing one still goes to the runtime that runs it, which is what that gate is worth.
  *
  *   SCOPES ARE NAMED, NEVER WILDCARDED. Every scope below is a deliberate line, and the enrolment

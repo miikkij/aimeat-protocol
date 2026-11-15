@@ -147,7 +147,7 @@ const DELEGATES: Record<string, string> = {
         + 'capability being run decides which view goes stale, and it is a different capability '
         + 'every call. Verified by reading the dispatch: the only fetch in node-invoke.ts targets '
         + '127.0.0.1 and the real Express stack.',
-    'src/mcp/agent-crew.ts': "services/crew-ops.ts → services/crew-def-store.ts, which emits 'agents' "
+    'src/mcp/agent-crew.ts': "services/crews/ops.ts → services/crews/def-store.ts, which emits 'agents' "
         + 'after a publish (publishCrewDef, the same call the Crew tab\'s route makes) and writes the '
         + 'draft and every version copy through services/memory/write.ts, whose afterMemoryWrite fires '
         + 'the memory events the profile listens on. The trial runs never touch storage and have '

@@ -2,7 +2,7 @@
  * @file test/unit/crew-llm-guard.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description What an owner's model choice for a crew may name (services/crew-llm-guard.ts): a
+ * @description What an owner's model choice for a crew may name (services/crews/llm-guard.ts): a
  *   provider key variable only (an allow-list), and a public https address only. Literal addresses,
  *   so no test depends on a name lookup.
  * @version-history
@@ -10,9 +10,9 @@
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { keyEnvProblem, crewAddressProblem, crewChoiceProblem, choiceAddresses } from '../../src/services/crew-llm-guard.js';
-import { validChoice } from '../../src/services/crew-menu.js';
-import { needsOwnerForChoice } from '../../src/services/crew-model-ask.js';
+import { keyEnvProblem, crewAddressProblem, crewChoiceProblem, choiceAddresses } from '../../src/services/crews/llm-guard.js';
+import { validChoice } from '../../src/services/crews/menu.js';
+import { needsOwnerForChoice } from '../../src/services/crews/model-ask.js';
 
 describe('needsOwnerForChoice: an address an app names waits for the owner', () => {
   const pointed = { kind: 'model', provider: { type: 'openai', base_url: 'https://8.8.8.8/v1', api_key_env: 'OPENROUTER_API_KEY' } };

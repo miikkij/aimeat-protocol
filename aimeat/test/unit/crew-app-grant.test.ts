@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
-import { crewValidate, crewTryStart, type CrewCaller } from '../../src/services/crew-ops.js';
+import { crewValidate, crewTryStart, type CrewCaller } from '../../src/services/crews/ops.js';
 
 const NODE = 'aimeat-unit-crew-001';
 let deps: { storage: Storage; config: AimeatConfig };

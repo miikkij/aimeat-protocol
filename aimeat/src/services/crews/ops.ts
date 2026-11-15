@@ -1,5 +1,5 @@
 /**
- * @file crew-ops.ts
+ * @file src/services/crews/ops.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Crew operations, once, for every door: read, draft, validate, try, publish,
@@ -37,18 +37,18 @@
  *   v1.0.0 — 2026-08-28 — Extracted from routes/agent-crew.ts so the MCP tools call the same code.
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { buildGAII, isOwnerInPerson } from '../utils/gaii.js';
-import { browserDomainsError } from './crew-browser-domains.js';
-import { nodeContext } from './node/context.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { buildGAII, isOwnerInPerson } from '../../utils/gaii.js';
+import { browserDomainsError } from './browser-domains.js';
+import { nodeContext } from '../node/context.js';
 import {
   readCrewState, saveCrewDraft, discardCrewDraft, publishCrewDef, readCrewRevision, crewKeysFor,
   CREW_VERSION_WINDOW, type CrewState,
-} from './crew-def-store.js';
-import { logger } from '../utils/logger.js';
-import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
-import { isStopped } from './agent/stop-rules.js';
+} from './def-store.js';
+import { logger } from '../../utils/logger.js';
+import { crewDefWarnings, type CrewDefWarning } from './def-warnings.js';
+import { isStopped } from '../agent/stop-rules.js';
 
 export interface CrewDeps { storage: Storage; config: AimeatConfig }
 

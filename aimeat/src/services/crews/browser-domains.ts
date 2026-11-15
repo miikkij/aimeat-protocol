@@ -1,5 +1,5 @@
 /**
- * @file src/services/crew-browser-domains.ts
+ * @file src/services/crews/browser-domains.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a crew definition must say when one of its members has the tool `browser`:

@@ -6,7 +6,7 @@
  *   validate, try, draft, publish. This is the chat path to building an agent: a person's own AI
  *   reads the definition, proposes a change, has the agent's runtime validate it, runs it once,
  *   and publishes — the whole loop the Crew tab offers, without a browser or this repo. Every tool
- *   calls services/crew-ops.ts, the same code the HTTP routes call, so the two cannot drift.
+ *   calls services/crews/ops.ts, the same code the HTTP routes call, so the two cannot drift.
  *   Nothing here writes memory itself: a chat session is an agent principal with its own name,
  *   and a plain memory write of `crews.registry.<agent>` would land under that name, invisible to
  *   the tab and the runtime (memory-write.ts refuses that write now, and points here).
@@ -33,10 +33,10 @@ import { localAccountName } from '../utils/gaii.js';
 import {
     crewState, crewValidate, crewTryStart, crewTryWait, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewSeed, crewData,
     resolveCrewAgent, type CrewCaller, type CrewRefusal,
-} from '../services/crew-ops.js';
+} from '../services/crews/ops.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { crewMenu, writeLlmChoice } from '../services/crew-menu.js';
+import { crewMenu, writeLlmChoice } from '../services/crews/menu.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 // The longest one tool call waits for a trial: the same constant the catalog's wait_seconds bound names.
 import { MAX_WAIT_SECONDS } from '../tool-catalog/input-schemas.js';
