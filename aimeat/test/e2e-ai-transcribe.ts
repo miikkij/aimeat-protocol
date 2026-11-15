@@ -8,6 +8,8 @@
  *   would reach OpenRouter stops at NO_API_KEY. A real transcription is verified by hand with a key
  *   before the feature is called done — stated here rather than left for someone to assume.
  * @version-history
+ *   2026-11-15 -- M069 oversized half: exactly 400 AUDIO_TOO_LARGE, now that the route is parsed at
+ *     the large body limit (it was 413 from express before that change).
  *   2026-11-15 -- Audit M069 (budget half), L019: the budget test no longer skips its 402 proof on a
  *     503, and NO_STT_MODEL is pinned with a key and a text model in place. The oversized-audio half
  *     stays loose: the JSON body limit answers 413 before the route's own guard (reported).
@@ -218,12 +220,9 @@ await test('Oversized inline audio → 400 AUDIO_TOO_LARGE (before any provider 
     headers: { Authorization: `Bearer ${alice.token}` },
     body: JSON.stringify({ audio_base64: huge, mime: 'audio/webm' }),
   });
-  assert(status === 400 || status === 413, `expected 400/413, got ${status}: ${JSON.stringify(body)}`);
-  if (status === 400) {
-    assert(body.error?.code === 'AUDIO_TOO_LARGE', `code: ${body.error?.code}`);
-  }
-  // Audit M069 left open, 2026-11-15: the 5 MB JSON body limit answers 413 QUOTA_EXCEEDED before the route's 8 MB guard runs.
-  // assert(status === 400 && body.error?.code === 'AUDIO_TOO_LARGE', `expected 400 AUDIO_TOO_LARGE, got ${status} ${body.error?.code}`);
+  // Audit M069: the route's own guard answers, with its storage advice. The 5 MB JSON body limit
+  // answered 413 QUOTA_EXCEEDED first until /v1/ai/transcribe joined the large-body list (server.ts).
+  assert(status === 400 && body.error?.code === 'AUDIO_TOO_LARGE', `expected 400 AUDIO_TOO_LARGE, got ${status} ${body.error?.code}`);
 });
 
 await test('Daily budget spent → 402, and the budget check precedes the provider', async () => {

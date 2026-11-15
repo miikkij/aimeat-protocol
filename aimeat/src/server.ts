@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-15 — POST /v1/ai/transcribe is parsed at the large body limit, so its own 8 MB guard and
+ *     its storage advice answer an oversized inline audio instead of express's 413 (E2E audit M069).
  *   2026-11-15 — notFoundHandler takes the config: a browser's navigation to an unknown address gets the not-found page.
  *   2026-11-15 — The comment on openapiBodyGuard(): its refusal runs after the route's own middleware.
  *   2026-11-14 — openapiBodyGuard() is given mode, config.requestBodyCheck (security.request_body_check,
@@ -240,7 +242,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
     // two or three pages; stored pictures by key are read on the node and count only against
     // IMAGE_INPUT_LIMITS (services/ai/call-files.ts).
     // /v1/secret-shares carries a secret file inline (up to security.secret_share_max_bytes, 25 MB at most).
-    const needsLargeBody = req.path.startsWith('/v1/secret-shares') || req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files') || req.path.startsWith('/v1/mcp') || req.path === '/v1/ai/image';
+    // /v1/ai/transcribe takes inline audio up to its own 8 MB cap (routes/ai.ts), whose 400
+    // AUDIO_TOO_LARGE names the storage upload instead; at the small limit express answered 413 first
+    // (E2E audit M069, 2026-11-15).
+    const needsLargeBody = req.path.startsWith('/v1/secret-shares') || req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files') || req.path.startsWith('/v1/mcp') || req.path === '/v1/ai/image' || req.path === '/v1/ai/transcribe';
     // POST /v1/mcp/register (open client registration) carries a name and a few addresses, and needs
     // no credential: it is parsed at 64 kB, not at the /v1/mcp file-call size (secaudit2026oct22).
     const limit = req.path === '/v1/mcp/register' ? '64kb'
