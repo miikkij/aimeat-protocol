@@ -44,7 +44,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { chatUsesSharedKey } from './goose-env.js';
-import { getAdminLedger } from './ledger-admin.js';
+import { getAdminLedger } from './ledger/admin.js';
 import { readKeySpend, type KeySpend } from './openrouter-key.js';
 import { nodeOpenRouterKey } from './ai/node-openrouter-key.js';
 

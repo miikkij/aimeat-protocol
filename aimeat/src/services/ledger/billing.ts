@@ -1,5 +1,5 @@
 /**
- * @file ledger-billing.ts
+ * @file src/services/ledger/billing.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Owner monthly billing rollup for the usage ledger (LEDGER / TARGET-019): the
@@ -16,12 +16,12 @@
  *   - getOwnerMonthlyBilling(storage, ownerGhii, month) -- structured monthly summary
  *   - billingToCsv(summary)                              -- CSV rows for an invoice attachment
  * @usage
- *   import { getOwnerMonthlyBilling, billingToCsv } from '../services/ledger-billing.js';
+ *   import { getOwnerMonthlyBilling, billingToCsv } from './billing.js';
  * @version-history
  *   v1.0.0 -- 2026-07-11 -- Initial creation for LEDGER TARGET-019
  */
 
-import type { Storage, AgentUsageDailyRecord } from '../storage/interface.js';
+import type { Storage, AgentUsageDailyRecord } from '../../storage/interface.js';
 
 interface Bucket {
   cost_usd: number;

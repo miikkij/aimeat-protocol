@@ -1,5 +1,5 @@
 /**
- * @file ledger-budget-alerts.ts
+ * @file src/services/ledger/budget-alerts.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Threshold alerting for the usage ledger (LEDGER / TARGET-017). Evaluates an
@@ -14,7 +14,7 @@
  * @structure
  *   - evaluateBudgetAlerts(storage, ownerGhii) -- evaluate + fire once per threshold per day
  * @usage
- *   import { evaluateBudgetAlerts } from '../services/ledger-budget-alerts.js';
+ *   import { evaluateBudgetAlerts } from './budget-alerts.js';
  * @version-history
  *   2026-11-15 -- The alert opens the AI page, where the daily budget is (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-14 -- notify() passes i18n so the notification is written in its recipient's language
@@ -24,12 +24,12 @@
  *   v1.0.0 -- 2026-07-11 -- Initial creation for LEDGER TARGET-017
  */
 
-import type { Storage } from '../storage/interface.js';
-import { getOwnerBudgetStatus } from './ledger-budget.js';
-import { notify } from './notify.js';
-import { emitChange } from './event-bus.js';
-import { logger } from '../utils/logger.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
+import type { Storage } from '../../storage/interface.js';
+import { getOwnerBudgetStatus } from './budget.js';
+import { notify } from '../notify.js';
+import { emitChange } from '../event-bus.js';
+import { logger } from '../../utils/logger.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 interface AlertState { fired: number[]; updatedAt: string }
 

@@ -24,7 +24,7 @@ import { slowReads } from './slow-reads.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig } from '../../src/config.js';
-import { evaluateBudgetAlerts } from '../../src/services/ledger-budget-alerts.js';
+import { evaluateBudgetAlerts } from '../../src/services/ledger/budget-alerts.js';
 import { runBatch, type RunState } from '../../src/services/refinery/pipeline.js';
 
 requirePostgresWhenAsked('atomic-once-jobs');
@@ -32,7 +32,7 @@ requirePostgresWhenAsked('atomic-once-jobs');
 const h = vi.hoisted(() => ({ alerts: 0, messageReads: 0 }));
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
-vi.mock('../../src/services/ledger-budget.js', async (importOriginal) => ({
+vi.mock('../../src/services/ledger/budget.js', async (importOriginal) => ({
     ...(await importOriginal<object>()),
     getOwnerBudgetStatus: async () => ({ dailyBudgetUsd: 1, level: 'over', date: '2026-10-18', spentUsd: 1.5, topConsumers: [] }),
 }));

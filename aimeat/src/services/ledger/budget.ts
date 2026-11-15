@@ -1,5 +1,5 @@
 /**
- * @file ledger-budget.ts
+ * @file src/services/ledger/budget.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Budget tracking for the usage ledger (LEDGER / TARGET-017): computes an owner's
@@ -14,13 +14,13 @@
  * @structure
  *   - getOwnerBudgetStatus(storage, ownerGhii, opts) -- spend vs budget + per-agent breakdown
  * @usage
- *   import { getOwnerBudgetStatus } from '../services/ledger-budget.js';
+ *   import { getOwnerBudgetStatus } from './budget.js';
  * @version-history
  *   v1.0.0 -- 2026-07-11 -- Initial creation for LEDGER TARGET-017
  */
 
-import type { Storage } from '../storage/interface.js';
-import { getDailyBudgetUsd } from './ai/daily-budget.js';
+import type { Storage } from '../../storage/interface.js';
+import { getDailyBudgetUsd } from '../ai/daily-budget.js';
 
 /** Default alert thresholds (fraction of daily budget). Overridable per owner via prefs. */
 export const DEFAULT_WARN_RATIO = 0.8;

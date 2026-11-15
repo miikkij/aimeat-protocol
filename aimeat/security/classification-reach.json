@@ -2269,13 +2269,13 @@
       },
       "why": "Written 2026-11-14 (structure programme 2026-11, unit 2b, B15), passes the reader at the point of use: packageLinksFor reads the copies of one package manifest key by that key, chooses the one the caller may read (its own account, a public copy, or an audience that admits it) and returns it only through presentMemory with the caller's classification reader, as GET /v1/knowledge/:id/links and aimeat_knowledge_links answer it."
     },
-    "src/services/ledger-billing.ts": {
+    "src/services/ledger/billing.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI settings for the margin."
     },
-    "src/services/ledger-budget.ts": {
+    "src/services/ledger/budget.ts": {
       "reads": {
         "getMemory": 1
       },

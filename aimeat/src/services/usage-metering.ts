@@ -25,7 +25,7 @@ import { randomUUID } from 'node:crypto';
 import type { Storage, AgentUsageEvent } from '../storage/interface.js';
 import { priceUsd } from './llm-pricing.js';
 import { emitChange } from './event-bus.js';
-import { evaluateBudgetAlerts } from './ledger-budget-alerts.js';
+import { evaluateBudgetAlerts } from './ledger/budget-alerts.js';
 import { logger } from '../utils/logger.js';
 
 export interface UsageEventInput {

@@ -1,5 +1,5 @@
 /**
- * @file ledger-admin.ts
+ * @file src/services/ledger/admin.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Operator-only cross-user aggregation of the agent LLM usage ledger (LEDGER /
@@ -23,14 +23,14 @@
  * @structure
  *   - getAdminLedger(storage, { from, to }) — node-wide agent ledger over a date range
  * @usage
- *   import { getAdminLedger } from '../services/ledger-admin.js';
+ *   import { getAdminLedger } from './admin.js';
  * @version-history
  *   v2.0.0 — 2026-08-14 — Read the precomputed UsageRollup cuts instead of scanning every owner's
  *     daily rows. Response shape unchanged.
  *   v1.0.0 — 2026-07-11 — Initial: operator dashboard cross-user agent-ledger aggregate.
  */
-import type { Storage, UsageRollupRow } from '../storage/interface.js';
-import { queryUsageRollupLive } from './usage/usage-read.js';
+import type { Storage, UsageRollupRow } from '../../storage/interface.js';
+import { queryUsageRollupLive } from '../usage/usage-read.js';
 
 interface Totals {
   cost_usd: number;
