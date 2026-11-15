@@ -7,6 +7,7 @@
  *   independently-archived record archived when its container is unarchived; organism archive flips
  *   the org flag; and only the creator/admin may archive (non-member 403).
  * @version-history
+ *   2026-11-15 — Audit M250: test 9 asserts the organism archive hides t2 from the workspace read and search, and the unarchive brings it back.
  *   v1.1.0 — 2026-10-16 — 5b/5c: PUT /v1/memory/:key on the archived record (the Memory page and AIMEAT.data.update() use it) is refused with 409 ARCHIVED like POST, and the record keeps its value (QA audit D2-03, F05a-03).
  *   v1.0.0 — 2026-06-26 — Initial: record/workspace/organism archive + cascade + smart restore + guard.
  */
@@ -183,8 +184,18 @@ await test('9. Archive the whole organism sets the archived flag; unarchive clea
     assert(a.status === 200, `org archive ${a.status}: ${JSON.stringify(a.body.error)}`);
     const g = await json(`/v1/organisms/${orgId}`, { headers: auth(A.token) });
     assert(g.body.data.organism?.archived === true || g.body.data.archived === true, `org should be archived, got ${JSON.stringify(g.body.data).slice(0, 200)}`);
+    // The consequence, not only the flag: the archived organism's records leave the default reads.
+    const seesT2 = async () => {
+        const s = await json(`/v1/organisms/${orgId}/search?q=blueberry`, { headers: auth(A.token) });
+        const w = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(A.token) });
+        return { search: (s.body.data?.results || []).some((x: any) => x.id === 't2'), read: (w.body.data?.objects?.task || []).some((x: any) => x.id === 't2') };
+    };
+    const hidden = await seesT2();
+    assert(!hidden.search && !hidden.read, `an archived organism still serves t2: ${JSON.stringify(hidden)}`);
     const u = await json(`/v1/organisms/${orgId}/unarchive`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ level: 'organism' }) });
     assert(u.status === 200, `org unarchive ${u.status}`);
+    const back = await seesT2();
+    assert(back.search && back.read, `the unarchived organism does not serve t2 again: ${JSON.stringify(back)}`);
 });
 
 await test('10. A non-member cannot archive (403)', async () => {

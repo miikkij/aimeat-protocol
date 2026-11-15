@@ -9,6 +9,7 @@
  *   (The aimeat_dm_send MCP tool is a thin wrapper over the same sendDirectMessage path exercised here.)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-dm
  * @version-history
+ *   2026-11-15 — Audit L008: test 5 reads both attachments off Bob's own copy of the thread.
  *   2026-11-10 — 14b: GET /v1/messages/conversations with waiting, since, limit and preview, and its
  *     counts (the Home's waiting band).
  */
@@ -176,6 +177,14 @@ await test('5. Bob sees the agent as a pending request, accepts, then the DM is 
     const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
     const m = inbox.body.data.messages.find((x: any) => x.senderGhii === dmbot.gaii && /Alicen agentti/.test(x.body));
     assert(m !== undefined, 'Bob inbox should contain the agent-sent DM after accepting');
+    // Test 3's two attachments reach Bob's own copy, read from his side of the thread.
+    const withFiles = inbox.body.data.messages.find((x: any) => x.senderGhii === dmbot.gaii && /kaksi liitettä/.test(x.body));
+    assert(withFiles !== undefined, 'Bob inbox should contain the message with two attachments');
+    const t = await json(`/v1/messages/conversations/${encodeURIComponent(withFiles.conversationId)}`, { headers: { Authorization: `Bearer ${bob.token}` } });
+    const copy = (t.body.data?.messages ?? []).find((x: any) => x.id === withFiles.id);
+    const names = (copy?.attachments ?? []).map((a: any) => a.name).sort();
+    assert(t.status === 200 && JSON.stringify(names) === JSON.stringify(['notes.md', 'shot.png']) && copy.attachments.every((a: any) => !!a.storageKey),
+        `Bob's copy lost the attachments: ${t.status} ${JSON.stringify(copy?.attachments)}`);
 });
 
 console.log('\nPhase B — agent reads its federated inbox (two-way)');
