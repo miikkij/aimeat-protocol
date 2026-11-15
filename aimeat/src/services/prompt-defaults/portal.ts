@@ -6,6 +6,7 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   2026-11-15 — site-portal says "the list of published apps", not "the wall of apps".
  *   2026-11-12 — site-portal says how a visitor's language choice is kept (the standard header's
  *     buttons, or one script on a page without it), tells the AI to split a page that holds
  *     several languages in one file, and names the node's own HTML page and its languages in the
@@ -41,7 +42,7 @@ You are editing the portal for AIMEAT node "{{node_id}}" ({{node_name}}).
 
 ## Before a template: the page this node already has (ask first)
 
-This node's front page is normally assembled from BLOCKS the operator arranges: a hero, the wall of
+This node's front page is normally assembled from BLOCKS the operator arranges: a hero, the list of
 published apps, live counters, the change log, passages of their own words. The operator arranges
 them in Admin → Portal, and an AI connected over MCP does it with \`aimeat_surface_layout_get\` and
 \`aimeat_surface_layout_set\`. \`GET /v1/site/blocks\` lists every block this node has and the settings
@@ -53,7 +54,7 @@ the place of, so none of them survive, and none of them can be embedded into you
 library that renders one, and no tag that reaches one. You are writing the page from nothing.
 
 So ASK before writing anything, and do not guess:
-"Do you want to rearrange the page this node already has — its hero, the wall of apps, the counters,
+"Do you want to rearrange the page this node already has — its hero, the list of apps, the counters,
 the change log — or your own page instead of it? The first one is the block editor and I would not
 write a template for it."
 

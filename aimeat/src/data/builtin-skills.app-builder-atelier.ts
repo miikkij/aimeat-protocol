@@ -13,6 +13,7 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-15 — A component is customised "in the four ways above", not "through the four doors".
  *   2026-11-11 — Step 7 names the two checks the specification's Finishing gained: the console read
  *     with the browser's own warnings while the app works, and an app that computes every frame run
  *     with the JavaScript compiler off (Jouni approved the change to the specification).
@@ -559,7 +560,7 @@ moved under you says so.
   the stored names.
 - Hand-written ARIA, focus management or animation code — the components carry them, and a
   hand-rolled control is an accessibility regression, not a shortcut.
-- A copied component. When one is nearly what you need, customise it through the four doors above
+- A copied component. When one is nearly what you need, customise it in the four ways above
   (a token, a variant, a slot, a part selector) and it keeps the keyed reconcile, the designed
   empty state, the accessibility wiring and every later fix. A fork gives all four away, and the
   dialog family is never forked at all — the focus trap, Escape and focus return are the

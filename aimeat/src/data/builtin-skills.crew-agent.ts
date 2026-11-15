@@ -12,6 +12,7 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   2026-11-15 -- A resident agent suits one that answers whatever arrives, not "a front door".
  *   2026-11-10 -- Section 2: in an organism that admits every member's agent, a listed agent works
  *     with its owner's rights; the line that kept it off the list described a node defect, fixed
  *     the same day (services/organism-agent-access.ts attachedAsParticipant).
@@ -205,7 +206,7 @@ schedule, \`task:read\` for the task roster, \`ext:invoke\` to run an extension,
 \`organism:invite\` for organism membership, \`packages:read\` to list installs. Until then such a
 call works and its answer carries a \`Deprecation\` header. \`mode: "task-runner"\` lets a queued task
 start without asking the owner each time, so say that in the purpose. \`run_mode: "spawn"\` starts
-a worker per piece of work and suits bursty jobs; \`"resident"\` stays up and suits a front door.
+a worker per piece of work and suits bursty jobs; \`"resident"\` stays up and suits an agent that answers whatever arrives.
 Ask for \`"resident"\` only when the owner's connector can keep an agent up: \`aimeat connect serve\`
 and a hosted place run every agent by spawning, so the node stores such a proposal as \`spawn\` and
 says so in \`run_mode_corrected\`. When the owner's crews think through the node (their default model

@@ -23,6 +23,7 @@
  * @structure PROJECT_WORKSTATION — the multi-file scaffold, files separated by `=== file: <path> ===`
  * @usage import { PROJECT_WORKSTATION } from './app-templates/workstation.js';
  * @version-history
+ *   v1.0.1 — 2026-11-15 — The publish script names the presigned upload, not a door.
  *   v1.0.0 — 2026-08-25 — Initial.
  */
 
@@ -197,7 +198,7 @@ if (share >= 60) console.log('Assets belong in storage, not in the source. See n
 
 === file: publish.mjs ===
 /**
- * Publish dist/<filename> to the node, presigned — the door for anything over about 1 kB.
+ * Publish dist/<filename> to the node, presigned — the upload to use for anything over about 1 kB.
  * Needs AIMEAT_AGENT_TOKEN in the environment.
  */
 import fs from 'node:fs';

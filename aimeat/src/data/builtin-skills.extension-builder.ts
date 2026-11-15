@@ -27,6 +27,7 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-11-15 — A write lands in the owner's namespace "however the code was started", not "on every road".
  *   2026-11-09 — Section 5: an extension signals a change to named owners' pages with ctx.changed;
  *     the line said an extension had no way to reach an app.
  *   2026-11-08 — "Name a refusal" says EXTENSION_REFUSED with the script's code as `reason`
@@ -373,7 +374,7 @@ Every action can carry two values, and they do different jobs:
   \`ctx.files.read\` answers \`visibility\` and \`workspaceRef\`, so an extension can tell the person
   when a file it links is still closed to the readers.
 - **A read with nobody present may be narrower than the same read with a person there.** A write
-  always lands in the owner's namespace under \`ext/{name}/\`, on every road. A READ on a schedule, an
+  always lands in the owner's namespace under \`ext/{name}/\`, however the code was started. A READ on a schedule, an
   \`@activate\` job or a workflow step is judged against whoever the owner chose: their own reach by
   default, which is every node's behaviour, or the reach of the principal that wrote the code when
   they set that per extension. So an unattended \`ctx.files.read\` of the owner's private file can be

@@ -13,6 +13,8 @@
  * @structure LIVING_PACKS: LibraryPack[]
  * @usage Imported by ./sdk.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.5.4 — 2026-11-15 — The aiDoc says two ways, the mosaic's own update, the same call, the
+ *     trigger and the source, in place of roads and doors.
  *   v1.5.3 — 2026-10-21 — The aiDoc: a host on the operator's list binds by itself; one only on the
  *     person's own allowlist asks once. Additive.
  *   v1.5.2 — 2026-10-21 —The aiDoc says to store a key "for host X", and who makes the first use of one
@@ -92,15 +94,15 @@ export const LIVING_PACKS: LibraryPack[] = [
       'is why { expr: "t * 9/5 + 32", unit: "°F" } means what its author meant. A real conversion is asked',
       'for: convert(t, "K"), or a unit on a formula whose result still carries one.',
       '',
-      'WHERE A NODE APPEARS ON THE SCREEN, two roads and no third:',
+      'WHERE A NODE APPEARS ON THE SCREEN, two ways and no third:',
       '  a BINDING feeds a kit component — a gauge\'s value, a figure\'s value, a chart\'s labels and series,',
-      '  a statRow\'s tiles. The refresh goes through the mosaic\'s own door, so the kit\'s motion runs: the',
+      '  a statRow\'s tiles. The refresh goes through the mosaic\'s own update, so the kit\'s motion runs: the',
       '  figure counts to its new number and the chart\'s marks move. You write nothing for that.',
       '  a BLOCK FIELD on a control, formula, text, machine or value node draws it into a `section` block',
       '  (component: "section") through the mosaic\'s fill. It must be a section; anything else is refused.',
       '',
       'MOUNTING: const d = AIMEAT.living.mount(host, record, { onChange(e) { … }, chainBlock: "chain" }).',
-      'd.set(id, value) moves a node the way a control does — the same door for a person and for an agent.',
+      'd.set(id, value) moves a node the way a control does — the same call for a person and for an agent.',
       'd.get(id) · d.values() · d.state() · d.send("EVENT") · d.chain(el) draws the dependency graph and',
       'flashes the path a change travelled. chainBlock names a section to draw that chain into.',
       'AIMEAT.living.validate(record) reads a document WITHOUT running it and returns every refusal in words',
@@ -169,7 +171,7 @@ export const LIVING_PACKS: LibraryPack[] = [
       'stops at the ends, so a clock scrubbed to 13:30 reads an hourly curve), cumsum(xs) and where(cond, a, b),',
       'the element-wise if. min(xs) and max(xs) still REDUCE a row to one value; min(a, b) and max(a, b) with',
       'two or more arguments go element by element. The trigonometry is there too — sin cos tan asin acos atan',
-      'atan2 log10 and pi — and every angle is in RADIANS, with deg() and rad() as the two doors.',
+      'atan2 log10 and pi — and every angle is in RADIANS, and deg() and rad() convert between degrees and radians.',
       'So a 24-hour day is ONE node, not twenty-four; a battery hour by hour is one scan; a year of irradiation',
       'on a tilted plane is one 288-element vector. Ask describe("formula").functions for the whole list.',
       '',
@@ -186,9 +188,9 @@ export const LIVING_PACKS: LibraryPack[] = [
       'and `raw:true` takes the body itself. A read that FAILS keeps the last value and writes the refusal',
       'into the node\'s `stale` output, which a sentence can print as {{ spot.stale }}: a price that dropped',
       'to zero because a server was down for one poll would be a document that lies with a number.',
-      'BOTH ROADS GO THROUGH THE NODE\'S `living-hooks` EXTENSION as the signed-in caller. The browser never',
+      'THE TRIGGER AND THE SOURCE BOTH GO THROUGH THE NODE\'S `living-hooks` EXTENSION as the signed-in caller. The browser never',
       'calls a third-party address itself, the owner\'s allowlist decides which hosts may be reached, and a',
-      'guest sees both roads disabled with words rather than a page that quietly does nothing. Two switches',
+      'guest sees both disabled, with words that say why, rather than a page that does nothing. Two switches',
       'are the owner\'s and both live in the record: `hooks: { enabled: false }` on the document stops every',
       'trigger at once, and `enabled` on a trigger stops that one. Each delivery is an extension action, so a',
       'page with triggers or sources declares ext:invoke in <meta name="aimeat-scopes">; node 4.0 refuses it without.',

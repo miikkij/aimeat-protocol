@@ -15,6 +15,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-11-15 — Words only (Jouni's ruling): the platform enforces permissions "on every request", not "at the door".
  *   2026-10-21 — ADDITIVE: an outside key is stored "for host X", and the extension declares it in `uses_secrets`.
  *   2026-10-17 — The new-app publish walkthrough moved unchanged to build-app-publish-walkthrough.ts (line ceiling).
  *   2026-10-17 — ADDITIVE: the data map step after the interview's six questions (build-data-map-step.ts, plan V7); questions 1-6 unchanged.
@@ -344,7 +345,7 @@ function composeAppPrompt(
   body += '\n';
   body += '**If you move data between homes, carry it over ONCE, and only when the copy actually landed.** Stamp the old record when the new one is written; without the stamp the migration copies the first group\'s data into every group the person visits, which is the bleed you were fixing. And never stamp before checking the write succeeded — that turns a failed migration into permanent data loss. Copy rather than delete, so somebody moving between an updated and a not-yet-updated surface keeps working.\n';
   body += '\n';
-  body += '**Permissions come in two layers and they answer different questions.** The PLATFORM decides whether this group may touch the thing at all (organism membership, scopes, ownership) and enforces it at the door. Your app decides which member does what — draft, send, approve, read the numbers — and `aimeat-iam` is the ready-made way to hold that. Do not confuse them in the UI: if the underlying action is a node route the user can call directly, your layer is process control between colleagues and not a lock. Say so on the screen. A permission somebody believes in and does not have is worse than no permission at all.\n';
+  body += '**Permissions come in two layers and they answer different questions.** The PLATFORM decides whether this group may touch the thing at all (organism membership, scopes, ownership) and enforces it on every request. Your app decides which member does what — draft, send, approve, read the numbers — and `aimeat-iam` is the ready-made way to hold that. Do not confuse them in the UI: if the underlying action is a node route the user can call directly, your layer is process control between colleagues and not a lock. Say so on the screen. A permission somebody believes in and does not have is worse than no permission at all.\n';
   body += '\n';
   body += '**A consent list keys on the thing it protects, not on the actor.** Unsubscribes, do-not-contact flags, approvals: if two members of one group keep their own copies, a person who opted out of one member\'s message is contacted by the next, and both believe they honoured it. Key it to the group, the company or the account the promise was made to.\n';
   body += '\n';

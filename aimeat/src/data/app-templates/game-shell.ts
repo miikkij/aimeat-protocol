@@ -19,6 +19,7 @@
  * @structure SHELL_PHASER_GAME
  * @usage  import { SHELL_PHASER_GAME } from './app-templates/game-shell.js';
  * @version-history
+ *   v1.1.1 — 2026-11-15 — The title screen's comment names three menu items, not three doors.
  *   v1.1.0 — 2026-09-05 — The register meta `custom:game`: a game's screen is the canvas, so the
  *     shell commits to its own register rather than a Design Book genre, and passes the gate.
  *   v1.0.0 — 2026-09-02 — Initial: the shell-phaser-game template (Atelier shell + aimeat-phaser).
@@ -168,7 +169,7 @@ entry: index.html
       a.status('none');
 
       /* The title screen is a SCENE CONFIG, so it goes into the scenes array like any other
-         scene and nothing is built until Phaser starts it. Three doors: play, change the
+         scene and nothing is built until Phaser starts it. Three menu items: play, change the
          settings, look at the board. An item with a scene name moves there; an item with an
          onPick runs your code. */
       var title = P.titleScene({

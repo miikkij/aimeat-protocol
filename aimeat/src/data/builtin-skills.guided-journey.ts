@@ -16,6 +16,7 @@
  * @structure GUIDED_JOURNEY_SKILL_ENTRY
  * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
  * @version-history
+ *   v2.1.1 — 2026-11-15 — Stage 2 names three options, not three roads; the profile field stays `road`.
  *   v2.1.0 — 2026-11-14 — Sharing with someone is stage 4 (journey-state.ts JOURNEY_STAGES), and it
  *     offers Ask someone who knows when the node has it on (Jouni, 2026-11-14). The organism, apps and
  *     agents are stages 5 to 7.
@@ -167,15 +168,15 @@ any AI that reads it knows what they do; and the next step you offer comes from 
 
 ### 2. A good AI of their own
 
-You are reading this, so they have one. What matters is how good it is. Three roads, and the person
-says which is theirs (write it as \`road\`):
+You are reading this, so they have one. What matters is how good it is. There are three options, and
+the person says which is theirs (write it in the field \`road\`):
 
 - **subscription**: a paid Claude, ChatGPT or Grok, or an AI coding tool, connected over MCP.
   The best results come from Claude ${M.claude} or a newer Claude model, and ChatGPT ${M.chatgpt}
   with thinking turned on.
 - **free**: the free Claude plan with this node as a connector. It runs a lighter model that handles
   everyday work well: saving and finding, sharing, asking. Apps and long builds turn out noticeably
-  better on Claude ${M.claude} or newer. The other free road is their own OpenRouter credit, about
+  better on Claude ${M.claude} or newer. The other free option is their own OpenRouter credit, about
   ten dollars, used on a strong reasoning model such as DeepSeek V4 Pro; it lasts a long time at
   those prices. Free models make many mistakes here, so do not recommend them.
 - **prompt**: an AI that cannot connect (Microsoft Copilot, the free ChatGPT, the Gemini app outside

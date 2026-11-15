@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-15 — An imported agent's trust score is capped on import, not "on the way in".
  *   2026-11-15 — Section 4: an AI's delete in a team waits for a lead while the team's approval gate
  *     is on (services/team/action-gate.ts, team setup T7).
  *   2026-11-15 — Section 6: erasure also removes the people registered to the person's apps without an
@@ -203,7 +204,7 @@ What an export leaves out, and why:
   \`direction: "import"\`. Both create a NEW organism or workspace; members and the board are not
   restored. A ZIP that fails the safety checks is refused and kept aside for the operator.
 - **An agent:** \`POST /v1/agents/import\` with the agent export. The agent gets new keys, and a high
-  trust score is capped on the way in, so a moved agent earns the rest again on its new node.
+  trust score is capped on import, so a moved agent earns the rest again on its new node.
 - **One public record of someone else**, copied into the person's own records:
   \`POST /v1/memory/copy\` (an agent's call). It keeps the source's classification and never lowers it;
   for a record of a workspace or an organism that is the higher of its own and the workspace's or

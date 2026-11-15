@@ -28,6 +28,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.46.1 — 2026-11-15 — Words only (Jouni: the prompts work better when they explain the thing):
+ *     "an admin or monitoring screen" for the machine room, "the log view" for the log vane, "the one
+ *     colour you set" for the one colour door.
  *   v1.46.0 — 2026-11-11 — ADDITIVE (Jouni approved it: "Tee"): Finishing gains one paragraph with
  *     two checks. The console is read with the browser's own warnings while the app works, and an
  *     app that computes every frame is run with the JavaScript compiler off. An app built from this
@@ -441,10 +444,10 @@ function composeBody(config: AimeatConfig): string {
     + 'and free at idle because it is pure CSS scroll timelines. And a chart block may carry '
     + '`presentation: "mural"`: the chart stops living in a tile and becomes the section\'s '
     + 'full-bleed ground — the data as the decor, one mural per screen.\n\n'
-    + 'THE MACHINE ROOM IS AN ARRANGEMENT, NOT APP CODE. Four blocks make any admin or '
-    + 'monitoring screen: `health` (one row per watched thing — lamp, name, latest reading), '
+    + 'AN ADMIN OR MONITORING SCREEN IS AN ARRANGEMENT, NOT APP CODE. Four blocks make any such '
+    + 'screen: `health` (one row per watched thing — lamp, name, latest reading), '
     + '`queue` (work items with states, counted in a strip), `gauge` (ONE value on a dial, '
-    + 'bands turning the tone) and `console` (the log vane — monospace, capped, follows the '
+    + 'bands turning the tone) and `console` (the log view — monospace, capped, follows the '
     + 'tail only while the reader is at the tail). Their tones ride the theme\'s ok/warn/err '
     + 'colours, so a status screen reads at a glance in every look and mode.\n\n'
     + 'CHARTS ARE A FAMILY on one block: `chart` with `kind: "axes"` (bars, lines and filled '
@@ -698,7 +701,7 @@ function composeBody(config: AimeatConfig): string {
   body += '## The signature: this app\'s own hand\n\n';
   body += 'A stored layout may carry a top-level `tokens` object: bounded overrides of colour, '
     + 'shape, typography, density and motion on top of the look (the catalogue\'s '
-    + '`signature_tokens` lists every legal name). The one colour door is `--ak-accent` as a '
+    + '`signature_tokens` lists every legal name). The one colour you set is `--ak-accent`, as a '
     + 'LIGHT/DARK PAIR "#hex/#hex" — the validator runs the full contrast matrix on each half '
     + 'against its own mode, so a pair that lands is proven readable everywhere, and a failing '
     + 'one refuses with the measured numbers and which direction to move. Every other colour '

@@ -24,6 +24,7 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.4.2 — 2026-11-15 — The rule's `use` is enforced on every route and MCP tool, not "every door".
  *   v1.4.1 — 2026-10-05 — A decision counts against the account's AI call limit, and a run counts once
  *     at its start (secaudit 2026-10, C5).
  *   v1.4.0 — 2026-10-01 — settingsUrl() for the unavailable state, and the kit's decision block.
@@ -215,7 +216,7 @@ the rule, its version and the outcome. A rule bound to an action that cannot be 
 3. **Write a rule and try it.** The owner writes it and presses Try on its sample. An agent may
    propose one with \`aimeat_decide_rule_propose\`; that creates nothing until the owner approves it.
 4. **Give the rule to an agent.** In the agent's Crew tab the tool picker has the rows \`decide\` and
-   \`decide:<rule>\`. The rule's \`use\` (agent, app, both) is enforced by the server on every door.
+   \`decide:<rule>\`. The rule's \`use\` (agent, app, both) is enforced by the server on every route and MCP tool.
 5. **Decide about the gate.** A per-agent switch, off until the owner turns it on, so a comparison run
    can run unguarded. On: an answer under the act band answers \`proceed: false\` and becomes a task for
    the owner. Off: the agent acts, and the decision is recorded with the same outcome.

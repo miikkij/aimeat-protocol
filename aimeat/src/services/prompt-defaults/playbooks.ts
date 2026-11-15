@@ -20,6 +20,7 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS.
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.2.1 — 2026-11-15 — playbook-marketplace: an agent pays through the same handler, not "the same door".
  *   v1.2.0 — 2026-10-11 — playbook-marketplace: two kinds of money (the morsel handler is gone), and
  *     each item's two values, a money price and a pacing amount (decision-morseli-on-tahdistus-ei-
  *     hinta-tarjouksen-kaksi-arvoa).
@@ -192,7 +193,7 @@ quietly becomes "everything we know", and the weekly check names any source that
 
 ## What they are getting
 One checkout that accepts two kinds of money and pays out to them:
-- **Cards and agentic checkout** through the Stripe handler (com.stripe.spt) — a person pays with a card, and an AI agent shopping on someone's behalf pays through the same door with a shared payment token.
+- **Cards and agentic checkout** through the Stripe handler (com.stripe.spt) — a person pays with a card, and an AI agent shopping on someone's behalf pays through the same handler with a shared payment token.
 - **Stablecoin** through x402 (io.aimeat.x402): USDC settles a USD price, EURC a EUR price, non-custodial. The price stays in the fiat currency; the coin is the payment method.
 
 Both register in the same payment-handler registry and implement the same collect/payout/refund contract, so the shop is built once and gains each method as it is switched on.

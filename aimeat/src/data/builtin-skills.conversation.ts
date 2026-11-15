@@ -33,7 +33,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
- *   2026-11-07 -- aimeat-paying-for-the-ai: the chat's own key pays for the chat alone; the operator's model lock sets the person's model aside.
+ *   2026-11-15 -- Options, not roads: aimeat-paying-for-the-ai names option one and option two, aimeat-first-conversation names the claude.ai connector as the easiest way, and aimeat-welcome-pages asks "is this a page or an app?".
+ *   2026-11-07 --aimeat-paying-for-the-ai: the chat's own key pays for the chat alone; the operator's model lock sets the person's model aside.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-02 -- aimeat-paying-for-the-ai: an ecosystem app's AI is paid from its owner's account (secaudit2026nov02d round 13).
  *   2026-11-01 -- aimeat-paying-for-the-ai: no free model on a node set up for the EU only (ai.region_mode eu-only).
@@ -151,10 +152,10 @@ When it fits — usually after the first real piece of work — ask:
 
 **If they do**, that subscription can do this work: their own AI connects over MCP and acts with
 their identity, their memory, their agents, the same tools this chat has. It adds no bill on either
-side, and the node's key stays for people who have not brought one. The easiest road is the
+side, and the node's key stays for people who have not brought one. The easiest way is the
 claude.ai connector — the walkthrough below, nothing to install — and the Connect page,
-/v1/profile?tab=mcp , has the copy-paste instructions per platform; \`npx aimeat connect\` is the
-road for CLI tools.
+/v1/profile?tab=mcp , has the copy-paste instructions per platform; \`npx aimeat connect\` is how
+CLI tools connect.
 
 Say it once and let them decide. **If they say no, or if they have no subscription**, carry on
 exactly as before — this chat works for them either way, and the node is paying for it.
@@ -176,7 +177,7 @@ which completes the offer. The phone-install nudge belongs to the page itself; l
 
 ## Walking someone onto their own AI
 
-When they want to connect the AI they already pay for, walk the claude.ai connector road first: it
+When they want to connect the AI they already pay for, start with the claude.ai connector: it
 works on the free tier and needs nothing installed. One step at a time, waiting for them between
 steps:
 
@@ -197,7 +198,7 @@ so before they invest time); Grok → its strongest model; a key of their own �
 model such as DeepSeek V4 Pro. A strong model makes the setup go right the first time; the cheap
 default is where it goes wrong.
 
-ChatGPT's free tier, and any app without connector support, takes the other road: their own
+ChatGPT's free tier, and any app without connector support, uses the other option: their own
 OpenRouter key, on the AI keys page, /v1/profile?tab=ai , and \`aimeat-paying-for-the-ai\` carries
 the details.
 
@@ -238,9 +239,9 @@ A person's welcome page and a company's page are **published documents**, not ap
 file, written by you and served at a permanent address. One tool call publishes it. There is no
 build step, no template catalogue, no draft, no research phase.
 
-## Read this first: which road is this?
+## Read this first: is this a page or an app?
 
-| The person wants | The road | The tool |
+| The person wants | Use | The tool |
 |---|---|---|
 | Their own page, portfolio, "my site", welcome page | this skill | \`aimeat_portfolio_publish\` |
 | Their company's page | this skill | \`aimeat_company_portfolio_publish\` |
@@ -251,7 +252,7 @@ just happy, with some interactivity". The agent loaded \`aimeat-app-builder\`, w
 to research the node before building anything, so it read the handbook, the appdev overview, a
 skill, the extension list and the capability list — and then printed the HTML into the chat for the
 person to copy into a file by hand. Every step was right for an app. None of it was right for a
-page. The person got a wall of research, a wall of code and no address.
+page. The person got pages of research, a long block of code and no address.
 
 A page is not an app. If nothing needs to be stored, no second person needs to see each other's
 input, and no server-side rule has to hold, it is a page. Publish it.
@@ -563,7 +564,7 @@ refusal (\`QUOTA_EXHAUSTED\`), not a weaker answer.
 Step 3 is the one to be honest about. The response carries \`degradedToFreeModel: true\` when it
 happens, and a person whose answers quietly got worse and was never told will conclude the system
 broke. **Say it in one line when it applies** — "your allowance here is used up, so this came from a
-free model" — and then offer the two roads below. Do not warn about it before it happens; a number
+free model" — and then offer the two options below. Do not warn about it before it happens; a number
 on a page is enough until it is actually spent.
 
 Two things this does NOT cover, and you should not imply otherwise:
@@ -592,7 +593,7 @@ Why it exists here at all: this node does not want to be the place you buy AI fr
 to work with your data. One key you own, that works everywhere else too, is the version of that with
 the least lock-in.
 
-## Road one: their own OpenRouter key
+## Option one: their own OpenRouter key
 
 1. Make an account at **https://openrouter.ai** and create a key.
 2. Paste it in **Profile › OpenRouter**. It is stored encrypted, and it is used from that moment on.
@@ -615,23 +616,23 @@ two numbers worth repeating are the one-off $10 that lifts the free tier to 1000
 DeepSeek v4 0813 with reasoning on as the first model to pick. One pointer and the numbers — the
 panel does the rest.
 
-## Road two: the subscription they already pay for
+## Option two: the subscription they already pay for
 
 If they already pay for Claude, ChatGPT or Grok, that subscription can do this work instead, over
 MCP, with their identity and their memory on this node:
 
-- In a chat app, the claude.ai connector is the no-install road — the walkthrough is in
+- In a chat app, the claude.ai connector needs nothing installed — the walkthrough is in
   \`aimeat-first-conversation\`.
 - \`npx aimeat connect\` on their machine writes the configuration for CLI tools.
 - **Profile › Agents** carries the copy-paste instructions per platform.
 - Nothing extra is charged on either side: they are already paying for the subscription, and the
   node's key is left for people who have not brought one.
 
-## Which road to suggest
+## Which option to suggest
 
-- **They already pay for a chat subscription** → road two first. It costs them nothing beyond what
+- **They already pay for a chat subscription** → option two first. It costs them nothing beyond what
   they already spend, and it gives them their own tool rather than only this page.
-- **They do not** → road one. A key of their own, and the $10 note above so they know what the free
+- **They do not** → option one. A key of their own, and the $10 note above so they know what the free
   models need.
 - **They ask which is better** → they are not exclusive. Many people end up with both: the
   subscription for their own chatting, a key here for what the node does on a schedule.
@@ -687,7 +688,7 @@ That is the operator's to fix, not the person's, and the list says so.
 
 ## Many messages, or every night: the refinery
 
-What follows is the hand-made road: one search, one message, one attachment at a time. When the job
+What follows is the manual way: one search, one message, one attachment at a time. When the job
 is "sort all my mail" or "collect every receipt from now on", the node does it for you: the mail
 refinery reads a batch from where the last one stopped, sorts each message into a kind, reads its
 fields from the text and the PDFs, and files it as a workspace row in a queue. \`aimeat_refinery_run\`

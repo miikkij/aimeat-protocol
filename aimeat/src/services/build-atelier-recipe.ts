@@ -24,6 +24,8 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.10.2 — 2026-11-15 — Words only (Jouni's ruling): four ways to customise, two ways a node
+ *     reaches the screen, the mosaic's own update, one extension, in place of doors and roads.
  *   v1.10.1 — 2026-11-08 — The sheet example drops `nav: 'stack'`, a mode the node does not have (the
  *     publish refused the layout in silence); with no `nav` the blocks stack.
  *   v1.10.0 — 2026-11-03 — The variants line names fingerprint (`dense` and `plain`, kit 0.69.0),
@@ -64,7 +66,7 @@
  */
 export function renderCustomisation(): string {
   return '## A COMPONENT THAT IS NEARLY RIGHT IS CUSTOMISED, NEVER COPIED\n\n'
-    + 'Four doors, the same four on every component; `AIMEAT.atelier.describe("list")` tells '
+    + 'Four ways to customise, the same four on every component; `AIMEAT.atelier.describe("list")` tells '
     + 'you which ones a component has, and `describe()` names every component that answers.\n\n'
     + '1. **Named parts.** Every element the kit builds carries `data-ak-part="<name>"`; your own '
     + 'CSS reaches it by name — `[data-ak-part="aside"] { … }` — so the rule keeps working when '
@@ -95,7 +97,7 @@ export function renderCustomisation(): string {
     + '`direction: "up"|"down"|"flat"` with `delta` (how far it went, in your own words).\n\n'
     + 'EVERYTHING CUSTOMISED STILL MOVES: a slot fills the row the kit already built and keyed, so '
     + 'the entrance, the glide, the exit, the pick and the selection mark are unchanged.\n\n'
-    + 'Style through those four doors and the app keeps every later fix: leave the `.ak-*` '
+    + 'Style in those four ways and the app keeps every later fix: leave the `.ak-*` '
     + 'selectors to the kit, and put the piece you would have bolted on with wrapper markup into '
     + 'the slot that is waiting for it.\n\n'
     + 'FORK ONLY AS A LAST RESORT: copy the component\'s markup out of its module and its '
@@ -140,12 +142,12 @@ export function renderLiving(base: string): string {
     + 'tells an address or one of the owner\'s own agents) and `decide` (the decision model reads '
     + 'a text and moves a machine by its own events above a threshold; below it, a person decides; '
     + 'the page then also loads aimeat-decide.js and the app asks for ai:use).\n\n'
-    + 'WHERE A NODE LANDS ON THE SCREEN, two roads: a `binding` feeds a kit component — a '
+    + 'WHERE A NODE LANDS ON THE SCREEN, two ways: a `binding` feeds a kit component — a '
     + 'figure\'s value, a gauge\'s reading, a chart\'s series — and the refresh goes through the '
-    + 'mosaic\'s own door, so the count-up and the glide run for you; and a `block` field on a '
+    + 'mosaic\'s own update, so the count-up and the glide run for you; and a `block` field on a '
     + 'control, formula, text, machine or value node draws it into a `section` block of the same '
     + 'arrangement, which is where a node goes when the kit has no component for it.\n\n'
-    + 'A DOCUMENT CAN ALSO REACH OUT, AND ONLY THROUGH ONE DOOR. A `trigger` fires when a machine '
+    + 'A DOCUMENT CAN ALSO REACH OUT, AND ONLY THROUGH ONE EXTENSION. A `trigger` fires when a machine '
     + 'TRANSITIONS — not on every recompute — and sends one message carrying the whole state: the '
     + 'document, the time, which machine moved from where to where on which event, every value '
     + 'with its unit and its label, and every machine\'s state. Its target is a url or one of the '
@@ -154,7 +156,7 @@ export function renderLiving(base: string): string {
     + 'a read that fails keeps the last value and writes the refusal into the node\'s `stale` '
     + 'output. Both go through the node\'s `living-hooks` extension as the signed-in caller, so '
     + 'the owner\'s allowlist decides which hosts may be reached — never the record, and never the '
-    + 'browser calling a third party directly. A guest sees both roads disabled with words. Two '
+    + 'browser calling a third party directly. A guest sees both disabled, with words that say why. Two '
     + 'switches are the owner\'s: `hooks: { enabled: false }` on the document stops every trigger, '
     + 'and `enabled` on a trigger stops that one. An address that wants a key gets it by NAME: a '
     + 'trigger\'s or a source\'s `headers` may carry `{{secret:NAME}}`, which the node fills from '
