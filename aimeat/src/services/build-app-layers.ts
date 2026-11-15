@@ -34,6 +34,9 @@
  *   import { buildAppPiece } from './build-app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
+ *   2026-11-15 — The section "Installing the app on a phone, and its home-screen icon" is on demand,
+ *     id `install`, with a short `when`: its pointer line is read from part `start`, which has
+ *     about 80 characters left under MAX_PART_CHARS on a long node address.
  *   2026-11-01 — The section "Users who have no AIMEAT account" (aimeat-parties.js) is on demand,
  *     id `outside-users` (plan D4).
  *   2026-10-19 —The section "Calling the node" is served in part `data`, not `start`. Part `start`
@@ -146,6 +149,10 @@ export const SECTION_TABLE: Record<string, SectionRule> = {
   'Images & files (cross-user display)': {
     id: 'files', layer: 'on-demand',
     when: 'The app uploads images or files, or shows them to other people.',
+  },
+  'Installing the app on a phone, and its home-screen icon': {
+    id: 'install', layer: 'on-demand',
+    when: 'Install on a phone; the home-screen icon.',
   },
   "AI work in the person's own chat: the prompt-driven workflow (aimeat-prompt.js)": {
     id: 'prompt-driven', layer: 'on-demand',

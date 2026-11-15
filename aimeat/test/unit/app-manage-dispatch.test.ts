@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-15 — icon_upload reaches POST .../icon with icon and storage_key.
  *   2026-11-15 — parties carries limit and offset (a page of the registered people).
  *   2026-11-06 — settings carries `about` and `about_lang` (TARGET-093).
  *   2026-11-01 — party_stop and party_resume (WP9d).
@@ -64,7 +65,7 @@ const VALUE: Record<string, unknown> = {
     image: 'https://x/zqximg.png', lang: 'fi', badge: false, install: true, aiUse: false, info: false, tucked: true, kind: 'privacy', format: 'markdown',
     content: 'zqxcontent', remove: true, limit: 7, playtest: true, days: 9, on: true, geo: 'region', detail: ['zqxdetail'],
     layout: { v: 1, blocks: [] }, note: 'zqxnote', version: 3, name: 'zqxname', descriptions: { fi: 'zqxfi' }, about: 'zqxabout', about_lang: 'zqxlang', listing: 'unlisted', parked: true,
-    forkable: true, access_code: 'zqxcode', open_to: 'organism:zqxopen', screenshot_public: true, protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp',
+    forkable: true, access_code: 'zqxcode', open_to: 'organism:zqxopen', screenshot_public: true, protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp', icon: 'zqxicon', storage_key: 'zqxkey.png',
     subdomain: 'zqxsub', target: 'alice/shop.html', subdomain_kind: 'redirect', enabled: false, origin: 'publisher', bundled_agent: 'zqxagent',
     runner_agent: 'zqxrunner', organism_id: 'zqxorg', values: { zqxfield: 'zqxvalue' },
     account: 'zqxacct', role: 'zqxrole', level: 4, offerings: ['zqxoff'], expires_at: '2027-01-02T03:04:05Z',
@@ -92,6 +93,7 @@ const EXPECT: Record<string, [string, string]> = {
     screenshot: ['POST', '/v1/apps/alice/shop.html/screenshot/capture'],
     screenshot_upload: ['POST', '/v1/apps/alice/shop.html/screenshot'],
     screenshot_clear: ['DELETE', '/v1/apps/alice/shop.html/screenshot'],
+    icon_upload: ['POST', '/v1/apps/alice/shop.html/icon'],
     preview_link: ['POST', '/v1/apps/alice/shop.html/draft/preview-token'],
     visitors: ['GET', '/v1/apps/visitors?filename=shop.html&days=9'],
     visitors_measure: ['PUT', '/v1/apps/visitors/measurement'],
