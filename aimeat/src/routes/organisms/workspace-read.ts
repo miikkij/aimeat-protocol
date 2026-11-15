@@ -94,7 +94,7 @@ import { provenanceForWrite, ProvenanceScopeError } from '../../services/ai/prov
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { provenanceWriteEcho } from '../../services/ai/provenance-echo.js';
 import { fresherRec } from './shared.js';
-import { sharedPublishedProvenanceIds } from '../../services/share-provenance.js';
+import { sharedPublishedProvenanceIds } from '../../services/share/provenance.js';
 import { loadWorkspaceContent } from '../../services/workspace/content.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';

@@ -43,7 +43,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
-import { sharePublicInScope, SHARE_SCAN_LIMIT } from '../share-provenance.js';
+import { sharePublicInScope, SHARE_SCAN_LIMIT } from '../share/provenance.js';
 import { AI_PROVENANCE_SPEC_V1, type AiProvenance } from '../../models/ai-provenance-schemas.js';
 import { disclosureFor, type DisclosureLabelPolicy } from './disclosure.js';
 import { servedContext } from './disclosure-served.js';
@@ -89,7 +89,7 @@ export interface ReportOptions {
   labelPolicy?: DisclosureLabelPolicy;
   /**
    * The node's configuration. With it, content an open workspace share serves to anyone counts as
-   * public (services/share-provenance.ts sharePublicInScope), as every surface that serves it now
+   * public (services/share/provenance.ts sharePublicInScope), as every surface that serves it now
    * decides its label; without it only the SQL rule counts, which sees no share.
    */
   config?: AimeatConfig;

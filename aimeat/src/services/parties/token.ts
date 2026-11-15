@@ -6,7 +6,7 @@
  *   POST /v1/parties/token answers for an outside party's key, an OAuth 2.0 client-credentials token
  *   for programs that send `Authorization: Bearer` (DuckDB, pandas, an ETL job).
  *
- *   A PURPOSE TOKEN, NEVER A SESSION. It is signed with the node keys like services/share-token.ts and
+ *   A PURPOSE TOKEN, NEVER A SESSION. It is signed with the node keys like services/share/token.ts and
  *   services/download-token.ts and carries `typ: 'party'`, which auth/jwt.ts verifyJWT refuses as a
  *   session (PURPOSE_CLAIMS). It is sent as `aimeat_party_<jwt>`: the prefix lets the global auth
  *   middleware recognise it without a signature check, leave req.auth unset, and answer 401 on every

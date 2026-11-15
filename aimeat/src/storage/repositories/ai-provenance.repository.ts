@@ -112,7 +112,7 @@ export interface AiProvenanceRepository {
    * one of these records (`ids`) or a record with this content hash (`contentHash`). A share link
    * serves such a record to anyone without changing its stored visibility, so the SQL rule above
    * cannot see it; whether the share actually opens a candidate is decided in
-   * services/share-provenance.ts, by the same collectors the share routes serve with. Applies no
+   * services/share/provenance.ts, by the same collectors the share routes serve with. Applies no
    * authorization: a candidate is not an answer. At most `limit` rows (default 200, at most 1000).
    *
    * `scan` asks for every candidate in a report's population instead: the records of one owner

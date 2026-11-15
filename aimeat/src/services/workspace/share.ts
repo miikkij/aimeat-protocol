@@ -121,7 +121,7 @@ export function isDocPublicAt(share: ResolvedShare, typeName: string, docId: str
 /**
  * Does this share serve its pages to anyone who has the link? An open share does; a password or a
  * sign-in narrows who may read. The same rule GET /v1/provenance/:id and the hash lookup use
- * (services/share-provenance.ts), so a page's label, its record and the compliance counts
+ * (services/share/provenance.ts), so a page's label, its record and the compliance counts
  * agree about one page.
  */
 export function shareIsOpen(share: Pick<ResolvedShare, 'access'>): boolean {

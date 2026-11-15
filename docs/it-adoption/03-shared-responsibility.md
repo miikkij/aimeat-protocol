@@ -1,6 +1,6 @@
 # 03 Shared responsibility
 
-> Checked against AIMEAT node 4.3.1 (commit e9ef859d7) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 5d9156499) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page says who does what when an organisation runs AIMEAT as its own system. It is for the security officer, the architect and the DPO who must sign off the split before go-live. Each row names what the software does by itself, what the operator (the organisation's IT) must provide, what organism admins decide, and what each user decides. The detail for each row is on pages 04 to 18; this page is the map. When the organisation runs more than one node (per unit, partner or person), each node has its own operator and this split applies per node ([18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#many-nodes)).
 

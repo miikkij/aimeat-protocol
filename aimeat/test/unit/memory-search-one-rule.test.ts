@@ -20,7 +20,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { MemoryRecord } from '../../src/storage/interface.js';
 import { buildSearchBlob, searchValueText } from '../../src/storage/search-text.js';
 import { backfillMemorySearchValues } from '../../src/storage/providers/sqlite/schema-memory-search.js';
-import { reindexShareSearchTextOnce } from '../../src/services/share-search-reindex.js';
+import { reindexShareSearchTextOnce } from '../../src/services/share/search-reindex.js';
 
 const OWNER = 'alice@search-rule-node';
 

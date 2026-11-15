@@ -79,7 +79,7 @@ function storageWith(opts: {
     getOrganism: async () => null,
     aiProvenanceFacets: async () => [],
     listAiProvenance: async () => ({ items: [], total: 0 }),
-    // The share candidates the counts add (services/share-provenance.ts sharePublicInScope): none here.
+    // The share candidates the counts add (services/share/provenance.ts sharePublicInScope): none here.
     workspaceProvenanceLinks: async () => [],
     getAiProvenanceMany: async () => [],
     listApps: async () => ({

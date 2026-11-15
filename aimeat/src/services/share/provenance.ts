@@ -1,5 +1,5 @@
 /**
- * @file src/services/share-provenance.ts
+ * @file src/services/share/provenance.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The workspace-share half of THE visibility rule for provenance records (aiprov E1).
@@ -46,17 +46,17 @@
  *   v1.0.0 — 2026-10-08 — Initial (aiprov E1). Beside the share routes, whose collectors it asks;
  *     a service may not import a route (check:deps).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
-import type { WorkspaceProvenanceLink } from '../storage/repositories/ai-provenance.repository.js';
-import { publiclyResolvable } from './ai/provenance.js';
-import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock, type ServeOptions } from './ai/provenance-marks.js';
-import { createPublicCollectors } from './workspace/public-collectors.js';
-import { readerFor } from './classification/reader.js';
-import { shareIsOpen, isDocPublicAt, readShareMetaOf } from './workspace/share.js';
-import { servedPageProvenanceIds } from './served-page-provenance.js';
-import { spacePrefixesOf, spaceRowAt } from './workspace/record-key.js';
-import type { ResolvedShare } from '../routes/organisms/share-types.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
+import type { WorkspaceProvenanceLink } from '../../storage/repositories/ai-provenance.repository.js';
+import { publiclyResolvable } from '../ai/provenance.js';
+import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock, type ServeOptions } from '../ai/provenance-marks.js';
+import { createPublicCollectors } from '../workspace/public-collectors.js';
+import { readerFor } from '../classification/reader.js';
+import { shareIsOpen, isDocPublicAt, readShareMetaOf } from '../workspace/share.js';
+import { servedPageProvenanceIds } from '../served-page-provenance.js';
+import { spacePrefixesOf, spaceRowAt } from '../workspace/record-key.js';
+import type { ResolvedShare } from '../../routes/organisms/share-types.js';
 
 /** `organism.{org}.w.{ws}.` — the workspace a published record key belongs to. */
 const WS_KEY_RE = /^organism\.([^.]+)\.w\.([^.]+)\./;

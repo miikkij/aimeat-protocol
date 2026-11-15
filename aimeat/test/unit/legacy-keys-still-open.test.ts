@@ -72,7 +72,7 @@ beforeAll(async () => {
   const { privateKey, publicKey } = jwt.getNodeCryptoKeys();
   (await import('../../src/services/download-token.js')).initDownloadTokenKeys(privateKey, publicKey);
   (await import('../../src/services/upload/token.js')).initUploadTokenKeys(privateKey, publicKey);
-  (await import('../../src/services/share-token.js')).initShareTokenKeys(privateKey, publicKey);
+  (await import('../../src/services/share/token.js')).initShareTokenKeys(privateKey, publicKey);
   (await import('../../src/services/draft-token.js')).initDraftTokenKeys(privateKey, publicKey);
   (await import('../../src/services/operator/confirm.js')).initConfirmTokenKeys(privateKey, publicKey);
   (await import('../../src/services/parties/token.js')).initPartyTokenKeys(privateKey, publicKey);
@@ -130,7 +130,7 @@ describe('sessions and the credentials issueJWT minted at 0c741df55 still verify
 
 describe('share links and signed addresses still open', () => {
   it('a share link', async () => {
-    const { verifyShareToken } = await import('../../src/services/share-token.js');
+    const { verifyShareToken } = await import('../../src/services/share/token.js');
     expect(await verifyShareToken(T.shareToken)).toEqual({ org: 'org-legacy', ws: 'ws-legacy', pwv: 'pwv-legacy' });
   });
 

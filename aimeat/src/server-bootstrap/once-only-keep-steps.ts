@@ -110,7 +110,7 @@ import { moveEcosystemSubscriptionsByOwnerOnce } from '../services/ecosystem/sub
 import { keepTaskContentForAppGrantsOnce } from '../services/account/event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capabilities/extension-ref.js';
 import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain/site-origin-keep.js';
-import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js';
+import { reindexShareSearchTextOnce } from '../services/share/search-reindex.js';
 import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
 import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover-schedules.js';
@@ -224,7 +224,7 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   await keepOperatorOwnAddressesOnce(storage, config)
     .catch(err => logger.error('Failed to keep the operators\' own subdomain addresses; the next boot tries again', { error: String(err) }));
   // The workspace share records stored before the search text left out the password hash are stored
-  // again, so the index holds no word of it (services/share-search-reindex.ts). Awaited, so no search
+  // again, so the index holds no word of it (services/share/search-reindex.ts). Awaited, so no search
   // meets the old index first.
   await reindexShareSearchTextOnce(storage, config)
     .catch(err => logger.error('Failed to rebuild the search text of the workspace share records; the next boot tries again', { error: String(err) }));

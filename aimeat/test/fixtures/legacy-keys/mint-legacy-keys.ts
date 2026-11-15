@@ -74,7 +74,7 @@ async function main(): Promise<void> {
   const { privateKey, publicKey } = jwt.getNodeCryptoKeys();
   const download = await import('../../../src/services/download-token.js');
   const upload = await import('../../../src/services/upload/token.js');
-  const share = await import('../../../src/services/share-token.js');
+  const share = await import('../../../src/services/share/token.js');
   const draft = await import('../../../src/services/draft-token.js');
   const confirm = await import('../../../src/services/operator/confirm.js');
   const party = await import('../../../src/services/parties/token.js');

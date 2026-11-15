@@ -82,7 +82,7 @@ import { initNodeKeys, getNodeCryptoKeys } from './jwt.js';
 import { initUploadTokenKeys } from '../services/upload/token.js';
 import { initConfirmTokenKeys } from '../services/operator/confirm.js';
 import { initDownloadTokenKeys } from '../services/download-token.js';
-import { initShareTokenKeys } from '../services/share-token.js';
+import { initShareTokenKeys } from '../services/share/token.js';
 import { initPartyTokenKeys } from '../services/parties/token.js';
 import { initPageFrameTokenKeys } from '../services/page/frame-token.js';
 import { initDesignBookPreviewTokenKeys } from '../services/design-book/preview-token.js';

@@ -32,7 +32,7 @@ import { markPdf } from './pdf.js';
 import { markArchive, ArchiveBusyError } from './archive.js';
 import { toIptc, iptcComposite } from '../ai/provenance-adapters.js';
 import { recordUrlFor } from '../ai/provenance-marks.js';
-import { publiclyResolvableWithShares } from '../share-provenance.js';
+import { publiclyResolvableWithShares } from '../share/provenance.js';
 import { writeStorageFile } from '../stored-files/write.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 

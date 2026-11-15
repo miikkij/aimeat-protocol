@@ -244,7 +244,7 @@ export const aiProvenanceMethods = {
   },
 
   // ── Workspace share candidates (aiprov E1) — kept apart from publiclyLinked above on purpose:
-  //    whether a share link opens one of these is decided in services/share-provenance.ts. ──
+  //    whether a share link opens one of these is decided in services/share/provenance.ts. ──
   async workspaceProvenanceLinks(
     this: PostgresKyselyStorage,
     query: { ids?: string[]; contentHash?: string; limit?: number; scan?: { ownerGhii?: string; since?: string } },

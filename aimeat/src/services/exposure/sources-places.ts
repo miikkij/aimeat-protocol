@@ -16,7 +16,7 @@
  *     The node's own signed-in setting is applied to every kind by the report.
  *   - A workspace share: what the share routes hand an anonymous visitor, asked of their own
  *     collectors (services/workspace/public-collectors.ts) with the anonymous classification reader,
- *     as services/share-provenance.ts does. An open share is 'link', an account share 'signed-in'.
+ *     as services/share/provenance.ts does. An open share is 'link', an account share 'signed-in'.
  *     A password share is not counted: a stranger needs the password too.
  *   - An organism: its visibility, and its member roster when the roster is set public.
  *   - The welcome page while it is switched on, and a company front page while the address serves

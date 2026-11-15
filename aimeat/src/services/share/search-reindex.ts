@@ -1,5 +1,5 @@
 /**
- * @file src/services/share-search-reindex.ts
+ * @file src/services/share/search-reindex.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A once-per-node step: every workspace share record written before the search text left
@@ -24,11 +24,11 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
-import { workspaceRegistrations } from './workspace/meta-read.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
+import { workspaceRegistrations } from '../workspace/meta-read.js';
 
 /** The record under `system@<nodeId>` that says the step has run. */
 export const SHARE_SEARCH_REINDEX_KEY = 'migrations.secaudit2026oct22.share-search-reindex';

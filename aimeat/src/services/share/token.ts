@@ -1,5 +1,5 @@
 /**
- * @file share-token.ts
+ * @file src/services/share/token.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Workspace-share session tokens. When a workspace's public share is in
@@ -15,7 +15,7 @@
  *   - verifyShareToken() — validate signature + expiry, return { org, ws }
  *   - ShareTokenError — typed error with code field
  * @usage
- *   import { generateShareToken, verifyShareToken } from '../services/share-token.js';
+ *   import { generateShareToken, verifyShareToken } from './token.js';
  * @version-history
  *   v1.2.0 -- 2026-11-04 -- Signed with the share purpose's own key (auth/node-signer.ts); a token
  *     signed before, with the node key, verifies as before until it expires (codebase analysis
@@ -27,7 +27,7 @@
  */
 
 import { SignJWT } from 'jose';
-import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
+import { signFor, verifyFor, TokenPurposeError } from '../../auth/node-signer.js';
 import { createHmac } from 'node:crypto';
 
 let _privateKey: CryptoKey | null = null;

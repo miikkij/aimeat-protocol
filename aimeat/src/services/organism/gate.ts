@@ -109,7 +109,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { VerifiedToken } from '../../auth/jwt.js';
-import { verifyShareToken, shareTokenVersionOf } from '../share-token.js';
+import { verifyShareToken, shareTokenVersionOf } from '../share/token.js';
 import { emitMemoryWritten } from '../event-bus.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from '../doc-images.js';
 import { scopeRecordFilesToWorkspace } from '../record-files.js';

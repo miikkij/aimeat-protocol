@@ -2998,7 +2998,7 @@
       },
       "why": "Reviewed 2026-10-31, the node's own read: the operator's settlement ceiling for a federation peer and the day's record of that peer's refused settlements, in the federation-settlement system namespace. No content of a person's."
     },
-    "src/services/share-search-reindex.ts": {
+    "src/services/share/search-reindex.ts": {
       "reads": {
         "listAllMemory": 1
       },
