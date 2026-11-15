@@ -4,6 +4,29 @@
     {
       "date": "2026-11-15",
       "kind": "feature",
+      "id": "2026-11-15-teams-that-run-themselves",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Teams that run themselves",
+        "fi": "Tiimit, jotka pyörivät itsestään"
+      },
+      "body": {
+        "en": "Your home and each team's page show what waits for you and the team's week. When an AI deletes in a team, or a team's agent sends or pays, a lead approves it first. A decision can be shared with your other teams, a team moves to another node with its people invited back, and each member's AI onboarding is recorded for the EU AI Act. The operator sees every team as counts only and can send security events to the organisation's SIEM.",
+        "fi": "Kotinäkymä ja tiimin sivu näyttävät, mikä odottaa sinua ja miten tiimin viikko meni. Kun tekoäly poistaa jotain tiimistä tai tiimin agentti lähettää tai maksaa, vetäjä hyväksyy sen ensin. Päätöksen voi jakaa muille tiimeillesi, tiimin voi siirtää toiseen nodeen niin, että sen ihmiset kutsutaan takaisin, ja jokaisen jäsenen tekoälyperehdytys kirjataan EU:n tekoälyasetusta varten. Ylläpitäjä näkee tiimeistä vain luvut ja voi lähettää turvatapahtumat organisaation SIEM-järjestelmään."
+      },
+      "summary": {
+        "en": "A lead approves what an AI deletes, sends or pays; teams move with their people.",
+        "fi": "Vetäjä hyväksyy tekoälyn poistot, lähetykset ja maksut; tiimi siirtyy ihmisineen."
+      }
+    },
+    {
+      "date": "2026-11-15",
+      "kind": "feature",
       "id": "2026-11-15-your-app-holds-as-many-people-as-you-need",
       "highlight": false,
       "audience": [
