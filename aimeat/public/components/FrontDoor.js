@@ -28,6 +28,7 @@
  * @structure FrontDoor({ onNavigate })
  * @usage import { FrontDoor } from '/components/FrontDoor.js';
  * @version-history
+ *   2026-11-15: The register line's fallback says "an account", as en.json does.
  *   2026-09-23: Moved whole from views/home/welcome-door.js into the component library as
  *     FrontDoor (it was WelcomeDoor), markup unchanged; its look is css/components/front-door.css,
  *     its catalogue entry `front-door` (UI consolidation phase 1, a move).
@@ -139,7 +140,7 @@ export function FrontDoor({ onNavigate }) {
       <div class="poster-door-entrances">
         <a class="poster-door-register" href="/v1/portal" onClick=${(e) => enter(e, 'register')}>
           <span class="poster-door-register-title">${tr('landing.registerHome', 'Register your home')}</span>
-          <span class="poster-door-register-sub">${tr('landing.registerHomeSub', 'If you do not have a way in yet.')}</span>
+          <span class="poster-door-register-sub">${tr('landing.registerHomeSub', 'If you do not have an account yet.')}</span>
         </a>
 
         ${/* Sign-in as a keyhole: coming back here is stepping into somewhere of your own. */''}

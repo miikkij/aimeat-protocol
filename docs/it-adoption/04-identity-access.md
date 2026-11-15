@@ -172,7 +172,7 @@ The sign-in dialog's headline and the line under it can be the operator's own wo
 **Password sign-in.**
 
 - `off` refuses with 403 `PASSWORD_SIGN_IN_OFF` every local password sign-in, password registration, invitation with a password, organism code key, password reset and password change. The sign-in dialog then shows no password form (`aimeat/src/services/sign-in-policy.ts`, `aimeat/src/routes/ghii/recovery.ts`, `aimeat/src/static/sdk-libs/auth/modal.js`).
-- `operators` keeps the password for operator accounts, as the way in when the other methods fail. The node checks the password first and the role after, and a non-operator gets the same `PASSWORD_SIGN_IN_OFF`, so the answer does not tell the role (`aimeat/src/services/sign-in-policy.ts`).
+- `operators` keeps the password for operator accounts, as the fallback when the other methods fail. The node checks the password first and the role after, and a non-operator gets the same `PASSWORD_SIGN_IN_OFF`, so the answer does not tell the role (`aimeat/src/services/sign-in-policy.ts`).
 - The first operator still gets a password, through the setup wizard or `POST /v1/admin/setup/register` (`aimeat/src/services/sign-in-policy.ts`, `aimeat/src/routes/admin/setup-register.ts`).
 - Saving `off` is refused with 409 `OPERATOR_LOCKOUT` while no operator account has a passkey or an identity provider link. Set that way from the environment, the node starts and logs a `SECURITY` warning (`aimeat/src/services/sign-in-policy.ts`, `aimeat/src/index-start.ts`).
 

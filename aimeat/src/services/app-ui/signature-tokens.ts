@@ -11,6 +11,7 @@
  * @usage
  *   import { SIGNATURE_TOKENS } from './signature-tokens.js';
  * @version-history
+ *   v1.10.1 — 2026-11-15 — The spring tokens name their default value as "the default", not "the house hand".
  *   v1.10.0 — 2026-11-04 — SERVED_FONT_FAMILIES takes Source Serif 4, Source Sans 3 and Hanken Grotesk
  *     (aimeat-fonts.css v1.8.0), the faces of the vuosikertomus and konserni looks.
  *   v1.9.0 — 2026-11-04 — SERVED_FONT_FAMILIES takes Pixelify Sans, Baloo 2 and Nunito
@@ -105,9 +106,9 @@ export const SIGNATURE_TOKENS: Record<string, string> = {
   '--ak-enter-distance': 'How far content travels on entry, e.g. "0px" turns reveals off.',
   '--ak-enter-stagger': 'The gap between one entering element and the next, e.g. "0ms" lands everything at once, "90ms" deals them like cards.',
   '--ak-blur': 'The glass blur of the chrome, e.g. "0px" for solid chrome.',
-  '--ak-spring-stiffness': 'How hard the look\'s spring pulls toward where a thing is going, a plain number from 60 to 600: higher is snappier, 170 is the house hand. The tab ink, the switch, the menus, the island and every spring() read it.',
+  '--ak-spring-stiffness': 'How hard the look\'s spring pulls toward where a thing is going, a plain number from 60 to 600: higher is snappier, 170 is the default. The tab ink, the switch, the menus, the island and every spring() read it.',
   '--ak-spring-damping': 'How quickly the spring stops swinging, a plain number from 8 to 60: with stiffness 170, 26 lands without overshoot, 20 overshoots a little, 12 bounces.',
-  '--ak-spring-mass': 'How heavy the moving thing feels, a plain number from 0.5 to 3: 1 is the house hand, 1.6 is slow and weighty, 0.8 is light.',
+  '--ak-spring-mass': 'How heavy the moving thing feels, a plain number from 0.5 to 3: 1 is the default, 1.6 is slow and weighty, 0.8 is light.',
 };
 
 /**

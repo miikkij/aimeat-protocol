@@ -22,6 +22,7 @@
  *   import { McpQuickConnect } from '/components/McpInstall.js';
  *   html`<${McpQuickConnect} serverName=${agentName} />`
  * @version-history
+ *   v1.2.1 — 2026-11-15 — The heading's fallback reads "Quick setup", as en.json does.
  *   v1.2.0 — 2026-09-29 — AppOffer: the desktop app beside the steps it replaces, from
  *     `install.app`, with the person's own platform first. Once per quick-connect card, once per
  *     tool row in the setup guide.
@@ -89,7 +90,7 @@ export function McpInstallRow({ tool, serverName, className = '' }) {
 
   return html`
     <div class=${`mcpi mcpi--tool ${className}`}>
-      <div class="mcpi-head">${tr('mcpInstall.title', 'The short way in')}</div>
+      <div class="mcpi-head">${tr('mcpInstall.title', 'Quick setup')}</div>
       ${install.link ? html`
         <div class="mcpi-oneclick">
           <a class="btn-primary btn-sm" href=${install.link.href}>${install.link.label}</a>

@@ -19,7 +19,8 @@
  * @structure buildGettingStarted(base, instruction, anonymousMode, canSendMail)
  * @usage import { buildGettingStarted } from '../data/getting-started.js';
  * @version-history
- *   2026-10-16 — The no-account path says what to do when the invite answers not_sent (a send that failed) (QA audit F02a-04).
+ *   2026-11-15 — The keypair sign-in is "the other way to get a token", not "the other way in".
+ *   2026-10-16 —The no-account path says what to do when the invite answers not_sent (a send that failed) (QA audit F02a-04).
  *   2026-10-15 — The keypair sign-in signs the identity and a timestamp; no nonce is fetched, and the token lasts the node's token lifetime (feature-list audit 33).
  *   2026-10-15 — The no-account path offers POST /v1/registration-invites only when the node can send mail; otherwise it gives the portal link (feature-list audit #23).
  *   v1.0.0 — 2026-08-07 — Extracted from routes/bootstrap.ts and rewritten off the removed
@@ -93,7 +94,7 @@ export function buildGettingStarted(
       } : {}),
 
       step_3_authenticate: {
-        description: 'Device authorization already handed you a token. This is the OTHER way in: when you hold an agent keypair (from POST /v1/agents), sign your identity and a timestamp for a JWT. No nonce is fetched.',
+        description: 'Device authorization already handed you a token. This is the OTHER way to get one: when you hold an agent keypair (from POST /v1/agents), sign your identity and a timestamp for a JWT. No nonce is fetched.',
         flow: [
           '1. Sign: Ed25519_sign(your_private_key, your_gaii + current_iso_timestamp)',
           `2. POST ${base}/v1/auth/token with { "gaii": "your_gaii", "timestamp": "ISO string", "signature": "base64 signature" }`,

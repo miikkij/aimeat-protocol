@@ -8,6 +8,7 @@
  * @structure StatusBar({ status, onReset })
  * @usage html`<${StatusBar} status=${status} onReset=${reset} />`
  * @version-history
+ *   v1.5.1 — 2026-11-15 — The chat.nodeKey fallback says "this server", as en.json does since 2026-09-13.
  *   v1.5.0 — 2026-10-31 — On a node the store sold: no "Your agent" label, and the reset reads "Start
  *     the conversation over" (Jouni's review of v31, K32; the chat asks before it resets).
  *   v1.4.0 — 2026-10-31 — On a node the store sold, the allowance line is the AI credit in euros
@@ -54,7 +55,7 @@ export function StatusBar({ status, onReset }) {
         allowance: () => credit
             ? tr('home.credit.chatLine', 'AI credit left: {amount}.').replace('{amount}', money(credit.eur, 'EUR'))
             : tr('chat.allowance', '{n} USD left of your allowance.').replace('{n}', remaining.toFixed(2)),
-        node: () => tr('chat.nodeKey', 'The house pays for this conversation, on its own key.'),
+        node: () => tr('chat.nodeKey', 'This server pays for the conversation, on its own key.'),
     }[status.pays] ?? null;
     // What the person's OWN money is doing while the node pays for this conversation. Shown only
     // when it is not already the subject of the payer line, and worded so it cannot be read as a

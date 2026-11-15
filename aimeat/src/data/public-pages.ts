@@ -34,7 +34,8 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
- *   2026-11-12 - `language` on PublicPage: the language of a page served in one known language.
+ *   2026-11-15 - /v1/how-an-app-builds says the front page's list of apps, not "the wall".
+ *   2026-11-12 -`language` on PublicPage: the language of a page served in one known language.
  *   2026-11-09 - TARGET-094: `ownContent` marks the three pages that show this node's own content (/,
  *     /v1/app-store, /v1/members). With `seo.primary_node_url` set, every other page names the main
  *     node's address as canonical (canonicalPageUrl) and leaves this node's sitemap and IndexNow
@@ -349,7 +350,7 @@ change, each with a date, a kind, a title and a body in English and Finnish.
     // the road: say it, carry the prompt to any AI, bring the file back, it lands on the wall.
     path: '/v1/how-an-app-builds',
     title: 'How an app gets built here, from one sentence to a live page',
-    description: 'From a sentence to an app on the wall in four beats, with any AI chat you already have and no connector: describe it, carry the prompt to your AI, bring the file back, and it is live at its own address.',
+    description: 'From a sentence to an app on the front page in four beats, with any AI chat you already have and no connector: describe it, carry the prompt to your AI, bring the file back, and it is live at its own address.',
     changefreq: 'monthly',
     priority: '0.7',
     markdown: `How an app gets built on this node, in four beats.
@@ -361,7 +362,7 @@ change, each with a date, a kind, a title and a body in English and Finnish.
    No connector is needed for this.
 3. Bring the file back: paste the code or upload the file, making an account on the way if you
    have none. If the AI you used is connected to this node, it publishes the app for you instead.
-4. The app lands on the wall of published apps at its own address, with your name, the date and a
+4. The app goes into the front page's list of published apps at its own address, with your name, the date and a
    live count of opens. Anyone can open it; anyone who likes it can copy it and make it their own.
 
 The page at [{{BASE_URL}}/v1/how-an-app-builds]({{BASE_URL}}/v1/how-an-app-builds) tells the

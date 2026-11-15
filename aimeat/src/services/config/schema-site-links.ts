@@ -8,6 +8,7 @@
  * @structure SITE_LINK_CONFIG_FIELDS
  * @usage import { SITE_LINK_CONFIG_FIELDS } from './schema-site-links.js';
  * @version-history
+ *   v1.8.1 — 2026-11-15 — site.learn_url describes a demo app, not a showroom app.
  *   v1.8.0 — 2026-11-01 — site.build_queue_url: the operator's build queue for "build it with you"
  *     (services/build-with-you.ts; Jouni, 1.11 16.22).
  *   v1.7.0 — 2026-11-01 — site.ai_eur_per_message removed the same night: no message counts are
@@ -48,7 +49,7 @@ export const SITE_LINK_CONFIG_FIELDS: ConfigFieldShape<`siteLinks.${keyof SiteLi
   // dropped), so none of these may ever be required. Mutable: a store opens, an app moves, and the
   // front page should follow without a restart. These are the one nested group in this file; the
   // key addresses config.siteLinks.<name> through readConfigField / writeConfigField.
-  { key: 'siteLinks.learn', dotPath: 'site.learn_url', envVar: 'AIMEAT_SITE_LEARN_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Hands-on academy / showroom app. Renders the "Learn" nav item when set; empty hides it' },
+  { key: 'siteLinks.learn', dotPath: 'site.learn_url', envVar: 'AIMEAT_SITE_LEARN_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Hands-on academy / demo app. Renders the "Learn" nav item when set; empty hides it' },
   { key: 'siteLinks.exchange', dotPath: 'site.exchange_url', envVar: 'AIMEAT_SITE_EXCHANGE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Capability marketplace app. Renders the "EXCHANGE" nav item and the front page\'s live-proof link when set' },
   { key: 'siteLinks.assessment', dotPath: 'site.assessment_url', envVar: 'AIMEAT_SITE_ASSESSMENT_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Free AI current-state assessment, the business page\'s entry point' },
   { key: 'siteLinks.roadmap', dotPath: 'site.roadmap_url', envVar: 'AIMEAT_SITE_ROADMAP_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Public roadmap and portfolio surface' },

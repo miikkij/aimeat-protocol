@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.36.5 -- 2026-11-15 -- The usage paragraph says "this server's own key", not "the house key".
  *   v1.36.4 -- 2026-11-15 -- consent.app_party_max: the most people one app holds (10 000), in place of the fixed 1000.
  *   v1.36.3 -- 2026-11-14 -- aimeat_admin_usage reads a node usage report with report (tool, day, model and the rest).
  *   v1.36.2 -- 2026-11-14 -- aimeat_consent_list lists the agent's own consents, and the account's with
@@ -109,7 +110,7 @@ does not include. If one you need is missing, ask the operator to tick it. Use d
 **Node administration (operator).** \`aimeat_admin_usage\` (what AI COSTS here, and whose money it
 is: \`whose_money.house\` is the operator's own bill, \`whose_money.own\` is other people's provider
 accounts and costs them nothing, \`whose_money.ledger\` is a third count off a different table — never
-add the three together. \`ceiling_usd\` is the grant × the accounts: the most the house key can cost
+add the three together. \`ceiling_usd\` is the grant × the accounts: the most this server's own key can cost
 before somebody is refused. \`keys.chat.metered_here\` is false because every chat turn is spent from
 a key handed to a child process, so say that whenever you report a total, and pass ask_provider true
 to get the provider's own figure for it. Give \`report\` and it reads one usage report across the node

@@ -8,6 +8,7 @@
  * @structure STEP_ENTRIES
  * @usage import { STEP_ENTRIES } from './entries-steps.js';
  * @version-history
+ *   v1.2.1 — 2026-11-15 — front-door's summary names the first block and its buttons, not a way in and doors.
  *   v1.2.0 — 2026-09-27 — PromptCard's loud and quiet (the copy's weight as a meaning, not a class).
  *   v1.1.0 — 2026-09-23 — AgentCard, LinkRow, AppList, TeachNote and the step card's done and limit
  *     looks deleted with their code (Jouni's decision).
@@ -127,7 +128,7 @@ export const STEP_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'front-door', name: 'FrontDoor', kind: 'component', status: 'active',
-        summary: 'The front page\'s way in: a headline, the let-your-AI-do-it box, and the register and sign-in doors.',
+        summary: 'The front page\'s first block: a headline, the let-your-AI-do-it box, and the register and sign-in buttons.',
         module: '/components/FrontDoor.js', sheet: '/css/components/front-door.css',
         data: { shape: 'FrontDoor({ onNavigate })', fields: { onNavigate: 'the router\'s navigate, for the sign-in and register doors' } },
         useFor: ['The front page (portal.welcome-door block). It reads its own prompt from the node.'],

@@ -21,6 +21,7 @@
  *     it. The playbook text itself is unchanged.
  *   v1.2.0 — 2026-08-08 — The inline code copy button uses the shared .btn-copy-inline modifier instead of
  *       .st-pb-copy, and copied-labels come from common.copied.
+ *   v1.2.1 — 2026-11-15 — The start.doors.sub fallback matches en.json: three ways to start, no house.
  */
 import { h } from 'preact';
 import { useState, useEffect, useMemo } from 'preact/hooks';
@@ -140,7 +141,7 @@ function Playbook({ answers, tier, onBack, onRestart }) {
       </div>
       <div class="st-doors st-no-print">
         <h3 class="st-doors-title">${tr('start.doors.title', 'Three doors')}</h3>
-        <p class="st-doors-sub">${tr('start.doors.sub', 'Same house, three ways in. Your playbook covers the one you picked, the others wait here.')}</p>
+        <p class="st-doors-sub">${tr('start.doors.sub', 'The same place, three ways to start. Your playbook covers the one you picked; the others are here.')}</p>
         <div class="st-doors-grid">
           <a class="st-door" href="/v1/portal">
             <span class="st-door-name">${tr('start.doors.hosted', 'Try it hosted')}</span>

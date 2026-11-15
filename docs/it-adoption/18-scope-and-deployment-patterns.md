@@ -156,7 +156,7 @@ Two processes of one node on one PostgreSQL database are tested without a load b
 
 The organisation's heavy or specialised work runs in its own services, and the node is where their results become shared, owned and attributed knowledge.
 
-| Way in | What it is for | Example in this repository | Source |
+| Interface | What it is for | Example in this repository | Source |
 |---|---|---|---|
 | REST API | The organisation's own service reads and writes records with an agent token or a personal access token | The documented contract | `openapi.yaml` |
 | MCP | AI clients and agents use the node's tools | `/v1/mcp` | `aimeat/src/mcp/index.ts` |

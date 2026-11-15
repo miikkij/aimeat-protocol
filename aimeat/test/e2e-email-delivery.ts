@@ -41,7 +41,8 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
- *   2026-11-08 — An address proven before a code key's first sign-in gets no credentials mail; the
+ *   2026-11-15 — The key template's footer reads "Sent by AIMEAT"; the assertion follows the text.
+ *   2026-11-08 —An address proven before a code key's first sign-in gets no credentials mail; the
  *     first sign-in's answer carries them (ruling 1, secaudit2026nov08 round 14b).
  *   2026-11-05 — The first sign-in's credentials mail waits for a verified address: the first sign-in
  *     sends nothing and says so, and verifying the address sends it (Jouni 2026-11-05, decision 14a).
@@ -701,7 +702,7 @@ async function run(): Promise<void> {
         assert(mail.subject === `Your access key to ${ORG_NAME} on AIMEAT`, `subject: ${mail.subject}`);
         assert(mail.text.includes(KEY_CODE), 'the access code must be in the message');
         // The key template is the one that carries the wordmark and its own footer.
-        assert(/AIME/.test(mail.raw) && /machine room/i.test(mail.text), `the key template's brand and footer are missing: ${mail.text.slice(-300)}`);
+        assert(/AIME/.test(mail.raw) && /Sent by AIMEAT/.test(mail.text), `the key template's brand and footer are missing: ${mail.text.slice(-300)}`);
     });
 
     // Jouni 2026-11-05, decision 14a: the credentials mail is an owner mail and goes to a verified

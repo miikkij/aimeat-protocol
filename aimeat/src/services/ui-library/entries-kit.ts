@@ -7,6 +7,7 @@
  * @structure KIT_ENTRIES
  * @usage import { KIT_ENTRIES } from './entries-kit.js';
  * @version-history
+ *   v1.4.1 — 2026-11-15 — The roads component's variants say "options"; the class names stay.
  *   v1.4.0 — 2026-10-19 — AgentAvatar: an agent's own picture in the Avatar square.
  *   v1.3.0 — 2026-10-18 — FigureStrip's `stacked` variant (og-strip--stacked).
  *   v1.2.0 — 2026-09-27 — What the admin pages added: Loud quiet, SettingBox pre (the setting-box entry names Box.js
@@ -304,9 +305,9 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
         },
         useFor: ['Where a person can do one thing in two or three ways and should see them side by side before choosing.'],
         variants: [
-            { name: 'two', prop: 'cols="two"', class: 'roads', when: 'two roads in two equal columns' },
-            { name: 'three', prop: 'cols="three"', class: 'roads--three', when: 'three roads side by side' },
-            { name: 'wide', prop: 'wide', class: 'roads--wide', when: 'the first road has more room for its request' },
+            { name: 'two', prop: 'cols="two"', class: 'roads', when: 'two options in two equal columns' },
+            { name: 'three', prop: 'cols="three"', class: 'roads--three', when: 'three options side by side' },
+            { name: 'wide', prop: 'wide', class: 'roads--wide', when: 'the first option has more room for its request' },
             { name: 'lead', prop: 'lead', when: 'the way to take first: the raised box' },
             { name: 'chosen', prop: 'chosen', class: 'on', when: 'one of a few to choose; the chosen one on the sun' },
             { name: 'door chooses', prop: 'chosen without onPick', class: 'road--still', when: 'only the road\'s door chooses it; the tile keeps the plain pointer' },

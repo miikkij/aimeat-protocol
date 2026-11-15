@@ -7,6 +7,7 @@
  * @structure PRIMITIVES_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=primitives
  * @usage import { PRIMITIVES_HANDBOOK } from './primitives.js';
  * @version-history
+ *   v1.1.1 — 2026-11-15 — The surface is "another endpoint onto the same capabilities", not "a different way in".
  *   v1.1.0 — 2026-11-14 — A paragraph on route capabilities: a REST route run with aimeat_invoke.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2).
  */
@@ -52,6 +53,6 @@ them is a capability, and a capability is something you look up when you need it
 ## If you would rather have all of them
 
 The full tool surface is still there and unchanged, at \`/v1/mcp\`, and the purpose-scoped surfaces
-(\`agent\`, \`appdev\`, \`service\`, \`admin\`, \`commerce\`) are unchanged too. This surface is a
-different way in, not a smaller version of them.
+(\`agent\`, \`appdev\`, \`service\`, \`admin\`, \`commerce\`) are unchanged too. This surface is
+another endpoint onto the same capabilities, and it reaches all of them.
 `;

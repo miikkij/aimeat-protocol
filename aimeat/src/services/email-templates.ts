@@ -9,7 +9,9 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
- *   2026-11-14 — An organism invitation says the person brings the AI they already use, and that the
+ *   2026-11-15 — The key template's footer says who sent it ("Sent by AIMEAT"), in place of "the AIMEAT
+ *     machine room", in en, fi and es.
+ *   2026-11-14 —An organism invitation says the person brings the AI they already use, and that the
  *     page after joining shows the one step for it (inviteAiLine, en/fi/es).
  *   2026-11-01 — textNotificationEmailHtml(): a `[Label](https://…)` line is a button and a bare https line a link
  *     (email-text-links.ts); the rest of the body stays escaped text.
@@ -96,7 +98,7 @@ const i18n: Record<string, Record<string, string>> = {
     keyExpiryPrefix: 'This key expires on',
     keyFallback: 'Or copy and paste this address into your browser:',
     keyIgnore: "If you weren't expecting this key, you can safely ignore this email.",
-    keyFooter: 'Sent from the AIMEAT machine room',
+    keyFooter: 'Sent by AIMEAT',
     credSubject: 'Your login to {org} on AIMEAT',
     credHeading: "You're in. Here is your login.",
     credIntro: 'Your access code opened the door. These are your durable login details for AIMEAT. Use them to sign in again on any device, and to reach the linked apps in read only mode.',
@@ -165,7 +167,7 @@ const i18n: Record<string, Record<string, string>> = {
     keyExpiryPrefix: 'Tämä avain vanhenee',
     keyFallback: 'Tai kopioi ja liitä tämä osoite selaimeesi:',
     keyIgnore: 'Jos et odottanut tätä avainta, voit jättää viestin huomiotta.',
-    keyFooter: 'Lähetetty AIMEATin konehuoneesta',
+    keyFooter: 'Lähettäjä: AIMEAT',
     credSubject: 'Kirjautumistietosi: {org} (AIMEAT)',
     credHeading: 'Olet sisällä. Tässä kirjautumistietosi.',
     credIntro: 'Pääsykoodisi avasi oven. Nämä ovat pysyvät AIMEAT-kirjautumistietosi. Käytä niitä kirjautuaksesi uudelleen millä tahansa laitteella ja päästäksesi liitettyihin appeihin lukutilassa.',
@@ -234,7 +236,7 @@ const i18n: Record<string, Record<string, string>> = {
     keyExpiryPrefix: 'Esta clave caduca el',
     keyFallback: 'O copia esta dirección en tu navegador:',
     keyIgnore: 'Si no esperabas esta clave, puedes ignorar este correo sin problema.',
-    keyFooter: 'Enviado desde la sala de máquinas de AIMEAT',
+    keyFooter: 'Enviado por AIMEAT',
     credSubject: 'Tu acceso a {org} en AIMEAT',
     credHeading: 'Ya estás dentro. Estos son tus datos de acceso.',
     credIntro: 'Tu código de acceso abrió la puerta. Estos son tus datos de acceso permanentes a AIMEAT. Úsalos para iniciar sesión de nuevo desde cualquier dispositivo y para abrir las aplicaciones enlazadas en modo de solo lectura.',

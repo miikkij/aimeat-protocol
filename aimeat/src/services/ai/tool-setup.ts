@@ -44,6 +44,7 @@
  *   (aliases, resolveAiClient, decideBranch, the question options) is in ai-tool-branch.ts.
  * @usage import { buildAiToolSetup } from './tool-setup.js';
  * @version-history
+ *   v1.11.2 — 2026-11-15 — The ChatGPT step says where you can also start, not "the way in".
  *   v1.11.1 — 2026-11-05 — Moved unchanged from src/services/ai-tool-setup.ts to src/services/ai/tool-setup.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.11.0 — 2026-11-04 — Codex: `codex mcp add` starts the sign-in itself and waits for it, and the
  *     sign-in dies with the command (measured with codex-cli 0.166.0), so the steps say to run it in
@@ -364,7 +365,7 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 steps: [
                     s(l, 'Open ChatGPT in a browser. The desktop and mobile apps cannot do this.',
                         'Avaa ChatGPT selaimessa. Työpöytä- ja mobiilisovellukset eivät tähän pysty.'),
-                    s(l, 'Go to chatgpt.com/plugins, click + and choose Add custom MCP server. On Business, Enterprise and Edu the way in can also be Settings > Apps > Advanced settings: turn Developer mode on, then Apps > Create.',
+                    s(l, 'Go to chatgpt.com/plugins, click + and choose Add custom MCP server. On Business, Enterprise and Edu you can also start from Settings > Apps > Advanced settings: turn Developer mode on, then Apps > Create.',
                         'Mene osoitteeseen chatgpt.com/plugins, klikkaa + ja valitse Add custom MCP server. Business-, Enterprise- ja Edu-tileillä reitti voi olla myös Settings > Apps > Advanced settings: kytke Developer mode päälle ja valitse sitten Apps > Create.'),
                     s(l, 'Fill the fields with the values below and choose OAuth as the authentication. The URL must end in /v1/mcp; without the path it will not connect.',
                         'Täytä kentät alla olevilla arvoilla ja valitse tunnistautumiseksi OAuth. Osoitteen pitää päättyä /v1/mcp; ilman polkua se ei yhdistä.'),

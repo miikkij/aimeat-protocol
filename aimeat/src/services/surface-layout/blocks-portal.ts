@@ -24,6 +24,7 @@
  *   and falls back to this one. A new block, or a rewritten sentence, moves both: the locale key is
  *   what a Finnish operator actually reads.
  * @version-history
+ *   2026-11-15 - portal.welcome-door's summary names the three ways to start, as en.json does.
  *   2026-09-29 - portal.frame-signage shows only when the node names a signage screen
  *     (signageEnabled); its addresses default to the node's own settings, not aimeat.io's.
  *   2026-09-17 - TARGET-078: describe the expanded ownership block.
@@ -52,7 +53,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'The front door: what this place is in one sentence, and the ways in.',
+        summary: 'What this place is in one sentence, and three ways to start: let your AI register you, create an account, or sign in.',
     },
     {
         id: 'portal.pitch',

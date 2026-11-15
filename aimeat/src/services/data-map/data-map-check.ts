@@ -15,6 +15,7 @@
  * @structure summariseMap · checkMap · statesInvites · statesRegisters · stampFor · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.8.2 — 2026-11-15 — The summary says a thing "is sent elsewhere", not that it "leaves the house".
  *   v1.8.1 — 2026-11-01 — DATAMAP_FORM_CONTRADICTED does not fire for a static page whose rows are files
  *     somebody else writes (writtenByThePage; Varoituskartta, WP10e C3).
  *   v1.8.0 — 2026-11-01 — DATAMAP_REGISTERS_UNSTATED: an app whose party signup is open (checkMap's
@@ -194,8 +195,8 @@ export function summariseMap(map: DataMap): string {
 
   const parts = [places.join(', ')];
   if (map.machinery.length > 0) parts.push(`uses ${map.machinery.join(', ')}`);
-  if (map.leaves.length === 1) parts.push('one thing leaves the house');
-  else if (map.leaves.length > 1) parts.push(`${map.leaves.length} things leave the house`);
+  if (map.leaves.length === 1) parts.push('one thing is sent elsewhere');
+  else if (map.leaves.length > 1) parts.push(`${map.leaves.length} things are sent elsewhere`);
   return parts.join(' · ');
 }
 

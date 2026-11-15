@@ -9,6 +9,7 @@
  * @structure OPERATOR_ENTRIES
  * @usage import { OPERATOR_ENTRIES } from './entries-operator.js';
  * @version-history
+ *   v1.3.1 — 2026-11-15 — ask-page names its `or` + `ways` "other choices", not "other ways in".
  *   v1.3.0 — 2026-10-16 — menu-find: onSearchStart, busyNote and a group's byScore/max (the person's
  *     own things in the find).
  *   v1.2.0 — 2026-10-14 — menu-find: the find field at the top of a side menu.
@@ -124,14 +125,14 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
                 title: 'the question, as the page\'s headline',
                 children: 'what the person needs to know before answering',
                 doors: 'the ways to answer, at the right of the foot (under each other on a phone, the first one lowest)',
-                or: 'the word over the other ways in',
-                ways: 'other ways in, each on its own line',
+                or: 'the word over the other choices',
+                ways: 'other choices, each on its own line',
             },
         },
         useFor: ['A consent or an invitation the person answers once: an app asking for access, an invitation to an organism.'],
         variants: [
             { name: 'asking', prop: 'who + title + doors', when: 'the question is ready to answer' },
-            { name: 'other ways', prop: 'or + ways', when: 'the page offers other ways in under the answers' },
+            { name: 'other ways', prop: 'or + ways', when: 'the page offers other choices under the answers' },
             { name: 'waiting', class: 'ask-page-message', prop: 'message', when: 'there is nothing to ask yet, or nothing to ask at all' },
         ],
         example: { title: 'Lumo Bakery wants to read your recipes', who: { name: 'Lumo Bakery', meta: 'lumo-bakery.apps.aimeat.io', text: 'L' } },

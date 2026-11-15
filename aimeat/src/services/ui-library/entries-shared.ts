@@ -9,6 +9,7 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.10.1 — 2026-11-15 — mcp-install's summary reads "Quick setup", as its heading does.
  *   v1.10.0 — 2026-10-18 — ClassificationBadge (components/ClassificationBadge.js): how sensitive one thing
  *     is, beside the AudienceBadge, with a conflict as its own mark (plan doc-mvdipuyqraas, L4.2).
  *   v1.9.1 — 2026-10-18 — AudienceBadge has its own sheet (audience-badge.css): it sizes to its words, and a link or a code is the attention tone.
@@ -167,7 +168,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'mcp-install', name: 'McpInstall', kind: 'component', status: 'active',
-        summary: 'The short way in: one-click install links, terminal one-liners and downloadable config files, ranked by effort.',
+        summary: 'Quick setup: one-click install links, terminal one-liners and downloadable config files, ranked by effort.',
         module: '/components/McpInstall.js', sheet: '/css/components/mcp-install.css',
         data: { shape: 'McpInstallRow({ tool, serverName, className }) · McpQuickConnect({ serverName, guideHref, title, lead })', fields: { tool: 'which AI tool', serverName: 'the name the connection gets', guideHref: 'the full guide', title: 'the headline', lead: 'the line under it' } },
         useFor: ['Connecting an AI tool to this node over MCP.'],
