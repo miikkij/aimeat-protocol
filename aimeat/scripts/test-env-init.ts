@@ -23,11 +23,15 @@
  * @structure slugOf · portFor · render · databaseOf · ensureDatabase · reportPortConflicts · main
  * @usage cd aimeat && pnpm test:env:init            (refuses to overwrite an existing file)
  *        cd aimeat && pnpm test:env:init --force    (rewrites them)
- *        AIMEAT_E2E_PORT=40282 pnpm test:env:init   (take the port your claim names; 40251-40499,
- *                                                  anything else is refused)
+ *        AIMEAT_E2E_PORT=40282 pnpm test:env:init --force
+ *                                                  (take the port your claim names; 40251-40499,
+ *                                                  anything else is refused; without --force a file
+ *                                                  that names another port is refused, not kept)
  *        AIMEAT_TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/x pnpm test:env:init --force
  *                                                  (your PostgreSQL account instead of the CI one)
  * @version-history
+ *   v1.3.1 -- 2026-11-15 -- An explicit AIMEAT_E2E_PORT that an existing env file does not carry is
+ *     refused without --force, instead of the file being kept and the request ignored.
  *   v1.3.0 -- 2026-11-15 -- An AIMEAT_E2E_PORT outside 40251-40499 is refused with the range, instead
  *     of being replaced by the hashed port in silence.
  *   v1.2.0 — 2026-11-11 — After its own database is there, drops the E2E databases of worktrees that
@@ -174,6 +178,15 @@ async function main(): Promise<void> {
       return;
     }
     if (existsSync(targetPath) && !FORCE) {
+      // An explicit port that the existing file does not carry would be ignored in silence, and the
+      // suites would then run on a port nobody claimed. Refuse instead and name the flag.
+      const existingPort = /^AIMEAT_PORT=(\d+)$/m.exec(readFileSync(targetPath, 'utf-8'))?.[1];
+      if (process.env.AIMEAT_E2E_PORT?.trim() && existingPort && Number(existingPort) !== port) {
+        console.error(`\n  ${f.target} names port ${existingPort}, and AIMEAT_E2E_PORT asks for ${port}.`);
+        console.error(`  Nothing rewritten. To take the claimed port: AIMEAT_E2E_PORT=${port} pnpm test:env:init --force`);
+        process.exitCode = 1;
+        return;
+      }
       console.log(`  ${f.target} exists, left alone (--force to rewrite)`);
       continue;
     }

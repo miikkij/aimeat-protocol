@@ -134,9 +134,9 @@ The rules that apply only to certain code live in `.claude/rules/`, and each loa
 
 | Former section or Gates bullet | Rule file | Loads when a file is read under |
 |---|---|---|
-| Backend; openapi in the same commit; dependency-cruiser | `backend.md` | `aimeat/src/`, `openapi.yaml` |
+| Backend; openapi in the same commit; dependency-cruiser; where an agent finds its way in | `backend.md` | `aimeat/src/`, `openapi.yaml` |
 | Security; the six audit rules; the owner sees their agents' data; `resolveIdentity`; the identity detail | `security.md` | `aimeat/src/` routes, auth, services, storage, mcp, middleware, utils, commerce, server-bootstrap, cli |
-| A tool has three surfaces; where an agent finds its way in | `tool-surfaces.md` | `aimeat/src/mcp/`, `aimeat/src/cli/`, `python/aimeat-crewai/` |
+| A tool has three surfaces | `tool-surfaces.md` | `aimeat/src/mcp/`, `aimeat/src/cli/`, `python/aimeat-crewai/` |
 | Extension, cortex and app namespaces; a memory value is a record | `namespaces-memory.md` | `aimeat/src/` services, routes, storage, mcp, data; sdk-libs; cortex-bundled; `packages/` |
 | Frontend; browser verification | `frontend.md` | `aimeat/public/`, `aimeat/src/static/` |
 | How a page explains itself: the page start, the page's and a setting's question mark, the tooltip, what not to build | `page-guidance.md` | `aimeat/public/views/profile/` and `admin/`, the guidance components, `aimeat/locales/` |
