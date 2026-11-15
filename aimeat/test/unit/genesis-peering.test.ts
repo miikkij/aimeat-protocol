@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createGenesisPeeringService } from '../../src/services/genesis-peering.js';
-import type { GenesisPeeringService } from '../../src/services/genesis-peering.js';
+import { createGenesisPeeringService } from '../../src/services/genesis/peering.js';
+import type { GenesisPeeringService } from '../../src/services/genesis/peering.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type {
     Storage,

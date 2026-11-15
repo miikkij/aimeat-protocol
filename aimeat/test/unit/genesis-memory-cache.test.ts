@@ -23,7 +23,7 @@ import {
     GENESIS_CACHE_OWNER,
     GENESIS_CACHE_PREFIX,
     type GenesisResult,
-} from '../../src/services/genesis-memory-cache.js';
+} from '../../src/services/genesis/memory-cache.js';
 
 const PEER = 'genesis-peer-a';
 const OWNER = 'alice@remote-node';

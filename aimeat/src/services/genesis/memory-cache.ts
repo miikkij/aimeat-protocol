@@ -1,5 +1,5 @@
 /**
- * @file src/services/genesis-memory-cache.ts
+ * @file src/services/genesis/memory-cache.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The local cache for cross-genesis memory reads: one prefix, written and read in one
@@ -36,7 +36,7 @@
  *   v1.0.0 — 2026-09-04 — Extracted from routes/federation-genesis.ts, which is where the two halves
  *     had disagreed since the cache was added.
  */
-import type { MemoryRecord } from '../storage/types/commerce.js';
+import type { MemoryRecord } from '../../storage/types/commerce.js';
 
 /**
  * Cached peer answers are filed under a reserved identity rather than under the person whose memory

@@ -298,7 +298,7 @@ import { createMyDataReceiptService } from '../services/mydata-receipt.js';
 import { createEmailService } from '../services/email.js';
 import { SiteService } from '../services/site.js';
 import { startSiteSyncJob, triggerSiteSync } from '../services/site-sync.js';
-import { createGenesisPeeringService } from '../services/genesis-peering.js';
+import { createGenesisPeeringService } from '../services/genesis/peering.js';
 import { startBackgroundJobs } from './background-jobs.js';
 import { initProcessBuffers } from './process-buffers.js';
 import { createMetricsRegistry } from '../services/prometheus.js';

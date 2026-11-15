@@ -10,7 +10,7 @@
  *   WHY IT HAD NEVER BEEN TESTED. A genesis peer is another FEDERATION, not another node, so every
  *   one of these paths needs a second world that answers four doors and signs with a key this node
  *   pinned. Nothing stood one up, so 525 of 765 lines in src/routes/federation-genesis.ts and 322 of
- *   466 in src/services/genesis-sync.ts had never been executed: half of genesis-sync's functions,
+ *   466 in src/services/genesis/sync.ts had never been executed: half of genesis-sync's functions,
  *   the whole of genesis-memory-cache.ts, and the four matches* predicates in federation-helpers.ts.
  *   test/helpers/fake-genesis-peer.ts is that second world, on loopback inside this process.
  *
@@ -99,11 +99,11 @@ Object.assign(process.env, {
 
 const { createServer: createNode } = await import('../src/server.js');
 const { loadConfig } = await import('../src/config.js');
-const { createGenesisSyncService } = await import('../src/services/genesis-sync.js');
+const { createGenesisSyncService } = await import('../src/services/genesis/sync.js');
 const { startFakeGenesisPeer } = await import('./helpers/fake-genesis-peer.js');
 const { verify } = await import('../src/auth/keypair.js');
 const { deliveryRefusal, deliveryProof } = await import('../src/services/signed-node-request.js');
-type GenesisSyncService = import('../src/services/genesis-sync.js').GenesisSyncService;
+type GenesisSyncService = import('../src/services/genesis/sync.js').GenesisSyncService;
 type FakeGenesisPeer = import('./helpers/fake-genesis-peer.js').FakeGenesisPeer;
 
 const { config } = loadConfig({});
@@ -799,7 +799,7 @@ async function run(): Promise<void> {
         // genesis-memory-cache.ts. Until 2026-09-08 the prune took all three, so a subscription set
         // through the operator route survived exactly until the next sync, and syncSubscribedMemory,
         // which reads that record LATER IN THE SAME CYCLE, could never see one the operator set.
-        // Fixed in services/genesis-sync.ts; this asserts the fix.
+        // Fixed in services/genesis/sync.ts; this asserts the fix.
         const subs = await json(`/v1/federation/genesis-peer/${peerId}/subscriptions`, { headers: auth(operatorToken) });
         assert(subs.body.data.subscribed_prefixes.join(',') === 'note.',
             `the subscription set in phase 5 survives a sync: ${JSON.stringify(subs.body.data.subscribed_prefixes)}`);
@@ -1006,7 +1006,7 @@ async function run(): Promise<void> {
         // recurring one to itself. Until 2026-09-08 stop() cleared only the recurring one, and
         // background-jobs.ts discards the returned handle, so the first sync could not be stopped;
         // it is why this suite never lets the node start its own scheduler. Fixed in
-        // services/genesis-sync.ts: stop() clears both, which is what lets this process exit.
+        // services/genesis/sync.ts: stop() clears both, which is what lets this process exit.
         const initial = syncService!.start();
         assert(typeof initial === 'object' && initial !== null, `start() hands back the initial timer: ${typeof initial}`);
         syncService!.stop();

@@ -297,11 +297,11 @@
     "src/services/finance/vat-report.ts": {
       "listVatCodes": 1
     },
-    "src/services/genesis-peering.ts": {
+    "src/services/genesis/peering.ts": {
       "listOwners": 1,
       "listAgents": 1
     },
-    "src/services/genesis-sync.ts": {
+    "src/services/genesis/sync.ts": {
       "listAgents": 2
     },
     "src/services/indexnow-site.ts": {

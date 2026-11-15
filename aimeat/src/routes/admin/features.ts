@@ -52,7 +52,7 @@ import { emailReach } from '../../services/email/recipients.js';
 import { getStats } from '../../services/stats.js';
 import type { DirectoryService } from '../../services/directory.js';
 import type { PushService } from '../../services/push.js';
-import type { GenesisPeeringService } from '../../services/genesis-peering.js';
+import type { GenesisPeeringService } from '../../services/genesis/peering.js';
 import { TEMPLATE_IDS, SUPPORTED_LOCALES, getDefaultTemplate, seedDefaultTemplates } from '../../services/notifications/templates.js';
 import type { TemplateId } from '../../services/notifications/templates.js';
 import { LOCALES } from '../../i18n.js';

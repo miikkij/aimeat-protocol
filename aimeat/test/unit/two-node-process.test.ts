@@ -284,7 +284,7 @@ vi.mock('../../src/services/track-registry.js', async (importOriginal) => ({
     rebuildTrackRegistry: async () => {},
     isTracked: (key: string) => key.startsWith('watched.'),
 }));
-vi.mock('../../src/services/genesis-sync.js', async (importOriginal) => ({
+vi.mock('../../src/services/genesis/sync.js', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), createGenesisSyncService: () => null,
 }));
 vi.mock('../../src/services/cache-cleanup.js', async (importOriginal) => ({

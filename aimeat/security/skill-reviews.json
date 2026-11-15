@@ -665,7 +665,7 @@
         "docs/pitfalls.md",
         ".claude/skills/aimeat-organism-records/SKILL.md"
       ],
-      "digest": "sha256:167981f55aaaae518554409e",
+      "digest": "sha256:072b564532228428a6934865",
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
@@ -1059,7 +1059,7 @@
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
     "agent:note-writer": {
-      "docs/pitfalls.md": "88d50147aabc9885",
+      "docs/pitfalls.md": "c35c1901968281a8",
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {

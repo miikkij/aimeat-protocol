@@ -61,12 +61,12 @@ import { registerGenesisMemoryReadAnswer, genesisMemoryReadFields } from './fede
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { emitChange } from '../services/event-bus.js';
-import { createGenesisPeeringService } from '../services/genesis-peering.js';
+import { createGenesisPeeringService } from '../services/genesis/peering.js';
 import { createOrganismReputationService } from '../services/organism/reputation.js';
 import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation/helpers.js';
 import {
     cacheGenesisResults, findCachedGenesis, genesisPeerKey, isGenesisSubscriptionRecord, GENESIS_CACHE_TAG, GENESIS_SUBSCRIPTION_TAG,
-} from '../services/genesis-memory-cache.js';
+} from '../services/genesis/memory-cache.js';
 import { logger } from '../utils/logger.js';
 import { actionPricingFromPeer, presentActionPricing } from '../services/action-pacing.js';
 import { csmMayRead } from '../services/csm-service.js';
@@ -554,7 +554,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
 
             await Promise.allSettled(peerPromises);
 
-            // Optionally cache results. The key and the prefix live in services/genesis-memory-cache.ts
+            // Optionally cache results. The key and the prefix live in services/genesis/memory-cache.ts
             // with the lookup above, because they were written out separately here once and disagreed.
             if (config.genesisMemoryCache && results.length > 0) {
                 await cacheGenesisResults(storage, results, config.genesisMemoryCacheTtlHours, (cacheKey, err) => {

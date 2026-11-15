@@ -2073,7 +2073,7 @@
       },
       "why": "Written 2026-10-29 (secaudit2026oct26 round 8c), the node's own read: every client's accountant list (finance.accountants) read once at start to ask each client about an older grant whose holder the node cannot place. Access lists, no content."
     },
-    "src/services/genesis-sync.ts": {
+    "src/services/genesis/sync.ts": {
       "reads": {
         "listMemory": 2,
         "getMemory": 1

@@ -45,7 +45,7 @@ import type { createPushService } from '../services/push.js';
 import type { createEmailService } from '../services/email.js';
 import { logger } from '../utils/logger.js';
 import { runAsNode } from '../utils/gaii.js';
-import { createGenesisSyncService } from '../services/genesis-sync.js';
+import { createGenesisSyncService } from '../services/genesis/sync.js';
 import { startCacheCleanupJob } from '../services/cache-cleanup.js';
 import { startSyncScheduler } from '../services/sync-scheduler.js';
 import { startMessageRetryJob } from '../services/message/delivery.js';

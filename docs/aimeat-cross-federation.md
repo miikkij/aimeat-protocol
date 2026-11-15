@@ -44,9 +44,9 @@ Defaults below come from [config.ts](../aimeat/src/config.ts). See the
 | `AIMEAT_GENESIS_MEMORY_CACHE_TTL_HOURS` | `4` | Memory cache lifetime |
 
 Synchronization and failure handling are defined by
-[genesis-peering.ts](../aimeat/src/services/genesis-peering.ts).
+[genesis-peering.ts](../aimeat/src/services/genesis/peering.ts).
 Cache writes and reads use the shared
-[genesis memory cache](../aimeat/src/services/genesis-memory-cache.ts).
+[genesis memory cache](../aimeat/src/services/genesis/memory-cache.ts).
 A stored remote catalogue entry retains its remote ID separately; callers use
 the returned memory key to address an entry. Do not assume that a local record
 ID is valid on another node.

@@ -1,5 +1,5 @@
 /**
- * @file src/services/genesis-sync.ts
+ * @file src/services/genesis/sync.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Genesis Sync Service — periodic catalogue exchange with cross-federation genesis peers
@@ -37,21 +37,21 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
-import type { AimeatConfig } from '../config.js';
-import type { Storage, GenesisPeerRecord, CsmRecord, ActionRecord } from '../storage/interface.js';
-import { computeCatalogueHash } from '../utils/catalogue-hash.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
-import { peerFetch } from '../utils/peer-fetch.js';
-import { sign } from '../auth/keypair.js';
-import { deliveryProof } from './signed-node-request.js';
-import { logger } from '../utils/logger.js';
-import { leaveToPeer } from './classification/egress.js';
-import { presentActionPricing } from './action-pacing.js';
-import { federationConsentCovers } from './memory/replication.js';
-import { csmMayReadAs } from './csm/readers.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, GenesisPeerRecord, CsmRecord, ActionRecord } from '../../storage/interface.js';
+import { computeCatalogueHash } from '../../utils/catalogue-hash.js';
+import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
+import { sign } from '../../auth/keypair.js';
+import { deliveryProof } from '../signed-node-request.js';
+import { logger } from '../../utils/logger.js';
+import { leaveToPeer } from '../classification/egress.js';
+import { presentActionPricing } from '../action-pacing.js';
+import { federationConsentCovers } from '../memory/replication.js';
+import { csmMayReadAs } from '../csm/readers.js';
 import {
   GENESIS_CACHE_TAG, GENESIS_SUBSCRIPTION_TAG, genesisPeerKey, genesisSubscriptionKey, isGenesisSubscriptionRecord,
-} from './genesis-memory-cache.js';
+} from './memory-cache.js';
 
 /** System GAII used to store genesis catalogue entries as memory. */
 const GENESIS_SYSTEM_GAII = '__genesis__';

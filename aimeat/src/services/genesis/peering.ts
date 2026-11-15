@@ -1,5 +1,5 @@
 /**
- * @file src/services/genesis-peering.ts
+ * @file src/services/genesis/peering.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Service managing cross-federation "genesis" peerings — request/approve/suspend/remove
@@ -18,10 +18,10 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, GenesisPeerRecord } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { peerUrlRefusal } from './peer/url-policy.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, GenesisPeerRecord } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { peerUrlRefusal } from '../peer/url-policy.js';
 
 export interface GenesisPeeringService {
   requestPeering(genesisNodeId: string, genesisUrl: string, publicKey: string): Promise<GenesisPeerRecord>;

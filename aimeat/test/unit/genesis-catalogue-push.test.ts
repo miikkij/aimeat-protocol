@@ -2,7 +2,7 @@
  * @file test/unit/genesis-catalogue-push.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description What the genesis catalogue push sends a genesis peer (services/genesis-sync.ts
+ * @description What the genesis catalogue push sends a genesis peer (services/genesis/sync.ts
  *   federableCatalogue), on an in-memory SQLite node: a federable CSM only when it is public, as the
  *   local cross-catalogue and the peer service summary list it, and the actions tied to such a CSM.
  *   The peer stores what it is sent as public genesis entries, so a private, members or organism CSM
@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, ActionRecord } from '../../src/storage/interface.js';
-import { federableCatalogue } from '../../src/services/genesis-sync.js';
+import { federableCatalogue } from '../../src/services/genesis/sync.js';
 
 const NOW = '2026-11-08T00:00:00.000Z';
 
