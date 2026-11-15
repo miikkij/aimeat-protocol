@@ -560,14 +560,14 @@
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/scripts/sandbox.ts",
         "aimeat/scripts/sandbox-machines.ts",
         "aimeat/scripts/ui-compare.ts",
         "aimeat/src/services/build-app-prompt.ts"
       ],
-      "digest": "sha256:a2271cde3bd17053b6193016",
+      "digest": "sha256:db18b1937e818524852abd09",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -627,11 +627,11 @@
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:400cb6fd749d43606daa56c1",
+      "digest": "sha256:090dc651e1e3c033c2adcff3",
       "note": "It checks pages on the session's sandbox node; its viewports follow skill aimeat-frontend-verify."
     },
     "agent:gatekeeper": {
@@ -658,20 +658,20 @@
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names, not about code in this tree."
     },
     "agent:ui-conformance": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:400cb6fd749d43606daa56c1",
+      "digest": "sha256:090dc651e1e3c033c2adcff3",
       "note": "It checks pages on the session's sandbox node against the decisions the lead points it at."
     },
     "agent:ui-design-review": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/scripts/sandbox.ts",
         ".claude/rules/page-guidance.md"
       ],
-      "digest": "sha256:93cc81c0e4cae97caac7c9c9",
+      "digest": "sha256:c07a88ff72b969ec39b53272",
       "note": "It looks at pages on the session's sandbox node and judges them by the page-guidance rule and skill aimeat-design-language."
     }
   },
@@ -836,7 +836,7 @@
       "aimeat/src/services/themes/tiilitaivas.ts": "5b4513bcfaeaa121"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "06a900eaea28b058",
+      "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
       "aimeat/scripts/ui-compare.ts": "a9f4b0a0d091a9ee",
       "aimeat/src/services/build-app-prompt.ts": "f127a119a9b879f6"
@@ -1030,7 +1030,7 @@
       "aimeat/test/run-e2e-ci.ts": "831d483d44da4e1a"
     },
     "agent:browser-verifier": {
-      "aimeat/scripts/sandbox.ts": "06a900eaea28b058"
+      "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "e77ab93684ed497b",
@@ -1041,11 +1041,11 @@
     },
     "agent:note-writer": {},
     "agent:ui-conformance": {
-      "aimeat/scripts/sandbox.ts": "06a900eaea28b058"
+      "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
     },
     "agent:ui-design-review": {
-      "aimeat/scripts/sandbox.ts": "06a900eaea28b058",
-      ".claude/rules/page-guidance.md": "dae9513d2fd1a355"
+      "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
+      ".claude/rules/page-guidance.md": "2d641d98bbc4a1e5"
     }
   }
 }
