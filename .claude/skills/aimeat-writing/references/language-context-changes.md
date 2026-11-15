@@ -5,6 +5,7 @@ which day, and why a word was chosen. A writer does not need it to compose a tex
 you want to know why a decided word is what it is. A change to the table adds its line here, the
 newest at the top.
 
+- **2026-11-15**: dispute (*riita*, *disputa*), ruling (*ratkaisu*, *decisión*) and the two parties requester and provider (*tilaaja* / *toimittaja*, *solicitante* / *proveedor*), for the Work page's disputes that wait for the operator. *Riita* and *disputa* are the words the admin overview and the agent trust text already used. No cold reader has read them yet.
 - **2026-11-15**: blocking hook (*estävä koukku*, *gancho bloqueante*), for a pre_ hook on the Hooks and Security pages, which said *gate* (*portti*, *compuerta*). *Portti* was also the network port on the same admin pages, and *gate* is the decision rule's settled word. The API value `kind: gate` stays. No cold reader has read them yet.
 
 - **2026-11-15**: public app list (*julkinen sovelluslista*, *lista pública de aplicaciones*), for the list of published apps that the admin Apps page and the publish hints used to call *the wall* (*seinä*, *muro*). The front page's own block already called it the app list. Recorded with the sweep that removed road, way in, hand, machine room, showroom, wall and single pictures from the locale files. No cold reader has read them yet.

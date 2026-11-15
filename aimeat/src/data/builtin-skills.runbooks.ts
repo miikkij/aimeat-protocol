@@ -194,7 +194,8 @@ asked, who delivered, why it was opened, and \`paid_morsels\`, what delivery pai
 shares out only those morsels: \`to_requester\` goes back to the requester, \`burned\` leaves circulation,
 the provider keeps the rest. Tell the operator what each party gets, and rule with
 \`aimeat_admin_dispute_rule\` only on their word: a ruling closes the dispute and cannot be undone, and a
-requester_wins ruling lowers the provider's trust score.
+requester_wins ruling lowers the provider's trust score. The admin Work page shows the same list, each
+dispute with its ruling dialog.
 
 ## Replacing the data key
 The data key seals every stored secret. The keys are set in the server's environment by whoever runs

@@ -66,3 +66,6 @@ forbidden, and how a row is added or changed. `language-context.md` lists the ot
 | two agents handing work to each other | a coder and a reviewer; it has its own limit, separate from the chain length | back and forth | edestakaisin | ida y vuelta |
 | the steps only the owner can take | choose, approve, answer, do it yourself, or give a file or a fact | waiting for you | odottaa sinua | te espera |
 | the agent that leads a goal | plans, hands out work, makes subgoals and asks the owner; any agent of the owner's, on any model | coordinator | koordinaattori | coordinador |
+| a party's objection to delivered work | the requester or the provider opens it on delivered work; the two settle it, or it waits for the operator when one escalates it or 30 days pass | dispute | riita | disputa |
+| the operator's decision on a dispute | shares out the morsels delivery paid the provider (back to the requester, removed from circulation, kept) and closes the dispute for good | ruling (verb: rule) | ratkaisu (ratkaista) | decisión (decidir) |
+| the two parties of a work item | the one who asked for the work and the one who delivered it | requester / provider | tilaaja / toimittaja | solicitante / proveedor |

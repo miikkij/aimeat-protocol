@@ -13,6 +13,7 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   2026-11-15 — getAdminDisputes, getAdminDispute and ruleDispute (GET /v1/admin/disputes, /:id, POST /:id/rule).
  *   2026-10-29 — getPossiblePayouts and markPossiblePayoutArrived (secaudit2026oct26 round 8c).
  *   2026-10-15 — unsubscribePush(endpoint) removes that one device; it sent no endpoint and the route
  *     removed every device of the account (feature-list audit #132).
@@ -81,6 +82,11 @@ export const enableOwner     = (name) => apiPost(`/v1/admin/owners/${encodeURICo
 // ── Organism ownership: the operator's break-glass over an organism nobody inside can repair ──
 export const getAdminOrganisms   = (archived) => apiGet(`/v1/admin/organisms${archived ? '?archived=include' : ''}`);
 export const getAdminTeams       = () => apiGet('/v1/admin/teams');
+
+// ── Disputes that wait for the operator's ruling ──
+export const getAdminDisputes = (status = 'escalated') => apiGet(`/v1/admin/disputes?status=${encodeURIComponent(status)}`);
+export const getAdminDispute  = (id) => apiGet(`/v1/admin/disputes/${encodeURIComponent(id)}`);
+export const ruleDispute      = (id, body) => apiPost(`/v1/admin/disputes/${encodeURIComponent(id)}/rule`, body);
 export const getOrganismOwnership = (id) => apiGet(`/v1/admin/organisms/${encodeURIComponent(id)}/ownership`);
 export const addOrganismOwner    = (id, ghii) => apiPost(`/v1/admin/organisms/${encodeURIComponent(id)}/ownership`, { ghii });
 

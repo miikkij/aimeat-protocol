@@ -20,6 +20,8 @@
  *   - WorkTab({ data, switchPage }) — the three sections
  *   - dur / deadlineWords — the countdown a row prints instead of a timestamp
  * @version-history
+ *   v2.4.0 — 2026-11-15 — The disputes that wait for the operator's ruling stand first when there are
+ *     any, each with its ruling dialog (work-tab.disputes.js).
  *   v2.3.0 — 2026-09-27 — On the library components (page group G5): the sections are Sections, the
  *     verdict and its readings the Verdict and Reading, the strip the FigureStrip, the find the search
  *     field with the filter Tabs, the items the List (the row past its deadline carries the coral rail,
@@ -42,7 +44,8 @@ import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, dt, Row, Badge, Empty } from './shared.js';
+import { num, dt, Row, Badge, Empty, useToast, Toast } from './shared.js';
+import { useWaitingDisputes, DisputesSection } from './work-tab.disputes.js';
 import { decorate, summarise, counts, search, FILTERS, PAGE } from './work-tab.model.js';
 import { Section } from '/components/Section.js';
 import { Verdict } from '/components/Readings.js';
@@ -103,6 +106,8 @@ export default function WorkTab({ data, switchPage }) {
   const [query, setQuery] = useState('');
   const [oldestFirst, setOldestFirst] = useState(false);
   const [all, setAll] = useState(false);
+  const disputes = useWaitingDisputes();
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   const nodeId = data.dash?.node_id || '';
   // THE SAME ARRAY THE MENU COUNTS. admin.js sets counts.work = data.workItems.length; reading any
@@ -132,7 +137,9 @@ export default function WorkTab({ data, switchPage }) {
   const head = ['#', W('colCode'), W('colStatus'), W('colAction'), W('colWho'), { label: W('colCost'), num: true }, W('colDeadline')];
 
   return html`
-    <${Section} first id="adm-work-waiting" num="01" title=${W('waitingQ')}
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+    <${DisputesSection} list=${disputes} first onError=${showErr} onDone=${showOk} />
+    <${Section} first=${!disputes.length} id="adm-work-waiting" num="01" title=${W('waitingQ')}
       doors=${html`<${Action} small soft onClick=${() => scrollToSection('adm-work-acts')}>${W('whatIsDoor')}<//>`}>
       <${Verdict} tone=${figures.overdue ? 'danger' : undefined}
         word=${figures.open === 0
