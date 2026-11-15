@@ -294,3 +294,15 @@ describe('POST /v1/capabilities/{id}/invoke (profile Capabilities tab, the try p
         ]);
     });
 });
+
+describe('POST /v1/ext/{extName}/{actionId} and the instance path (app catalogue ODPS sample, capability invoke)', () => {
+    // app-catalog/js/odps.js sends JSON.parse(the sample input box) as the whole body, so an owner who
+    // types ["Oulu"] sends an array, and a capability over an extension forwards an array input the
+    // same way. express.json (server.ts) parses objects and arrays, and routes/extensions/actions.ts
+    // runAction passes req.body to the action unchecked, so the action runs with the array.
+    it('takes an object or an array as the action input', async () => {
+        for (const path of ['/v1/ext/weather/forecast', '/v1/ext/weather/i-main/forecast']) {
+            await taken('POST', path, [['Oulu'], [], [{ city: 'Oulu' }], { city: 'Oulu' }, {}]);
+        }
+    });
+});

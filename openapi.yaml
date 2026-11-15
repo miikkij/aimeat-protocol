@@ -57911,8 +57911,10 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              description: Action-specific input payload defined by the extension manifest
+              type: [object, array]
+              description: >-
+                Action-specific input payload defined by the extension manifest: an object, or an
+                array, which the action receives as its input unchanged.
       responses:
         '200':
           description: Action executed successfully
@@ -58007,7 +58009,8 @@ paths:
         content:
           application/json:
             schema:
-              type: object
+              type: [object, array]
+              description: The action's input, an object or an array, which the action receives unchanged.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
