@@ -11,6 +11,8 @@
  *   CLASSIFICATION_ACTIONS · checkClassificationInput()
  * @usage imported by catalog/definitions.ts and src/tool-dispatch/classification-call.ts
  * @version-history
+ *   2026-11-15 — exception_set names a board (board_id) or an app (app) for an audience exception,
+ *     as the service and POST /v1/classification/exceptions take it.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-23 — pack_list and pack_set (the TL and NATO label packs), and a label's externalAi in the
  *     policy shape (plan doc-mvlftkh9zmc9, C3.2, C3.4).
@@ -135,12 +137,12 @@ export const classificationTools = [
             pending: { type: 'boolean', description: 'explorer: only the items where a suggestion waits for a person.' },
             cursor: { type: 'string', description: 'explorer: the `next` value of the previous page.' },
             mode: { type: 'string', enum: ['off', 'owner', 'all'], description: "switch_set: the node's switch. off: nothing is classified; owner: each owner decides for their own content; all: on for every owner." },
-            kind: { type: 'string', enum: [...CLASSIFICATION_KINDS], description: 'get, set, review: what is classified. Default memory. Content: memory, file, row. A container: organism (organism_id), workspace (organism_id and ws), board (board_id), app (app). explorer: only this kind. exception_set: memory, file or row.' },
+            kind: { type: 'string', enum: [...CLASSIFICATION_KINDS], description: 'get, set, review: what is classified. Default memory. Content: memory, file, row. A container: organism (organism_id), workspace (organism_id and ws), board (board_id), app (app). explorer: only this kind. exception_set: memory, file or row; a container only with exception_action audience.' },
             key: { type: 'string', description: 'get, set, review: the memory key (an organism workspace key included) or the stored file key.' },
             organism_id: { type: 'string', description: 'A row, an organism or a workspace: the organism. policy_get, policy_set, audit, explorer, exception_list at level organism: the organism.' },
             ws: { type: 'string', description: 'A row or a workspace: the workspace id.' },
-            board_id: { type: 'string', description: 'get, set, review with kind board: the board id.' },
-            app: { type: 'string', description: 'get, set, review with kind app: the filename of your hosted app or the name of your ecosystem app.' },
+            board_id: { type: 'string', description: 'get, set, review, exception_set with kind board: the board id.' },
+            app: { type: 'string', description: 'get, set, review, exception_set with kind app: the filename of your hosted app or the name of your ecosystem app.' },
             space: { type: 'string', description: 'A row: its row space.' },
             row_id: { type: 'string', description: 'A row: its id.' },
             owner: { type: 'string', description: 'get, set, review: the identity that holds the key when it is one of your agents or apps (a memory key or a stored file). Absent: your own.' },

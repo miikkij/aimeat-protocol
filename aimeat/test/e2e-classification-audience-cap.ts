@@ -22,6 +22,8 @@
  *   on for every owner, and turns it off and restores the policy at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=classification-audience-cap
  * @version-history
+ *   2026-11-15 — An audience exception made over REST for a board lands with its board (the route
+ *     had dropped board_id and app).
  *   2026-11-01 — A page or a space whose share end has passed and whose label rose since is held to
  *     its label when it is opened again; an unlabelled one opens (secaudit2026oct31w2 round 12).
  *   v1.1.0 — 2026-10-18 — A whole space shared is held to each published page's label, naming the page
@@ -307,6 +309,18 @@ await test('OVERRIDE: the owner makes an audience exception with a reason; it is
     const rows = (audit.body?.data?.rows as Body[] | undefined) ?? [];
     assert(rows.some(r => String(r.purpose).includes('audience') && String(r.purpose).includes(reason)), `audit rows: ${JSON.stringify(rows.map(r => r.purpose))}`);
     assert(rows.some(r => String(r.purpose).startsWith('used')), `the use is audited: ${JSON.stringify(rows.map(r => r.purpose))}`);
+});
+
+await test('OVERRIDE on a container: an audience exception made over REST for a board lands with its board', async () => {
+    const b = await call('POST', '/v1/boards', alice.token, { name: `Except board ${stamp}`, visibility: 'shared' });
+    assert(b.status === 201, `board: ${b.status} ${JSON.stringify(b.body?.error)}`);
+    const id = b.body.data.id as string;
+    const l = await setLabel(alice.token, { kind: 'board', board_id: id }, HIGH);
+    assert(l.status === 200 && l.body.data.applied === true, `label: ${l.status} ${JSON.stringify(l.body?.error ?? l.body?.data)}`);
+    const made = await call('POST', '/v1/classification/exceptions', alice.token, { kind: 'board', board_id: id, action: 'audience', reason: `board launch ${stamp}` });
+    assert(made.status === 201, `exception: ${made.status} ${JSON.stringify(made.body?.error ?? made.body?.data)}`);
+    assert(made.body.data.target?.kind === 'board' && made.body.data.target?.key === id && made.body.data.label === HIGH,
+        `the exception names the board: ${JSON.stringify(made.body.data.target)} ${made.body.data.label}`);
 });
 
 // ─── 4. A publish request is held to the cap again ───

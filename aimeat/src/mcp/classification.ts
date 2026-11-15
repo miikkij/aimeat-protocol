@@ -15,6 +15,8 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
  * @version-history
+ *   2026-11-15 — exception_set passes board_id and app to makeException, as POST
+ *     /v1/classification/exceptions does.
  *   2026-10-23 — pack_list and pack_set: the TL and NATO label packs (services/classification/packs.ts,
  *     plan doc-mvlftkh9zmc9 C3.2); pack_set needs memory:write and writes the node policy.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -136,7 +138,8 @@ export function registerClassificationTools(
             // PERSON_REQUIRED: the exception is the person's to make, in their Data Wallet.
             return text(await makeException(deps, actor, {
               kind: args.kind, key: args.key, owner: args.owner, organism_id: args.organism_id, ws: args.ws,
-              space: args.space, row_id: args.row_id, action: args.exception_action, reason: args.reason, until: args.until,
+              space: args.space, row_id: args.row_id, board_id: args.board_id, app: args.app,
+              action: args.exception_action, reason: args.reason, until: args.until,
             }));
           case 'pack_list':
             return text({ packs: packStatus(await readNodePolicy(storage, config.nodeId)) });

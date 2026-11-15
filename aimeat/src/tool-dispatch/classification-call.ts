@@ -17,6 +17,8 @@
  * @structure classificationCall
  * @usage return envelopeResult(await classificationCall(client, args));
  * @version-history
+ *   v1.4.1 — 2026-11-15 — exception_set passes board_id and app too: an audience exception may name
+ *     a board or an app, as the route and the service take it.
  *   v1.4.0 — 2026-10-23 — pack_list → GET /v1/classification/packs, pack_set → PUT
  *     /v1/classification/packs (up_to as upTo, acknowledge_not_accredited as acknowledgeNotAccredited).
  *   v1.3.0 — 2026-10-18 — get, set and review pass board_id and app for a container (plan
@@ -122,7 +124,7 @@ export async function classificationCall(client: Pick<AimeatClient, 'get' | 'pos
         case 'exception_set':
             // The node refuses an AI credential with PERSON_REQUIRED; the same answer as the node MCP.
             return client.post('/v1/classification/exceptions', {
-                ...pick(input, [...CONTENT_TARGET, 'reason', 'until']),
+                ...pick(input, [...TARGET, 'reason', 'until']),
                 ...(input.exception_action !== undefined && input.exception_action !== null ? { action: input.exception_action } : {}),
             });
         case 'pack_list':

@@ -18,6 +18,8 @@
  * @structure classificationRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.7.1 — 2026-11-15 — POST /v1/classification/exceptions passes board_id and app to the service,
+ *     so an audience exception for a board or an app is not refused with "board_id is required".
  *   v1.7.0 — 2026-10-23 — GET and PUT /v1/classification/packs: the TL and NATO label packs (plan
  *     doc-mvlftkh9zmc9, C3.2).
  *   v1.6.0 — 2026-10-18 — The label routes take a container: kind organism, workspace, board
@@ -154,7 +156,8 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       const actor = labelActorOf(req.auth!, config.nodeId);
       const out = await makeException(deps, actor, {
         kind: body.kind, key: body.key, owner: body.owner, organism_id: body.organism_id,
-        ws: body.ws, space: body.space, row_id: body.row_id, action: body.action, reason: body.reason, until: body.until,
+        ws: body.ws, space: body.space, row_id: body.row_id, board_id: body.board_id, app: body.app,
+        action: body.action, reason: body.reason, until: body.until,
       });
       res.status(201).json(success(config.nodeId, out));
     } catch (err) { fail(res, err); }
