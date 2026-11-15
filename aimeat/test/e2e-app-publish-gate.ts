@@ -27,6 +27,7 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   (2026-11-15) Audit M276: DOOR 3 asserts the refused draft left no catalogue row and no version.
  *   (2026-11-08) The acceptance line names the one size matrix (390×844, 1280×900, 1280×460), not 390 and 1440.
  *   (2026-11-05) The Atelier specification has seven parts: `motion` was split from `look` in effc2bcaa.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -771,6 +772,10 @@ const publish = (token: string, body: Record<string, unknown>) =>
         // Clearing the staging slot on a refusal would delete the only copy of the work.
         const draft = await json(`/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(f)}/draft`, { headers: auth(o.token) });
         assert(draft.status === 200, `THE DRAFT WAS LOST on a refused promotion: ${draft.status}`);
+        // And nothing went live: no catalogue row, no version (a refusal that half-published is the danger).
+        assert(!await appRow(o.name, f, o.token), 'the refused draft is in the catalogue');
+        const versions = await json(`/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(f)}/versions`, { headers: auth(o.token) });
+        assert(versions.status === 404 && versions.body?.error?.code === 'NOT_FOUND', `the refused draft left a version: ${versions.status} ${JSON.stringify(versions.body).slice(0, 200)}`);
     });
 
     // ── The warning half: everything else publishes, and says what is wrong ────────────────────

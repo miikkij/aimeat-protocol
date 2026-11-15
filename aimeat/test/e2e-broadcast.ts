@@ -6,6 +6,7 @@
 // and GET /v1/messages/broadcast/:id aggregates the results.
 //
 // Version history:
+//   2026-11-15 — Audit L035: test 5 expects exactly one recipient, and Bob outside the group gets nothing.
 //   2026-09-24 — The limit test is number 14 (there was a test 10 already), and it names the ACCOUNT:
 //     the limit moved into the send services and counts the owner and their agents together.
 //   2026-09-24 — Test 10, the limit (security audit A5-3): one principal's sends and broadcasts share
@@ -129,7 +130,8 @@ await test('5. Broadcast to a Share Group audience reaches its members', async (
         body: JSON.stringify({ group_id: groupId, mode: 'broadcast', body: 'Hello team (via Share Group)!' }),
     });
     assert(send.status === 201, `group broadcast ${send.status}: ${JSON.stringify(send.body)}`);
-    assert(send.body.data.sent >= 1, `expected ≥1 sent to the group, got ${send.body.data.sent}`);
+    // Exactly the one member: a fan-out that also reached Alice's other contacts is a leak, not a pass.
+    assert(send.body.data.sent === 1 && send.body.data.recipients === 1, `expected exactly Carol, got ${JSON.stringify(send.body.data)}`);
     // Carol sees it (as a request from Alice, first contact).
     let seen = false;
     for (let i = 0; i < 10; i++) {
@@ -141,6 +143,9 @@ await test('5. Broadcast to a Share Group audience reaches its members', async (
         await sleep(100);
     }
     assert(seen, 'Carol (group member) received the group broadcast');
+    // Bob, Alice's accepted contact outside the group, did not.
+    const bobInbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(!(bobInbox.body?.data?.messages ?? []).some((m: any) => /via Share Group/.test(m.body)), 'Bob, outside the group, received the group broadcast');
 });
 
 await test('6. A broadcast with no recipients is rejected (400)', async () => {

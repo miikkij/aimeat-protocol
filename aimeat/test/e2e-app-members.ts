@@ -7,6 +7,7 @@
  *   behind. A 200 proved none of them.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-members
  * @version-history
+ *   2026-11-15 — Audit M042: a stranger is refused DELETE /members/seen/{account} and the guest stays listed.
  *   v1.2.3 — 2026-10-13 — The priced capabilities' manifests carry tollMorsels: from 4.0.0 POST
  *     /v1/memory refuses price.morsels on a tool manifest (MORSEL_PRICE_REMOVED).
  *   v1.2.2 — 2026-10-12 — The member's agent is approved with ext:invoke beside memory:read: it calls an
@@ -1194,6 +1195,10 @@ await test('guests: turning up is recorded, and one person appears in exactly on
     await json(`/v1/apps/${owner.name}/${APP9}/members/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
     await me(stranger.token);
     assert((await roster()).seen.length === 1, 'removed from the roster, they are a visitor again');
+    // Dismissing is the owner's: the guest cannot erase themselves (or anyone) from the list.
+    const selfErase = await json(`/v1/apps/${owner.name}/${APP9}/members/seen/${stranger.name}`, { method: 'DELETE', headers: auth(stranger.token) });
+    assert(selfErase.status === 403 && selfErase.body?.error?.code === 'FORBIDDEN', `a stranger dismissed a guest: ${selfErase.status} ${JSON.stringify(selfErase.body?.error)}`);
+    assert((await roster()).seen.length === 1, 'the refused dismiss changed the guest list');
     const dismissed = await json(`/v1/apps/${owner.name}/${APP9}/members/seen/${stranger.name}`, {
         method: 'DELETE', headers: auth(owner.token),
     });

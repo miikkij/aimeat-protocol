@@ -8,6 +8,7 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   2026-11-15 — Audit M157: test 35 refuses a seller's agent holding commerce:psp on PUT /v1/commerce/payout/x402; the address stays.
  *   2026-10-20 — 27b: a PRIVATE app-tool manifest is not sold, at session creation or at completion
  *     (secaudit 2026-10, sellable-resolvers.ts:appToolSellableResolver:private-manifest-sold).
  *   2026-10-16 — 37c: PUT /v1/commerce/payout/invoice without a credential is refused (QA audit W29).
@@ -67,6 +68,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 import { removedOn } from './helpers/node-release.js';
 import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../src/utils/rest-scope-release.js';
@@ -862,6 +864,13 @@ await test('35. A too-short Stripe secret is refused, and one rail never clears 
     const addr = '0x' + 'c3d4e5f6'.repeat(5);
     const x = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: addr }) });
     assert(x.status === 200, `seed x402 address ${x.status}: ${JSON.stringify(x.body?.error)}`);
+    // The payout address is the seller's own act: an agent of the seller holding every word,
+    // commerce:psp included (no wildcard carries it), is refused, and the address stays.
+    const payAgent = await connectAgentByDevice(BASE, { owner: seller.name, ownerToken: seller.token, name: `payagent${Date.now() % 100000}`, scopes: ['*', 'commerce:psp'] });
+    const hijack = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(payAgent.token), body: JSON.stringify({ address: '0x' + 'a1b2c3d4'.repeat(5) }) });
+    assert(hijack.status === 403 && hijack.body?.error?.code === 'ACCESS_DENIED', `an agent set the payout address: ${hijack.status} ${JSON.stringify(hijack.body?.error)}`);
+    const kept = await json('/v1/memory/commerce.psp', { headers: auth(seller.token) });
+    assert(String(((kept.body.data?.value ?? kept.body.data?.record?.value) as any)?.payTo ?? '').toLowerCase() === addr.toLowerCase(), `the payout address changed: ${JSON.stringify(kept.body.data?.value)}`);
     const set = await json('/v1/commerce/payout/stripe', {
         method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ secret_key: 'sk_test_kept_alongside' }),
     });
