@@ -7,6 +7,7 @@
  *   403, and the serving half: a company host serves its front-page app, a redirect front page
  *   301s, an unclaimed label 404s, and the invoice seller prefills from the company record.
  * @version-history
+ *   2026-11-15 — Audit M168, 7b: an access-code-protected front page app answers 404 on the company address.
  *   2026-10-29 — 32, 33: a company address that keeps its holder clears nothing; the first visit after a
  *     deleted company's address passed to another account clears the old storage once (secaudit2026oct26
  *     round 8c, origin-handed-to-next-name-holder).
@@ -245,6 +246,17 @@ await test('7. setting your own app makes the address serve it', async () => {
   assert(served.body.includes(APP_MARKER), 'the company host served the wrong document');
   assert((served.contentType ?? '').includes('text/html'), `wrong content type: ${served.contentType}`);
   assert((served.contentType ?? '').includes('utf-8'), 'charset must be explicit (mojibake guard)');
+});
+
+await test('7b. an access-code-protected front page app is not served on the company address', async () => {
+  const lock = await json(`/v1/apps/${APP_FILE}`, { method: 'PATCH', headers: authed(A.token), body: JSON.stringify({ access_code: 'front-code-1234' }) });
+  assert(lock.status === 200, `set access code: ${lock.status} ${JSON.stringify(lock.body?.error)}`);
+  const locked = await coFetch(slug);
+  assert(locked.status === 404 && !locked.body.includes(APP_MARKER), `a protected app must not be served, got ${locked.status}`);
+  const open = await json(`/v1/apps/${APP_FILE}`, { method: 'PATCH', headers: authed(A.token), body: JSON.stringify({ access_code: null }) });
+  assert(open.status === 200, `clear access code: ${open.status} ${JSON.stringify(open.body?.error)}`);
+  const served = await coFetch(slug);
+  assert(served.status === 200 && served.body.includes(APP_MARKER), `served again once the code is gone, got ${served.status}`);
 });
 
 await test('8. a redirect front page 301s; a relative target is refused', async () => {

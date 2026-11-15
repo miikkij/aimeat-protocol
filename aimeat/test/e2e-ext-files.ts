@@ -10,6 +10,8 @@
  *   the result, return only the new key — no base64 in the arguments or the result.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-files.ts
  * @version-history
+ *   v1.3.0 — 2026-11-15 — Audit M251 (the escape key is exact and nothing lands at the escaped address)
+ *     and M252 (the written bytes are read back and compared, sameLength is asserted).
  *   v1.2.0 — 2026-10-30 — read() answers the file's visibility: private on the round trip, public once
  *     the owner opened it. Red before the change (undefined). And the second owner is refused the
  *     private file on /v1/pub with 403, the refusal of a signed-in principal the suite lacked (P3-08).
@@ -120,21 +122,35 @@ await test('Round trip: reference in, reference out, no bytes in the arguments',
   assert(out.wrote.gaii === owner.gaii, `the result belongs to the caller, got ${out.wrote.gaii}`);
   wroteKey = out.wrote.key;
   assert(out.read.visibility === 'private', `read says who can open it, got ${out.read.visibility}`);
+  assert(out.sameLength === true, `the script saw the real source bytes, got ${out.sameLength}`);
 });
 
 await test('What the extension wrote is a real file in the caller\'s storage', async () => {
   // Without this guard an empty key hits the LIST route, answers 200, and the test passes while
   // nothing was written. It did exactly that on the first run.
   assert(!!wroteKey, 'the previous step must have produced a key');
-  const r = await json(`/v1/storage/${encodeURIComponent(wroteKey)}`, { headers: auth(owner.token) });
-  assert(r.status === 200, `read back ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const r = await fetch(`${BASE}/v1/storage/${encodeURIComponent(wroteKey)}`, { headers: auth(owner.token) });
+  assert(r.status === 200, `read back ${r.status}`);
+  // The bytes, not only the status: the script wrote the source bytes unchanged.
+  const got = Buffer.from(await r.arrayBuffer()).toString('base64');
+  assert(got === SOURCE_B64, `the stored bytes are the source bytes, got ${got.slice(0, 40)}`);
 });
 
 await test('A write cannot escape the ext/{name}/ prefix', async () => {
   const r = await invoke(owner.token, 'transform', { ref: SOURCE_KEY, out: '../../escape.bin' });
   assert(r.status === 200, `status ${r.status}`);
   const key = r.body.data.wrote.key as string;
-  assert(key.startsWith(`ext/${EXT}/`), `stayed inside its own prefix, got ${key}`);
+  // The key is stored verbatim under the prefix (a storage key is opaque, so `..` is inert), and
+  // nothing landed at the address a path-normalizing consumer would resolve it to.
+  assert(key === `ext/${EXT}/../../escape.bin`, `stayed inside its own prefix, got ${key}`);
+  const kept = await fetch(`${BASE}/v1/storage/${encodeURIComponent(key)}`, { headers: auth(owner.token) });
+  assert(kept.status === 200, `the file is at the verbatim key, got ${kept.status}`);
+  for (const escaped of ['escape.bin', 'ext/escape.bin']) {
+    const s = await json(`/v1/storage/${encodeURIComponent(escaped)}`, { headers: auth(owner.token) });
+    assert(s.status === 404, `nothing at ${escaped}, got ${s.status}`);
+    const p = await fetch(`${BASE}/v1/pub/${encodeURIComponent(owner.gaii)}/${escaped}`, { headers: auth(owner.token) });
+    assert(p.status === 404, `nothing at /v1/pub/.../${escaped}, got ${p.status}`);
+  }
 });
 
 await test('A read is authorized AS THE CALLER: another owner\'s private file is refused', async () => {

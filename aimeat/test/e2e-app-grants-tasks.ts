@@ -8,6 +8,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants-tasks
  * @version-history
+ *   v1.3.0 — 2026-11-15 — Audit M122: an app with workflow:read and the step words but not
+ *     workflow:write is refused PUT and DELETE, and the owner's read-back is unchanged.
  *   v1.2.0 — 2026-10-09 — ext:invoke is an app word: an app granted it with workflow:write saves and
  *     runs a workflow with an extension step, and without it the save is refused naming the word.
  *   v1.1.0 — 2026-09-26 — work:request is an app word: an app granted it with workflow:write saves a
@@ -184,6 +186,18 @@ async function main() {
         const giver = await grantApp(['workflow:read', 'workflow:write', 'work:request', 'memory:read']);
         const saved = await json('/v1/workflows/agency-flow', { method: 'PUT', headers: { Authorization: `Bearer ${giver}` }, body: JSON.stringify(flow) });
         assert(saved.status === 200 && saved.body.data.savedBy?.kind === 'app', `with work:request: ${saved.status} ${JSON.stringify(saved.body.error ?? saved.body.data?.savedBy)}`);
+        // An app with every word this save costs but workflow:write is refused PUT and DELETE, and
+        // the owner reads the workflow unchanged (a gate lowered to workflow:read lets both through).
+        const noWrite = await grantApp(['workflow:read', 'work:request', 'memory:read']);
+        const read = () => json('/v1/workflows/agency-flow', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        const kept = JSON.stringify((await read()).body.data);
+        for (const method of ['PUT', 'DELETE']) {
+            const r = await json('/v1/workflows/agency-flow', { method, headers: { Authorization: `Bearer ${noWrite}` }, ...(method === 'PUT' ? { body: JSON.stringify({ ...flow, description: 'rewritten' }) } : {}) });
+            assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED' && /workflow:write/.test(r.body?.error?.message ?? ''),
+                `${method} without workflow:write: expected 403 SCOPE_DENIED naming workflow:write, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+        }
+        const after = await read();
+        assert(after.status === 200 && JSON.stringify(after.body.data) === kept, 'the refused PUT and DELETE left the workflow unchanged');
     });
 
     console.log('\nPhase 3c: ext:invoke — the app runs the owner\'s extension through a workflow step');

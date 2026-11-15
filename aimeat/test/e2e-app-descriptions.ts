@@ -8,6 +8,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-descriptions
  * @version-history
+ *   v1.2.0 — 2026-11-15 — Audit M239: description and name are asserted after the PATCH and the re-publish.
  *   v1.1.0 — 2026-09-04 — Who else can rewrite what an app says about itself. A description is the
  *     sentence a stranger reads in the catalogue before deciding whether to open the app, and the
  *     route is addressed by filename alone, so nothing here had called it as anyone but the owner.
@@ -94,6 +95,8 @@ await test('PATCH { descriptions: { en, fi } } updates the map; a blank locale i
     const m = await manifest();
     assert(m.descriptions?.en === 'Edited English.', `en updated, got ${JSON.stringify(m.descriptions)}`);
     assert(m.descriptions?.fi === undefined, `blank fi dropped, got ${JSON.stringify(m.descriptions)}`);
+    // The edit is in place: the rest of the manifest is unchanged.
+    assert(m.description === 'the canonical description' && m.name === 'Descriptions Demo', `description and name kept, got ${m.description} / ${m.name}`);
 });
 
 // ── Phase 3: carry-forward across a re-publish ──
@@ -107,6 +110,7 @@ await test('Re-publishing WITHOUT descriptions keeps the existing map', async ()
     assert(pub.status === 201, `re-publish status ${pub.status}`);
     const m = await manifest();
     assert(m.descriptions?.en === 'Edited English.', `descriptions survived re-publish, got ${JSON.stringify(m.descriptions)}`);
+    assert(m.description === 'the canonical description' && m.name === 'Descriptions Demo', `description and name kept, got ${m.description} / ${m.name}`);
 });
 
 // ── Phase 4: validation ──

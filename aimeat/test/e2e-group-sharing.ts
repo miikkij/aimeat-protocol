@@ -25,6 +25,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-group-sharing
  * @version-history
+ *   v1.1.0 — 2026-11-15 — Audit M104 (a member with read:false is refused) and L058 (the anonymous
+ *     refusal is asserted by status and code).
  *   v1.0.0 — 2026-08-11 — Initial. Written before the fix, and failing, per the test-first rule.
  */
 import * as ed from '@noble/ed25519';
@@ -181,7 +183,30 @@ async function main() {
 
     await test('an anonymous caller is refused', async () => {
         const r = await readForeign(null, A.ghii, BORN);
-        assert(r.status !== 200 || !gotValue(r), `anonymous must not read a group record, got ${r.status}`);
+        assert(r.status === 403 && r.body?.error?.code === 'CONSENT_DENIED',
+            `anonymous: expected 403 CONSENT_DENIED, got ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        assert(!gotValue(r), 'and it carries no value');
+    });
+
+    await test('a member the owner gave no read permission is refused, as both principal types', async () => {
+        // The management API stores per-member permissions; read:false must decide the read.
+        const r = await json('/v1/groups', {
+            method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
+            body: JSON.stringify({
+                name: 'e2e no-read group',
+                members: [{ identifier: C.ghii, identifier_type: 'ghii', permissions: { read: false, write: false } }],
+                default_permissions: { read: true, write: false },
+            }),
+        });
+        assert(r.status === 201, `create group: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const NOREAD = `grpshare.noread.${stamp}`;
+        const w = await writeShared(NOREAD, { secret: 'noread-v1' }, r.body.data.group.id);
+        assert(w.status === 201, `write: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        for (const [who, token] of [['agent', C.agentToken], ['human', C.ownerToken]] as const) {
+            const read = await readForeign(token, A.ghii, NOREAD);
+            assert(read.status === 403 && read.body?.error?.code === 'CONSENT_DENIED',
+                `read:false member ${who}: expected 403 CONSENT_DENIED, got ${read.status} ${JSON.stringify(read.body?.error ?? read.body?.data)}`);
+        }
     });
 
     // ── 2. A record shared AFTER it was created ──────────────────────────────

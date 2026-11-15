@@ -10,6 +10,8 @@
  *     under the same file name leaves the first owner's app unchanged. The E2E report of 2026-11-15
  *     proposed deleting this suite as covered elsewhere; five of its cases are not (the single-use
  *     token, metadata carried forward, strict base64, the empty body and the bad token), so it stays.
+ *   v1.3.0 -- 2026-11-15 -- Audit M045 (an unheld address answers 410 TOKEN_EXPIRED), M046 (the
+ *     storage PUT asks the shared writer again, bytes read back) and L122 (the delete cascade is read).
  */
 
 import * as ed from '@noble/ed25519';
@@ -297,6 +299,31 @@ await test('PUT file to storage upload_url succeeds', async () => {
     assert(result.success === true, 'success should be true');
     assert(result.type === 'storage', 'type should be storage');
     assert(result.key === 'test/presigned-file.txt', `key should match, got ${result.key}`);
+    // Fields only the shared writer's record gives, then the bytes read back through GET /v1/storage.
+    assert(result.owner_gaii === agentGaii, `owner_gaii is the uploading agent, got ${result.owner_gaii}`);
+    assert(result.embed_url === `/v1/pub/${encodeURIComponent(agentGaii)}/test/presigned-file.txt`, `embed_url: ${result.embed_url}`);
+    const back = await fetch(`${BASE}/v1/storage/test/presigned-file.txt`, agentAuthed());
+    assert(back.status === 200 && (await back.text()) === content, `the stored bytes read back, got ${back.status}`);
+});
+
+await test('The storage PUT asks the shared writer again: a group deleted after the mint refuses the upload', async () => {
+    // The mint checks the group exists; the PUT must ask again (services/storage-file-write.ts),
+    // so a route that stored the record itself would land a file bound to a group that is gone.
+    const g = await json('/v1/groups', authed({ method: 'POST', body: JSON.stringify({ name: 'upload-gone-group', members: [] }) }));
+    assert(g.status === 201, `create group: ${g.status} ${JSON.stringify(g.body?.error)}`);
+    const gid = g.body.data.group.id;
+    const mint = await json('/v1/storage', agentAuthed({
+        method: 'POST',
+        body: JSON.stringify({ key: 'test/group-gone.txt', mime_type: 'text/plain', visibility: 'group', group_id: gid, mode: 'presigned' }),
+    }));
+    assert(mint.status === 200 && !!mint.body.data?.upload_url, `mint: ${mint.status} ${JSON.stringify(mint.body?.error)}`);
+    const del = await json(`/v1/groups/${gid}`, authed({ method: 'DELETE' }));
+    assert(del.status === 200, `delete group: ${del.status}`);
+    const res = await fetch(mint.body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: 'bound to nobody' });
+    const out = await res.json() as any;
+    assert(res.status === 400 && out.error === 'INVALID_INPUT', `expected 400 INVALID_INPUT, got ${res.status} ${JSON.stringify(out)}`);
+    const back = await fetch(`${BASE}/v1/storage/test/group-gone.txt`, agentAuthed());
+    assert(back.status === 404, `nothing was stored, got ${back.status}`);
 });
 
 // ── Phase 3: Error cases ──
@@ -325,6 +352,15 @@ await test('Invalid token returns 401', async () => {
     assert(res.status === 401, `Expected 401, got ${res.status}`);
     const result = await res.json() as any;
     assert(result.error === 'TOKEN_INVALID', `error should be TOKEN_INVALID, got ${result.error}`);
+});
+
+await test('An upload address the node no longer holds returns 410 TOKEN_EXPIRED', async () => {
+    // A handle is kept only until its token expires, so this is the answer an expired URL gets.
+    const res = await fetch(`${BASE}/v1/upload/u_${'A'.repeat(16)}`, {
+        method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: '<html>late</html>',
+    });
+    const result = await res.json() as any;
+    assert(res.status === 410 && result.error === 'TOKEN_EXPIRED', `expected 410 TOKEN_EXPIRED, got ${res.status} ${result.error}`);
 });
 
 // ── Phase 3.5: Inline-upload base64 validation ──
@@ -382,8 +418,15 @@ await test('POST /v1/apps with malformed base64 (random non-alphabet chars) -> 4
 console.log('\nPhase 4: Cleanup');
 
 await test('Delete test owner (cascade)', async () => {
+    const appUrl = `${BASE}/v1/apps/${ownerName}/upload-test.html`;
+    const fileUrl = `${BASE}/v1/pub/${encodeURIComponent(agentGaii)}/test/presigned-file.txt`;
+    const before = [(await fetch(appUrl)).status, (await fetch(fileUrl)).status];
+    assert(before[0] === 200 && before[1] === 200, `app and public file are served before the delete, got ${before}`);
     const { status } = await json(`/v1/owners/${ownerName}`, authed({ method: 'DELETE' }));
     assert(status === 200 || status === 204, `Expected 2xx, got ${status}`);
+    // The cascade: the uploaded app and the agent's public file go with the account.
+    const after = [(await fetch(appUrl)).status, (await fetch(fileUrl)).status];
+    assert(after[0] === 404 && after[1] === 404, `app and file are gone after the delete, got ${after}`);
 });
 
 // ── Summary ──

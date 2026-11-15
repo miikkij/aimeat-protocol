@@ -26,6 +26,7 @@
  *   (secaudit 2026-10, mcp-oauth:access-token-without-session-survives-agent-delete).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-token-revocation
  * @version-history
+ *   v1.4.1 — 2026-11-15 — Audit M041: "sign out everywhere" is read back on two owner sessions (both 401).
  *   v1.4.0 — 2026-10-25 — A key rotation ends the MCP OAuth grant: the old bearer opens no new session
  *     (and the open one answers 401, not 404), the refresh grant mints nothing, the answer says the
  *     connected AIs ask for approval once more, and one new consent works (secaudit2026oct22,
@@ -419,8 +420,15 @@ async function run() {
 
     await test('"sign out everywhere" leaves the fleet connected', async () => {
         assert((await stillWorks(keeper.token)).ok, 'the agent works to begin with');
+        // A second device of the same person, so "everywhere" is more than the calling session.
+        const second = (await ownerSignIn(BASE, o2.owner, 'RevokeMe123456')).body.data.token as string;
+        assert((await stillWorks(second)).ok, 'the second session works to begin with');
         const { status } = await json('/v1/auth/sessions', { method: 'DELETE', headers: auth2 });
         assert(status === 200, `revoke-all ${status}`);
+        for (const [which, token] of [['calling', o2.ownerToken], ['second', second]] as const) {
+            const s = await stillWorks(token);
+            assert(!s.ok && s.status === 401, `the ${which} owner session must be signed out, got ${s.status}`);
+        }
         const r = await stillWorks(keeper.token);
         assert(r.ok, `signing out of every device must not disconnect an agent, got ${r.status}`);
     });

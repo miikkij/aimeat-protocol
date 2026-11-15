@@ -8,6 +8,8 @@
  *   Ports: G 28278, P1 28279, P2 28280. Each node has a database of its own on the run's backend
  *   (test/helpers/own-node-db.ts), one per port.
  * @version-history
+ *   v1.0.3 — 2026-11-15 — Audit M071 (a plain owner is refused /book/pull and /book/rebuild) and
+ *     L053 (node_card_hash is recomputed from the returned card).
  *   v1.0.2 — 2026-10-23 — setupOwner uses setupOperator (a password and the password sign-in); POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.0.1 — 2026-10-16 — The nodes this suite starts follow the run's backend
@@ -24,7 +26,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { ownNodeDb } from './helpers/own-node-db.js';
-import { setupOperator } from './helpers/owner-login.js';
+import { setupOperator, registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -96,7 +98,11 @@ await test('1. G node-card lists its operator + version + settings + resources',
   assert(Array.isArray(c.operators) && c.operators.some((o: any) => o.ghii === `gop${ts}@${G.nodeId}`), `operators: ${JSON.stringify(c.operators)}`);
   assert(c.settings && typeof c.settings.open_join === 'boolean', `settings: ${JSON.stringify(c.settings)}`);
   assert(c.resources && typeof c.resources.actions === 'number', `resources: ${JSON.stringify(c.resources)}`);
-  assert(typeof c.node_card_hash === 'string', 'has hash');
+  // The hash is recomputed from the returned card the way services/federation-book.ts computes it:
+  // SHA-256 of the card's JSON without node_card_hash and computed_at, in the order the node sends.
+  const stable = Object.fromEntries(Object.entries(c).filter(([k]) => k !== 'node_card_hash' && k !== 'computed_at'));
+  const expected = createHash('sha256').update(JSON.stringify(stable)).digest('hex');
+  assert(c.node_card_hash === expected, `node_card_hash covers the card: ${c.node_card_hash} vs ${expected}`);
 });
 
 await test('2. opted-out node (P2) returns listed:false, no operators', async () => {
@@ -142,6 +148,17 @@ await test('6. P1 peers+key-exchanges G, then pulls + mirrors the book', async (
   assert(book.body.data.is_primary === false, `P1 is_primary should be false`);
   const again = await P1.json('/v1/federation/book/pull', { method: 'POST', headers: auth(P1.ownerToken), body: JSON.stringify({ source_url: G.baseUrl }) });
   assert(again.body.data.applied === false && again.body.data.reason === 'not_newer', `second pull not_newer: ${JSON.stringify(again.body)}`);
+});
+
+await test('6b. a plain owner on P1 is refused /book/pull and /book/rebuild (403), and the mirror does not move', async () => {
+  const plain = await registerOwner(P1.baseUrl, `p1plain${ts}`);
+  const before = (await P1.json('/v1/federation/book')).body.data.book.book_version;
+  for (const path of ['/v1/federation/book/pull', '/v1/federation/book/rebuild']) {
+    const r = await P1.json(path, { method: 'POST', headers: auth(plain.token), body: JSON.stringify({ source_url: G.baseUrl }) });
+    assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED', `${path}: expected 403 ACCESS_DENIED, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+  }
+  const after = (await P1.json('/v1/federation/book')).body.data.book.book_version;
+  assert(after === before, `the mirrored book version is unchanged: ${before} -> ${after}`);
 });
 
 // Test 6 pulls G's GENUINE book from G's real node, so the signature check has never refused

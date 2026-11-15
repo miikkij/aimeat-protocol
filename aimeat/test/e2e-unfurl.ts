@@ -9,6 +9,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=unfurl
  * @version-history
+ *   2026-11-15 — Audit M124: the image proxy is refused without a token (401), as /v1/unfurl is.
  *   2026-10-31 — A page full of unclosed `<meta` openers is read in bounded time (secaudit2026oct31w2
  *     round 10, f-2026aug-dos-ratelimit-1). Added beside the existing cases; none of them changed.
  *   v1.0.0 — 2026-07-21 — Initial: auth/validation, OG metadata happy path, image proxy, SSRF block.
@@ -141,6 +142,12 @@ await test('Image proxy streams the image back with an image/* content-type', as
   assert((res.headers.get('content-type') || '').startsWith('image/'), `image content-type, got ${res.headers.get('content-type')}`);
   const buf = Buffer.from(await res.arrayBuffer());
   assert(buf.length === PNG.length, `proxied the PNG bytes, got ${buf.length}`);
+});
+
+await test('GET /v1/unfurl/image requires auth (401 without a token)', async () => {
+  const res = await fetch(`${BASE}/v1/unfurl/image?url=${encodeURIComponent(fixtureBase + '/img.png')}`);
+  const body = await res.json().catch(() => ({})) as any;
+  assert(res.status === 401 && body?.error?.code === 'AUTH_REQUIRED', `expected 401 AUTH_REQUIRED, got ${res.status} ${JSON.stringify(body?.error)}`);
 });
 
 await test('Image proxy rejects a non-image target with 415', async () => {

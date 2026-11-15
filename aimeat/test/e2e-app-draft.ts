@@ -13,6 +13,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-draft
  * @version-history
+ *   v1.6.0 — 2026-11-15 — Audit L022: the re-saved draft's manifest is read back (name, description, tags).
  *   v1.5.0 — 2026-10-24 — Phase 3: owner B's preview token on owner A's app URL answers 403 TOKEN_INVALID,
  *     and B's token on B's own URL still serves B's draft (secaudit2026oct22).
  *   v1.4.0 — 2026-10-19 — Phase 7: PUT .../draft and POST .../publish-draft take `version`; the live app
@@ -141,6 +142,11 @@ await test('The draft inherits the live manifest name when omitted', async () =>
         method: 'PUT', body: JSON.stringify({ content: b64(DRAFT_V2) }),
     }));
     assert(body.data?.saved === true, 're-save ok');
+    // Read the draft back: the inheritance is in the stored draft manifest, not in the answer.
+    const d = await json(`/v1/apps/${ownerAName}/${APP}/draft`, aAuthed());
+    const m = d.body.data?.manifest ?? {};
+    assert(d.status === 200 && m.name === 'Drum Pad', `draft name inherited, got ${d.status} ${m.name}`);
+    assert(m.description === 'calibration' && Array.isArray(m.tags) && m.tags.includes('audio'), `description and tags inherited, got ${JSON.stringify(m)}`);
 });
 
 // ── Phase 2: preview token serves the DRAFT ──

@@ -1,5 +1,8 @@
 // E2E Tests for Agent Governance (budget controls, owner-only start, task pause, readiness gates, admin endpoints)
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-governance.ts
+// @version-history
+//   2026-11-15 — Audit M149: a non-operator is refused the onboarding, readiness and skill-bundle
+//     admin routes (403), and an anonymous regenerate is 401.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -290,6 +293,19 @@ await test('Operator can POST /admin/skill-bundles/regenerate', async () => {
     });
     assert(status === 200, `status ${status}`);
     assert(body.data.regenerated === true, 'regenerated flag');
+});
+
+await test('Non-operator gets 403 on the agent onboarding, readiness and skill-bundle admin routes', async () => {
+    const calls: Array<[string, string]> = [
+        ['GET', '/v1/admin/agents/onboarding'], ['GET', '/v1/admin/agents/readiness'],
+        ['GET', '/v1/admin/skill-bundles'], ['POST', '/v1/admin/skill-bundles/regenerate'],
+    ];
+    for (const [method, path] of calls) {
+        const { status, body } = await json(path, { method, headers: { Authorization: `Bearer ${owner2Token}` } });
+        assert(status === 403 && body?.error?.code === 'ACCESS_DENIED', `${method} ${path}: expected 403 ACCESS_DENIED, got ${status} ${JSON.stringify(body?.error)}`);
+    }
+    const anon = await json('/v1/admin/skill-bundles/regenerate', { method: 'POST' });
+    assert(anon.status === 401 && anon.body?.error?.code === 'AUTH_REQUIRED', `anonymous regenerate: expected 401 AUTH_REQUIRED, got ${anon.status} ${JSON.stringify(anon.body?.error)}`);
 });
 
 // ─── Cleanup ───

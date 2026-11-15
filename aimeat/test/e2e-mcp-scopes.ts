@@ -5,6 +5,7 @@
  *   the words no wildcard carries, which is the half this file used to leave out.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-scopes
  * @version-history
+ *   2026-11-15 — Audit L079: the owner holds x first, and the refused MCP write leaves the owner's x unchanged.
  *   2026-10-17 — Permission ask (mcp/permission-ask-gate.ts): the narrow agent and the default agent
  *     are offered a tool whose missing words are all one-press, and each call is refused SCOPE_DENIED
  *     with the allow address; a tool missing a powerful word (task:write), an operator word or a word
@@ -216,6 +217,9 @@ await test('Narrow agent (memory:read) is answered only by scope-allowed + ungat
 });
 
 await test('Narrow agent cannot call a tool its scopes do not cover (memory_write)', async () => {
+    // The owner holds x with a known value first, so a write that landed under the owner is visible.
+    const seed = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'x', value: 'original' }) });
+    assert(seed.status === 201, `owner seed: ${seed.status}`);
     const client = await connectMcp(narrow.gaii, narrow.key);
     const { ok } = await client.call('aimeat_memory_write', { key: 'x', value: 'y' });
     assert(!ok, 'calling aimeat_memory_write without memory:write must not succeed');
@@ -223,6 +227,8 @@ await test('Narrow agent cannot call a tool its scopes do not cover (memory_writ
     const back = await client.call('aimeat_memory_read', { key: 'x' });
     const text = back.body.result?.content?.[0]?.text ?? '';
     assert(!text.includes('"value": "y"') && !text.includes('"value":"y"'), 'filtered write must not persist');
+    const owner = await json('/v1/memory/x', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(owner.status === 200 && owner.body.data?.value === 'original', `the owner's x is unchanged, got ${owner.status} ${JSON.stringify(owner.body.data?.value)}`);
 });
 
 // An agent's OWN tags need no word; a sibling's need agent:write (auth/self-or-scope.ts, ruled

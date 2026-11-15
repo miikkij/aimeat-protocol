@@ -8,6 +8,7 @@
  *   failure from the same incident: kind:'document' without mode must resolve to document mode,
  *   not fall through to records.
  * @version-history
+ *   2026-11-15 — Audit L128: test 9 opens its throwaway storage on the run's backend (ownNodeDb).
  *   2026-10-27 — 8d: POST /v1/memory/bulk-delete keeps an append-only event, by prefix and by name
  *     (secaudit2026oct26, bulk-delete-skips-bin-refusals).
  *   v1.0.0 — 2026-06-10 — Initial: backing gate (REST update + MCP create/write) + kind→mode inference.
@@ -327,9 +328,15 @@ await test('8d. POST /v1/memory/bulk-delete leaves the append-only event in plac
 // against a throwaway SQLite :memory: storage — no server restart needed to exercise the path) ──
 
 await test('9. version-aware seed: a stale system-seeded schema is upgraded, an operator-customized one is not', async () => {
-    const { SqliteStorage } = await import('../src/storage/providers/sqlite/index.js');
+    // The throwaway storage is on the run's own backend, so a PostgreSQL run exercises that provider's
+    // setSchema/getSchema round trip of the $comment seed marker, not SQLite's.
+    const { createStorage } = await import('../src/storage/storage-factory.js');
+    const { ownNodeDb } = await import('./helpers/own-node-db.js');
     const { seedManifestSchema, seededVersionOf, MANIFEST_SCHEMA_KEY, MANIFEST_WS_SCHEMA_KEY, MANIFEST_SEED_VERSION } = await import('../src/services/manifest-schema.js');
-    const storage = new SqliteStorage(':memory:');
+    const db = await ownNodeDb('backing-gate-seed', { memory: true });
+    const storage = db.provider === 'postgres-kysely'
+        ? await createStorage({ provider: 'postgres-kysely', dbUrl: db.dbUrl })
+        : await createStorage({ provider: 'sqlite', sqlitePath: db.sqlitePath });
     const system = 'system@test-node';
     const now = new Date().toISOString();
     // The pre-versioning (v1) schema exactly as old nodes have it: no $comment marker, wide enum.
@@ -361,7 +368,7 @@ await test('9. version-aware seed: a stale system-seeded schema is upgraded, an 
 
     // Re-run is a no-op (idempotent at the current version).
     assert(await seedManifestSchema(storage, system) === 0, 'second run writes nothing');
-    storage.close();
+    await (storage as unknown as { close?: () => unknown }).close?.();
 });
 
 await test('Cleanup', async () => {

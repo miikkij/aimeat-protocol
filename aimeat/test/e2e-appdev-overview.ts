@@ -7,6 +7,7 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-overview).
  * @version-history
+ *   v1.4.2 — 2026-11-15 — Audit M051: B's include_shared list is read before A shares the entry.
  *   v1.4.1 — 2026-11-15 — The node skills start with the Atelier and the Classic builder skill, in that
  *     order; the Classic one had fallen past the cap of 25 on PostgreSQL (nightly 43700514021).
  *   v1.4.0 — 2026-11-07 — +`microservices`: none named for an owner without a Central; the owner's own
@@ -178,6 +179,10 @@ await test('learned KB REST: seed via memory → list → PATCH share → cross-
     const entry = list.data.pitfalls.find((p: any) => p.slug === 'ui-test-entry');
     assert(entry && entry.source === 'own' && entry.shared === false, `entry missing/wrong: ${JSON.stringify(entry)}`);
     assert(entry.symptom && entry.resolution, 'full bodies missing from learned list');
+    // Before the share, B's include_shared view must not hold A's private entry: the shared branch
+    // filters on the share, not on "every owner's learned entries".
+    const { body: bEarly } = await json('/v1/appdev/pitfalls/learned?include_shared=1', { headers: { Authorization: `Bearer ${tokenB}` } });
+    assert(!bEarly.data.pitfalls.some((p: any) => p.slug === 'ui-test-entry'), 'A\'s private entry leaked into B\'s include_shared list');
 
     const { status: ps, body: patched } = await json('/v1/appdev/pitfalls/learned/auth/ui-test-entry', {
         method: 'PATCH', headers: { Authorization: `Bearer ${tokenA}` },

@@ -14,6 +14,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-onboarding-funnel
  * @version-history
+ *   v1.2.0 — 2026-11-15 — Audit M018 (a real uxtest-* account is activated and still excluded) and
+ *     M019 (the two negatives are read for a 2 s window instead of once after a fixed sleep).
  *   v1.1.0 — 2026-08-07 — Cohorts are now grouped by week × track (remake phase 0), so the cohort
  *     assertion selects the `remake` group by name instead of reading cohorts[0].
  *   v1.0.0 — 2026-08-07 — Initial.
@@ -77,6 +79,14 @@ const waitForActivation = async (token: string) => {
     }
     return null;
 };
+/** A late write looks like no write at a single read, so a negative is read for the whole window. */
+const changedWithin = async (token: string, expected: unknown, windowMs = 2000) => {
+    for (const end = Date.now() + windowMs; Date.now() < end; await sleep(250)) {
+        const v = await readActivation(token);
+        if (JSON.stringify(v) !== JSON.stringify(expected)) return v ?? 'removed';
+    }
+    return null;
+};
 
 let tokenApp = '';
 let tokenAgent = '';
@@ -123,10 +133,8 @@ await test('A SECOND publish does not move the marker (write-once)', async () =>
         }),
     }));
     assert(r.status === 201 || r.status === 200, `second publish ${r.status}`);
-    await sleep(600);
-    const after = await readActivation(tokenApp);
-    assert(after.at === before.at && after.kind === before.kind,
-        `marker moved: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+    const moved = await changedWithin(tokenApp, before);
+    assert(moved === null, `marker moved: ${JSON.stringify(before)} → ${JSON.stringify(moved)}`);
 });
 
 console.log('\nPhase 2: the agent door');
@@ -152,9 +160,8 @@ await test('An AGENT write activates its owner with kind=agent', async () => {
         body: JSON.stringify({ key: 'onboarding.hello_mcp', value: { ok: true }, visibility: 'private' }),
     }));
     assert(marker.status === 201, `hello_mcp write ${marker.status}`);
-    await sleep(600);
-    assert((await readActivation(tokenAgent)) === null,
-        'an onboarding.* marker write must not activate the account');
+    const activated = await changedWithin(tokenAgent, null);
+    assert(activated === null, `an onboarding.* marker write must not activate the account: ${JSON.stringify(activated)}`);
 
     // A real write does.
     const real = await json('/v1/memory', auth(agentToken, {
@@ -212,8 +219,20 @@ await test('An operator reads cohorts + rows, and this account appears activated
 
 await test('Test accounts (uxtest-*) are excluded from the funnel', async () => {
     if (!rolesOf(tokenApp).includes('operator')) return;
+    // A uxtest account activated through the same app route, so there is something to exclude.
+    const uxName = `uxtest-${stamp}`;
+    const uxToken = (await registerOwner(uxName)).token;
+    const html = '<!DOCTYPE html><html><head><title>Ux</title></head><body>ux</body></html>';
+    const pub = await json('/v1/apps', auth(uxToken, {
+        method: 'POST',
+        body: JSON.stringify({ filename: 'ux-test.html', content: Buffer.from(html).toString('base64'), mime_type: 'text/html', description: 'Ux fixture' }),
+    }));
+    assert(pub.status === 201, `ux publish ${pub.status}`);
+    assert((await waitForActivation(uxToken))?.kind === 'app', 'the uxtest account is activated');
     const { body } = await json('/v1/admin/onboarding-funnel?limit=1000', auth(tokenApp));
-    const leaked = (body.data?.rows ?? []).filter((r: any) => String(r.owner).startsWith('uxtest-'));
+    const rows = body.data?.rows ?? [];
+    assert(rows.some((r: any) => r.owner === ownerApp), `${ownerApp} is in the rows`);
+    const leaked = rows.filter((r: any) => String(r.owner).startsWith('uxtest-'));
     assert(leaked.length === 0, `measurement accounts must not pollute the numbers: ${leaked.length} found`);
 });
 

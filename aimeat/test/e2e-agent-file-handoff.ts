@@ -22,6 +22,8 @@
  *     test tree had ever sent a token the node did not mint. Test 3 now also fetches the URL with its
  *     last four characters altered and with a hand-made token, both 401 TOKEN_INVALID. Measured with
  *     jwtVerify replaced by a bare decode: the tampered URL streams the file.
+ *   v1.2.0 -- 2026-11-15 -- Audit M231: tests 11 and 12 read the task list back, so a refused create
+ *     that stored its task anyway is red.
  */
 
 import * as ed from '@noble/ed25519';
@@ -294,7 +296,16 @@ await test('11. attaching a file the creator cannot read → 403, nothing stored
     });
     assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body)}`);
     assert(r.body?.error?.code === 'FILE_ACCESS_DENIED', `code: ${r.body?.error?.code}`);
+    await assertNoOrphanTask();
 });
+
+/** "Nothing stored": the refused create left no task behind in the agent's task list. */
+async function assertNoOrphanTask() {
+    const list = await json(`/v1/agents/${AGENT}/tasks?per_page=100`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(list.status === 200, `task list: ${list.status}`);
+    const orphans = (list.body.data?.tasks ?? []).filter((t: any) => t.title === 'Should not exist');
+    assert(orphans.length === 0, `a refused create stored a task: ${orphans.map((t: any) => t.id).join(', ')}`);
+}
 
 await test('12. attaching a non-existent reference → 400 FILE_NOT_FOUND', async () => {
     const r = await json(`/v1/agents/${AGENT}/tasks`, {
@@ -306,6 +317,7 @@ await test('12. attaching a non-existent reference → 400 FILE_NOT_FOUND', asyn
     });
     assert(r.status === 400, `expected 400, got ${r.status} ${JSON.stringify(r.body)}`);
     assert(r.body?.error?.code === 'FILE_NOT_FOUND', `code: ${r.body?.error?.code}`);
+    await assertNoOrphanTask();
 });
 
 await test('13. revoking access flips the task attachment to denied on the NEXT read', async () => {

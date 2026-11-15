@@ -17,6 +17,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-memory-namespaces
  * @version-history
+ *   2026-11-15 — Audit M215 (a non-operator's DELETE ?owner= stays in its own namespace) and L085
+ *     (the reserved-key write is read back by the owner).
  *   2026-10-17 — The MCP client refreshes its token on 401 invalid_token and repeats the request, as a
  *     spec client does: an MCP OAuth token older than a widened grant is answered so
  *     (mcp/permission-ask-gate.ts).
@@ -338,6 +340,14 @@ async function main() {
         assert(r.status === 404, `owner_scope: expected 404, got ${r.status}`);
         const a = await json(`/v1/memory/nstest.sib.private?agent=${encodeURIComponent(sibGaii)}`, asAgent(t));
         assert(a.status === 403, `?agent=: expected 403, got ${a.status}`);
+        // The operator-only DELETE ?owner= override, sent by an owner who is not the operator: it
+        // stays in their own namespace (404) and this owner's record is still there.
+        const v = await json('/v1/memory', { method: 'POST', ...asAgent(ownerToken), body: JSON.stringify({ key: 'nstest.override.victim', value: { v: 1 } }) });
+        assert(v.status === 201, `victim write: ${v.status}`);
+        const d = await json(`/v1/memory/nstest.override.victim?owner=${encodeURIComponent(ownerGhii())}`, { method: 'DELETE', ...asAgent(otherToken) });
+        assert(d.status === 404 && d.body?.error?.code === 'NOT_FOUND', `?owner= by a non-operator: expected 404 NOT_FOUND, got ${d.status} ${JSON.stringify(d.body?.error)}`);
+        const kept = await json('/v1/memory/nstest.override.victim', asAgent(ownerToken));
+        assert(kept.status === 200, `the record survives, got ${kept.status}`);
     });
 
     await test('the owner grants memory:read-as-owner, and the agent reads the private records (REST and MCP)', async () => {
@@ -655,6 +665,10 @@ async function main() {
             assert(w.status === 201 || w.status === 200, `${key}: ${w.status} ${JSON.stringify(w.body)}`);
             assert(w.body.data.owner_gaii === ownerGhii(), `${key} must land under the owner`);
         }
+        // Read back by the owner at the owner's own address (an owner session's plain GET also finds
+        // its agents' copies), so the write landed in the owner's record and not only in the answer.
+        const back = await json(`/v1/memory/${encodeURIComponent(ownerGhii())}/openrouter.settings`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(back.status === 200 && back.body.data?.value?.managed === 'by agent', `read back: ${back.status} ${JSON.stringify(back.body.data?.value ?? back.body.error)}`);
     });
 
     await test('the reserved grant does NOT imply the redirect: without the flag it still stays put', async () => {
