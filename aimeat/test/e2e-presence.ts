@@ -11,6 +11,7 @@
  *   test/helpers/own-node-db.ts; in-process — same pattern as the federation-* suites, so the test
  *   shares the server's PresenceTracker instance).
  * @version-history
+ *   v1.3.0 -- 2026-11-15 -- Audit M080: under 'contacts', a contact sees the real status (8b).
  *   v1.2.2 -- 2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.2.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
@@ -155,6 +156,14 @@ await test('8. contacts: hidden (unknown) from a stranger', async () => {
   await json('/v1/presence/me', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ visibility: 'contacts', status: 'away' }) });
   const { body } = await json(`/v1/presence/${encodeURIComponent(alice.ghii)}`, { headers: auth(bob.token) });
   assert(body.data.status === 'unknown', `expected unknown for non-contact, got ${body.data.status}`);
+});
+
+// Test 8 proves only the refusal. A message from Alice to Bob opens the conversation isContact reads.
+await test('8b. contacts: a contact (Bob, after a message from Alice) sees away', async () => {
+  const dm = await json('/v1/messages', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ to: bob.ghii, body: 'hello from alice' }) });
+  assert(dm.status === 201, `alice → bob message: ${dm.status} ${JSON.stringify(dm.body?.error)}`);
+  const { body } = await json(`/v1/presence/${encodeURIComponent(alice.ghii)}`, { headers: auth(bob.token) });
+  assert(body.data.status === 'away', `a contact should see away under contacts, got ${body.data.status}`);
 });
 
 console.log('\nPhase 3 — Batch endpoint');

@@ -8,6 +8,8 @@
  *   free (non-commercial) public call; refund-on-throw; and install-time C1/no-mint validation.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-paywall.ts
  * @version-history
+ *   v1.5.0 — 2026-11-15 — Audit L050: a forged x-aimeat-internal-pass header from outside is charged the
+ *     toll as if absent; single use and randomness are held in test/unit/internal-pass.test.ts.
  *   v1.4.0 — 2026-10-12 — Node 4.0.0 refuses `commercial.payMorsels` (MORSEL_PRICE_REMOVED), so the shared
  *     extension states `tollMorsels` (the unaffordable action at the per-call ceiling of 100, which the
  *     old 9 999 was clamped to). The case whose subject is the 3.x figure installs its own extension and
@@ -38,7 +40,7 @@ async function json(path: string, opts: RequestInit = {}) {
   return { status: res.status, body };
 }
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
@@ -162,6 +164,16 @@ await test('Cross-owner TOLL is pacing: caller debited 2, the burn share burns, 
   assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(await balance(caller.token) === cb - 2, 'caller debited the 2 morsels of pacing');
   assert(await balance(owner.token) === ob + 2 - burn, `owner credited 2 less the burn of ${burn}`);
+});
+
+// The paywall stands down on a pass it minted itself; the header is read off the client request, so a
+// value sent from outside must be charged as if it were absent (test/unit/internal-pass.test.ts holds
+// single use and randomness).
+await test('A forged x-aimeat-internal-pass from outside is charged normally', async () => {
+  const cb = await balance(caller.token);
+  const r = await json(`/v1/ext/${EXT}/tollcall`, { method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-internal-pass': randomBytes(24).toString('base64url') }, body: JSON.stringify({ hi: 1 }) });
+  assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(await balance(caller.token) === cb - 2, `a forged pass skipped the toll: ${cb} -> ${await balance(caller.token)}`);
 });
 
 await test('Owner is free of toll too', async () => {

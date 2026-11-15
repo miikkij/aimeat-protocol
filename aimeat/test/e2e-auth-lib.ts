@@ -2,6 +2,7 @@
 // Tests the exact same API calls the browser auth library makes
 // Run: cd aimeat && AIMEAT_PORT=40251 npx tsx test/e2e-auth-lib.ts
 // @version-history
+//   2026-11-15 — Audit M159: with test mode on, the re-created account's predecessor agent JWT is 401.
 //   2026-10-16 — Phase 8 asserts the answer of the node's own mode instead of accepting either: with
 //     test mode off (the production-settings lane) registering a taken name answers 409 NAME_TAKEN
 //     and the account keeps working; with test mode on it is re-created. The old test accepted 201
@@ -581,6 +582,13 @@ if (!TEST_MODE) {
         });
         assert(data._status === 201, `expected 201 with test mode on, got ${data._status}`);
         assert(data.data.ghii.display_name === 'Re-registered User', 'display name should be updated');
+    });
+
+    // The re-creation erases the old account, and the old account's agent credential goes with it.
+    await test('the wiped account\'s agent JWT no longer authenticates against the re-created account (401)', async () => {
+        const memData = await authApi('/v1/memory/e2e-test', agentJwt);
+        assert(memData._status === 401 && memData.error?.code === 'INVALID_TOKEN',
+            `the old agent JWT still works: ${memData._status} ${memData.error?.code} ${JSON.stringify(memData.data?.value ?? null)}`);
     });
 }
 

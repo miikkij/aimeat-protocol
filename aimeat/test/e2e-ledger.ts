@@ -6,6 +6,7 @@
  *   Covers: priced call (table), provider-reported cost, unpriced model (cost stays null,
  *   not 0), per-run drill-down, group_by, owner isolation, and auth gating.
  * @version-history
+ *   v1.1.0 -- 2026-11-15 -- Audit M062: the owner's agent is refused the billing export, JSON and CSV.
  *   v1.0.0 -- 2026-07-10 -- Initial creation for LEDGER TARGET-016
  */
 
@@ -404,6 +405,14 @@ await test('24. CSV export -> text/csv attachment with model rows', async () => 
     assert(ct.includes('text/csv'), `content-type: ${ct}`);
     assert(text.startsWith('month,owner_ghii,api_key_scope'), `header: ${text.slice(0, 40)}`);
     assert(text.includes('claude-opus-4') && text.includes('node'), `rows: ${text}`);
+});
+
+// The fleet reads take an agent token; the billing export is owner-only (requireRole('owner')).
+await test('24b. The owner\'s own agent cannot read the billing export, as JSON or CSV (403)', async () => {
+    for (const q of ['', '?format=csv']) {
+        const { status, body } = await json(`/v1/ledger/billing${q}`, { headers: { Authorization: `Bearer ${e.agentToken}` } });
+        assert(status === 403 && body?.error?.code === 'ACCESS_DENIED', `agent billing${q}: ${status} ${JSON.stringify(body?.error ?? body).slice(0, 160)}`);
+    }
 });
 
 await test('25. Invalid month -> 400', async () => {

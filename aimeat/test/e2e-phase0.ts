@@ -7,6 +7,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=phase0
  * @version-history
+ *   v1.3.0 — 2026-11-15 — Audit M261, L104: the consent audit trail is read for this grant's own
+ *     grant and revoke entries; the TOTP cases no longer return early on 503, so TOTP off fails them.
  *   v1.2.1 — 2026-10-12 — The semantic-annotation action is published with pricing.toll_morsels; node
  *     4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the same on 3.x.
  *   v1.2.0 — 2026-08-17 — E2E quality, phase0:322. The consent layer was driven by one principal end
@@ -390,6 +392,11 @@ await test('GET /v1/consent/audit \u2192 200, audit trail endpoint works', async
     assert(Array.isArray(body.data?.entries), 'has entries array');
     assert(typeof body.data?.total === 'number', 'has total');
     assert(typeof body.data?.period_days === 'number', 'has period_days');
+    // The grant and the revoke above are both in the trail, under this consent's id.
+    const mine = await json(`/v1/consent/audit?consent_id=${encodeURIComponent(consentId)}`, agentAuthed());
+    const actions = (mine.body.data?.entries ?? []).filter((e: any) => e.consent_id === consentId).map((e: any) => e.action);
+    assert(actions.includes('grant'), `no grant entry for ${consentId}: ${JSON.stringify(actions)}`);
+    assert(actions.includes('revoke'), `no revoke entry for ${consentId}: ${JSON.stringify(actions)}`);
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -434,11 +441,8 @@ await test('POST /v1/ghii/totp/setup → returns secret and QR data', async () =
     const { status, body } = await json('/v1/ghii/totp/setup', ghiiAuthed({
         method: 'POST',
     }));
-    // If TOTP is disabled on the test node, 503 is acceptable
-    if (status === 503) {
-        console.log('    (TOTP disabled on test node — skipping)');
-        return;
-    }
+    // The test node runs with TOTP on (AIMEAT_TOTP_ENABLED defaults to true). A 503 here used to
+    // return early in all three cases, so switching it off made this section pass with no assertion.
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(typeof body.data?.totp_secret === 'string', 'has totp_secret');
@@ -451,11 +455,7 @@ await test('POST /v1/ghii/totp/verify → rejects invalid code', async () => {
         method: 'POST',
         body: JSON.stringify({ code: '000000' }),
     }));
-    // 503 if TOTP disabled, 400 if bad code or not setup
-    if (status === 503) {
-        console.log('    (TOTP disabled on test node — skipping)');
-        return;
-    }
+    // 400 if bad code or not set up; a 503 (TOTP off) fails here
     assert(status === 400 || status === 401, `expected 400 or 401, got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === false, 'ok is false');
 });
@@ -465,11 +465,7 @@ await test('DELETE /v1/ghii/totp → handles no TOTP enabled', async () => {
         method: 'DELETE',
         body: JSON.stringify({ code: '000000' }),
     }));
-    // 503 if TOTP disabled, 400 if not enabled
-    if (status === 503) {
-        console.log('    (TOTP disabled on test node — skipping)');
-        return;
-    }
+    // 400 if not enabled; a 503 (TOTP off) fails here
     assert(status === 400 || status === 200, `expected 400 or 200, got ${status}: ${JSON.stringify(body)}`);
 });
 

@@ -7,6 +7,9 @@
  *   progress tracking, DELETE cancellation, role enforcement, full 11-step
  *   completion flow, readiness score verification, and auto-check on GET.
  * @version-history
+ *   v1.6.0 -- 2026-11-15 -- Audit M177, M178, L012: a sibling agent's step confirmation is refused (33b),
+ *     health components and the score are pinned to values (29, 30), the over-long model is a 400 on
+ *     the pending step (4c, moved before 4).
  *   v1.5.0 -- 2026-10-31 -- 25b: the finished onboarding smoke test is not in the owner's home feed, a
  *     finished real task is (Jouni v27 P6).
  *   v1.4.0 -- 2026-10-19 -- set_avatar, an optional step in every flow: 17 steps in the full flow,
@@ -293,6 +296,20 @@ await test('3b. GET enriches steps with descriptionText + howTo and returns step
 // ─── Phase 3: Step confirmations ───
 console.log('\nPhase 3 -- Step Confirmations');
 
+// While the step is still pending, so the schema runs: a passed step answers 200 "already passed"
+// to any body, which is how this case used to pass without ever reaching the model cap.
+await test('4c. identify_platform with an over-long model is refused (400) and stores nothing', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/onboarding/step/identify_platform`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ platform: 'hermes', model: 'x'.repeat(200) }),
+    });
+    assert(status === 400 && body?.error?.code === 'VALIDATION_ERROR',
+        `expected 400 VALIDATION_ERROR, got ${status}: ${JSON.stringify(body?.error ?? body?.data).slice(0, 200)}`);
+    const { body: list } = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const agent = (list.data?.agents ?? []).find((a: any) => a.name === agentName);
+    assert(!agent?.model, `the refused model reached the record: ${String(agent?.model).slice(0, 80)}`);
+});
+
 await test('4. POST step identify_platform passes with valid payload', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/onboarding/step/identify_platform`, {
         method: 'POST',
@@ -316,25 +333,6 @@ await test('4b. identify_platform stored the model on the agent record (lowercas
     assert(agent.model_detected_by === 'self_report', `model_detected_by wrong: ${agent.model_detected_by}`);
 });
 
-await test('4c. identify_platform with an over-long model is handled safely (no 500, capped)', async () => {
-    const { status, body } = await json(`/v1/agents/${agentName}/onboarding/step/identify_platform`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ platform: 'hermes', model: 'x'.repeat(200) }),
-    });
-    assert(status === 200 || status === 400, `unexpected status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
-    if (status === 200) {
-        const { body: list } = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
-        const agent = (list.data?.agents ?? []).find((a: any) => a.name === agentName);
-        assert(agent && typeof agent.model === 'string' && agent.model.length <= 64, `model not capped: len ${agent?.model?.length}`);
-    }
-    // Restore the canonical model for later steps' assertions.
-    await json(`/v1/agents/${agentName}/onboarding/step/identify_platform`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ platform: 'hermes', platform_version: '2.1.0', model: 'claude-haiku-4.5' }),
-    });
-});
 
 await test('5. POST step install_skill passes with valid payload', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/onboarding/step/install_skill`, {
@@ -892,36 +890,28 @@ await test('28. Onboarding baseline is 100 when all steps (including optional) p
     assert(ob.onboardingBaseline === 100, `expected baseline 100, got ${ob.onboardingBaseline}`);
 });
 
-await test('29. Operational health is a number between 0 and 1', async () => {
-    const { body } = await json(`/v1/agents/${agentName}/onboarding`, {
-        headers: { Authorization: `Bearer ${ownerToken}` },
-    });
-    const ob = body.data.onboarding;
-
-    assert(typeof ob.operationalHealth === 'number', `operationalHealth should be number, got ${typeof ob.operationalHealth}`);
-    assert(ob.operationalHealth >= 0 && ob.operationalHealth <= 1,
-        `operationalHealth should be 0-1, got ${ob.operationalHealth}`);
-});
-
-await test('30. Health components are present with expected structure', async () => {
+await test('29. Operational health is the weighted health components, and the score follows it', async () => {
     const { body } = await json(`/v1/agents/${agentName}/onboarding`, {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     const ob = body.data.onboarding;
     const hc = ob.healthComponents;
+    const health = hc.deliveryHealth * 0.4 + hc.telemetryContinuity * 0.3 + hc.taskCompletion * 0.3;
+    assert(ob.operationalHealth === health, `operationalHealth ${ob.operationalHealth} != weighted components ${health}`);
+    assert(ob.readinessScore === Math.floor(ob.onboardingBaseline * health), `readinessScore ${ob.readinessScore} != floor(baseline x ${health})`);
+});
 
-    assert(hc !== null && hc !== undefined, 'healthComponents should exist');
-    assert(typeof hc.deliveryHealth === 'number', `deliveryHealth should be number, got ${typeof hc.deliveryHealth}`);
-    assert(typeof hc.telemetryContinuity === 'number', `telemetryContinuity should be number, got ${typeof hc.telemetryContinuity}`);
-    assert(typeof hc.taskCompletion === 'number', `taskCompletion should be number, got ${typeof hc.taskCompletion}`);
-
-    // All health components should be 0-1
-    assert(hc.deliveryHealth >= 0 && hc.deliveryHealth <= 1,
-        `deliveryHealth should be 0-1, got ${hc.deliveryHealth}`);
-    assert(hc.telemetryContinuity >= 0 && hc.telemetryContinuity <= 1,
-        `telemetryContinuity should be 0-1, got ${hc.telemetryContinuity}`);
-    assert(hc.taskCompletion >= 0 && hc.taskCompletion <= 1,
-        `taskCompletion should be 0-1, got ${hc.taskCompletion}`);
+await test('30. Health components hold the values tests 21 and 22 imply', async () => {
+    const { body } = await json(`/v1/agents/${agentName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const hc = body.data.onboarding.healthComponents;
+    // No webhook delivery was logged in the window, and an empty delivery log scores 1.
+    assert(hc.deliveryHealth === 1, `deliveryHealth with an empty delivery log should be 1, got ${hc.deliveryHealth}`);
+    // Test 22's one telemetry event is one day of seven once the 60 s activity buffer flushes, and no
+    // data (score 1) before it does (services/telemetry-buffer.ts).
+    assert(hc.telemetryContinuity === 1 || hc.telemetryContinuity === 1 / 7,
+        `telemetryContinuity for one day of telemetry should be 1/7 (or 1 before the flush), got ${hc.telemetryContinuity}`);
 });
 
 await test('31. Task completion health reflects completed test task', async () => {
@@ -1076,6 +1066,19 @@ await test('33. Start onboarding for second agent', async () => {
 
     const taskStep = ob.steps.find((s: any) => s.id === 'accept_test_task');
     autoTestTaskId = taskStep.details.testTaskId;
+});
+
+await test('33b. A sibling agent cannot confirm another agent\'s onboarding step', async () => {
+    // POST /step/:id has no scope gate; canAccessAgent is the only check between siblings (tags differ).
+    const r = await json(`/v1/agents/${agent2Name}/onboarding/step/identify_platform`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ platform: 'sibling-forged' }),
+    });
+    assert(r.status === 403 && r.body?.error?.code === 'FORBIDDEN',
+        `a sibling confirmed ${agent2Name}'s step: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+    const { body } = await json(`/v1/agents/${agent2Name}/onboarding`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const step = body.data.onboarding.steps.find((s: any) => s.id === 'identify_platform');
+    assert(step?.status === 'pending', `identify_platform should still be pending, got ${step?.status}`);
 });
 
 await test('34. Confirm manual steps (identify_platform, install_skill, read_directives, declare_services)', async () => {

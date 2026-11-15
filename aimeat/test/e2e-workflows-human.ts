@@ -9,6 +9,8 @@
  *   unit-covered (test/unit/workflow-human-input.test.ts — the 60s sweep isn't black-box-able). Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflows-human
  * @version-history
+ *   v1.3.0 — 2026-11-15 — Audit L125: every fixed sleep after a task end or an answer is a bounded poll
+ *     of the run (waitRun) until the expected step state, so a slower dispatch no longer races them.
  *   v1.2.0 — 2026-10-08 — aiprov D16: a review keeps the reviewed content's level (an assisted draft
  *     stays assisted) and adds editorial control.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: the gate step declares `reviews_key`, and a new test
@@ -104,6 +106,18 @@ const WORKFLOW = {
   ],
 };
 
+/** Poll a run until `done(run)` holds: onTaskTerminal and the answer's dispatch run after the
+ *  response, so a fixed sleep raced them. Fails after 15 s, naming what never arrived. */
+async function waitRun(wf: string, runId: string, done: (run: any) => boolean, what: string): Promise<any> {
+  const until = Date.now() + 15_000;
+  for (;;) {
+    const { body } = await json(`/v1/workflows/${wf}/runs/${runId}`, { headers: auth });
+    if (body?.data && done(body.data)) return body.data;
+    if (Date.now() > until) throw new Error(`run ${runId} never reached ${what}: ${JSON.stringify(body?.data?.steps ?? body).slice(0, 300)}`);
+    await sleep(100);
+  }
+}
+
 /** Start a full run and drive `draft` to green; returns the runId with `gate` waiting-human. */
 async function startAndReachGate(mode: 'full', target?: 'sandbox'): Promise<string> {
   const { status, body } = await json('/v1/workflows/gated/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode, target }) });
@@ -117,7 +131,7 @@ async function startAndReachGate(mode: 'full', target?: 'sandbox'): Promise<stri
   await writeMem(`${prefix}plan.draft`, 'the draft plan');
   const c = await json(`/v1/agents/${agentName}/tasks/${draftTask}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
   assert(c.status === 200, `complete draft ${c.status}: ${JSON.stringify(c.body)}`);
-  await sleep(700); // onTaskTerminal is fire-and-forget after the response
+  await waitRun('gated', runId, r => r.steps.gate.state === 'waiting-human', 'gate waiting-human');
   return runId;
 }
 
@@ -189,7 +203,7 @@ async function run() {
 
     const ok = await json(`/v1/workflows/gated/runs/${approveRunId}/steps/gate/answer`, { method: 'POST', headers: auth, body: JSON.stringify({ picks: ['approve'] }) });
     assert(ok.status === 200, `answer ${ok.status}: ${JSON.stringify(ok.body)}`);
-    await sleep(300);
+    await waitRun('gated', approveRunId, d => d.steps.gate.state === 'green' && !!d.steps.ship.taskIds?.length, 'gate green with ship dispatched');
 
     const { body: r } = await json(`/v1/workflows/gated/runs/${approveRunId}`, { headers: auth });
     assert(r.data.steps.gate.state === 'green', `gate green, got ${r.data.steps.gate.state}`);
@@ -204,9 +218,8 @@ async function run() {
     // Finish the run.
     await writeMem('plan.shipped', 'shipped');
     await json(`/v1/agents/${agentName}/tasks/${shipTask}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
-    await sleep(700);
-    const { body: r2 } = await json(`/v1/workflows/gated/runs/${approveRunId}`, { headers: auth });
-    assert(r2.data.status === 'done', `run done, got ${r2.data.status}`);
+    const r2 = await waitRun('gated', approveRunId, d => d.status === 'done', 'status done');
+    assert(r2.status === 'done', `run done, got ${r2.status}`);
   });
 
   // ── TARGET-058: the ONE step that may upgrade humanInvolvement, proven end to end ──
@@ -254,7 +267,7 @@ async function run() {
     assert(declared.status === 201 || declared.status === 200, `declare: ${declared.status} ${JSON.stringify(declared.body?.error)}`);
     const ok = await json(`/v1/workflows/gated/runs/${runId}/steps/gate/answer`, { method: 'POST', headers: auth, body: JSON.stringify({ picks: ['approve'] }) });
     assert(ok.status === 200, `answer ${ok.status}: ${JSON.stringify(ok.body)}`);
-    await sleep(300);
+    await waitRun('gated', runId, d => d.steps.gate.state === 'green', 'gate green');
     try {
       const mem = await json('/v1/memory/plan.draft', { headers: auth });
       const rec = mem.body.meta?.provenance?.record;
@@ -267,8 +280,8 @@ async function run() {
       await writeMem('plan.shipped', 'shipped');
       if (typeof shipTask === 'string') {
         await json(`/v1/agents/${agentName}/tasks/${shipTask}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
+        await waitRun('gated', runId, d => d.status === 'done', 'status done');
       }
-      await sleep(700);
     }
   });
 
@@ -281,7 +294,7 @@ async function run() {
 
     const ok = await json(`/v1/workflows/gated/runs/${runId}/steps/gate/answer`, { method: 'POST', headers: auth, body: JSON.stringify({ picks: ['reject'] }) });
     assert(ok.status === 200, `answer ${ok.status}: ${JSON.stringify(ok.body)}`);
-    await sleep(300);
+    await waitRun('gated', runId, d => d.steps.ship.state === 'input-red', 'ship input-red');
 
     const { body: r } = await json(`/v1/workflows/gated/runs/${runId}`, { headers: auth });
     assert(r.data.steps.gate.state === 'green', `gate green (any answer counts), got ${r.data.steps.gate.state}`);
@@ -299,9 +312,9 @@ async function run() {
 
     const ok = await json(`/v1/workflows/gated/runs/${runId}/steps/gate/answer`, { method: 'POST', headers: auth, body: JSON.stringify({ picks: ['approve'] }) });
     assert(ok.status === 200, `answer ${ok.status}: ${JSON.stringify(ok.body)}`);
-    await sleep(300);
+    await waitRun('gated', runId, d => d.steps.gate.state === 'green', 'gate green');
 
-    const prod = await json('/v1/memory/gate.decision', { headers: auth });
+    const prod =await json('/v1/memory/gate.decision', { headers: auth });
     assert(prod.status === 404, `prod gate.decision untouched (404), got ${prod.status}`);
     const sandboxed = await json(`/v1/memory/wf-test.${runId}.gate.decision`, { headers: auth });
     assert(sandboxed.status === 200 && sandboxed.body.data?.value?.pick === 'approve', `sandbox answer written, got ${sandboxed.status}`);
@@ -339,7 +352,7 @@ async function run() {
       method: 'POST', headers: agentAuth, body: JSON.stringify({ picks: ['approve'] }),
     });
     assert(ans.status === 200, `an agent must still be able to answer, got ${ans.status}: ${JSON.stringify(ans.body).slice(0, 200)}`);
-    await sleep(700);
+    await waitRun('gated', runId, d => d.steps.gate.state === 'green', 'gate green');
 
     const mem = await json('/v1/memory/plan.draft', { headers: auth });
     assert(mem.status === 200, `plan.draft read ${mem.status}`);
@@ -402,10 +415,8 @@ async function run() {
     const st = await json('/v1/workflows/gatedx/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
     assert(st.status === 200, `run gatedx ${st.status}: ${JSON.stringify(st.body?.error)}`);
     const runId = st.body.data.runId;
-    await sleep(700);
-    const { body: r0 } = await json(`/v1/workflows/gatedx/runs/${runId}`, { headers: auth });
-    assert(r0.data.steps.gate.state === 'waiting-human',
-      `the run must be parked for any of this to mean anything, got ${r0.data.steps.gate.state}`);
+    // The run must be parked for any of this to mean anything.
+    await waitRun('gatedx', runId, d => d.steps.gate.state === 'waiting-human', 'gate waiting-human');
 
     // 1. No credential at all.
     const anon = await json(`/v1/workflows/gatedx/runs/${runId}/steps/gate/answer`, {

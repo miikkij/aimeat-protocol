@@ -4,6 +4,8 @@
  *   out-of-format entry are all REJECTED (422 ZIP_REJECTED) — never processed — and each rejection
  *   records a quarantined security incident the operator can list on the admin Security endpoint.
  * @version-history
+ *   v1.1.0 — 2026-11-15 — Audit M025, M026, M027: quarantine download refused to a plain owner,
+ *     RATIO_EXCEEDED and SYMLINK refusals, a non-member's workspace import refused.
  *   v1.0.0 — 2026-06-09 — Initial: bomb/traversal/format rejection + incident logging.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=zip-security
@@ -42,7 +44,7 @@ async function importZip(token: string, orgId: string, zip: Buffer) {
 
 console.log('\n=== AIMEAT ZIP Security E2E ===\n');
 
-let token = '', ownerName = '', orgId = '';
+let token = '', ownerName = '', orgId = '', cleanZipB64 = '';
 
 await test('Setup owner (operator) + org', async () => {
     ownerName = `zipsec${Date.now()}`;
@@ -133,6 +135,28 @@ for (const hostile of ['../bb.json', '/b/bb.json']) {
     });
 }
 
+// The size guards: nothing above reaches maxRatio or the symlink check. 2 MB of spaces compresses to
+// about 2 KB, far past the 200x ratio, so the read must stop with RATIO_EXCEEDED before the JSON parse.
+await test('3c. a highly compressible entry is refused as RATIO_EXCEEDED (zip-bomb guard)', async () => {
+    const zip = await makeZip([{ name: 'workspace.json', data: Buffer.alloc(2 * 1024 * 1024, 0x20) }]);
+    const r = await importZip(token, orgId, zip);
+    assert(r.status === 422 && r.body.error?.code === 'ZIP_REJECTED', `expected 422 ZIP_REJECTED, got ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(/\(RATIO_EXCEEDED\)/.test(r.body.error?.message || ''), `refused for the ratio: ${r.body.error?.message}`);
+});
+
+await test('3d. a symlink entry is refused as SYMLINK', async () => {
+    const zip = await new Promise<Buffer>((resolve, reject) => {
+        const a = new ZipArchive({ zlib: { level: 9 } });
+        const chunks: Buffer[] = [];
+        a.on('data', (c: Buffer) => chunks.push(c)); a.on('end', () => resolve(Buffer.concat(chunks))); a.on('error', reject);
+        a.symlink('images/link.png', '/etc/passwd');
+        a.finalize();
+    });
+    const r = await importZip(token, orgId, zip);
+    assert(r.status === 422 && r.body.error?.code === 'ZIP_REJECTED', `expected 422 ZIP_REJECTED, got ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(/\(SYMLINK\)/.test(r.body.error?.message || ''), `refused for the symlink: ${r.body.error?.message}`);
+});
+
 await test('4. operator can list the quarantined incidents', async () => {
     const r = await json('/v1/admin/security/incidents', { headers: auth(token) });
     assert(r.status === 200, `incidents ${r.status} (owner must be operator — first registered owner is)`);
@@ -164,6 +188,10 @@ await test('4b. a plain owner cannot read, resolve or delete the incident list',
     assert(resolve.status === 403, `a plain owner resolved an incident: ${resolve.status}`);
     const del = await json(`/v1/admin/security/incidents/${id}`, { method: 'DELETE', headers: auth(otherToken) });
     assert(del.status === 403, `a plain owner deleted an incident: ${del.status}`);
+    // The quarantine route serves the rejected upload's own bytes, so it needs the operator too.
+    const q = await json(`/v1/admin/security/incidents/${id}/quarantine`, { headers: auth(otherToken) });
+    assert(q.status === 403 && q.body?.error?.code === 'ACCESS_DENIED',
+        `a plain owner downloaded a quarantined payload: ${q.status} ${JSON.stringify(q.body?.error ?? q.body?._raw?.slice(0, 80))}`);
 
     // Unauthenticated is the same answer or better.
     const anon = await json('/v1/admin/security/incidents');
@@ -223,6 +251,7 @@ await test('6. a LEGITIMATE workspace ZIP still imports (the guards are not a ba
     assert(exp.status === 200, `export ${exp.status}: ${JSON.stringify(exp.body.error)}`);
     const b64 = exp.body.data.zip_base64 as string;
     assert(typeof b64 === 'string' && b64.length > 100, `export produced bytes (${b64?.length})`);
+    cleanZipB64 = b64;
 
     const imp = await json(`/v1/organisms/${orgId}/workspace/import`, {
         method: 'POST', headers: auth(token), body: JSON.stringify({ zip_base64: b64 }),
@@ -236,6 +265,27 @@ await test('6. a LEGITIMATE workspace ZIP still imports (the guards are not a ba
     assert(back.status === 200, `the restored record reads back, got ${back.status}`);
     assert(back.body.data?.value?.title === 'Survives a round trip',
         `restored value: ${JSON.stringify(back.body.data?.value)}`);
+});
+
+// The import route is gated on active membership; every call above is by the organism's creator.
+// A second owner who never joined sends the same clean ZIP, and the workspace list must not grow.
+await test('6b. a non-member cannot import a workspace into the organism', async () => {
+    assert(cleanZipB64.length > 100, 'test 6 produced a clean ZIP');
+    const other = `zipsec3${Date.now()}`;
+    const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: other, display_name: 'ZipSec3', password: 'ZipSec1234' }) });
+    assert(reg.status === 201, `second owner ${reg.status}`);
+    const otherToken = (await ownerSignIn(BASE, other, 'ZipSec1234')).body.data.token as string;
+    const before = await json(`/v1/organisms/${orgId}/workspaces`, { headers: auth(token) });
+    assert(before.status === 200, `workspace list ${before.status}`);
+    const imp = await json(`/v1/organisms/${orgId}/workspace/import`, {
+        method: 'POST', headers: auth(otherToken), body: JSON.stringify({ zip_base64: cleanZipB64 }),
+    });
+    assert(imp.status === 403 && imp.body?.error?.code === 'ACCESS_DENIED',
+        `a non-member imported a workspace: ${imp.status} ${JSON.stringify(imp.body?.error ?? imp.body?.data)}`);
+    const after = await json(`/v1/organisms/${orgId}/workspaces`, { headers: auth(token) });
+    assert(after.body.data.workspaces.length === before.body.data.workspaces.length,
+        `workspaces ${before.body.data.workspaces.length} -> ${after.body.data.workspaces.length}`);
+    await json(`/v1/owners/${other}`, { method: 'DELETE', headers: auth(otherToken) });
 });
 
 await test('Cleanup', async () => { await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: auth(token) }); });

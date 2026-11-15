@@ -15,6 +15,9 @@
  *                                      consumer debited) · and a STALE session token (named error, no charge)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-exchange-mcp.ts
  * @version-history
+ *   2026-11-15 — Audit M066: aimeat_exchange_work, aimeat_exchange_proposals and aimeat_app_tool_invoke
+ *     run over a real /v1/mcp session for the consumer's agent, and an agent without the exchange
+ *     words is refused aimeat_exchange_work there.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.4.2 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED): the
  *     agent-work listing states `toll_morsels: 5` and the app tool `tollMorsels: 3`, which 3.x accepts too.
@@ -43,6 +46,7 @@ import { loadConfig } from '../src/config.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { registerExchangeRunTools } from '../src/mcp/exchange-run.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -357,6 +361,36 @@ await test('aimeat_app_tool_invoke — a session token that went stale fails by 
     assert(res.error!.includes('CALLER_TOKEN'), `the error must name the token, got: ${res.error}`);
     const after = await balance(consumer.token);
     assert(after === before, `a failed invoke must leave no charge (before ${before}, after ${after})`);
+});
+
+// ── The same tools over a real /v1/mcp session ──
+// Everything above calls handlers captured from a mock McpServer, with the identity and token handed
+// in as test closures, so the registration in src/mcp/register-all.ts, the session → caller
+// resolution and the tool scope table are never on the path. These two cases drive them for real.
+await test('Over /v1/mcp, the consumer\'s agent starts work, lists proposals and invokes the app tool for its owner', async () => {
+    const agent = await makeAgent(BASE, consumer, ['exchange:read', 'exchange:write', 'ext:invoke']);
+    const s = await openSession(BASE, agent.token, 'e2e-exchange-mcp-real');
+    const w = await callTool(s, 'aimeat_exchange_work', { offering_id: awOfferingId, input: { text: 'over a real session' } });
+    assert(!w.isError && w.data?.work?.state === 'open', `aimeat_exchange_work over /v1/mcp: ${w.text.slice(0, 200)}`);
+    // Read back through the owner's REST list: the work runs on the consumer's contract.
+    const list = await json('/v1/exchange/work', { headers: auth(consumer.token) });
+    assert((list.body.data?.work ?? []).some((x: any) => x.work_id === w.data.work.work_id), `consumer's work list: ${JSON.stringify(list.body.data).slice(0, 200)}`);
+    const p = await callTool(s, 'aimeat_exchange_proposals', {});
+    assert(!p.isError && Array.isArray(p.data?.proposals), `aimeat_exchange_proposals over /v1/mcp: ${p.text.slice(0, 200)}`);
+    const before = await balance(consumer.token);
+    const inv = await callTool(s, 'aimeat_app_tool_invoke', { owner: provider.name, app: 'plotter', tool: 'run', input: { q: 'real' } });
+    assert(!inv.isError && inv.data?.result?.echo?.q === 'real', `aimeat_app_tool_invoke over /v1/mcp: ${inv.text.slice(0, 200)}`);
+    assert(await balance(consumer.token) === before - 3, 'the consumer is charged the 3-morsel pacing for the call');
+});
+
+await test('Over /v1/mcp, an agent without the exchange words is refused aimeat_exchange_work and nothing is stored', async () => {
+    const agent = await makeAgent(BASE, consumer, ['memory:read']);
+    const s = await openSession(BASE, agent.token, 'e2e-exchange-mcp-narrow');
+    const count = async () => ((await json('/v1/exchange/work', { headers: auth(consumer.token) })).body.data?.work ?? []).length;
+    const before = await count();
+    const r = await callTool(s, 'aimeat_exchange_work', { offering_id: awOfferingId, input: { text: 'not mine to spend' } });
+    assert(r.isError && /SCOPE_DENIED/.test(r.text), `a memory:read agent ran aimeat_exchange_work: ${r.text.slice(0, 200)}`);
+    assert(await count() === before, 'a refused call stored work');
 });
 
 // ── The HTTP twin asks for the same word the tool does ──

@@ -8,6 +8,8 @@
  *   - A2: a space declared `versioned:false` (e.g. a request queue) keeps only .latest — publishing it
  *     (even with real changes) never writes a .version.N.
  * @version-history
+ *   v1.4.0 — 2026-11-15 — Audit M185, L131: a contributor is refused a meta.* publish by the namespace
+ *     rule; the first two note drafts are written through POST /v1/organisms/:id/workspace/drafts.
  *   v1.3.0 — 2026-10-31 — A viewer and a member with no grant cannot reopen a record by moving the
  *     first part of its namespace into ws (or the workspace into the namespace), on REST or over MCP
  *     (secaudit 2026-10-31 inv-06).
@@ -92,9 +94,17 @@ await test('Create organism + workspace with a versioned `note` space and a vers
 });
 
 // ── Happy path: a real edit still versions ──
+// The first two drafts go through the workspace draft route, so publish is proven against a draft the
+// node writes and not only against one hand-written to /v1/memory (A1 below keeps the direct write).
+const draftViaWorkspace = async (id: string, value: Record<string, unknown>) => {
+    const w = await json(`/v1/organisms/${orgId}/workspace/drafts`, { method: 'POST', headers: auth(), body: JSON.stringify({ ws: WS, space: 'shared.notes', id, value }) });
+    assert(w.status === 200, `workspace draft ${w.status}: ${JSON.stringify(w.body.error)}`);
+};
+
 await test('First publish of a versioned note creates .version.1 + .latest', async () => {
     const base = `${root()}.shared.notes.n1`;
-    await json('/v1/memory', { method: 'POST', headers: auth(), body: JSON.stringify({ key: `${base}.draft`, value: { id: 'n1', title: 'v1' }, visibility: 'private' }) });
+    await draftViaWorkspace('n1', { id: 'n1', title: 'v1' });
+    assert(await hasDraft(base), 'the workspace draft route wrote the draft publish reads');
     const pub = await json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: auth(), body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id: 'n1' }) });
     assert(pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
     assert(pub.body.data.skipped !== true, 'first publish must not be skipped');
@@ -105,7 +115,7 @@ await test('First publish of a versioned note creates .version.1 + .latest', asy
 
 await test('A genuine edit → publish appends .version.2 (history preserved)', async () => {
     const base = `${root()}.shared.notes.n1`;
-    await json('/v1/memory', { method: 'POST', headers: auth(), body: JSON.stringify({ key: `${base}.draft`, value: { id: 'n1', title: 'v2' }, visibility: 'private' }) });
+    await draftViaWorkspace('n1', { id: 'n1', title: 'v2' });
     const pub = await json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: auth(), body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id: 'n1' }) });
     assert(pub.status === 200 && pub.body.data.skipped !== true, `changed publish not skipped: ${JSON.stringify(pub.body)}`);
     assert(await versionCount(base) === 2, `expected 2 versions, got ${await versionCount(base)}`);
@@ -262,6 +272,17 @@ await test('A viewer\'s agent cannot publish over MCP, nor through the batch rou
     const b = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: as(V), body: JSON.stringify({ ws: WS, namespace: 'shared.notes', instances: ['c1'] }) });
     assert(b.status === 403, `batch publish by a viewer: expected 403, got ${b.status} ${JSON.stringify(b.body).slice(0, 200)}`);
     assert(await draftOwnedBy(C, 'c1'), 'C\'s draft must still exist');
+});
+
+// canWriteNamespace: a meta.* space is the creator's or an admin's, whatever the workspace grant says.
+await test('A contributor cannot publish into a meta.* namespace (403), and nothing under meta changes', async () => {
+    const metaKeys = async () => ((await json(`/v1/memory?prefix=${encodeURIComponent(`${root()}.meta.`)}`, { headers: auth() })).body.data.items as any[])
+        .map(i => `${i.key}@${i.version}`).sort().join(',');
+    const before = await metaKeys();
+    const r = await json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: as(C), body: JSON.stringify({ ws: WS, namespace: 'meta.manifest', id: 'm1' }) });
+    assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED', `contributor meta publish: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(/admin or whoever created this space/.test(r.body.error.message), `refused by another check: ${r.body.error.message}`);
+    assert(await metaKeys() === before, 'a meta.* record changed');
 });
 
 await test('POSITIVE CONTROL: the contributor publishes their own draft', async () => {

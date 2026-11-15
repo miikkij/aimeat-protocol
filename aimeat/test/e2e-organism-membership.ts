@@ -5,6 +5,8 @@
  *   and creator/admin revoking (removing) a member → removed-member notification. Also covers the
  *   guardrails: the creator cannot be removed, and a non-admin cannot review or remove.
  * @version-history
+ *   2026-11-15 — Audit L098: the join-request notice is matched on the organism as well as the type,
+ *     and neither the requester nor a plain member gets it (tests 2 and 7).
  *   2026-11-15 — Tests 2, 6 and 7 read the notice's link: the request and the approval open the
  *     organism, the decline opens the list of organisms.
  *   2026-09-28 — Test 22 registers the agent it attaches: the setup no longer matched the code, which now
@@ -55,9 +57,11 @@ async function setupOwner(label: string) {
     return { name, token: tok.body.data.token as string };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
-const hasNotif = async (token: string, type: string) => {
+/** With `org`, only a notice of this type whose link names that organism counts. */
+const hasNotif = async (token: string, type: string, org?: string) => {
     const r = await json('/v1/notifications', { headers: auth(token) });
-    return r.status === 200 && (r.body.data.notifications || []).some((n: any) => n.type === type);
+    return r.status === 200 && (r.body.data.notifications || [])
+        .some((n: any) => n.type === type && (!org || String(n.link ?? '').includes(encodeURIComponent(org))));
 };
 /** The link of the newest notice of this type, or null when there is none. */
 const notifLink = async (token: string, type: string): Promise<string | null> => {
@@ -106,7 +110,8 @@ await test('1. B requests to join → pending (202)', async () => {
 });
 
 await test('2. A (creator) gets an organism_join_request notification', async () => {
-    assert(await hasNotif(A.token, 'organism_join_request'), 'A should have a join-request notification');
+    assert(await hasNotif(A.token, 'organism_join_request', orgId), 'A should have a join-request notification for this organism');
+    assert(!(await hasNotif(B.token, 'organism_join_request')), 'the requester B got the approvers\' join-request notice');
     // The notice opens the organism, whose home lists the requests, not the list of organisms.
     const link = await notifLink(A.token, 'organism_join_request');
     assert(link === organismLink(orgId), `the request notice opens the organism: ${link}`);
@@ -142,6 +147,9 @@ await test('6. B gets an organism_join_approved notification', async () => {
 await test('7. C requests, A rejects → C is NOT a member, C notified', async () => {
     const jr = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(C.token), body: '{}' });
     assert(jr.status === 202, `C join ${jr.status}`);
+    // The request notice goes to the approvers only: B is a plain member now, and C is the requester.
+    assert(!(await hasNotif(B.token, 'organism_join_request', orgId)), 'plain member B got C\'s join-request notice');
+    assert(!(await hasNotif(C.token, 'organism_join_request', orgId)), 'the requester C got the approvers\' join-request notice');
     const list = await json(`/v1/organisms/${orgId}/join-requests`, { headers: auth(A.token) });
     const creq = (list.body.data.join_requests || []).find((x: any) => x.ghii === C.name);
     assert(!!creq, 'C request present');

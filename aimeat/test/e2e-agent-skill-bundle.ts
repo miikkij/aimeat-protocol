@@ -2,6 +2,7 @@
  * @file e2e-agent-skill-bundle.ts
  * @description E2E tests for skill bundle download and version check endpoints.
  * @version-history
+ *   v1.1.0 -- 2026-11-15 -- Audit M147: SKILL.md is checked for the full GAII, not a bare '#'.
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase A
  */
 
@@ -235,8 +236,9 @@ await test('6. ZIP contains agent-specific GAII in SKILL.md', async () => {
     const buffer = Buffer.from(await res.arrayBuffer());
     const skillMd = await readZipEntry(buffer, 'aimeat-hermes/SKILL.md');
     assert(skillMd.includes(agentName), 'SKILL.md contains agent name');
-    assert(skillMd.includes('#'), 'SKILL.md contains GAII separator');
     assert(skillMd.includes(NODE_ID), 'SKILL.md contains node ID');
+    // The three parts as the one address agent#owner@node; a bare '#' matched every markdown heading.
+    assert(skillMd.includes(agentGaii), `SKILL.md does not carry the agent's GAII ${agentGaii}`);
 });
 
 await test('7. 401 without auth', async () => {

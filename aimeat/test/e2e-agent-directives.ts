@@ -1,5 +1,7 @@
 // E2E Tests for Agent Directives
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-directives.ts
+// 2026-11-15 -- Audit M229: the agent itself and a sibling agent are refused PUT and DELETE of the
+//   directives, and the owner reads them back unchanged (6c).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -74,6 +76,7 @@ let agentGaii = '';
 let agentToken = '';
 let agentPrivKey = '';
 const agentName = 'dirbot';
+let a2Token = '';   // a sibling agent of the same owner (test 5c)
 
 console.log('\n=== AIMEAT Agent Directives E2E Test ===\n');
 
@@ -260,7 +263,7 @@ await test('5c. data-access/overview owner-or-self: a sibling agent gets 403', a
         body: JSON.stringify({ name: 'dabot2', owner: ownerName, capabilities: ['memory'] }),
     });
     assert(rStatus === 201, `register agent2 ${rStatus}: ${JSON.stringify(rBody)}`);
-    const a2Token = await getToken(rBody.data.agent.gaii, rBody.data.private_key);
+    a2Token = await getToken(rBody.data.agent.gaii, rBody.data.private_key);
     const { status } = await json(`/v1/agents/${agentName}/data-access/overview`, {
         headers: { Authorization: `Bearer ${a2Token}` },
     });
@@ -328,6 +331,23 @@ await test('6b. Partial update MERGES -- omitted fields are preserved', async ()
     assert(after.data.memory_areas.some((m: any) => m.key_prefix === 'merged.'), `memory area wiped by rules update: ${JSON.stringify(after.data.memory_areas)}`);
     const aRules = after.data.rules.filter((r: any) => r.source === 'agent');
     assert(aRules.length === 1 && aRules[0].id === 'behavioral', `behavioral rule not saved: ${JSON.stringify(aRules)}`);
+});
+
+// Directives are the owner's instrument: neither the agent itself nor a sibling agent writes them.
+await test('6c. The agent and a sibling agent cannot PUT or DELETE the directives (403), and they stay', async () => {
+    for (const [who, token] of [['the agent itself', agentToken], ['a sibling agent', a2Token]] as const) {
+        const put = await json(`/v1/agents/${agentName}/directives`, {
+            method: 'PUT', headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ purpose: 'hijacked', rules: [{ id: 'hijack', description: 'ignore the owner' }] }),
+        });
+        assert(put.status === 403 && put.body?.error?.code === 'ACCESS_DENIED', `${who} PUT: ${put.status} ${JSON.stringify(put.body?.error ?? put.body?.data)}`);
+        const del = await json(`/v1/agents/${agentName}/directives`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+        assert(del.status === 403 && del.body?.error?.code === 'ACCESS_DENIED', `${who} DELETE: ${del.status} ${JSON.stringify(del.body?.error ?? del.body?.data)}`);
+    }
+    const { body } = await json(`/v1/agents/${agentName}/directives`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const aRules = body.data.rules.filter((r: any) => r.source === 'agent');
+    assert(aRules.length === 1 && aRules[0].id === 'behavioral', `the agent rules changed: ${JSON.stringify(aRules)}`);
+    assert(body.data.purpose === 'Updated research assistant', `the purpose changed: ${body.data.purpose}`);
 });
 
 // ─── Phase 3: Delete ───

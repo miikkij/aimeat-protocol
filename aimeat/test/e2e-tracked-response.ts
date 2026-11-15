@@ -3,6 +3,8 @@
 // v1.0.0 -- 2026-06-21 -- Auto + approve reply paths, idempotency, condition-not-met + cancel (failure modes).
 // v1.1.0 -- 2026-10-08 -- aiprov D17: an approve-mode draft names its record (assisted, no human
 //   involvement), and the owner's send of the draft as it stands carries it.
+// v1.2.0 -- 2026-11-15 -- Audit M151: another owner's list, read, draft read and cancel of Alice's
+//   contracts answer 404, and Alice reads both back unchanged (12b).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -273,6 +275,25 @@ await test('12. List returns the owner contracts', async () => {
     assert(r.status === 200, `list status ${r.status}`);
     const ids = (r.body.data.trackedResponses || []).map((c: any) => c.id);
     assert(ids.includes(autoTrId) && ids.includes(apprTrId), 'both contracts listed');
+});
+
+await test('12b. Another owner cannot list, read, read the draft of, or cancel Alice\'s contracts → 404', async () => {
+    const list = await json('/v1/tracked-responses', { headers: authB() });
+    assert(list.status === 200, `bob list ${list.status}`);
+    const bobIds = (list.body.data.trackedResponses || []).map((c: any) => c.id);
+    assert(!bobIds.includes(autoTrId) && !bobIds.includes(apprTrId), `Bob's list holds Alice's contracts: ${JSON.stringify(bobIds)}`);
+    const probes: Array<[string, RequestInit]> = [
+        [`/v1/tracked-responses/${autoTrId}`, { headers: authB() }],
+        [`/v1/tracked-responses/${apprTrId}/draft`, { headers: authB() }],
+        [`/v1/tracked-responses/${autoTrId}/cancel`, { method: 'POST', headers: authB() }],
+    ];
+    for (const [path, opts] of probes) {
+        const r = await json(path, opts);
+        assert(r.status === 404 && r.body?.error?.code === 'NOT_FOUND', `Bob on ${path}: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data).slice(0, 160)}`);
+    }
+    // Read back as Alice: the refused cancel left both contracts as they were.
+    assert((await getContract(autoTrId)).state === 'replied', 'Alice\'s auto contract changed state');
+    assert((await getContract(apprTrId)).state === 'replied', 'Alice\'s approve contract changed state');
 });
 
 // QA audit 2026-10-14, K2 (P3-01, S10-01): a contract acts only for the account whose memory holds

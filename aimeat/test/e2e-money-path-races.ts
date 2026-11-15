@@ -28,6 +28,8 @@
  *   registers: Stripe's id for the UCP card, and a kept-card handler for the renewal.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-path-races
  * @version-history
+ *   2026-11-15 — Audit L084 (e2e-memory-full's key-ceiling half, held here where the config is
+ *     in-process): the next new key past memoryMaxKeysPerAgent is 413 QUOTA_EXCEEDED and not stored.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-18 — Initial (wish-rahapolkujen-kilpatilanteet-kaksoismyynti-peruutus-ja-tilin-).
  */
@@ -340,6 +342,11 @@ await test('The node\'s own UCP records do not count against the seller\'s memor
     try {
         const w = await json('/v1/memory', { method: 'POST', headers: auth(shop.token), body: JSON.stringify({ key: `notes.races${stamp}`, value: { a: 1 } }) });
         assert(w.status === 200 || w.status === 201, `the owner's own write was refused: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        // That write used the one free key, so the next new key is past the ceiling and refused.
+        const over = await json('/v1/memory', { method: 'POST', headers: auth(shop.token), body: JSON.stringify({ key: `notes.races${stamp}b`, value: { a: 2 } }) });
+        assert(over.status === 413 && over.body?.error?.code === 'QUOTA_EXCEEDED', `a key past the ceiling: ${over.status} ${JSON.stringify(over.body?.error)}`);
+        const back = await json(`/v1/memory/${encodeURIComponent(`notes.races${stamp}b`)}`, { headers: auth(shop.token) });
+        assert(back.status === 404, `the refused key was stored anyway: ${back.status}`);
     } finally {
         config.memoryMaxKeysPerAgent = limitBefore;
     }

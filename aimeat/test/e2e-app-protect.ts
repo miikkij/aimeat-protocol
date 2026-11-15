@@ -13,6 +13,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-protect
  * @version-history
+ *   2026-11-15 — Audit M052, M053: an empty inline body or a missing watermark fails instead of
+ *     returning early; an anonymous raw download of a noRawDownload app is 403 FORBIDDEN.
  *   2026-10-16 — Phase 6: an older version is gated by the latest version's access code and pacing
  *     amount, on read and on fork (QA audit F10a-01).
  *   2026-10-15 — Phase 5: an older version is served with the app's current protection
@@ -71,7 +73,9 @@ console.log('\nPhase 1: obfuscate');
 
 await test('Baseline inline serve exposes the source identifier', async () => {
     const html = await inline();
-    if (html.length === 0) { console.log('    (inline 301 / empty — app origin on; skipping)'); return; }
+    // The test node serves apps inline (no app origin). An empty body used to return early here and in
+    // five more cases, so the obfuscate and watermark phases could pass asserting nothing.
+    assert(html.length > 0, 'the inline serve answered with no body (redirect to an app origin?)');
     assert(html.includes('secretToken'), 'un-protected inline HTML contains the original identifier');
 });
 
@@ -83,7 +87,7 @@ await test('PATCH { protection: { obfuscate: true } } is accepted', async () => 
 
 await test('Obfuscated inline serve mangles the source identifier', async () => {
     const html = await inline();
-    if (html.length === 0) return;
+    assert(html.length > 0, 'the inline serve answered with no body');
     assert(!html.includes('secretToken'), 'obfuscated inline HTML no longer contains the original local identifier');
 });
 
@@ -100,14 +104,14 @@ await test('PATCH { protection: { watermark: true } }, inline serve embeds an ai
     const r = await json(`/v1/apps/${FILE}`, aAuth({ method: 'PATCH', body: JSON.stringify({ protection: { watermark: true } }) }));
     assert(r.status === 200, `status ${r.status}`);
     const html = await inline();
-    if (html.length === 0) { console.log('    (app origin on; skipping)'); return; }
-    const m = html.match(/aimeat-wm:([0-9a-f:]+)/i);
+    assert(html.length > 0, 'the inline serve answered with no body');
+    const m =html.match(/aimeat-wm:([0-9a-f:]+)/i);
     assert(!!m, 'inline HTML carries an <!--aimeat-wm:...--> fingerprint');
     wmToken = m![1];
 });
 
 await test('Operator decodes the watermark back to the app it was served for', async () => {
-    if (!wmToken) { console.log('    (no watermark captured; skipping)'); return; }
+    assert(!!wmToken, 'no watermark was captured by the case before');
     const r = await json('/v1/admin/apps/watermark/decode', aAuth({ method: 'POST', body: JSON.stringify({ token: wmToken }) }));
     assert(r.status === 200, `operator decode status ${r.status}: ${JSON.stringify(r.body)}`);
     assert(r.body.data?.app === `${ownerAName}/${FILE}`, `decoded app should be ${ownerAName}/${FILE}, got ${r.body.data?.app}`);
@@ -115,7 +119,7 @@ await test('Operator decodes the watermark back to the app it was served for', a
 });
 
 await test('A non-operator cannot decode a watermark (403)', async () => {
-    if (!wmToken) return;
+    assert(!!wmToken, 'no watermark was captured');
     const r = await json('/v1/admin/apps/watermark/decode', bAuth({ method: 'POST', body: JSON.stringify({ token: wmToken }) }));
     assert(r.status === 403, `non-operator decode must 403, got ${r.status}`);
 });
@@ -134,6 +138,10 @@ await test('PATCH { protection: { noRawDownload: true } } blocks the raw downloa
     // Outsider (owner B) raw download → 403.
     const outsider = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE}`, bAuth());
     assert(outsider.status === 403, `outsider raw download must 403, got ${outsider.status}`);
+    // And with no Authorization at all, the common case for someone copying an app.
+    const anon = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE}`);
+    const anonBody = anon.headers.get('content-type')?.includes('json') ? await anon.json() as any : null;
+    assert(anon.status === 403 && anonBody?.error?.code === 'FORBIDDEN', `anonymous raw download must be 403 FORBIDDEN, got ${anon.status} ${JSON.stringify(anonBody?.error)}`);
     // Inline (runnable) delivery still works.
     const runnable = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE}?mode=inline`, { redirect: 'manual' });
     assert(runnable.status === 200 || runnable.status === 301, `inline delivery still available, got ${runnable.status}`);
@@ -161,7 +169,7 @@ await test('PATCH { protection: {} } clears all protection', async () => {
     const dl = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE}`, bAuth());
     assert(dl.status === 200, `raw download restored, got ${dl.status}`);
     const html = await inline();
-    if (html.length === 0) return;
+    assert(html.length > 0, 'the inline serve answered with no body');
     assert(html.includes('secretToken'), 'inline HTML is un-obfuscated again');
     assert(!/aimeat-wm:/i.test(html), 'no watermark after clearing');
 });
@@ -182,8 +190,9 @@ await test('An older version answers with the protection set after it was publis
     const v1raw = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE2}?version=1`, bAuth());
     assert(v1raw.status === 403, `an outsider's raw download of version 1 must 403, got ${v1raw.status}`);
     const v1inline = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE2}?version=1&mode=inline`, { redirect: 'manual' });
-    const html = v1inline.status === 200 ? await v1inline.text() : '';
-    if (html.length > 0) assert(!html.includes('secretToken'), 'version 1 inline HTML is obfuscated too');
+    assert(v1inline.status === 200, `version 1 inline serve: ${v1inline.status}`);
+    const html = await v1inline.text();
+    assert(html.length > 0 && !html.includes('secretToken'), 'version 1 inline HTML is obfuscated too');
     const ownerDl = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE2}?version=1`, aAuth());
     assert(ownerDl.status === 200, `the owner still downloads version 1, got ${ownerDl.status}`);
 });
