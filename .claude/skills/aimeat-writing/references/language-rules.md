@@ -99,6 +99,19 @@ not tell what it meant. Name the thing itself: *the button*, *the link*, *sign-i
 *el acceso*), *the call* (*kutsu*, *la llamada*), *your agent is asking to connect*. A real door (a
 door code, a door sensor) and the idiom *showed X the door* stay.
 
+**The same habit with other words: a picture in place of the thing's name.** `pnpm check:locales`
+refuses five more, each with its own baseline of allowed uses (`security/locale-<word>-baseline.json`):
+*road* and *way in* (*tie sisään*, *kolme tietä*; *vía de entrada*, *tres caminos*), a *hand* that
+does something (*by your own hand*, *your AI gets hands*), the *machine room* and the *showroom*,
+the *wall* for the list of published apps, and single pictures (a shop window, a shelf, the internet
+knocking, a price ladder, a cockpit, a fence, *the house*). On 2026-11-15 they stood for a sign-in
+method, a set of options, a prompt, a link, "you do it yourself", an admin page, a demo and the
+public app list. Ask what the reader sees or does, and write that: *sign in*, *three ways*, *this
+prompt*, *a link*, *you revoke it yourself*, *the admin pages*, *a demo*, *the public app list*.
+Ordinary words stay: *by hand*, *hands-on*, *into the wrong hands*, a realtime *room*, a time
+*window*, a picture caption that describes what the picture shows, Finnish *saman tien* and Spanish
+*en camino*, *dejar en tus manos*.
+
 ## Register
 
 **Finnish.** Full sentences, not clipped slogans. The developer's own model, which beat a shorter
