@@ -665,7 +665,7 @@ components:
         kind:
           type: string
           enum: [gate, notify]
-          description: A gate decides whether the thing happens; a notify hook is told once it has
+          description: A blocking hook (`gate`) decides whether the thing happens; a notify hook is told once it has
         guards:
           type: string
           enum: [accounts, work, social]
@@ -38515,9 +38515,10 @@ paths:
       summary: Bind actions to one moment
       description: |
         Operator-only. The actions are called in the order given, each after the last has answered.
-        A gate (any hook whose name starts with `pre_`) WAITS for them and refuses the thing when one
-        answers no, returns a non-2xx, or does not answer within ten seconds, so binding an address
-        that is not reachable stops everything that moment guards. The other seven are told
+        A blocking hook (any hook whose name starts with `pre_`, kind `gate`) WAITS for them and
+        refuses the thing when one answers no, returns a non-2xx, or does not answer within ten
+        seconds, so binding an address that is not reachable stops everything that moment checks.
+        The other seven are told
         afterwards and stop nothing.
 
         A hook binds only an action that is already published: publish the action first
@@ -38538,7 +38539,7 @@ paths:
 
         When a hook runs, only an `id#provider` reference names an action. A bare id in a stored
         binding names none, whatever is published or deleted at that moment: nothing is called, a
-        gate bound to it refuses, and `GET /v1/admin/hooks` shows it with `ambiguous`, the
+        blocking hook bound to it refuses, and `GET /v1/admin/hooks` shows it with `ambiguous`, the
         `id#provider` of each provider that publishes the id now. Bind the one you mean as
         `id#provider`. A node settles the bindings in its store once, at the first start that finds
         a bare id: one that a single provider publishes is stored as its `id#provider`, and one that
