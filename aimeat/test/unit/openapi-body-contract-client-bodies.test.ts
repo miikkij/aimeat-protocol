@@ -213,3 +213,18 @@ describe('PUT /v1/admin/internet-openers/{owner} (portal internet-opening.js set
         await refused('PUT', path, [{ until: '2099-12-31' }]);
     });
 });
+
+describe('POST /v1/compliance/agreements (portal agreements.js createAgreement)', () => {
+    // The admin form sends the counterparty's contact address as typed. The route checks it with
+    // utils/email-validator.ts isValidEmail (something@something.something on the trimmed value, at
+    // most 254 characters), which takes letters outside ASCII; JSON Schema's email format does not.
+    const body = (contactEmail: string) => ({ counterparty: { name: 'Carol Oy', contactEmail } });
+
+    it('takes a contact address with letters outside ASCII, and one with spaces around it', async () => {
+        await taken('POST', '/v1/compliance/agreements', [body('jöns@äiti.fi'), body(' carol@example.com '), body('carol@example.com')]);
+    });
+
+    it('still refuses what isValidEmail refuses', async () => {
+        await refused('POST', '/v1/compliance/agreements', [body('carol at example'), body('carol@example'), body('a@b c.fi'), body(`${'x'.repeat(250)}@e.fi`)]);
+    });
+});

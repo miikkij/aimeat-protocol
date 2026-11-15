@@ -25420,7 +25420,11 @@ paths:
                     country: { type: string }
                     contactName: { type: string }
                     contactRole: { type: string }
-                    contactEmail: { type: string, format: email }
+                    contactEmail:
+                      type: string
+                      maxLength: 254
+                      pattern: '^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*$'
+                      description: An e-mail address, checked only for its shape (something@something.something); letters outside ASCII are taken.
                     signerName: { type: string }
                     signerRole: { type: string }
                     dpo: { type: string }
