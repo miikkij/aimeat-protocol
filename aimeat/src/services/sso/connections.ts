@@ -1,5 +1,5 @@
 /**
- * @file src/services/sso-connections.ts
+ * @file src/services/sso/connections.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SSO connection management (BR-04), as ONE implementation. The admin HTTP routes
@@ -18,13 +18,13 @@
  *     caller (BR-04 phase 1's MCP batch).
  */
 import { createHash, randomBytes } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, SsoConnectionRecord } from '../storage/interface.js';
-import { SSO_CONNECTION_ID_PATTERN } from '../storage/interface.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { spEntityId, spAcsUrl, parseIdpMetadata } from './saml-sp.js';
-import { emitChange } from './event-bus.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, SsoConnectionRecord } from '../../storage/interface.js';
+import { SSO_CONNECTION_ID_PATTERN } from '../../storage/interface.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { spEntityId, spAcsUrl, parseIdpMetadata } from '../saml-sp.js';
+import { emitChange } from '../event-bus.js';
+import { logger } from '../../utils/logger.js';
 
 /** Raw SCIM bearer prefix — recognisable in an IdP console and in a leaked log alike. */
 const SCIM_TOKEN_PREFIX = 'aimeat_scim_';

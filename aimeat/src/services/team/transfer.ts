@@ -16,7 +16,7 @@
  *     addresses, and aimeat_team_setup or aimeat_organism_invite_email sends the invitations.
  *   Direct membership without an invitation comes only through the organisation's own sign-in: an
  *   SSO connection bound to the organism makes everyone who signs in through it a member
- *   (services/sso-membership.ts). Entra gives each node its own user id, so the bundle cannot carry
+ *   (services/sso/membership.ts). Entra gives each node its own user id, so the bundle cannot carry
  *   one that would match on the new node.
  *
  *   THE TEAM COMES BACK with `team: true` (the default when the bundle has one): the team record is

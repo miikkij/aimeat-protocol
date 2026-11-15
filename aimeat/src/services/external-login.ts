@@ -389,7 +389,7 @@ export async function mapExternalIdentity(
      *  SAML passes its connection's `scim:<id>` so a provisioned account is adopted, not duplicated. */
     adoptProviderKeys?: string[];
     /** Whether a step-2 match asks the account's two-step code before the link is saved (SAML passes
-     *  services/sso-adoption-notice.ts adoptionAsksCode). Absent = never. */
+     *  services/sso/adoption-notice.ts adoptionAsksCode). Absent = never. */
     adoptionAsksCode?: (account: GHIIRecord) => Promise<boolean>;
     /** Restrict step 3 (link by verified email) to these domains (BR-04 R5). Null/absent = any. */
     emailLinkDomains?: string[] | null;

@@ -6,7 +6,7 @@
  *   identity provider, read and change connections, mint the SCIM token, and offboard by hand
  *   (deactivate/reactivate an account) — the chat path for the same work the admin dashboard's
  *   Organisation sign-in tab does. Every tool checks the operator role at call time and calls the
- *   ONE implementation in services/sso-connections.ts and services/owner/lifecycle.ts; none of
+ *   ONE implementation in services/sso/connections.ts and services/owner/lifecycle.ts; none of
  *   them reads storage records directly, which is what check:shared-impl holds this directory to.
  * @structure registerAdminSsoTools(mcp, storage, config, getAgentGaii, scopes) — ten operator tools.
  * @usage registerAdminSsoTools(mcp, storage, config, () => agentGaii, scopes);
@@ -30,8 +30,8 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import {
   createSsoConnection, updateSsoConnectionAdmin,
   deleteSsoConnectionAdmin, mintScimToken, setIdpMetadata,
-} from '../services/sso-connections.js';
-import { buildSsoOverview, buildSsoConnectionRow } from '../services/sso-overview.js';
+} from '../services/sso/connections.js';
+import { buildSsoOverview, buildSsoConnectionRow } from '../services/sso/overview.js';
 import {
   resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL, deactivateOwnerByOperator, reactivateOwnerByOperator,
 } from '../services/owner/lifecycle.js';

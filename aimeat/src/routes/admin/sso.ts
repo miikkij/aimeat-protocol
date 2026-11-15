@@ -5,7 +5,7 @@
  * @description Operator management of SSO connections (BR-04) plus the one public piece, the SP
  *   metadata document an IdP fetches. Management works with `sso.enabled` OFF on purpose — a node
  *   is configured first and switched on second; only the public doors gate on the flag. The work
- *   happens in services/sso-connections.ts, shared with the operator MCP tools, so this file is
+ *   happens in services/sso/connections.ts, shared with the operator MCP tools, so this file is
  *   the HTTP shape only: operator gate, params, envelope.
  * @structure adminSsoRouter(config, storage): operator CRUD under /v1/admin/sso/connections,
  *   POST …/:id/scim-token, POST …/:id/idp-metadata, and the public GET /v1/sso/:id/metadata.
@@ -29,8 +29,8 @@ import { spMetadataXml } from '../../services/saml-sp.js';
 import {
   createSsoConnection, updateSsoConnectionAdmin,
   deleteSsoConnectionAdmin, mintScimToken, setIdpMetadata, type SsoAdminRefusal,
-} from '../../services/sso-connections.js';
-import { buildSsoOverview, buildSsoConnectionRow } from '../../services/sso-overview.js';
+} from '../../services/sso/connections.js';
+import { buildSsoOverview, buildSsoConnectionRow } from '../../services/sso/overview.js';
 
 export function adminSsoRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -44,7 +44,7 @@ export function adminSsoRouter(config: AimeatConfig, storage: Storage): Router {
   // The `node` and `summary` blocks are additive, and they are here rather than on a page-shaped
   // route of their own because the question they answer is the same question this list was always
   // being asked: can anybody sign in. A connection can be complete and nobody can, because
-  // sso.enabled is off and both public doors answer 503. → services/sso-overview.ts
+  // sso.enabled is off and both public doors answer 503. → services/sso/overview.ts
   router.get('/v1/admin/sso/connections', ...operator, async (_req, res) => {
     res.json(success(config.nodeId, await buildSsoOverview(config, storage)));
   });

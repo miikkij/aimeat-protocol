@@ -139,7 +139,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/sso-connections.ts": {
+      "src/services/sso/connections.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },

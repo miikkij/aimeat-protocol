@@ -50,7 +50,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, GHIIRecord } from '../../storage/interface.js';
 import { AccountDisabledError } from '../../auth/jwt.js';
 import { establishForGhii, externalIdUpdate } from '../../services/external-login.js';
-import { ensureSsoMembership } from '../../services/sso-membership.js';
+import { ensureSsoMembership } from '../../services/sso/membership.js';
 import { checkSecondFactor } from '../../services/password-check.js';
 import { success, error } from '../../middleware/envelope.js';
 import { keepErrorMessage } from '../../middleware/internal-error-text.js';

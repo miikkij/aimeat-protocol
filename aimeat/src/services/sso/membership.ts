@@ -1,5 +1,5 @@
 /**
- * @file src/services/sso-membership.ts
+ * @file src/services/sso/membership.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one effect of an SSO connection's organism binding (BR-04 R1): a person who
@@ -16,9 +16,9 @@
  *   v1.0.0 — 2026-08-23 — Initial (BR-04 phases 2-3).
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, SsoConnectionRecord } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
-import { logger } from '../utils/logger.js';
+import type { Storage, SsoConnectionRecord } from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Make sure `ownerName` is an active member of the connection's organism. No-op when the

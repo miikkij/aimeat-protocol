@@ -45,9 +45,9 @@ import type { SsoConnectionRecord } from '../storage/interface.js';
 import { provisionOwner, RegistrationClosedError, ProvisionEmailTakenError } from './owner/provisioning.js';
 import { deactivateOwner, reactivateOwner } from './owner/lifecycle.js';
 import { deriveUniqueUsername, emailHashOf } from './external-login.js';
-import { ensureSsoMembership } from './sso-membership.js';
-import { emailInConnectionDomains } from './sso-connections.js';
-import { adoptedMarkerKey } from './sso-adoption-notice.js';
+import { ensureSsoMembership } from './sso/membership.js';
+import { emailInConnectionDomains } from './sso/connections.js';
+import { adoptedMarkerKey } from './sso/adoption-notice.js';
 import { logger } from '../utils/logger.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 
@@ -173,7 +173,7 @@ async function createUser(ctx: ScimContext, data: Record<string, unknown>): Prom
       // Adoption (R5): the organisation vouches for its own domain; the account verified the
       // address locally. Lifecycle authority moves to the connection, nothing else changes. The
       // adoption marker is the evidence that makes the first organisation sign-in into an account
-      // with two-step sign-in ask its code once (services/sso-adoption-notice.ts adoptionAsksCode).
+      // with two-step sign-in ask its code once (services/sso/adoption-notice.ts adoptionAsksCode).
       await ctx.storage.updateOwner(owner.name, { managedBy: ctx.conn.id });
       await writeIdentityKeys(ctx, byEmail, userName, externalId, { [adoptedMarkerKey(ctx.conn.id)]: new Date().toISOString() });
       if (typeof data.active === 'boolean') await applyActive(ctx, { ...owner, managedBy: ctx.conn.id }, data.active);

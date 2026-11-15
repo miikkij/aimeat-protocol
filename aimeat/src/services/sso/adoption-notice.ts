@@ -1,5 +1,5 @@
 /**
- * @file src/services/sso-adoption-notice.ts
+ * @file src/services/sso/adoption-notice.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The person is told when their organisation's SAML sign-in opened their account without
@@ -29,10 +29,10 @@
  *     account with two-step sign-in asks the code once (secaudit2026oct26 round 8c, adoption-skips-second-factor).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
-import type { Storage, GHIIRecord, SsoConnectionRecord } from '../storage/interface.js';
-import { notify } from './notify.js';
-import { twoStepArmed } from './passkeys.js';
-import { logger } from '../utils/logger.js';
+import type { Storage, GHIIRecord, SsoConnectionRecord } from '../../storage/interface.js';
+import { notify } from '../notify.js';
+import { twoStepArmed } from '../passkeys.js';
+import { logger } from '../../utils/logger.js';
 
 export const SSO_SIGNED_IN_PAST_CODE_TYPE = 'sso_signed_in_past_code';
 

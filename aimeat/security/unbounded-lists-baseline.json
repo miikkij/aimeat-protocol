@@ -381,10 +381,10 @@
     "src/services/skills.ts": {
       "listAgents": 1
     },
-    "src/services/sso-connections.ts": {
+    "src/services/sso/connections.ts": {
       "listSsoConnections": 1
     },
-    "src/services/sso-overview.ts": {
+    "src/services/sso/overview.ts": {
       "listOwners": 1
     },
     "src/services/stats-page.ts": {

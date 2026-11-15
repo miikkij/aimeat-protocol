@@ -57,15 +57,15 @@ import { AccountDisabledError } from '../auth/jwt.js';
 import { inflateRawSync } from 'node:zlib';
 import { samlForConnection, spAcsUrl } from '../services/saml-sp.js';
 import { bindLoginRound, endLoginRound, loginRoundHeldBy, loginRoundsBound } from '../middleware/login-round-binding.js';
-import { ensureSsoMembership } from '../services/sso-membership.js';
-import { emailInConnectionDomains } from '../services/sso-connections.js';
+import { ensureSsoMembership } from '../services/sso/membership.js';
+import { emailInConnectionDomains } from '../services/sso/connections.js';
 import {
   mapExternalIdentity, finalizeExternalSignup, establishForGhii,
   signPendingToken, setPendingCookie,
 } from '../services/external-login.js';
 import { startLinkSecondFactor } from './ghii/login-link-second-factor.js';
 import { twoStepArmed } from '../services/passkeys.js';
-import { tellSignedInPastCode, adoptionAsksCode } from '../services/sso-adoption-notice.js';
+import { tellSignedInPastCode, adoptionAsksCode } from '../services/sso/adoption-notice.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 import { safeRedirectPath, withQueryParam } from '../utils/same-origin-path.js';
@@ -246,7 +246,7 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
           redirect: postLoginPath,
           adoptProviderKeys: [`scim:${conn.id}`],
           // The first sign-in into an account the directory adopted asks its two-step code once
-          // (services/sso-adoption-notice.ts; secaudit2026oct26 round 8c).
+          // (services/sso/adoption-notice.ts; secaudit2026oct26 round 8c).
           adoptionAsksCode: (account) => adoptionAsksCode(storage, conn, account, `saml:${conn.id}`),
           emailLinkDomains: conn.domains,
         });
@@ -272,7 +272,7 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
         const screen = await establishForGhii(storage, config, req, res, result.ghii, postLoginPath);
         await ensureSsoMembership(storage, conn, result.ghii.ownerName);
         // The organisation's sign-in opened an adopted account past its two-step code: the person
-        // is told (services/sso-adoption-notice.ts; secaudit2026oct26).
+        // is told (services/sso/adoption-notice.ts; secaudit2026oct26).
         if (result.adoptedNow && twoStepArmed(result.ghii)) void tellSignedInPastCode(storage, result.ghii, conn);
 
         // Playbook evidence: the connection has seen a real login (throttled write).

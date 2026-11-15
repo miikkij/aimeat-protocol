@@ -1,5 +1,5 @@
 /**
- * @file src/services/sso-overview.ts
+ * @file src/services/sso/overview.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one read behind the Organisation sign-in page: the connections, and the two
@@ -26,15 +26,15 @@
  *   - SsoConnectionState — the one word for where a connection stands, and the one thing in its way
  *   - buildSsoOverview(config, storage) — connections + node switches + the summary
  * @usage
- *   import { buildSsoOverview } from '../services/sso-overview.js';
+ *   import { buildSsoOverview } from './overview.js';
  *   const data = await buildSsoOverview(config, storage);
  * @version-history
  *   v1.0.0 — 2026-09-12 — Initial, with the Organisation sign-in page's rebuild.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { listSsoConnectionViews, getSsoConnectionView, type SsoConnectionView } from './sso-connections.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { listSsoConnectionViews, getSsoConnectionView, type SsoConnectionView } from './connections.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Where one connection stands, as one word.

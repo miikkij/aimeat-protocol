@@ -67,9 +67,9 @@ This page answers how people, AI agents and apps sign in to a node, who may get 
 | Signature | A signed assertion is required; the outer Response need not be signed | `aimeat/src/services/saml-sp.ts` |
 | Checks before any account is read | Signature, Audience, InResponseTo, validity window | `aimeat/src/routes/saml-login.ts` |
 | Browser binding | An SP-initiated round finishes only in the browser that started it | `aimeat/src/routes/saml-login.ts` |
-| IdP-initiated sign-in | Refused unless the connection allows it (`allow_idp_initiated`) | `aimeat/src/services/sso-connections.ts` |
+| IdP-initiated sign-in | Refused unless the connection allows it (`allow_idp_initiated`) | `aimeat/src/services/sso/connections.ts` |
 | Account mapping | NameID, then a SCIM `externalId`, then a verified email inside the connection's own domains, then a new account under the registration mode | `aimeat/src/routes/saml-login.ts` |
-| Hidden connections | A connection can be hidden from the public sign-in dialog | `aimeat/src/services/sso-connections.ts` |
+| Hidden connections | A connection can be hidden from the public sign-in dialog | `aimeat/src/services/sso/connections.ts` |
 | AuthnRequest signing, encrypted assertions | Not supported: the SP metadata carries no signing or decryption certificate | `aimeat/src/services/saml-sp.ts` |
 | Single Logout | Not found in the code | `aimeat/src/routes/saml-login.ts` |
 
