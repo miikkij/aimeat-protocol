@@ -6,6 +6,8 @@
  *   retire → history, the legacy "retire with no prior active" path, and the ownership/authority
  *   failure modes (activate an agent you don't own; retire as a non-owner non-manager).
  * @version-history
+ *   v1.0.1 — 2026-11-15 — Audit M022, L100: B is refused A's agent's by-agent engagements by full GAII
+ *     (403 ACCESS_DENIED); the re-adopt is read back from the stored roster.
  *   v1.0.0 — 2026-07-03 — Initial: engagement activate/retire lifecycle + authority checks.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-workspace-engagements
@@ -127,6 +129,12 @@ await test('3. list-by-agent (A) shows it, enriched with org + ws names', async 
     assert(e.organismName === 'Engage Org' && e.wsName === 'Coordination', `names enriched: ${e.organismName} / ${e.wsName}`);
 });
 
+await test('3b. FAIL: B cannot list A\'s agent\'s engagements by its full GAII (403 ACCESS_DENIED)', async () => {
+    const r = await json(`/v1/agents/${encodeURIComponent(agentGaii)}/engagements`, { headers: auth(B.token) });
+    assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED',
+        `B read A's agent's engagements: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+});
+
 await test('4. FAIL: B cannot adopt an agent it does not own (403)', async () => {
     const r = await json(engUrl(), { method: 'POST', headers: auth(B.token), body: JSON.stringify({ ws: WS, agent: agentGaii, contract: 'research' }) });
     assert(r.status === 403, `expected 403, got ${r.status}`);
@@ -166,6 +174,11 @@ await test('9. re-adopt flips research back to active + preserves original adopt
     assert(r.status === 200 && r.body.data.engagement.state === 'active', 'back to active');
     assert(r.body.data.engagement.adoptedAt === prev.adoptedAt, 'adoptedAt unchanged on re-adopt');
     assert(r.body.data.engagement.retiredAt === null, 'retiredAt cleared');
+    // The stored row, read back through the list route, not the POST's own answer.
+    const after = await json(`${engUrl()}?ws=${WS}`, { headers: auth(A.token) });
+    const row = (after.body.data.engagements || []).find((x: any) => x.contract === 'research');
+    assert(row?.state === 'active' && row.adoptedAt === prev.adoptedAt && row.retiredAt === null,
+        `stored research row after re-adopt: ${JSON.stringify(row)}`);
 });
 
 await test('Cleanup A + B', async () => {

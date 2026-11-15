@@ -21,6 +21,8 @@
  *   B6 NOTE: the actual SMTP email needs live SMTP + an owner notification email; without SMTP the node
  *   logs "email skipped (not configured)" and only writes the in-app report — which is what (h) asserts.
  * @version-history
+ *   v1.2.1 — 2026-11-15 — Audit M043: the non-matching key, the disabled recipe and email:false are
+ *     each checked after a positive control written later has demonstrably run, not after a sleep.
  *   v1.0.0 — 2026-06-15 — Initial creation (B4 recipe CRUD + the data-published → agent-task trigger).
  *   v1.1.0 — 2026-06-15 — Add B5 (organism routing) + B6 (email/in-app report on completion) coverage.
  *   v1.2.0 — 2026-06-15 — Add B7/B8 (advisory outbox drain + approval gate + deliver-advisory) coverage:
@@ -260,33 +262,44 @@ await test('Writing feedback.stats.weekly → a task is materialised for wisdomb
 // ─── (e) Non-matching key → no task; disabled recipe → no task ───
 console.log('\n(e) Non-matching key + disabled recipe → no task');
 
-await test('Writing a NON-matching key → no new task', async () => {
-  const before = await countTasks();
+// "Nothing happened" is measured against a positive control written after it: once the control's
+// task exists, the pipeline has demonstrably run past the write that must spawn nothing.
+const taskFor = async (key: string) => (await listTasks()).find(t => (t.title ?? '').endsWith(`: ${key}`));
+async function writeOwnerKey(key: string, value: unknown) {
   const w = await json('/v1/memory', {
     method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
-    body: JSON.stringify({ key: 'unrelated.note', value: 'hello', visibility: 'owner' }),
+    body: JSON.stringify({ key, value, visibility: 'owner' }),
   });
-  assert(w.status === 200 || w.status === 201, `write status ${w.status}`);
-  await sleep(1500);
-  const after = await countTasks();
-  assert(after.matching === before.matching, `non-matching key must not spawn a task: before=${before.matching} after=${after.matching}`);
+  assert(w.body?.ok === true, `write ${key}: ${w.status}`);
+}
+async function waitForControl(key: string) {
+  for (let i = 0; i < 40 && !(await taskFor(key)); i++) await sleep(250);
+  assert(!!(await taskFor(key)), `the positive control ${key} spawned no task within 10 s`);
+}
+
+await test('Writing a NON-matching key → no new task', async () => {
+  await writeOwnerKey('unrelated.note', 'hello');
+  await writeOwnerKey('feedback.stats.control-nomatch', { x: 1 });
+  await waitForControl('feedback.stats.control-nomatch');
+  const leaked = await taskFor('unrelated.note');
+  assert(!leaked, `non-matching key spawned a task: ${leaked?.title}`);
 });
 
 await test('Disable the recipe → a matching write spawns NO task', async () => {
-  const upd = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+  const recipe = (enabled: boolean) => json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
     method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
-    body: JSON.stringify({ agents: [AGENT], trigger: { keyGlob: 'feedback.stats.*' }, enabled: false }),
+    body: JSON.stringify({ agents: [AGENT], trigger: { keyGlob: 'feedback.stats.*' }, enabled }),
   });
+  const upd = await recipe(false);
   assert(upd.status === 200, `disable status ${upd.status}`);
-  const before = await countTasks();
-  const w = await json('/v1/memory', {
-    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
-    body: JSON.stringify({ key: 'feedback.stats.daily', value: { x: 1 }, visibility: 'owner' }),
-  });
-  assert(w.status === 200 || w.status === 201, `write status ${w.status}`);
-  await sleep(1500);
-  const after = await countTasks();
-  assert(after.matching === before.matching, `disabled recipe must not spawn a task: before=${before.matching} after=${after.matching}`);
+  await writeOwnerKey('feedback.stats.daily', { x: 1 });
+  await sleep(300);   // the trigger reads the recipe for that write before it is enabled again
+  const on = await recipe(true);
+  assert(on.status === 200, `re-enable status ${on.status}`);
+  await writeOwnerKey('feedback.stats.control-disabled', { x: 1 });
+  await waitForControl('feedback.stats.control-disabled');
+  const leaked = await taskFor('feedback.stats.daily');
+  assert(!leaked, `the write made while the recipe was disabled spawned a task: ${leaked?.title}`);
 });
 
 // ─── (g) B5: organism routing — the materialised task carries the organism ───
@@ -479,11 +492,14 @@ await test('email:true + seeded advisories → the report carries the advisory c
 });
 
 await test('email:false → completing the task writes NO automation report record', async () => {
-  const before = (await listReports()).length;
-  await materialiseAndComplete(false, 'feedback.stats.report2');
-  await sleep(2500); // give any (incorrect) fire-and-forget write time to land
-  const after = (await listReports()).length;
-  assert(after === before, `email:false must not write a report: before=${before} after=${after}`);
+  const { taskId } = await materialiseAndComplete(false, 'feedback.stats.report2');
+  // Positive control: an email:true task completed after it. Once its report lands, the email:false
+  // task's completion hook has run as well.
+  const control = await materialiseAndComplete(true, 'feedback.stats.report3');
+  const reportOf = async (id: string) => (await listReports()).find(r => (r.value?.taskId ?? r.taskId) === id);
+  for (let i = 0; i < 40 && !(await reportOf(control.taskId)); i++) await sleep(250);
+  assert(!!(await reportOf(control.taskId)), 'the email:true control wrote no report within 10 s');
+  assert(!(await reportOf(taskId)), `email:false wrote a report for task ${taskId}`);
 });
 
 // ─── (i) B7/B8: advisory outbox drain + approval gate + delivery ───

@@ -7,6 +7,7 @@
  *
  *   Node: 28277 aimeat-test-001-nodeinfo.
  * @version-history
+ *   v1.1.3 -- 2026-11-15 -- Audit M113: test 6 also lists the peers as a plain owner (403 ACCESS_DENIED).
  *   v1.1.2 -- 2026-10-23 -- The operator comes from setupOperator (a password and the password
  *     sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22). Test 6: an
  *     owner who is not an operator cannot add or change a peer (403).
@@ -140,6 +141,9 @@ await test('6. an owner who is not an operator cannot add a peer or change one (
   assert(add.status === 403, `add a peer as a plain owner: expected 403, got ${add.status}: ${JSON.stringify(add.body)}`);
   const put = await json(`/v1/federation/peers/${PEER}`, { method: 'PUT', headers: auth(plain.token), body: JSON.stringify({ status: 'suspended' }) });
   assert(put.status === 403, `change a peer as a plain owner: expected 403, got ${put.status}: ${JSON.stringify(put.body)}`);
+  const list = await json('/v1/federation/peers', { headers: auth(plain.token) });
+  assert(list.status === 403 && list.body?.error?.code === 'ACCESS_DENIED',
+    `list peers as a plain owner: expected 403 ACCESS_DENIED, got ${list.status}: ${JSON.stringify(list.body)}`);
 });
 
 console.log(`\n${'═'.repeat(50)}`);

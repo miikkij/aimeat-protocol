@@ -7,8 +7,12 @@
  *   budget); each call flows through the gateway — caller debited, provider credited its cut, the platform
  *   rake routed, the budget decremented; the budget CAP hard-stops the call; the cost surface reflects the
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
- * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=exchange
+ *   (the .env.test.* file turns on the extensions and the EUR test money handler the money tests need)
  * @version-history
+ *   2026-11-15 — Audit L047, L048: a missing EUR money handler fails a precondition test instead of
+ *     skipping the money and earnings tests; the consumer withdrawing the provider's proposal is 403
+ *     FORBIDDEN.
  *   2026-10-27 — A work item or an offering written through the memory routes is not an EXCHANGE record:
  *     not listed, and no contract to a provider that does not own the extension (secaudit2026oct26).
  *   2026-10-27 — A provider accepting a proposal after the consumer paused keeps the pause; after a
@@ -457,9 +461,12 @@ try {
     Array.isArray(h.currencies) && h.currencies.includes('EUR'));
 } catch { /* leave false */ }
 
-if (!moneyEnabled) {
-  console.log('  ⏭  money-unit contract skipped — no EUR handler (set AIMEAT_TEST_MONEY_HANDLER=true)');
-} else {
+// A precondition, not a skip: without a EUR handler the money rail and the earnings owner-scope
+// tests below cannot run, and a run that silently skipped them would report green.
+await test('Precondition: a EUR money handler is registered (AIMEAT_TEST_MONEY_HANDLER=true)', async () => {
+  assert(moneyEnabled, 'no EUR payment handler on /.well-known/ucp; run through test/run-e2e-ci.ts with an .env.test.* file');
+});
+{
   await test('Accept a MONEY-priced contract → unit=money, authoritative EUR price, budget in micros', async () => {
     const r = await accept(consumer.token, 'money', { cap_units: 250000, app_id: appId }); // 0.25 EUR cap
     assert(r.status === 201, `accept money ${r.status}: ${JSON.stringify(r.body?.error)}`);
@@ -790,6 +797,10 @@ await test('DECLINE: a new proposal declined by the consumer leaves the contract
 await test('WITHDRAW: the proposer can withdraw their own pending proposal', async () => {
   const p = await propose(provider.token, { consumer_gaii: consumerGaii, ext: EXT, action: 'cheap', new_price_per_call: 7 });
   const id = p.body.data.proposal.proposal_id;
+  // The counterparty cannot erase a proposal the other side is waiting on.
+  const byConsumer = await json(`/v1/exchange/proposals/${id}/withdraw`, { method: 'POST', headers: auth(consumer.token), body: '{}' });
+  assert(byConsumer.status === 403 && byConsumer.body?.error?.code === 'FORBIDDEN',
+    `the consumer withdrawing the provider's proposal: ${byConsumer.status} ${JSON.stringify(byConsumer.body?.error)}`);
   const wd = await json(`/v1/exchange/proposals/${id}/withdraw`, { method: 'POST', headers: auth(provider.token), body: '{}' });
   assert(wd.status === 200 && wd.body.data.proposal.status === 'withdrawn', `withdraw ${wd.status}`);
   const cannotAccept = await json(`/v1/exchange/proposals/${id}/accept`, { method: 'POST', headers: auth(consumer.token), body: '{}' });

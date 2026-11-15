@@ -5,6 +5,9 @@
  *   mid-upsert), init re-runs so new behaviour goes live, no quota slot consumed on update,
  *   identical bytes are a 200 no-op, and create-via-PUT works.
  * @version-history
+ *   v1.3.1 — 2026-11-15 — Audit M206, L123: an agent holding only memory:read is refused PUT with 403
+ *     SCOPE_DENIED (the 401 case stays separate); the identical re-PUT is proven a no-op by a lib
+ *     poller and the seed record's unchanged version and updated_at.
  *   v1.3.0 — 2026-09-24 — The extension's v2 code is deployed as version 1.0.1. A kept version is
  *     immutable now (secaudit 2026-09, A6-7), so other code under 1.0.0 is refused with 409
  *     VERSION_EXISTS; the suite had redeployed v2 under v1's version, which the node no longer
@@ -266,13 +269,35 @@ await test('Init actually re-ran: seed-data now reflects A′ (greeting = hello 
 });
 
 await test('PUT again with identical A′ → 200 no-op (action: unchanged)', async () => {
+  // The no-op is proven by what did not happen, not by the answer: no 404 on the lib during the
+  // call, and the seed record init would rewrite keeps its version and updated_at.
+  const greeting = async () => {
+    const r = await json(`/v1/memory/${encodeURIComponent(ownerName)}/${encodeURIComponent('upsert:greeting')}`);
+    assert(r.status === 200, `greeting read ${r.status}`);
+    return { version: r.body.data.version, updated: r.body.data.updated_at ?? r.body.data.updatedAt };
+  };
+  const seedBefore = await greeting();
+  assert(seedBefore.version !== undefined && seedBefore.updated !== undefined, `greeting carries no version/updated_at: ${JSON.stringify(seedBefore)}`);
+  let saw404 = false;
+  let done = false;
+  const poller = (async () => {
+    while (!done) {
+      if ((await fetch(`${BASE}/v1/cortex/${CORTEX_ENC}/libs/demo.js`)).status === 404) saw404 = true;
+    }
+  })();
   const { status, body } = await json(`/v1/cortex/${CORTEX_ENC}`, {
     method: 'PUT',
     headers: ownerHdr(),
     body: JSON.stringify({ manifest: cortexManifest('1.0.1', 'hello B'), libs: { 'demo.js': LIB_B } }),
   });
+  done = true;
+  await poller;
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   assert(body.data.action === 'unchanged', `action: ${body.data.action}`);
+  assert(!saw404, 'GET /libs 404\'d during a no-op PUT');
+  const seedAfter = await greeting();
+  assert(seedAfter.version === seedBefore.version && seedAfter.updated === seedBefore.updated,
+    `the no-op re-ran init: greeting ${JSON.stringify(seedBefore)} → ${JSON.stringify(seedAfter)}`);
 });
 
 await test('PUT a never-seen cortex name → 201 created (create-via-PUT)', async () => {
@@ -362,14 +387,34 @@ await test('A redeploy the board ceiling refuses changes nothing: bytes, manifes
   await json(`/v1/owners/${name}`, { method: 'DELETE', headers: hdr });
 });
 
-await test('Agent without cortex:write is rejected on PUT (scope gate)', async () => {
-  // Default test agent scopes are '*', so simulate a denied agent by stripping the bearer:
-  // an UNauthenticated PUT must 401, confirming the route is gated (not public).
+await test('An unauthenticated PUT is refused 401 (the route is not public)', async () => {
   const { status } = await json(`/v1/cortex/${CORTEX_ENC}`, {
     method: 'PUT',
     body: JSON.stringify({ manifest: cortexManifest('1.0.1', 'hello B'), libs: { 'demo.js': LIB_B } }),
   });
   assert(status === 401, `unauthenticated PUT should be 401, got ${status}`);
+});
+
+await test('An agent of the owner holding only memory:read is refused PUT with 403 SCOPE_DENIED (scope gate)', async () => {
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: ownerHdr(),
+    body: JSON.stringify({ name: 'upsertreader', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+  });
+  assert(reg.status === 201, `scoped agent ${reg.status}: ${JSON.stringify(reg.body)}`);
+  const gaii = reg.body.data.agent.gaii;
+  const ts = new Date().toISOString();
+  const tok = await json('/v1/auth/token', {
+    method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }),
+  });
+  assert(typeof tok.body.data?.token === 'string', `scoped agent token: ${JSON.stringify(tok.body)}`);
+  const { status, body } = await json(`/v1/cortex/${CORTEX_ENC}`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${tok.body.data.token}` },
+    body: JSON.stringify({ manifest: cortexManifest('1.0.2', 'planted'), libs: { 'demo.js': LIB_A } }),
+  });
+  assert(status === 403 && body?.error?.code === 'SCOPE_DENIED' && JSON.stringify(body.error).includes('cortex:write'),
+    `memory:read agent PUT: ${status} ${JSON.stringify(body?.error)}`);
+  const detail = await json(`/v1/cortex/${CORTEX_ENC}`, { headers: ownerHdr() });
+  assert(detail.body.data.version === '1.0.1', `the refused PUT changed the cortex: version ${detail.body.data.version}`);
 });
 
 // ─── Extension upsert acceptance test ───

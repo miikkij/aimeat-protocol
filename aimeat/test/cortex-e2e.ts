@@ -1,6 +1,10 @@
 // Cortex-Core E2E test suite — fixture-driven tests for the extension system
 // Run: cd aimeat && pnpm exec tsx test/cortex-e2e.ts
 // Requires the AIMEAT server to be running on the configured port (default: 40251)
+// @version-history
+//   2026-11-15 — Audit M144, M145: anonymous install and uninstall are 401 and a memory:read agent's
+//     install is 403 SCOPE_DENIED (Phase 11); the redundant activate leaves the seed record's version
+//     and updated_at as they were and opens no second board.
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -303,6 +307,17 @@ await test('Activate extension → status: active', async () => {
 });
 
 await test('Activate already-active is idempotent', async () => {
+  // Idempotent means init does not run again: the seed record activation writes keeps its version
+  // and updated_at (a rerun writes version + 1 over whatever the owner had), and the board is not
+  // opened twice. The seed record is read before and after the redundant activate.
+  const SEED_KEY = 'recipe:spaghetti-aglio-olio';
+  const seedState = async () => {
+    const r = await json(`/v1/memory/${encodeURIComponent(ownerName)}/${encodeURIComponent(SEED_KEY)}`);
+    assert(r.status === 200, `seed read ${r.status}`);
+    return { version: r.body.data.version, updated: r.body.data.updated_at ?? r.body.data.updatedAt };
+  };
+  const seedBefore = await seedState();
+  assert(seedBefore.version !== undefined && seedBefore.updated !== undefined, `seed carries no version/updated_at: ${JSON.stringify(seedBefore)}`);
   const { status, body } = await json(`/v1/cortex/${RECIPE_ENC}/activate`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -311,6 +326,12 @@ await test('Activate already-active is idempotent', async () => {
   assert(body.ok === true, 'ok');
   assert(body.data.status === 'active', `status: ${body.data.status}`);
   assert(body.data.message === 'Extension is already active', `message: ${body.data.message}`);
+  const seedAfter = await seedState();
+  assert(seedAfter.version === seedBefore.version && seedAfter.updated === seedBefore.updated,
+    `the redundant activate rewrote the seed record: ${JSON.stringify(seedBefore)} → ${JSON.stringify(seedAfter)}`);
+  const boards = await json('/v1/boards');
+  const n = (boards.body.data.boards as any[]).filter(b => b.id === `cortex-${RECIPE_EXT}-recipe-reviews`).length;
+  assert(n === 1, `expected exactly one recipe-reviews board, got ${n}`);
 });
 
 await test('Deactivate → status: inactive', async () => {
@@ -751,6 +772,57 @@ await test('Second owner CANNOT delete first owner\'s extension (403); it surviv
   assert(get.status === 200, `owner can still read it after blocked delete: ${get.status}`);
 });
 
+// ─── Phase 11: The write routes are gated before the record guard (audit M144) ───
+console.log('\nPhase 11 — Authentication and the cortex:write scope');
+
+const PROBE_EXT = `scope-probe-${Date.now()}`;
+const probeManifest = `
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${PROBE_EXT}
+  namespace: ${ownerName}
+spec:
+  version: "1.0.0"
+  description: "Scope probe"
+  author: "test"
+  components:
+    - type: seed-data
+      entries:
+        - key: "probe:planted"
+          value: { text: "planted" }
+`;
+
+await test('Anonymous POST /v1/cortex and DELETE /v1/cortex/:name → 401; nothing installed, nothing removed', async () => {
+  const post = await json('/v1/cortex', { method: 'POST', body: JSON.stringify({ manifest: probeManifest }) });
+  assert(post.status === 401, `anonymous install: ${post.status} ${JSON.stringify(post.body?.error)}`);
+  const del = await json(`/v1/cortex/${RECIPE_ENC}`, { method: 'DELETE' });
+  assert(del.status === 401, `anonymous uninstall: ${del.status} ${JSON.stringify(del.body?.error)}`);
+  const get = await json(`/v1/cortex/${RECIPE_ENC}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(get.status === 200, `recipe-collection gone after an anonymous DELETE: ${get.status}`);
+});
+
+await test('An agent holding only memory:read is refused install with 403 SCOPE_DENIED; nothing installed', async () => {
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ name: 'cortexreader', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+  });
+  assert(reg.status === 201, `scoped agent ${reg.status}: ${JSON.stringify(reg.body)}`);
+  const gaii = reg.body.data.agent.gaii;
+  const ts = new Date().toISOString();
+  const tok = await json('/v1/auth/token', {
+    method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }),
+  });
+  assert(typeof tok.body.data?.token === 'string', `scoped agent token: ${JSON.stringify(tok.body)}`);
+  const post = await json('/v1/cortex', {
+    method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` }, body: JSON.stringify({ manifest: probeManifest }),
+  });
+  assert(post.status === 403 && post.body?.error?.code === 'SCOPE_DENIED',
+    `memory:read agent install: ${post.status} ${JSON.stringify(post.body?.error)}`);
+  const list = await json('/v1/cortex', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(!JSON.stringify(list.body.data).includes(PROBE_EXT), 'the refused install landed in the cortex list');
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 
@@ -761,7 +833,7 @@ await json(`/v1/owners/${otherOwnerName}`, {
 });
 
 // Remove all test extensions
-for (const name of [RECIPE_EXT, PROJECT_EXT, IOT_EXT]) {
+for (const name of [RECIPE_EXT, PROJECT_EXT, IOT_EXT, PROBE_EXT]) {
   await json(`/v1/cortex/${encodeURIComponent(name)}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${ownerToken}` },

@@ -8,6 +8,8 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-pitfalls).
  * @version-history
+ *   v1.1.2 — 2026-11-15 — Audit L030: the severity order is checked over the whole page, so a warn
+ *     ranked before a critical fails.
  *   v1.1.1 — 2026-09-15 — The full-entry test reads its marker from the entry's title instead of a
  *     hard-coded `mountLoginButton`, which the guidance dropped on 2026-09-13 and which kept the
  *     nightly sweep red on both backends since.
@@ -70,12 +72,12 @@ await test('GET /v1/appdev/pitfalls returns a paginated index with facets', asyn
   assert((d.facets.severity.critical ?? 0) > 0, 'no critical entries counted in facets');
 });
 
-await test('severity ordering: criticals come before infos', async () => {
+await test('severity ordering: critical, then warn, then info, never decreasing', async () => {
   const { body } = await json('/v1/appdev/pitfalls?limit=100');
-  const sevs = body.data.pitfalls.map((p: any) => p.severity);
-  const lastCritical = sevs.lastIndexOf('critical');
-  const firstInfo = sevs.indexOf('info');
-  assert(firstInfo === -1 || lastCritical < firstInfo, 'critical entries not sorted before info');
+  const rank: Record<string, number> = { critical: 0, warn: 1, info: 2 };
+  const ranks = body.data.pitfalls.map((p: any) => rank[p.severity]);
+  const firstDrop = ranks.findIndex((r: number, i: number) => i > 0 && ranks[i - 1] > r);
+  assert(firstDrop === -1, `severity order breaks at index ${firstDrop}: ${body.data.pitfalls[firstDrop - 1]?.severity} before ${body.data.pitfalls[firstDrop]?.severity}`);
 });
 
 await test('?applies_to=realtime filters to realtime entries', async () => {

@@ -45,6 +45,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-core-jobs.ts
  * @version-history
+ *   2026-11-15 -- Audit M121: an archive prune before 2019 deletes none of today's archived rows.
  *   2026-10-25 -- core:held-label-release is seeded and fires (app-label-recycled-after-delete).
  *   2026-10-25 -- core:mcp-client-cleanup is seeded, fires, and keeps a registration made today
  *     (secaudit2026oct22, dcr-unbounded-client-records).
@@ -405,6 +406,14 @@ async function run(): Promise<void> {
         // before the sweep can see them.
         await sleep(2500);
         await fire('core:usage-archive');
+
+        // The cutoff holds: a prune before 2019 leaves today's archived rows alone.
+        const early = await json('/v1/admin/usage/archive/prune', {
+            method: 'POST', headers: bearer(opToken), body: JSON.stringify({ before: '2019-01-01', confirm: true }),
+        });
+        assert(early.status === 200, `archive prune before 2019: ${early.status} ${short(early.body)}`);
+        assert(early.body.data.deleted.usageEvents === 0,
+            `a prune before 2019 deleted ${early.body.data.deleted.usageEvents} of today's archived rows`);
 
         const drained = await json('/v1/admin/usage/archive/prune', {
             method: 'POST', headers: bearer(opToken), body: JSON.stringify({ before: day(1), confirm: true }),

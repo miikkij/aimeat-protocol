@@ -12,6 +12,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-apps
  * @version-history
+ *   v1.14.1 — 2026-11-15 — Audit M166, L031, L032: owner B's public record on A's face key is not
+ *     served for A's app; the inline badge, CSP, trap and rename-download tests assert 200 instead of
+ *     returning on a 301; the badge ordering is checked against the last </h1> and </body>.
  *   v1.14.0 — 2026-10-16 — The icon upload refuses no credential (401), another owner (403) and a file
  *     over 1 MB (413), and the stored icon survives the refusals (QA audit F10b-06).
  *   v1.0.0 — 2026-06-05 — initial: versions, restore, fork, GHII fallback, 404
@@ -542,8 +545,8 @@ await test('PATCH { name } renames in place (200, response carries the new name)
 });
 
 await test('The download URL is unchanged after rename (link still works, same content)', async () => {
+    // The E2E node runs without an app origin, so nothing here redirects; a 301 fails rather than skips.
     const res = await fetch(`${BASE}/v1/apps/${ownerName}/${PARK_FILE}`, { redirect: 'manual' });
-    if (res.status === 301) { console.log('    (app origin on — direct download 301s; covered elsewhere)'); return; }
     assert(res.status === 200, `download still 200 after rename, got ${res.status}`);
     assert((await res.text()) === '<h1>park me v2</h1>', 'serves the same content under the same URL');
 });
@@ -605,19 +608,20 @@ await test("Another owner cannot rename A's app (PATCH → 404)", async () => {
 console.log('\nPhase 10: inline publish-your-own-app badge');
 
 await test('GET ?mode=inline appends the AIMEAT badge', async () => {
+    // The E2E node runs without an app origin (e2e-app-origin covers that one), so the inline path
+    // serves here: a 301 fails the test instead of turning its assertions into a no-op.
     const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}?mode=inline`, { redirect: 'manual' });
-    // If the app origin is provisioned this 301s instead (covered by e2e-app-origin); skip then.
-    if (res.status === 301) { console.log('    (app origin on — inline 301s; badge covered by app-origin serving)'); return; }
     assert(res.status === 200, `status ${res.status}`);
     const text = await res.text();
     assert(text.includes('id="aimeat-app-badge"'), 'inline body carries the badge element');
     assert(text.includes('Publish your own app'), 'badge shows the publish CTA');
-    assert(/<\/body\s*>\s*$/i.test(text.trim()) === false || text.indexOf('aimeat-app-badge') < text.lastIndexOf('</body>'), 'badge injected before </body>');
+    const at = text.indexOf('aimeat-app-badge');
+    assert(at > text.lastIndexOf('</h1>'), `badge sits after the app's content (badge ${at}, last </h1> ${text.lastIndexOf('</h1>')})`);
+    assert(at < text.lastIndexOf('</body>'), `badge injected before </body> (badge ${at}, </body> ${text.lastIndexOf('</body>')})`);
 });
 
 await test('GET ?mode=inline CSP permits wasm compilation, not eval()', async () => {
     const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}?mode=inline`, { redirect: 'manual' });
-    if (res.status === 301) { console.log('    (app origin on — inline 301s; CSP covered by e2e-app-origin)'); return; }
     assert(res.status === 200, `status ${res.status}`);
     const scriptSrc = ((res.headers.get('content-security-policy') ?? '').match(/script-src ([^;]*)/) ?? ['', ''])[1];
     // Without 'wasm-unsafe-eval' the browser refuses to COMPILE wasm — self-hosting the
@@ -640,7 +644,6 @@ await test("Badge injection survives '</body>' inside app JavaScript (last-match
     }));
     assert(pub.status === 201 || pub.status === 200, `publish status ${pub.status}: ${JSON.stringify(pub.body)}`);
     const res = await fetch(`${BASE}/v1/apps/${ownerName}/${TRAP_FILE}?mode=inline`, { redirect: 'manual' });
-    if (res.status === 301) { console.log('    (app origin on — inline 301s; badge covered by app-origin serving)'); return; }
     assert(res.status === 200, `inline status ${res.status}`);
     const text = await res.text();
     assert(text.includes(TRAP_JS_STRING), 'the JS string containing </body> is byte-intact (badge not injected into it)');
@@ -756,6 +759,20 @@ await test("A NON-public agent face behaves like no face (owner + agent copies b
     assert(!text.includes('agent-published view'), 'non-public agent face content is NOT served');
     assert(text.includes('# version one'), 'falls back to converted HTML (indistinguishable from no face)');
     assert(text.includes('## Agent affordances'), 'affordances footer present on the fallback');
+});
+
+await test("Owner B's PUBLIC record on the same face key is not served for A's app", async () => {
+    // The face lookup is A's identity union only; a key-only lookup would serve B's text on A's URL.
+    const write = await json('/v1/memory', bAuthed({
+        method: 'POST',
+        body: JSON.stringify({ key: FACE_KEY, value: '# Planted by owner B\n\nNot A\'s words.\n', visibility: 'public' }),
+    }));
+    assert(write.body?.ok === true, `B's face write: ${write.status} ${JSON.stringify(write.body?.error)}`);
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`, { headers: mdHeaders });
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(!text.includes('Planted by owner B'), "owner B's face text was served on A's app URL");
+    assert(text.includes('# version one'), "A's app still falls back to its own converted HTML");
 });
 
 await test('Accept: text/html keeps exactly today\'s behavior (byte-exact HTML, no markdown headers)', async () => {

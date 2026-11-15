@@ -6,6 +6,8 @@
  *   email-per-account-per-node invariant that the resolver relies on (a duplicate verified email is
  *   refused, so an email can never map to two accounts).
  * @version-history
+ *   v1.0.2 — 2026-11-15 — Audit L006: the duplicate address is refused with exactly 409 EMAIL_TAKEN,
+ *     not with any status other than 201.
  *   v1.0.1 — 2026-10-06 — A code key's account starts unverified (secaudit 2026-10 follow-up, A1), so
  *     the fixture marks the address verified with helpers/verified-email.ts.
  *   v1.0.0 — 2026-07-19 — Initial: email→handle resolution (found/handle/unknown/malformed) + uniqueness.
@@ -125,7 +127,8 @@ await test('5. Malformed email (has @, not valid) → 400 INVALID_EMAIL', async 
 
 await test('6. Invariant: a second account cannot claim the SAME verified email', async () => {
     const dupMint = await provisionVerifiedEmailAccount(inviter.token, email, `cxdup${Date.now()}`);
-    assert(dupMint.status !== 201, `duplicate verified email was accepted (${dupMint.status}) — invariant broken`);
+    assert(dupMint.status === 409 && dupMint.body.error?.code === 'EMAIL_TAKEN',
+        `duplicate verified email: expected 409 EMAIL_TAKEN, got ${dupMint.status} ${dupMint.body.error?.code}`);
     // …and the email still resolves to the ORIGINAL account (never became ambiguous).
     const r = await deviceAuthorize(email);
     assert(r.status === 200, `authorize after dup ${r.status}: ${JSON.stringify(r.body.error)}`);

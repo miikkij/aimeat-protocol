@@ -6,6 +6,8 @@
  *   cloning, reviews, organism-member consent resolution, contributed packages, the pacing amount's
  *   name, and the Federation switch of a package (a consent to everyone opens no private entry).
  * @version-history
+ *   2026-11-15 — Audit M031: a member contributing Owner-1's public package is 404 NOT_FOUND and the
+ *     organism's list does not show it.
  *   2026-11-08 — The Federation switch: with the page's own consent granted, an unrelated signed-in
  *     account, its agent and the anonymous reader cannot read a private entry by its key; the public
  *     entry stays readable and the consent stays an active federation-reach grant (k1-federation).
@@ -642,6 +644,17 @@ await test('Owner-1 contributes the package to the organism', async () => {
     body: JSON.stringify({ organism_id: organismId }),
   });
   assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('A member cannot contribute Owner-1\'s public package as their own → 404 NOT_FOUND, not listed', async () => {
+  // The package lookup is the caller's own scope: a public manifest of another account is not theirs.
+  const { status, body } = await json(`/v1/knowledge/${discoverablePackageId}/contribute`, {
+    method: 'POST', headers: { Authorization: `Bearer ${member.agentToken}` }, body: JSON.stringify({ organism_id: organismId }),
+  });
+  assert(status === 404 && body?.error?.code === 'NOT_FOUND', `member contributed another owner's package: ${status} ${JSON.stringify(body?.error ?? body?.data)}`);
+  const list = await json(`/v1/knowledge/organism/${organismId}`, { headers: { Authorization: `Bearer ${member.agentToken}` } });
+  assert(list.status === 200 && !JSON.stringify(list.body.data).includes(discoverablePackageId),
+    `the refused contribution is listed: ${JSON.stringify(list.body.data).slice(0, 300)}`);
 });
 
 await test('Fellow organism member can read the contributed package manifest → 200', async () => {

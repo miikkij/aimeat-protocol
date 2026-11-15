@@ -8,6 +8,8 @@
 // 2026-10-02: the delivery id is the transition's own (`<task id>:<status>:<time>`); the task id
 // rides in the payload, which is what the connector dedups on. Test 8 is the hosted-places case:
 // the create push acknowledged, a plan proposed, then Start, which the tunnel used to drop.
+// 2026-11-15: audit L040. Test 4 reconnects in a bounded loop after the ack instead of sleeping a
+// fixed 150 ms once, so an ack that suppressed the backlog late would still be seen.
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -139,14 +141,21 @@ await test('4. ack does NOT drop a still-queued task (no-loss is storage truth)'
   const bl = await t.waitForBacklog(1500);
   assert(backlogTaskIds(bl).includes(offlineTaskId), 'task present before ack');
   t.ack(offlineTaskId);
-  await sleep(150);  // let the server record the ack
   await t.close();
 
-  const t2 = await TunnelClient.connect(BASE, agentToken);
-  const bl2 = await t2.waitForBacklog(1500);
-  assert(bl2 !== null, 'received backlog after ack');
-  assert(backlogTaskIds(bl2).includes(offlineTaskId), 'still-queued task remains in backlog after ack');
-  await t2.close();
+  // Not one reconnect after a fixed sleep: an ack handled late would pass that by arriving after
+  // it. Reconnect for two seconds and the task must be in every backlog.
+  const until = Date.now() + 2000;
+  let rounds = 0;
+  do {
+    const t2 = await TunnelClient.connect(BASE, agentToken);
+    const bl2 = await t2.waitForBacklog(1500);
+    await t2.close();
+    rounds++;
+    assert(bl2 !== null, `received backlog after ack (round ${rounds})`);
+    assert(backlogTaskIds(bl2).includes(offlineTaskId), `still-queued task missing from the backlog after ack (round ${rounds})`);
+    await sleep(200);
+  } while (Date.now() < until);
 });
 
 await test('5. A status change (done) is what removes a task from the backlog', async () => {

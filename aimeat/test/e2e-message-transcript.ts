@@ -10,6 +10,8 @@
  *
  *   WHAT THIS DOES NOT COVER: a successful transcription (CI has no provider key). Verified by hand.
  * @version-history
+ *   v1.1.1 — 2026-11-15 — Audit M162: the force=true refusal is exactly 400 NO_STT_MODEL or
+ *     NO_API_KEY, and the sender's AI usage for the day is read back unchanged around it.
  *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit (e2e-message-transcript:145): the one test
  *     for the mailbox-scoped lookup accepted "404 or 200", which is the exact range an UNSCOPED
  *     lookup produces. Mailbox copies are per-owner and share the message id, so the recipient
@@ -195,17 +197,23 @@ await test('An existing transcript is REUSED, not re-charged', async () => {
 });
 
 await test('force=true on a node with no model/key refuses BEFORE spending', async () => {
+  const usage = async () => {
+    const u = await json('/v1/ai/usage', { headers: { Authorization: `Bearer ${sender.token}` } });
+    assert(u.status === 200, `ai usage read ${u.status}: ${JSON.stringify(u.body)}`);
+    return { calls: u.body.data.total_calls, spent: u.body.data.spent_today_usd };
+  };
+  const before = await usage();
   const { status, body } = await json(`/v1/messages/${messageId}/attachments/at0/transcribe`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${sender.token}` },
     body: JSON.stringify({ force: true }),
   });
-  assert(status === 400 || status === 402 || status === 502,
-    `expected a refusal, got ${status}: ${JSON.stringify(body)}`);
-  if (status === 400) {
-    assert(['NO_STT_MODEL', 'NO_API_KEY', 'ENCRYPTION_NOT_CONFIGURED'].includes(body.error?.code),
-      `unexpected code: ${body.error?.code}`);
-  }
+  // A refusal by name before any provider is called: a 402 or a 502 means the call got past the gate.
+  assert(status === 400 && ['NO_STT_MODEL', 'NO_API_KEY'].includes(body.error?.code),
+    `expected 400 NO_STT_MODEL or NO_API_KEY, got ${status}: ${JSON.stringify(body)}`);
+  const after = await usage();
+  assert(after.calls === before.calls && after.spent === before.spent,
+    `the refused transcription was metered: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
 });
 
 console.log('\nPhase 3 — Non-audio attachments');

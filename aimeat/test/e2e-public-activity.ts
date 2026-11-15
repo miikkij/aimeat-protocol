@@ -21,6 +21,8 @@
  *     dedicated regression case names them.
  *   v1.2.0 — 2026-11-04 — Phase 5: a cached count shows the owner's private write at once, and the
  *     cached ticker a public write at once (codebase analysis 2026-11-03, item C4).
+ *   v1.2.1 — 2026-11-15 — Audit L112: the two negative cases wait for a public marker written after
+ *     the private one to reach the feed, instead of a fixed 600 ms.
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -124,8 +126,12 @@ await test('Creating a PUBLIC organism records an "organisms" feed event', async
 await test('Creating a PRIVATE organism does NOT appear in the feed', async () => {
   const r = await json('/v1/organisms', agentAuth({ method: 'POST', body: JSON.stringify({ name: privOrgName, visibility: 'private' }) }));
   assert(r.status === 201, `create status ${r.status}: ${JSON.stringify(r.body)}`);
-  // Give any (erroneous) async write time to land, then read fresh.
-  await sleep(600);
+  // A public marker created after it: once the marker's event is in the feed, the activity write
+  // for the private organism (issued earlier) has had its time to land, however slow the write is.
+  const marker = `PAC Marker ${stamp}`;
+  const m = await json('/v1/organisms', agentAuth({ method: 'POST', body: JSON.stringify({ name: marker, visibility: 'public' }) }));
+  assert(m.status === 201, `marker create status ${m.status}`);
+  await waitForFeed('organisms', it => typeof it.summary === 'string' && it.summary.includes(marker));
   const items = await readFeed('organisms');
   const leaked = items.find(it => typeof it.summary === 'string' && it.summary.includes(privOrgName));
   assert(!leaked, 'private organism must not be announced publicly');
@@ -157,7 +163,10 @@ await test('Importing a catalog_listed knowledge package records an "agents" fee
 await test('Importing a non-catalog knowledge package does NOT appear in the feed', async () => {
   const r = await json('/v1/knowledge/import', agentAuth({ method: 'POST', body: knowledgeBody(unlistedPkg, false) }));
   assert(r.status === 201, `import status ${r.status}: ${JSON.stringify(r.body)}`);
-  await sleep(600);
+  const marker = `PAC Marker Pkg ${stamp}`;
+  const m = await json('/v1/knowledge/import', agentAuth({ method: 'POST', body: knowledgeBody(marker, true) }));
+  assert(m.status === 201, `marker import status ${m.status}`);
+  await waitForFeed('agents', it => typeof it.summary === 'string' && it.summary.includes(marker));
   const items = await readFeed('agents');
   const leaked = items.find(it => typeof it.summary === 'string' && it.summary.includes(unlistedPkg));
   assert(!leaked, 'non-catalog knowledge must not be announced publicly');

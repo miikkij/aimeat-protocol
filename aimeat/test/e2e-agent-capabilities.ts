@@ -8,6 +8,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-agent-capabilities
  * @version-history
+ *   v1.1.1 — 2026-11-15 — Audit M217, M218: a sibling agent of the same owner is refused PUT and GET
+ *     (403 ACCESS_DENIED); an mcp capability on a server the owner attached is verified over the
+ *     agent's session and not over the owner's.
  *   v1.1.0 — 2026-09-04 — Phase 2: a second owner and an unauthenticated caller, with a positive
  *     control asserting the refused write did not land. One of the 34 seeded into
  *     security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B). Header added;
@@ -315,6 +318,45 @@ await test('8. POSITIVE CONTROL: the list is the owner\'s own, and nothing was p
     assert(status === 200, `owner read ${status}`);
     assert(!JSON.stringify(body.data).includes('planted'),
         `a refused write landed anyway: ${JSON.stringify(body.data).slice(0, 200)}`);
+});
+
+await test('8b. A sibling agent of the same owner can neither write nor read this agent\'s list (403)', async () => {
+    // Same owner name, different principal: the check compares the caller's GAII, never the owner name.
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'capbot2', owner: ownerName, capabilities: ['memory'] }),
+    });
+    assert(reg.status === 201, `sibling register ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const sibling = { Authorization: `Bearer ${await getToken(reg.body.data.agent.gaii, reg.body.data.private_key)}` };
+    const put = await json(`/v1/agents/${agentName}/capabilities`, {
+        method: 'PUT', headers: sibling, body: JSON.stringify({ technical: [], domain: ['sibling-planted'] }),
+    });
+    assert(put.status === 403 && put.body?.error?.code === 'ACCESS_DENIED', `sibling PUT: ${put.status} ${JSON.stringify(put.body?.error)}`);
+    const get = await json(`/v1/agents/${agentName}/capabilities`, { headers: sibling });
+    assert(get.status === 403 && get.body?.error?.code === 'ACCESS_DENIED', `sibling GET: ${get.status} ${JSON.stringify(get.body?.error)}`);
+    const back = await json(`/v1/agents/${agentName}/capabilities`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(back.status === 200 && !JSON.stringify(back.body.data).includes('sibling-planted'), 'the refused sibling write landed anyway');
+});
+
+await test('8c. verified is earned over the agent\'s own session: the same mcp capability from the owner is not', async () => {
+    // A server the node knows, attached by the owner. auth 'oauth' parks it without probing an address.
+    const srv = await json('/v1/mcp-servers', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'capfs', url: 'https://capfs.example/mcp', auth: 'oauth' }),
+    });
+    assert(srv.status === 201, `attach ${srv.status}: ${JSON.stringify(srv.body)}`);
+    const put = (token: string) => json(`/v1/agents/${agentName}/capabilities`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ technical: [{ name: 'capfs', type: 'mcp' }], domain: [] }),
+    });
+    const byAgent = await put(agentToken);
+    assert(byAgent.status === 200 && byAgent.body.data.technical_capabilities[0]?.verified === true,
+        `agent session on a known server should verify: ${JSON.stringify(byAgent.body.data?.technical_capabilities)}`);
+    const byOwner = await put(ownerToken);
+    assert(byOwner.status === 200, `owner PUT ${byOwner.status}`);
+    const back = await json(`/v1/agents/${agentName}/capabilities`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(back.body.data.technical_capabilities[0]?.verified === false,
+        `an owner session must not stamp verified: ${JSON.stringify(back.body.data.technical_capabilities)}`);
 });
 
 await test('9. Cascade-delete the second owner', async () => {

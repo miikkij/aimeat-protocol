@@ -20,6 +20,9 @@
 //      here — because "an invalid token is rejected" would prove something else.
 //   6. A SINGLE-OWNER DAEMON BEHAVES EXACTLY AS BEFORE. The old shape is not a legacy path to be
 //      tolerated; it is what most installs are.
+//
+// @version-history
+//   2026-11-15 — Audit M040: test 6 asserts no other identity on the socket received the deliver.
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -209,6 +212,10 @@ await test('6. deliver reaches the right identity, and its ack is accepted', asy
   const got = hub!.delivers.slice(before).find(f => f.agent === target);
   assert(!!got, `deliver for ${target}, saw ${JSON.stringify(hub!.delivers.slice(before).map(f => f.agent))}`);
   hub!.ack(got!.id!, target);
+  // Only the target: five other identities ride this socket, and none of them may get the task.
+  await sleep(500);
+  const strays = hub!.delivers.slice(before).filter(f => f.agent !== target);
+  assert(strays.length === 0, `the task reached other identities: ${JSON.stringify(strays.map(f => f.agent))}`);
 });
 
 await test('7. subscribe/subscribed answers the identity that asked', async () => {

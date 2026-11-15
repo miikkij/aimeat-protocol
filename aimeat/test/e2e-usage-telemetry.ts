@@ -12,6 +12,7 @@
  *
  *   Design: docs/internal/telemetria/02-design.md
  * @version-history
+ *   v1.2.1 -- 2026-11-15 -- Audit L124: the setup's agent create must answer 201, not 200 or 409.
  *   v1.2.0 -- 2026-11-14 -- apps-used rows carry last_bucket, the day the reader last used the app,
  *     and another owner's report never shows that open.
  *   v1.1.0 -- 2026-10-02 -- chat_agent.metered_here is true on a node without the shared chat key.
@@ -67,7 +68,8 @@ await test('Setup: an agent llm_call lands in the ledger for each owner', async 
             method: 'POST', headers: auth,
             body: JSON.stringify({ name: 'reporter', owner: name, capabilities: ['test'] }),
         });
-        assert(created.status === 201 || created.status === 200 || created.status === 409,
+        // Both owners were registered a moment ago, so the first create is the only valid answer.
+        assert(created.status === 201,
             `agent create for ${name}: ${created.status} ${JSON.stringify(created.body.error)}`);
 
         const rep = await json('/v1/agents/reporter/telemetry', {

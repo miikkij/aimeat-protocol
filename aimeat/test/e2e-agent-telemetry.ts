@@ -4,6 +4,8 @@
  *   Tests event creation for llm_call and tool_call types, listing, type filtering,
  *   time-based filtering, and input validation.
  * @version-history
+ *   v1.1.1 -- 2026-11-15 -- Audit M137: test 11b, a sibling agent of the same owner is refused 403
+ *     ACCESS_DENIED on both POST and GET of this agent's telemetry, and writes its own.
  *   v1.1.0 -- 2026-09-04 -- Phase 4: whose telemetry is it. Both directions, because telemetry
  *     carries what a model was asked and what it cost: a stranger writing into somebody else's
  *     agent poisons their usage record, and a stranger reading it learns what that agent has been
@@ -276,6 +278,29 @@ await test('11. POSITIVE CONTROL: the owner still reads their own, and nothing w
     const events: any[] = body.data?.events ?? body.data ?? [];
     assert(!JSON.stringify(events).includes('planted'),
         'the refused write landed anyway — a 403 that still wrote is the worst of both');
+});
+
+await test('11b. A sibling agent of the same owner cannot write or read this agent\'s telemetry (403)', async () => {
+    // Same owner name, different principal: mayActOnAgent compares the caller's GAII, never the owner name.
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'telbot2', owner: ownerName, capabilities: ['memory'] }),
+    });
+    assert(reg.status === 201, `sibling register ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const siblingToken = await getToken(reg.body.data.agent.gaii, reg.body.data.private_key);
+    const hdr = { Authorization: `Bearer ${siblingToken}` };
+    const write = await json(`/v1/agents/${agentName}/telemetry`, {
+        method: 'POST', headers: hdr, body: JSON.stringify({ type: 'llm_call', data: { model: 'sibling-planted' } }),
+    });
+    assert(write.status === 403 && write.body?.error?.code === 'ACCESS_DENIED', `sibling write: ${write.status} ${JSON.stringify(write.body?.error)}`);
+    const read = await json(`/v1/agents/${agentName}/telemetry`, { headers: hdr });
+    assert(read.status === 403 && read.body?.error?.code === 'ACCESS_DENIED', `sibling read: ${read.status} ${JSON.stringify(read.body?.error)}`);
+    const own = await json('/v1/agents/telbot2/telemetry', {
+        method: 'POST', headers: hdr, body: JSON.stringify({ type: 'tool_call', data: { tool: 'own' } }),
+    });
+    assert(own.status === 201, `sibling writes its own telemetry: ${own.status} ${JSON.stringify(own.body)}`);
+    const back = await json(`/v1/agents/${agentName}/telemetry`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(back.status === 200 && !JSON.stringify(back.body.data).includes('sibling-planted'), 'the refused sibling write landed anyway');
 });
 
 await test('12. Cascade-delete the second owner', async () => {
