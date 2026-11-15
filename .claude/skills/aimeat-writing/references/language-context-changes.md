@@ -5,6 +5,8 @@ which day, and why a word was chosen. A writer does not need it to compose a tex
 you want to know why a decided word is what it is. A change to the table adds its line here, the
 newest at the top.
 
+- **2026-11-15**: public app list (*julkinen sovelluslista*, *lista pública de aplicaciones*), for the list of published apps that the admin Apps page and the publish hints used to call *the wall* (*seinä*, *muro*). The front page's own block already called it the app list. Recorded with the sweep that removed road, way in, hand, machine room, showroom, wall and single pictures from the locale files. No cold reader has read them yet.
+
 - **2026-11-15**: AI onboarding (*tekoälyperehdytys*, *introducción a la IA*), for the team page's row and the record a team keeps under EU AI Act article 4. *Perehdytys* is the Finnish workplace word for showing a new person how things are done here, which is what the member's AI does with the team skill. No cold reader has read them yet.
 - **2026-11-15**: privacy notice (*tietosuojaseloste*, *aviso de privacidad*) and Business ID (*Y-tunnus*, *identificación fiscal*), the words the locales and the outbound email footer already used (`campaign-email.ts` said the table settled them, and it did not). Recorded as they ship, not chosen anew. No cold reader has read them yet.
 - **2026-11-14**: API description (*API-kuvaus*, *descripción de la API*) and its two modes, refuse a mismatch (*hylkää poikkeava*, *rechazar lo que no coincide*) and report only (*vain raportoi*, *solo informar*), for the Config row security.request_body_check. *API-kuvaus* follows *API-avain*, which these pages already use. No cold reader has read them yet.

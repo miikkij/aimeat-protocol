@@ -8,6 +8,7 @@ forbidden, and how a row is added or changed. `language-context.md` lists the ot
 | The thing | In one sentence | en | fi | es |
 |---|---|---|---|---|
 | a published web app | one file, runs on their AIMEAT | app | sovellus | aplicación |
+| the list of published apps that visitors see | the front page's app list (the block *App list, community first*); an operator takes an app out of it on the admin Apps page, and the owner can park their own. Never *the wall* | public app list; on the front page, the front page's app list | julkinen sovelluslista; etusivulla etusivun sovelluslista | lista pública de aplicaciones; en la portada, la lista de aplicaciones de la portada |
 | a page with script inside a workspace | one whole HTML document in a document space, beside the Markdown pages: a presentation, a report with charts, a page with pictures; it runs isolated in a frame with no network and no way into anybody's account, and is shared like any page. Never *applikaatio*, never *sovellus*: it is a page, not an app | HTML page | HTML-sivu | página HTML |
 | sandboxed outside-calling code | holds no key of theirs | extension | laajennus | extensión |
 | an extension running with nobody present | a schedule, an activation or a step of a workflow starts it; the opposite is a run a person or an app started | when it runs on its own | kun laajennus toimii yksin | cuando se ejecuta sola |
