@@ -17,6 +17,8 @@
  * @usage  pnpm check:locales           (exit 1 on any violation)
  *         pnpm check:locales --list    (coverage only, always exit 0)
  * @version-history
+ *   v1.6.0 — 2026-11-15 — PICTURE_WORDS: the door ratchet's model for the other words used as a
+ *     picture of something else (road and way in first), one baseline file per word.
  *   v1.5.0 — 2026-11-15 — The same ratchet for "door" (fi "ovi", es "puerta"), with its own
  *     baseline security/locale-door-baseline.json, a map from id to the reason a real door or an
  *     idiom is allowed. The word had reached 64 English, 47 Finnish and 58 Spanish strings as a name
@@ -167,6 +169,28 @@ const DOOR_BY_LOCALE: Record<string, RegExp> = {
 };
 const DOOR_BASELINE = new URL('../security/locale-door-baseline.json', import.meta.url);
 
+/**
+ * The same habit as "door", with other words: a picture of something else in place of the thing's
+ * name. The strings were rewritten on 2026-11-15, one word family per change, and each family keeps
+ * its own ratchet here with its own baseline (security/locale-<word>-baseline.json, a map from id
+ * to the reason a use is allowed). Where a word has many idiomatic uses in one language (Finnish
+ * "saman tien", Spanish "en camino"), that language's pattern names only the pictures the sweep
+ * removed, so an idiom is never an offense.
+ */
+interface PictureWord { word: string; byLocale: Record<string, RegExp>; baseline: URL; fix: string }
+const PICTURE_WORDS: PictureWord[] = [
+  {
+    word: 'road / way in',
+    byLocale: {
+      en: /\b(?:roads?|ways? in)\b/i,
+      fi: /(?<![\p{L}])(?:(?:tie|tiet|tiesi|reitti) (?:sisään|ulos|tänne)|(?:kaksi|kolme|neljä|viisi|\d+) (?:tietä|reittiä)|tällä tiellä|(?:koko|parempi) (?:tie|reitti)(?![\p{L}]))/iu,
+      es: /\b(?:vías? de entrada|(?:dos|tres|cuatro|cinco|\d+) caminos|camino corto|por este camino|camino de vuelta)\b/i,
+    },
+    baseline: new URL('../security/locale-road-baseline.json', import.meta.url),
+    fix: 'name what the reader does: sign in, three ways, this prompt, a link, all the steps',
+  },
+];
+
 function jargonOffenders(
   byLocale: Record<string, RegExp> = JARGON_BY_LOCALE,
   baselineFile: URL = JARGON_BASELINE,
@@ -242,6 +266,18 @@ for (const id of doors.fresh) {
 }
 for (const id of doors.stale) {
   failures.push(`✖ baseline entry no longer offends: ${id}\n      → remove it from security/locale-door-baseline.json — the ratchet only tightens`);
+}
+
+// One ratchet per picture word, each with its own baseline of allowed uses.
+for (const p of PICTURE_WORDS) {
+  const file = `security/${p.baseline.pathname.split('/').pop()}`;
+  const hits = jargonOffenders(p.byLocale, p.baseline);
+  for (const id of hits.fresh) {
+    failures.push(`✖ [${id.split(':')[0]}] "${p.word}" is a picture, not the thing's name: ${id.split(':').slice(1).join(':')}\n      → ${p.fix}; a real use goes in ${file} with its reason`);
+  }
+  for (const id of hits.stale) {
+    failures.push(`✖ baseline entry no longer offends: ${id}\n      → remove it from ${file} — the ratchet only tightens`);
+  }
 }
 
 if (failures.length) {
