@@ -157,7 +157,7 @@ export const PARTY_TOKEN_ROUTES: ReadonlyArray<{ methods: readonly string[]; pat
     { methods: ['GET', 'HEAD'], path: /^\/v1\/odata\/[^/]+\/[^/]+(?:\/[^/]+)?\/?$/ },
     { methods: ['GET', 'HEAD'], path: /^\/v1\/pub\/[^/]+\/datapkg\// },
     { methods: ['GET', 'POST'], path: /^\/v1\/parties\/me(?:\/.*)?$/ },
-    // A party buying a data package again tops up its contract (services/exchange-party-buy.ts, D5.4).
+    // A party buying a data package again tops up its contract (services/exchange/party-buy.ts, D5.4).
     { methods: ['POST'], path: /^\/v1\/exchange\/offerings\/[^/]+\/buy\/?$/ },
     // An app's registered party: its own standing, its sign-out and its data in the app (D4.2).
     { methods: ['GET', 'POST'], path: /^\/v1\/apps\/[^/]+\/[^/]+\/parties\/(?:me|signout)\/?$/ },

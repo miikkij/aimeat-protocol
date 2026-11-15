@@ -30,7 +30,7 @@
  *   is set and works again on reactivation, because nothing is deleted.
  *   Since 2026-11-08 (round 15) also the two sales to a buyer with no account here: the foreign A2A
  *   quote and payment (services/a2a-offering.ts priceForForeignCaller) and the outside party's data
- *   package purchase (services/exchange-party-buy.ts buyable). Neither charges while the flag is set.
+ *   package purchase (services/exchange/party-buy.ts buyable). Neither charges while the flag is set.
  * @structure deactivatedAccountSkip(storage, identity) · deactivatedAccountOf(storage, identity) ·
  *   deactivatedSince(storage, identity)
  * @usage const skip = await deactivatedAccountSkip(storage, job.ownerScope); if (skip) { ...skip... }

@@ -11,7 +11,7 @@
  *   source is `proposed` until a review in the compliance document `intermediation` says otherwise).
  *
  *   WHICH OFFERING DELIVERS DATA. Every offering carries `deliversData` (plan D5.5): the provider's
- *   statement on its source, else the node's proposal (services/exchange-datapackage.ts
+ *   statement on its source, else the node's proposal (services/exchange/datapackage.ts
  *   proposeDeliversData: a data package, and an action or tool whose output schema returns rows or
  *   records). A listing made before the field existed is read by its kind until its next projection
  *   writes the field: an `ext-action` and a `datapackage` as data, an app tool and agent work as a service.

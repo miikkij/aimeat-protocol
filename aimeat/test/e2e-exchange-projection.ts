@@ -135,7 +135,7 @@ console.log('\n=== AIMEAT EXCHANGE PROJECTION E2E (TARGET-050 — the source own
 
 // Node 4.0.0 refuses the 3.x morsel price fields and drops the deprecated mirrors of a morsel-rail
 // offering or contract (`unit`, `basePrice`, `price_per_call`, `currency`), keeping `toll_morsels` as
-// the only figure (services/exchange-market.ts presentOffering, presentContractTerms).
+// the only figure (services/exchange/market.ts presentOffering, presentContractTerms).
 const MIRRORS_GONE = await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
 /** Whether an offering or contract row is on the morsel rail: `unit: 'morsels'` on 3.x, no `unit` on 4.0.0. */
 const onPacingRail = (x: any): boolean => (MIRRORS_GONE ? x?.unit === undefined : x?.unit === 'morsels') && typeof x?.toll_morsels === 'number';

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The ODPS `dataHolder` of a data package: the legal entity behind it, when the owner has
  *   stated one. An EXCHANGE offering takes it from the provider's declaration on the listing
- *   (services/exchange-odps.ts); a data package has no listing, so it takes it from the owner's company
+ *   (services/exchange/odps.ts); a data package has no listing, so it takes it from the owner's company
  *   register (`aimeat_company_*`, GET /v1/companies), which is where an owner states their company.
  *
  *   WHICH COMPANY. A package published to an organism is held by the owner's company bound to that

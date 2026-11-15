@@ -70,7 +70,7 @@ import {
     getOffering, getOfferingWithMeta, listOfferings, matchOfferings, filterOfferings,
     putNeed, getNeed, parseNeedSpec, listNeeds, putBid, getBid, acceptBid,
     offeringStats, offeringConsumers, enrichNeeds, presentOffering, presentContractTerms, budgetFloorText,
-} from '../services/exchange-market.js';
+} from '../services/exchange/market.js';
 import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -405,7 +405,7 @@ export function registerExchangeTools(
             const bid = await getBid(storage, n.needId, bid_id);
             if (!bid || bid.state !== 'open') return fail('NOT_FOUND: no such open bid');
 
-            // The rest of the acceptance is services/exchange-market.ts: resolve the capability,
+            // The rest of the acceptance is services/exchange/market.ts: resolve the capability,
             // price it, carry the spend already on an existing contract, create the entitlement with
             // the action's own pacing toll, then move the bid and the need. Written out here, this
             // copy had lost the toll — the same capability burned morsels per call through one door

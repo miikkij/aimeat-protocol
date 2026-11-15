@@ -15,7 +15,7 @@ import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import {
     canonicalAppToolsId, canonicalAppToolsKey, migrateAppToolsKeysOnce, APP_TOOLS_KEY_MIGRATION_KEY,
 } from '../../src/services/app/tools-key.js';
-import { putOffering, type Offering } from '../../src/services/exchange-market.js';
+import { putOffering, type Offering } from '../../src/services/exchange/market.js';
 
 const NODE = 'node-test';
 const stores: SqliteStorage[] = [];

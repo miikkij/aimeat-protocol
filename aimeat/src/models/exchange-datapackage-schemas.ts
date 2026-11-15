@@ -5,7 +5,7 @@
  * @description The zod shapes of the request bodies that sell a data package on EXCHANGE and buy one
  *   as an outside party (plan doc-mvwxcas3dom3, D5): validateBody bounds every field before the
  *   handler runs. The meaning (a price, a model, the usage terms, a party's e-mail) is checked once
- *   more by services/exchange-datapackage.ts and services/exchange-party-buy.ts.
+ *   more by services/exchange/datapackage.ts and services/exchange/party-buy.ts.
  * @structure DatapackageExchangeSchema · PartyBuySchema · PartyPurchaseCompleteSchema
  * @usage router.put('/v1/datapackages/:owner/:name/exchange', ..., validateBody(DatapackageExchangeSchema, config.nodeId), handler)
  * @version-history

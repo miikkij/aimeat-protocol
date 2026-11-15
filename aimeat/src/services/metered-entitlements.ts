@@ -155,7 +155,7 @@ export interface AgentWorkSurface {
  * The sellable surface for a DATA PACKAGE (plan doc-mvwxcas3dom3, D5.1): one owner's package sold as a
  * metered feed. The coordinate is `datapkg:{owner}/{name}` + `read`, and a metered call is one data
  * read (an OData entity set, a row window, the CSV of a resource). `ifaceVersion` pins the package's
- * Table Schemas at accept time (services/exchange-datapackage.ts): the contract reads the versions whose
+ * Table Schemas at accept time (services/exchange/datapackage.ts): the contract reads the versions whose
  * schemas are that interface, so a schema change leaves the contract on the versions it was signed for.
  */
 export interface DatapackageSurface {
@@ -453,7 +453,7 @@ export async function createEntitlement(
   // something by watching their balance.
   const contractLabel = value.capabilityLabel || `${value.ext}/${value.action}`;
   for (const side of new Set([ownerGhiiOf(value.consumerGaii), value.providerGhii])) {
-    // An outside party (a buyer with no account, services/exchange-party-buy.ts) has no account events.
+    // An outside party (a buyer with no account, services/exchange/party-buy.ts) has no account events.
     if (side.startsWith('party:')) continue;
     void recordAccountEvent(storage, {
       ownerGhii: side, kind: 'contract_started', actorGaii: value.createdBy,

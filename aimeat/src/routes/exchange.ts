@@ -81,11 +81,11 @@ import { mergeOwnerEntitlements, listAllEntitlementsForMerge } from '../services
 import { listPayables } from '../commerce/payable-book.js';
 import {
   resolveExtActionPricing, resolveOfferingPricing, getOffering, budgetFloorText, presentContractTerms,
-} from '../services/exchange-market.js';
+} from '../services/exchange/market.js';
 import {
   type ContractProposal, newProposalId, putProposal, getProposal, listProposalsForOwner,
   supersedeWithProposal, ownerOfGaii, CONTRACT_ENDED_TEXT,
-} from '../services/exchange-proposals.js';
+} from '../services/exchange/proposals.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
 import { logger } from '../utils/logger.js';

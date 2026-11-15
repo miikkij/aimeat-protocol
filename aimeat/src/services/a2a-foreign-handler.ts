@@ -74,7 +74,7 @@ import type { ForeignPeer } from './a2a-foreign.js';
 import {
   newWorkId, putWork, getWork, isOpenForPayment, claimWorkForPayment, settleWorkPayment, releaseWorkPayment,
   cancelOpenWork, type AgentWork,
-} from './exchange-work.js';
+} from './exchange/work.js';
 import { refundCollected, refundSentence, recordUndeliveredPayment } from '../commerce/undelivered-payment.js';
 import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
 import { getPaymentHandler } from '../commerce/payment-handlers.js';

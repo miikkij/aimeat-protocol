@@ -1,5 +1,5 @@
 /**
- * @file src/services/exchange-work.ts
+ * @file src/services/exchange/work.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description AGENT WORK records for EXCHANGE (TARGET-045 Gap 2) — the async third sellable surface
@@ -35,11 +35,11 @@
  *   v1.0.0 — 2026-07-21 — Initial agent-work records (start → deliver → settle on delivery); metered per task.
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { EntitlementUnit } from './metered-entitlements.js';
-import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock } from './ai/provenance-marks.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { EntitlementUnit } from '../metered-entitlements.js';
+import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock } from '../ai/provenance-marks.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 const NS = 'exchange-work';
 const keyOf = (id: string): string => `xwork.${id}`;

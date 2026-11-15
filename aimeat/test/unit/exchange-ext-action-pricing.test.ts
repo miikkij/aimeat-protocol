@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-10-12 — Initial (the 4.0.0 sweep).
  */
 import { describe, it, expect } from 'vitest';
-import { resolveOfferingPricing, extActionDeclaredToll, type Offering } from '../../src/services/exchange-market.js';
+import { resolveOfferingPricing, extActionDeclaredToll, type Offering } from '../../src/services/exchange/market.js';
 import type { Storage } from '../../src/storage/interface.js';
 
 function storageWith(action: Record<string, unknown>): Storage {

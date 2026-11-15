@@ -45,7 +45,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { carryLabelToCopy, CopyLabelError } from '../../services/classification-exits.js';
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
-import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
+import { odpsWriteRefusal } from '../../services/exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
 import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';

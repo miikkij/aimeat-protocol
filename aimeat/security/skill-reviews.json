@@ -451,7 +451,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:75d51283b0ed4903ea16facf",
+      "digest": "sha256:ed458f50d32d57209facd731",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -591,12 +591,12 @@
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-11-15",
       "watches": [
-        "aimeat/src/services/exchange-odps.ts",
+        "aimeat/src/services/exchange/odps.ts",
         "aimeat/src/static/sdk-libs/exchange/odps-completeness.js",
         "docs/known_gaps.md",
         ".claude/agents/note-writer.md"
       ],
-      "digest": "sha256:5c6e4e0ccf316c4c7f920643",
+      "digest": "sha256:c619b2e588b1614882ad3d32",
       "note": "Most of it is about records on the node and Lifecycle Central; the code it makes claims about is the ODPS descriptor and its completeness list (which fields a validator reports missing), the known-gaps rule, and the decision_record call it shares with agent note-writer. Its frontmatter also carries a review-by date."
     },
     "project:aimeat-pages-links": {
@@ -862,7 +862,7 @@
       "aimeat/src/services/builder/extension-prompt.ts": "91ab68a199b0d408"
     },
     "project:aimeat-organism-records": {
-      "aimeat/src/services/exchange-odps.ts": "40876b1432ca4b0a",
+      "aimeat/src/services/exchange/odps.ts": "29f3def5e2722db1",
       "aimeat/src/static/sdk-libs/exchange/odps-completeness.js": "3ece888a8069ba12",
       "docs/known_gaps.md": "9b4977634dac65c3",
       ".claude/agents/note-writer.md": "14642ac19048c31a"
@@ -938,7 +938,7 @@
       "aimeat/src/services/extension/schedules.ts": "ae3a0c93f2e7baf7"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "44fbce82e02c4256",
+      "aimeat/src/routes/memory/bulk.ts": "946f71b4c15023d8",
       "aimeat/src/routes/memory/key.ts": "cc53be9d60454990",
       "aimeat/src/services/memory/bin.ts": "5974db996ff348d5",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",

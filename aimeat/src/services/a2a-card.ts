@@ -31,7 +31,7 @@
  */
 import type { AgentCard } from '@a2a-js/sdk';
 import { A2A_PROTOCOL_VERSION } from '@a2a-js/sdk';
-import type { Offering } from './exchange-market.js';
+import type { Offering } from './exchange/market.js';
 import { A2A_X402_EXTENSION } from './a2a-offering.js';
 import { FOREIGN_HEADERS } from './a2a-foreign.js';
 

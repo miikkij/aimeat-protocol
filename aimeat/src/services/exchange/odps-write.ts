@@ -1,5 +1,5 @@
 /**
- * @file src/services/exchange-odps-write.ts
+ * @file src/services/exchange/odps-write.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The ODPS length rule at the WRITE. Decided by the developer on 2026-09-13: a write that would
@@ -11,7 +11,7 @@
  *   Refused ONLY when the text changed. Each entry of the source (a tool by name, an offer by id, an
  *   extension action by id) is compared with the same entry in the stored record, by the ODPS text it
  *   generates: text the stored record already produced keeps publishing with the listing's
- *   ODPS_FIELD_TOO_LONG warning (services/exchange-projection.ts), so republishing an unchanged source
+ *   ODPS_FIELD_TOO_LONG warning (services/exchange/projection.ts), so republishing an unchanged source
  *   does not start failing. A new record, a new entry, or text that differs by one character is checked.
  *   Comparing the generated text rather than one authoring field is what makes a usage flag count: turning
  *   `derivatives` off adds a node sentence to the same 255-character field, and that can push an unchanged
@@ -29,12 +29,12 @@
  * @version-history
  *   v1.0.0 — 2026-09-13 — Initial: the refusal the developer chose over the listing-only warning.
  */
-import type { Offering, UsageTerms } from './exchange-market.js';
-import type { OdpsExtras } from '../models/odps-schemas.js';
-import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
-import { OffersDocSchema } from '../models/offer-schemas.js';
-import { ODPS_VERSION, offeringToOdps, odpsCappedTexts, charLength, mergeOdpsExtras, type OdpsTextLimit } from './exchange-odps.js';
-import { usageTermsOf } from './exchange-source-terms.js';
+import type { Offering, UsageTerms } from './market.js';
+import type { OdpsExtras } from '../../models/odps-schemas.js';
+import { AppToolsDocSchema } from '../../models/app-tool-schemas.js';
+import { OffersDocSchema } from '../../models/offer-schemas.js';
+import { ODPS_VERSION, offeringToOdps, odpsCappedTexts, charLength, mergeOdpsExtras, type OdpsTextLimit } from './odps.js';
+import { usageTermsOf } from './source-terms.js';
 
 export const ODPS_FIELD_TOO_LONG = 'ODPS_FIELD_TOO_LONG' as const;
 

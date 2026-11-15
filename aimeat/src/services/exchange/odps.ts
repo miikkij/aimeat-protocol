@@ -1,5 +1,5 @@
 /**
- * @file src/services/exchange-odps.ts
+ * @file src/services/exchange/odps.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Projects an EXCHANGE offering into an **Open Data Product Specification v4.1** document
@@ -56,11 +56,11 @@
  *     decision from the spec, implemented as a mapping over the native offering record.
  */
 import { stringify as yamlStringify } from 'yaml';
-import { formatMoneyMajor } from '../commerce/money.js';
-import type { Offering, OfferingStats } from './exchange-market.js';
-import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension, Provenance } from '../models/odps-schemas.js';
-import { AiProvenanceSchema } from '../models/ai-provenance-schemas.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
+import { formatMoneyMajor } from '../../commerce/money.js';
+import type { Offering, OfferingStats } from './market.js';
+import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension, Provenance } from '../../models/odps-schemas.js';
+import { AiProvenanceSchema } from '../../models/ai-provenance-schemas.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config/pacing.js';
 
 /** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x, v4.1 current). */
 export const ODPS_VERSION = '4.1';
@@ -579,7 +579,7 @@ export interface OdpsTextLimit {
   /**
    * The authoring fields a provider writes into it, as paths into one listing source's own terms
    * (`usageTerms.*`, `odps.*`). Empty when only the node writes the field. The write check
-   * (services/exchange-odps-write.ts) names these when it refuses.
+   * (services/exchange/odps-write.ts) names these when it refuses.
    */
   fields: readonly string[];
 }
@@ -659,7 +659,7 @@ export function odpsCappedTexts(doc: OdpsDocument): Array<{ limit: OdpsTextLimit
  * The fields of a generated ODPS document that are longer than the schema allows. On a listing this is
  * a WARNING, and the node never shortens the text, because a truncated legal restriction states
  * something the provider never wrote. The developer decided on 2026-09-13 that the WRITE which changes
- * such text is refused instead (services/exchange-odps-write.ts), so a listing reaches this with text
+ * such text is refused instead (services/exchange/odps-write.ts), so a listing reaches this with text
  * its stored source already carried, and the provider is told here.
  */
 export function odpsLengthOverruns(doc: OdpsDocument): OdpsLengthOverrun[] {

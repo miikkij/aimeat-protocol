@@ -54,7 +54,7 @@ const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 // Node 4.0.0 drops the deprecated mirrors of a morsel-rail offering or contract (`unit`, `basePrice`,
-// `price_per_call`, `currency`) and keeps `toll_morsels` as the only figure (services/exchange-market.ts
+// `price_per_call`, `currency`) and keeps `toll_morsels` as the only figure (services/exchange/market.ts
 // presentOffering, presentContractTerms). A 3.x node still answers with the mirrors, marked deprecated.
 const MIRRORS_GONE = await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
 /**

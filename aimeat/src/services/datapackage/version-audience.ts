@@ -100,7 +100,7 @@ export async function writeLatest(
     // (./personal-guard.ts): the one this publish carried, else the one the service recorded
     // (./audience-record.ts), never the earlier pointer's word. Every other field of the earlier
     // pointer is the old version's. The EXCHANGE sale terms stay with the package too
-    // (services/exchange-datapackage.ts, D5.1): the pointer carries a copy of the service's record of
+    // (services/exchange/datapackage.ts, D5.1): the pointer carries a copy of the service's record of
     // them (./sale-terms-record.ts), not the earlier pointer's word.
     const before = await readPointer(deps, ownerGhii, name);
     const confirmed = opts.personalPublicConfirmed
@@ -137,7 +137,7 @@ const latestHooks: LatestHook[] = [];
 
 /**
  * Run `hook` after every new pointer writeLatest writes. The EXCHANGE projection registers here
- * (services/exchange-projection.ts), so a package on sale has its listing follow each new version
+ * (services/exchange/projection.ts), so a package on sale has its listing follow each new version
  * without this file importing the projection.
  */
 export function onLatestWritten(hook: LatestHook): void {

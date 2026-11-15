@@ -24,7 +24,7 @@
  *                           and the consumer took the agreement (./negotiation.ts calls bookAgreementSale).
  *
  *   The share is granted in the owner's name: the owner's published policy (autoAgree) or the owner's
- *   approval is the consent, as listing a package for sale is in services/exchange-party-buy.ts.
+ *   approval is the consent, as listing a package for sale is in services/exchange/party-buy.ts.
  *   ENDING an agreement (a termination, the owner's decline after it was finalised) revokes the share
  *   and deletes every transfer key of the share, so the next read is refused. The contract is one slot
  *   per participant and package, which later agreements stack onto: ending one agreement takes back
@@ -54,11 +54,11 @@ import { endShares, isLiveShare, setShareMeta, shareMetaOf, sharePatternOf } fro
 import { partyRefOf } from '../parties/contract.js';
 import { changeParty } from '../parties/store.js';
 import { UNCHANGED } from '../record-cas.js';
-import { getOffering } from '../exchange-market.js';
+import { getOffering } from '../exchange/market.js';
 import {
     createEntitlement, persistEntitlement, readContractForCall, revokeEntitlement, type PricingSpec,
 } from '../metered-entitlements.js';
-import { PER_MONTH_SECONDS } from '../exchange-datapackage.js';
+import { PER_MONTH_SECONDS } from '../exchange/datapackage.js';
 import { getPaymentHandler } from '../../commerce/payment-handlers.js';
 import { INVOICE_HANDLER_ID } from '../../commerce/invoice-handler.js';
 import { bookSessionlessSale } from '../../commerce/session-service.js';

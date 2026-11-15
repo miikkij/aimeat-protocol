@@ -1,12 +1,12 @@
 /**
- * @file src/services/exchange-source-terms.ts
+ * @file src/services/exchange/source-terms.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How a listing SOURCE's own declarations read as listing fields: the usage terms with
  *   their defaults, the provenance stamped with its ODPS version, every money price, the price rows a
  *   source sells in with the pacing it carries, and the content hash a reconcile compares.
- *   Moved out of services/exchange-projection.ts unchanged, so the projection stays under the file limit
- *   and the ODPS write check (services/exchange-odps-write.ts) reads usage terms with the same defaults
+ *   Moved out of services/exchange/projection.ts unchanged, so the projection stays under the file limit
+ *   and the ODPS write check (services/exchange/odps-write.ts) reads usage terms with the same defaults
  *   the listing gets, rather than with a copy of them.
  * @structure hasSchema · usageTermsOf · provenanceOf · moneyPricesOf · contentHash · listingTerms · ListingRow
  * @usage
@@ -22,10 +22,10 @@
  *   v1.0.0 — 2026-09-13 — Extracted verbatim from services/exchange-projection.ts (pure move).
  */
 import { createHash } from 'node:crypto';
-import type { UsageTerms } from './exchange-market.js';
-import type { EntitlementUnit } from './metered-entitlements.js';
-import type { Provenance } from '../models/odps-schemas.js';
-import { ODPS_VERSION } from './exchange-odps.js';
+import type { UsageTerms } from './market.js';
+import type { EntitlementUnit } from '../metered-entitlements.js';
+import type { Provenance } from '../../models/odps-schemas.js';
+import { ODPS_VERSION } from './odps.js';
 
 export const hasSchema = (v: unknown): boolean => !!v && typeof v === 'object' && Object.keys(v as Record<string, unknown>).length > 0;
 
@@ -47,7 +47,7 @@ export function provenanceOf(src: Provenance | undefined): Provenance | null {
 
 /** Every money price a source declares, `priceMoney` first. Lives in commerce/money.ts, so the
  *  checkout and the tool catalog read money prices with the same function this listing does. */
-export { moneyPricesOf } from '../commerce/money.js';
+export { moneyPricesOf } from '../../commerce/money.js';
 
 export function contentHash(parts: unknown): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 24);

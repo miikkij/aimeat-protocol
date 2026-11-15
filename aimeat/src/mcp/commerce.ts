@@ -124,7 +124,7 @@ import { listOpenPayoutHoldsOnNode, markPayoutHoldArrived, possiblePayoutView } 
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { issueJWT } from '../auth/jwt.js';
 import { writeMemoryRecord } from '../services/memory/write.js';
-import { exchangeOutcome, type ReconcileReport } from '../services/exchange-projection.js';
+import { exchangeOutcome, type ReconcileReport } from '../services/exchange/projection.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import { appToolManifestIds } from '../services/app-tools/manifest-read.js';

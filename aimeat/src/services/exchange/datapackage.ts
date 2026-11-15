@@ -1,5 +1,5 @@
 /**
- * @file src/services/exchange-datapackage.ts
+ * @file src/services/exchange/datapackage.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A data package sold on EXCHANGE (plan doc-mvwxcas3dom3, D5.1, D5.2, D5.5): the fourth
@@ -9,7 +9,7 @@
  *     carries the sale terms (contract.ts DatapackageExchangeTerms): the switch, the money prices, the
  *     model (`per_month` or `per_read`), the pacing, the usage terms (required) and the ODPS fields.
  *     setPackageExchange writes them, after the same refusals the REST route and the MCP tool ask, and
- *     the EXCHANGE projection lists the package from them (services/exchange-projection-datapackage.ts),
+ *     the EXCHANGE projection lists the package from them (services/exchange/projection-datapackage.ts),
  *     on the version the service recorded. The record is per package, so a new version stays on sale.
  *     The pointer `latest.json` gets a copy of the terms, which no decision reads: the generic storage
  *     routes write that file, and an app with storage:write must not set the price a buyer pays.
@@ -45,22 +45,22 @@
  *     incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.1, D5.2, D5.5).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import type { CallerContext } from './caller-context.js';
-import { OdpsExtrasSchema, ProvenanceSchema } from '../models/odps-schemas.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { CallerContext } from '../caller-context.js';
+import { OdpsExtrasSchema, ProvenanceSchema } from '../../models/odps-schemas.js';
 import {
     descriptorKey, validateName, bare,
     type DatapackageExchangeTerms, type Descriptor, type LatestPointer,
-} from './datapackage/contract.js';
-import { trustedPackageOf, type TrustedAudience } from './datapackage/audience-record.js';
-import { saleTermsOf, writeSaleTerms } from './datapackage/sale-terms-record.js';
-import { currentNodeId } from '../utils/gaii.js';
-import { hashDef, getInterfaceVersion, type InterfaceDef } from './app/tool-interfaces.js';
-import { resolveActionPricing, type OfferingPlan } from './exchange-action-pricing.js';
-import type { EntitlementUnit, PricingSpec, DatapackageSurface } from './metered-entitlements.js';
-import { dataListingRefusal } from './data-intermediation/gate.js';
-import { logger } from '../utils/logger.js';
+} from '../datapackage/contract.js';
+import { trustedPackageOf, type TrustedAudience } from '../datapackage/audience-record.js';
+import { saleTermsOf, writeSaleTerms } from '../datapackage/sale-terms-record.js';
+import { currentNodeId } from '../../utils/gaii.js';
+import { hashDef, getInterfaceVersion, type InterfaceDef } from '../app/tool-interfaces.js';
+import { resolveActionPricing, type OfferingPlan } from './action-pricing.js';
+import type { EntitlementUnit, PricingSpec, DatapackageSurface } from '../metered-entitlements.js';
+import { dataListingRefusal } from '../data-intermediation/gate.js';
+import { logger } from '../../utils/logger.js';
 
 /** The action of every data package coordinate: one read. */
 export const DATAPACKAGE_ACTION = 'read';

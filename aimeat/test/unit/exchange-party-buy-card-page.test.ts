@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An outside buyer's purchase paid on the provider's Stripe card page
- *   (services/exchange-party-buy.ts) and completed late, by the seller's Stripe webhook
+ *   (services/exchange/party-buy.ts) and completed late, by the seller's Stripe webhook
  *   (commerce/stripe-checkout-complete.ts), or not at all; and the sale a failed delivery books.
  *   Driven in process on an in-memory SQLite store with the real card page handler; Stripe is answered
  *   by a stand-in for safeFetch, which also keeps every refund asked of it. A share for a new party is
@@ -64,12 +64,12 @@ import type { PaymentHandler } from '../../src/commerce/types.js';
 import { stripeCheckoutHandler } from '../../src/commerce/stripe-checkout.js';
 import { completeFromStripeCheckout } from '../../src/commerce/stripe-checkout-complete.js';
 import { microsToStripeMinor } from '../../src/commerce/money.js';
-import { putOffering, type Offering } from '../../src/services/exchange-market.js';
+import { putOffering, type Offering } from '../../src/services/exchange/market.js';
 import { createEntitlement, readContractForCall } from '../../src/services/metered-entitlements.js';
 import { insertParty, findParty } from '../../src/services/parties/store.js';
 import { partyRefOf, type PartyRecord } from '../../src/services/parties/contract.js';
 import { partyKeyMatches } from '../../src/services/parties/keys.js';
-import { completePartyPurchase, readPartyPurchase, PURCHASE_TTL_MS } from '../../src/services/exchange-party-buy.js';
+import { completePartyPurchase, readPartyPurchase, PURCHASE_TTL_MS } from '../../src/services/exchange/party-buy.js';
 
 const NODE = 'unit-partycard-001';
 const OWNER = 'seller';

@@ -399,7 +399,7 @@ async function decideMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome>
   if (!budgetAllows(ent, decision.chargeUnits)) return { kind: 'refused_budget', entitlement: ent };
 
   // 3b. An outside party (services/parties/) has no account to charge and no morsel balance: it paid
-  //     its contract in advance at the purchase (services/exchange-party-buy.ts). A call inside what it
+  //     its contract in advance at the purchase (services/exchange/party-buy.ts). A call inside what it
   //     paid is settled at 0 with no pacing (the party's own rate limit paces it); a call that would
   //     charge again (a new month, a new block) is refused and the party buys again (plan D5.4).
   if (isPartyRef(caller)) {

@@ -32,7 +32,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
 import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
 import { listSkillsByBinding } from '../skills.js';
-import { filterOfferings } from '../exchange-market.js';
+import { filterOfferings } from '../exchange/market.js';
 import { parseAppScopes } from '../protected-resource.js';
 
 /** The metered EXCHANGE coordinate an app's tools are sold under. */

@@ -64,17 +64,17 @@ import {
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings, filterOfferings,
   putNeed, getNeed, parseNeedSpec, listNeeds, putBid, listBids, getBid, acceptBid,
   offeringStats, offeringConsumers, enrichNeeds, presentOffering, offeringTollMorsels,
-} from '../services/exchange-market.js';
-import { listingTerms } from '../services/exchange-source-terms.js';
+} from '../services/exchange/market.js';
+import { listingTerms } from '../services/exchange/source-terms.js';
 import { TOLL_MORSELS_MAX } from '../models/offer-schemas.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import { ProvenanceSchema, OdpsExtrasSchema, type Provenance, type OdpsExtras } from '../models/odps-schemas.js';
-import { offeringToOdps, odpsToYaml, ODPS_VERSION } from '../services/exchange-odps.js';
+import { offeringToOdps, odpsToYaml, ODPS_VERSION } from '../services/exchange/odps.js';
 import { AppToolsDocSchema, appToolsKey, toolMoneyPrices } from '../models/app-tool-schemas.js';
 import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app/tool-interfaces.js';
-import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled } from '../services/exchange-projection.js';
-import { migrateLegacyOfferings } from '../services/exchange-projection-migrate.js';
-import { proposeDeliversData, packageIfaceApp, DATAPACKAGE_ACTION } from '../services/exchange-datapackage.js';
+import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled } from '../services/exchange/projection.js';
+import { migrateLegacyOfferings } from '../services/exchange/projection-migrate.js';
+import { proposeDeliversData, packageIfaceApp, DATAPACKAGE_ACTION } from '../services/exchange/datapackage.js';
 import { logger } from '../utils/logger.js';
 import { findExtension, addressSegment } from '../services/component-address.js';
 import { dataListingRefusal } from '../services/data-intermediation/gate.js';

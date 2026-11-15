@@ -21,9 +21,9 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
-import type { Offering } from '../../src/services/exchange-market.js';
-import { offeringToOdps, odpsLengthOverruns, ODPS_TEXT_LIMITS } from '../../src/services/exchange-odps.js';
-import { reconcileOwnerOfferings } from '../../src/services/exchange-projection.js';
+import type { Offering } from '../../src/services/exchange/market.js';
+import { offeringToOdps, odpsLengthOverruns, ODPS_TEXT_LIMITS } from '../../src/services/exchange/odps.js';
+import { reconcileOwnerOfferings } from '../../src/services/exchange/projection.js';
 
 const schema = JSON.parse(readFileSync(new URL('../fixtures/odps-v4.1.schema.json', import.meta.url), 'utf8'));
 

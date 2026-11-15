@@ -95,15 +95,15 @@ import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { readEntitlementForCall } from '../services/metered-entitlements.js';
-import { getOffering } from '../services/exchange-market.js';
+import { getOffering } from '../services/exchange/market.js';
 import {
     type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
     claimWorkForDelivery, releaseWorkClaim,
-} from '../services/exchange-work.js';
+} from '../services/exchange/work.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
 import {
     getProposal, listProposalsForOwner, supersedeWithProposal, putProposal, CONTRACT_ENDED_TEXT,
-} from '../services/exchange-proposals.js';
+} from '../services/exchange/proposals.js';
 import { authoriseMeteredCall, type ProductRefusal } from '../services/metered-access.js';
 import type { MeteredEntitlement } from '../services/metered-entitlements.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
@@ -159,7 +159,7 @@ export function registerExchangeRunTools(
         } catch (err) { logger.warn('notify: notification failure must never fail the action', { error: String(err) }); }
     }
 
-    // The one wire shape of a work item (services/exchange-work.ts), shared with the REST routes. It
+    // The one wire shape of a work item (services/exchange/work.ts), shared with the REST routes. It
     // embeds the delivery's record, which is private, so the buyer can read it.
     const view = (w: AgentWork) => workView(storage, config, w);
 

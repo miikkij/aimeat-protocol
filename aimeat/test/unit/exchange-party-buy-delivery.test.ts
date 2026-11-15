@@ -2,7 +2,7 @@
  * @file test/unit/exchange-party-buy-delivery.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description An outside buyer's purchase (services/exchange-party-buy.ts) when the delivery fails
+ * @description An outside buyer's purchase (services/exchange/party-buy.ts) when the delivery fails
  *   after the payment was collected, and the month's purchase cap against openings nobody paid for.
  *   Driven in process on an in-memory SQLite store with a spy payment rail registered as `test.money`,
  *   so the refund call's arguments and the contract left behind are observed directly.
@@ -28,12 +28,12 @@ import { registerPaymentHandler } from '../../src/commerce/payment-handlers.js';
 import type { PaymentHandler, RefundOutcome } from '../../src/commerce/types.js';
 import { writePsp } from '../../src/commerce/psp-record.js';
 import { UNDELIVERED_PREFIX } from '../../src/commerce/undelivered-payment.js';
-import { putOffering, type Offering } from '../../src/services/exchange-market.js';
+import { putOffering, type Offering } from '../../src/services/exchange/market.js';
 import { createEntitlement, readContractForCall } from '../../src/services/metered-entitlements.js';
 import { insertParty, findParty } from '../../src/services/parties/store.js';
 import { partyRefOf, type PartyRecord } from '../../src/services/parties/contract.js';
 import type { PartyContext } from '../../src/services/parties/verify.js';
-import { openPartyPurchase, completePartyPurchase, readPartyPurchase, PURCHASE_TTL_MS } from '../../src/services/exchange-party-buy.js';
+import { openPartyPurchase, completePartyPurchase, readPartyPurchase, PURCHASE_TTL_MS } from '../../src/services/exchange/party-buy.js';
 
 const NODE = 'unit-partybuy-001';
 const OWNER = 'seller';

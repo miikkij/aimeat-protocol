@@ -37,8 +37,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { appToolsKey, appIdFromToolsKey } from '../../models/app-tool-schemas.js';
 import { parseGAII } from '../../utils/gaii.js';
-import { listAllOfferings } from '../exchange-market.js';
-import { reconcileAfterSourceWrite } from '../exchange-projection.js';
+import { listAllOfferings } from '../exchange/market.js';
+import { reconcileAfterSourceWrite } from '../exchange/projection.js';
 import { logger } from '../../utils/logger.js';
 import { claimOnceOnlyStep } from '../once-only-step.js';
 

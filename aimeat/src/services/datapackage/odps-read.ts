@@ -9,7 +9,7 @@
  *   included. An audience also changes after the write (an approved publish request, a re-publish of
  *   the same bytes under another audience), and a stored sheet cannot follow it. So the sheet is now
  *   projected from the descriptor and the version's audience on every read, the way
- *   services/exchange-odps.ts projects an offering's sheet, and nothing is stored for a new version.
+ *   services/exchange/odps.ts projects an offering's sheet, and nothing is stored for a new version.
  *
  *   The reader is admitted by openPackage (./store.ts), the same audience decision every other read
  *   path asks, so a reader who may not open the package gets null. A withdrawn package answers null too.
@@ -38,8 +38,8 @@ import { descriptorToOdps, odpsToYamlDocument } from './odps.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { dataHolderFor } from './data-holder.js';
 import { packageFreshness } from './freshness-read.js';
-import { listOfferings } from '../exchange-market.js';
-import { pricingPlans } from '../exchange-odps.js';
+import { listOfferings } from '../exchange/market.js';
+import { pricingPlans } from '../exchange/odps.js';
 
 /**
  * The audience of one stored version: the pointer's when the pointer names it, else the audience

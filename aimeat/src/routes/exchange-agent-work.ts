@@ -37,12 +37,12 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { readEntitlementForCall } from '../services/metered-entitlements.js';
-import { getOffering } from '../services/exchange-market.js';
+import { getOffering } from '../services/exchange/market.js';
 import { settleMeteredCoordinate } from '../services/extension-access/entitlement-gate.js';
 import {
   type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
   claimWorkForDelivery, releaseWorkClaim,
-} from '../services/exchange-work.js';
+} from '../services/exchange/work.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import { provenanceForWrite, provenanceDeclarationRefusal } from '../services/ai/provenance.js';

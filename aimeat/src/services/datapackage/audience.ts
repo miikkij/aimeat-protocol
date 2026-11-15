@@ -96,7 +96,7 @@ export interface ContractReaderFacts {
   ownerGhii: string;
   packageName: string;
   entitlementId: string;
-  /** The pinned version range (services/exchange-datapackage.ts contractVersionHashes), `sha256:<hex>`. */
+  /** The pinned version range (services/exchange/datapackage.ts contractVersionHashes), `sha256:<hex>`. */
   versions: string[];
 }
 

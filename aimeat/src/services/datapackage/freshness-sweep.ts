@@ -54,7 +54,7 @@ const sweptHooks: SweptHook[] = [];
 
 /**
  * Run `hook` after every check with the packages it read. The EXCHANGE projection registers here
- * (services/exchange-projection.ts), so a listing follows its package's freshness without this file
+ * (services/exchange/projection.ts), so a listing follows its package's freshness without this file
  * importing the projection. A hook's failure is logged and the check goes on.
  */
 export function onFreshnessSwept(hook: SweptHook): void {

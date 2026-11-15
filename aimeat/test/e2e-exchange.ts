@@ -97,7 +97,7 @@ async function balance(token: string): Promise<number> {
 console.log('\n=== AIMEAT EXCHANGE E2E (TARGET-045 — G1 entitlement + G2 gateway + G3 cost) ===\n');
 
 // Node 4.0.0 drops the deprecated mirrors of a morsel-rail offering or contract (`unit`, `basePrice`,
-// `price_per_call`, `currency`) and keeps `toll_morsels` as the only figure (services/exchange-market.ts
+// `price_per_call`, `currency`) and keeps `toll_morsels` as the only figure (services/exchange/market.ts
 // presentOffering, presentContractTerms). A 3.x node still answers with the mirrors, marked deprecated.
 const MIRRORS_GONE = await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
 /**
@@ -1122,7 +1122,7 @@ await test('Offering DETAIL points at the ODPS projection (discoverable without 
 // `license.scope.restrictions` is capped at 255 and holds the node's own usage sentences before the
 // provider's note, so a note that fits the authoring schema (10 000) produced a document an outside
 // validator refused, and the node said nothing. A flagged source whose changed text would do that is
-// now refused with 422 ODPS_FIELD_TOO_LONG (services/exchange-odps-write.ts); text the stored record
+// now refused with 422 ODPS_FIELD_TOO_LONG (services/exchange/odps-write.ts); text the stored record
 // already carries keeps publishing with the warning. Last in the file: the projected tool binds the
 // `free` capability, and a sold capability is paywalled on its raw route for everyone after this.
 await test('A usage note past the ODPS restrictions cap is refused on write, and an already-stored one lists whole with a warning', async () => {

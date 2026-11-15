@@ -1,5 +1,5 @@
 /**
- * @file src/services/exchange-party-buy.ts
+ * @file src/services/exchange/party-buy.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An OUTSIDE BUYER of a data package (plan doc-mvwxcas3dom3, D5.4): a person or a program
@@ -80,35 +80,35 @@
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.4).
  */
 import { randomBytes } from 'node:crypto';
-import type { Storage, ConsentRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import type { CheckoutSessionRecord } from '../commerce/types.js';
-import { getOffering, type Offering } from './exchange-market.js';
+import type { Storage, ConsentRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { CheckoutSessionRecord } from '../../commerce/types.js';
+import { getOffering, type Offering } from './market.js';
 import {
     createEntitlement, readContractForCall, persistEntitlement, revokeEntitlement,
     type MeteredEntitlement, type PricingSpec, type DatapackageSurface,
-} from './metered-entitlements.js';
-import { PER_MONTH_SECONDS } from './exchange-datapackage.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { getPaymentHandler, PaymentError } from '../commerce/payment-handlers.js';
-import { sellerKey } from '../commerce/stripe-handler.js';
-import { percentFee } from '../commerce/money.js';
-import { commerceFeePercent } from './marketplace-fee.js';
-import { settleSessionlessSale } from '../commerce/session-service.js';
-import { openStripeCheckout, STRIPE_CHECKOUT_HANDLER_ID } from '../commerce/stripe-checkout.js';
-import { TEST_MONEY_HANDLER_ID } from '../commerce/test-money-handler.js';
-import { readPsp } from '../commerce/psp-record.js';
-import { refundCollected, refundSentence, recordUndeliveredPayment } from '../commerce/undelivered-payment.js';
-import { isValidEmail } from '../utils/email-validator.js';
-import { grantConsent } from './consent-write.js';
-import { PARTY_NAME_RE, partyRefOf, partyView, type PartyKind, type PartyRecord } from './parties/contract.js';
-import { newPartyKey, newPartyKeyId, newPartyUid } from './parties/keys.js';
-import { insertParty, findPartyByUid, removeParty, changeParty } from './parties/store.js';
-import { connectionFileOf, isLiveShare, partySharesOf, setShareMeta, sharePatternOf, shareMetaOf, shareView } from './parties/shares.js';
-import type { PartyContext } from './parties/verify.js';
-import { emitChange } from './event-bus.js';
-import { deactivatedSince } from './account-deactivated.js';
-import { logger } from '../utils/logger.js';
+} from '../metered-entitlements.js';
+import { PER_MONTH_SECONDS } from './datapackage.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { getPaymentHandler, PaymentError } from '../../commerce/payment-handlers.js';
+import { sellerKey } from '../../commerce/stripe-handler.js';
+import { percentFee } from '../../commerce/money.js';
+import { commerceFeePercent } from '../marketplace-fee.js';
+import { settleSessionlessSale } from '../../commerce/session-service.js';
+import { openStripeCheckout, STRIPE_CHECKOUT_HANDLER_ID } from '../../commerce/stripe-checkout.js';
+import { TEST_MONEY_HANDLER_ID } from '../../commerce/test-money-handler.js';
+import { readPsp } from '../../commerce/psp-record.js';
+import { refundCollected, refundSentence, recordUndeliveredPayment } from '../../commerce/undelivered-payment.js';
+import { isValidEmail } from '../../utils/email-validator.js';
+import { grantConsent } from '../consent-write.js';
+import { PARTY_NAME_RE, partyRefOf, partyView, type PartyKind, type PartyRecord } from '../parties/contract.js';
+import { newPartyKey, newPartyKeyId, newPartyUid } from '../parties/keys.js';
+import { insertParty, findPartyByUid, removeParty, changeParty } from '../parties/store.js';
+import { connectionFileOf, isLiveShare, partySharesOf, setShareMeta, sharePatternOf, shareMetaOf, shareView } from '../parties/shares.js';
+import type { PartyContext } from '../parties/verify.js';
+import { emitChange } from '../event-bus.js';
+import { deactivatedSince } from '../account-deactivated.js';
+import { logger } from '../../utils/logger.js';
 
 /** How long an open purchase waits for its payment. */
 export const PURCHASE_TTL_MS = 60 * 60 * 1000;

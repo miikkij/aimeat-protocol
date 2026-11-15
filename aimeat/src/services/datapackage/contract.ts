@@ -333,7 +333,7 @@ export interface LatestPointer {
      *  personal (./personal-guard.ts): when, and the principal whose request carried it. Kept on every
      *  later pointer, so the producer's next public versions are not asked again. */
     personalPublicConfirmed?: { at: string; by: string };
-    /** The package's EXCHANGE sale terms (services/exchange-datapackage.ts), the source its listing is
+    /** The package's EXCHANGE sale terms (services/exchange/datapackage.ts), the source its listing is
      *  projected from. Kept on every later pointer, as the confirmation above is. */
     exchange?: DatapackageExchangeTerms;
 }

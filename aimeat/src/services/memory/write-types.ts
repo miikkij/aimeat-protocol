@@ -15,7 +15,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { provenanceForWrite } from '../ai/provenance.js';
-import type { reconcileAfterSourceWrite } from '../exchange-projection.js';
+import type { reconcileAfterSourceWrite } from '../exchange/projection.js';
 import type { publishRequestedBody } from '../publish-requests/ask.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
@@ -106,7 +106,7 @@ export interface MemoryWriteInput {
 /**
  * What the EXCHANGE projection reports about a write to one of its listing sources (an app-tool
  * manifest, an agent's offers document): what listed and what was skipped, and why. Its shape
- * belongs to services/exchange-projection.ts; this file only carries it out of the write, so the
+ * belongs to services/exchange/projection.ts; this file only carries it out of the write, so the
  * type follows whatever that function returns and is `never` while it returns nothing.
  */
 export type ExchangeReconcileReport =

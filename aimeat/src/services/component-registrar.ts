@@ -102,7 +102,7 @@ import { installPackageAppTools } from './packages/install/package-app-tools.js'
 import { forgetDependencies, appRef } from './dependency-map.js';
 import { removeCortex } from './cortex-lifecycle.js';
 import { holdAppLabels } from './held-app-labels.js';
-import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
+import { odpsWriteRefusal, extensionOdpsKey } from './exchange/odps-write.js';
 import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './packages/install/package-memory-component.js';
 import { writeAppConfigValues, type AppConfigValues } from './app/config.js';
 import { mergeExtensionConfig } from './packages/compose/package-config.js';

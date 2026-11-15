@@ -1,23 +1,23 @@
 /**
- * @file src/services/exchange-projection-migrate.ts
+ * @file src/services/exchange/projection-migrate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description TARGET-050 slice 3: bring hand-authored EXCHANGE listings into the projection model by
  *   flipping the `exchange` flag on in their source and letting the reconcile adopt them. Moved out of
- *   services/exchange-projection.ts unchanged when the fourth source (data packages, plan
+ *   services/exchange/projection.ts unchanged when the fourth source (data packages, plan
  *   doc-mvwxcas3dom3, D5.1) took that file toward the line limit.
  * @structure migrateLegacyOfferings
  * @usage const report = await migrateLegacyOfferings(storage, ownerGhii, { dryRun: true });
  * @version-history
  *   v1.0.0 — 2026-11-01 — Pure extraction from services/exchange-projection.ts (v1.8.0).
  */
-import type { Storage } from '../storage/interface.js';
-import { AppToolsDocSchema, appToolsKey, type AppTool } from '../models/app-tool-schemas.js';
-import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
-import { listAllOfferings } from './exchange-market.js';
-import { reconcileOwnerOfferings, type ReconcileReport } from './exchange-projection.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { localAccountName } from '../utils/gaii.js';
+import type { Storage } from '../../storage/interface.js';
+import { AppToolsDocSchema, appToolsKey, type AppTool } from '../../models/app-tool-schemas.js';
+import { OffersDocSchema, type Offer } from '../../models/offer-schemas.js';
+import { listAllOfferings } from './market.js';
+import { reconcileOwnerOfferings, type ReconcileReport } from './projection.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 /** A stored source document as its schema reads it, or null when it is absent or does not validate. */
 const parsedOrNull = <T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, v: unknown): T | null => {

@@ -52,7 +52,7 @@ import { emitResourceUpdated, emitResourceListChanged } from '../resource-events
 import { enqueueMemoryReplication } from '../memory/replication.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange, emitMemoryWritten, emitRecordChange } from '../event-bus.js';
-import { reconcileAfterSourceWrite } from '../exchange-projection.js';
+import { reconcileAfterSourceWrite } from '../exchange/projection.js';
 import { nodeContext } from '../node-context.js';
 import { emitEcosystemMemoryWrite } from '../ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../ecosystem-automation.js';
@@ -68,7 +68,7 @@ import { readsAsOwner, visibleToSameOwnerReader, hiddenRecordRelabel, READ_AS_OW
 import { memoryWriteAsks, fileMemoryWriteAsks, type MemoryWriteAsk } from '../memory/write-asks.js';
 import { isKeyArchived } from '../archive.js';
 import { undeclaredSpaceForKey } from '../workspace/write-items.js';
-import { odpsWriteRefusal } from '../exchange-odps-write.js';
+import { odpsWriteRefusal } from '../exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../legacy-pacing-write.js';
 import { stampAgentWrite, storeHeldProvenance } from '../ai/provenance.js';
 import { applyMergePatch } from '../../utils/json-merge-patch.js';

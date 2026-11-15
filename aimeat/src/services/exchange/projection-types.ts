@@ -1,23 +1,23 @@
 /**
- * @file src/services/exchange-projection-types.ts
+ * @file src/services/exchange/projection-types.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The shapes the EXCHANGE projection works in: one outcome line of a reconcile, the report
  *   those lines make, and a listing the sources say should exist. Moved out of
- *   services/exchange-projection.ts unchanged so that file stays under the line limit; it re-exports
+ *   services/exchange/projection.ts unchanged so that file stays under the line limit; it re-exports
  *   ReconcileChange and ReconcileReport, so every importer keeps its import.
  * @structure ReconcileChange · ReconcileReport · DesiredListing
  * @usage
- *   import type { ReconcileChange, DesiredListing } from './exchange-projection-types.js';
+ *   import type { ReconcileChange, DesiredListing } from './projection-types.js';
  * @version-history
  *   v1.2.0 — 2026-11-01 — DesiredListing.freshness: a datapackage listing states its freshness (plan D6).
  *   v1.1.0 — 2026-11-01 — DesiredListing.deliversData: every listing says whether it delivers data (plan D5.5).
  *   v1.0.0 — 2026-09-13 — Extracted from services/exchange-projection.ts. ReconcileChange.reason and
  *     message now also describe the list-once skip (DUPLICATE_OF {app}/{tool} with a sentence).
  */
-import type { Offering, OfferingPlan, UsageTerms } from './exchange-market.js';
-import type { EntitlementUnit } from './metered-entitlements.js';
-import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
+import type { Offering, OfferingPlan, UsageTerms } from './market.js';
+import type { EntitlementUnit } from '../metered-entitlements.js';
+import type { Provenance, OdpsExtras } from '../../models/odps-schemas.js';
 
 /** One outcome line of a reconcile — the dry-run report is exactly this list. */
 export interface ReconcileChange {

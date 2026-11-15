@@ -40,7 +40,7 @@ import { bare } from '../datapackage/contract.js';
 import type { PartyContext } from './verify.js';
 import { packageOfPattern, partySharesOf, shareMetaOf, standingShares, type ShareContract } from './shares.js';
 import { logPartyRead, takeReadSlot } from './activity.js';
-import { contractVersionHashes } from '../exchange-datapackage.js';
+import { contractVersionHashes } from '../exchange/datapackage.js';
 
 export interface PartyReadTarget {
     /** The package name. */

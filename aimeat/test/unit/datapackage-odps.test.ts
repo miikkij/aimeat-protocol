@@ -34,7 +34,7 @@ const rawValidate = ajv.compile(odpsSchema);
  * `product.dataAccess` is excluded, and NOT because ours is wrong. The published v4.1 schema
  * contradicts itself there: the `product.dataAccess` property is `type: object` while it `$ref`s an
  * array-typed definition, so no document can satisfy both halves. The spec's own examples show a
- * MAPPING of named access blocks, which is what this node emits and what services/exchange-odps.ts
+ * MAPPING of named access blocks, which is what this node emits and what services/exchange/odps.ts
  * already decided for the EXCHANGE projection. The tripwire below fails the day upstream fixes it,
  * so this exclusion cannot outlive its reason.
  */

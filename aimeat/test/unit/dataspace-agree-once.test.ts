@@ -31,7 +31,7 @@ vi.mock('../../src/services/dataspace/agreement.js', async (orig) => ({
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
-import { putOffering, type Offering } from '../../src/services/exchange-market.js';
+import { putOffering, type Offering } from '../../src/services/exchange/market.js';
 import { readContractForCall } from '../../src/services/metered-entitlements.js';
 import { publishPackage } from '../../src/services/datapackage/store.js';
 import { partyRefOf } from '../../src/services/parties/contract.js';

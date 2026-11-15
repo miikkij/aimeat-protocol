@@ -129,7 +129,7 @@ import { undeclaredSpaceForKey } from '../../services/workspace/write-items.js';
 import { fencedKeysRefusal } from '../../services/fenced-space.js';
 import { bulkDeleteKeyRefusal } from '../../services/memory/bin.js';
 import { callerOf } from '../../middleware/caller.js';
-import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
+import { odpsWriteRefusal } from '../../services/exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
 import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';

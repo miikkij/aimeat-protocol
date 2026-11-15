@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import {
     datapackageCoordinate, parseDatapackageCoordinate, proposeDeliversData, validateExchangeTerms, plansForTerms,
     resolveDatapackagePricing, PER_MONTH_SECONDS,
-} from '../../src/services/exchange-datapackage.js';
+} from '../../src/services/exchange/datapackage.js';
 import { offeringDeliversData } from '../../src/services/data-intermediation/contract.js';
 import { datapackageReadable, versionOpenTo } from '../../src/services/datapackage/audience.js';
 import type { Storage } from '../../src/storage/interface.js';

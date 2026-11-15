@@ -11,7 +11,7 @@
  *        are never charged: a contract buys access the reader does not have, not a second bill for
  *        access it has. So a sold package is one whose audience is narrower than its buyers.
  *     2. Otherwise an account (the buyer, or the buyer's agent or app) holding a live entitlement on the
- *        package's coordinate (services/exchange-datapackage.ts) is admitted by it: the reader names the
+ *        package's coordinate (services/exchange/datapackage.ts) is admitted by it: the reader names the
  *        package and the versions of the interface the contract pins, a read without a version reads the
  *        newest of them, and another version is refused (403 VERSION_NOT_IN_CONTRACT).
  *     3. A data read admitted so (an OData entity set, a row window, a CSV) is metered and charged through
@@ -36,7 +36,7 @@ import { trustedPackageOf } from './audience-record.js';
 import { bare } from './contract.js';
 import { readEntitlementForCall, type MeteredEntitlement } from '../metered-entitlements.js';
 import { authoriseMeteredCall, type MeteredOutcome } from '../metered-access.js';
-import { contractVersionHashes, datapackageCoordinate } from '../exchange-datapackage.js';
+import { contractVersionHashes, datapackageCoordinate } from '../exchange/datapackage.js';
 import { resolveIdentity, isForeignPrincipal } from '../../utils/gaii.js';
 
 /** The facts of a verified token this decision reads. */

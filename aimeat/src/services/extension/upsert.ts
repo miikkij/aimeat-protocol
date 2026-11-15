@@ -31,7 +31,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ExtensionRecord } from '../../storage/interface.js';
 import type { Scheduler } from '../scheduler.js';
-import { reconcileAfterExtensionWrite } from '../exchange-projection.js';
+import { reconcileAfterExtensionWrite } from '../exchange/projection.js';
 import { registerExtensionSchedules } from './schedules.js';
 import { logger } from '../../utils/logger.js';
 

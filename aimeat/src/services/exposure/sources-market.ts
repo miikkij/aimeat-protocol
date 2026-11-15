@@ -5,7 +5,7 @@
  * @description The exposure sources for what a person offers to others: packages, exchange offerings
  *   and needs, and agents in the public agent list (plan doc-mvcn6c7e4e5q, V6.1).
  *
- *   An exchange offering or need is a PUBLIC memory record (services/exchange-market.ts putPublic),
+ *   An exchange offering or need is a PUBLIC memory record (services/exchange/market.ts putPublic),
  *   and it stays one after it is delisted or closed: the market stops showing it, the record is still
  *   readable at its address. So every one of the person's offerings and needs is counted, and the
  *   title says which are off the market, with deleting the record as the way to close those.
@@ -19,7 +19,7 @@
  *     and identifiers a page says the instruction and the title with in its language (WP9c).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
  */
-import { listAllOfferings, listNeeds } from '../exchange-market.js';
+import { listAllOfferings, listNeeds } from '../exchange/market.js';
 import {
   type ExposureItem, type ExposureLevel, type ExposureSource, LEVELS,
   levelOfVisibility, ownerIdentities, closeAs,

@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { reconcileAfterSourceWrite, exchangeOutcome } from '../../src/services/exchange-projection.js';
+import { reconcileAfterSourceWrite, exchangeOutcome } from '../../src/services/exchange/projection.js';
 
 const NODE = 'node-x';
 const OWNER = 'seller';

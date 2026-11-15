@@ -11,7 +11,7 @@
  *   data intermediation gate a new listing asks. The record `datapkg-exchange.<name>` sits in the
  *   package owner's memory under a service-owned prefix (utils/reserved-keys.ts
  *   SERVICE_OWNED_KEY_PREFIXES), which no memory route writes, restores or deletes. setPackageExchange
- *   (services/exchange-datapackage.ts) is its one writer, through writeSaleTerms, and a purge
+ *   (services/exchange/datapackage.ts) is its one writer, through writeSaleTerms, and a purge
  *   (./withdraw.ts) deletes it with the package. The record is per package, so the terms carry over to
  *   every new version, as writeLatest kept them on the pointer (plan doc-mvwxcas3dom3, D5.1). The pointer
  *   still gets a copy of the terms, so a reader of the file sees what it saw; no decision reads it.

@@ -94,7 +94,7 @@ import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from '../../services/write-target.js';
 import { resolveIdentity, isForeignPrincipal, isOwnerInPerson, localAccountName } from '../../utils/gaii.js';
-import { exchangeOutcome } from '../../services/exchange-projection.js';
+import { exchangeOutcome } from '../../services/exchange/projection.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
 import { isVersionKey, searchHitShape, matchesType } from '../../services/memory/search-shape.js';
 import { presentMemories } from '../../services/classification/present-memory.js';

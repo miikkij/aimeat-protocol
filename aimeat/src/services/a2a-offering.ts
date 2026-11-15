@@ -32,7 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import {
   filterOfferings, resolveOfferingPricing, agentWorkCoordinate, type Offering,
-} from './exchange-market.js';
+} from './exchange/market.js';
 import { isMoneyCurrency } from '../commerce/money.js';
 import { buildGAII } from '../utils/gaii.js';
 import { deactivatedSince } from './account-deactivated.js';

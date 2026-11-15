@@ -1,5 +1,5 @@
 /**
- * @file src/services/exchange-projection.ts
+ * @file src/services/exchange/projection.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description TARGET-050 — the EXCHANGE listing as a PROJECTION of its source, not a hand-authored
@@ -77,34 +77,34 @@
  *     authoring block) project from the manifest/action/offer onto the listing and into its sourceHash.
  *   v1.0.0 — 2026-07-25 — Initial projection + reconcile + legacy adoption (TARGET-050 slices 1 & 3).
  */
-import type { Storage } from '../storage/interface.js';
-import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
-import { OffersDocSchema, normalizeOfferPacing, type Offer } from '../models/offer-schemas.js';
-import { ensureInterfaceVersion, getLatestInterface } from './app/tool-interfaces.js';
+import type { Storage } from '../../storage/interface.js';
+import { AppToolsDocSchema, appToolsKey } from '../../models/app-tool-schemas.js';
+import { OffersDocSchema, normalizeOfferPacing, type Offer } from '../../models/offer-schemas.js';
+import { ensureInterfaceVersion, getLatestInterface } from '../app/tool-interfaces.js';
 import {
   appToolCoordinate, agentWorkCoordinate, listAllOfferings, newOfferingId, putOffering,
   type Offering, type OfferingPlan,
-} from './exchange-market.js';
-import { mergeOdpsExtras, mergeProvenance, inheritAiProvenance, offeringOdpsOverruns } from './exchange-odps.js';
-import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './exchange-source-terms.js';
-import type { ReconcileChange, ReconcileReport, DesiredListing } from './exchange-projection-types.js';
-import { logger } from '../utils/logger.js';
-import { findExtension } from './component-address.js';
-import { dataListingRefusal } from './data-intermediation/gate.js';
-import { desiredFromDataPackages } from './exchange-projection-datapackage.js';
-import { proposeDeliversData } from './exchange-datapackage.js';
-import { onLatestWritten } from './datapackage/version-audience.js';
-import { onFreshnessSwept } from './datapackage/freshness-sweep.js';
-import { freshnessBrief } from './datapackage/freshness.js';
+} from './market.js';
+import { mergeOdpsExtras, mergeProvenance, inheritAiProvenance, offeringOdpsOverruns } from './odps.js';
+import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './source-terms.js';
+import type { ReconcileChange, ReconcileReport, DesiredListing } from './projection-types.js';
+import { logger } from '../../utils/logger.js';
+import { findExtension } from '../component-address.js';
+import { dataListingRefusal } from '../data-intermediation/gate.js';
+import { desiredFromDataPackages } from './projection-datapackage.js';
+import { proposeDeliversData } from './datapackage.js';
+import { onLatestWritten } from '../datapackage/version-audience.js';
+import { onFreshnessSwept } from '../datapackage/freshness-sweep.js';
+import { freshnessBrief } from '../datapackage/freshness.js';
 
 /** A tool binding's extension as stored: an owner's bare name for their own namespaced extension is that one. */
 async function ownBindingExt(storage: Storage, name: string, ownerName: string): Promise<string> {
   if (name.includes('/')) return name;
   return (await findExtension(storage, name, ownerName, 'manage'))?.name ?? name;
 }
-import { ownerGhiiOf as ownerGhiiOfPrincipal, localAccountName } from '../utils/gaii.js';
+import { ownerGhiiOf as ownerGhiiOfPrincipal, localAccountName } from '../../utils/gaii.js';
 
-export type { ReconcileChange, ReconcileReport } from './exchange-projection-types.js';
+export type { ReconcileChange, ReconcileReport } from './projection-types.js';
 
 /** The dedupe identity of a listing: one per (kind, coordinate, unit, currency) — never one per relist. */
 const listingKey = (kind: string, ext: string, action: string, unit: string, currency: string | null): string =>
@@ -582,7 +582,7 @@ async function warnAlsoListed(
 
 /**
  * ODPS_FIELD_TOO_LONG on a listing: a warning, never a truncation. The developer decided on 2026-09-13
- * that a write CHANGING such text is refused before it is stored (services/exchange-odps-write.ts), so
+ * that a write CHANGING such text is refused before it is stored (services/exchange/odps-write.ts), so
  * what reaches this row is text a stored source already carried, which keeps publishing. One row per field of a label.
  */
 function warnOdpsOverruns(changes: ReconcileChange[], resolved: Resolved[]): void {
@@ -760,4 +760,4 @@ onFreshnessSwept(async (storage, swept) => {
   }
 });
 
-// The migration of hand-authored listings (TARGET-050 slice 3) is services/exchange-projection-migrate.ts.
+// The migration of hand-authored listings (TARGET-050 slice 3) is services/exchange/projection-migrate.ts.

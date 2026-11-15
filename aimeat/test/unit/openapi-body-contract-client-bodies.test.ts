@@ -205,7 +205,7 @@ describe('DELETE /v1/ghii/totp (portal security.js totpDisable)', () => {
 describe('PUT /v1/datapackages/{owner}/{name}/exchange (portal dataproducts.js sellPackage)', () => {
     // views/profile/offers/sell-dialog.js termsBody sends toll_morsels: null when the pacing field is
     // empty, the usual money-only sale. DatapackageExchangeSchema reads toll_morsels, odps and provenance
-    // as nullable, and services/exchange-datapackage.ts treats null as not sent.
+    // as nullable, and services/exchange/datapackage.ts treats null as not sent.
     const path = '/v1/datapackages/alice/weather/exchange';
     const terms = { exchange: true, model: 'per_month', prices_money: [{ amount: 4_900_000, currency: 'EUR' }], usage_terms: { derivatives: false, resale: false, attribution: true } };
 

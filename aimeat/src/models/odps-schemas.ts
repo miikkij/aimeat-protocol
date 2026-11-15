@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The ODPS (Open Data Product Specification, Linux Foundation) authoring contract for an
  *   EXCHANGE offering. AIMEAT derives most of an ODPS v4.1 document from what the node already knows
- *   (title, price, plans, licence, provider, observed usage — see services/exchange-odps.ts); these are the
+ *   (title, price, plans, licence, provider, observed usage — see services/exchange/odps.ts); these are the
  *   fields ODPS defines that the node CANNOT derive and a provider may therefore declare on the listing:
  *   the product framing (value proposition, categories, standards, use cases, sample), the SLA + data-quality
  *   COMMITMENTS (objectives, which are promises no observation can substitute for), and the legal data holder.
@@ -178,7 +178,7 @@ export const OdpsExtrasSchema = z.object({
   /**
    * ODPS caps the value proposition at 512 characters. This schema accepts more, because it also
    * validates sources that are not for sale; a write that puts a longer one on a listing is refused
-   * with ODPS_FIELD_TOO_LONG (services/exchange-odps-write.ts), and one already stored publishes as
+   * with ODPS_FIELD_TOO_LONG (services/exchange/odps-write.ts), and one already stored publishes as
    * written with the listing warning.
    */
   valueProposition: z.string().trim().min(1).max(4_000).optional(),

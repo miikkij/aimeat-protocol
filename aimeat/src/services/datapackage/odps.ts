@@ -49,7 +49,7 @@
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1: "the package is sellable").
  */
 import { stringify as yamlStringify } from 'yaml';
-import { ODPS_VERSION, ODPS_SCHEMA_URL_YAML } from '../exchange-odps.js';
+import { ODPS_VERSION, ODPS_SCHEMA_URL_YAML } from '../exchange/odps.js';
 import { bare, type Descriptor } from './contract.js';
 import { freshnessBrief, type Freshness } from './freshness.js';
 import { licenceFacts, licenceUrlOf } from './licences.js';

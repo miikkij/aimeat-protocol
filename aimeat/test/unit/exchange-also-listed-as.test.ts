@@ -18,8 +18,8 @@
 import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
-import { reconcileOwnerOfferings, type ReconcileChange } from '../../src/services/exchange-projection.js';
-import { getOffering, putOffering, newOfferingId, resolveOfferingPricing } from '../../src/services/exchange-market.js';
+import { reconcileOwnerOfferings, type ReconcileChange } from '../../src/services/exchange/projection.js';
+import { getOffering, putOffering, newOfferingId, resolveOfferingPricing } from '../../src/services/exchange/market.js';
 import { createEntitlement, readEntitlementForCall, computeCharge } from '../../src/services/metered-entitlements.js';
 
 const NODE = 'node-x';

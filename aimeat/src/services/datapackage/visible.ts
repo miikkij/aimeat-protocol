@@ -54,7 +54,7 @@ import { audienceRecordsInPlace, trustedAudienceOf } from './audience-record.js'
 import { i18nTitles, licenseOf, readPointer } from './version-audience.js';
 import { bare, packageId, type Descriptor } from './contract.js';
 import { openPackage } from './store.js';
-import { contractVersionHashes } from '../exchange-datapackage.js';
+import { contractVersionHashes } from '../exchange/datapackage.js';
 import { isLiveShare, packageOfPattern, partySharesOf, shareMetaOf, standingShares } from '../parties/shares.js';
 import { shareOfUnversionedRead, shareReader } from '../parties/read-gate.js';
 import type { PartyContext } from '../parties/verify.js';

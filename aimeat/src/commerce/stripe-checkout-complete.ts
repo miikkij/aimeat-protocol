@@ -14,7 +14,7 @@
  *
  *   A card page the node opened for an outside buyer's purchase of a data package names that purchase
  *   (`pp_…`) instead of a checkout; it is completed by the same rule through
- *   services/exchange-party-buy.ts completePartyPurchaseFromStripe.
+ *   services/exchange/party-buy.ts completePartyPurchaseFromStripe.
  * @structure completeFromStripeCheckout
  * @version-history
  *   v1.2.0 — 2026-11-03 — A party purchase's card page completes that purchase (secaudit2026nov02d
@@ -28,7 +28,7 @@ import type { AimeatConfig } from '../config-types.js';
 import type { Storage } from '../storage/interface.js';
 import { getSession, completeSession } from './session-service.js';
 import { STRIPE_CHECKOUT_HANDLER_ID } from './stripe-checkout.js';
-import { isPartyPurchaseId, completePartyPurchaseFromStripe } from '../services/exchange-party-buy.js';
+import { isPartyPurchaseId, completePartyPurchaseFromStripe } from '../services/exchange/party-buy.js';
 import { logger } from '../utils/logger.js';
 
 export async function completeFromStripeCheckout(

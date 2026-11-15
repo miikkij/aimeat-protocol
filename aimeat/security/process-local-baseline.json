@@ -953,7 +953,7 @@
       "count": 1,
       "reason": "The transports this process hands its events to (services/bus-relay.ts). Each process adds its own at boot; this is what carries events to the other processes."
     },
-    "src/services/exchange-projection.ts :: map :: lastReconcile": {
+    "src/services/exchange/projection.ts :: map :: lastReconcile": {
       "count": 1,
       "reason": "DEBT"
     },

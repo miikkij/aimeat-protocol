@@ -99,7 +99,7 @@ export interface ShareMeta {
     termsAcceptedAt?: string;
     declinedAt?: string;
     endedReason?: string;
-    /** The EXCHANGE purchase this share delivers (services/exchange-party-buy.ts): its reads are metered. */
+    /** The EXCHANGE purchase this share delivers (services/exchange/party-buy.ts): its reads are metered. */
     contract?: ShareContract;
     /** The Dataspace Protocol agreement this share delivers (services/dataspace/agreement.ts). */
     dspAgreement?: string;

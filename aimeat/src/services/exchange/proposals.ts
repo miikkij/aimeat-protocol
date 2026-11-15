@@ -1,5 +1,5 @@
 /**
- * @file src/services/exchange-proposals.ts
+ * @file src/services/exchange/proposals.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Contract RENEGOTIATION for EXCHANGE (TARGET-045). A live contract (metered entitlement) can be
@@ -26,12 +26,12 @@
  *   v1.0.0 — 2026-07-21 — Initial renegotiation: propose / accept (supersede + archive) / decline / withdraw.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
+import type { Storage } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
 import {
   archiveEntitlement, createEntitlement, pauseEntitlement, readContractForCall,
   type EntitlementUnit, type MeteredEntitlement,
-} from './metered-entitlements.js';
+} from '../metered-entitlements.js';
 
 const NS = 'exchange-proposal';
 const keyOf = (id: string): string => `xprop.${id}`;

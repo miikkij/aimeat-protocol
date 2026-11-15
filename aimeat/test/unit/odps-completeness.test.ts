@@ -2,7 +2,7 @@
  * @file test/unit/odps-completeness.test.ts
  * @description Drift guard for the aimeat-exchange ODPS completeness meter. The meter counts the
  *   fields a PROVIDER authors on an ODPS v4.1 descriptor; the fields it names live in three server
- *   files (models/odps-schemas.ts, services/exchange-market.ts, services/exchange-odps.ts), so a
+ *   files (models/odps-schemas.ts, services/exchange/market.ts, services/exchange/odps.ts), so a
  *   rename there would silently turn a filled field into a permanent "missing" and a completeness
  *   bar that never reaches 100 no matter what the seller does. These tests fix that to the actual
  *   record shape: a maximally-authored offering must read 100%, an empty one 0%, and every field key

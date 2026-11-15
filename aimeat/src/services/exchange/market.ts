@@ -1,5 +1,5 @@
 /**
- * @file src/services/exchange-market.ts
+ * @file src/services/exchange/market.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two-sided EXCHANGE marketplace records (TARGET-045 Phase C) — the DEMAND + SUPPLY sides
@@ -8,7 +8,7 @@
  *   is the generic store + a simple capability match, per "node holds refined data, not orchestration"):
  *     - OFFERING — a provider's public supply listing: a capability (ext/action) + pricing (base + plans) +
  *       provenance + an optional ODPS authoring block. Discoverable by any consumer, and projectable into
- *       a full ODPS v4.1 document (services/exchange-odps.ts).
+ *       a full ODPS v4.1 document (services/exchange/odps.ts).
  *     - NEED — a consumer/app's open demand: a wanted capability + budget + autonomy. Providers browse open
  *       needs and BID.
  *     - BID — a provider's offer against a NEED (links an OFFERING + proposed terms). The requester accepts
@@ -17,7 +17,7 @@
  *   marketplace is browsable; ownership is the record's provider/requester GHII (authorised by the routes).
  * @structure Offering·Need·Bid types · UsageTerms·NeedSpec · put/get/list/delete for each · matchOfferings ·
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
- * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
+ * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './market.js';
  * @version-history
  *   2026-11-15 — acceptBid asks the team approval gate before it mints (services/team/action-gate.ts, T7).
  *   2026-11-01 — A datapackage offering carries its `freshness` (plan D6).
@@ -65,25 +65,25 @@
  *   v1.0.0 — 2026-07-20 — Initial marketplace records (offering/need/bid) + capability matching (Phase C).
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { createEntitlement, readContractForCall, listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from './metered-entitlements.js';
-import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
-import type { FreshnessBrief } from './datapackage/freshness.js';
-import { readCallTiming } from './call-timing.js';
-import { resolvePacingToll } from './metered-settlement.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
-import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
-import { resolveDatapackagePricing } from './exchange-datapackage.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { createEntitlement, readContractForCall, listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from '../metered-entitlements.js';
+import type { Provenance, OdpsExtras } from '../../models/odps-schemas.js';
+import type { FreshnessBrief } from '../datapackage/freshness.js';
+import { readCallTiming } from '../call-timing.js';
+import { resolvePacingToll } from '../metered-settlement.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config/pacing.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { resolveDatapackagePricing } from './datapackage.js';
 
 export type { AppToolSurface, AgentWorkSurface, SellableSurface };
 
 // The pricing of a contract from its source lives in exchange-action-pricing.ts; every name is re-exported here.
-import { resolveActionPricing, resolveExtActionPricing, type ActionCommercial, type OfferingPlan } from './exchange-action-pricing.js';
-import { teamAgentGate } from './team/action-gate.js';
-export { resolveActionPricing, resolveExtActionPricing, extActionDeclaredToll } from './exchange-action-pricing.js';
-export type { ActionCommercial, OfferingPlan } from './exchange-action-pricing.js';
+import { resolveActionPricing, resolveExtActionPricing, type ActionCommercial, type OfferingPlan } from './action-pricing.js';
+import { teamAgentGate } from '../team/action-gate.js';
+export { resolveActionPricing, resolveExtActionPricing, extActionDeclaredToll } from './action-pricing.js';
+export type { ActionCommercial, OfferingPlan } from './action-pricing.js';
 /**
  * Provenance attestation + the ODPS authoring block. Both are defined (and validated) in
  * `models/odps-schemas.ts` and re-exported here so the offering record stays the single import site.
@@ -132,7 +132,7 @@ export interface Offering {
   surface: SellableSurface | null;   // app-tool (pinned interface), agent-work (task type) or datapackage (pinned schemas); null for ext-action
   /**
    * Whether this offering delivers data (plan doc-mvwxcas3dom3, D5.5): the provider states it, and the
-   * node proposes it when the source says nothing (services/exchange-datapackage.ts proposeDeliversData).
+   * node proposes it when the source says nothing (services/exchange/datapackage.ts proposeDeliversData).
    * The data intermediation setting and its findings read it. Absent on a listing made before it existed.
    */
   deliversData?: boolean;

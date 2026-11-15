@@ -89,7 +89,7 @@ export type OffersWriteResult =
         offers: Offer[];
         record: MemoryRecord;
         /** What the EXCHANGE projection did with this document's listings, when it reported. */
-        exchange?: import('../exchange-projection.js').ReconcileReport | null;
+        exchange?: import('../exchange/projection.js').ReconcileReport | null;
     }
     | OffersWriteRefusal;
 

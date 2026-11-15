@@ -1,20 +1,20 @@
 /**
- * @file src/services/exchange-action-pricing.ts
+ * @file src/services/exchange/action-pricing.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The price of an EXCHANGE contract read from its source: an action's `commercial` block
  *   (resolveActionPricing), an extension action as the node stores it (resolveExtActionPricing, which
  *   reads the 4.0.0 form, the action's own tollMorsels), the toll a live detail states beside the
  *   per-call amount (extActionDeclaredToll), and the plan shape an offering carries. Moved out of
- *   services/exchange-market.ts unchanged, which re-exports every name, when that file passed 800 lines.
+ *   services/exchange/market.ts unchanged, which re-exports every name, when that file passed 800 lines.
  * @structure ActionCommercial · resolveActionPricing · resolveExtActionPricing · extActionDeclaredToll · OfferingPlan
  * @usage
- *   import { resolveExtActionPricing } from './exchange-market.js';   // or from this file
+ *   import { resolveExtActionPricing } from './market.js';   // or from this file
  *   const priced = resolveExtActionPricing(act, planId);
  * @version-history
  *   v1.0.0 — 2026-10-13 — Pure extraction from services/exchange-market.ts (v1.12.1).
  */
-import type { EntitlementUnit, PricingSpec } from './metered-entitlements.js';
+import type { EntitlementUnit, PricingSpec } from '../metered-entitlements.js';
 
 /** The action `commercial` block an offering/contract prices against. */
 export interface ActionCommercial {

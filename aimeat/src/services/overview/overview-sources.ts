@@ -32,7 +32,7 @@ import { queryUsageRollupLive } from '../usage/usage-read.js';
 import { ownPublicManifests } from '../../commerce/app-tool-catalog.js';
 import { isToolPriced } from '../../models/app-tool-schemas.js';
 import { offersKeyFor } from '../agent/offers-write.js';
-import { listOfferings, appToolCoordinate } from '../exchange-market.js';
+import { listOfferings, appToolCoordinate } from '../exchange/market.js';
 import { listEntitlementsByProvider } from '../metered-entitlements.js';
 import { logger } from '../../utils/logger.js';
 

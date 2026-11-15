@@ -17,10 +17,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { AppToolsDocSchema } from '../../src/models/app-tool-schemas.js';
-import { desiredFromAppTools } from '../../src/services/exchange-projection.js';
-import { inheritAiProvenance, offeringToOdps } from '../../src/services/exchange-odps.js';
+import { desiredFromAppTools } from '../../src/services/exchange/projection.js';
+import { inheritAiProvenance, offeringToOdps } from '../../src/services/exchange/odps.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
-import type { Offering } from '../../src/services/exchange-market.js';
+import type { Offering } from '../../src/services/exchange/market.js';
 
 const LIVE = JSON.parse(readFileSync(
   fileURLToPath(new URL('../fixtures/app-tools-manifest-live.json', import.meta.url)), 'utf8')) as Record<string, unknown>;

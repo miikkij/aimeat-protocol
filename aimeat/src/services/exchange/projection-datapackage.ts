@@ -1,5 +1,5 @@
 /**
- * @file src/services/exchange-projection-datapackage.ts
+ * @file src/services/exchange/projection-datapackage.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The fourth EXCHANGE source (plan doc-mvwxcas3dom3, D5.1): an owner's data packages
@@ -7,7 +7,7 @@
  *   on the version and withdrawal the service recorded (packageForSale), never on the `latest.json`
  *   pointer's own word, which an app with storage:write rewrites. Each one projects one listing
  *   per money currency (or one free listing with pacing), kind `datapackage`, coordinate
- *   `datapkg:{owner}/{name}` + `read`, as services/exchange-projection.ts projects the other three.
+ *   `datapkg:{owner}/{name}` + `read`, as services/exchange/projection.ts projects the other three.
  *
  *   SKIPPED, with the reason on the report: a withdrawn package (PACKAGE_WITHDRAWN), one with no
  *   published version (NOT_PUBLISHED), a version whose resources carry no Table Schema fields
@@ -22,7 +22,7 @@
  *   FRESHNESS (plan D6). Each listing carries the package's freshness (fresh, late, stale, unscheduled,
  *   with due_at and stale_at), read by services/datapackage/freshness-read.ts on the recorded version.
  *   It is in the sourceHash, so a pass that sees another state updates the listing; the hourly freshness
- *   check starts that pass when a state changes (services/exchange-projection.ts onFreshnessSwept).
+ *   check starts that pass when a state changes (services/exchange/projection.ts onFreshnessSwept).
  * @structure desiredFromDataPackages · packageNamesOf
  * @usage const desired = await desiredFromDataPackages(storage, ownerGhii, ownerName, only, changes, dryRun);
  * @version-history
@@ -30,18 +30,18 @@
  *   v1.0.1 — 2026-11-01 — Lists from the service's records through packageForSale, not the pointer (WP9e).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.1, D5.5).
  */
-import type { Storage } from '../storage/interface.js';
-import type { ReconcileChange, DesiredListing } from './exchange-projection-types.js';
-import { usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './exchange-source-terms.js';
-import { ensureInterfaceVersion, getLatestInterface } from './app/tool-interfaces.js';
+import type { Storage } from '../../storage/interface.js';
+import type { ReconcileChange, DesiredListing } from './projection-types.js';
+import { usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './source-terms.js';
+import { ensureInterfaceVersion, getLatestInterface } from '../app/tool-interfaces.js';
 import {
     datapackageCoordinate, packageIfaceApp, packageForSale, packageDescriptor, packageSchemaDef, plansForTerms,
     proposeDeliversData, DATAPACKAGE_ACTION,
-} from './exchange-datapackage.js';
-import type { OdpsExtras, Provenance } from '../models/odps-schemas.js';
-import { packageFreshness } from './datapackage/freshness-read.js';
-import { freshnessBrief } from './datapackage/freshness.js';
-import { currentNodeId } from '../utils/gaii.js';
+} from './datapackage.js';
+import type { OdpsExtras, Provenance } from '../../models/odps-schemas.js';
+import { packageFreshness } from '../datapackage/freshness-read.js';
+import { freshnessBrief } from '../datapackage/freshness.js';
+import { currentNodeId } from '../../utils/gaii.js';
 
 const POINTER_RE = /^datapkg\/([a-z0-9][a-z0-9-]{0,62}[a-z0-9])\/latest\.json$/;
 

@@ -37,7 +37,7 @@ import { publicDatasetFacts } from '../datapackage/catalogue-facts.js';
 import { trustedPackageOf } from '../datapackage/audience-record.js';
 import { saleTermsOf } from '../datapackage/sale-terms-record.js';
 import { descriptorFor, isLiveShare, packageOfPattern, partySharesOf, shareMetaOf } from '../parties/shares.js';
-import { listOfferings, type Offering } from '../exchange-market.js';
+import { listOfferings, type Offering } from '../exchange/market.js';
 import { dataListingRefusal } from '../data-intermediation/gate.js';
 import type { PartyRecord } from '../parties/contract.js';
 import { DSP_CONTEXT, DSP_PATH, PULL_FORMAT, datasetIdOf, offerIdOf, parseDatasetId, type OfferKind } from './contract.js';

@@ -319,7 +319,7 @@ await test('CONTRACT · the consumer takes both contracts at exactly the declare
         const e = acc.body.data.entitlement;
         assert(e.toll_morsels === 8, `contract pacing: ${e.toll_morsels} (source says 8 morsels)`);
         // A morsel-rail contract's `unit` and `price_per_call` are deprecated mirrors of toll_morsels on
-        // 3.x; 4.0.0 leaves them out (services/exchange-market.ts presentContractTerms).
+        // 3.x; 4.0.0 leaves them out (services/exchange/market.ts presentContractTerms).
         if (await mirrorsGone()) {
             assert(e.unit === undefined && e.price_per_call === undefined, `4.0.0 answers no unit/price_per_call mirror: ${e.unit}/${e.price_per_call}`);
         } else {
@@ -817,7 +817,7 @@ await test('PROJECTION · every listing carries the price its source declares, a
     const byTool = new Map(mine.map(o => [o.action, o]));
     // Straight from the manifest written in setup — the listing may not invent a figure of its own.
     // toll_morsels is the figure on both releases; on 3.x `unit` and `basePrice` mirror it, and 4.0.0
-    // leaves them out (services/exchange-market.ts presentOffering).
+    // leaves them out (services/exchange/market.ts presentOffering).
     const gone = await mirrorsGone();
     for (const [tool, unit, price, currency] of [
         ['brief', 'morsels', 8, null], ['cheap', 'morsels', 3, null],

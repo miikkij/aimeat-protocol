@@ -94,10 +94,10 @@ import type { PublishInput, TableSchema } from '../services/datapackage/contract
 import { publishPackage, openPackage, readRows, readAllRows, listPackages, listVersions, parseRef } from '../services/datapackage/store.js';
 import { toCsv } from '../services/datapackage/table.js';
 import { packageReaderFor } from './package-reader.js';
-import { setPackageExchange } from '../services/exchange-datapackage.js';
+import { setPackageExchange } from '../services/exchange/datapackage.js';
 import { validateBody } from '../models/schemas.js';
 import { DatapackageExchangeSchema } from '../models/exchange-datapackage-schemas.js';
-import { exchangeOutcome, reconcileAfterPackageWrite } from '../services/exchange-projection.js';
+import { exchangeOutcome, reconcileAfterPackageWrite } from '../services/exchange/projection.js';
 import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { callerOf } from '../middleware/caller.js';
@@ -106,7 +106,7 @@ import { withdrawPackage, withdrawalOfRef, withdrawnMessage } from '../services/
 import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE } from '../services/datapackage/audience.js';
 import { odpsSheetFor, odpsAddress } from '../services/datapackage/odps-read.js';
 import { schemaOrgOfOpened } from '../services/datapackage/landing-page.js';
-import { ODPS_VERSION } from '../services/exchange-odps.js';
+import { ODPS_VERSION } from '../services/exchange/odps.js';
 import { packageFreshness } from '../services/datapackage/freshness-read.js';
 import { versionsInUse } from '../services/datapackage/versions-in-use.js';
 import { sharedDataForCaller } from '../services/datapackage/shared-data.js';
@@ -393,7 +393,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
 
     /**
      * Sell a package on EXCHANGE, change its terms, or with `exchange: false` take it off the market
-     * (services/exchange-datapackage.ts; plan doc-mvwxcas3dom3, D5.1, D5.2). The terms are stored on the
+     * (services/exchange/datapackage.ts; plan doc-mvwxcas3dom3, D5.1, D5.2). The terms are stored on the
      * package pointer and the listing is projected from them before the answer, which carries what the
      * projection did. A contract already signed keeps its price and its interface. The owner in person,
      * or the owner's principal with exchange:write; a new listing of data asks the node's data

@@ -41,7 +41,7 @@ import { parsePartyRef } from '../parties/contract.js';
 import { readParties } from '../parties/store.js';
 import { readStats30, type ReadStats30 } from '../parties/read-stats.js';
 import { DATAPRODUCT_KEY_PREFIX } from '../dataproduct/definition.js';
-import { listOfferings } from '../exchange-market.js';
+import { listOfferings } from '../exchange/market.js';
 import { listAllEntitlements } from '../metered-entitlements.js';
 import { offeringDeliversData } from '../data-intermediation/contract.js';
 

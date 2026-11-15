@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A buyer with no AIMEAT account buys a data package on EXCHANGE and becomes an outside
- *   party of its provider (services/exchange-party-buy.ts; plan doc-mvwxcas3dom3, D5.4). No session:
+ *   party of its provider (services/exchange/party-buy.ts; plan doc-mvwxcas3dom3, D5.4). No session:
  *   the purchase id (128 random bits) is the buyer's handle on its purchase, and a party buying again
  *   presents its own credential (HTTP Basic `<owner>/<party>` and the key, or a party token), which
  *   tops up the contract it has.
@@ -32,7 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { acceptCredential, credentialOf } from '../auth/credential-strategies.js';
-import { openPartyPurchase, completePartyPurchase, readPartyPurchase, purchaseView } from '../services/exchange-party-buy.js';
+import { openPartyPurchase, completePartyPurchase, readPartyPurchase, purchaseView } from '../services/exchange/party-buy.js';
 import { validateBody } from '../models/schemas.js';
 import { PartyBuySchema, PartyPurchaseCompleteSchema } from '../models/exchange-datapackage-schemas.js';
 import { rateBuckets } from '../services/rate-buckets.js';

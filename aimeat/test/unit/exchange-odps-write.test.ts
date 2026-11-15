@@ -12,8 +12,8 @@
  *   v1.0.0 — 2026-09-13 — Initial (appdev pitfall usageterms-note-caps-at-156-not-255, turned into a refusal).
  */
 import { describe, it, expect } from 'vitest';
-import { odpsWriteRefusal, extensionOdpsKey } from '../../src/services/exchange-odps-write.js';
-import { ODPS_TEXT_LIMITS } from '../../src/services/exchange-odps.js';
+import { odpsWriteRefusal, extensionOdpsKey } from '../../src/services/exchange/odps-write.js';
+import { ODPS_TEXT_LIMITS } from '../../src/services/exchange/odps.js';
 
 const KEY = 'apps.shop.html.tools';
 const IN = { type: 'object', properties: { q: {} } };
