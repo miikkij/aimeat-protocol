@@ -98,6 +98,8 @@ export async function performKeyExchange(
     storage: Storage,
     /** The node this exchange is with. An answer naming another node fails the exchange. */
     expectNodeId: string,
+    /** The key this node already holds for that peer, when it has one; an answer equal to it is not checked again. */
+    onFileKey?: string,
 ): Promise<{ success: boolean; error?: string; peerPublicKey?: string }> {
     try {
         // Every peering runs this exchange, so it is where a stored plain-http address on a public
@@ -152,9 +154,9 @@ export async function performKeyExchange(
         }
         // The answered key is cached for signature checks and, on activation, adopted by a peer with
         // none on file (routes/federation-peer/peers.ts), so it gets the check every inbound peer key
-        // gets (audit 2026-11 L056). The key already on file for this peer is not checked again.
-        const onFile = (await storage.listFederationPeers()).find(p => p.nodeId === expectNodeId)?.publicKey;
-        const keyProblem = peerData.node_public_key === onFile ? null : ed25519PublicKeyProblem(peerData.node_public_key);
+        // gets (audit 2026-11 L056). The key already on file for this peer (the caller's onFileKey) is
+        // not checked again; the caller holds the peer, so no whole-table read is needed for it.
+        const keyProblem = onFileKey && peerData.node_public_key === onFileKey ? null : ed25519PublicKeyProblem(peerData.node_public_key);
         if (keyProblem) {
             logger.warn('Key exchange answered with an unusable key', { node: expectNodeId, peerUrl, problem: keyProblem });
             return { success: false, error: `INVALID_PEER_KEY: the node at ${peerUrl} answered with a key this node cannot use. ${keyProblem}` };

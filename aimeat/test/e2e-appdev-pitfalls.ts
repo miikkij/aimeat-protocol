@@ -8,6 +8,9 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-pitfalls).
  * @version-history
+ *   v1.2.0 — 2026-11-15 — A second principal is refused: the owner's agent holding memory:read only
+ *     gets 403 SCOPE_DENIED on POST /v1/appdev/pitfalls/learned and nothing is stored, and an agent
+ *     holding memory:write reports the entry (the suite's denial-coverage exemption is removed).
  *   v1.1.2 — 2026-11-15 — Audit L030: the severity order is checked over the whole page, so a warn
  *     ranked before a critical fails.
  *   v1.1.1 — 2026-09-15 — The full-entry test reads its marker from the entry's title instead of a
@@ -19,6 +22,8 @@
  *     security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
  *   v1.0.0 — 2026-07-19 — initial (AppDev Knowledge Base, Phase 1).
  */
+import { registerOwner } from './helpers/owner-login.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -148,6 +153,24 @@ await test('and it cannot be written or deleted without one either', async () =>
     });
     assert(res.status === 401, `${method} answered ${res.status}, expected 401`);
   }
+});
+
+await test("the owner's agent without memory:write is refused a learned report, and nothing is stored", async () => {
+  const owner = await registerOwner(BASE, `pitf${Date.now().toString(36)}`);
+  const reader = await connectAgentByDevice(BASE, { owner: owner.name, ownerToken: owner.token, name: 'pitreader', scopes: ['memory:read'] });
+  const writer = await connectAgentByDevice(BASE, { owner: owner.name, ownerToken: owner.token, name: 'pitwriter', scopes: ['memory:read', 'memory:write'] });
+  const report = (token: string, slug: string) => fetch(`${BASE}/v1/appdev/pitfalls/learned`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'test-model', category: 'build', slug, title: 'A refused report', symptom: 'symptom text', resolution: 'resolution text' }),
+  }).then(async r => ({ status: r.status, body: await r.json() as any }));
+  const refused = await report(reader.token, 'refused-one');
+  assert(refused.status === 403 && refused.body?.error?.code === 'SCOPE_DENIED', `memory:read agent: expected 403 SCOPE_DENIED, got ${refused.status} ${refused.body?.error?.code}`);
+  const list = async () => (await fetch(`${BASE}/v1/appdev/pitfalls/learned`, { headers: { Authorization: `Bearer ${owner.token}` } }).then(r => r.json()) as any);
+  assert(!JSON.stringify(await list()).includes('refused-one'), 'the refused report was stored');
+  // The use: an agent holding memory:write reports the same kind of entry.
+  const kept = await report(writer.token, 'kept-one');
+  assert(kept.status === 201, `memory:write agent: expected 201, got ${kept.status} ${JSON.stringify(kept.body?.error)}`);
+  assert(JSON.stringify(await list()).includes('kept-one'), 'the permitted report is listed for the owner');
 });
 
 await test('POSITIVE CONTROL: the curated half still answers with no credential', async () => {

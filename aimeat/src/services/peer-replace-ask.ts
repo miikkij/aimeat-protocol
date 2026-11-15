@@ -178,7 +178,7 @@ export async function decidePeerReplacement(
     peers.set(ask.nodeId, admitted);
     await storage.saveFederationPeer(admitted);
     await finish('approved');
-    void performKeyExchange(ask.nodeUrl, config, storage, ask.nodeId)
+    void performKeyExchange(ask.nodeUrl, config, storage, ask.nodeId, admitted.publicKey || undefined)
         .catch(err => logger.warn('peer replacement: the key exchange after the approval failed; the next one retries', { node: ask.nodeId, error: String(err) }));
     return { ok: true, status: 'approved' };
 }

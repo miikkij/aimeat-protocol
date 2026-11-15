@@ -7,11 +7,12 @@
   "test/api-full.ts": {
    "ownHarness": 1,
    "deviceFlow": 1,
-   "lines": 2652,
+   "lines": 2643,
    "lintErrors": 3
   },
   "test/cortex-e2e.ts": {
    "ownHarness": 1,
+   "lines": 860,
    "lintErrors": 1
   },
   "test/cortex-ui-e2e.ts": {
@@ -140,8 +141,7 @@
    "ownHarness": 1
   },
   "test/e2e-agent-connect-email.ts": {
-   "ownHarness": 1,
-   "looseRefusal": 1
+   "ownHarness": 1
   },
   "test/e2e-agent-connectors.ts": {
    "ownHarness": 1
@@ -203,8 +203,7 @@
   },
   "test/e2e-agent-readiness.ts": {
    "ownHarness": 1,
-   "looseRefusal": 1,
-   "lines": 804
+   "lines": 803
   },
   "test/e2e-agent-reapproval.ts": {
    "ownHarness": 1,
@@ -221,7 +220,7 @@
   "test/e2e-agent-schedules.ts": {
    "ownHarness": 1,
    "mcpOauth": 1,
-   "lines": 1261
+   "lines": 1282
   },
   "test/e2e-agent-scope-add.ts": {
    "ownHarness": 1
@@ -487,8 +486,7 @@
   "test/e2e-app-grants.ts": {
    "ownHarness": 1,
    "mcpOauth": 1,
-   "looseRefusal": 1,
-   "lines": 882
+   "lines": 885
   },
   "test/e2e-app-internet-opening.ts": {
    "ownHarness": 1,
@@ -509,7 +507,7 @@
    "deviceFlow": 1,
    "mcpOauth": 1,
    "looseRefusal": 1,
-   "lines": 1970
+   "lines": 1974
   },
   "test/e2e-app-news.ts": {
    "ownHarness": 1
@@ -517,7 +515,7 @@
   "test/e2e-app-origin.ts": {
    "ownHarness": 1,
    "looseRefusal": 2,
-   "lines": 1419
+   "lines": 1420
   },
   "test/e2e-app-parties.ts": {
    "ownHarness": 1
@@ -530,7 +528,7 @@
   },
   "test/e2e-app-publish-gate.ts": {
    "ownHarness": 1,
-   "lines": 852
+   "lines": 856
   },
   "test/e2e-app-publish-provenance-doors.ts": {
    "ownHarness": 1,
@@ -562,7 +560,7 @@
   "test/e2e-app-silent.ts": {
    "ownHarness": 1,
    "mcpOauth": 1,
-   "lines": 873
+   "lines": 877
   },
   "test/e2e-app-store-license.ts": {
    "ownHarness": 1,
@@ -625,7 +623,7 @@
   },
   "test/e2e-apps.ts": {
    "ownHarness": 1,
-   "lines": 927
+   "lines": 941
   },
   "test/e2e-ard-manifest.ts": {
    "ownHarness": 1
@@ -678,7 +676,7 @@
   "test/e2e-beneficiary-split.ts": {
    "ownHarness": 1,
    "looseRefusal": 1,
-   "lines": 1170
+   "lines": 1168
   },
   "test/e2e-board-access.ts": {
    "ownHarness": 1,
@@ -724,7 +722,7 @@
   },
   "test/e2e-capabilities.ts": {
    "ownHarness": 1,
-   "lines": 1239,
+   "lines": 1257,
    "lintErrors": 1
   },
   "test/e2e-capability-extension-ref.ts": {
@@ -809,7 +807,7 @@
    "ownHarness": 1,
    "mcpOauth": 1,
    "looseRefusal": 3,
-   "lines": 1104
+   "lines": 1112
   },
   "test/e2e-companies.ts": {
    "ownHarness": 1,
@@ -931,7 +929,7 @@
   },
   "test/e2e-core-jobs.ts": {
    "ownHarness": 1,
-   "lines": 803
+   "lines": 811
   },
   "test/e2e-cortex-board-ownership.ts": {
    "ownHarness": 1
@@ -1036,7 +1034,7 @@
   },
   "test/e2e-disputes.ts": {
    "ownHarness": 1,
-   "lines": 867,
+   "lines": 863,
    "lintErrors": 2
   },
   "test/e2e-dm-delete-as-owner.ts": {
@@ -1065,7 +1063,8 @@
    "ownHarness": 1
   },
   "test/e2e-ecosystem-app-foundation.ts": {
-   "ownHarness": 1
+   "ownHarness": 1,
+   "lines": 841
   },
   "test/e2e-ecosystem-automation-recipe.ts": {
    "ownHarness": 1
@@ -1091,7 +1090,7 @@
    "ownHarness": 1,
    "deviceFlow": 1,
    "looseRefusal": 1,
-   "lines": 1087
+   "lines": 1086
   },
   "test/e2e-email.ts": {
    "ownHarness": 1,
@@ -1110,7 +1109,7 @@
   },
   "test/e2e-exchange.ts": {
    "ownHarness": 1,
-   "lines": 1183
+   "lines": 1190
   },
   "test/e2e-exposure-conflicts.ts": {
    "ownHarness": 1
@@ -1230,7 +1229,7 @@
   "test/e2e-federation.ts": {
    "ownHarness": 1,
    "looseRefusal": 1,
-   "lines": 1313,
+   "lines": 1312,
    "lintErrors": 1
   },
   "test/e2e-file-store-direct.ts": {
@@ -1262,7 +1261,7 @@
   },
   "test/e2e-genesis-federation.ts": {
    "ownHarness": 1,
-   "lines": 1033
+   "lines": 1038
   },
   "test/e2e-goals.ts": {
    "ownHarness": 1
@@ -1277,8 +1276,7 @@
    "ownHarness": 1
   },
   "test/e2e-group-sharing.ts": {
-   "ownHarness": 1,
-   "looseRefusal": 1
+   "ownHarness": 1
   },
   "test/e2e-header-nav.ts": {
    "ownHarness": 1
@@ -1300,7 +1298,7 @@
   },
   "test/e2e-hooks.ts": {
    "ownHarness": 1,
-   "lines": 905,
+   "lines": 917,
    "lintErrors": 2
   },
   "test/e2e-html-pages.ts": {
@@ -1336,7 +1334,8 @@
    "looseRefusal": 1
   },
   "test/e2e-install-sets.ts": {
-   "ownHarness": 1
+   "ownHarness": 1,
+   "lines": 881
   },
   "test/e2e-intake-form-owner.ts": {
    "ownHarness": 1
@@ -1378,7 +1377,7 @@
   "test/e2e-knowledge.ts": {
    "ownHarness": 1,
    "looseRefusal": 1,
-   "lines": 821
+   "lines": 832
   },
   "test/e2e-ledger-admin.ts": {
    "ownHarness": 1
@@ -1396,7 +1395,7 @@
   },
   "test/e2e-libs.ts": {
    "ownHarness": 1,
-   "lines": 1330
+   "lines": 1348
   },
   "test/e2e-live-catchup.ts": {
    "ownHarness": 1
@@ -1508,7 +1507,7 @@
   },
   "test/e2e-mcp-extensions.ts": {
    "ownHarness": 1,
-   "lines": 994
+   "lines": 1000
   },
   "test/e2e-mcp-flags.ts": {
    "ownHarness": 1
@@ -1627,7 +1626,7 @@
   "test/e2e-mcp.ts": {
    "ownHarness": 1,
    "deviceFlow": 1,
-   "lines": 1357,
+   "lines": 1373,
    "lintErrors": 2
   },
   "test/e2e-members-only-payments.ts": {
@@ -1825,7 +1824,7 @@
    "ownHarness": 1,
    "mcpOauth": 1,
    "looseRefusal": 1,
-   "lines": 871
+   "lines": 886
   },
   "test/e2e-overview.ts": {
    "ownHarness": 1
@@ -1916,8 +1915,8 @@
   },
   "test/e2e-packages.ts": {
    "ownHarness": 1,
-   "lines": 1814,
-   "lintErrors": 5
+   "lines": 1791,
+   "lintErrors": 4
   },
   "test/e2e-page-access.ts": {
    "ownHarness": 1
@@ -1982,7 +1981,7 @@
   },
   "test/e2e-profile-tabs.ts": {
    "ownHarness": 1,
-   "lines": 1576,
+   "lines": 1573,
    "lintErrors": 3
   },
   "test/e2e-projects.ts": {
@@ -2082,7 +2081,7 @@
   },
   "test/e2e-remake-home.ts": {
    "ownHarness": 1,
-   "lines": 874
+   "lines": 891
   },
   "test/e2e-rest-scope-gates.ts": {
    "ownHarness": 1,
@@ -2216,7 +2215,7 @@
   },
   "test/e2e-storage-visibility.ts": {
    "ownHarness": 1,
-   "lines": 1540,
+   "lines": 1538,
    "lintErrors": 2
   },
   "test/e2e-stripe-testmode.ts": {
@@ -2329,7 +2328,7 @@
   },
   "test/e2e-workspace-activity.ts": {
    "ownHarness": 1,
-   "lintErrors": 2
+   "lintErrors": 1
   },
   "test/e2e-workspace-backing-gate.ts": {
    "ownHarness": 1
@@ -2415,7 +2414,7 @@
   },
   "test/federation-mesh.ts": {
    "ownHarness": 1,
-   "lines": 892,
+   "lines": 891,
    "lintErrors": 1
   },
   "test/federation-messages.ts": {

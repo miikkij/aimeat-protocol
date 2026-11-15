@@ -443,7 +443,7 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
                 updatedAt: now,
             });
 
-            const keyExchange = await performKeyExchange(node_url, config, storage, node_id)
+            const keyExchange = await performKeyExchange(node_url, config, storage, node_id, admittedPeer.publicKey || undefined)
                 .catch(() => ({ success: false }));
 
             res.status(200).json(success(config.nodeId, {

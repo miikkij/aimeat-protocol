@@ -25,10 +25,6 @@
       "count": 1,
       "why": "removePeer, behind the operator role on REST and operator:admin on MCP: sets de-peering status with its grace end. Status only."
     },
-    "src/services/signed-node-request.ts": {
-      "count": 1,
-      "why": "federationPeerProofPin: sets deliveryProofAt on the stored peer record, and only after the message's delivery or audience proof verified against that peer's pinned key. It saves the peer record this process holds in memory, as the heartbeat loop in federation.ts does; the message changes no other field, so the url, the key, the status and the tier are written back as held (secaudit 2026-10-10 I21)."
-    },
     "src/services/federation.ts": {
       "count": 3,
       "why": "The heartbeat loop: availability, version and status from a ping signed by this node. Status and statistics only; never the url or the key."
@@ -37,13 +33,13 @@
       "count": 1,
       "why": "linkRepository, behind the operator check (requireOperatorPrincipal with operator:admin, or the operator's own start-up file): the repository the set names is written only after its own card answers with the same node id and key (2026-10-01)."
     },
-    "src/services/packages/sale/package-sale-client.ts": {
-      "count": 1,
-      "why": "claimPackageHere, behind requireOperatorPrincipal with operator:admin on POST /v1/package-claims and resolveOperatorAgentName on MCP: after the repository accepted this node's signed claim, the repository's existing peer record is saved with shareCatalogue true, so pulls reach it. Only that flag changes; the url and key are the ones linkPackagePeer pinned after the repository's own card answered with them (2026-10-02)."
-    },
     "src/services/packages/peer/package-peer-register.ts": {
       "count": 1,
       "why": "registerPackagePeer, from linkPackagePeer and adoptPendingPeer only: a package author, an operator or a seller node of the author asked, and the node's own card answered with the same id and key. Written packages-only (contact tier, messaging off). The card does not prove the id is the asker's; the readers below keep such a peer to packages."
+    },
+    "src/services/packages/sale/package-sale-client.ts": {
+      "count": 1,
+      "why": "claimPackageHere, behind requireOperatorPrincipal with operator:admin on POST /v1/package-claims and resolveOperatorAgentName on MCP: after the repository accepted this node's signed claim, the repository's existing peer record is saved with shareCatalogue true, so pulls reach it. Only that flag changes; the url and key are the ones linkPackagePeer pinned after the repository's own card answered with them (2026-10-02)."
     },
     "src/services/peer-replace-ask.ts": {
       "count": 1,
@@ -52,6 +48,10 @@
     "src/services/relay-claim-policy.ts": {
       "count": 2,
       "why": "The operator's relay-claim setting for one peer, and the timestamps of verified relays. Neither touches the url or the key."
+    },
+    "src/services/signed-node-request.ts": {
+      "count": 1,
+      "why": "federationPeerProofPin: sets deliveryProofAt on the stored peer record, and only after the message's delivery or audience proof verified against that peer's pinned key. It saves the peer record this process holds in memory, as the heartbeat loop in federation.ts does; the message changes no other field, so the url, the key, the status and the tier are written back as held (secaudit 2026-10-10 I21)."
     }
   },
   "readers": {
@@ -59,13 +59,13 @@
       "count": 1,
       "why": "The 'federation-peer' credential strategy: the peer comes from gatePeer (an active peer, entitled to the door's capability, with a key on file) and its pinned key verifies the Ed25519 signature over the exact text the door signs, unconditionally, before the handler runs. The key is read, never the url. These are the first lines the inbound federation handlers below ran themselves until 2026-11-05 (codebase analysis 2026-11-03, decision 2 of 2026-11-05)."
     },
-    "src/routes/federation-auth.ts": {
-      "count": 1,
-      "why": "POST /v1/federation/auth/verify, the home node's answer to a federated sign-in: gatePeer admits only an active peer with a key, the tier ceiling must allow sign-ins, and the request's signature is verified against that peer's pinned key before any account is read. The key is read, never the url (secaudit 2026-10, D1). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
-    },
     "src/routes/apps/catalogue-admin.ts": {
       "count": 3,
       "why": "Peer app search for an operator: active peers only, url checked with validateOutboundUrl first; reads public app listings and sends nothing private."
+    },
+    "src/routes/federation-auth.ts": {
+      "count": 1,
+      "why": "POST /v1/federation/auth/verify, the home node's answer to a federated sign-in: gatePeer admits only an active peer with a key, the tier ceiling must allow sign-ins, and the request's signature is verified against that peer's pinned key before any account is read. The key is read, never the url (secaudit 2026-10, D1). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/federation-genesis-memory-read.ts": {
       "count": 2,
@@ -76,16 +76,16 @@
       "why": "Verifies a genesis node's signed message against the key pinned for the genesis peer, refusing when there is no key or no signature. The catalogue ingest reads the same pinned key again, after the message's own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
     },
     "src/routes/federation-peer/introduce.ts": {
-      "count": 7,
-      "why": "Compares the key an introduction presents with the key of the peer already holding that node id, to refuse or to record a held id. No outbound use. The service summary reads the pinned key of the active, catalogue-sharing peer the x-source-node header names, to verify the request's signature and then its audience proof and single use (signedGetRefusal; QA audit S6-09, 2026-10-16)."
+      "count": 8,
+      "why": "Hands the admitted peer's own key to performKeyExchange as the key on file (2026-11-15, E2E audit L056), so an answer equal to it is not format-checked again; the key is the one this route just stored. Compares the key an introduction presents with the key of the peer already holding that node id, to refuse or to record a held id. No outbound use. The service summary reads the pinned key of the active, catalogue-sharing peer the x-source-node header names, to verify the request's signature and then its audience proof and single use (signedGetRefusal; QA audit S6-09, 2026-10-16)."
     },
     "src/routes/federation-peer/lifecycle.ts": {
       "count": 12,
       "why": "Key exchange: compares the presented key with the pinned one (rotation needs a signature by it), proves an unpinned key against the card at the operator-approved address, and verifies a ping's signature with the pinned key. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/federation-peer/peers.ts": {
-      "count": 16,
-      "why": "Operator listing and editing of peers, the activate key exchange (bound to the peer's id), and inbound heartbeat and presence verified with the pinned key after gatePeer. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
+      "count": 17,
+      "why": "Operator listing and editing of peers, the activate key exchange (bound to the peer's id; it passes the peer's stored key as the key on file, 2026-11-15, E2E audit L056), and inbound heartbeat and presence verified with the pinned key after gatePeer. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/federation-peer/promotion.ts": {
       "count": 2,
@@ -112,7 +112,7 @@
       "why": "POST /v1/federation/retract, a peer taking back a record it replicated here: gatePeer with the capability word ('replicateMemory', so an active peer with a key and the replication door), then the retraction's own signature against the pinned key, verified unconditionally before anything is read. The same pinned key is read again for the audience proof that names this node and for the pin, and the signed send time carries a five-minute single-use window, checked after the signature so a forged message cannot use up a real one. The replica key is built from the node id the signature proved, never from a body field, and a row is removed only when it carries a tag naming that node, so a peer reaches its own copies and nothing else (secaudit 2026-10, replica retention)."
     },
     "src/routes/federation-sync/routing.ts": {
-      "count": 8,
+      "count": 7,
       "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off. The routed call parses the active peer's stored url once more to keep the request on that peer's own origin, refusing a path that would leave it (secaudit2026oct22)."
     },
     "src/routes/federation-sync/templates.ts": {
@@ -124,12 +124,12 @@
       "why": "Federated sign-in: the home node must be an active peer whose tier can carry federated sign-in (member or genesis; contact, visiting and packages-only refused under every policy) and, under specific_peers, have allowFederatedAuth; the reply is verified with its pinned key and the visitor's home is the signing peer (2026-10-01)."
     },
     "src/routes/memory/federation.ts": {
-      "count": 9,
+      "count": 7,
       "why": "A federated visitor's pull, push and list go to the visitor's home peer, which only a sign-in through a member or genesis peer can have made; list-remote and pull-remote need an active peer and validateOutboundUrl."
     },
     "src/server-bootstrap/service-init.ts": {
-      "count": 1,
-      "why": "On a peer's recovery, a key exchange with it that must answer as its id; the key cache is written under that id only."
+      "count": 2,
+      "why": "On a peer's recovery, a key exchange with it that must answer as its id; the key cache is written under that id only. The peer's stored key goes with it as the key on file (2026-11-15, E2E audit L056), so an unchanged key is not format-checked again."
     },
     "src/services/agent/port-redirect.ts": {
       "count": 1,
@@ -175,13 +175,13 @@
       "count": 1,
       "why": "A federation broadcast goes to active, non-private peers; a packages-only or contact peer is private (peerMode), so it receives none."
     },
-    "src/services/message-reactions.ts": {
-      "count": 2,
-      "why": "A mark on a message goes only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on), through peerFetch, signed with this node's key and the audience proof naming that peer (2026-10-26)."
-    },
     "src/services/message-delivery.ts": {
       "count": 3,
       "why": "Messages and read receipts go only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on); the plain fetch is the federation carve-out of security/outbound-fetch-exemptions.json (2026-10-01)."
+    },
+    "src/services/message-reactions.ts": {
+      "count": 2,
+      "why": "A mark on a message goes only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on), through peerFetch, signed with this node's key and the audience proof naming that peer (2026-10-26)."
     },
     "src/services/packages/compose/package-import.ts": {
       "count": 3,
