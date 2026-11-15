@@ -1,5 +1,5 @@
 /**
- * @file federation-peer-gate.ts
+ * @file src/services/federation/peer-gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Is this peer allowed through this door at all? One answer, so a new permission word
@@ -52,8 +52,8 @@
  *   v1.0.0 — 2026-08-23 — Initial, with the contact tier: message/receipt/storage-grant, broadcast,
  *     settlement, presence, memory-list and templates each name a word now.
  */
-import type { PeerInfo } from './federation.js';
-import { ownNodeIdOf } from './peer-registry.js';
+import type { PeerInfo } from '../federation.js';
+import { ownNodeIdOf } from '../peer-registry.js';
 
 /**
  * The permission words an inbound door may require. Deliberately a subset of the peer's flags: the

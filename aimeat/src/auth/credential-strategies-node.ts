@@ -8,7 +8,7 @@
  *   (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *
  *   A FEDERATION PEER. Every inbound federation door that takes it read the body, refused what the
- *   door needs and lacks (400), found the peer with gatePeer() (services/federation-peer-gate.ts:
+ *   door needs and lacks (400), found the peer with gatePeer() (services/federation/peer-gate.ts:
  *   active, entitled to the door's capability, key on file), refused a missing signature, and verified
  *   the signature over the exact text the door signs. Those steps are this strategy, in that order and
  *   with the door's own sentences, which the route passes as options next to the text it signs, so
@@ -34,7 +34,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
-import { gatePeer, type PeerCapability } from '../services/federation-peer-gate.js';
+import { gatePeer, type PeerCapability } from '../services/federation/peer-gate.js';
 import { verifySaleRequest, verifyRequestWithKey } from '../services/packages/sale/package-sale-auth.js';
 import { isSellerFor } from '../services/packages/sale/package-sellers.js';
 import { error } from '../middleware/envelope.js';

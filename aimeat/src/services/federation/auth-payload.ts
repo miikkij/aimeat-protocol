@@ -1,5 +1,5 @@
 /**
- * @file src/services/federation-auth-payload.ts
+ * @file src/services/federation/auth-payload.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The text a node signs when it asks a person's home node to check their password for a

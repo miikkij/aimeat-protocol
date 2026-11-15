@@ -77,10 +77,10 @@ import { LIVENESS_RECOVERABLE, type PeerInfo } from '../../services/federation.j
 import { verify, ed25519PublicKeyProblem } from '../../auth/keypair.js';
 import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { emitChange } from '../../services/event-bus.js';
-import { performKeyExchange } from '../../services/federation-helpers.js';
+import { performKeyExchange } from '../../services/federation/helpers.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../../services/presence.js';
-import { deriveTierFlags, coerceTier, clampFlagsToTier } from '../../services/federation-tiers.js';
-import { gatePeer, selfNodeIdMessage } from '../../services/federation-peer-gate.js';
+import { deriveTierFlags, coerceTier, clampFlagsToTier } from '../../services/federation/tiers.js';
+import { gatePeer, selfNodeIdMessage } from '../../services/federation/peer-gate.js';
 import { getActivePolicy, evaluatePromotion } from '../../services/network-policy.js';
 import { parsePeerRelayClaim, setPeerRelayClaim, peerRelayClaimView } from '../../services/relay-claim-policy.js';
 import {

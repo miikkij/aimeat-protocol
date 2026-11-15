@@ -279,13 +279,13 @@
     "src/services/exposure/exposure-report.ts": {
       "listOwners": 1
     },
-    "src/services/federation-book.ts": {
+    "src/services/federation/book.ts": {
       "listOwners": 1
     },
-    "src/services/federation-overview.ts": {
+    "src/services/federation/overview.ts": {
       "listAgents": 1
     },
-    "src/services/federation-peer-reload.ts": {
+    "src/services/federation/peer-reload.ts": {
       "listFederationPeers": 1
     },
     "src/services/federation.ts": {

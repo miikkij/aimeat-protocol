@@ -41,7 +41,7 @@ import { parseGaiiLoose } from '../utils/gaii.js';
 import { deliveryTargetFor } from '../utils/messaging.js';
 import { logger } from '../utils/logger.js';
 import { sweepReferenceAttachments } from './attachment-duplication.js';
-import { peerTakesMessages } from './federation-peer-gate.js';
+import { peerTakesMessages } from './federation/peer-gate.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { claimedSweep } from './process-lease.js';
 

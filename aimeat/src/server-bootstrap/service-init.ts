@@ -135,7 +135,7 @@ import { registerVisitorPeers } from '../auth/visitor-peer.js';
 import { startHeartbeatJob, setOnPeerRecovery, peerRegistry } from '../services/federation.js';
 import { startScreenshotAutoCapture } from '../services/screenshot-capture.js';
 import { presence } from '../services/presence.js';
-import { assembleBook, pullBook } from '../services/federation-book.js';
+import { assembleBook, pullBook } from '../services/federation/book.js';
 import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
 import { ConnectTunnelManager } from '../services/connect-tunnel.js';
@@ -158,8 +158,8 @@ import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
 import { runOnceOnlyKeepSteps } from './once-only-keep-steps.js';
-import { flagOrphanPeerApprovalsOnce } from '../services/federation-orphan-approvals.js';
-import { peerInfoFromRow } from '../services/federation-peer-reload.js';
+import { flagOrphanPeerApprovalsOnce } from '../services/federation/orphan-approvals.js';
+import { peerInfoFromRow } from '../services/federation/peer-reload.js';
 import { startNodeBusRelay } from './bus-relay-start.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app/tools-key.js';
@@ -484,7 +484,7 @@ export async function initializeServices(
   // removes or restricts ends its visitors' sessions at once (auth/visitor-peer.ts).
   registerVisitorPeers(peers, config.nodeId);
   // Once per node: the approved peering requests no peer stands behind are named on the Security page,
-  // none changed (services/federation-orphan-approvals.ts). Reads the registry loaded just above.
+  // none changed (services/federation/orphan-approvals.ts). Reads the registry loaded just above.
   await flagOrphanPeerApprovalsOnce(storage, config, peers.keys())
     .catch(err => logger.error('Failed to look for approved peering requests without a peer; the next boot tries again', { error: String(err) }));
 

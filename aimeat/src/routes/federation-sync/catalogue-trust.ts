@@ -40,14 +40,14 @@ import { badInput, bodyOf, signedJson } from '../../auth/credential-strategies-n
 import {
     deliveryRefusal, pinnedRefusal, federationPeerProofPin, audienceRefusal, signedMessageRefusalOnNode,
 } from '../../services/signed-node-request.js';
-import { TRUST_ADVISORY_TYPES, trustNoticeSignString } from '../../services/federation-trust-notice.js';
+import { TRUST_ADVISORY_TYPES, trustNoticeSignString } from '../../services/federation/trust-notice.js';
 
 /** A node id as nodes write them: letters, digits, dot, dash and underscore. */
 const NODE_ID_SHAPE = /^[A-Za-z0-9._-]{1,128}$/;
 const MAX_REASON_CHARS = 1000;
 /** How many trust notices one peer may have stored here at a time. */
 const MAX_RECEIVED_PER_PEER = 50;
-import { deriveTierFlags, tierRank, coerceTier } from '../../services/federation-tiers.js';
+import { deriveTierFlags, tierRank, coerceTier } from '../../services/federation/tiers.js';
 import { emitChange } from '../../services/event-bus.js';
 import { actionPricingFromPeer } from '../../services/action-pacing.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
@@ -161,7 +161,7 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
 
     // POST /v1/federation/trust-advisory, first handler: a signed trust notice from a PEER (the
     // emergency removal of a peer with notify_network, or the other operator's advisory; sender in
-    // services/federation-trust-notice.ts). It is taken when the body carries a signature; any other
+    // services/federation/trust-notice.ts). It is taken when the body carries a signature; any other
     // request goes on to the operator's handler below (next('route'), the strategy's unsignedPassesOn).
     // The sending peer and its signature are verified by the 'federation-peer' credential strategy.
     //

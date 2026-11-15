@@ -22,7 +22,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { syncCatalogueToPeer } from '../../src/services/catalogue-sync.js';
-import { deriveTierFlags } from '../../src/services/federation-tiers.js';
+import { deriveTierFlags } from '../../src/services/federation/tiers.js';
 import type { PeerInfo } from '../../src/services/federation.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';

@@ -1,5 +1,5 @@
 /**
- * @file src/services/federation-trust-notice.ts
+ * @file src/services/federation/trust-notice.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A trust notice from this node to its peers: "this node removed, suspended or warns
@@ -19,13 +19,13 @@
  *   v1.0.0 — 2026-10-16 — Initial: the signed notice and the per-peer outcome, replacing an unsigned
  *     POST whose answer was not read (QA audit S6-06).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PeerInfo } from './federation.js';
-import { sign } from '../auth/keypair.js';
-import { audienceProof } from './signed-node-request.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
-import { peerFetch } from '../utils/peer-fetch.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { sign } from '../../auth/keypair.js';
+import { audienceProof } from '../signed-node-request.js';
+import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
 
 export const TRUST_ADVISORY_TYPES = ['warning', 'suspend', 'ban'] as const;
 export type TrustAdvisoryType = typeof TRUST_ADVISORY_TYPES[number];

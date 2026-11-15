@@ -61,13 +61,13 @@ import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationP
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { peerUrlRefusal } from '../../services/peer-url-policy.js';
 import { emitChange } from '../../services/event-bus.js';
-import { peerKeyCache } from '../../services/federation-helpers.js';
+import { peerKeyCache } from '../../services/federation/helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
-import { deriveTierFlags, coerceTier, type PeerTier } from '../../services/federation-tiers.js';
+import { deriveTierFlags, coerceTier, type PeerTier } from '../../services/federation/tiers.js';
 import { proveNodeCard } from '../../services/packages/peer/package-peer-register.js';
 import { reportPeerIncident } from '../../services/peer-incidents.js';
-import { removePeer } from '../../services/federation-peer-remove.js';
-import { selfNodeIdMessage } from '../../services/federation-peer-gate.js';
+import { removePeer } from '../../services/federation/peer-remove.js';
+import { selfNodeIdMessage } from '../../services/federation/peer-gate.js';
 
 /** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
 let cachedSummaryHash = '';
@@ -84,7 +84,7 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
     router.delete('/v1/federation/peers/:nodeId', requireAuth(), requireOperator(storage), async (req, res) => {
         const out = await removePeer({ config, storage, peers }, req.params.nodeId as string, {
             emergency: req.query.emergency === 'true',
-            // The signed notice to the other peers (services/federation-trust-notice.ts); emergency only.
+            // The signed notice to the other peers (services/federation/trust-notice.ts); emergency only.
             notifyNetwork: req.body?.notify_network === true || req.query.notify_network === 'true',
             // The reason from the body (the page) or the query (the MCP tool's connector and CLI twins,
             // whose DELETE carries no body).

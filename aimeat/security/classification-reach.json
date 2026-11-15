@@ -2016,19 +2016,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's public tool manifest, read to validate a purchase."
     },
-    "src/services/federation-book.ts": {
+    "src/services/federation/book.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's federation book record."
     },
-    "src/services/federation-peer-remove.ts": {
+    "src/services/federation/peer-remove.ts": {
       "reads": {
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Rewrites replica records to expiring when a peer is removed (read-to-rewrite). Moved here from routes/federation-peer/lifecycle.ts on 2026-10-01 unchanged. From 2026-10-20 the listing is listAllMemory, paged by key prefix across every owner principal instead of a walk of the local agents table, because a replica sits under the SENDING node's principal and the walk converted none of them (secaudit 2026-10, replica retention). The value is read because the row is written back under the expiring key, and it goes nowhere else."
     },
-    "src/services/federation-remote-templates.ts": {
+    "src/services/federation/remote-templates.ts": {
       "reads": {
         "getMemory": 2
       },

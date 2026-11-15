@@ -33,7 +33,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
-import { recordHeartbeatOutcome } from '../src/services/federation-availability.js';
+import { recordHeartbeatOutcome } from '../src/services/federation/availability.js';
 import type { PeerInfo } from '../src/services/federation.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { setupOperator, registerOwner } from './helpers/owner-login.js';

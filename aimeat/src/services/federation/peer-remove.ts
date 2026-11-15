@@ -1,5 +1,5 @@
 /**
- * @file services/federation-peer-remove.ts
+ * @file src/services/federation/peer-remove.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Remove a federation peer: the operator's way to end a link, and to free a node id that
@@ -31,17 +31,17 @@
  *     to the peer-registration incident, item 5). Unchanged but for the network notice, which goes
  *     through safeFetch and logs the error it caught.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PeerInfo } from './federation.js';
-import { returnEscrow } from './morsel.js';
-import { logger } from '../utils/logger.js';
-import { emitChange } from './event-bus.js';
-import { sendTrustNotice } from './federation-trust-notice.js';
-import { deleteRemoteTemplates } from './federation-remote-templates.js';
-import { peerKeyCache } from './federation-helpers.js';
-import { forgetPeer, readPendingPeer, deletePendingPeer } from './peer-origin.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { returnEscrow } from '../morsel.js';
+import { logger } from '../../utils/logger.js';
+import { emitChange } from '../event-bus.js';
+import { sendTrustNotice } from './trust-notice.js';
+import { deleteRemoteTemplates } from './remote-templates.js';
+import { peerKeyCache } from './helpers.js';
+import { forgetPeer, readPendingPeer, deletePendingPeer } from '../peer-origin.js';
+import { parseGaiiLoose } from '../../utils/gaii.js';
 
 /** Replicas read per listing call while de-peering converts them, and the paging loop's stop. */
 const REPLICA_PAGE_SIZE = 200;
@@ -161,7 +161,7 @@ export async function removePeer(
         }
         const accepted = notices.filter(n => n.accepted).length;
 
-        // The stored template listings of this peer go with it (services/federation-remote-templates.ts).
+        // The stored template listings of this peer go with it (services/federation/remote-templates.ts).
         await deleteRemoteTemplates(storage, nodeId);
 
         // Its replicas go with it too. Until 2026-10-27 the emergency branch left every replica in

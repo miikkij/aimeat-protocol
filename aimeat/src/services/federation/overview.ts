@@ -1,5 +1,5 @@
 /**
- * @file src/services/federation-overview.ts
+ * @file src/services/federation/overview.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one read behind the operator's Federation page: where this node stands, what is
@@ -42,7 +42,7 @@
  *   - compareVersions(a, b) / versionsBehind(a, b) — the semver-ish comparison, exported for tests
  *   - buildFederationOverview(config, storage, peers)
  * @usage
- *   import { buildFederationOverview } from '../services/federation-overview.js';
+ *   import { buildFederationOverview } from './overview.js';
  * @version-history
  *   v1.3.0 — 2026-10-29 — The requests that expired (federation.peering_request_days) are deleted before
  *     the requests are read, so the page never offers to approve one (secaudit2026oct26 round 8c,
@@ -58,17 +58,17 @@
  *     claimed and unclaimed relay, and `relay_claims` names who is not ready and the two versions.
  *   v1.0.0 — 2026-09-12 — Initial, with the Federation page's rebuild.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PeerInfo } from './federation.js';
-import { getActiveBook, buildNodeCard } from './federation-book.js';
-import type { NodeCard } from './federation-book.js';
-import { computeServiceSummary } from '../utils/service-summary.js';
-import { logger } from '../utils/logger.js';
-import { peerRelayClaimView, relayClaimSummary, type PeerRelayClaimView, type RelayClaimSummary } from './relay-claim-policy.js';
-import { describePeerOrigins, type PeerOriginView } from './peer-origin-view.js';
-import { pendingRegistrationView } from './peer-origin.js';
-import { sweepExpiredPeeringRequests } from './peering-request-expiry.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { getActiveBook, buildNodeCard } from './book.js';
+import type { NodeCard } from './book.js';
+import { computeServiceSummary } from '../../utils/service-summary.js';
+import { logger } from '../../utils/logger.js';
+import { peerRelayClaimView, relayClaimSummary, type PeerRelayClaimView, type RelayClaimSummary } from '../relay-claim-policy.js';
+import { describePeerOrigins, type PeerOriginView } from '../peer-origin-view.js';
+import { pendingRegistrationView } from '../peer-origin.js';
+import { sweepExpiredPeeringRequests } from '../peering-request-expiry.js';
 
 export type FederationStanding = 'alone' | 'waiting' | 'degraded' | 'linked';
 

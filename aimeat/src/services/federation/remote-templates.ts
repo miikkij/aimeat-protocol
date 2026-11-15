@@ -1,5 +1,5 @@
 /**
- * @file src/services/federation-remote-templates.ts
+ * @file src/services/federation/remote-templates.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The template listings this node fetched from its peers, kept so an owner's session can
@@ -17,19 +17,19 @@
  *   - syncRemoteTemplates(config, storage, peers): fetch every peer, store per peer, report per peer
  *   - readRemoteTemplates(storage, peers): what the Packages page shows, with per-peer status
  *   - deleteRemoteTemplates(storage, peerId): the cleanup on peer removal
- * @usage import { syncRemoteTemplates, readRemoteTemplates } from '../services/federation-remote-templates.js';
+ * @usage import { syncRemoteTemplates, readRemoteTemplates } from './remote-templates.js';
  * @version-history
  *   2026-10-16 — The listing request carries the audience headers the receiving route checks (QA audit S6-09).
  *   v1.0.0 — 2026-10-16 — Initial: the sync stores what it fetched and the Packages page reads it
  *     through an owner-session route (QA audit F1-04).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PeerInfo } from './federation.js';
-import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
-import { sign } from '../auth/keypair.js';
-import { audienceHeaders } from './signed-node-request.js';
-import { readJson, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
+import { sign } from '../../auth/keypair.js';
+import { audienceHeaders } from '../signed-node-request.js';
+import { readJson, OUTBOUND_READ_MAX_BYTES } from '../../utils/read-capped.js';
 
 /** The namespace the stored listings live in. Not an identity form, so no account can own it. */
 export const REMOTE_TEMPLATES_OWNER = '__federation_templates__';

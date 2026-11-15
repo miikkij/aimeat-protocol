@@ -1,5 +1,5 @@
 /**
- * @file src/services/federation-auth-consent.ts
+ * @file src/services/federation/auth-consent.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Has a person of this node let a peer node act for them? One answer for every route
@@ -25,10 +25,10 @@
  *     (secaudit 2026-10 wave 3, v70 and v71).
  */
 
-import type { Storage } from '../storage/interface.js';
-import type { PeerInfo } from './federation.js';
-import { coerceTier, tierCeiling } from './federation-tiers.js';
-import { deactivatedAccountSkip } from './account-deactivated.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { coerceTier, tierCeiling } from './tiers.js';
+import { deactivatedAccountSkip } from '../account-deactivated.js';
 
 /**
  * Has this auth consent's end time passed? Only a time that parses and lies at or before `now` ends

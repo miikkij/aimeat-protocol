@@ -10,7 +10,7 @@
  *   them: a peer approved and never switched on, whether the sign-in policy reaches anybody, how
  *   far behind a version is and behind what, and how old the book is. They are computed once, in a
  *   service, so the MCP tool answers the same question with the same arithmetic.
- *   → services/federation-overview.ts
+ *   → services/federation/overview.ts
  * @structure registerOverviewRoutes(router, config, storage, peers)
  * @usage registerOverviewRoutes(router, config, storage, peers);
  * @version-history
@@ -23,7 +23,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success } from '../../middleware/envelope.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { buildFederationOverview } from '../../services/federation-overview.js';
+import { buildFederationOverview } from '../../services/federation/overview.js';
 
 export function registerOverviewRoutes(
   router: Router,

@@ -52,7 +52,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { sign, verify } from '../auth/keypair.js';
-import { gatePeer } from './federation-peer-gate.js';
+import { gatePeer } from './federation/peer-gate.js';
 import { spendAssertionIdentity } from './assertion-spend.js';
 
 /**

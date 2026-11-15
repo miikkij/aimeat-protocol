@@ -268,7 +268,7 @@ When `federate` is `true`:
 - Each action from a remote node gets a composite ID: `{source_node}:{action.id}`.
 - Actions are tagged `federated:{nodeId}` to record where they came from.
 - An existing federated action is updated; a new one is created.
-- When a peer is removed, its federated actions are re-tagged from `federated:{nodeId}` to `expiring:{nodeId}` for cleanup (`src/services/federation-peer-remove.ts`).
+- When a peer is removed, its federated actions are re-tagged from `federated:{nodeId}` to `expiring:{nodeId}` for cleanup (`src/services/federation/peer-remove.ts`).
 
 ---
 
@@ -291,7 +291,7 @@ When `federate` is `true`:
 | `src/services/csm-parser.ts` | CSM YAML parser: `CsmDefinition` with `consentRequirements`, `parseCsm()`, `validateCsm()` |
 | `src/routes/federation-sync/catalogue-trust.ts` | `POST /v1/federation/catalogue-sync`: composite ID, `federated:` tag |
 | `src/services/catalogue-sync.ts` | Outbound catalogue sync of federated CSMs' actions |
-| `src/services/federation-peer-remove.ts` | Re-tags a removed peer's actions `expiring:{nodeId}` |
+| `src/services/federation/peer-remove.ts` | Re-tags a removed peer's actions `expiring:{nodeId}` |
 
 ### Key Functions
 

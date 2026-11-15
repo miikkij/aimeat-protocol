@@ -68,15 +68,15 @@ import {
 } from '../../services/signed-node-request.js';
 import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
-import { performKeyExchange } from '../../services/federation-helpers.js';
+import { performKeyExchange } from '../../services/federation/helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
-import { deriveTierFlags, type PeerTier } from '../../services/federation-tiers.js';
+import { deriveTierFlags, type PeerTier } from '../../services/federation/tiers.js';
 import { consumeLinkInvite } from '../../services/link-invites.js';
 import { getActivePolicy, evaluateAutoAdmit } from '../../services/network-policy.js';
 import { logger } from '../../utils/logger.js';
 import { reportPeerIncident } from '../../services/peer-incidents.js';
 import { peerUrlRefusal } from '../../services/peer-url-policy.js';
-import { selfNodeIdMessage } from '../../services/federation-peer-gate.js';
+import { selfNodeIdMessage } from '../../services/federation/peer-gate.js';
 import { askPeerReplacement } from '../../services/peer-replace-ask.js';
 import { sweepExpiredPeeringRequests, peeringRequestExpired, expiredRequestMessage } from '../../services/peering-request-expiry.js';
 import { unsignedServiceSummaryAccepted, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../../config/federation.js';

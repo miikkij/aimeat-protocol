@@ -470,7 +470,7 @@ async function doKeyExchange(
   s.start(t('join.keyExchange'));
 
   try {
-    // The same field names the node's own exchange sends (services/federation-helpers.ts
+    // The same field names the node's own exchange sends (services/federation/helpers.ts
     // performKeyExchange); the route refuses a body without `node_public_key`.
     const resp = await peerFetch(`${targetUrl}/v1/federation/key-exchange`, {
       method: 'POST',

@@ -11,9 +11,9 @@
  *   2026-10-29 -- Initial (secaudit2026oct26 round 8c, federation-07).
  */
 import { describe, it, expect } from 'vitest';
-import { gatePeer } from '../../src/services/federation-peer-gate.js';
+import { gatePeer } from '../../src/services/federation/peer-gate.js';
 import { peerRegistry, ownNodeIdOf } from '../../src/services/peer-registry.js';
-import { deriveTierFlags } from '../../src/services/federation-tiers.js';
+import { deriveTierFlags } from '../../src/services/federation/tiers.js';
 import type { PeerInfo } from '../../src/services/federation.js';
 
 const now = new Date().toISOString();

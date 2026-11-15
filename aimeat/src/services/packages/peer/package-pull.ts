@@ -71,7 +71,7 @@
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage, PackageRecord, UpstreamRef } from '../../../storage/interface.js';
 import type { PeerInfo } from '../../federation.js';
-import { gatePeer } from '../../federation-peer-gate.js';
+import { gatePeer } from '../../federation/peer-gate.js';
 import { safeFetch, stripTrailingSlashes } from '../../../utils/url-validator.js';
 import { readBodyCapped } from '../../../utils/read-capped.js';
 import { parseZip, ZipValidationError, type ParsedPackage } from '../compose/package-zip.js';

@@ -32,7 +32,7 @@ import { rmSync, existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, FederationPeerRecord } from '../../src/storage/interface.js';
-import { deriveTierFlags, type PeerTier } from '../../src/services/federation-tiers.js';
+import { deriveTierFlags, type PeerTier } from '../../src/services/federation/tiers.js';
 
 requirePostgresWhenAsked('federation-peer-flag-roundtrip');
 

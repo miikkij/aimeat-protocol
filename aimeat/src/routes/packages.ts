@@ -112,7 +112,7 @@ import { listForSale, listingFor, saleView } from '../services/packages/sale/pac
 import { readAccountSale, listedSaleRefusal } from '../services/packages/sale/package-account-entitlement.js';
 import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 import { isOperatorCaller } from '../services/operator-override.js';
-import { readRemoteTemplates } from '../services/federation-remote-templates.js';
+import { readRemoteTemplates } from '../services/federation/remote-templates.js';
 
 // The version generator, the content hash and the per-author ceiling used to live here, one copy
 // per road. They are in services/packages/compose/package-create.ts now, which is the one place a package version is

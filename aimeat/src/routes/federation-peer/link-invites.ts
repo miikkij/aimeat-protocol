@@ -24,7 +24,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { coerceTier, type PeerTier } from '../../services/federation-tiers.js';
+import { coerceTier, type PeerTier } from '../../services/federation/tiers.js';
 import { mintLinkInvite, listLinkInvites, revokeLinkInvite, DEFAULT_INVITE_TTL_HOURS } from '../../services/link-invites.js';
 
 /** Tiers an invite may name. Deliberately not `genesis` or `member`: an invite is presented by an

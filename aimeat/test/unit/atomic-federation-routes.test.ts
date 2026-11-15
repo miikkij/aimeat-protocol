@@ -25,7 +25,7 @@ import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig } from '../../src/config.js';
 import { generateKeyPair, sign } from '../../src/auth/keypair.js';
 import { audienceProof, deliveryProof } from '../../src/services/signed-node-request.js';
-import { trustNoticeSignString } from '../../src/services/federation-trust-notice.js';
+import { trustNoticeSignString } from '../../src/services/federation/trust-notice.js';
 import type { PeerInfo } from '../../src/services/federation.js';
 import { registerCatalogueTrustRoutes } from '../../src/routes/federation-sync/catalogue-trust.js';
 import { registerMessagingRoutes } from '../../src/routes/federation-sync/messaging.js';

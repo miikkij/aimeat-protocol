@@ -60,7 +60,7 @@ import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
 import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { safeFetch } from '../utils/url-validator.js';
-import { peerTakesMessages } from './federation-peer-gate.js';
+import { peerTakesMessages } from './federation/peer-gate.js';
 import { readBodyCapped } from '../utils/read-capped.js';
 import { systemReader } from './classification/reader.js';
 import { fileTarget } from './classification/labels.js';

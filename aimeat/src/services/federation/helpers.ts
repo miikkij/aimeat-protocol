@@ -1,5 +1,5 @@
 /**
- * @file src/services/federation-helpers.ts
+ * @file src/services/federation/helpers.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Federation shared helpers used across the federation routers
@@ -29,13 +29,13 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { readJson, readText, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
-import { peerUrlRefusal } from './peer-url-policy.js';
-import { ed25519PublicKeyProblem } from '../auth/keypair.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { readJson, readText, OUTBOUND_READ_MAX_BYTES } from '../../utils/read-capped.js';
+import { peerUrlRefusal } from '../peer-url-policy.js';
+import { ed25519PublicKeyProblem } from '../../auth/keypair.js';
 
 // ── E.4: Keyword matching helpers for cross-catalogue filtering ──
 

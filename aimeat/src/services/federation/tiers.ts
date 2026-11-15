@@ -1,5 +1,5 @@
 /**
- * @file federation-tiers.ts
+ * @file src/services/federation/tiers.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Single source of truth for federation peer TIERS and the permission
@@ -43,7 +43,7 @@
  *   - deriveTierFlags(tier) — what a tier STARTS with
  *   - tierCeiling(tier) — what a tier may REACH
  *   - clampFlagsToTier(tier, requested) — an edit, held to the ceiling
- * @usage import { deriveTierFlags, coerceTier, clampFlagsToTier } from '../services/federation-tiers.js';
+ * @usage import { deriveTierFlags, coerceTier, clampFlagsToTier } from './tiers.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial tier model (visiting/member/genesis) + flag derivation.
  *   v1.1.0 — 2026-08-23 — `contact`: the floor of the ladder, messages only. Three new permission

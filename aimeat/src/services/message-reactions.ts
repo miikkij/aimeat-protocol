@@ -44,7 +44,7 @@ import { deliveryTargetFor } from '../utils/messaging.js';
 import { parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
 import { sign } from '../auth/keypair.js';
 import { audienceProof } from './signed-node-request.js';
-import { peerTakesMessages } from './federation-peer-gate.js';
+import { peerTakesMessages } from './federation/peer-gate.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { logger } from '../utils/logger.js';
 

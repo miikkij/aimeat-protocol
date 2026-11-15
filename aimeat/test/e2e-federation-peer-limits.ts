@@ -35,7 +35,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof, deliveryProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from '../src/services/signed-node-request.js';
 import { bodyDigest, SALE_PURPOSE, CLAIM_PURPOSE } from '../src/services/packages/sale/package-sale-auth.js';
-import { performKeyExchange } from '../src/services/federation-helpers.js';
+import { performKeyExchange } from '../src/services/federation/helpers.js';
 import { bootNode, setupOperator, addPeer, startFakePeer, seen, auth, type NodeState } from './helpers/federation-two-node.js';
 
 let passed = 0;

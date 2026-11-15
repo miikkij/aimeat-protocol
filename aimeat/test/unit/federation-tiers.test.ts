@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import {
     deriveTierFlags, tierCeiling, clampFlagsToTier, coerceTier, tierRank,
     type PeerTier, type TierFlags,
-} from '../../src/services/federation-tiers.js';
+} from '../../src/services/federation/tiers.js';
 
 const ALL_TIERS: PeerTier[] = ['contact', 'visiting', 'member', 'genesis'];
 

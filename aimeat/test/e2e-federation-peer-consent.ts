@@ -9,7 +9,7 @@
  *   local person a signed member peer named in the body. Neither read a consent of that person. The
  *   two routes exist for a person of B who is signed in on A as a visitor (list-home, push-home), and
  *   B let that visitor sign in on A only after it found the person's sign-in consent for A. So the
- *   consent is the boundary on both routes now (services/federation-auth-consent.ts).
+ *   consent is the boundary on both routes now (services/federation/auth-consent.ts).
  *
  *   WHAT IT ASSERTS. Node B is the home node, node A the peer; each holds the other as an active
  *   member peer, and A accepts sign-ins from its peers.

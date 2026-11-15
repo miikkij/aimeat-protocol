@@ -24,7 +24,7 @@ import {
   onMemoryWrittenEvent, offMemoryWrittenEvent,
   type ChangeEvent, type DeliveryEvent, type PublicActivityEvent, type MemoryWriteEvent,
 } from '../../src/services/event-bus.js';
-import { reloadPeers } from '../../src/services/federation-peer-reload.js';
+import { reloadPeers } from '../../src/services/federation/peer-reload.js';
 import { createStoredConfigReload } from '../../src/services/config/reload.js';
 import { createMaintenanceCache } from '../../src/services/maintenance-cache.js';
 import type { FederationPeerRecord, MaintenanceState } from '../../src/storage/interface.js';
@@ -200,7 +200,7 @@ function row(nodeId: string, extra: Partial<FederationPeerRecord> = {}): Federat
 
 describe('reloadPeers', () => {
   it('drops a peer storage no longer has, adds a new one, and takes the operator\'s decisions', async () => {
-    const { peerInfoFromRow } = await import('../../src/services/federation-peer-reload.js');
+    const { peerInfoFromRow } = await import('../../src/services/federation/peer-reload.js');
     const peers = new Map<string, PeerInfo>();
     peers.set('gone', peerInfoFromRow(row('gone')));
     const kept = peerInfoFromRow(row('kept'));
@@ -216,7 +216,7 @@ describe('reloadPeers', () => {
   });
 
   it('keeps what this process learned from the peer: last seen, liveness status, version, heartbeats', async () => {
-    const { peerInfoFromRow } = await import('../../src/services/federation-peer-reload.js');
+    const { peerInfoFromRow } = await import('../../src/services/federation/peer-reload.js');
     const peers = new Map<string, PeerInfo>();
     const p = peerInfoFromRow(row('p', { status: 'offline' }));
     p.status = 'active'; p.lastSeen = '2026-11-04T09:00:00.000Z'; p.softwareVersion = '4.2.0'; p.heartbeatOk = 9;
@@ -229,7 +229,7 @@ describe('reloadPeers', () => {
   });
 
   it('leaves a peer this process added, replaced or removed while the read was under way', async () => {
-    const { peerInfoFromRow } = await import('../../src/services/federation-peer-reload.js');
+    const { peerInfoFromRow } = await import('../../src/services/federation/peer-reload.js');
     const peers = new Map<string, PeerInfo>();
     peers.set('removed-here', peerInfoFromRow(row('removed-here')));
     let release!: (rows: FederationPeerRecord[]) => void;

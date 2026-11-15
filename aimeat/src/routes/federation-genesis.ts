@@ -63,7 +63,7 @@ import { peerFetch } from '../utils/peer-fetch.js';
 import { emitChange } from '../services/event-bus.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism/reputation.js';
-import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation-helpers.js';
+import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation/helpers.js';
 import {
     cacheGenesisResults, findCachedGenesis, genesisPeerKey, isGenesisSubscriptionRecord, GENESIS_CACHE_TAG, GENESIS_SUBSCRIPTION_TAG,
 } from '../services/genesis-memory-cache.js';

@@ -25,7 +25,7 @@ import { removeContact } from '../../src/services/contacts.js';
 import {
   getActiveBook, storeActiveBook, assembleBook, pullBook, bookSignString,
   FEDERATION_BOOK_GAII, FEDERATION_BOOK_KEY, type FederationBook,
-} from '../../src/services/federation-book.js';
+} from '../../src/services/federation/book.js';
 import { generateKeyPair, sign } from '../../src/auth/keypair.js';
 
 const NODE = 'node-1';

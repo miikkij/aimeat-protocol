@@ -33,8 +33,8 @@ import type { PeerInfo } from './federation.js';
 import { notify } from './notify.js';
 import { approverGhiis, closeQuestion } from './approval-standard.js';
 import { LINK_INVITE_GAII, consumeLinkInviteAtKey, type LinkInviteRecord } from './link-invites.js';
-import { deriveTierFlags, coerceTier } from './federation-tiers.js';
-import { performKeyExchange } from './federation-helpers.js';
+import { deriveTierFlags, coerceTier } from './federation/tiers.js';
+import { performKeyExchange } from './federation/helpers.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 

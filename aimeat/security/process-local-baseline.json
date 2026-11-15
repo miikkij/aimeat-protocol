@@ -973,7 +973,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/federation-helpers.ts :: map :: peerKeyCache": {
+    "src/services/federation/helpers.ts :: map :: peerKeyCache": {
       "count": 1,
       "reason": "DEBT"
     },

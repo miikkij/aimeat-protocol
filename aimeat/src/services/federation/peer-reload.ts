@@ -1,5 +1,5 @@
 /**
- * @file src/services/federation-peer-reload.ts
+ * @file src/services/federation/peer-reload.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The federation peers a process keeps in memory, read from storage: at boot
@@ -23,8 +23,8 @@
  *   v1.0.0 — 2026-11-04 — Initial. peerInfoFromRow moved unchanged from service-init.ts (codebase
  *     analysis 2026-11-03, HA stage 2, e2-bus).
  */
-import type { FederationPeerRecord, Storage } from '../storage/interface.js';
-import { LIVENESS_RECOVERABLE, type PeerInfo } from './federation.js';
+import type { FederationPeerRecord, Storage } from '../../storage/interface.js';
+import { LIVENESS_RECOVERABLE, type PeerInfo } from '../federation.js';
 
 /** One stored peer row as the in-memory peer. A row written before a column existed keeps what it could already do. */
 export function peerInfoFromRow(sp: FederationPeerRecord): PeerInfo {

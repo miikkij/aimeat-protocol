@@ -107,7 +107,7 @@ import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
-import type { PeerCapability } from '../../services/federation-peer-gate.js';
+import type { PeerCapability } from '../../services/federation/peer-gate.js';
 import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
 import { badInput, bodyOf, signedJson, type FederationPeerOptions } from '../../auth/credential-strategies-node.js';
 import {
@@ -118,7 +118,7 @@ import { emitResourceUpdated } from '../../services/resource-events.js';
 import { notify } from '../../services/notify.js';
 import { parseGaiiLoose, isSameOwner, localAccountName, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
 import { acceptedSameAccount, blockedSenderAccount } from '../../services/contact-same-account.js';
-import { readPeerOperators } from '../../services/federation-book.js';
+import { readPeerOperators } from '../../services/federation/book.js';
 import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
 import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message-alias.js';
 import { listOperatorGhiis } from '../../services/operators.js';
@@ -127,7 +127,7 @@ import { duplicateMessageAttachments, sameAccount, isSentVersion, FILE_CHANGED_R
 import { systemReader } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
-import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation-auth-consent.js';
+import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation/auth-consent.js';
 import { NONCE_WINDOW_MS } from '../../services/request-nonce.js';
 import { boundInboundConversationId } from '../../services/message-thread-binding.js';
 import { normalizeInboundAttachments } from './inbound-attachments.js';
@@ -183,7 +183,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
      * signing node, or a person or agent that exists on this node. Anything else, a system namespace
      * such as package-entitlements or a third node's principal, is refused. A person of this node
      * passes only while they hold the sign-in consent for the signing node that push-home's visitor
-     * session needed in the first place (services/federation-auth-consent.ts), and an agent of this
+     * session needed in the first place (services/federation/auth-consent.ts), and an agent of this
      * node only while its owner holds it: existence alone let a linked peer publish records under
      * any local person or agent (secaudit 2026-10 wave 3, v71).
      */

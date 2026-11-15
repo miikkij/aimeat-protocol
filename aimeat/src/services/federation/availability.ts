@@ -1,5 +1,5 @@
 /**
- * @file federation-availability.ts
+ * @file src/services/federation/availability.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Heartbeat-derived uptime/availability for federation peers (Phase B).
@@ -12,11 +12,11 @@
  *   cycle — so this piggybacks that write with no new table.
  * @structure recordHeartbeatOutcome(peer, ok, now, opts) — mutates peer in place
  *   AvailabilityOpts: { windowDays, permanentThreshold, minSamples }
- * @usage import { recordHeartbeatOutcome } from './federation-availability.js';
+ * @usage import { recordHeartbeatOutcome } from './availability.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial uptime measurement (lifetime counters + daily buckets + label).
  */
-import type { PeerInfo } from './federation.js';
+import type { PeerInfo } from '../federation.js';
 
 export interface AvailabilityOpts {
   windowDays: number;

@@ -37,7 +37,7 @@
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage } from '../../../storage/interface.js';
 import type { PeerInfo } from '../../federation.js';
-import { gatePeer } from '../../federation-peer-gate.js';
+import { gatePeer } from '../../federation/peer-gate.js';
 import { signNodeRequest, checkNodeRequest } from '../../signed-node-request.js';
 
 /** What a package request signs besides the common fields (services/signed-node-request.ts). Exported

@@ -65,7 +65,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { buildRelayClaim } from '../../services/relay-claim.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { routingFee } from '../../services/morsel.js';
-import { gatePeer } from '../../services/federation-peer-gate.js';
+import { gatePeer } from '../../services/federation/peer-gate.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { isWorkPayload, WORK_INPUT_NOT_OBJECT } from '../../services/work/work-payload.js';
 

@@ -9,13 +9,13 @@
  *   in its own order (shorter keys first), and the book was signed over JSON.stringify of the
  *   object, so a book served from a PostgreSQL primary failed verification on every leaf with 401
  *   INVALID_SIGNATURE. Found when e2e-federation-book first ran its nodes on PostgreSQL (QA audit
- *   P1-02). The first case fails on src/services/federation-book.ts v1.0.1.
+ *   P1-02). The first case fails on src/services/federation/book.ts v1.0.1.
  * @version-history
  *   2026-10-16 — Initial (QA audit P1-02).
  */
 import { describe, expect, it } from 'vitest';
 import { generateKeyPair, sign } from '../../src/auth/keypair.js';
-import { bookSignString, legacyBookSignString, verifyBookSignature, type FederationBook } from '../../src/services/federation-book.js';
+import { bookSignString, legacyBookSignString, verifyBookSignature, type FederationBook } from '../../src/services/federation/book.js';
 
 const book = (): FederationBook => ({
     book_version: 3,

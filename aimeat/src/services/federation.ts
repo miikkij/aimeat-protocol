@@ -56,7 +56,7 @@ import type { Storage } from '../storage/interface.js';
 import { sign } from '../auth/keypair.js';
 import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from './signed-node-request.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
-import { recordHeartbeatOutcome } from './federation-availability.js';
+import { recordHeartbeatOutcome } from './federation/availability.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { serviceSummaryForm, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../config/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
@@ -119,7 +119,7 @@ export interface PeerInfo {
     peerMode: 'federation' | 'private';
     allowFederatedAuth: boolean;
     federationAuthScopes: string[];
-    /** Trust tier (see services/federation-tiers.ts). Absent → 'member'. `contact` is the floor:
+    /** Trust tier (see services/federation/tiers.ts). Absent → 'member'. `contact` is the floor:
      *  messages and nothing else. */
     tier?: 'genesis' | 'member' | 'visiting' | 'contact';
     /** Does this node's `support@operators` resolve to THIS peer? Deliberately NOT a TierFlag: it is

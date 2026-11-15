@@ -10,7 +10,7 @@
  *   WHY. assembleBook and pullBook read the peer's answer with resp.json(), which holds the whole
  *   body in memory before anything measures it, so an admitted peer decided how much the primary
  *   read, signed, stored as a public record and served to every leaf. The two attack cases fail on
- *   src/services/federation-book.ts v1.1.0.
+ *   src/services/federation/book.ts v1.1.0.
  * @usage cd aimeat && pnpm exec vitest run test/unit/federation-book-byte-ceiling.test.ts
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2 round 11).
@@ -36,7 +36,7 @@ import type { PeerInfo } from '../../src/services/federation.js';
 import {
   assembleBook, pullBook, getActiveBook, bookSignString,
   type FederationBook, type NodeCard,
-} from '../../src/services/federation-book.js';
+} from '../../src/services/federation/book.js';
 import { generateKeyPair, sign } from '../../src/auth/keypair.js';
 
 const NODE = 'aimeat-test-001-primary';

@@ -46,8 +46,8 @@
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
-import type { PeerTier } from './federation-tiers.js';
-import { coerceTier } from './federation-tiers.js';
+import type { PeerTier } from './federation/tiers.js';
+import { coerceTier } from './federation/tiers.js';
 import { logger } from '../utils/logger.js';
 
 /** The system identity these records live under. Not an owner: no person holds them. */

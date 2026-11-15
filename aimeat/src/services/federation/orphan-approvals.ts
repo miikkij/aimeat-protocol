@@ -1,5 +1,5 @@
 /**
- * @file src/services/federation-orphan-approvals.ts
+ * @file src/services/federation/orphan-approvals.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A once-per-node step: the approved peering requests that no peer stands behind are shown
@@ -25,12 +25,12 @@
  * @version-history
  *   v1.0.0 — 2026-10-23 — Initial (secaudit2026oct22).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PeeringRequestRecord } from '../storage/types/organisms-federation.js';
-import { logger } from '../utils/logger.js';
-import { recordSecurityIncident } from './security-incident.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeeringRequestRecord } from '../../storage/types/organisms-federation.js';
+import { logger } from '../../utils/logger.js';
+import { recordSecurityIncident } from '../security-incident.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
 
 /** The record under `system@<nodeId>` that says this node has run the step. */
 export const FEDERATION_ORPHAN_APPROVALS_KEY = 'migrations.secaudit2026oct22.federation-orphan-approvals';

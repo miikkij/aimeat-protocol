@@ -7,7 +7,7 @@
  *
  * @structure
  *   - federationRouter(config, storage, peers, networkDirectory?): mounts all federation sub-routers
- *   - Re-exports: peerKeyCache, performKeyExchange, PeerKeyEntry (from services/federation-helpers.js)
+ *   - Re-exports: peerKeyCache, performKeyExchange, PeerKeyEntry (from services/federation/helpers.js)
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -25,8 +25,8 @@ import { federationGenesisRouter } from './federation-genesis.js';
 import { federationAuthRouter } from './federation-auth.js';
 
 // Re-export shared helpers for backward compatibility
-export { peerKeyCache, performKeyExchange } from '../services/federation-helpers.js';
-export type { PeerKeyEntry } from '../services/federation-helpers.js';
+export { peerKeyCache, performKeyExchange } from '../services/federation/helpers.js';
+export type { PeerKeyEntry } from '../services/federation/helpers.js';
 
 export function federationRouter(
     config: AimeatConfig,

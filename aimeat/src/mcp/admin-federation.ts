@@ -9,7 +9,7 @@
  *   NOTHING COULD READ THIS BEFORE. The federation surface has doors for peers, settlements and
  *   genesis peering, and no tool at all for the operator's own view of it — so an operator asking
  *   their AI "is our federation healthy, does anything need me" got nothing, and the answer was on
- *   a screen. It calls services/federation-overview.ts, the one implementation
+ *   a screen. It calls services/federation/overview.ts, the one implementation
  *   GET /v1/admin/federation/overview calls.
  *
  *   THE PEERS MAP IS PASSED IN, not read from storage. It is the live map the federation routes and
@@ -44,10 +44,10 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
-import { buildFederationOverview } from '../services/federation-overview.js';
+import { buildFederationOverview } from '../services/federation/overview.js';
 import { setPeerRelayClaim, peerRelayClaimView } from '../services/relay-claim-policy.js';
 import { emitChange } from '../services/event-bus.js';
-import { removePeer } from '../services/federation-peer-remove.js';
+import { removePeer } from '../services/federation/peer-remove.js';
 import { setPeerSettlementCeiling } from '../services/settlement-ceiling.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 

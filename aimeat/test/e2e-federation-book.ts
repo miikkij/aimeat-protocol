@@ -98,7 +98,7 @@ await test('1. G node-card lists its operator + version + settings + resources',
   assert(Array.isArray(c.operators) && c.operators.some((o: any) => o.ghii === `gop${ts}@${G.nodeId}`), `operators: ${JSON.stringify(c.operators)}`);
   assert(c.settings && typeof c.settings.open_join === 'boolean', `settings: ${JSON.stringify(c.settings)}`);
   assert(c.resources && typeof c.resources.actions === 'number', `resources: ${JSON.stringify(c.resources)}`);
-  // The hash is recomputed from the returned card the way services/federation-book.ts computes it:
+  // The hash is recomputed from the returned card the way services/federation/book.ts computes it:
   // SHA-256 of the card's JSON without node_card_hash and computed_at, in the order the node sends.
   const stable = Object.fromEntries(Object.entries(c).filter(([k]) => k !== 'node_card_hash' && k !== 'computed_at'));
   const expected = createHash('sha256').update(JSON.stringify(stable)).digest('hex');

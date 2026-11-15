@@ -1,14 +1,14 @@
 /**
  * @file test/unit/federation-auth-consent.test.ts
  * @description The sign-in consent check the federated sign-in, the peer memory list and the peer
- *   replicate share (src/services/federation-auth-consent.ts): which consent rows count for a node,
+ *   replicate share (src/services/federation/auth-consent.ts): which consent rows count for a node,
  *   which links may carry a sign-in, and that the moved authConsentEnded is the one the sign-in
  *   route still exports.
  * @version-history
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10 wave 3, v70 and v71).
  */
 import { describe, it, expect } from 'vitest';
-import { isNodeAuthConsent, linkCarriesSignIn, peerMayActFor, authConsentEnded } from '../../src/services/federation-auth-consent.js';
+import { isNodeAuthConsent, linkCarriesSignIn, peerMayActFor, authConsentEnded } from '../../src/services/federation/auth-consent.js';
 import { authConsentEnded as fromRoute } from '../../src/routes/federation-auth.js';
 import type { Storage } from '../../src/storage/interface.js';
 

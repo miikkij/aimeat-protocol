@@ -1,5 +1,5 @@
 /**
- * @file federation-book.ts
+ * @file src/services/federation/book.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The "federation book" — a phone-book of the federation: per node, its operator
@@ -17,7 +17,7 @@
  *   - bookSignString() · legacyBookSignString() · verifyBookSignature() · getActiveBook() · storeActiveBook()
  *   - assembleBook(config, storage, peers) — primary: fetch peer cards + own → sign → store
  *   - readPeerOperators(peer, timeoutMs) — the operator GHIIs a peer's own node card names
- * @usage import { buildNodeCard, assembleBook, getActiveBook } from './federation-book.js';
+ * @usage import { buildNodeCard, assembleBook, getActiveBook } from './book.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial federation book (node-card + primary assembly + signed doc).
  *   v1.0.1 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
@@ -38,18 +38,18 @@
  *     auto-accepts a new contact only for a sender the peer names as its operator (E2E audit M181).
  */
 import { createHash } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PeerInfo } from './federation.js';
-import { buildNodeDescriptor } from '../utils/node-descriptor.js';
-import { isOperatorAccount } from '../utils/operator-account.js';
-import { computeServiceSummary } from '../utils/service-summary.js';
-import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
-import { readJson, ResponseTooLargeError } from '../utils/read-capped.js';
-import { sign, verify } from '../auth/keypair.js';
-import { peerKeyCache } from './federation-helpers.js';
-import { logger } from '../utils/logger.js';
-import { canonicalJson } from '../utils/memory-content.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { buildNodeDescriptor } from '../../utils/node-descriptor.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
+import { computeServiceSummary } from '../../utils/service-summary.js';
+import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
+import { readJson, ResponseTooLargeError } from '../../utils/read-capped.js';
+import { sign, verify } from '../../auth/keypair.js';
+import { peerKeyCache } from './helpers.js';
+import { logger } from '../../utils/logger.js';
+import { canonicalJson } from '../../utils/memory-content.js';
 
 export const FEDERATION_BOOK_GAII = '__federation_book__';
 export const FEDERATION_BOOK_KEY = 'federation-book.active';

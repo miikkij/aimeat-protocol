@@ -39,7 +39,7 @@
  */
 import type { VerifiedToken } from './jwt.js';
 import { isForeignPrincipal } from '../utils/gaii.js';
-import { coerceTier, tierCeiling } from '../services/federation-tiers.js';
+import { coerceTier, tierCeiling } from '../services/federation/tiers.js';
 import { PerNode, sessionConfig } from './node-auth.js';
 
 /** Statuses a peer leaves on its own when it answers again (services/federation.ts LIVENESS_RECOVERABLE). */

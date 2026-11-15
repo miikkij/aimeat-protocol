@@ -46,13 +46,13 @@ import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { emitChange } from '../../services/event-bus.js';
-import { syncRemoteTemplates } from '../../services/federation-remote-templates.js';
+import { syncRemoteTemplates } from '../../services/federation/remote-templates.js';
 import {
     signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal,
 } from '../../services/signed-node-request.js';
 import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
 import { badInput, bodyOf, signedJson } from '../../auth/credential-strategies-node.js';
-import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation-auth-consent.js';
+import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation/auth-consent.js';
 import { parseGaiiLoose, localAccountOf } from '../../utils/gaii.js';
 
 /** How stale a signed peer request may be. Same window /v1/federation/peer/introduce uses. */

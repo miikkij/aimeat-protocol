@@ -15,7 +15,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { PeeringRequestRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { forgetPeer } from '../../src/services/peer-origin.js';
-import { flagOrphanPeerApprovalsOnce } from '../../src/services/federation-orphan-approvals.js';
+import { flagOrphanPeerApprovalsOnce } from '../../src/services/federation/orphan-approvals.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 
 const config = { nodeId: 'test-node' } as AimeatConfig;

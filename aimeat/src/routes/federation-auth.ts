@@ -54,8 +54,8 @@ import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
 import { acceptCredential, credentialOf } from '../auth/credential-strategies.js';
 import { badInput, bodyOf } from '../auth/credential-strategies-node.js';
-import { hasNodeAuthConsent, linkCarriesSignIn } from '../services/federation-auth-consent.js';
-import { federationAuthPayload } from '../services/federation-auth-payload.js';
+import { hasNodeAuthConsent, linkCarriesSignIn } from '../services/federation/auth-consent.js';
+import { federationAuthPayload } from '../services/federation/auth-payload.js';
 import { checkPassword, checkSecondFactor } from '../services/password-check.js';
 import { sign } from '../auth/keypair.js';
 import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../services/signed-node-request.js';
@@ -64,8 +64,8 @@ import { logger } from '../utils/logger.js';
 import { passwordSignInRefusal, passwordWayInRefusal, twoStepCovers, TWO_STEP_SETUP_REQUIRED } from '../services/sign-in-policy.js';
 import { twoStepArmed } from '../services/passkeys.js';
 
-/** Moved to services/federation-auth-consent.ts (v1.5.0); exported here too for its existing importers. */
-export { authConsentEnded } from '../services/federation-auth-consent.js';
+/** Moved to services/federation/auth-consent.ts (v1.5.0); exported here too for its existing importers. */
+export { authConsentEnded } from '../services/federation/auth-consent.js';
 
 export function federationAuthRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -147,7 +147,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
             // services/consent.ts does for its readers (secaudit 2026-10,
             // federation-auth.ts:verify:auth-consent-expiry-unchecked). An end time that does not
             // parse is honoured, as before (authConsentEnded). The predicate lives in
-            // services/federation-auth-consent.ts, which the memory list and the replicate read too.
+            // services/federation/auth-consent.ts, which the memory list and the replicate read too.
             const hasAuthConsent = await hasNodeAuthConsent(storage, ghii, requesting_node, new Date());
             if (!hasAuthConsent) {
                 logger.info(`Federation auth denied: ${ghii} has no auth consent for node ${requesting_node}`);

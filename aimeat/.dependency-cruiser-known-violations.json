@@ -883,12 +883,11 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/federation-availability.ts",
-    "to": "src/services/federation.ts",
-    "unresolvedTo": "./federation.js",
+    "from": "src/services/federation.ts",
+    "to": "src/services/federation/availability.ts",
+    "unresolvedTo": "./federation/availability.js",
     "dependencyTypes": [
       "local",
-      "type-only",
       "import"
     ],
     "rule": {
@@ -897,17 +896,17 @@
     },
     "cycle": [
       {
-        "name": "src/services/federation.ts",
+        "name": "src/services/federation/availability.ts",
         "dependencyTypes": [
           "local",
-          "type-only",
           "import"
         ]
       },
       {
-        "name": "src/services/federation-availability.ts",
+        "name": "src/services/federation.ts",
         "dependencyTypes": [
           "local",
+          "type-only",
           "import"
         ]
       }

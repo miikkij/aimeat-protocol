@@ -41,7 +41,7 @@ import { getSoftwareVersion } from '../utils/version.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { readBodyCapped } from '../utils/read-capped.js';
 import { logger } from '../utils/logger.js';
-import { compareVersions } from './federation-overview.js';
+import { compareVersions } from './federation/overview.js';
 import { readChangelog, type ChangelogEntry } from './page-body-live.js';
 import { buildNodeUpdatePrompt, type InstallMethod } from './node-update-prompt.js';
 

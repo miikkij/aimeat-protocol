@@ -21,7 +21,7 @@ import { sign, verify } from '../../auth/keypair.js';
 import { validateOutboundUrl, safeFetch, stripTrailingSlashes } from '../../utils/url-validator.js';
 import { readJson } from '../../utils/read-capped.js';
 import { emitChange } from '../../services/event-bus.js';
-import { peerKeyCache } from '../../services/federation-helpers.js';
+import { peerKeyCache } from '../../services/federation/helpers.js';
 import { logger } from '../../utils/logger.js';
 import {
     getActivePolicy, storeActivePolicy, coercePolicy, policySignString,
@@ -29,7 +29,7 @@ import {
 } from '../../services/network-policy.js';
 import {
     buildNodeCard, assembleBook, getActiveBook, pullBook,
-} from '../../services/federation-book.js';
+} from '../../services/federation/book.js';
 
 export function registerPolicyBookRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // ── Network policy (genesis-defined federation rules) ──

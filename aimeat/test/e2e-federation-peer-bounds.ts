@@ -62,7 +62,7 @@ import http, { type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
 import { federationSettlementsRouter } from '../src/routes/federation-settlements.js';
-import { deriveTierFlags } from '../src/services/federation-tiers.js';
+import { deriveTierFlags } from '../src/services/federation/tiers.js';
 import type { PeerInfo } from '../src/services/federation.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';

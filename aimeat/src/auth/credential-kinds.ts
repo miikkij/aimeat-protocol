@@ -82,7 +82,7 @@ export const CREDENTIAL_KINDS = {
     },
     'federation-peer': {
         credential: 'A peer node of this node: active, entitled to the endpoint\'s capability, its key on file '
-            + '(services/federation-peer-gate.ts), and an Ed25519 signature by that key over the exact text the endpoint '
+            + '(services/federation/peer-gate.ts), and an Ed25519 signature by that key over the exact text the endpoint '
             + 'signs, always verified. A missing or unknown peer is 403, a missing or forged signature 401.',
         admitsNoCredential: false,
     },

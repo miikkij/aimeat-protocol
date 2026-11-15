@@ -6,7 +6,7 @@
  *
  *   The question was answered in three places and two of them disagreed with each other:
  *   services/feedback.ts took the FIRST owner holding the role and notified only that one, while
- *   services/federation-book.ts enumerated them all for the node card. On a node with two operators
+ *   services/federation/book.ts enumerated them all for the node card. On a node with two operators
  *   the first one silently absorbed every blocker report.
  *
  *   It is one question, so it is one function. `support@operators` needs the full list by

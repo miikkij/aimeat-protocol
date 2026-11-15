@@ -126,7 +126,7 @@ export const PLATFORM_WRITTEN_PREFIXES: readonly { prefix: string; writtenBy: st
   { prefix: 'presence.', writtenBy: 'services/presence.ts' },
   { prefix: 'portfolio.', writtenBy: 'routes/portfolio.ts' },
   { prefix: 'network-policy.', writtenBy: 'services/network-policy.ts' },
-  { prefix: 'federation-book.', writtenBy: 'services/federation-book.ts' },
+  { prefix: 'federation-book.', writtenBy: 'services/federation/book.ts' },
   { prefix: 'link-invite.', writtenBy: 'services/link-invites.ts' },
   { prefix: 'peer-replace-ask.', writtenBy: 'services/peer-replace-ask.ts' },
   { prefix: 'living.template.', writtenBy: 'services/living-pulse.ts' },

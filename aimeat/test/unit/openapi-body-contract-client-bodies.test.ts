@@ -327,7 +327,7 @@ describe('POST /v1/ext/{extName}/{actionId} and the instance path (app catalogue
 });
 
 describe('POST /v1/federation/key-exchange (CLI federation join, the node\'s own key exchange)', () => {
-    // cli/federation-join.ts and services/federation-helpers.ts performKeyExchange both send
+    // cli/federation-join.ts and services/federation/helpers.ts performKeyExchange both send
     // node_public_key; routes/federation-peer/lifecycle.ts reads node_id, node_url, node_public_key,
     // timestamp, signature and capabilities, and refuses a body without node_id or node_public_key.
     const cli = { node_id: 'node-b', node_url: 'https://b.example.org', node_public_key: 'ab'.repeat(32), timestamp: '2026-11-15T10:00:00.000Z', capabilities: ['memory', 'federation'] };
