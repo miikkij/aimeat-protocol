@@ -15,6 +15,8 @@
  *     refused on the app tool's REST, MCP and checkout paths until the caller's app declares the
  *     action and the account holder allows it with one press; then all three run, and the
  *     registrant's own use never asks (secaudit 2026-10, capability-invoke.ts ecosystem source).
+ *   2026-11-15 — Audit M014, M015: the owner reads an app's organism deposit back; another account's
+ *     read-through of the owner's reference is a 404 and invokes nothing.
  */
 import { TunnelClient } from './helpers/tunnel-harness.js';
 
@@ -242,6 +244,11 @@ async function run() {
     const g = await connectGeai('depositapp', ['memory:read', 'memory:write'], [{ area: 'organisms', pattern: `organism.${orgId}.**`, rights: ['write'] }]);
     const r = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${g.token}` }, body: JSON.stringify({ key: `organism.${orgId}.w.${WS}.refined`, value: { ok: 1 }, visibility: 'owner' }) });
     assert(r.status === 200 || r.status === 201, `deposit should succeed, got ${r.status}: ${JSON.stringify(r.body)}`);
+    // Read back as the OWNER, not the app: a write path that moved the deposit somewhere the
+    // owner's scope does not reach would still answer 201 to the app.
+    const back = await json(`/v1/memory/${encodeURIComponent(`organism.${orgId}.w.${WS}.refined`)}`, { headers: auth });
+    assert(back.status === 200 && back.body.data?.value?.ok === 1,
+      `the owner does not see the app's deposit: ${back.status} ${JSON.stringify(back.body.data ?? back.body.error)}`);
   });
 
   await test('The grant PATTERN is a boundary: a second organism is not covered', async () => {
@@ -299,6 +306,20 @@ async function run() {
     const r2 = await json('/v1/ecosystem/read-through', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'refs.doc1' }) });
     assert(r2.status === 200 && r2.body.data?.read_through_unavailable === true, `offline should return cached marker: ${JSON.stringify(r2.body.data)}`);
     assert(r2.body.data?.cached?.title === 'Q3', 'cached metadata is returned when offline');
+  });
+
+  await test('Another account cannot read through the owner\'s reference, even naming the owner', async () => {
+    const strangerAuth = { Authorization: `Bearer ${(await registerOwner(BASE, `ecortx${Date.now()}`)).token}` };
+    const g = await connectGeai('livedocs', ['memory:read']);
+    const tunnel = await TunnelClient.connect(BASE, g.token);
+    const frames: unknown[] = [];
+    tunnel.onInvoke(f => { frames.push(f); return { ok: true, result: { body: 'live:leak' } }; });
+    try {
+      const r = await json('/v1/ecosystem/read-through', { method: 'POST', headers: strangerAuth, body: JSON.stringify({ key: 'refs.doc1', owner: ownerName }) });
+      assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND',
+        `a stranger read through the owner's reference: ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+      assert(frames.length === 0, `the owner's app was invoked for a stranger: ${frames.length} frame(s)`);
+    } finally { await tunnel.close(); }
   });
 
   // secaudit2026oct26, ecosystem-read-through:ref-target-unbound-to-writer. A reference an

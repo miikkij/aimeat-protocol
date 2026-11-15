@@ -5,6 +5,8 @@
  *   release it (either party), and lazy expiry. Runs on the test.money handler
  *   (AIMEAT_TEST_MONEY_HANDLER=true) — no real PSP.
  * @version-history
+ *   2026-11-15 — Audit M140: test 14 ages a real hold in storage and proves lazy expiry (read
+ *     'expired', capture 409).
  *   v1.0.0 — 2026-08-06 — Initial: hold lifecycle happy paths + authz failures (TINKI phase 1)
  */
 
@@ -42,6 +44,8 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 
 async function makeOwner(name: string): Promise<{ token: string; ghii: string }> {
   const reg = await json('/v1/ghii', {
@@ -221,6 +225,43 @@ await test('13. The buyer deletes a finished hold of their own, cannot put it ba
   assert(del.status === 200, `the owner deletes a finished hold: ${del.status} ${JSON.stringify(del.body.error)}`);
   const back = await json(`/v1/memory/${encodeURIComponent(key)}/restore`, { method: 'POST', headers: authed(buyer.token), body: '{}' });
   assert(back.status === 403, `a deleted hold is not put back: ${back.status} ${JSON.stringify(back.body.error)}`);
+});
+
+// ─── Lazy expiry ───
+console.log('\nPhase 4 — lazy expiry');
+
+// No route ages a hold, and the clock of the node cannot be moved, so the two copies of a real hold
+// (the buyer's record and the seller's mirror) get a past expiresAt through the node's own storage,
+// the way e2e-designbook plants a stored part. The rail still holds the authorization.
+await test('14. A hold past its expiry reads as expired and cannot be captured', async () => {
+  const provider = (process.env.AIMEAT_DB ?? 'memory') as StorageProvider;
+  const sqlitePath = pinnedSqlitePath();
+  const dbUrl = serverDbUrl();
+  assert((provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl), `backend "${provider}" is not reachable from this process`);
+  const storage = await createStorage({ provider, sqlitePath, dbUrl });
+  const create = await json('/v1/commerce/holds', {
+    method: 'POST', headers: authed(buyer.token),
+    body: JSON.stringify({
+      seller: sellerName, amount: 5_000000, currency: 'EUR', purpose: 'bid',
+      reference: 'tinki-listing-4', payment: { handler: 'test.money', instrument: 'pm_test_hold' },
+    }),
+  });
+  assert(create.status === 201, `create: ${create.status}`);
+  const id = create.body.data.hold.id as string;
+  const past = new Date(Date.now() - 60_000).toISOString();
+  for (const [ghii, key] of [[buyer.ghii, `commerce.hold.${id}`], [seller.ghii, `commerce.hold-in.${id}`]] as const) {
+    const rec = await storage.getMemory(ghii, key);
+    assert(!!rec, `no stored record ${key} under ${ghii}`);
+    const value = (typeof rec!.value === 'string' ? JSON.parse(rec!.value) : rec!.value) as Record<string, unknown>;
+    await storage.setMemory({ ...rec!, value: { ...value, expiresAt: past }, version: rec!.version + 1 });
+  }
+  const cap = await json(`/v1/commerce/holds/${id}/capture`, {
+    method: 'POST', headers: authed(seller.token), body: JSON.stringify({}),
+  });
+  assert(cap.status === 409 && cap.body.error?.code === 'HOLD_NOT_CAPTURABLE',
+    `capture of an expired hold: expected 409 HOLD_NOT_CAPTURABLE, got ${cap.status} ${JSON.stringify(cap.body.error ?? cap.body.data?.hold?.status)}`);
+  const read = await json(`/v1/commerce/holds/${id}`, { headers: authed(buyer.token) });
+  assert(read.status === 200 && read.body.data.hold.status === 'expired', `buyer read: ${read.status} ${read.body.data?.hold?.status}`);
 });
 
 // ─── Summary ───

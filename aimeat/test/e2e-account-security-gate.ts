@@ -17,6 +17,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-account-security-gate
  * @version-history
+ *   2026-11-15 — Audit L002: the owner and owner-PAT passes also fail on a 5xx other than a 503, so a
+ *     crashing handler no longer reads as a gate that let the owner through.
  *   v1.2.1 — 2026-10-13 — The replaced key's /v1/auth/token answer is chosen by the node's release and
  *     security.owner_key_login: 401 AUTH_REQUIRED on 3.x with the sign-in on, 410 OWNER_KEY_LOGIN_OFF
  *     otherwise. It accepted either one before (4.0-testimuutokset.md §4 item 2).
@@ -306,8 +308,9 @@ async function main() {
             // What each door answers depends on the account's state and the node's feature flags —
             // a 400 for a wrong TOTP code and a 503 for a disabled wallet integration are both the
             // handler running. The gate is what is under test, so the assertion is that the request
-            // got past it.
+            // got past it. A 5xx is a broken handler, not a gate that opened, so it fails as well.
             assert(r.status !== 403, `${door.method} ${door.path}: owner was refused with ${JSON.stringify(r.body)}`);
+            assert(r.status < 500 || r.status === 503, `${door.method} ${door.path}: the handler failed with ${r.status} ${JSON.stringify(r.body?.error)}`);
         });
     }
 
@@ -340,6 +343,7 @@ async function main() {
         await test(`an owner PAT can ${door.what}`, async () => {
             const r = await call(door, ownerPatToken);
             assert(r.status !== 403, `${door.method} ${door.path}: the owner's own token was refused with ${JSON.stringify(r.body)}`);
+            assert(r.status < 500 || r.status === 503, `${door.method} ${door.path}: the handler failed with ${r.status} ${JSON.stringify(r.body?.error)}`);
         });
     }
 

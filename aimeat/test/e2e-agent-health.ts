@@ -15,6 +15,8 @@
  *     test/run-e2e-ci.ts --test=agent-health
  * @version-history
  *   v1.0.0 — 2026-08-09 — Initial (V1-V4).
+ *   2026-11-15 — Audit M092, L009: a second owner with two agents of its own joins in Phase 0, so the
+ *     home card's counts are owner-scoped and a foreign user_code is proven ignored by the marker.
  */
 
 import { registerOwner } from './helpers/owner-login.js';
@@ -56,20 +58,23 @@ const auth = (token: string, opts: RequestInit = {}): RequestInit =>
 
 let ownerToken = '';
 const codes: Record<string, string> = {};
+// A second owner on the same node, so a count or a user_code lookup that is not owner-scoped shows.
+const stranger = `${owner}x`;
+let strangerToken = '';
 
 /** Connect one agent through the real device-auth flow and return its user_code. */
-async function connectAgent(name: string): Promise<string> {
+async function connectAgent(name: string, who = owner, token = ownerToken): Promise<string> {
     const a = await json('/v1/agents/device-authorize', {
-        method: 'POST', body: JSON.stringify({ agent_name: name, owner }),
+        method: 'POST', body: JSON.stringify({ agent_name: name, owner: who }),
     });
     assert(a.status === 200, `authorize ${name}: ${a.status}`);
     const code = a.body.data.user_code as string;
     const v = await json('/v1/agents/verify', {
         method: 'POST',
-        body: JSON.stringify({ user_code: code, action: 'approve', scopes: ['*'], owner_token: ownerToken }),
+        body: JSON.stringify({ user_code: code, action: 'approve', scopes: ['*'], owner_token: token }),
     });
     assert(v.status === 200 && v.body.ok === true, `approve ${name}: ${v.status} ${JSON.stringify(v.body.error)}`);
-    codes[name] = code;
+    if (who === owner) codes[name] = code;
     return code;
 }
 
@@ -97,6 +102,14 @@ await test('Two agents join, oldest first', async () => {
     await connectAgent('beta-agent');
     const agents = await listAgents();
     assert(agents.length === 2, `expected 2 agents, got ${agents.length}`);
+});
+
+// The stranger's second agent shares a name with the owner's on purpose: a user_code lookup that
+// skipped the ownership check would then find a same-named agent in the caller's own list.
+await test('A second owner joins with two agents of its own', async () => {
+    strangerToken = (await registerOwner(BASE, stranger)).token;
+    await connectAgent('s-first', stranger, strangerToken);
+    await connectAgent('beta-agent', stranger, strangerToken);
 });
 
 console.log('\nPhase 1: V1 — one verdict, projected by both surfaces');
@@ -180,10 +193,17 @@ await test('first-agent records the agent named by the submitted user_code', asy
 await test('a user_code from another account is ignored, not honoured', async () => {
     // Resolving a stranger's code would be a cross-account read, and a user_code is a short
     // human-typed string. It falls back rather than failing — the marker is measurement, not a gate.
-    const r = await json('/v1/home/first-agent', auth(ownerToken, {
-        method: 'POST', body: JSON.stringify({ user_code: 'ZZZZ-ZZZZ' }),
+    // The second owner (whose marker is still unwritten) sends the FIRST owner's real beta-agent
+    // code. Honoured, it would name the second owner's own 'beta-agent'; ignored, it falls back to
+    // that owner's first agent.
+    const r = await json('/v1/home/first-agent', auth(strangerToken, {
+        method: 'POST', body: JSON.stringify({ user_code: codes['beta-agent'] }),
     }));
-    assert(r.status === 200, `first-agent with an unknown code ${r.status}`);
+    assert(r.status === 200, `first-agent with a foreign code ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const marker = await json('/v1/memory/onboarding.first_agent_connected', auth(strangerToken));
+    assert(marker.status === 200, `marker read ${marker.status}`);
+    assert(marker.body.data.value.agentName === 's-first',
+        `the foreign user_code was honoured: ${JSON.stringify(marker.body.data.value)}`);
 });
 
 // A workstation is the MCP connection a tool uses, given a GAII for traceability. It is online only
@@ -220,9 +240,6 @@ await test('a connection counts as a live agent, so the home does not call the a
 // look at anybody else's. Naming the real one must be refused rather than obeyed: the mode decides
 // which Hello Integration flow an agent is measured against, so setting it is not a cosmetic write.
 await test('another owner cannot set the mode of an agent that is not theirs', async () => {
-    const stranger = `${owner}x`;
-    const strangerToken = (await registerOwner(BASE, stranger)).token;
-
     const target = encodeURIComponent(`ws-tool#${owner}@${NODE_ID}`);
     const r = await json(`/v1/agents/${target}/mode`, auth(strangerToken, {
         method: 'PATCH', body: JSON.stringify({ mode: 'task-runner' }),

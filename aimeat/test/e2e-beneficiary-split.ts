@@ -15,6 +15,7 @@
  *       split against someone else's revenue, and cannot release someone else's obligation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=beneficiary-split
  * @version-history
+ *   2026-11-15 — Audit M188: the stranger's payout quote and settle run while gamma is still owed.
  *   v1.3.0 — 2026-10-29 — A payout whose settle did not answer is held, listed only for the operator, and
  *     marked arrived with a reference: the share reads paid and both parties are told (secaudit2026oct26
  *     round 8c).
@@ -717,6 +718,8 @@ const signedPayment = (reqs: any) => ({
 
 const payoutQuote = (token: string, beneficiary: string) =>
   json(`/v1/commerce/beneficiary/payout?beneficiary=${encodeURIComponent(beneficiary)}`, { headers: auth(token) });
+const payoutSettle = (token: string, payment: unknown) =>
+  json('/v1/commerce/beneficiary/payout', { method: 'POST', headers: auth(token), body: JSON.stringify({ beneficiary: gamma.ghii, payment }) });
 
 await test('PAYOUT: a beneficiary with no address cannot be pushed to, and is told why', async () => {
   const r = await payoutQuote(provider.token, gamma.ghii);
@@ -744,13 +747,23 @@ await test('PAYOUT: once the beneficiary sets their OWN address, the node quotes
 });
 
 await test('PAYOUT: an unsigned request is refused with 402, nothing marked paid', async () => {
-  const r = await json('/v1/commerce/beneficiary/payout', {
-    method: 'POST', headers: auth(provider.token),
-    body: JSON.stringify({ beneficiary: gamma.ghii, payment: { x402Version: 1, scheme: 'exact', payload: {} } }),
-  });
+  const r = await payoutSettle(provider.token, { x402Version: 1, scheme: 'exact', payload: {} });
   assert(r.status === 402, `expected 402, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const after = await earnings(gamma.token);
   assert(Number(after.body.data.totals?.EUR?.paid ?? 0) === 0, 'nothing was marked paid');
+});
+
+// Run while the provider still owes gamma, so NOTHING_OWED is about who asks and not about the ledger.
+await test('PAYOUT: a stranger cannot settle somebody else\'s debt', async () => {
+  const mine = await payoutQuote(provider.token, gamma.ghii);
+  assert(mine.body.data.payable === true, `the provider's own quote is payable: ${JSON.stringify(mine.body.data)}`);
+  const q = await payoutQuote(stranger.token, gamma.ghii);
+  assert(q.status === 200 && q.body.data.payable === false, 'a stranger owes them nothing, so there is nothing to sign');
+  assert(q.body.data.reason === 'NOTHING_OWED', `reason: ${q.body.data.reason}`);
+  const r = await payoutSettle(stranger.token, signedPayment(mine.body.data.accepts[0]));
+  assert(r.status === 404 && r.body?.error?.code === 'NOTHING_OWED', `a stranger's settle: expected 404 NOTHING_OWED, got ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+  const e = await earnings(gamma.token);
+  assert(Number(e.body.data.totals?.EUR?.paid ?? 0) === 0, `the stranger's settle marked something paid: ${JSON.stringify(e.body.data.totals?.EUR)}`);
 });
 
 let paidAmount = 0;
@@ -759,10 +772,7 @@ await test('PAYOUT: the provider signs, it settles onchain, and the entries read
   const owed = Number(q.body.data.amount);
   assert(owed > 0, `owed ${owed}`);
 
-  const r = await json('/v1/commerce/beneficiary/payout', {
-    method: 'POST', headers: auth(provider.token),
-    body: JSON.stringify({ beneficiary: gamma.ghii, payment: signedPayment(q.body.data.accepts[0]) }),
-  });
+  const r = await payoutSettle(provider.token, signedPayment(q.body.data.accepts[0]));
   assert(r.status === 200, `settle ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.paid === true, 'paid');
   assert(r.body.data.amount === owed, `settled the whole balance: ${r.body.data.amount} vs ${owed}`);
@@ -783,19 +793,10 @@ await test('PAYOUT: paying again finds nothing owed — a confirmation cannot pa
   const q = await payoutQuote(provider.token, gamma.ghii);
   assert(q.body.data.payable === false && q.body.data.reason === 'NOTHING_OWED',
     `expected NOTHING_OWED, got ${JSON.stringify(q.body.data.reason)}`);
-  const r = await json('/v1/commerce/beneficiary/payout', {
-    method: 'POST', headers: auth(provider.token),
-    body: JSON.stringify({ beneficiary: gamma.ghii, payment: signedPayment({ network: 'base-sepolia', payTo: X402_ADDR, maxAmountRequired: '1' }) }),
-  });
+  const r = await payoutSettle(provider.token, signedPayment({ network: 'base-sepolia', payTo: X402_ADDR, maxAmountRequired: '1' }));
   assert(r.status === 404, `expected 404, got ${r.status}`);
   const e = await earnings(gamma.token);
   assert(Number(e.body.data.totals?.EUR?.paid ?? 0) === paidAmount, 'the paid total did not move');
-});
-
-await test('PAYOUT: a stranger cannot settle somebody else\'s debt', async () => {
-  const q = await json('/v1/commerce/beneficiary/payout?beneficiary=' + encodeURIComponent(gamma.ghii), { headers: auth(stranger.token) });
-  assert(q.body.data.payable === false, 'a stranger owes them nothing, so there is nothing to sign');
-  assert(q.body.data.reason === 'NOTHING_OWED', `reason: ${q.body.data.reason}`);
 });
 
 // ── A payout whose settlement did not answer, marked arrived by the operator (round 8c) ──────
@@ -817,9 +818,7 @@ await test('POSSIBLE PAYOUT: an unanswered settle is held and answered 502', asy
   assert(q.body.data.payable === true, `payable: ${JSON.stringify(q.body.data)}`);
   const pay = signedPayment(q.body.data.accepts[0]);
   pay.payload.authorization.nonce = UNANSWERED_NONCE;
-  const s = await json('/v1/commerce/beneficiary/payout', {
-    method: 'POST', headers: auth(provider.token), body: JSON.stringify({ beneficiary: gamma.ghii, payment: pay }),
-  });
+  const s = await payoutSettle(provider.token, pay);
   assert(s.status === 502 && s.body?.error?.code === 'X402_SETTLE_UNKNOWN', `expected 502 X402_SETTLE_UNKNOWN, got ${s.status}`);
 });
 
