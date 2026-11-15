@@ -11,6 +11,8 @@
  *   - submitRating: rate a completed work item
  *
  * @version-history
+ *   v1.2.0 — 2026-11-15 — submitRating sends rating 'positive' (four or five stars) or 'negative' (one
+ *     to three), the values POST /v1/work/:tc/rate reads; it sent the star count, which the route refused.
  *   v1.1.0 — 2026-07-16 — Add getWorkOverview (GET /v1/work/overview) folding the inbox + sent mount reads.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -42,8 +44,13 @@ export async function getWorkOverview() {
   } catch (err) { swallowed('work: getWorkOverview', err); return null; }
 }
 
-/** Submit a rating for a completed work item. */
-export async function submitRating(workId, rating, comment) {
+/**
+ * Submit a rating for a delivered work item. The Work tab gives one to five stars; POST
+ * /v1/work/:tc/rate takes rating 'positive' or 'negative' (WorkRatingSchema) and stores score 5 or 1.
+ * Four and five stars are positive, the same line services/trust.ts draws on a stored score (>= 4).
+ */
+export async function submitRating(workId, stars, comment) {
+  const rating = Number(stars) >= 4 ? 'positive' : 'negative';
   return api(`/v1/work/${encodeURIComponent(workId)}/rate`, {
     method: 'POST',
     body: JSON.stringify({ rating, comment }),
