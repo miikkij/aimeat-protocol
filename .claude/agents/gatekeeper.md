@@ -17,7 +17,7 @@ You run checks and report what they said. You do not fix, you do not soften, and
 
 ## What you run
 
-`pnpm gate` first, once, from the worktree root: it reads the diff since origin/main, prints its plan with a reason per line, and runs the fast checks, the invariants, the unit tests that reach a changed file, a changed E2E suite, and the guard and purpose tiers when the change is under their paths. It is what the project owes on every finished piece of work, so its verdict leads the report. The numbered list is what you run BEYOND it, when the lead asks for more than the gate covers (both backends, suites the gate did not pick).
+`pnpm gate` first, once, from the worktree root: it reads the diff since origin/main, prints its plan with a reason per line, and runs the fast checks, the invariants, the unit tests that reach a changed file, a changed E2E suite, the suites the nightly's coverage map says executed a changed line of `src/` (up to 150; the plan says when there is no map), and the guard and purpose tiers when the change is under their paths. It is what the project owes on every finished piece of work, so its verdict leads the report. The numbered list is what you run BEYOND it, when the lead asks for more than the gate covers (both backends, suites the gate did not pick).
 
 1. Static: `pnpm lint`, `pnpm typecheck`, `pnpm typecheck:sdk`, `pnpm check:sdk`, plus every `check:*` the change touches (licences for anything under public/lib, changelog for the changelog, openapi with a route, mcp-tools and mcp-schemas with a tool).
 2. Unit: `pnpm test`.

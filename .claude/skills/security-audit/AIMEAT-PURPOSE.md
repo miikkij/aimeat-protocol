@@ -103,9 +103,10 @@ one of them is wrong even when it closes the hole.
 3. **Tests in this order.** The suites the change reaches, on both backends; then `pnpm gate`, once,
    as the last step. The purpose suites (wish
    `wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni`) run in the gate on every
-   change that reaches `src/`. The full E2E sweep on both backends takes about two hours, and it runs
-   only when the developer has looked at the round and says so, or asks for it. Never start it on
-   your own; report the targeted results and the gate, and ask.
+   change that reaches `src/`, together with the suites the nightly's coverage map says executed a
+   changed line. The full E2E sweep on both backends runs only when the developer has looked at the
+   round and says so, or asks for it, and then on GitHub (`pnpm nightly:preflight --dispatch`). Never
+   start it on your own; report the targeted results and the gate, and ask.
 
 **The purpose tier** is the automated form of the list above: `PURPOSE_SUITES` in
 `aimeat/test/run-e2e-ci.ts` (`pnpm test:e2e:purpose:sqlite`, `:postgres-kysely`), which `pnpm gate`
