@@ -34,7 +34,7 @@
 import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
 import { listPackages as listDataPackages } from '../datapackage/store.js';
 import { packageFreshness } from '../datapackage/freshness-read.js';
-import { MANIFEST_KEY_RE } from '../skill-refs.js';
+import { MANIFEST_KEY_RE } from '../skill/refs.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
 import {
   type ExposureFound, type ExposureItem, type ExposureSource, type ExposureClose,
@@ -181,7 +181,7 @@ export const knowledgeSource: ExposureSource = {
 export const skillSource: ExposureSource = {
   kind: 'skill',
   async list(ctx, ownerName, ownerGhii) {
-    // A person's own skills are the user-scope registry, kept under their GHII (services/skill-refs.ts).
+    // A person's own skills are the user-scope registry, kept under their GHII (services/skill/refs.ts).
     const rows = (await ownerMemoryMeta(ctx, ownerName, ownerGhii)).filter(r => r.ownerGaii === ownerGhii);
     const out: ExposureFound[] = [];
     for (const r of rows) {

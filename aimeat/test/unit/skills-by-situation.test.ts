@@ -42,7 +42,7 @@ describe('skillsBySituation', () => {
         // The shipped texts, parsed as the registry parses them: the instruction audit of
         // 2026-11-08 found the handbook naming only the Classic app builder, because the Atelier
         // skill's name begins with the Classic one's.
-        const { parseSkillMd } = await import('../../src/services/skill-md.js');
+        const { parseSkillMd } = await import('../../src/services/skill/md.js');
         const { APP_BUILDER_SKILL_ENTRY } = await import('../../src/data/builtin-skills.app-builder.js');
         const { APP_BUILDER_ATELIER_SKILL_ENTRY } = await import('../../src/data/builtin-skills.app-builder-atelier.js');
         const asSummary = (md: string) => {

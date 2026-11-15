@@ -1,5 +1,5 @@
 /**
- * @file skill-md.ts
+ * @file src/services/skill/md.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SKILL.md parser + validator for the skills registry. A skill is a directory
@@ -24,7 +24,7 @@
  *   - validateSkillFiles(files) — validate a whole skill directory (SKILL.md text + safe paths)
  *   - SKILL_NAME_RE — contract constant (shared with the ZIP allowlist)
  * @usage
- *   import { parseSkillMd, validateSkillFiles, SkillValidationError } from './skill-md.js';
+ *   import { parseSkillMd, validateSkillFiles, SkillValidationError } from './md.js';
  * @version-history
  *   v2.0.0 -- 2026-10-26 -- Agent Skills standard: a skill folder holds any file whose path stays
  *     inside it (isAllowedSkillPath also refuses an absolute or drive path, a `:` or other character

@@ -18,7 +18,7 @@ through one choke point (`resolveSkillRef()` in `aimeat/src/services/skills.ts`)
 A skill is a directory `skill-name/` with a required `SKILL.md` plus any other files beside it:
 `scripts/`, `references/` and `assets/` by convention, and a `LICENSE.txt`, a `forms.md` at the root
 or a `templates/` folder just as well. A file path must stay inside the folder on every platform
-(`isAllowedSkillPath` in `aimeat/src/services/skill-md.ts`): no `..` segment, no leading `/`, no
+(`isAllowedSkillPath` in `aimeat/src/services/skill/md.ts`): no `..` segment, no leading `/`, no
 backslash, no `:` or other character Windows reserves, no control character, no device name such as
 `NUL`, no segment ending in a dot or a space, no `.git` folder, at most 200 characters, and no second
 spelling of `SKILL.md`. A path that breaks one is refused with 422 `BAD_FILE_PATH`. A ZIP upload drops
@@ -105,7 +105,7 @@ the skill as replaced instead of leaving the fact in the description.
 frontmatter, `metadata.requires_config: <config key>` (for example `helpEnabled`). While that switch
 is off on the node, the handbook leaves the skill out and a read of it is refused with
 `FEATURE_OFF`, so an AI is not taught a feature that would refuse every call
-(`aimeat/src/services/skill-types.ts`, `skillFeatureOff`).
+(`aimeat/src/services/skill/types.ts`, `skillFeatureOff`).
 
 ## App-bound skills (`binding`) — how and why
 
@@ -290,6 +290,6 @@ propose-then-confirm tokens.
 workspace WRITE rule**, because a workspace skill is workspace content stored under
 `organism.{org}.w.{ws}.skills.*` that every member's agents load as instructions: publishing or
 deleting it needs the workspace's registered creator, an organism manager, or an active
-`workspace-contributor` grant (`services/skill-workspace-gate.ts`, Core 2026-11 COL-09). A `viewer`
+`workspace-contributor` grant (`services/skill/workspace-gate.ts`, Core 2026-11 COL-09). A `viewer`
 grant reads and does not write. The delete removes every member's copies for the creator and an
 organism manager; a contributor removes their own.

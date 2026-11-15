@@ -16,7 +16,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { BUILTIN_SKILLS } from '../../src/data/builtin-skills.js';
-import { parseSkillMd } from '../../src/services/skill-md.js';
+import { parseSkillMd } from '../../src/services/skill/md.js';
 
 // Docs audit phase 5a (2026-10-12): the guidance an AI needs for these four families had no home on
 // any node, so each ships as a built-in skill. Listed here so a later move or rename that drops one

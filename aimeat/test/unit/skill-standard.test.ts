@@ -14,8 +14,8 @@
  *   v1.0.0 — 2026-10-26 — Initial (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss).
  */
 import { describe, it, expect } from 'vitest';
-import { parseSkillMd, validateSkillFiles, SkillValidationError } from '../../src/services/skill-md.js';
-import { storedSkillFile, skillFileBytes, readSkillFileInput } from '../../src/services/skill-files.js';
+import { parseSkillMd, validateSkillFiles, SkillValidationError } from '../../src/services/skill/md.js';
+import { storedSkillFile, skillFileBytes, readSkillFileInput } from '../../src/services/skill/files.js';
 import { BUILTIN_SKILLS } from '../../src/data/builtin-skills.js';
 
 const md = (fm: string) => `---\n${fm}\n---\n\nBody.\n`;

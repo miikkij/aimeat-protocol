@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The built-in skills this repo once shipped and no longer does. The seeder
- *   (services/skill-seeds.ts) reads this list at startup and takes each one off the node.
+ *   (services/skill/seeds.ts) reads this list at startup and takes each one off the node.
  *
  *   WHY A LIST. Dropping a skill from BUILTIN_SKILLS removes it from a NEW node only. A node that
  *   was seeded earlier keeps its copy for ever, because the seeder walks the skills that exist and

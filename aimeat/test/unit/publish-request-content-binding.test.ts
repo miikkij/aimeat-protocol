@@ -17,7 +17,7 @@ import type { Storage, CortexExtensionRecord } from '../../src/storage/interface
 import type { AimeatConfig } from '../../src/config.js';
 import type { PublishRequest } from '../../src/services/publish-requests/store.js';
 import { publishSkill } from '../../src/services/skills.js';
-import { userSkillState } from '../../src/services/skill-publish-gate.js';
+import { userSkillState } from '../../src/services/skill/publish-gate.js';
 import { applySkillPublish } from '../../src/services/publish-requests/apply-skill.js';
 import { applyCortexPublish } from '../../src/services/publish-requests/apply-cortex.js';
 import { userSkillContent, cortexContentDigest } from '../../src/services/publish-requests/content-digests.js';

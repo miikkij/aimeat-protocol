@@ -103,18 +103,18 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill-md.js';
+import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill/md.js';
 import { canReadWorkspace } from './workspace/access.js';
-import { assertWsSkillWrite, mayActOnEveryWsSkillCopy, wsWriteCaller } from './skill-workspace-gate.js';
+import { assertWsSkillWrite, mayActOnEveryWsSkillCopy, wsWriteCaller } from './skill/workspace-gate.js';
 import { localAccountName } from '../utils/gaii.js';
-import { showSkillRecords } from './skill-reader.js';
-import { listAcrossOwners, freshestByKey, writtenByWsWriters } from './skill-records.js';
+import { showSkillRecords } from './skill/reader.js';
+import { listAcrossOwners, freshestByKey, writtenByWsWriters } from './skill/records.js';
 import { CAS_ATTEMPTS } from './record-cas.js';
-import { skillProvenanceId, type SkillPublishProvenance } from './skill-provenance.js';
+import { skillProvenanceId, type SkillPublishProvenance } from './skill/provenance.js';
 import { settleRequestsForRemovedTarget } from './publish-requests/store.js';
-import { mayReadSkill, publisherMayName, skillVisibilityOf, storedSkillVisibility, type SkillVisibility } from './skill-audience.js';
-import { getAgentSkillLinks } from './skill-agent-link-records.js';
-import { storedSkillFile, skillFileBytes, type SkillFileEntry } from './skill-files.js';
+import { mayReadSkill, publisherMayName, skillVisibilityOf, storedSkillVisibility, type SkillVisibility } from './skill/audience.js';
+import { getAgentSkillLinks } from './skill/agent-link-records.js';
+import { storedSkillFile, skillFileBytes, type SkillFileEntry } from './skill/files.js';
 
 // The addresses (ref grammar, scope owner, key conventions) live in skill-refs.ts since 2026-09-03.
 import {
@@ -122,12 +122,12 @@ import {
   manifestKey, filePrefix, fileKey, VERSION_SNAPSHOTS_KEPT, versionPrefix, versionKey,
   wsVersionPrefix, wsVersionKey, assertSkillBinding, bindingOwner, wsManifestKey, wsFilePrefix, wsFileKey,
   MANIFEST_KEY_RE, WS_MANIFEST_KEY_RE, type SkillScope, type SkillRef,
-} from './skill-refs.js';
-export { parseSkillRef, formatSkillRef, scopeOwnerGhii, readNodeSkillBody, type SkillScope, type SkillRef } from './skill-refs.js';
+} from './skill/refs.js';
+export { parseSkillRef, formatSkillRef, scopeOwnerGhii, readNodeSkillBody, type SkillScope, type SkillRef } from './skill/refs.js';
 
 // The stored and returned shapes and SkillAccessError live in skill-types.ts (max-file-lines).
-import { SkillAccessError, skillFeatureOff, type SkillVersionSnapshot, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill-types.js';
-export { SkillAccessError, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill-types.js';
+import { SkillAccessError, skillFeatureOff, type SkillVersionSnapshot, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill/types.js';
+export { SkillAccessError, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill/types.js';
 
 // ── Internals ──
 
@@ -176,7 +176,7 @@ async function mayReadWs(
   return canReadWorkspace(storage, config, organism, a.sub, a.ownerName ?? undefined, a.gaii, ws);
 }
 
-// The WRITE rule for a workspace skill is services/skill-workspace-gate.ts: reading a workspace is
+// The WRITE rule for a workspace skill is services/skill/workspace-gate.ts: reading a workspace is
 // not writing it, and a workspace skill is workspace content (secaudit 2026-10, defect 2).
 
 // The visibility gate shared by resolve and list is mayReadSkill (skill-audience.ts), with the

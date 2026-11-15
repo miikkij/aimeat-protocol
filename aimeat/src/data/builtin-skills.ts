@@ -7,7 +7,7 @@
  *   user-level how-tos for automating node and profile management. Content is embedded
  *   as template strings (no filesystem reads, works from dist). Each entry is a full
  *   SKILL.md (frontmatter + body) following the shared contract; seeding updates a copy
- *   nobody edited (by fingerprint, services/skill-seeds.ts) and never overwrites an operator's edit.
+ *   nobody edited (by fingerprint, services/skill/seeds.ts) and never overwrites an operator's edit.
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history

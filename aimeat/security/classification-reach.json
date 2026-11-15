@@ -3026,25 +3026,25 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's site template, portal keys and header navigation. Reviewed 2026-11-12: the template's language versions, the operator's own __site__ files, listed and read like the default page."
     },
-    "src/services/skill-agent-link-records.ts": {
+    "src/services/skill/agent-link-records.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-26, the node's own read, moved here from skills.ts unchanged: the owner's own agents.{name}.skills link record, read to list and rewrite an agent's skill refs; it holds refs and no skill content."
     },
-    "src/services/skill-records.ts": {
+    "src/services/skill/records.ts": {
       "reads": {
         "listAllMemory": 1
       },
       "why": "Moved out of skills.ts unchanged on 2026-10-09 (max-file-lines, aiprov E12); reviewed there 2026-09-29 (TARGET-082 V4): listAcrossOwners collects the registry's own records under a skill key prefix, and the bodies it returns pass the reader (skill-reader.ts) in listing, resolve and pinned reads."
     },
-    "src/services/skill-refs.ts": {
+    "src/services/skill/refs.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A node skill body, read only to compare fingerprints."
     },
-    "src/services/skill-seeds.ts": {
+    "src/services/skill/seeds.ts": {
       "reads": {
         "getMemory": 3
       },

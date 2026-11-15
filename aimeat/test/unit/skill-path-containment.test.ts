@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { join, resolve } from 'node:path';
-import { isAllowedSkillPath } from '../../src/services/skill-md.js';
+import { isAllowedSkillPath } from '../../src/services/skill/md.js';
 import { skillInstallTarget } from '../../src/cli/skill-install.js';
 
 describe('isAllowedSkillPath', () => {

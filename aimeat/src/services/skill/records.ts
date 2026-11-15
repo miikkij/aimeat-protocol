@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-records.ts
+ * @file src/services/skill/records.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Reading the skills registry's memory records across the members who hold copies of
@@ -15,10 +15,10 @@
  *     served that copy to the organism's members as their operating instructions.
  *   v1.0.0 — 2026-10-08 — Moved from services/skills.ts (max-file-lines).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { checkOrganismNamespaceAccess } from './organism/namespace-access.js';
-import { localAccountName } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 /** All owners' copies of the records under a key prefix (workspace records may be
  *  published by different members — the organism content-ownership invariant). */
@@ -30,7 +30,7 @@ export async function listAcrossOwners(storage: Storage, prefix: string): Promis
 /**
  * The copies whose OWNER may write workspace content here, which is the only copy a reader should
  * take: a workspace skill is read as instructions, and freshest-wins means one copy replaces the
- * rest. Every write path asks this rule first (services/skill-workspace-gate.ts over
+ * rest. Every write path asks this rule first (services/skill/workspace-gate.ts over
  * services/organism/namespace-access.ts), so this is the read side of the same rule, not a second
  * copy of it: a record that arrived some other way, as a package install's raw write did until
  * 2026-10-20, is left where it is and never served.

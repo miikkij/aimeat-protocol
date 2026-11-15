@@ -6,7 +6,7 @@
  *   an app on this node.
  *
  *   WHY IT MOVED OUT OF builtin-skills.ts, AND WHAT THAT FIXED. Seeding was create-if-missing then
- *   (it now updates a copy nobody edited, by fingerprint: services/skill-seeds.ts), so a
+ *   (it now updates a copy nobody edited, by fingerprint: services/skill/seeds.ts), so a
  *   built-in skill has two places it can be edited and no reconciliation between them: the repo,
  *   which never reaches a node that already has the skill, and the node itself, which never comes
  *   back here. Both happened. On 2026-08-16 the node's copy gained a whole section — "Say it in

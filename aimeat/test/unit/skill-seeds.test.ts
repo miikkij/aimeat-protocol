@@ -20,7 +20,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { decideSeedAction, skillFingerprint, seedStampKey } from '../../src/services/skill-seeds.js';
+import { decideSeedAction, skillFingerprint, seedStampKey } from '../../src/services/skill/seeds.js';
 import { publishSkill, readNodeSkillBody } from '../../src/services/skills.js';
 
 const NODE = 'node-test';
@@ -54,7 +54,7 @@ vi.mock('../../src/data/builtin-skills.retired.js', () => ({ RETIRED_BUILTIN_SKI
 async function seedWith(storage: Storage, text: string) {
   const mod = await import('../../src/data/builtin-skills.js');
   (mod.BUILTIN_SKILLS as { skillMd: string }[])[0]!.skillMd = text;
-  const { seedBuiltinSkills } = await import('../../src/services/skill-seeds.js');
+  const { seedBuiltinSkills } = await import('../../src/services/skill/seeds.js');
   return seedBuiltinSkills(storage, config);
 }
 
@@ -151,7 +151,7 @@ describe('a skill this repo stopped shipping', () => {
     (live.BUILTIN_SKILLS as unknown[]).length = 0;
     const retired = await import('../../src/data/builtin-skills.retired.js');
     (retired.RETIRED_BUILTIN_SKILLS as { name: string; reason: string }[]).push({ name: 'probe-skill', reason: 'test' });
-    const { seedBuiltinSkills } = await import('../../src/services/skill-seeds.js');
+    const { seedBuiltinSkills } = await import('../../src/services/skill/seeds.js');
     try { return await seedBuiltinSkills(storage, config); }
     finally {
       (retired.RETIRED_BUILTIN_SKILLS as unknown[]).length = 0;

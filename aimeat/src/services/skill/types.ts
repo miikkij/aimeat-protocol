@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-types.ts
+ * @file src/services/skill/types.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The skills registry's stored and returned shapes, and its access error. Moved out of
@@ -7,7 +7,7 @@
  *   unchanged.
  * @structure SkillVersionSnapshot · SkillPackageTag · SkillManifestValue · SkillSummary · ResolvedSkill ·
  *   SkillAccessor · SkillAccessError
- * @usage import { type SkillSummary, SkillAccessError } from './skills.js';   // through the re-export
+ * @usage import { type SkillSummary, SkillAccessError } from '../skills.js';   // through the re-export
  * @version-history
  *   v1.3.0 — 2026-11-14 — skillFeatureOff(): a skill names the switch of the feature it teaches; FEATURE_OFF.
  *   v1.2.0 — 2026-10-26 — A file index entry may say `encoding: "base64"` (skill-files.ts);
@@ -19,14 +19,14 @@
  *     additions of the same change: SkillManifestValue.audience, SkillAccessor.auth, the
  *     BAD_VISIBILITY and NOT_ORGANISM_MEMBER codes (plan doc-mvcn6c7e4e5q, V3.9).
  */
-import type { MemoryRecord } from '../storage/interface.js';
-import type { ContentReader } from './classification/reader.js';
-import type { SkillScope } from './skill-refs.js';
-import type { SkillVisibility } from './skill-audience.js';
-import type { AudienceAuth } from './audience.js';
-import type { CallerContext } from './caller-context.js';
-import type { SkillFileEntry } from './skill-files.js';
-import type { SkillStandardIssue } from './skill-md.js';
+import type { MemoryRecord } from '../../storage/interface.js';
+import type { ContentReader } from '../classification/reader.js';
+import type { SkillScope } from './refs.js';
+import type { SkillVisibility } from './audience.js';
+import type { AudienceAuth } from '../audience.js';
+import type { CallerContext } from '../caller-context.js';
+import type { SkillFileEntry } from './files.js';
+import type { SkillStandardIssue } from './md.js';
 
 export interface SkillVersionSnapshot {
   manifest: SkillManifestValue;

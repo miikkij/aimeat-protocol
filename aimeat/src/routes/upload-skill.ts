@@ -29,15 +29,15 @@ import type { Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
-import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
+import { SkillValidationError, isAllowedSkillPath } from '../services/skill/md.js';
 import { publishSkill, SkillAccessError, type SkillScope } from '../services/skills.js';
-import { parseSkillVisibility } from '../services/skill-audience.js';
+import { parseSkillVisibility } from '../services/skill/audience.js';
 import { ProvenanceScopeError } from '../services/ai/provenance.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../services/resource-events.js';
-import { skillPublishAsk, fileSkillAsk, closedSkillLevel } from '../services/skill-publish-gate.js';
+import { skillPublishAsk, fileSkillAsk, closedSkillLevel } from '../services/skill/publish-gate.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 

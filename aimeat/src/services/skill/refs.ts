@@ -1,5 +1,5 @@
 /**
- * @file skill-refs.ts
+ * @file src/services/skill/refs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The skills registry's addresses: the scope type, the ref grammar (node:{name},
@@ -9,15 +9,15 @@
  *   skills.ts unchanged when that file crossed 800 lines; skills.ts re-exports the public part.
  * @structure SkillScope / SkillRef, parseSkillRef / formatSkillRef, scopeOwnerGhii,
  *   readNodeSkillBody, key helpers and regexes, bindingOwner / assertSkillBinding
- * @usage import { parseSkillRef, manifestKey } from './skill-refs.js';
+ * @usage import { parseSkillRef, manifestKey } from './refs.js';
  * @version-history
  *   v1.1.0 -- 2026-10-09 -- bindingOwner and assertSkillBinding: a user-scope skill may bind only to
  *     an app of its own publisher, refused at publish with BAD_FIELD (the shape check moved here too).
  *   v1.0.0 -- 2026-09-03 -- Extracted from services/skills.ts (pure move).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { SKILL_NAME_RE, SkillValidationError } from './skill-md.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { SKILL_NAME_RE, SkillValidationError } from './md.js';
 
 // ── Refs & scopes ──
 

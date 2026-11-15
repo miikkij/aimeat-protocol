@@ -70,10 +70,10 @@ import {
   publishSkill, listSkills, listSkillLibrary, resolveSkillRef, setSkillVisibility, deleteSkill,
   listSkillsByBinding, SkillAccessError, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
-import { readSkillFileInput } from '../services/skill-files.js';
-import { SkillValidationError } from '../services/skill-md.js';
-import { getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent } from '../services/skill-agent-links.js';
-import type { SkillVisibility } from '../services/skill-audience.js';
+import { readSkillFileInput } from '../services/skill/files.js';
+import { SkillValidationError } from '../services/skill/md.js';
+import { getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent } from '../services/skill/agent-links.js';
+import type { SkillVisibility } from '../services/skill/audience.js';
 import { readerForAgent, readerFor } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -82,7 +82,7 @@ import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import type { PublishGateInput } from '../services/publish-requests/door.js';
-import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill-publish-gate.js';
+import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill/publish-gate.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 

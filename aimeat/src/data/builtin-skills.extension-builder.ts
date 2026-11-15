@@ -15,7 +15,7 @@
  *   since 2026-07-18), an update is PUT /v1/extensions/{name} in place, `instance_scope` on a
  *   manifest schedule does not exist, there is no /v1/federation/capabilities route, and a morsel
  *   is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). A
- *   skill ships with every installation and seeds by hash (services/skill-seeds.ts).
+ *   skill ships with every installation and seeds by hash (services/skill/seeds.ts).
  *
  *   WHAT IT MUST AGREE WITH. services/builder/extension-prompt.ts (the canonical table it points
  *   to), services/extension/ctx-contract.ts (ctx members), services/extension/manifest.ts (manifest

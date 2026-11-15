@@ -20,7 +20,7 @@
  */
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 import { setSkillVisibility } from '../skills.js';
-import { userSkillState } from '../skill-publish-gate.js';
+import { userSkillState } from '../skill/publish-gate.js';
 import { userSkillContent } from './content-digests.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';

@@ -164,7 +164,7 @@ import { startNodeBusRelay } from './bus-relay-start.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app/tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
-import { seedBuiltinSkills } from '../services/skill-seeds.js';
+import { seedBuiltinSkills } from '../services/skill/seeds.js';
 import { DirectoryService, registerDirectoryNotifier } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';

@@ -111,7 +111,7 @@ export const PLATFORM_WRITTEN_PREFIXES: readonly { prefix: string; writtenBy: st
   { prefix: 'apps.', writtenBy: 'services/app/tool-interfaces.ts (apps.{appId}.tools)' },
   { prefix: 'apptool.', writtenBy: 'services/app/tool-interfaces.ts' },
   { prefix: 'app-catalog.', writtenBy: 'routes/apps (promoted + favourites docs)' },
-  { prefix: 'skills.', writtenBy: 'services/skills.ts, services/skill-seeds.ts' },
+  { prefix: 'skills.', writtenBy: 'services/skills.ts, services/skill/seeds.ts' },
   { prefix: 'workflows.', writtenBy: 'services/workflow/store.ts, engine.ts, lifecycle.ts' },
   { prefix: 'exchange.', writtenBy: 'services/exchange-market.ts, exchange-projection.ts and 11 more' },
   { prefix: 'onboarding.', writtenBy: 'services/onboarding-funnel.ts and 10 more' },

@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-agent-links.ts
+ * @file src/services/skill/agent-links.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Agent attachment for the skills registry: linking a skill ref to an agent (validated
@@ -8,18 +8,18 @@
  *   services/skills.ts (max-file-lines).
  * @structure AgentSkillLink · getAgentSkillLinks (re-exported) · linkSkillToAgent ·
  *   unlinkSkillFromAgent · resolveAgentSkills
- * @usage import { getAgentSkillLinks, linkSkillToAgent } from '../services/skill-agent-links.js';
+ * @usage import { getAgentSkillLinks, linkSkillToAgent } from './agent-links.js';
  * @version-history
  *   v1.0.0 — 2026-10-26 — Extracted from skills.ts (pure extraction; no behaviour change).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { recordAccountEvent } from './account-events.js';
-import { resolveSkillRef } from './skills.js';
-import type { ResolvedSkill, SkillAccessor } from './skill-types.js';
-import { getAgentSkillLinks, writeAgentSkillLinks, type AgentSkillLink } from './skill-agent-link-records.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { recordAccountEvent } from '../account-events.js';
+import { resolveSkillRef } from '../skills.js';
+import type { ResolvedSkill, SkillAccessor } from './types.js';
+import { getAgentSkillLinks, writeAgentSkillLinks, type AgentSkillLink } from './agent-link-records.js';
 
-export { getAgentSkillLinks, type AgentSkillLink } from './skill-agent-link-records.js';
+export { getAgentSkillLinks, type AgentSkillLink } from './agent-link-records.js';
 
 // ── Agent attachment (links are refs, never copies) ──
 

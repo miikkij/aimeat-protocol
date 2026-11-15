@@ -73,9 +73,9 @@ import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
-import { SkillValidationError, isAllowedSkillPath, SKILL_NAME_RE } from '../services/skill-md.js';
-import { readSkillFileInput, skillFileBytes, skillFileEncodings } from '../services/skill-files.js';
-import { parseSkillVisibility, SKILL_VISIBILITY_HINT } from '../services/skill-audience.js';
+import { SkillValidationError, isAllowedSkillPath, SKILL_NAME_RE } from '../services/skill/md.js';
+import { readSkillFileInput, skillFileBytes, skillFileEncodings } from '../services/skill/files.js';
+import { parseSkillVisibility, SKILL_VISIBILITY_HINT } from '../services/skill/audience.js';
 import { ProvenanceScopeError } from '../services/ai/provenance.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import { provenanceWriteEcho } from '../services/ai/provenance-echo.js';
@@ -85,11 +85,11 @@ import {
   publishSkill, deleteSkill, listSkills, listSkillLibrary, resolveSkillRef,
   listSkillsByBinding, setSkillVisibility, SkillAccessError, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
-import { getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills } from '../services/skill-agent-links.js';
+import { getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills } from '../services/skill/agent-links.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { requireScopeUnlessSelf } from '../auth/self-or-scope.js';
 import { callerOf } from '../middleware/caller.js';
-import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill-publish-gate.js';
+import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill/publish-gate.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import type { PublishGateInput } from '../services/publish-requests/door.js';
 
@@ -117,7 +117,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
     };
   }
 
-  /** The caller the publish gate asks about (services/skill-publish-gate.ts): the session, and an app grant's app. */
+  /** The caller the publish gate asks about (services/skill/publish-gate.ts): the session, and an app grant's app. */
   function publishGateOf(req: Request): PublishGateInput {
     return { caller: callerOf(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) };
   }

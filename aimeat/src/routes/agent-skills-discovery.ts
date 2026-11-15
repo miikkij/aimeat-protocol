@@ -28,7 +28,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { listSkills, resolveSkillRef, SkillAccessError, type SkillAccessor } from '../services/skills.js';
-import { SKILL_NAME_RE } from '../services/skill-md.js';
+import { SKILL_NAME_RE } from '../services/skill/md.js';
 import { cached, TTL } from '../services/cache.js';
 import { logger } from '../utils/logger.js';
 

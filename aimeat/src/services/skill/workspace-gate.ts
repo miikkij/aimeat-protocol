@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-workspace-gate.ts
+ * @file src/services/skill/workspace-gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The WRITE rule for a workspace-scope skill, which is a different question from the
@@ -20,11 +20,11 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, defect 2).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { checkOrganismNamespaceAccess, type OrganismAccessCaller } from './organism/namespace-access.js';
-import { wsManifestKey } from './skill-refs.js';
-import { SkillAccessError, type SkillAccessor } from './skill-types.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { checkOrganismNamespaceAccess, type OrganismAccessCaller } from '../organism/namespace-access.js';
+import { wsManifestKey } from './refs.js';
+import { SkillAccessError, type SkillAccessor } from './types.js';
 
 /**
  * The session the organism namespace rule decides on, from the accessor.

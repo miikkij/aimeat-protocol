@@ -45,10 +45,10 @@
 import YAML from 'yaml';
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage, ContentLabelTarget } from '../../../storage/interface.js';
-import { validateSkillFiles, SkillValidationError, parseSkillMd } from '../../skill-md.js';
-import { manifestKey, fileKey, MANIFEST_KEY_RE, scopeOwnerGhii } from '../../skill-refs.js';
+import { validateSkillFiles, SkillValidationError, parseSkillMd } from '../../skill/md.js';
+import { manifestKey, fileKey, MANIFEST_KEY_RE, scopeOwnerGhii } from '../../skill/refs.js';
 import { publishSkill, deleteSkill, SkillAccessError, type SkillManifestValue, type SkillPackageTag } from '../../skills.js';
-import { skillFileBytes, skillFileEncodings, type SkillFileEncoding } from '../../skill-files.js';
+import { skillFileBytes, skillFileEncodings, type SkillFileEncoding } from '../../skill/files.js';
 import { localAccountName } from '../../../utils/gaii.js';
 import { memoryTarget } from '../../classification/labels.js';
 

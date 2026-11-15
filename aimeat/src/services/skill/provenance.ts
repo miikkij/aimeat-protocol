@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-provenance.ts
+ * @file src/services/skill/provenance.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The provenance record of a published skill. A skill's SKILL.md is prose people and
@@ -17,9 +17,9 @@
  * @version-history
  *   v1.0.0 — 2026-10-08 — Initial (aiprov E12).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { provenanceForWrite, type DeclaredProvenance } from './ai/provenance.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { provenanceForWrite, type DeclaredProvenance } from '../ai/provenance.js';
 
 /** Who publishes the skill and what they said about how it was written. */
 export interface SkillPublishProvenance {

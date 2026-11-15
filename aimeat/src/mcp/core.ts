@@ -197,7 +197,7 @@ import { descriptionFor, shapeResponse, jsonContent, structuredResult } from '..
 import { walletStanding } from '../services/wallet/wallet-standing.js';
 import { agentProfileNow } from '../services/agent/profile-read.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, discoveryCaller, DISCOVERY_TYPES, type DiscoveryType } from '../services/discovery/index.js';
-import { getAgentSkillLinks } from '../services/skill-agent-links.js';
+import { getAgentSkillLinks } from '../services/skill/agent-links.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { readsAsOwner, ownerScopeViewAdmitting } from '../services/owner-scope-read.js';

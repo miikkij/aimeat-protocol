@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-files.ts
+ * @file src/services/skill/files.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How a skill's files are stored and handed out, text and bytes alike. A skill folder
@@ -21,7 +21,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-26 — Initial: binary files in a skill folder (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss).
  */
-import { isUtf8Text, SkillValidationError } from './skill-md.js';
+import { isUtf8Text, SkillValidationError } from './md.js';
 
 /** How a stored file's string reads back into bytes; absent is UTF-8 text. */
 export type SkillFileEncoding = 'base64';

@@ -1112,7 +1112,7 @@ await test('27b2. seeded aimeat-node-guide serves anonymously and its bytes hash
 // The six conversation skills existed only as hand-published skills on aimeat.io until 2026-09-18,
 // so a fresh node had the chat and none of the guidance that steers it. They were moved in byte for
 // byte, and equal bytes is what let that node ADOPT its own copies instead of keeping them as
-// unknown (services/skill-seeds.ts). Since 2026-09-19 the repository is their source: the content
+// unknown (services/skill/seeds.ts). Since 2026-09-19 the repository is their source: the content
 // audit corrected aimeat-welcome-pages and aimeat-mail-to-data here, so those two no longer equal
 // what aimeat.io served that day, and a node takes the corrections on its next start. The digest
 // that pinned aimeat-first-conversation to the aimeat.io text went on 2026-10-03, when its first

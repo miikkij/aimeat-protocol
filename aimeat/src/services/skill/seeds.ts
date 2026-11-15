@@ -1,5 +1,5 @@
 /**
- * @file skill-seeds.ts
+ * @file src/services/skill/seeds.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Keeps the built-in node-scope skills (data/builtin-skills.ts) and the node's copy of
@@ -43,7 +43,7 @@
  *   - decideRetireAction(live, stamp) — the same for a skill the repo no longer ships
  *   - seedBuiltinSkills(storage, config) — apply both, return the counts
  * @usage
- *   import { seedBuiltinSkills } from '../services/skill-seeds.js';
+ *   import { seedBuiltinSkills } from './seeds.js';
  *   seedBuiltinSkills(storage, config).then(r => ...);
  * @version-history
  *   v2.2.0 -- 2026-11-08 -- A pre-fingerprint copy still at version 1.0.0 is updated: it was seeded and
@@ -56,13 +56,13 @@
  *   v1.0.0 -- 2026-07-05 -- Initial (Skills feature Phase 2b)
  */
 import { createHash } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
-import { RETIRED_BUILTIN_SKILLS } from '../data/builtin-skills.retired.js';
-import { deleteSkill, publishSkill, readNodeSkillBody, scopeOwnerGhii } from './skills.js';
-import { manifestKey } from './skill-refs.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { BUILTIN_SKILLS } from '../../data/builtin-skills.js';
+import { RETIRED_BUILTIN_SKILLS } from '../../data/builtin-skills.retired.js';
+import { deleteSkill, publishSkill, readNodeSkillBody, scopeOwnerGhii } from '../skills.js';
+import { manifestKey } from './refs.js';
+import { logger } from '../../utils/logger.js';
 
 /** What to do with one built-in skill this startup. */
 export type SeedAction =

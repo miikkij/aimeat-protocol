@@ -11,7 +11,7 @@
  *   schemas and readmes are made and checked exactly as there. The team context is one record in
  *   the shared-knowledge workspace (space `context`, id `team`), so every member and every member's
  *   AI with a contributor grant writes it, as with any other record there. The skill is a user
- *   skill whose audience is the organism (services/skill-audience.ts).
+ *   skill whose audience is the organism (services/skill/audience.ts).
  *
  *   The workspace and space names are written once per language and the team's working language
  *   picks one; a team is not translated after it is made.

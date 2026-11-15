@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-agent-link-records.ts
+ * @file src/services/skill/agent-link-records.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The record behind an agent's skill links: `agents.{agentName}.skills`, an
@@ -7,12 +7,12 @@
  *   services/skills.ts (the library's `linkedBy`) and skill-agent-links.ts (link, unlink, resolve)
  *   share it without importing each other. Moved out of services/skills.ts (max-file-lines).
  * @structure AgentSkillLink · getAgentSkillLinks · writeAgentSkillLinks
- * @usage import { getAgentSkillLinks } from './skill-agent-link-records.js';
+ * @usage import { getAgentSkillLinks } from './agent-link-records.js';
  * @version-history
  *   v1.0.0 — 2026-10-26 — Extracted from skills.ts (pure extraction; no behaviour change).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
 
 export interface AgentSkillLink {
   ref: string;

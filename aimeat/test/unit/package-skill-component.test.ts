@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import {
     skillComponentContent, skillFilesOf, skillComponentName, rebindSkillMd, skillComponentId,
 } from '../../src/services/packages/install/package-skill-component.js';
-import { parseSkillMd } from '../../src/services/skill-md.js';
+import { parseSkillMd } from '../../src/services/skill/md.js';
 import { registeredNameFor } from '../../src/services/packages/install/package-install.js';
 
 const MD = '---\nname: shop-guide\ndescription: How to run the shop app.\nlicense: MIT\nmetadata:\n  binding: app:alice/shop.html\n  audience: staff\n---\n\n# Shop guide\n\nBody text.\n';

@@ -37,7 +37,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { listSkills } from './skills.js';
-import { skillFeatureOff } from './skill-types.js';
+import { skillFeatureOff } from './skill/types.js';
 
 const LINE_MAX = 190;
 

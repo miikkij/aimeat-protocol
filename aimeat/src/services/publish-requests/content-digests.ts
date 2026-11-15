@@ -23,8 +23,8 @@
  */
 import type { CortexExtensionRecord, Storage } from '../../storage/interface.js';
 import { resolveSkillRef, formatSkillRef } from '../skills.js';
-import { SkillAccessError } from '../skill-types.js';
-import { SkillValidationError } from '../skill-md.js';
+import { SkillAccessError } from '../skill/types.js';
+import { SkillValidationError } from '../skill/md.js';
 import { servedCortexLibs } from '../component-versions.js';
 import { memoryValueDigest, type PublishStoreCtx } from './store.js';
 

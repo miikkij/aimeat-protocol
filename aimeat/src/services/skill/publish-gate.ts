@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-publish-gate.ts
+ * @file src/services/skill/publish-gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The publish gate at the doors that make a user skill public (plan doc-mvcn6c7e4e5q,
@@ -25,15 +25,15 @@
  *     only, a user skill asked as public is stored at 'members' with PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { isRaiseToPublic } from './publish-gate.js';
-import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
-import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
-import { resolveSkillRef, formatSkillRef, SkillAccessError } from './skills.js';
-import { SkillValidationError, parseSkillMd } from './skill-md.js';
-import { signedInOnly } from '../config/visibility.js';
-import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { isRaiseToPublic } from '../publish-gate.js';
+import { publishAskOf, type PublishAsk } from '../publish-requests/ask.js';
+import { fileAskForDoor, type DoorAsk, type PublishGateInput } from '../publish-requests/door.js';
+import { resolveSkillRef, formatSkillRef, SkillAccessError } from '../skills.js';
+import { SkillValidationError, parseSkillMd } from './md.js';
+import { signedInOnly } from '../../config/visibility.js';
+import { closedNodeLevel, type ClosedNodeWarning } from '../closed-node-level.js';
 
 export type SkillGateAsk = Extract<PublishAsk, { kind: 'ask' | 'refused' }>;
 type Ctx = { storage: Storage; config: AimeatConfig };

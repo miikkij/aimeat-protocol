@@ -27,8 +27,8 @@
 import { homedir } from 'node:os';
 import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
 import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
-import { isAllowedSkillPath, SKILL_NAME_RE } from '../services/skill-md.js';
-import { skillFileBytes, skillFileEncodings, type SkillFileEntry } from '../services/skill-files.js';
+import { isAllowedSkillPath, SKILL_NAME_RE } from '../services/skill/md.js';
+import { skillFileBytes, skillFileEncodings, type SkillFileEntry } from '../services/skill/files.js';
 
 interface ResolvedSkillPayload {
   ref: string;

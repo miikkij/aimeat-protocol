@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-reader.ts
+ * @file src/services/skill/reader.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The classification check of the skills registry (TARGET-082 V4). services/skills.ts
@@ -16,10 +16,10 @@
  * @version-history
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { readerFor, readerForAgent, type ContentReader } from './classification/reader.js';
-import { memoryTarget } from './classification/labels.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { readerFor, readerForAgent, type ContentReader } from '../classification/reader.js';
+import { memoryTarget } from '../classification/labels.js';
 
 /** The accessor fields this reads. services/skills.ts SkillAccessor fits. */
 export interface SkillReaderAccessor {

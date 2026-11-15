@@ -1,5 +1,5 @@
 /**
- * @file src/services/skill-audience.ts
+ * @file src/services/skill/audience.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may read a node or user skill: the registry's visibility gate, with the
@@ -21,8 +21,8 @@
  *   v1.0.0 — 2026-10-17 — Initial: mayRead moved here from skills.ts and made asynchronous for the
  *     organisation level (plan doc-mvcn6c7e4e5q, V3.9).
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { parseAudience, audienceAllows, formatAudience, type Audience, type AudienceAuth } from './audience.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { parseAudience, audienceAllows, formatAudience, type Audience, type AudienceAuth } from '../audience.js';
 
 /** What a node or user skill's visibility may be set to. */
 export type SkillVisibility = 'owner' | 'members' | 'public' | `organism:${string}`;

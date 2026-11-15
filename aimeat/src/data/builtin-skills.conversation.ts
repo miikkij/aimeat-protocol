@@ -26,7 +26,7 @@
  *   ON A NODE THAT ALREADY HAS THEM (aimeat.io). A copy published by hand carries no seed
  *   fingerprint. The seeder ADOPTS such a copy when it is identical to the text here, and from
  *   then on it follows the repo like any other built-in skill; a copy that differs is kept as it
- *   is and named in the log (decideSeedAction in services/skill-seeds.ts). A node that had not yet
+ *   is and named in the log (decideSeedAction in services/skill/seeds.ts). A node that had not yet
  *   booted on the build that adopted these keeps its own copy and says so in the log; correcting
  *   it there is then a hand edit, or a re-adopt once the two texts agree again.
  * @structure CONVERSATION_SKILL_ENTRIES
