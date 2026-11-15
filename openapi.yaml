@@ -89183,8 +89183,8 @@ paths:
       operationId: getWorkOverview
       summary: The Work tab in one read
       description: >-
-        The work waiting for the caller as a provider and the work they sent as a requester, in one
-        read. An owner session sees their own work, under their GHII, and the work of all their
+        The work waiting for the caller as a provider, the work they delivered as a provider and the
+        work they sent as a requester, in one read. An owner session sees their own work, under their GHII, and the work of all their
         agents and ecosystem apps; an agent or federated principal sees only its own, for the same
         reason the individual inbox and sent endpoints do.
       tags: [Owner]
@@ -89233,6 +89233,25 @@ paths:
                                     2026-11-15 may hold another value.
                                 ttl_expires_at: { type: string, format: date-time, nullable: true }
                                 created_at: { type: string, format: date-time }
+                          delivered:
+                            type: array
+                            description: >-
+                              The work the caller delivered as a provider, which has left the inbox: status
+                              delivered, rated, disputed, contested, escalated or settled, with what was
+                              delivered and the requester's rating. The same principals as inbox.
+                            items:
+                              type: object
+                              properties:
+                                tracking_code: { type: string }
+                                status: { type: string }
+                                action_id: { type: string }
+                                requester_gaii: { type: string }
+                                cost: { type: number }
+                                rating: { type: number, nullable: true }
+                                output:
+                                  description: What was delivered, as GET /v1/work/{tc} returns it.
+                                created_at: { type: string, format: date-time }
+                                updated_at: { type: string, format: date-time }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

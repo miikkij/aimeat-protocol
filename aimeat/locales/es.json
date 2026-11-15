@@ -23246,7 +23246,17 @@
       "declined": "Trabajo rechazado",
       "delivered": "Trabajo entregado",
       "deliveredText": "Entregado: {text}",
-      "deliveredEmpty": "Entregado sin texto"
+      "deliveredEmpty": "Entregado sin texto",
+      "acceptBtn": "Aceptar",
+      "declineBtn": "Rechazar",
+      "acceptFailed": "No se pudo aceptar el trabajo.",
+      "declineFailed": "No se pudo rechazar el trabajo.",
+      "deliverFailed": "No se pudo entregar el trabajo.",
+      "deliverPlaceholder": "Describe el trabajo que hiciste y su resultado.",
+      "deliveredTab": "Entregados",
+      "deliveredListEmpty": "Todavía no has entregado ningún trabajo. El trabajo que entregas se queda aquí con lo que enviaste.",
+      "ratedPositive": "Valoración: positiva",
+      "ratedNegative": "Valoración: negativa"
     },
     "services": {
       "title": "Servicios",

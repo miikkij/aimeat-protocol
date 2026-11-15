@@ -24607,7 +24607,17 @@
       "declined": "Work declined",
       "delivered": "Work delivered",
       "deliveredText": "Delivered: {text}",
-      "deliveredEmpty": "Delivered with no text"
+      "deliveredEmpty": "Delivered with no text",
+      "acceptBtn": "Accept",
+      "declineBtn": "Decline",
+      "acceptFailed": "Could not accept the work.",
+      "declineFailed": "Could not decline the work.",
+      "deliverFailed": "Could not deliver the work.",
+      "deliverPlaceholder": "Describe the work you did and its result.",
+      "deliveredTab": "Delivered",
+      "deliveredListEmpty": "You have not delivered any work yet. Work you deliver stays here with what you sent.",
+      "ratedPositive": "Rated positive",
+      "ratedNegative": "Rated negative"
     },
     "services": {
       "title": "Services",

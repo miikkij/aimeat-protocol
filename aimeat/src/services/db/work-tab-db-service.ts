@@ -9,9 +9,12 @@
  *   and running the provider + requester reads together. Single-master: the Work tab mount only. The
  *   individual endpoints stay for interactive re-fetch (accept/reject/deliver/rate).
  *
- * @structure WorkTabService.overview(isOwnerSession, ownerName, caller) → { inbox, sent }
+ * @structure WorkTabService.overview(isOwnerSession, ownerName, caller) → { inbox, sent, delivered }
  * @usage const ov = await createWorkTabService(storage).overview(isOwner, ownerName, resolveIdentity(req.auth, nodeId));
  * @version-history
+ *   v1.4.0 — 2026-11-15 — `delivered`: the work the caller delivered as a provider (delivered, rated,
+ *     disputed or settled), with its output and rating, so a delivered item no longer leaves the provider's view without a record. Read from the
+ *     provider rows the inbox already reads; no new query.
  *   v1.3.0 — 2026-11-15 — A sent item carries the delivered `output`, as GET /v1/work/sent does, so the
  *     Work tab shows what was delivered.
  *   v1.2.0 — 2026-09-26 — An owner session's tab reads the person's ecosystem apps' identities beside
@@ -25,10 +28,17 @@ import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { identitiesActingFor } from './owner-identity.js';
 
 const OPEN_INBOX_STATUSES = ['pending', 'accepted', 'in_progress'];
+/**
+ * The statuses of work that was delivered: delivered, then rated by the requester (routes/work.ts
+ * rate), or disputed and settled by a ruling (services/disputes/audit.ts DISPUTED_WORK, settled).
+ */
+const DELIVERED_STATUSES = ['delivered', 'rated', 'disputed', 'contested', 'escalated', 'settled'];
 
 export interface WorkOverview {
   inbox: Array<Record<string, unknown>>;
   sent: Array<Record<string, unknown>>;
+  /** The work the caller delivered as a provider: it left the inbox, and this is its record. */
+  delivered: Array<Record<string, unknown>>;
 }
 
 export class WorkTabService {
@@ -69,6 +79,10 @@ export class WorkTabService {
         sent: requesterItems.map(w => ({
           tracking_code: w.trackingCode, status: w.status, action_id: w.actionId,
           provider_gaii: w.providerGaii, cost: w.cost, rating: w.rating, output: w.output, ttl_expires_at: w.ttlExpiresAt, created_at: w.createdAt,
+        })),
+        delivered: providerItems.filter(w => DELIVERED_STATUSES.includes(w.status)).map(w => ({
+          tracking_code: w.trackingCode, status: w.status, action_id: w.actionId,
+          requester_gaii: w.requesterGaii, cost: w.cost, rating: w.rating, output: w.output, created_at: w.createdAt, updated_at: w.updatedAt,
         })),
       };
     });

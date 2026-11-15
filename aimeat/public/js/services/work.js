@@ -11,6 +11,8 @@
  *   - submitRating: rate a completed work item
  *
  * @version-history
+ *   v1.4.0 — 2026-11-15 — getWorkOverview returns `delivered`, the work the caller delivered as a
+ *     provider (GET /v1/work/overview).
  *   v1.3.0 — 2026-11-15 — deliverWork sends the text as output { text }, the JSON object the route
  *     takes; an empty text area sends { text: "" }, which is a valid delivery.
  *   v1.2.1 — 2026-11-15 — deliverWork sends the delivery text as `output`, the field POST
@@ -36,15 +38,16 @@ export async function listSent() {
 }
 
 /**
- * Composite mount for the Work tab: inbox + sent in ONE call. Returns { inbox, sent } (arrays) or null on
- * error so the caller can fall back to the individual listInbox/listSent reads.
+ * Composite mount for the Work tab: inbox, sent and the provider's delivered work in ONE call. Returns
+ * { inbox, sent, delivered } (arrays) or null on error so the caller can fall back to the individual
+ * listInbox/listSent reads.
  */
 export async function getWorkOverview() {
   try {
     const data = await apiGet('/v1/work/overview');
     const d = data?.data;
     if (!d) return null;
-    return { inbox: d.inbox || [], sent: d.sent || [] };
+    return { inbox: d.inbox || [], sent: d.sent || [], delivered: d.delivered || [] };
   } catch (err) { swallowed('work: getWorkOverview', err); return null; }
 }
 

@@ -8,6 +8,7 @@
  *   (.claude/rules/page-guidance.md): PageStart "work" under the head and the title's question mark
  *   concept.work_request.
  * @version-history
+ *   v1.20.0 -- 2026-11-15 -- Accept and Decline say what they do (the past-tense "Work accepted" was the label and the error toast); accept, decline and deliver have their own error toasts; the Deliver dialog's placeholder goes through t(). A Delivered view lists the work the person delivered as a provider (GET /v1/work/overview `delivered`), with what was sent and the rating, so a delivered item no longer leaves no record. Decline and Rate are the control-tall action (Action `control`), the touch target Accept has.
  *   v1.19.0 -- 2026-11-15 -- A row reads its tracking code from `tracking_code`, the name the work routes answer with, so accept, decline, deliver and rate reach the right item, and names the row by its `action_id` when it has no description. A sent item shows what was delivered, "Delivered with no text" for an empty one; an empty text area delivers { text: "" }.
  *   v1.18.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once a work item is listed) and the title's question mark concept.work_request; the head's paragraph is two sentences.
  *   v1.17.1 -- 2026-10-11 -- The pacing amount is read where the work routes put it, `cost.toll` (then `cost.base_price`, then the flat fields), so a work item in the inbox and in the sent list shows "pacing N morsels" again.
@@ -81,6 +82,9 @@ const workToll = (w) => num(w.cost?.toll) ?? num(w.cost?.base_price) ?? num(w.co
 export default function WorkTab({ session, showToast, onStats }) {
   const [workInbox, setWorkInbox] = useState(null);
   const [workSent, setWorkSent] = useState(null);
+  // The work this person (or their agents) delivered as a provider: it left the inbox, and this is
+  // where it stays on record. Only the overview carries it, so the fallback reads leave it empty.
+  const [workDelivered, setWorkDelivered] = useState(null);
   const [workSubTab, setWorkSubTab] = useState('inbox');
   const [rateModal, setRateModal] = useState(null);
   const [deliverModal, setDeliverModal] = useState(null);
@@ -93,8 +97,10 @@ export default function WorkTab({ session, showToast, onStats }) {
       setWorkInbox(ov.inbox);
       onStats?.({ work: ov.inbox.length });
       setWorkSent(ov.sent);
+      setWorkDelivered(ov.delivered);
       return;
     }
+    setWorkDelivered([]);
     try {
       const inbox = await listInbox();
       setWorkInbox(inbox);
@@ -140,11 +146,11 @@ export default function WorkTab({ session, showToast, onStats }) {
     setActionLoading(tc);
     try {
       const resp = await acceptWork(tc);
-      if (resp.ok === false) { showToast(resp.error?.message || t('profile.work.accepted'), true); return; }
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.work.acceptFailed'), true); return; }
       showToast(t('profile.work.accepted'));
       loadData();
     } catch (e) {
-      showToast(e.message || t('profile.work.accepted'), true);
+      showToast(e.message || t('profile.work.acceptFailed'), true);
     } finally {
       setActionLoading(null);
     }
@@ -154,11 +160,11 @@ export default function WorkTab({ session, showToast, onStats }) {
     setActionLoading(tc);
     try {
       const resp = await rejectWork(tc);
-      if (resp.ok === false) { showToast(resp.error?.message || t('profile.work.declined'), true); return; }
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.work.declineFailed'), true); return; }
       showToast(t('profile.work.declined'));
       loadData();
     } catch (e) {
-      showToast(e.message || t('profile.work.declined'), true);
+      showToast(e.message || t('profile.work.declineFailed'), true);
     } finally {
       setActionLoading(null);
     }
@@ -168,12 +174,12 @@ export default function WorkTab({ session, showToast, onStats }) {
     setActionLoading(tc);
     try {
       const resp = await deliverWork(tc, result);
-      if (resp.ok === false) { showToast(resp.error?.message || t('profile.work.delivered'), true); return; }
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.work.deliverFailed'), true); return; }
       showToast(t('profile.work.delivered'));
       setDeliverModal(null);
       loadData();
     } catch (e) {
-      showToast(e.message || t('profile.work.delivered'), true);
+      showToast(e.message || t('profile.work.deliverFailed'), true);
     } finally {
       setActionLoading(null);
     }
@@ -183,8 +189,13 @@ export default function WorkTab({ session, showToast, onStats }) {
     switch (status) {
       case 'completed':
       case 'accepted':
-      case 'in_progress': return 'fine';
-      case 'delivered': return 'attention';
+      case 'in_progress':
+      case 'rated':
+      case 'settled': return 'fine';
+      case 'delivered':
+      case 'disputed':
+      case 'contested':
+      case 'escalated': return 'attention';
       case 'rejected':
       case 'cancelled': return 'danger';
       default: return 'off';
@@ -193,10 +204,14 @@ export default function WorkTab({ session, showToast, onStats }) {
 
   function renderList(items, type) {
     if (!items) return html`<${List} loading=${t('profile.work.loading')} />`;
-    return html`<${List} cols="name-desc-doors" empty=${t(type === 'sent' ? 'profile.work.sentEmpty' : 'profile.work.empty')}>${items.map(w => {
+    const empty = { sent: 'profile.work.sentEmpty', delivered: 'profile.work.deliveredListEmpty' }[type] || 'profile.work.empty';
+    return html`<${List} cols="name-desc-doors" empty=${t(empty)}>${items.map(w => {
       // The work routes name the item `tracking_code`; the other names are older shapes.
       const tc = w.tracking_code || w.tc || w.id || w.work_id;
-      const said = type === 'sent' ? deliveredText(w.output) : null;
+      const said = type === 'sent' || type === 'delivered' ? deliveredText(w.output) : null;
+      // A rating is stored as score 5 (positive) or 1 (negative); four and up reads positive, the
+      // line services/trust.ts draws.
+      const score = typeof w.rating?.score === 'number' ? w.rating.score : null;
       const isLoading = actionLoading === tc;
       const status = w.status || '-';
       const isPending = status === 'pending' || status === 'offered';
@@ -210,15 +225,16 @@ export default function WorkTab({ session, showToast, onStats }) {
             ${workToll(w) > 0 ? ' \u2502 ' + t('pacing.amount', { n: workToll(w) }) : ''}
             ${w.created_at ? ' \u2502 ' + timeAgo(w.created_at) : ''}
             ${said ? ' \u2502 ' + (said.empty ? t('profile.work.deliveredEmpty') : t('profile.work.deliveredText', { text: said.text })) : ''}
+            ${type === 'delivered' && score !== null ? ' \u2502 ' + t(score >= 4 ? 'profile.work.ratedPositive' : 'profile.work.ratedNegative') : ''}
           <//>
           <${Doors}>
           <${Mark} kind="status" tone=${statusTone(status)}>${status}<//>
           ${type === 'inbox' && isPending && html`
               <${Loud} control disabled=${isLoading} onClick=${() => handleAccept(tc)}>
-                ${isLoading ? '...' : t('profile.work.accepted')}
+                ${isLoading ? '...' : t('profile.work.acceptBtn')}
               <//>
-              <${Action} small row disabled=${isLoading} onClick=${() => handleReject(tc)}>
-                ${isLoading ? '...' : t('profile.work.declined')}
+              <${Action} small row control disabled=${isLoading} onClick=${() => handleReject(tc)}>
+                ${isLoading ? '...' : t('profile.work.declineBtn')}
               <//>
           `}
 
@@ -229,7 +245,7 @@ export default function WorkTab({ session, showToast, onStats }) {
           `}
 
           ${type === 'sent' && w.status === 'delivered' && html`
-            <${Action} small row onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name || w.action_id })}>${t('profile.work.rateBtn')}<//>
+            <${Action} small row control onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name || w.action_id })}>${t('profile.work.rateBtn')}<//>
           `}
           <//>
         <//>
@@ -243,12 +259,14 @@ export default function WorkTab({ session, showToast, onStats }) {
       title=${t('profile.work.title')} help="concept.work_request"
       desc=${t('profile.work.desc')}
       start=${/* Folded once either list has a work item; a request is sent by one's own AI, so no button. */
-        html`<${PageStart} id="work" done=${workInbox === null || workSent === null ? null : (workInbox.length + workSent.length) > 0} />`}>
+        html`<${PageStart} id="work" done=${workInbox === null || workSent === null ? null : (workInbox.length + workSent.length + (workDelivered?.length ?? 0)) > 0} />`}>
       <${Tabs} bar kind="view" value=${workSubTab} onSelect=${setWorkSubTab} items=${[
         { value: 'inbox', label: t('profile.work.inbox') },
         { value: 'sent', label: t('profile.work.sent') },
+        { value: 'delivered', label: t('profile.work.deliveredTab') },
       ]} />
-      <${TabPanel} value=${workSubTab}>${workSubTab === 'inbox' ? renderList(workInbox, 'inbox') : renderList(workSent, 'sent')}<//>
+      <${TabPanel} value=${workSubTab}>${workSubTab === 'inbox' ? renderList(workInbox, 'inbox')
+        : workSubTab === 'delivered' ? renderList(workDelivered, 'delivered') : renderList(workSent, 'sent')}<//>
 
       ${rateModal && html`<${RateModal} desc=${rateModal.desc}
         onSubmit=${(r, c) => handleRate(rateModal.workId, r, c)}
@@ -289,7 +307,7 @@ function DeliverModal({ desc, loading, onSubmit, onCancel }) {
         <//>`}>
       <${Stack} gap="large">
         <${Note}>${t('profile.work.delivering')}: ${desc || ''}<//>
-        <${TextArea} label=${t('profile.work.commentLabel')} rows=${4} placeholder="Describe the completed work or attach results..."
+        <${TextArea} label=${t('profile.work.commentLabel')} rows=${4} placeholder=${t('profile.work.deliverPlaceholder')}
           value=${result} onInput=${setResult} />
       <//>
     <//>`;

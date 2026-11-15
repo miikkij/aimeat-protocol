@@ -25370,7 +25370,17 @@
       "declined": "Työ hylätty",
       "delivered": "Työ toimitettu",
       "deliveredText": "Toimitettu: {text}",
-      "deliveredEmpty": "Toimitettu ilman tekstiä"
+      "deliveredEmpty": "Toimitettu ilman tekstiä",
+      "acceptBtn": "Hyväksy",
+      "declineBtn": "Hylkää",
+      "acceptFailed": "Työtä ei voitu hyväksyä.",
+      "declineFailed": "Työtä ei voitu hylätä.",
+      "deliverFailed": "Työtä ei voitu toimittaa.",
+      "deliverPlaceholder": "Kerro, mitä teit ja mikä tulos on.",
+      "deliveredTab": "Toimitetut",
+      "deliveredListEmpty": "Et ole vielä toimittanut työtä. Toimittamasi työ jää tänne yhdessä sen kanssa, mitä lähetit.",
+      "ratedPositive": "Arvio: myönteinen",
+      "ratedNegative": "Arvio: kielteinen"
     },
     "services": {
       "title": "Palvelut",

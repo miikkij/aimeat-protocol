@@ -9,6 +9,8 @@
  *   ({ text: "" }, what the portal sends), and the requester's sent list carries the delivered output.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-work-owner-acts
  * @version-history
+ *   v1.1.0 — 2026-11-15 — 5: a delivered item leaves the provider's inbox and stays in the overview's
+ *     `delivered` list with its output; the requester's `delivered` list does not hold it.
  *   v1.0.0 — 2026-11-15 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -134,6 +136,27 @@ await test('4. KEPT: the agents themselves accept, deliver and rate as before', 
     assert(del.status === 200, `the provider agent delivers: ${del.status} ${JSON.stringify(del.body?.error)}`);
     const rate = await post(`/v1/work/${tc}/rate`, bobAgent.token, { rating: 'positive' });
     assert(rate.status === 200, `the requester agent rates: ${rate.status} ${JSON.stringify(rate.body?.error)}`);
+});
+
+await test('5. delivered work stays on the provider\'s side of the Work tab overview, out of the inbox', async () => {
+    const tc = await requested();
+    assert((await post(`/v1/work/${tc}/accept`, alice)).status === 200, 'accept');
+    const before = await json('/v1/work/overview', { headers: auth(alice) });
+    assert((before.body.data.inbox as { tracking_code: string }[]).some(w => w.tracking_code === tc), 'POSITIVE CONTROL: the accepted item is in the inbox');
+    assert((await post(`/v1/work/${tc}/deliver`, alice, { output: { text: 'the result' } })).status === 200, 'deliver');
+    const ov = await json('/v1/work/overview', { headers: auth(alice) });
+    assert(ov.status === 200, `overview: ${ov.status} ${JSON.stringify(ov.body?.error)}`);
+    assert(!(ov.body.data.inbox as { tracking_code: string }[]).some(w => w.tracking_code === tc), 'the delivered item left the inbox');
+    const row = ((ov.body.data.delivered ?? []) as { tracking_code: string; status: string; output?: { text?: string }; requester_gaii?: string }[]).find(w => w.tracking_code === tc);
+    assert(row?.status === 'delivered' && row.output?.text === 'the result' && row.requester_gaii === bobAgent.gaii,
+        `the provider's delivered list holds it with its output: ${JSON.stringify(row ?? ov.body.data.delivered)}`);
+    const bobView = await json('/v1/work/overview', { headers: auth(bob) });
+    assert(!((bobView.body.data.delivered ?? []) as { tracking_code: string }[]).some(w => w.tracking_code === tc), 'the requester\'s delivered list does not hold the provider\'s item');
+    // A rating moves the item to 'rated'; it is still delivered work and stays on the list.
+    assert((await post(`/v1/work/${tc}/rate`, bob, { rating: 'positive' })).status === 200, 'bob rates');
+    const rated = await json('/v1/work/overview', { headers: auth(alice) });
+    const after = ((rated.body.data.delivered ?? []) as { tracking_code: string; status: string; rating?: { score?: number } }[]).find(w => w.tracking_code === tc);
+    assert(after?.status === 'rated' && after.rating?.score === 5, `the rated item stays with its rating: ${JSON.stringify(after ?? rated.body.data.delivered)}`);
 });
 
 finish();
