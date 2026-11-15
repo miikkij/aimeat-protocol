@@ -14,6 +14,8 @@
  *   rounds that keeps what it does not name, on REST and over MCP, and a clock round's empty cron
  *   refused on update.
  * @version-history
+ *   v1.4.1 — 2026-11-15 — Test 20 waits for the goal's status, which the advance pass writes after
+ *     the work's own write, instead of reading it from the response that showed the work done.
  *   v1.4.0 — 2026-11-08 — Tests 28 and 29: updating the rounds with only the cron keeps the time zone
  *     and the works per round (REST and aimeat_goal_set), and an empty cron on a clock round is refused
  *     on update (group k3-goalrounds).
@@ -425,7 +427,14 @@ await test('20. a work for the node\'s model runs with the owner\'s key, and its
   assert(w.status === 'done' && w.claimed_by === 'model' && /halvin/.test(w.result?.summary ?? ''), `the work: ${JSON.stringify({ status: w.status, by: w.claimed_by, result: w.result, reason: w.reason })}`);
   const sent = provider.lastRequest('chat');
   assert(JSON.stringify(sent?.json ?? {}).includes('Vertaa kolmea kilpailijaa'), 'the model was told the goal');
-  assert(done.status === 'done', `a goal whose only work is done is done: ${done.status}`);
+  // The goal's own status is set by the advance pass that the work's settling wakes
+  // (services/goals/goals-advance.ts), a write after the work's own, so it is waited for, not read
+  // from the same response; on PostgreSQL the read landed between the two (nightly 43714532036).
+  const settled = await waitFor('the goal to settle', async () => {
+    const g = await readGoal(tokenA, id);
+    return g.status !== 'active' ? g : null;
+  }, 15_000).catch(() => null);
+  assert(settled?.status === 'done', `a goal whose only work is done is done: ${settled?.status ?? 'still active after 15 s'}`);
   const kept = await json(`/v1/memory/goal-results.${id}`, { headers: auth(tokenA) });
   assert(kept.status === 200 && JSON.stringify(kept.body.data).includes('halvin'), `the whole answer is kept: ${kept.status}`);
   const temp = await json(`/v1/memory/goal-runs.${id}.${wid}`, { headers: auth(tokenA) });
