@@ -3,6 +3,29 @@
   "entries": [
     {
       "date": "2026-11-15",
+      "kind": "feature",
+      "id": "2026-11-15-your-app-holds-as-many-people-as-you-need",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator",
+        "developer"
+      ],
+      "title": {
+        "en": "Your app holds as many people as you need",
+        "fi": "Appiisi mahtuu niin monta ihmistä kuin tarvitset"
+      },
+      "summary": {
+        "en": "One app holds 10 000 people without an account by default, the operator can raise it, and the app's page shows what is left.",
+        "fi": "Yhteen appiin mahtuu oletuksena 10 000 tilitöntä ihmistä, ylläpitäjä voi nostaa rajaa, ja appin sivu näyttää, paljonko on jäljellä."
+      },
+      "body": {
+        "en": "People who register to your app without an account now have their own storage. One app holds 10 000 of them by default, the operator can raise it, and the app's page shows how many places are left. Deleting the app removes them and what they kept.",
+        "fi": "Ilman tiliä rekisteröityneet ihmiset tallentuvat nyt omaan säilöönsä. Yhteen appiin mahtuu oletuksena 10 000 ihmistä, ylläpitäjä voi nostaa rajaa, ja appin sivu näyttää, montako paikkaa on jäljellä. Kun poistat appin, sen ihmiset ja heidän tietonsa poistuvat sen mukana."
+      }
+    },
+    {
+      "date": "2026-11-15",
       "kind": "security",
       "id": "2026-11-15-requests-are-checked-against-the-api-description",
       "highlight": false,
