@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { isNodeReservedPart, isNodeReservedWorkspaceKey, spaceRowAt } from '../../src/services/workspace/record-key.js';
 import { normalizeObjectTypes } from '../../src/services/workspace/meta.js';
-import { livingConfigContent } from '../../src/services/living-pulse-spend.js';
+import { livingConfigContent } from '../../src/services/living/pulse-spend.js';
 
 const root = 'organism.o1.w.ws-1';
 

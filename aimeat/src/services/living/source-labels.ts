@@ -1,5 +1,5 @@
 /**
- * @file src/services/living-source-labels.ts
+ * @file src/services/living/source-labels.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A living document's source copy inherits the strictest classification of its sources
@@ -23,13 +23,13 @@
  * @version-history
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
-import type { Storage, ContentLabelTarget } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { labelsFor, memoryTarget, setLabel, targetId, type LabelActor } from './classification/labels.js';
-import { classificationActiveFor, policyFor } from './classification/policy.js';
-import { labelById, type ClassificationLabel, type ClassificationPolicy } from './classification/defaults.js';
+import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { labelsFor, memoryTarget, setLabel, targetId, type LabelActor } from '../classification/labels.js';
+import { classificationActiveFor, policyFor } from '../classification/policy.js';
+import { labelById, type ClassificationLabel, type ClassificationPolicy } from '../classification/defaults.js';
 
 /** One written source copy (a memory key of the copy's owner) and the stored items its text came from. */
 export interface SourceCopy {

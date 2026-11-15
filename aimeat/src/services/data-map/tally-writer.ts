@@ -7,7 +7,7 @@
  *
  *   WHY. An app grant stores and reads as its owner, so its principal is the owner's GHII and its
  *   write was recorded as the owner's own. The living-document pulse decides whose permission an AI
- *   spend runs under by the latest writer of the config (services/living-pulse-spend.ts), and an app
+ *   spend runs under by the latest writer of the config (services/living/pulse-spend.ts), and an app
  *   without ai:use that wrote a config read as the owner (secaudit2026oct31w2 round 10,
  *   f-2026aug-ai-paths-3). An app grant is now recorded as the app, `eco:<app>#<owner>@<node>`
  *   (callerPrincipal in utils/gaii.ts), the name the node already gives it for "who did this".

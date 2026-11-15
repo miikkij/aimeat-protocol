@@ -129,7 +129,7 @@ export const PLATFORM_WRITTEN_PREFIXES: readonly { prefix: string; writtenBy: st
   { prefix: 'federation-book.', writtenBy: 'services/federation/book.ts' },
   { prefix: 'link-invite.', writtenBy: 'services/link-invites.ts' },
   { prefix: 'peer-replace-ask.', writtenBy: 'services/peer/replace-ask.ts' },
-  { prefix: 'living.template.', writtenBy: 'services/living-pulse.ts' },
+  { prefix: 'living.template.', writtenBy: 'services/living/pulse.ts' },
   { prefix: 'tracked-response', writtenBy: 'services/tracked-response.ts' },
   { prefix: 'open-items.', writtenBy: 'services/open-items.ts' },
   { prefix: 'message-flag.', writtenBy: 'services/security-incident.ts' },

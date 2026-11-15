@@ -1,5 +1,5 @@
 /**
- * @file living-pulse.ts
+ * @file src/services/living/pulse.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Living Documents — SERVER-SIDE unattended pulse (Phase 3). The client "Pulse now"
@@ -81,27 +81,27 @@
  *   v1.0.0 — 2026-06-21 — Phase 3: unattended self-fulfilled pulse + cadence/guards.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, MemoryRecord, AgentTaskRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import { localAccountName, isGEAI, parseGAII } from '../utils/gaii.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { readsAsOwner, ownerScopeView } from './owner/scope-read.js';
-import { callerFromAuth, agentSessionCaller, type CallerContext } from './caller-context.js';
-import { completeForOwner, AiCompletionError } from './ai/completion.js';
-import { librarianSearch } from './librarian.js';
-import { systemReader } from './classification/reader.js';
-import { memoryTarget } from './classification/labels.js';
-import { inheritSourceLabels, type SourceCopy } from './living-source-labels.js';
-import type { PushService } from './push.js';
-import { provenOwnerAddress } from './owner/mail-address.js';
-import { sendMail } from './mail-gate.js';
-import type { EmailService } from './email.js';
-import { emitDelivery } from './event-bus.js';
-import { OWNER_CALLER } from './ai/caller-context.js';
-import { updateRecord } from './record-cas.js';
-import { flushWriteTallyBuffer } from './data-map/write-tally-buffer.js';
-import { livingSpendHold, pulseSpender, spenderOfOtherAccount } from './living-pulse-spend.js';
+import type { Storage, MemoryRecord, AgentTaskRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName, isGEAI, parseGAII } from '../../utils/gaii.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { readsAsOwner, ownerScopeView } from '../owner/scope-read.js';
+import { callerFromAuth, agentSessionCaller, type CallerContext } from '../caller-context.js';
+import { completeForOwner, AiCompletionError } from '../ai/completion.js';
+import { librarianSearch } from '../librarian.js';
+import { systemReader } from '../classification/reader.js';
+import { memoryTarget } from '../classification/labels.js';
+import { inheritSourceLabels, type SourceCopy } from './source-labels.js';
+import type { PushService } from '../push.js';
+import { provenOwnerAddress } from '../owner/mail-address.js';
+import { sendMail } from '../mail-gate.js';
+import type { EmailService } from '../email.js';
+import { emitDelivery } from '../event-bus.js';
+import { OWNER_CALLER } from '../ai/caller-context.js';
+import { updateRecord } from '../record-cas.js';
+import { flushWriteTallyBuffer } from '../data-map/write-tally-buffer.js';
+import { livingSpendHold, pulseSpender, spenderOfOtherAccount } from './pulse-spend.js';
 
 /** Optional notify services for stop/retire alerts (web-push + email). The in-UI retired badge + ledger
  *  are written regardless; these are the extra out-of-app nudges. */

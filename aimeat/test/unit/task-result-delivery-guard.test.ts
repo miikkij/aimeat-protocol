@@ -28,7 +28,7 @@ import type { AimeatConfig } from '../../src/config.js';
 import { deliverTaskResult } from '../../src/services/task/result-delivery.js';
 import { createPrincipalNotification } from '../../src/services/notifications/create.js';
 import { notifyAutomationTaskComplete } from '../../src/services/ecosystem/automation-notify.js';
-import { pulseInstanceServer } from '../../src/services/living-pulse.js';
+import { pulseInstanceServer } from '../../src/services/living/pulse.js';
 import { tellAgreement } from '../../src/services/compliance/agreements-notify.js';
 import { updateNotificationSettings } from '../../src/services/notifications/settings.js';
 import { setActiveEmailService } from '../../src/services/email.js';

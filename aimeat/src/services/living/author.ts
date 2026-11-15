@@ -1,5 +1,5 @@
 /**
- * @file living-author.ts
+ * @file src/services/living/author.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Living Documents — AI template author (Phase 1). Turns a user's plain-language need into
@@ -14,12 +14,12 @@
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: the completion runs through the chokepoint, minted and
  *     metered as `living:author`.
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { stripCodeblock } from './llm-strip.js';
-import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook/ai.js';
-import { LIVING_AUTHOR_SYSTEM, LIVING_AUTHOR_TEMPLATE } from './living-author-prompt.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { stripCodeblock } from '../llm-strip.js';
+import { NotebookAiError, resolveOwnerModel, completeOwner } from '../notebook/ai.js';
+import { LIVING_AUTHOR_SYSTEM, LIVING_AUTHOR_TEMPLATE } from './author-prompt.js';
+import { logger } from '../../utils/logger.js';
 
 export interface LivingSlot { section: string; desc: string; slot: string; kind: 'derived' | 'aggregate' | 'static'; rules: { max_words?: number }; agent: string | null }
 export interface LivingTemplate {

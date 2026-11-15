@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A living document's source copy inherits the strictest classification of its sources
- *   (TARGET-082 V4, services/living-source-labels.ts), against SqliteStorage(':memory:'): the
+ *   (TARGET-082 V4, services/living/source-labels.ts), against SqliteStorage(':memory:'): the
  *   strictest source wins; a copy already as strict is not written; a person's locked label is not
  *   changed (the rule leaves a suggestion); with the switch off nothing is read; a failure never
  *   throws. Then the wiring in the unattended pulse (living-pulse.ts), with the librarian and the
@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { setLabel, memoryTarget, type LabelActor } from '../../src/services/classification/labels.js';
-import { inheritSourceLabels, INHERIT_REASON } from '../../src/services/living-source-labels.js';
+import { inheritSourceLabels, INHERIT_REASON } from '../../src/services/living/source-labels.js';
 import { logger } from '../../src/utils/logger.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { AgentTaskRecord, OrganismRecord, OrganismMembershipRecord } from '../../src/storage/interface.js';
@@ -28,7 +28,7 @@ vi.mock('../../src/services/ai/completion.js', () => ({
   AiCompletionError: class AiCompletionError extends Error { code = 'X'; },
   completeForOwner: async () => ({ content: 'derived', usage: { costUsd: 0 }, provenance: null }),
 }));
-const { pulseInstanceServer } = await import('../../src/services/living-pulse.js');
+const { pulseInstanceServer } = await import('../../src/services/living/pulse.js');
 
 const NODE = 'test-node';
 const ALICE = `alice@${NODE}`;

@@ -1,12 +1,12 @@
 /**
- * @file src/services/living-pulse-spend.ts
+ * @file src/services/living/pulse-spend.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Whose permission the unattended living-document pulse spends the owner's AI under, and
  *   the owner's one press when that principal may not use the owner's AI itself.
  *
  *   WHY. The pulse calls completeForOwner, the owner's key and AI allowance, for every due config it
- *   finds (services/living-pulse.ts). POST /v1/ai/complete asks an agent or an app for ai:use first; a
+ *   finds (services/living/pulse.ts). POST /v1/ai/complete asks an agent or an app for ai:use first; a
  *   config is an ordinary memory record, so an app signed in with the default permissions (no ai:use)
  *   wrote one into a workspace of the owner and the next pulse spent the owner's AI for it
  *   (secaudit2026oct31w2 round 10, f-2026aug-ai-paths-3). The same holds for an agent without ai:use;
@@ -48,16 +48,16 @@
  *   v1.0.0 -- 2026-10-31 -- Initial (secaudit2026oct31w2 round 10, f-2026aug-ai-paths-3).
  */
 import { createHash } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import { canonicalJson } from '../utils/memory-content.js';
-import type { AimeatConfig } from '../config.js';
-import { appSlug, isGEAI, isSameOwner, localAccountName, parseGAII, parseGaiiLoose } from '../utils/gaii.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { logger } from '../utils/logger.js';
-import { flushWriteTallyBuffer } from './data-map/write-tally-buffer.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { fileAsk } from './publish-requests/ask.js';
-import { readPublishRequest, effectiveState } from './publish-requests/store.js';
+import type { Storage } from '../../storage/interface.js';
+import { canonicalJson } from '../../utils/memory-content.js';
+import type { AimeatConfig } from '../../config.js';
+import { appSlug, isGEAI, isSameOwner, localAccountName, parseGAII, parseGaiiLoose } from '../../utils/gaii.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { logger } from '../../utils/logger.js';
+import { flushWriteTallyBuffer } from '../data-map/write-tally-buffer.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { fileAsk } from '../publish-requests/ask.js';
+import { readPublishRequest, effectiveState } from '../publish-requests/store.js';
 
 /** The record, in the owner's GHII namespace. Service-owned (utils/reserved-keys.ts). */
 export const LIVING_SPEND_HOLD_PREFIX = 'living-spend-hold.';

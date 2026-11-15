@@ -47,7 +47,7 @@ export type PublishKind =
   | 'portfolio-memory-read'
   // A program a computer holds for an agent, allowed by the owner (services/connector-programs.ts).
   | 'connector-program'
-  // A living document refreshing itself with the owner's AI, set up by a writer without ai:use (services/living-pulse-spend.ts).
+  // A living document refreshing itself with the owner's AI, set up by a writer without ai:use (services/living/pulse-spend.ts).
   | 'living-ai-spend'
   // A writer without company:write changing a company's page through the file routes (services/company/company-page-key.ts).
   | 'company-page-write'

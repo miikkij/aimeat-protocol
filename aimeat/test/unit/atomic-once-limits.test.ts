@@ -33,7 +33,7 @@ import { appendInboundEcosystemLog } from '../../src/services/ecosystem/events.j
 import { appendMailLog, readMailLog, MAIL_LOG_KEY } from '../../src/services/notifications/settings.js';
 import { writeMarkerOnce, recordAiModelDetected, recordWelcomeMatPasted, ONBOARDING_KEYS } from '../../src/services/onboarding/funnel.js';
 import { putOwnerProvider, PROVIDER_PREFIX } from '../../src/services/decide/providers.js';
-import { pulseInstanceServer } from '../../src/services/living-pulse.js';
+import { pulseInstanceServer } from '../../src/services/living/pulse.js';
 
 requirePostgresWhenAsked('atomic-once-limits');
 

@@ -41,7 +41,7 @@ import { canonicalJson } from '../../utils/memory-content.js';
 // `[^.]+`: two lazy `.+?` around `.w.` backtracked polynomially on a crafted key (code scanning 1784).
 const LIVING_LATEST_RE = /^organism\.([^.]+)\.w\.([^.]+)\.living\.([^.]+)\.latest$/;
 
-/** A living-document config's published key (services/living-pulse.ts CONFIG_RE). */
+/** A living-document config's published key (services/living/pulse.ts CONFIG_RE). */
 export const isLivingConfigLatestKey = (key: string): boolean => LIVING_LATEST_RE.test(key);
 
 const isLivingConfig = (v: unknown): v is Record<string, unknown> =>

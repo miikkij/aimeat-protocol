@@ -1,5 +1,5 @@
 /**
- * @file living-author-prompt.ts
+ * @file src/services/living/author-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Single source of truth for the Living Document AUTHOR prompt. Imported by the author
