@@ -1,5 +1,5 @@
 /**
- * @file src/services/entitlement-erasure.ts
+ * @file src/services/entitlement/erasure.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The exchange part of erasing an account: one step of eraseOwner
@@ -29,7 +29,7 @@
  *
  *   WRITTEN BACK UNDER THE ROW'S OWN KEY. persistEntitlement derives the key from the value, and rows
  *   minted before v1.7.0 of metered-entitlements.ts are keyed on the exact caller rather than the
- *   owner (services/entitlement-merge.ts: "a record does not know where it lives; the scan does").
+ *   owner (services/entitlement/merge.ts: "a record does not know where it lives; the scan does").
  *   Through persistEntitlement such a row would stay active and a revoked copy would be written to the
  *   owner's key, over a contract that may be someone's live one. So the scan's key and namespace are
  *   used, with the record shape persistEntitlement writes.
@@ -43,9 +43,9 @@
  *   v1.0.0 — 2026-10-01 — Initial: account erasure left exchange contracts and grants active for a
  *     reused account name.
  */
-import type { MemoryRecord, Storage } from '../storage/interface.js';
-import { localAccountOf, runAsNode } from '../utils/gaii.js';
-import { NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement } from './metered/entitlements.js';
+import type { MemoryRecord, Storage } from '../../storage/interface.js';
+import { localAccountOf, runAsNode } from '../../utils/gaii.js';
+import { NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement } from '../metered/entitlements.js';
 
 /** How many records the step revoked. A record where the account is both parties counts once, as consumer. */
 export interface EntitlementErasure {

@@ -50,7 +50,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { percentFee } from '../../commerce/money.js';
 import { commerceFeePercent, resolveOperatorFeeGhii } from '../marketplace-fee.js';
-import { settleEntitlementMoney, refundEntitlementMoney } from '../entitlement-money.js';
+import { settleEntitlementMoney, refundEntitlementMoney } from '../entitlement/money.js';
 import { commitSpend, refundSpend, type MeteredEntitlement, type PricingSpec } from './entitlements.js';
 import type { DynamicDesignation, SplitResult } from '../../commerce/beneficiary-split.js';
 import { reverseAccrual } from '../../commerce/beneficiary-book.js';

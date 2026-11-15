@@ -77,7 +77,7 @@ import {
   listEntitlementHistoryByConsumer, listEntitlementHistoryByProvider,
   type MeteredEntitlement, type EntitlementHistoryEntry,
 } from '../services/metered/entitlements.js';
-import { mergeOwnerEntitlements, listAllEntitlementsForMerge } from '../services/entitlement-merge.js';
+import { mergeOwnerEntitlements, listAllEntitlementsForMerge } from '../services/entitlement/merge.js';
 import { listPayables } from '../commerce/payable-book.js';
 import {
   resolveExtActionPricing, resolveOfferingPricing, getOffering, budgetFloorText, presentContractTerms,
@@ -655,7 +655,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   /**
    * GET /v1/exchange/earnings — the money the caller has EARNED and not yet been paid.
    *
-   * A money-priced call settles through the accrual rail (services/entitlement-money.ts): no per-call
+   * A money-priced call settles through the accrual rail (services/entitlement/money.ts): no per-call
    * PSP charge, no custodial escrow — each metered call books the seller's net (price − rake) as a
    * `pending` payable (commerce/payable-book.ts). Both halves of that were already true and only one
    * of them was readable: a seller could see they had been USED (offering stats, consumer lineage)

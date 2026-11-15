@@ -26,7 +26,7 @@
  *
  *   NOT HERE: the zero-priced exchange grants an approval issued (services/grant-sync.ts). They live
  *   in the metered-grant namespace, keyed by a hash of the consumer's GHII; the step in
- *   services/entitlement-erasure.ts revokes them, together with the paid contracts.
+ *   services/entitlement/erasure.ts revokes them, together with the paid contracts.
  * @structure eraseAppMembership(storage, account) → AppMembershipErasure
  * @usage const counts = await eraseAppMembership(storage, 'bob');
  * @version-history

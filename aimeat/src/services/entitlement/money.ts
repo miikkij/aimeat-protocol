@@ -1,5 +1,5 @@
 /**
- * @file src/services/entitlement-money.ts
+ * @file src/services/entitlement/money.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The MONEY settlement rail for EXCHANGE entitlements (TARGET-045) — the "identical seam"
@@ -21,15 +21,15 @@
  *   v1.0.1 — 2026-09-26 — ownerOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.0.2 — 2026-10-11 — The morsel payment handler no longer exists, so the accrual handler is picked from every registered handler. recordMoneyPlatformFee comes from commerce/platform-fee.ts, which breaks the import cycle with the checkout.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PaymentContext, PaymentHandler } from '../commerce/types.js';
-import { listPaymentHandlers } from '../commerce/payment-handlers.js';
-import { TEST_MONEY_HANDLER_ID } from '../commerce/test-money-handler.js';
-import { percentFee } from '../commerce/money.js';
-import { settlePurchase } from '../commerce/settle-purchase.js';
-import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PaymentContext, PaymentHandler } from '../../commerce/types.js';
+import { listPaymentHandlers } from '../../commerce/payment-handlers.js';
+import { TEST_MONEY_HANDLER_ID } from '../../commerce/test-money-handler.js';
+import { percentFee } from '../../commerce/money.js';
+import { settlePurchase } from '../../commerce/settle-purchase.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 /** The invoice/receivable rail that accrues real money without a live per-call PSP charge (prod EE). */
 const ACCRUAL_HANDLER_ID = 'io.aimeat.invoice';

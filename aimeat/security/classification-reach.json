@@ -1894,7 +1894,7 @@
       },
       "why": "Reviewed 2026-11-01 (secaudit2026oct31w2 round 12), the node's own read: the node-wide ecosystem subscription record under the node's system identity, read once at boot to move each entry to its owner's list. No content is shown to anyone."
     },
-    "src/services/entitlement-erasure.ts": {
+    "src/services/entitlement/erasure.ts": {
       "reads": {
         "listAllMemory": 1
       },

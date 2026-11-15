@@ -1,5 +1,5 @@
 /**
- * @file src/services/entitlement-merge.ts
+ * @file src/services/entitlement/merge.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one-off migration for rights minted before they were keyed to the owner who pays.
@@ -31,12 +31,12 @@
  *   v1.0.0 — 2026-07-28 — Extracted from metered-entitlements.ts (max-file-lines) with the deletion
  *     and idempotence fixes.
  */
-import type { Storage } from '../storage/interface.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import type { Storage } from '../../storage/interface.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 import {
   entitlementKey, grantKey, archiveEntitlement, persistEntitlement, serviceRows,
   NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement,
-} from './metered/entitlements.js';
+} from '../metered/entitlements.js';
 
 /**
  * Every live right on the node, contracts and grants alike — the input to the owner-key migration,

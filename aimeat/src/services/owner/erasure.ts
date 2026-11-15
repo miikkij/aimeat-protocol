@@ -160,7 +160,7 @@ import { eraseAppMembership } from '../app/member-erasure.js';
 import { eraseAppDesignSpecsOf } from '../app/design-spec.js';
 import { eraseAppPlansOf } from '../app/plan.js';
 import { eraseAppRoadmapsOf } from '../app/roadmap.js';
-import { revokeEntitlementsOfAccount } from '../entitlement-erasure.js';
+import { revokeEntitlementsOfAccount } from '../entitlement/erasure.js';
 import { uninstallExtension } from '../extension/lifecycle.js';
 import { appendRequest, removeAppDocsOfOwner } from '../compliance/docs.js';
 import { eraseNameBoundGrants } from '../name-bound-grants-erasure.js';
@@ -504,7 +504,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       return n ? `app_builder_records:${n}` : null;
     }, deletionLog, storage);
 
-    // Exchange contracts and grants (services/entitlement-erasure.ts). Keyed by a hash of the
+    // Exchange contracts and grants (services/entitlement/erasure.ts). Keyed by a hash of the
     // consumer's owner GHII, which a new holder of the name gets back unchanged, so an active record
     // authorises them; on the provider side it bills to or is carried by them. Revoked, not deleted:
     // the other party's spend and earnings history stays readable.
