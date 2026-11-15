@@ -47,11 +47,11 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { firstPackageCopy, type KnowledgeHelpers } from './helpers.js';
 import { validateManifest } from './manifest-validator.js';
-import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowledge-overview.js';
+import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowledge/overview.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
-import { holdsOldestPackageCopy } from '../../services/knowledge-review-reach.js';
+import { holdsOldestPackageCopy } from '../../services/knowledge/review-reach.js';
 
 export function registerAdminRoutes(
   router: Router,
@@ -71,7 +71,7 @@ export function registerAdminRoutes(
    * `facets` is the other half: by author, by kind, by how finished, counted over EVERYTHING that
    * matched rather than over the page. It is where two defects in the data become visible — one
    * person stored under two spellings, and a maturity word this node does not define.
-   * → services/knowledge-overview.ts
+   * → services/knowledge/overview.ts
    */
   router.get('/v1/admin/knowledge', requireAuth(), requireOperator(storage), async (req, res) => {
     const str = (k: string) => (typeof req.query[k] === 'string' ? req.query[k] as string : undefined);
@@ -363,7 +363,7 @@ export function registerAdminRoutes(
       const owner = req.auth!.owner;
       const identities = [`${owner}@${config.nodeId}`, ...(await storage.getAgentsByOwner(owner)).map(a => a.gaii)];
       // The package is the copy its import made first; a record another account writes at the same
-      // key is younger and reads no review (services/knowledge-review-reach.ts, secaudit2026oct26).
+      // key is younger and reads no review (services/knowledge/review-reach.ts, secaudit2026oct26).
       if (!(await holdsOldestPackageCopy(storage, manifestKey, identities))) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such package.'));
         return;

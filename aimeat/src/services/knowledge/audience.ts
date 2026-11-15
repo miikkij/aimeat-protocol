@@ -1,5 +1,5 @@
 /**
- * @file src/services/knowledge-audience.ts
+ * @file src/services/knowledge/audience.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who reads a knowledge package and each of its entries, in the words services/audience.ts
@@ -24,8 +24,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.6).
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { parseAudience, audienceAllows, type AudienceAuth, type AudienceLevel } from './audience.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { parseAudience, audienceAllows, type AudienceAuth, type AudienceLevel } from '../audience.js';
 
 /** The audiences a package takes, as audience.ts names them; the package spells 'private' as 'owner'. */
 export const KNOWLEDGE_PACKAGE_LEVELS: readonly AudienceLevel[] = ['private', 'members', 'organism', 'public'];

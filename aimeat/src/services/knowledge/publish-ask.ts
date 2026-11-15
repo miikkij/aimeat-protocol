@@ -1,5 +1,5 @@
 /**
- * @file src/services/knowledge-publish-ask.ts
+ * @file src/services/knowledge/publish-ask.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The publish gate for a knowledge package (plan doc-mvcn6c7e4e5q, V4). A package is
@@ -21,11 +21,11 @@
  * @version-history
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: knowledge packages).
  */
-import type { Storage } from '../storage/interface.js';
-import type { CallerContext } from './caller-context.js';
-import { publishAskOf, fileAsk, publishRequestedBody, type PublishAsk } from './publish-requests/ask.js';
-import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
-import { knowledgeEntryKey } from './knowledge-sharing.js';
+import type { Storage } from '../../storage/interface.js';
+import type { CallerContext } from '../caller-context.js';
+import { publishAskOf, fileAsk, publishRequestedBody, type PublishAsk } from '../publish-requests/ask.js';
+import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
+import { knowledgeEntryKey } from './sharing.js';
 
 /** What the request names: the package, and the entries kept back. */
 export interface KnowledgeAskTarget {

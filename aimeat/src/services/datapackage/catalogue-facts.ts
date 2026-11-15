@@ -46,7 +46,7 @@
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { cached, invalidateKey, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
-import { packageAudienceOf } from '../knowledge-audience.js';
+import { packageAudienceOf } from '../knowledge/audience.js';
 import { bare, bytesHash } from './contract.js';
 import type { AimeatConfig } from '../../config.js';
 import { signedInOnly } from '../../config/visibility.js';

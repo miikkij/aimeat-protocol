@@ -23,7 +23,7 @@
  *   capability asks the same value. The files a publish writes carry the storage tier nearest to it
  *   ('public', 'members', or 'private' for an organism or private package, since a file has no organism
  *   tier), so the session-free address `/v1/pub/...` stays public only for a public package. The
- *   catalogue entry beside the bytes takes the same audience (services/knowledge-audience.ts), so a
+ *   catalogue entry beside the bytes takes the same audience (services/knowledge/audience.ts), so a
  *   non-public package is not listed in the public catalogue.
  * @structure DATAPACKAGE_LEVELS · fileVisibilityOf · catalogueAudienceOf · catalogueEntryVisibilityOf
  *   · DatapackageReader · readsAsPackageOwner · lacksPackageReadScope · datapackageReadable

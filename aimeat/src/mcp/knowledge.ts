@@ -76,7 +76,7 @@ import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../services/ai/provenance-result.js';
 import {
     addKnowledgePackageEntry, type KnowledgeManifestValue,
-} from '../services/knowledge-package-entry.js';
+} from '../services/knowledge/package-entry.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import { packageLinksFor } from '../services/knowledge/package-links.js';
@@ -295,7 +295,7 @@ export function registerKnowledgeTools(
             annotations: annotationsFor('aimeat_knowledge_contribute'),
         },
         async ({ package_id, entry_key, content, model, ai_provenance, ai_provenance_id }) => {
-            // ONE implementation (services/knowledge-package-entry.ts). The tool declares its
+            // ONE implementation (services/knowledge/package-entry.ts). The tool declares its
             // parameters because the protocol requires that, maps `ai_provenance` from the wire
             // shape, and renders the answer as text; the entry record, the reserved-package guard
             // and the manifest's index line belong to the capability, not to this door.

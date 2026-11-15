@@ -1,5 +1,5 @@
 /**
- * @file src/services/knowledge-package-entry.ts
+ * @file src/services/knowledge/package-entry.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Adding one entry to a knowledge package, once, for every surface that can add one.
@@ -43,12 +43,12 @@
  *   v1.0.2 — 2026-10-19 — The manifest's index line is written with expectedVersion, and added to a
  *     fresh read of the manifest after a VERSION_CONFLICT (check:atomic-writes).
  */
-import type { MemoryRecord } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
-import { writeMemoryRecord, type MemoryWriteCaller, type MemoryWriteFanout } from './memory/write.js';
-import type { DeclaredProvenance } from './ai/provenance.js';
-import { PITFALL_PACKAGE_ID } from './appdev-kb.js';
-import { CAS_ATTEMPTS } from './record-cas.js';
+import type { MemoryRecord } from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
+import { writeMemoryRecord, type MemoryWriteCaller, type MemoryWriteFanout } from '../memory/write.js';
+import type { DeclaredProvenance } from '../ai/provenance.js';
+import { PITFALL_PACKAGE_ID } from '../appdev-kb.js';
+import { CAS_ATTEMPTS } from '../record-cas.js';
 
 /** An entry reference stored in a knowledge-package manifest's `entries` list. */
 export interface KnowledgeEntryRef {

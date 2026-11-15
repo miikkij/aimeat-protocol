@@ -36,7 +36,7 @@ import type { CallerContext } from '../caller-context.js';
 import { loadOwnerAgents } from '../db/owner-identity.js';
 import { readsAsOwner } from '../owner/scope-read.js';
 import { isNodeAccount, type AudienceAuth } from '../audience.js';
-import { packageAudienceOf, knowledgeAudienceAllows } from '../knowledge-audience.js';
+import { packageAudienceOf, knowledgeAudienceAllows } from './audience.js';
 import { readerFor, type ReaderAuth } from '../classification/reader.js';
 import { presentMemory } from '../classification/present-memory.js';
 import { isGEAI, localAccountName } from '../../utils/gaii.js';

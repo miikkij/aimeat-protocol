@@ -52,7 +52,7 @@ import {
     type Descriptor, type LatestPointer,
     bare, descriptorKey, latestKey, packageId, packageKeyRoot, publicUrl,
 } from './contract.js';
-import { manifestRecordVisibility, entryRecordVisibility } from '../knowledge-audience.js';
+import { manifestRecordVisibility, entryRecordVisibility } from '../knowledge/audience.js';
 import { fileVisibilityOf, catalogueAudienceOf, catalogueEntryVisibilityOf, withAudienceTag } from './audience.js';
 import { recordPackageAudience, trustedAudienceOf } from './audience-record.js';
 import { saleTermsOf } from './sale-terms-record.js';
@@ -184,7 +184,7 @@ export async function upsertCatalogueEntry(
         })),
         links: [],
         // Listed in the public catalogue only when the package is public; else the package's own
-        // audience (services/knowledge-audience.ts reads it).
+        // audience (services/knowledge/audience.ts reads it).
         sharing: { catalog_listed: visibility === 'public', allow_clone: false, toll_morsels: 0, audience: catalogueAudienceOf(visibility) },
         // The pointer back to the canonical bytes. The catalogue never holds them: a knowledge
         // package is a collection of memory entries, and memory does not carry files.

@@ -1,9 +1,9 @@
 /**
- * @file src/services/knowledge-shared.ts
+ * @file src/services/knowledge/shared.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The knowledge packages another account shared with this caller: audience members or
- *   organism:<id> (services/knowledge-audience.ts), for the library's reach "Shared with you" (WP11;
+ *   organism:<id> (services/knowledge/audience.ts), for the library's reach "Shared with you" (WP11;
  *   design canvas "Jaettu data", board Kirjasto-kirjautunut). The read that opens one is GET
  *   /v1/knowledge/:id, whose findSharedManifest (routes/knowledge/helpers.ts) admits the same caller by
  *   the same audience check, and the list passes the caller's classification reader as that read does,
@@ -21,14 +21,14 @@
  *   2026-11-04 — The cached manifests carry MEMORY_ANY_LEVEL_TAG (codebase analysis 2026-11-03, item C4).
  *   v1.0.0 — 2026-11-02 — Initial (WP11).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from './cache.js';
-import { localAccountName } from '../utils/gaii.js';
-import { packageAudienceOf, knowledgeAudienceAllows } from './knowledge-audience.js';
-import { readerFor } from './classification/reader.js';
-import { presentMemories } from './classification/present-memory.js';
-import type { AudienceAuth } from './audience.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { packageAudienceOf, knowledgeAudienceAllows } from './audience.js';
+import { readerFor } from '../classification/reader.js';
+import { presentMemories } from '../classification/present-memory.js';
+import type { AudienceAuth } from '../audience.js';
 
 /** A knowledge package manifest shared with members or an organism, as stored. */
 export type SharedKnowledgeManifest = MemoryRecord & { audience: string };

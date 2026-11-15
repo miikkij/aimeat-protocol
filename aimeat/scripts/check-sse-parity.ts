@@ -198,7 +198,7 @@ const DELEGATES: Record<string, string> = {
         + 'service rather than trusting the delegation.',
     'src/mcp/cortex.ts': "services/cortex-lifecycle.ts, which emits 'cortex'",
     'src/mcp/extensions.ts': "services/extension/lifecycle.ts, which emits 'extensions'",
-    'src/mcp/knowledge.ts': "services/knowledge-package-entry.ts, which emits 'knowledge'",
+    'src/mcp/knowledge.ts': "services/knowledge/package-entry.ts, which emits 'knowledge'",
     'src/mcp/organisms-name-invites.ts': "services/invitations.ts, which emits 'organisms' and 'notifications'",
     'src/mcp/sharing-groups.ts': "services/sharing-group-members.ts, which emits 'groups'",
 

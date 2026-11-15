@@ -9,7 +9,7 @@
  *     outgoing listing without an owner shows none;
  *   - eraseOwner deletes the rows the person contributed (GHII and, for older rows, the bare name)
  *     and the rows of their packages, and names knowledge_links in its log; another owner's row stays;
- *   - the once-only start step (services/knowledge-link-owner-keep.ts) places an older row with the
+ *   - the once-only start step (services/knowledge/link-owner-keep.ts) places an older row with the
  *     one record at its source in its contributor's account (an agent's included) and writes the GHII
  *     as linked_by; keeps a row whose package is gone; deletes an erased account's row whose package
  *     is gone; records the rest as one incident and leaves them unplaced; runs once.
@@ -27,7 +27,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryLinkRecord } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
-import { placeKnowledgeLinkOwnersOnce } from '../../src/services/knowledge-link-owner-keep.js';
+import { placeKnowledgeLinkOwnersOnce } from '../../src/services/knowledge/link-owner-keep.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 
 requirePostgresWhenAsked('knowledge-link-owner');

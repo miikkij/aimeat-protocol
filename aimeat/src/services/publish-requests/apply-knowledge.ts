@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for a knowledge package: the entries it names become
  *   public, and, when `change.field` is 'audience', the package is listed public, as the owner,
- *   through services/knowledge-sharing.ts, the code PATCH /v1/knowledge/:id/sharing and the entry
+ *   through services/knowledge/sharing.ts, the code PATCH /v1/knowledge/:id/sharing and the entry
  *   PATCH call (plan doc-mvcn6c7e4e5q, V4).
  *
  *   THE OWNER APPROVED WHAT THEY SAW. The request carries the manifest's version and each named
@@ -21,8 +21,8 @@
 import type { KnowledgeManifest, MemoryRecord } from '../../storage/interface.js';
 import { memoryValueDigest, type PublishApplyResult, type PublishRequest, type PublishStoreCtx } from './store.js';
 import { namespaceOfOwner } from './apply-memory.js';
-import { packageAudienceOf } from '../knowledge-audience.js';
-import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry } from '../knowledge-sharing.js';
+import { packageAudienceOf } from '../knowledge/audience.js';
+import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry } from '../knowledge/sharing.js';
 import { logger } from '../../utils/logger.js';
 
 const manifestOf = (r: MemoryRecord): KnowledgeManifest =>

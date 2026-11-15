@@ -1,5 +1,5 @@
 /**
- * @file src/services/knowledge-sharing.ts
+ * @file src/services/knowledge/sharing.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who reads a knowledge package and each of its entries: the two writes behind PATCH
@@ -9,7 +9,7 @@
  *
  *   The callers validate first (services/audience-write.ts); these functions write. The manifest is
  *   the record the knowledge views read, and its memory tier follows the package's audience
- *   (services/knowledge-audience.ts); an entry's own record follows the entry's visibility.
+ *   (services/knowledge/audience.ts); an entry's own record follows the entry's visibility.
  * @structure KnowledgeManifestRow · KnowledgeSharingChange · setKnowledgeSharing ·
  *   setKnowledgeEntryVisibility · findKnowledgeEntry · knowledgeEntryKey
  * @usage
@@ -19,14 +19,14 @@
  *   v1.0.1 — 2026-10-19 — setKnowledgeEntryVisibility sets the entry record's visibility on the
  *     record's version (record-cas.ts updateMemoryRecord) (check:atomic-writes).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, KnowledgeManifest, MemoryRecord } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
-import { recordPublicActivity } from './public-activity.js';
-import { presentKnowledgeManifest } from './toll-morsels-names.js';
-import { manifestRecordVisibility, entryRecordVisibility } from './knowledge-audience.js';
-import { logger } from '../utils/logger.js';
-import { updateMemoryRecord, UNCHANGED } from './record-cas.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, KnowledgeManifest, MemoryRecord } from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
+import { recordPublicActivity } from '../public-activity.js';
+import { presentKnowledgeManifest } from '../toll-morsels-names.js';
+import { manifestRecordVisibility, entryRecordVisibility } from './audience.js';
+import { logger } from '../../utils/logger.js';
+import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 
 interface Deps { storage: Storage; config: AimeatConfig }
 

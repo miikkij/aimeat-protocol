@@ -1,5 +1,5 @@
 /**
- * @file src/services/knowledge-overview.ts
+ * @file src/services/knowledge/overview.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one read behind the operator's Knowledge page: the packages on this node, the
@@ -32,7 +32,7 @@
  *   - KnowledgeFilters / KnowledgeOverview
  *   - buildKnowledgeOverview(config, storage, operatorGaii, reader, filters)
  * @usage
- *   import { buildKnowledgeOverview } from '../services/knowledge-overview.js';
+ *   import { buildKnowledgeOverview } from './overview.js';
  * @version-history
  *   v1.2.0 — 2026-09-29 — TARGET-082 V4: takes the operator's classification reader. Every manifest
  *     passes it (presentMemories) before it is counted or listed, so a package the operator may not
@@ -44,12 +44,12 @@
  *     null, which is the same silence this read was written to end.
  *   v1.0.0 — 2026-09-12 — Initial, with the Knowledge page's rebuild.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, KnowledgeManifest, OperatorReviewRecord } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
-import type { ContentReader } from './classification/reader.js';
-import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, KnowledgeManifest, OperatorReviewRecord } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
+import type { ContentReader } from '../classification/reader.js';
+import { presentMemories, classificationWarningOf } from '../classification/present-memory.js';
 
 /** The maturity words this node actually defines. Anything else is reported, never silently kept. */
 export const DECLARED_MATURITY = ['draft', 'review', 'published'] as const;

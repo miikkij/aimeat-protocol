@@ -30,7 +30,7 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { resolveIdentity, isOwnerInPerson, isForeignPrincipal, isSameOwner, localAccountName } from '../../utils/gaii.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { isNodeAccount } from '../../services/audience.js';
-import { packageAudienceOf, knowledgeAudienceAllows } from '../../services/knowledge-audience.js';
+import { packageAudienceOf, knowledgeAudienceAllows } from '../../services/knowledge/audience.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
 

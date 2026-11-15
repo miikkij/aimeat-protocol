@@ -74,7 +74,7 @@ export const ManifestSchema = {
           key: { type: 'string' },
           title: { type: 'string' },
           // 'members' and 'organism:<id>' are the two audiences between owner and public
-          // (services/knowledge-audience.ts); the id pattern is audience.ts parseAudience's.
+          // (services/knowledge/audience.ts); the id pattern is audience.ts parseAudience's.
           visibility: { type: 'string', pattern: '^(private|owner|group|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$' },
           schema: { type: 'string' },
           references: {

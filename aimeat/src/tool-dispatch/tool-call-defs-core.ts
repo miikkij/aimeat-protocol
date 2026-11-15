@@ -110,7 +110,7 @@ export const KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE =
 /**
  * Adding an entry to a knowledge package, from a connector that speaks HTTP and nothing else.
  *
- * The capability is services/knowledge-package-entry.ts, reachable through the node's MCP tool
+ * The capability is services/knowledge/package-entry.ts, reachable through the node's MCP tool
  * `aimeat_knowledge_contribute` and through no route at all. The name collides with one that does
  * exist: POST /v1/knowledge/:id/contribute shares a WHOLE package with an organism and requires
  * `organism_id`, which is why both connector doors posted `{entry_key, content}` at it and got

@@ -26,7 +26,7 @@ import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { readerFor, readerForAgent } from '../../src/services/classification/reader.js';
 import { memoryTarget, setLabel, type LabelActor } from '../../src/services/classification/labels.js';
 import { ownPitfallRecords, sharedPitfallRecords, listLearnedPitfalls, PITFALL_PREFIX } from '../../src/services/appdev-kb.js';
-import { buildKnowledgeOverview } from '../../src/services/knowledge-overview.js';
+import { buildKnowledgeOverview } from '../../src/services/knowledge/overview.js';
 import { createKnowledgeTabService } from '../../src/services/db/knowledge-tab-db-service.js';
 import { registerAppdevPitfallTools } from '../../src/mcp/appdev-pitfalls.js';
 import { registerKnowledgeTools } from '../../src/mcp/knowledge.js';

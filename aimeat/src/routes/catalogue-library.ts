@@ -33,7 +33,7 @@ import { datasetFactsOf, datapackageListing, type DatasetFacts } from '../servic
 import { packageFreshness } from '../services/datapackage/freshness-read.js';
 import { freshnessBrief, type FreshnessBrief } from '../services/datapackage/freshness.js';
 import { visiblePackages, viewerOf, type PackageViewer, type VisiblePackage, type PackageReach } from '../services/datapackage/visible.js';
-import { sharedKnowledgeFor } from '../services/knowledge-shared.js';
+import { sharedKnowledgeFor } from '../services/knowledge/shared.js';
 import { readStats30 } from '../services/parties/read-stats.js';
 import { partyCredentialOf, verifyParty } from '../services/parties/verify.js';
 import { localAccountName } from '../utils/gaii.js';

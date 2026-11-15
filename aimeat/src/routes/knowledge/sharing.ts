@@ -69,10 +69,10 @@ import { checkAudienceWrite } from '../../services/audience-write.js';
 import {
   KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING, KNOWLEDGE_ENTRY_LEVELS,
   packageAudienceOf, entryRecordVisibility, knowledgeAudienceAllows,
-} from '../../services/knowledge-audience.js';
-import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry, knowledgeEntryKey } from '../../services/knowledge-sharing.js';
+} from '../../services/knowledge/audience.js';
+import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry, knowledgeEntryKey } from '../../services/knowledge/sharing.js';
 import { memoryGroupRefusal, unknownGroupRefusal } from '../../storage/memory-sharing.js';
-import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
+import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge/publish-ask.js';
 import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -138,7 +138,7 @@ export function registerSharingRoutes(
       return;
     }
 
-    // The write: services/knowledge-sharing.ts, which an approved publish request calls too.
+    // The write: services/knowledge/sharing.ts, which an approved publish request calls too.
     const { manifest } = await setKnowledgeSharing({ storage, config }, found, packageId,
       ask.kind === 'ask' ? { allow_clone }
         : closed.warning ? { audience: closed.level, allow_clone }
@@ -221,7 +221,7 @@ export function registerSharingRoutes(
       return;
     }
 
-    // The write: services/knowledge-sharing.ts, which an approved publish request calls too.
+    // The write: services/knowledge/sharing.ts, which an approved publish request calls too.
     await setKnowledgeEntryVisibility({ storage, config }, found, packageId, entryKey, closed.level, groupId);
     res.json(success(config.nodeId, {
       package_id: packageId,

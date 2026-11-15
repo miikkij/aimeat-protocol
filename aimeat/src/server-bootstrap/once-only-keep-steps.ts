@@ -102,7 +102,7 @@ import { keepAiScheduleReadsOnce } from '../services/schedule/ai-read.js';
 import { keepExtensionFirstUseOnce } from '../services/extension/first-use-keep.js';
 import { keepExtensionPublishOnce } from '../services/extension/publish-keep.js';
 import { keepAppToolInvokeOnce } from '../services/app/tool-invoke-keep.js';
-import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-keep.js';
+import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge/link-owner-keep.js';
 import { recordDatapackageAudiencesOnce } from '../services/datapackage/audience-record.js';
 import { recordPointerStateOnce } from '../services/datapackage/sale-terms-record.js';
 import { markExistingPortfolioPagesOnce } from '../services/portfolio-read-hold-keep.js';
@@ -153,7 +153,7 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   await moveEcosystemSubscriptionsByOwnerOnce(storage, config)
     .catch(err => logger.error('Failed to move the ecosystem subscriptions to their owners; the next boot tries again', { error: String(err) }));
   // The knowledge link rows written before link rows carried their owner get the namespace that holds
-  // their source package (services/knowledge-link-owner-keep.ts). Awaited, so a package's links show
+  // their source package (services/knowledge/link-owner-keep.ts). Awaited, so a package's links show
   // from the first request.
   await placeKnowledgeLinkOwnersOnce(storage, config)
     .catch(err => logger.error('Failed to place the older knowledge link rows; the next boot tries again', { error: String(err) }));

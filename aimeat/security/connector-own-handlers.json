@@ -4,6 +4,6 @@
     "aimeat_knowledge_contribute"
   ],
   "reasons": {
-    "aimeat_knowledge_contribute": "Adding an entry to a knowledge package has no HTTP route (services/knowledge-package-entry.ts is reached only through the node MCP), so the connector and the shell refuse it. The connector keeps its own registration for one thing the dispatch path cannot give: a description that says the call refuses before an agent spends one (KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE). Whether to add the route is the developer's call (secaudit 2026-10 follow-up, Part B)."
+    "aimeat_knowledge_contribute": "Adding an entry to a knowledge package has no HTTP route (services/knowledge/package-entry.ts is reached only through the node MCP), so the connector and the shell refuse it. The connector keeps its own registration for one thing the dispatch path cannot give: a description that says the call refuses before an agent spends one (KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE). Whether to add the route is the developer's call (secaudit 2026-10 follow-up, Part B)."
   }
 }

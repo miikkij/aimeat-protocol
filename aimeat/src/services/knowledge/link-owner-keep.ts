@@ -1,5 +1,5 @@
 /**
- * @file src/services/knowledge-link-owner-keep.ts
+ * @file src/services/knowledge/link-owner-keep.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A once-per-node step: every knowledge link row written before link rows carried their
@@ -34,12 +34,12 @@
  * @version-history
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v78 and v79).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryLinkRecord } from '../storage/interface.js';
-import { isSameOwner, localAccountOf } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
-import { recordSecurityIncident, securityOwner } from './security-incident.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, MemoryLinkRecord } from '../../storage/interface.js';
+import { isSameOwner, localAccountOf } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
+import { recordSecurityIncident, securityOwner } from '../security-incident.js';
 
 /** The record under `system@<nodeId>` that says the step has run. */
 export const KNOWLEDGE_LINK_OWNER_STEP_KEY = 'migrations.knowledge-link-owner';

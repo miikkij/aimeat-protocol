@@ -11,7 +11,7 @@
  *   (secaudit 2026-10, v78). SQLite cannot change a primary key with ALTER, so this is the standard
  *   rebuild, gated on PRAGMA table_info: a fresh database, which schema-tables-2.ts creates with the
  *   column, pays nothing. Every existing row is carried over with ownerGaii '' (not yet placed); the
- *   once-only start step services/knowledge-link-owner-keep.ts places it. The old key was unique on
+ *   once-only start step services/knowledge/link-owner-keep.ts places it. The old key was unique on
  *   (source, target), so no two carried rows can meet on the new key.
  * @structure keyKnowledgeLinksByOwner(db)
  * @usage keyKnowledgeLinksByOwner(db);   // schema-tables-2.ts, after the CREATE TABLE block

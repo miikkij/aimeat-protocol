@@ -12,7 +12,7 @@
  *   "what is in this node's knowledge store, and what has nobody looked at" got the catalogue and
  *   no way to tell that the answer was a subset.
  *
- *   IT CALLS services/knowledge-overview.ts, the ONE implementation GET /v1/admin/knowledge calls.
+ *   IT CALLS services/knowledge/overview.ts, the ONE implementation GET /v1/admin/knowledge calls.
  *   The facets are counted over everything that matched rather than over the page, and a facet does
  *   not narrow its own counts, so an AI reading this can move sideways between filters instead of
  *   having to clear one before it can see the next.
@@ -43,7 +43,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
-import { buildKnowledgeOverview } from '../services/knowledge-overview.js';
+import { buildKnowledgeOverview } from '../services/knowledge/overview.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 

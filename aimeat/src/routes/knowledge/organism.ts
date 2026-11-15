@@ -40,7 +40,7 @@ import { classificationWarningOf } from '../../services/classification/present-m
 import { memoryTarget } from '../../services/classification/labels.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
-import { holdsOldestPackageCopy } from '../../services/knowledge-review-reach.js';
+import { holdsOldestPackageCopy } from '../../services/knowledge/review-reach.js';
 
 export function registerOrganismRoutes(
   router: Router,
@@ -213,7 +213,7 @@ export function registerOrganismRoutes(
 
     // Reviews
     // The moderation record is the package owner's: the account that holds the oldest copy of the key,
-    // as GET /v1/knowledge/:id/reviews decides it (services/knowledge-review-reach.ts, secaudit2026oct26).
+    // as GET /v1/knowledge/:id/reviews decides it (services/knowledge/review-reach.ts, secaudit2026oct26).
     const ownsPackage = !!readable?.own && !!req.auth && await holdsOldestPackageCopy(storage, manifestKey,
       [`${req.auth.owner}@${config.nodeId}`, ...(await storage.getAgentsByOwner(req.auth.owner)).map(a => a.gaii)]);
     const reviews = ownsPackage ? await storage.listReviews(manifestKey) : [];

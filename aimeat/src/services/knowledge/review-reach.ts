@@ -1,5 +1,5 @@
 /**
- * @file src/services/knowledge-review-reach.ts
+ * @file src/services/knowledge/review-reach.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Whose package an operator's review is about, for the two reads that show the review
@@ -21,7 +21,7 @@
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
 
 /** Every live copy of `key` on this node, whoever holds it. */
 async function copiesOf(storage: Storage, key: string): Promise<MemoryRecord[]> {

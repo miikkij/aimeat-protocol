@@ -70,7 +70,7 @@ import type { Storage, KnowledgeManifest, MemoryLinkRecord, MemoryRecord } from 
 import { checkAudienceWrite } from '../../services/audience-write.js';
 import {
   KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING, packageAudienceOf, manifestRecordVisibility, entryRecordVisibility,
-} from '../../services/knowledge-audience.js';
+} from '../../services/knowledge/audience.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -87,7 +87,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { normalizeKnowledgeSharing, presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
-import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
+import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge/publish-ask.js';
 import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
 import { packageLinksFor } from '../../services/knowledge/package-links.js';

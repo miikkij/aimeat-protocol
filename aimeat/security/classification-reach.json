@@ -2225,38 +2225,38 @@
       },
       "why": "Reviewed 2026-11-05 (codebase analysis 2026-11-03, decision 4a of 2026-11-05), the node's own read: the re-encrypt job's state record key-rotation.reencrypt under the node's system identity; no person's content is read here. The secrets it reseals are read and written through record-cas.ts updateMemoryRecord and storage swapSealedColumn, never shown, and only the place of a value that does not open reaches the operator."
     },
-    "src/services/knowledge-link-owner-keep.ts": {
+    "src/services/knowledge/link-owner-keep.ts": {
       "reads": {
         "listMemoryForOwners": 1
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, v78 and v79), the node's own read: the once-only start step reads which namespaces hold a link row's source key, to give the row its owner; only the holders' identities are used, and nothing is shown to anyone."
     },
-    "src/services/knowledge-overview.ts": {
+    "src/services/knowledge/overview.ts": {
       "reads": {
         "listMemoryForOwners": 1,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Manifests pass presentMemories."
     },
-    "src/services/knowledge-package-entry.ts": {
+    "src/services/knowledge/package-entry.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest existence check and read-to-update of an entry."
     },
-    "src/services/knowledge-publish-ask.ts": {
+    "src/services/knowledge/publish-ask.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: after a knowledge write by the caller's own account, the manifest's and the named entries' versions are read to stamp the publish request. Only the version numbers leave this file."
     },
-    "src/services/knowledge-review-reach.ts": {
+    "src/services/knowledge/review-reach.ts": {
       "reads": {
         "getMemoryByKeysAnyOwner": 1
       },
       "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the copies of one package manifest key are read only for their holders and creation times, to decide whose package the operator's reviews are; no value is shown to anyone."
     },
-    "src/services/knowledge-shared.ts": {
+    "src/services/knowledge/shared.ts": {
       "reads": {
         "listAllMemoryMeta": 1,
         "getMemoryByKeysAnyOwner": 1
