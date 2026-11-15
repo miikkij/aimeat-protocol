@@ -1,5 +1,5 @@
 /**
- * @file src/services/prompt-variables.ts
+ * @file src/services/prompts/variables.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Helpers for managed system prompts — substitute {{variable}} placeholders and
@@ -12,7 +12,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import type { SystemPromptRecord } from '../storage/interface.js';
+import type { SystemPromptRecord } from '../../storage/interface.js';
 
 /**
  * Replace {{variable_name}} placeholders in prompt content with actual values.

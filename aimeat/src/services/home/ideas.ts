@@ -23,7 +23,7 @@
  *   v1.0.0 — 2026-10-14 — Initial (wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  */
 import type { Storage } from '../../storage/interface.js';
-import { resolvePromptContent } from '../prompt-variables.js';
+import { resolvePromptContent } from '../prompts/variables.js';
 
 /** The managed prompt that holds the list. */
 export const HOME_IDEAS_PROMPT_ID = 'home-ideas';

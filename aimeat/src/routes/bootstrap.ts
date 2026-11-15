@@ -109,7 +109,7 @@ import type { TunnelManager } from '../services/personal-tunnel.js';
 import type { SiteService } from '../services/site.js';
 import { injectCspNonce } from '../utils/csp-nonce.js';
 import { success } from '../middleware/envelope.js';
-import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompts/variables.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
 import { buildLlmsHumanPages, buildLlmsOptionalPages, findPublicPage } from '../data/public-pages.js';

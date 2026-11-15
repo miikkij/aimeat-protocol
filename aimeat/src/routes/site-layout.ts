@@ -46,7 +46,7 @@ import { SiteError } from '../services/site.js';
 import { SurfaceLayoutService, type LayoutSubmission, type PassageProvenance } from '../services/surface-layout/service.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai/provenance-marks.js';
-import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompts/variables.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { blocksForSurface, defaultLayout, operatorLabelKey } from '../services/surface-layout/registry.js';
 import type { SurfaceId } from '../services/surface-layout/types.js';

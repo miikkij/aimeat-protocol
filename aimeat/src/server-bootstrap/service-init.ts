@@ -148,7 +148,7 @@ import { seedTemplateBundles } from '../services/template-bundles.js';
 import { seedKnowledgeTemplates } from '../services/knowledge.js';
 import { seedDesignBook } from '../services/design-book/lifecycle.js';
 import { noticeFailingComponents } from '../services/design-book/component-notice.js';
-import { seedSystemPrompts } from '../services/prompt-seeder.js';
+import { seedSystemPrompts } from '../services/prompts/seeder.js';
 import { loadCatalog } from '../services/ai/catalog/store.js';
 import { seedBundledCortexes } from '../services/cortex/seeder.js';
 import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';

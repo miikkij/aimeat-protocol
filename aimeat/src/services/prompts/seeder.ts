@@ -1,5 +1,5 @@
 /**
- * @file src/services/prompt-seeder.ts
+ * @file src/services/prompts/seeder.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Seeds managed system prompts into storage on startup from the factory
@@ -49,12 +49,12 @@
  *     overwrites.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { PROMPT_SEEDS } from './prompt-defaults.js';
-import { promptSourceKind, type PromptSourceKind } from './prompt-ownership.js';
-import { isShippedDefaultText, SHIPPED_PROMPT_HASHES } from './prompt-defaults/shipped-hashes.js';
-import type { Storage, SystemPromptRecord, SystemPromptVersionRecord } from '../storage/interface.js';
-import { stableStringify } from '../utils/stable-json.js';
-import { logger } from '../utils/logger.js';
+import { PROMPT_SEEDS } from '../prompt-defaults.js';
+import { promptSourceKind, type PromptSourceKind } from './ownership.js';
+import { isShippedDefaultText, SHIPPED_PROMPT_HASHES } from '../prompt-defaults/shipped-hashes.js';
+import type { Storage, SystemPromptRecord, SystemPromptVersionRecord } from '../../storage/interface.js';
+import { stableStringify } from '../../utils/stable-json.js';
+import { logger } from '../../utils/logger.js';
 
 /** What happens to one existing prompt's text this startup. */
 export type PromptContentAction = 'keep' | 'code-sync' | 'follow';

@@ -114,7 +114,7 @@ import { missingOperatorConfig, operatorTypeLabel } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
-import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompts/variables.js';
 import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
 import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
 // i18n imports removed — SPA handles translations client-side

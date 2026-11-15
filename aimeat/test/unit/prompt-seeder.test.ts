@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { PROMPT_SEEDS } from '../../src/services/prompt-defaults.js';
-import { seedSystemPrompts, decidePromptContent } from '../../src/services/prompt-seeder.js';
+import { seedSystemPrompts, decidePromptContent } from '../../src/services/prompts/seeder.js';
 
 const ID = 'bootstrap-auth';
 const OLD = 'Use /v1/mm for micro-memory. (the text before 2026-08-23)';

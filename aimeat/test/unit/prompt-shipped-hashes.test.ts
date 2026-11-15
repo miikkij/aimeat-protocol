@@ -19,8 +19,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { PROMPT_SEEDS } from '../../src/services/prompt-defaults.js';
-import { promptSourceKind } from '../../src/services/prompt-ownership.js';
-import { decidePromptContent, seedSystemPrompts } from '../../src/services/prompt-seeder.js';
+import { promptSourceKind } from '../../src/services/prompts/ownership.js';
+import { decidePromptContent, seedSystemPrompts } from '../../src/services/prompts/seeder.js';
 import { logger } from '../../src/utils/logger.js';
 import { SHIPPED_PROMPT_HASHES, isShippedDefaultText, promptTextHash } from '../../src/services/prompt-defaults/shipped-hashes.js';
 

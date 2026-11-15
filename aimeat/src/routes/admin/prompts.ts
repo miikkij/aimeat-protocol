@@ -27,8 +27,8 @@ import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { stableStringify } from '../../utils/stable-json.js';
 import { PROMPT_SEEDS } from '../../services/prompt-defaults.js';
-import { seedSystemPrompts } from '../../services/prompt-seeder.js';
-import { promptSourceKind, promptDiffersFromDefault } from '../../services/prompt-ownership.js';
+import { seedSystemPrompts } from '../../services/prompts/seeder.js';
+import { promptSourceKind, promptDiffersFromDefault } from '../../services/prompts/ownership.js';
 import type { SystemPromptRecord } from '../../storage/interface.js';
 
 export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Router {

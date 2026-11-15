@@ -54,7 +54,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
 import { isOperatorCaller } from '../services/operator/override.js';
 import { sendPlainText } from '../middleware/plain-text.js';
-import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompts/variables.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { handbookForRole } from '../services/handbooks/index.js';
 import { isV2Role, V2_ROLES } from '../tool-catalog/surfaces.js';

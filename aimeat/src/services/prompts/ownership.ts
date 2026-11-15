@@ -1,5 +1,5 @@
 /**
- * @file src/services/prompt-ownership.ts
+ * @file src/services/prompts/ownership.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who owns a managed system prompt: the operator, the code, or nobody any more.
@@ -18,7 +18,7 @@
  *   than offer a button that answers 404.
  * @structure PROMPT_SYNC_GROUPS · PROMPT_SYNC_IDS · promptSourceKind · promptDiffersFromDefault
  * @usage
- *   import { promptSourceKind, promptDiffersFromDefault } from './prompt-ownership.js';
+ *   import { promptSourceKind, promptDiffersFromDefault } from './ownership.js';
  *   const kind = promptSourceKind(record.id, record.group);   // 'code' | 'yours' | 'orphan'
  * @version-history
  *   v1.2.0 — 2026-09-18 — The `platform` group is written from source too. Two of its prompts taught
@@ -28,8 +28,8 @@
  *   v1.1.0 — 2026-09-15 — 'yours' is described as it now behaves: an unchanged prompt follows updates.
  *   v1.0.0 — 2026-09-12 — Initial, with the System Prompts page in the poster face.
  */
-import { PROMPT_SEEDS } from './prompt-defaults.js';
-import type { SystemPromptRecord } from '../storage/interface.js';
+import { PROMPT_SEEDS } from '../prompt-defaults.js';
+import type { SystemPromptRecord } from '../../storage/interface.js';
 
 /**
  * Groups whose content is written from source on every boot. These describe what the software can

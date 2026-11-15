@@ -77,7 +77,7 @@ import { contextIndexLine } from '../services/context/index-line.js';
 import { teamIndexLine } from '../services/team/index-line.js';
 import { skillsBySituation } from '../services/skills-by-situation.js';
 import { journeyHandbookFor } from '../services/journey-state.js';
-import { substituteVariables } from '../services/prompt-variables.js';
+import { substituteVariables } from '../services/prompts/variables.js';
 import { handbookFill } from '../services/prompts/handbook-fill.js';
 import { buildAppPrompt } from '../services/builder/app-prompt.js';
 import { buildAppPiece, buildAppPieceIds } from '../services/builder/app-layers.js';

@@ -33,7 +33,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { resolveOperatorFeeGhii } from './marketplace-fee.js';
-import { resolvePromptContent, substituteVariables } from './prompt-variables.js';
+import { resolvePromptContent, substituteVariables } from './prompts/variables.js';
 import { sendDirectMessage } from './message/send.js';
 import { logger } from '../utils/logger.js';
 

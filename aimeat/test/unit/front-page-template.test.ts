@@ -28,7 +28,7 @@ import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { bootstrapRouter } from '../../src/routes/bootstrap.js';
 import { SiteService } from '../../src/services/site.js';
-import { seedSystemPrompts } from '../../src/services/prompt-seeder.js';
+import { seedSystemPrompts } from '../../src/services/prompts/seeder.js';
 
 let storage: Storage;
 let config: AimeatConfig;

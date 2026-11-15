@@ -8,7 +8,7 @@
  *   is served forever with no factory text to go back to.
  */
 import { describe, it, expect } from 'vitest';
-import { promptSourceKind, promptDiffersFromDefault, PROMPT_SYNC_GROUPS, PROMPT_SYNC_IDS } from '../../src/services/prompt-ownership.js';
+import { promptSourceKind, promptDiffersFromDefault, PROMPT_SYNC_GROUPS, PROMPT_SYNC_IDS } from '../../src/services/prompts/ownership.js';
 import { PROMPT_SEEDS } from '../../src/services/prompt-defaults.js';
 
 describe('promptSourceKind', () => {

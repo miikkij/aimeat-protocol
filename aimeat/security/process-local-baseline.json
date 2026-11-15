@@ -1245,7 +1245,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/prompt-ownership.ts :: map :: SEED_BY_ID": {
+    "src/services/prompts/ownership.ts :: map :: SEED_BY_ID": {
       "count": 1,
       "reason": "DEBT"
     },

@@ -35,7 +35,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, SystemPromptRecord } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompts/variables.js';
 import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
 import { listPickablePrompts } from '../services/prompts/prompt-read.js';
 

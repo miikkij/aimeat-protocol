@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SiteChangeLogEntry } from '../storage/interface.js';
 import { getSiteSyncState } from './site-sync.js';
-import { substituteVariables, resolvePromptContent } from './prompt-variables.js';
+import { substituteVariables, resolvePromptContent } from './prompts/variables.js';
 import { extractTags, findUnresolvableTags, resolveTags, type TagDeps } from './site-tags.js';
 import { isReservedSurfaceKey } from './surface-layout/keys.js';
 import { documentLanguage, pickTemplateVersion, type TemplateReader, type TemplateVersions } from './site/template-languages.js';

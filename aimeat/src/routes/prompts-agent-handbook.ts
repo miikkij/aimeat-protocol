@@ -27,7 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
-import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompts/variables.js';
 import { parseGaiiLoose, resolveIdentity } from '../utils/gaii.js';
 import { isStopped } from '../services/agent/stop-rules.js';
 import { activeSystemPrompt } from '../services/prompts/prompt-read.js';
