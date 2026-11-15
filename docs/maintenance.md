@@ -59,9 +59,13 @@ the end of the output. The warning does not fail the check: read the guide again
 move the date. Name the narrowest source that decides what the guide says, so a warning means that
 something the guide describes changed. A row that says "held by <check>" names a test, a check
 script or a ledger under `aimeat/test/`, `aimeat/scripts/` or `aimeat/security/` as its source and
-carries no date: the holder fails when the file goes wrong (a runtime asset's loader test, the
-it-adoption ledger). A row with neither fails the check, unless the file is historical, and so does
-a row that is both dated and held.
+carries no date (a runtime asset's loader test, the it-adoption ledger). The check refuses a holder
+whose text does not name the file: its path, its file name, or a folder above it that the holder
+loads as a whole. A folder is not enough for a Markdown file, because a loader reads the yaml and the
+scripts in a folder and not the README beside them, so a `.md` file also needs its own name in the
+holder. The check does not prove that the holder fails when the file goes wrong; whoever writes
+"held by" answers for that. A row with neither fails the check, unless the file is historical, and
+so does a row that is both dated and held.
 
 `pnpm check:doc-links` refuses a string the node serves (in `aimeat/src` and
 `aimeat/public`) that links a repository `docs/` file the node does not serve. A source

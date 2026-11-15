@@ -10,9 +10,11 @@
  *   stale when that file's last commit is newer than the date. It is a report, never a failure: a
  *   source changes for many reasons that leave its guide true, and only a reader can tell which.
  * @structure inlineCodeSpans, backtickPathProblems (with the path index it builds once per file
- *   list), catalogRows, staleCatalogRows.
+ *   list), catalogRows, staleCatalogRows, holderNamesDoc.
  * @usage import { backtickPathProblems, staleCatalogRows } from './lib/doc-rules.mjs' (check-docs.mjs)
  * @version-history
+ *   v1.1.0 - 2026-11-15 - holderNamesDoc: a catalog row "held by" a file is refused when that file
+ *     does not name the doc.
  *   v1.0.0 - 2026-10-12 - Initial (docs audit phase 5b, "Pysyvät suojat").
  */
 
@@ -160,4 +162,30 @@ export function staleCatalogRows(rows, { isFile, lastChange }) {
     if (changed && changed > row.checked) stale.push({ ...row, changed });
   }
   return stale;
+}
+
+/**
+ * Whether a holder's text names the doc a catalog row says it holds, so it can fail when the doc goes
+ * wrong. It names the path (from the repository root or below `docs/`), or the file name when the
+ * name alone says which file it is, or a folder above the file that it loads as a whole
+ * (`docs/msm-examples`; a test under aimeat/ writes aimeat/docs/<x> as docs/<x>). A folder alone does
+ * not hold a prose file: a loader reads the yaml and the scripts in it, not the README beside them,
+ * so a `.md` file also needs its own name in the holder. Until 2026-11-15 any file under test/,
+ * scripts/ or security/ was taken as a holder, and five READMEs were "held" by tests that never
+ * read them.
+ * @param {string} holderText
+ * @param {string} path the doc's path from the repository root
+ */
+export function holderNamesDoc(holderText, path) {
+  if (holderText.includes(path) || holderText.includes(path.replace(/^docs\//, ''))) return true;
+  const parts = path.split('/');
+  const base = parts[parts.length - 1];
+  const generic = /^(readme|index)\.md$/i.test(base);
+  if (!generic && holderText.includes(base)) return true;
+  const folders = [];
+  for (const segs of [parts, parts[0] === 'aimeat' ? parts.slice(1) : []]) {
+    for (let i = 2; i < segs.length; i++) folders.push(segs.slice(0, i).join('/'));
+  }
+  if (!folders.some(folder => holderText.includes(folder))) return false;
+  return !base.endsWith('.md') || holderText.includes(base);
 }

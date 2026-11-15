@@ -8,6 +8,9 @@
  *   duplicate check, catalog staleness report (a warning, never a failure).
  * @usage pnpm check:docs
  * @version-history
+ *   v1.5.0 - 2026-11-15 - A held row's holder must name the file: its path, its file name, or a
+ *     folder above it that the holder loads whole, and a Markdown file needs its own name as well.
+ *     Five READMEs were "held" by tests that never read them.
  *   v1.4.0 - 2026-11-15 - Every catalog row says how it stays true: "checked YYYY-MM-DD" (compared
  *     with its source's last commit, as before) or "held by <check>" with a test, a check script or a
  *     ledger as its source (never compared: the holder fails when the file goes wrong). A row with
@@ -31,7 +34,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from 'yaml';
-import { backtickPathProblems, catalogRows, staleCatalogRows } from './lib/doc-rules.mjs';
+import { backtickPathProblems, catalogRows, holderNamesDoc, staleCatalogRows } from './lib/doc-rules.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = path => readFileSync(resolve(ROOT, path), 'utf8').replace(/\r\n/g, '\n');
@@ -80,6 +83,9 @@ for (const line of read('docs/catalog.md').split('\n')) {
     heldRows++;
     if (dated) errors.push(`Catalog row both dated and held: ${path} (a held row takes its date from its holder; drop "checked …")`);
     if (!HOLDER.test(source)) errors.push(`Catalog row held by something that is not a test, a check or a ledger: ${path} (${source})`);
+    else if (existsSync(resolve(ROOT, source)) && !holderNamesDoc(read(source), path)) {
+      errors.push(`Catalog row held by a file that never names it: ${path} (${source} names neither its path nor its file name; date the row with "checked YYYY-MM-DD" instead, or make the holder read it)`);
+    }
   } else if (!dated && status !== 'historical') {
     errors.push(`Catalog row says neither when it was checked nor what holds it: ${path} (write "checked YYYY-MM-DD" or "held by <check>")`);
   }

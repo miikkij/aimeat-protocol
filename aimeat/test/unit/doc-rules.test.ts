@@ -9,10 +9,11 @@
  *   is reported stale when that file changed after the date, so a guide whose code moved is seen.
  * @usage pnpm exec vitest run test/unit/doc-rules.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-15 — holderNamesDoc: a held catalog row's holder must name the doc.
  *   v1.0.0 — 2026-10-12 — Initial (docs audit phase 5b, "Pysyvät suojat").
  */
 import { describe, expect, it } from 'vitest';
-import { backtickPathProblems, catalogRows, staleCatalogRows, inlineCodeSpans } from '../../scripts/lib/doc-rules.mjs';
+import { backtickPathProblems, catalogRows, staleCatalogRows, inlineCodeSpans, holderNamesDoc } from '../../scripts/lib/doc-rules.mjs';
 
 const tracked = new Set([
     'docs/catalog.md',
@@ -101,5 +102,22 @@ describe('a catalog row checked before its source changed is stale', () => {
     it('reports the row whose source file changed after the date, and only that one', () => {
         const stale = staleCatalogRows(catalogRows(catalog), { isFile, lastChange: (p: string) => lastChange[p] ?? null });
         expect(stale).toEqual([{ path: 'docs/a.md', checked: '2026-10-01', source: 'aimeat/src/a.ts', changed: '2026-10-05' }]);
+    });
+});
+
+describe('a catalog row is held only by a file that names it', () => {
+    const loader = "const DIR = join(import.meta.dirname, '../../docs/msm-examples'); // reads every *.msm.yaml";
+    it('takes the path, or a file name that says which file it is', () => {
+        expect(holderNamesDoc("read('docs/it-adoption/02-architecture.md')", 'docs/it-adoption/02-architecture.md')).toBe(true);
+        expect(holderNamesDoc("pages: ['02-architecture.md']", 'docs/it-adoption/02-architecture.md')).toBe(true);
+    });
+    it('takes a folder the holder loads whole for a yaml or a script, also under aimeat/', () => {
+        expect(holderNamesDoc(loader, 'docs/msm-examples/posti-shipping.msm.yaml')).toBe(true);
+        expect(holderNamesDoc("join(dir, '../../docs/csm-examples')", 'aimeat/docs/csm-examples/marketplace.csm.yaml')).toBe(true);
+    });
+    it('refuses a README beside the files a loader reads, and a holder that names nothing', () => {
+        expect(holderNamesDoc(loader, 'docs/msm-examples/README.md')).toBe(false);
+        expect(holderNamesDoc("const PACKAGE_DIR = 'docs/it-adoption'; read(`${PACKAGE_DIR}/README.md`)", 'docs/it-adoption/README.md')).toBe(true);
+        expect(holderNamesDoc('installs the bundled extensions', 'docs/extensions/rest-connector/actions/pull.js')).toBe(false);
     });
 });

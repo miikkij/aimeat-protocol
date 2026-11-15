@@ -30,10 +30,6 @@
   ol#events li { margin:.2rem 0; }
   .ev-type { color:var(--accent); font-weight:600; }
   pre { background:#0c0d1c; border:1px solid var(--line); border-radius:6px; padding:.6rem; overflow:auto; font-size:.8rem; white-space:pre-wrap; word-break:break-word; }
-  .prompt { border:1px solid var(--warn); border-radius:8px; padding:.6rem; margin:.5rem 0; }
-  .prompt .q { font-weight:600; margin-bottom:.4rem; }
-  .chip { background:#12142a; border:1px solid var(--line); border-radius:999px; padding:.3rem .7rem; cursor:pointer; }
-  .chip:hover { border-color:var(--accent); }
   .gone { color:var(--warn); font-style:italic; }
   .err { color:var(--accent); }
 </style>
@@ -72,7 +68,7 @@
       <strong id="taskTitle"></strong>
       <span id="taskStatus" class="muted"></span>
     </div>
-    <div id="prompts"></div>
+    <p class="muted">If the agent asks you a question while it works, answer it on your own profile page under Agents, or in your AI chat. This app cannot answer for you: the node takes an answer to an agent's question only from the agent's owner in person, never from an app.</p>
     <ol id="events"></ol>
     <div id="deliverable"></div>
   </div>
@@ -131,7 +127,7 @@
     $('#commission').disabled = true;
     $('#status').textContent = 'Commissioning...';
     if (stopWatch) { stopWatch(); stopWatch = null; }
-    $('#events').innerHTML = ''; $('#prompts').innerHTML = ''; $('#deliverable').innerHTML = '';
+    $('#events').innerHTML = ''; $('#deliverable').innerHTML = '';
     try {
       var task = await AIMEAT.agents.createTask(name, { description: desc });
       $('#status').textContent = 'Commissioned. Watching live…';
@@ -153,26 +149,9 @@
       return '<li><span class="ev-type">' + esc(ev.type) + '</span> ' + esc(ev.message || '') + '</li>';
     }).join('');
 
-    // pending option-prompts → clickable chips
-    AIMEAT.agents.pendingPrompts(name).then(function (prompts) {
-      var box = $('#prompts');
-      box.innerHTML = '';
-      prompts.forEach(function (p) {
-        var div = document.createElement('div');
-        div.className = 'prompt';
-        div.innerHTML = '<div class="q">❓ ' + esc(p.question) + '</div>';
-        var row = document.createElement('div'); row.className = 'row';
-        p.options.forEach(function (opt) {
-          var b = document.createElement('button'); b.className = 'chip'; b.textContent = opt;
-          b.addEventListener('click', function () {
-            box.innerHTML = '<span class="muted">Answer sent: ' + esc(opt) + '</span>';
-            AIMEAT.agents.answerPrompt(name, { prompt_id: p.prompt_id, choice: opt });
-          });
-          row.appendChild(b);
-        });
-        div.appendChild(row); box.appendChild(div);
-      });
-    });
+    // An agent's option-prompts are not read or answered here: GET and POST
+    // /v1/agents/:name/messages admit only the agent itself or its owner in person, never an
+    // app grant, so both calls would answer 403 whatever scopes this page declares.
 
     // deliverable when done
     if (task.status === 'done') {
