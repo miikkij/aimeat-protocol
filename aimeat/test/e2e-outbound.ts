@@ -13,6 +13,8 @@
  *   reason EMAIL_DISABLED. That answer is what "every policy gate passed" looks like: a refusal from
  *   a gate is 400, 403, 404, 422 or 429 and never reaches the transport.
  * @version-history
+ *   v1.7.1 — 2026-11-15 — Audit M135, L101: another owner cannot opt out or bounce a contact, and the
+ *     recipient's request list holds the inbox message itself.
  *   v1.7.0 — 2026-10-16 — 16b: the RFC 8058 one-click POST (no sign-in, unknown token answered as a
  *     known one, a wrong or missing body refused); 16c: GET /v1/outbound/sender reads the record back
  *     validated, per owner, and a foreign company is 404; 16d: an unusable lead image is INVALID_IMAGE.
@@ -232,8 +234,13 @@ await test('5. a recipient with an AIMEAT identity gets the INBOX channel', asyn
   // The recipient really received it: their notification bell has the direct-message entry.
   const notifs = await json('/v1/notifications', { headers: authed(recipientToken) });
   assert(notifs.status === 200, `notifications read failed: ${notifs.status}`);
-  const list = JSON.stringify(notifs.body.data);
-  assert(list.includes('Tervetuloa asiakkaaksi') || list.includes('direct_message'), 'recipient notification missing');
+  assert(JSON.stringify(notifs.body.data).includes('direct_message'), 'recipient notification missing');
+  // And the message itself, from A, with its subject and body. The code invite made A a contact, so
+  // it lands in the recipient's inbox rather than in requests (L101).
+  const inbox = await json('/v1/messages/inbox', { headers: authed(recipientToken) });
+  const fromA = (inbox.body.data?.messages as any[] ?? []).find(m => m.senderGhii === A.ghii);
+  assert(!!fromA && fromA.body.includes('Tervetuloa asiakkaaksi') && fromA.body.includes('Kiitos tilauksestasi'),
+    `recipient inbox has no message from ${A.ghii} carrying the subject and body: ${JSON.stringify(inbox.body.data?.messages).slice(0, 300)}`);
 });
 
 await test('6. a plain-email recipient falls to the email channel; no SMTP → 503 SEND_FAILED, not a 200', async () => {
@@ -435,6 +442,16 @@ await test('14. another owner cannot see or use the contacts (404, empty list)',
   assert(list.body.data.total === 0, "B's contact list should be empty");
   const log = await json('/v1/outbound/log', { headers: authed(B.token) });
   assert(log.body.data.total === 0, "B's send log should be empty");
+  // The contact sub-routes are owner-scoped too: B cannot opt out or bounce A's contact (M135).
+  const rowOfA = async () => ((await json('/v1/outbound/contacts', { headers: authed(A.token) })).body.data.contacts as any[]).find(c => c.id === ghiiContactId);
+  const before = await rowOfA();
+  const opt = await json(`/v1/outbound/contacts/${ghiiContactId}/opt-out`, { method: 'POST', headers: authed(B.token), body: JSON.stringify({ opted_out: !before.optedOut }) });
+  assert(opt.status === 404 && opt.body.error?.code === 'NOT_FOUND', `cross-owner opt-out: ${opt.status} ${JSON.stringify(opt.body.error)}`);
+  const bounce = await json(`/v1/outbound/contacts/${ghiiContactId}/bounce`, { method: 'POST', headers: authed(B.token), body: JSON.stringify({}) });
+  assert(bounce.status === 404 && bounce.body.error?.code === 'NOT_FOUND', `cross-owner bounce: ${bounce.status} ${JSON.stringify(bounce.body.error)}`);
+  const after = await rowOfA();
+  assert(after.optedOut === before.optedOut && after.bounceCount === before.bounceCount,
+    `A's contact changed: ${JSON.stringify({ before: [before.optedOut, before.bounceCount], after: [after.optedOut, after.bounceCount] })}`);
 });
 
 await test('15. an agent without outbound:send gets 403', async () => {

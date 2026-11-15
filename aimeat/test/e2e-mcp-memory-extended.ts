@@ -3,6 +3,7 @@
  * @description E2E tests for MCP memory-extended module — 2 tools: full-text search and
  *   public memory cross-agent read.
  * @version-history
+ *   2026-11-15 — Audit L076: the visibility-filtered search must find the public record before its loop.
  *   2026-10-15 — 6d: the search follows one rule, values only, six levels, word start (feature-list audit #52).
  *   v1.0.0 — 2026-03-21 — Initial creation
  */
@@ -360,6 +361,9 @@ await test('5. aimeat_memory_search with visibility filter', async () => {
     }, 104);
     const res = JSON.parse(body.result.content[0].text);
     assert(Array.isArray(res.hits), 'res.hits is array');
+    // The public record is found, so the loop below has something to check (L076).
+    assert(res.hits.length >= 1 && res.hits.some((h: any) => h.key === 'search.test.public'),
+        `the public record is not among the hits: ${JSON.stringify(res.hits.map((h: any) => h.key))}`);
     for (const h of res.hits) {
         assert(h.visibility === 'public', `all hits should be public, got: ${h.visibility}`);
     }

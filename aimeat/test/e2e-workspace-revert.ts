@@ -7,6 +7,7 @@
  *   403 for a non-member).
  * @version-history
  *   v1.0.0 — 2026-06-13 — Initial: revert-to-draft (feature-mqaos6v2).
+ *   v1.1.0 — 2026-11-15 — Audit M112: the .latest value and version are read back unchanged after a revert.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-revert
 
@@ -56,11 +57,17 @@ await test('Setup: owner + org + workspace + a published record (t1 v1)', async 
 });
 
 await test('1. revert reopens the published record: .draft restored, .latest kept', async () => {
+    const latestKey = `/v1/memory/${encodeURIComponent(`${root()}.${NS}.t1.latest`)}`;
+    const before = await json(latestKey, { headers: auth(token) });
     const r = await json(`/v1/organisms/${orgId}/revert`, { method: 'POST', headers: auth(token), body: JSON.stringify({ ws: WS, namespace: NS, id: 't1' }) });
     assert(r.status === 200 && r.body.data?.reopened === true, `revert: ${r.status} ${JSON.stringify(r.body)}`);
     const roles = await rolesOf('t1');
     assert(roles.has('draft'), `draft restored (got ${[...roles]})`);
     assert(roles.has('latest') && roles.has('version.1'), `published version still live (got ${[...roles]})`);
+    // The published value itself stays live, unchanged, while the draft is open (M112).
+    const after = await json(latestKey, { headers: auth(token) });
+    assert(after.status === 200 && after.body.data?.value?.title === 'First', `.latest value after revert: ${JSON.stringify(after.body?.data?.value)}`);
+    assert(after.body.data.version === before.body.data.version, `.latest version changed: ${before.body.data.version} -> ${after.body.data.version}`);
 });
 
 await test('2. the restored draft holds the published content', async () => {

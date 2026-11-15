@@ -19,11 +19,13 @@
  *     test/run-e2e-ci.ts --test=e2e-hello-mcp
  * @version-history
  *   v1.0.0 — 2026-07-31 — Initial.
+ *   v1.1.0 — 2026-11-15 — Audit L059: anonymous prompt fetches leave the operator's funnel count and
+ *     a fresh owner unmarked.
  */
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-import { registerOwner } from './helpers/owner-login.js';
+import { registerOwner, setupOperator } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -221,6 +223,26 @@ await test('The anonymous fetches earlier left owner B unmarked', async () => {
     const m = await json(`/v1/memory/${encodeURIComponent(MARKER_KEY)}?soft=1`, auth(tokenB));
     assert(m.status === 200 && m.body.data?.exists === false,
         `owner B must have no marker from anonymous fetches; got ${JSON.stringify(m.body.data)}`);
+});
+
+// Owner B never fetched the prompt, so the test above cannot see the anonymous path. Here the
+// operator's funnel counts every account's marker before and after anonymous fetches (L059).
+await test('An anonymous prompt fetch marks no account: the operator funnel count stays the same', async () => {
+    const op = await setupOperator(BASE, process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!', `hmop${Date.now() % 100000}`);
+    const ownerC = await registerOwner(BASE, `hmc${Date.now() % 100000}`);
+    const opened = async () => {
+        const f = await json('/v1/admin/onboarding-funnel?limit=1000', auth(op.token));
+        assert(f.status === 200, `funnel ${f.status}: ${JSON.stringify(f.body?.error)}`);
+        return (f.body.data.rows as any[]).filter(r => !!r.helloOpenedAt).map(r => r.owner).sort();
+    };
+    const before = await opened();
+    for (const q of ['', '?lang=fi', '?format=txt']) assert((await fetch(`${BASE}/v1/prompts/hello-mcp${q}`)).status === 200, `anonymous fetch ${q}`);
+    await sleep(1500);   // the marker write is fire-and-forget
+    const after = await opened();
+    assert(JSON.stringify(after) === JSON.stringify(before), `anonymous fetches marked accounts: before ${JSON.stringify(before)}, after ${JSON.stringify(after)}`);
+    const m = await json(`/v1/memory/${encodeURIComponent(MARKER_KEY)}?soft=1`, auth(ownerC.token));
+    assert(m.status === 200 && m.body.data?.exists === false, `owner C has a marker: ${JSON.stringify(m.body.data)}`);
+    await json(`/v1/owners/${ownerC.name}`, auth(ownerC.token, { method: 'DELETE' }));
 });
 
 console.log(`\n=== Hello MCP: ${passed} passed, ${failed} failed ===\n`);

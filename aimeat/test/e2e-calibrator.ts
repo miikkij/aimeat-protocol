@@ -12,7 +12,10 @@
  *     calibrator:<projectId> (read back from /v1/ai/usage through a local stub provider), and a
  *     project the caller does not own is refused before anything is billed. The denial cases: no
  *     token → 401, another owner → 404 on read, update, batch and completion.
+ *   v2.2.0 — 2026-11-15 — Audit M190, M191: an agent of the owner is refused 403, another owner's
+ *     DELETE removes nothing, and the cascade is read back from memory and the version list.
  */
+import { connectAgentByDevice } from './helpers/agent-device.js';
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-calibrator.ts
 
@@ -531,8 +534,22 @@ await test('Another owner cannot read, change or run this calibration → 404, a
 
   const list = await json('/v1/calibrator', { headers: otherAuth });
   assert(list.status === 200 && !list.body.data.projects.some((p: any) => p.projectId === projectId), 'the other owner\'s list must not carry this project');
+  // A DELETE by another owner removes nothing of this project (M190).
+  const del = await json(`/v1/calibrator/${projectId}`, { method: 'DELETE', headers: otherAuth });
+  assert(del.status === 200 && del.body.data.deleted === 0, `delete by another owner: ${del.status} ${JSON.stringify(del.body.data ?? del.body.error)}`);
   const mine = await json(`/v1/calibrator/${projectId}`, { headers: auth() });
   assert(mine.status === 200 && mine.body.data.project.name !== 'taken over', 'the owner\'s project is untouched');
+  await json(`/v1/owners/${other}`, { method: 'DELETE', headers: otherAuth });
+});
+
+// requireRole('owner') keeps the owner's agents out, even one holding every scope (M190).
+await test('An agent of the owner is refused on create and read → 403 ACCESS_DENIED', async () => {
+  const agent = await connectAgentByDevice(BASE, { owner: username, ownerToken: jwt, name: `calagent${Date.now() % 100000}`, scopes: ['*'] });
+  const agentAuth = { Authorization: `Bearer ${agent.token}` };
+  const create = await json('/v1/calibrator', { method: 'POST', headers: agentAuth, body: JSON.stringify({ name: 'agent project' }) });
+  assert(create.status === 403 && create.body?.error?.code === 'ACCESS_DENIED', `agent create: ${create.status} ${JSON.stringify(create.body?.error)}`);
+  const read = await json(`/v1/calibrator/${projectId}`, { headers: agentAuth });
+  assert(read.status === 403 && read.body?.error?.code === 'ACCESS_DENIED', `agent read: ${read.status} ${JSON.stringify(read.body?.error)}`);
 });
 
 // ── 20b. A calibration's completions spend under the calibration's own name ──
@@ -622,6 +639,11 @@ await test('Cascade delete project removes all related data', async () => {
   // Verify project is gone
   const { status } = await json(`/v1/calibrator/${projectId}`, { headers: auth() });
   assert(status === 404, `project should be 404 after delete, got ${status}`);
+  // `deleted` is counted before the loop, so read back what is left: no key under the project (M191).
+  const left = await json(`/v1/memory?prefix=${encodeURIComponent(`calibrator.${projectId}.`)}`, { headers: auth() });
+  assert(left.status === 200 && left.body.data.items.length === 0, `keys left after the cascade: ${JSON.stringify(left.body.data?.items?.map((i: any) => i.key))}`);
+  const versions = await json(`/v1/calibrator/${projectId}/versions`, { headers: auth() });
+  assert(versions.status === 200 && versions.body.data.versions.length === 0, `versions left: ${JSON.stringify(versions.body.data?.versions)}`);
 });
 
 // ─── Summary ───

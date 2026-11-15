@@ -7,6 +7,8 @@
  *   and a blocking or failing hook refuses the request it guards.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-hooks
  * @version-history
+ *   v1.0.2 — 2026-11-15 — Audit M072: a hook-blocked request leaves no row at any status (read from the
+ *     requester's sent list), and exactly one pending item is in the provider's inbox.
  *   v1.0.1 — 2026-10-12 — The hook actions are published with pricing.toll_morsels: node 4.0.0 refuses
  *     pricing.base_morsels (MORSEL_PRICE_REMOVED), so no hook action was published and every hook
  *     test after it failed with it. toll_morsels 0 means the same free action on 3.x.
@@ -286,9 +288,18 @@ await test('6. Hook server received context', async () => {
     assert(typeof payload.timestamp === 'string', 'has timestamp');
 });
 
+// The requester's own sent list, every status: what test 8 compares against (M072).
+const sentCodes = async () => {
+    const r = await json('/v1/work/sent', { headers: { Authorization: `Bearer ${agentToken}` } });
+    assert(r.status === 200 && Array.isArray(r.body.data?.items), `sent list: ${r.status}`);
+    return (r.body.data.items as any[]).map(w => `${w.tracking_code}:${w.status}`).sort();
+};
+let sentBeforeBlock: string[] = [];
+
 await test('7. Hook blocks → work request rejected (403)', async () => {
     hookShouldAllow = false;
     hookShouldError = false;
+    sentBeforeBlock = await sentCodes();
 
     const { status, body } = await json('/v1/work/request', {
         method: 'POST',
@@ -309,11 +320,14 @@ await test('8. Blocked work was NOT created', async () => {
         headers: { Authorization: `Bearer ${providerToken}` },
     });
     assert(body.ok, 'ok');
-    // Inbox only shows work for this provider; blocked requests should be absent
-    const blocked = body.data.items?.filter((w: any) =>
-        w.action_id === hookActionId && w.status === 'pending') ?? [];
-    // We should have at most 1 pending from test 5 (the allowed one)
-    assert(blocked.length <= 1, `expected <=1 pending items, found ${blocked.length}`);
+    assert(Array.isArray(body.data.items), `inbox items is not an array: ${JSON.stringify(body.data)}`);
+    // Inbox only shows pending work for this provider: exactly the one test 5 let through.
+    const pending = body.data.items.filter((w: any) => w.action_id === hookActionId && w.status === 'pending');
+    assert(pending.length === 1, `expected exactly 1 pending item, found ${pending.length}`);
+    // The inbox shows pending only, so a row stored at any other status would hide from it. The
+    // requester's sent list shows every status, and it is unchanged by the blocked request (M072).
+    const after = await sentCodes();
+    assert(JSON.stringify(after) === JSON.stringify(sentBeforeBlock), `the blocked request left a row: before ${JSON.stringify(sentBeforeBlock)}, after ${JSON.stringify(after)}`);
 });
 
 // ─── Phase 3: Pre-Hook Failure = Block (fail-closed) ───

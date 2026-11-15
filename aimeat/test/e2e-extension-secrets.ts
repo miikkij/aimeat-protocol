@@ -11,8 +11,10 @@
 //   --import tsx test/run-e2e-ci.ts --test=extension-secrets
 //
 // 2026-10-09 — the stored form is the bound ciphertext v2:iv:tag:ct (secrets audit 2026-10-09, 1.1).
+// 2026-11-15 — Audit M277: ext:write is proven on instance POST, PATCH and DELETE with two agents.
 
 import { readFileSync } from 'node:fs';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 import { resolve } from 'node:path';
 import { serverSqlitePath } from './helpers/server-db.js';
 import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
@@ -301,6 +303,37 @@ await test('POSITIVE CONTROL: the extension is still there and still the owner\'
   });
   assert(status === 200, `owner GET ${status}`);
   assert(body.data?.instance?.config?.apiKey === MASK, 'owner still sees the masked secret');
+});
+
+// ─── ext:write on the instance routes (M277) ───
+// An owner session passes requireScope on its role, so only an agent proves the scope. One of the
+// owner's agents without ext:write is refused SCOPE_DENIED on POST, PATCH and DELETE; one with it
+// creates, changes and removes its own instance.
+console.log('Phase 5 — ext:write on the instance routes');
+
+await test('an agent without ext:write is refused SCOPE_DENIED on instance POST, PATCH and DELETE; one with it succeeds', async () => {
+  const narrow = await connectAgentByDevice(BASE, { owner: ownerName, ownerToken, name: `secnarrow${Date.now() % 100000}`, scopes: ['memory:read'] });
+  const wide = await connectAgentByDevice(BASE, { owner: ownerName, ownerToken, name: `secwide${Date.now() % 100000}`, scopes: ['ext:write'] });
+  const as = (t: string) => ({ Authorization: `Bearer ${t}` });
+  const base = '/v1/extensions/rest-connector/instances';
+  const tries: Array<[string, string, unknown]> = [
+    ['POST', base, { id: 'narrowinst', config: { apiKey: 'sk-narrow-1', baseUrl: '' } }],
+    ['PATCH', `${base}/acme`, { config: { baseUrl: 'https://example.com' } }],
+    ['DELETE', `${base}/acme`, {}],
+  ];
+  for (const [method, path, body] of tries) {
+    const r = await json(path, { method, headers: as(narrow.token), body: JSON.stringify(body) });
+    assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED', `narrow ${method}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+  }
+  const acme = await json(`${base}/acme`, { headers: as(ownerToken) });
+  assert(acme.status === 200 && acme.body.data?.instance?.config?.apiKey === MASK, `acme after the refusals: ${acme.status}`);
+  const c = await json(base, { method: 'POST', headers: as(wide.token), body: JSON.stringify({ id: 'wideinst', config: { apiKey: 'sk-wide-1', baseUrl: '' } }) });
+  assert(c.status === 201, `wide POST: ${c.status} ${JSON.stringify(c.body?.error)}`);
+  const p = await json(`${base}/wideinst`, { method: 'PATCH', headers: as(wide.token), body: JSON.stringify({ config: { apiKey: 'sk-wide-1', baseUrl: 'https://example.com' } }) });
+  assert(p.status === 200, `wide PATCH: ${p.status} ${JSON.stringify(p.body?.error)}`);
+  const d = await json(`${base}/wideinst`, { method: 'DELETE', headers: as(wide.token) });
+  assert(d.status === 200, `wide DELETE: ${d.status} ${JSON.stringify(d.body?.error)}`);
+  assert((await json(`${base}/wideinst`, { headers: as(ownerToken) })).status === 404, 'the wide agent\'s instance is gone');
 });
 
 // ─── Cleanup ───

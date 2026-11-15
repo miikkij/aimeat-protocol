@@ -14,6 +14,8 @@
 //  - 2026-10-17: both copies and the owner's list row name the agent that sent it (7); POST
 //    /v1/messages/as-owner does the same and refuses an agent without the word and an owner (8, 9);
 //    a send to support@operators reaches the group thread (10).
+//  - 2026-11-15 (audit M141): the self-send refusal (6) is held to its code and text, and Alice's
+//    mailbox is read back for the refused message.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -306,8 +308,18 @@ await test('5. plainbot (no scope) cannot use the delegated tool', async () => {
 
 await test('6. Cannot address the owner itself (own-owner-only sender; no self-send)', async () => {
     const client = await connectMcp(sendbot.gaii, sendbot.key);
-    const { ok } = await client.call('aimeat_dm_send_as_owner', { to: alice.ghii, body: 'to myself' });
+    const SELF_BODY = `to myself ${stamp}`;
+    const { ok, body } = await client.call('aimeat_dm_send_as_owner', { to: alice.ghii, body: SELF_BODY });
     assert(!ok, 'sending to your own owner identity must be rejected');
+    // The refusal is the self-send guard by name, and nothing reached Alice's mailbox (M141).
+    const text = String(body.result?.content?.[0]?.text ?? '');
+    assert(body.result?.isError === true && text.includes('"code":"INVALID_INPUT"') && text.includes('Cannot send a message to yourself'),
+        `expected the self-send refusal, got ${JSON.stringify(body).slice(0, 240)}`);
+    const conv = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(conv.status === 200 && inbox.status === 200, `Alice's mailbox reads: ${conv.status}/${inbox.status}`);
+    assert(!JSON.stringify(conv.body.data).includes(SELF_BODY) && !JSON.stringify(inbox.body.data).includes(SELF_BODY),
+        'the refused self-send landed in Alice\'s mailbox');
 });
 
 // ── 2026-10-17: the message says which agent sent it (wish-agentin-omistajan-nimiss-l-hett-m-viesti-n-ytt-mik-agentti-s) ──

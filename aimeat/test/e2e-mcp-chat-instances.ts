@@ -7,6 +7,8 @@
  *   v1.1.0 — 2026-08-10 — Phase 4: both doors, one write. The tool and POST /v1/chat-instances now
  *     share services/chat-instance-write.ts, so re-registering a session behaves the same way
  *     through either, and a session opened through one is visible through the other.
+ *   v1.2.0 — 2026-11-15 — Audit M216: another owner's PUT and DELETE on /v1/chat-instances/:id are 404
+ *     and the row survives unchanged.
  */
 // 2026-08-16 (August 2026 test-quality audit, e2e-mcp-chat-instances:283): one owner in the suite,
 // and test 6 asked about an id that exists for nobody — the same isError branch the cross-owner check
@@ -366,6 +368,21 @@ await test('6b. A second owner\'s agent cannot read A\'s instance, and does not 
     // A still reads their own, so the refusal is ownership and not a broken tool.
     const mine = await mcpRpc('tools/call', { name: 'aimeat_instance_status', arguments: { instance_id: instanceId } }, 203);
     assert(mine.body.result?.isError !== true, 'A must still read A\'s own instance');
+
+    // The REST PUT and DELETE carry the same ownership check: B's owner session gets 404 on both, and
+    // A's row survives with its last_seen unchanged (M216).
+    const readA = () => json(`/v1/chat-instances/${encodeURIComponent(instanceId)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const before = await readA();
+    assert(before.status === 200, `A reads the row: ${before.status}`);
+    const bAuth = { Authorization: `Bearer ${bTok.body.data.token}` };
+    for (const method of ['PUT', 'DELETE']) {
+        const r = await json(`/v1/chat-instances/${encodeURIComponent(instanceId)}`, { method, headers: bAuth, body: JSON.stringify({}) });
+        assert(r.status === 404 && r.body?.error?.code === 'NOT_FOUND', `B's ${method}: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+    }
+    const after = await readA();
+    assert(after.status === 200, `A's row is gone after B's DELETE: ${after.status}`);
+    assert(after.body.data.chat_instance.last_seen === before.body.data.chat_instance.last_seen,
+        `B's PUT touched A's row: ${before.body.data.chat_instance.last_seen} -> ${after.body.data.chat_instance.last_seen}`);
 });
 
 await test('7. aimeat_instance_create is idempotent (returns existing on duplicate)', async () => {

@@ -5,6 +5,8 @@
  *   listing a target's thread (sorted, with anchor + parent), the membership gate (non-member 403),
  *   and author-only / admin delete: a plain member cannot delete another's comment, the creator can.
  * @version-history
+ *   v1.2.0 — 2026-11-15 — Audit L096: the workspace is made by POST /v1/organisms/:id/workspaces, not
+ *     by hand-written registry and manifest records.
  *   v1.1.0 — 2026-09-30 — Admin moderation: the creator deletes a member's comment, and a member who is
  *     neither author nor admin is refused. Until now no admin delete ran (see 7b).
  *   v1.0.0 — 2026-06-09 — Initial: workspace comments + threads + anchoring.
@@ -41,7 +43,7 @@ console.log('\n=== AIMEAT Organism Comments E2E ===\n');
 let A: Awaited<ReturnType<typeof setupOwner>>;
 let B: Awaited<ReturnType<typeof setupOwner>>;
 let orgId = '';
-const WS = 'ws-com1';
+let WS = '';
 const root = () => `organism.${orgId}.w.${WS}`;
 let firstCommentId = '';
 
@@ -49,10 +51,12 @@ await test('Setup A (creator) + B (non-member); A creates org + workspace + a re
     A = await setupOwner('a'); B = await setupOwner('b');
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Comments Org', description: 'x', type: 'project', join_policy: 'approval_required', visibility: 'public' }) });
     assert(o.status === 201, `org ${o.status}`); orgId = o.body.data.organism.id;
-    await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `organism.${orgId}.meta.workspaces`, value: { workspaces: [{ id: WS, name: 'Coordination', createdAt: new Date().toISOString(), createdBy: A.name }] }, visibility: 'private' }) });
+    // The workspace comes from the provisioning route, so its registry entry and manifest have the
+    // shape real workspaces have (L096); they were hand-written memory records before.
     const manifest = { manifestVersion: '1.0', id: orgId, name: 'Coordination', kind: 'project', status: 'active', objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: 'shared.tasks', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] };
-    const mr = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `${root()}.meta.manifest`, value: manifest, visibility: 'private' }) });
-    assert(mr.status === 201 || mr.status === 200, `manifest ${mr.status}: ${JSON.stringify(mr.body.error)}`);
+    const w = await json(`/v1/organisms/${orgId}/workspaces`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Coordination', manifest }) });
+    assert(w.status === 201 && typeof w.body.data?.ws === 'string', `workspace ${w.status}: ${JSON.stringify(w.body.error)}`);
+    WS = w.body.data.ws;
     const r1 = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `${root()}.shared.tasks.t1.latest`, value: { id: 't1', title: 'Design the API', markdown: 'We should version the endpoints.' }, visibility: 'private' }) });
     assert(r1.status === 201 || r1.status === 200, `record ${r1.status}`);
 });
