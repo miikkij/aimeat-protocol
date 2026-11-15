@@ -11,6 +11,8 @@
  *     approval is what mints the GEAI credential and its scopes. Adds a second owner holding the
  *     user_code (403 ACCESS_DENIED, still pending, no binding on either side) plus the owner
  *     approving it afterwards as the positive control.
+ *   v1.2.0 — 2026-11-15 — Audit M055, M056: a manifest declaring a scope the request omits fails
+ *     its check (the ceiling half is in e2e-scope-ceiling); a decided user_code answers 409.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -38,6 +40,7 @@ import { registerOwner } from './helpers/owner-login.js';
 const ownerName = `ecovalowner${Date.now()}`;
 let ownerToken = '';
 let auth: Record<string, string> = {};
+let goodCode = '';
 
 async function pendingFor(app: string): Promise<any> {
   const r = await json('/v1/ecosystem-apps/pending', { headers: auth });
@@ -60,8 +63,40 @@ async function run() {
     assert(hello.body.data?.validation?.ok === true, `hello validation should pass: ${JSON.stringify(hello.body.data?.validation)}`);
     const p = await pendingFor('goodapp');
     assert(p?.validation === 'validated', `pending should be validated, got ${p?.validation}`);
+    goodCode = p.user_code;
     const ap = await json(`/v1/ecosystem-apps/${p.user_code}/approve`, { method: 'POST', headers: auth, body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }) });
     assert(ap.body.data?.status === 'approved', `approve should succeed: ${JSON.stringify(ap.body)}`);
+  });
+
+  await test('A manifest declaring a scope the request omits fails declared_scopes_subset_requested', async () => {
+    const hello = await json('/v1/ecosystem-apps/hello', { method: 'POST', body: JSON.stringify({
+      owner: ownerName, app: 'overdeclared', public_key: 'a2V5', scopes: ['memory:read'],
+      manifest: { app: 'overdeclared', origin: 'https://overdeclared.example', scopes: ['memory:read', 'memory:write'] },
+    }) });
+    const v = hello.body.data?.validation;
+    const failedChecks = (v?.checks ?? []).filter((c: any) => !c.ok).map((c: any) => c.name);
+    assert(v?.ok === false && JSON.stringify(failedChecks) === JSON.stringify(['declared_scopes_subset_requested']),
+      `only declared_scopes_subset_requested should fail: ${JSON.stringify(v)}`);
+    const p = await pendingFor('overdeclared');
+    assert(p?.validation === 'failed', `pending should be failed, got ${p?.validation}`);
+  });
+
+  // A user_code is decided once. Approving it again, or approving one the owner denied, would mint
+  // a credential the owner already decided on. (The 410 for an expired code needs a moved clock.)
+  await test('An approved or denied user_code cannot be approved again → 409 ALREADY_PROCESSED', async () => {
+    assert(!!goodCode, 'the goodapp user_code was kept from the first test');
+    const again = await json(`/v1/ecosystem-apps/${goodCode}/approve`, { method: 'POST', headers: auth, body: JSON.stringify({ action: 'approve', scopes: ['memory:read'] }) });
+    assert(again.status === 409 && again.body.error?.code === 'ALREADY_PROCESSED', `second approve: ${again.status} ${JSON.stringify(again.body?.error)}`);
+
+    const hello = await json('/v1/ecosystem-apps/hello', { method: 'POST', body: JSON.stringify({ owner: ownerName, app: 'deniedapp', public_key: 'a2V5', scopes: ['memory:read'] }) });
+    assert(hello.status === 200, `hello ${hello.status}`);
+    const p = await pendingFor('deniedapp');
+    const deny = await json(`/v1/ecosystem-apps/${p.user_code}/approve`, { method: 'POST', headers: auth, body: JSON.stringify({ action: 'deny' }) });
+    assert(deny.body.data?.status === 'denied', `deny: ${JSON.stringify(deny.body)}`);
+    const after = await json(`/v1/ecosystem-apps/${p.user_code}/approve`, { method: 'POST', headers: auth, body: JSON.stringify({ action: 'approve', scopes: ['memory:read'] }) });
+    assert(after.status === 409 && after.body.error?.code === 'ALREADY_PROCESSED', `approve after deny: ${after.status} ${JSON.stringify(after.body?.error)}`);
+    const mine = await json('/v1/ecosystem-apps', { headers: auth });
+    assert(mine.status === 200 && !(mine.body.data?.apps ?? []).some((a: any) => a.app === 'deniedapp'), 'a denied request must leave no binding');
   });
 
   await test('A failed manifest (app mismatch) is flagged and BLOCKS approval', async () => {

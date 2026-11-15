@@ -8,6 +8,7 @@
  *   working for the operator as before, and an act on the operator's own account writes no line.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-admin-operator-trail
  * @version-history
+ *   v1.0.1 — 2026-11-15 — Audit M273: the identity delete is read back from GET /v1/admin/ghii.
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import { ownerSignIn } from './helpers/owner-login.js';
@@ -142,6 +143,10 @@ await test('The operator deletes another person\'s identity profile, and the per
     const r = await json(`/v1/admin/ghii/${encodeURIComponent(B.ghii)}`, { method: 'DELETE', headers: authed(OP.token) });
     assert(r.status === 200, `DELETE ghii: ${r.status} ${JSON.stringify(r.body)}`);
     assert((await actedOn(B.token, 'identity', 'delete')).length === 1, 'no operator line for the profile delete');
+    // The delete is proven by the operator's own list, not by the DELETE's answer (audit M273).
+    const list = await json('/v1/admin/ghii', { headers: authed(OP.token) });
+    assert(list.status === 200, `GET /v1/admin/ghii: ${list.status}`);
+    assert(!(list.body.data.ghii_users as any[]).some(u => u.ghii === B.ghii), `the deleted profile is still listed: ${B.ghii}`);
 });
 
 await test('FAILURE: a person who is not the operator cannot set another person\'s level, and no line is written', async () => {

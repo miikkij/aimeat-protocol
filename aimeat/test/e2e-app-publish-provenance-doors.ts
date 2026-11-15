@@ -22,6 +22,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=app-publish-provenance-doors
  * @version-history
+ *   v1.3.1 — 2026-11-15 — Audit M088, L027: the content hash is compared to sha256 of the uploaded
+ *     bytes on every door; the refused presigned handshake leaves no upload address and no app.
  *   v1.3.0 — 2026-10-08 — aiprov D13: the board announcement of an agent's publish carries a
  *     model-written record of its own text, found by hash; the owner's own announcement carries none.
  *     aiprov D12: a fork of another owner's app behind an access code carries a copy of the record,
@@ -71,6 +73,7 @@ const APP_HTML = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <title>Provenance door fixture</title></head><body><h1>Door fixture</h1>
 <p>${'Filler so this is a plausible app bundle rather than a token. '.repeat(40)}</p>
 <script>console.log("door fixture");</script></body></html>`;
+const APP_HTML_HASH = 'sha256:' + createHash('sha256').update(APP_HTML, 'utf-8').digest('hex');
 
 /**
  * The declaration under test. Every field is one a caller may state and the node must not invent —
@@ -112,8 +115,9 @@ function assertDeclarationSurvived(prov: any, door: string) {
     // about the who. `stampedBy: 'principal'` says the node recorded a claim rather than made one.
     assert(rec.attestation?.stampedBy === 'principal',
         `${door}: a declared record is stamped by the principal, got ${rec.attestation?.stampedBy}`);
-    assert(typeof rec.attestation?.contentHash === 'string' && rec.attestation.contentHash.startsWith('sha256:'),
-        `${door}: the node must hash the bytes itself, got ${rec.attestation?.contentHash}`);
+    // Every door publishes APP_HTML, so the digest must be of exactly those bytes, not of a name or metadata.
+    assert(rec.attestation?.contentHash === APP_HTML_HASH,
+        `${door}: the node must hash the published bytes (${APP_HTML_HASH}), got ${rec.attestation?.contentHash}`);
 }
 
 async function main() {
@@ -305,6 +309,9 @@ async function main() {
             }),
         });
         assert(r.status === 400, `expected 400 at mint, got ${r.status} ${JSON.stringify(r.body)}`);
+        assert(JSON.stringify(r.body).includes('upload_url') === false, `a refused handshake must hand out no upload address: ${JSON.stringify(r.body)}`);
+        const g = await json(`/v1/apps/${encodeURIComponent(owner)}/door-bad2.html`);
+        assert(g.status === 404, `a refused handshake must leave no app behind, got ${g.status}`);
     });
 
     console.log('\nThe recorded REASON follows what the app stated, not the over-label default');
@@ -422,8 +429,8 @@ async function main() {
             `the record must name the agent that published, got ${JSON.stringify(rec.generator)} (expected ${agentGaii})`);
         assert(rec.generator?.model === AGENT_MODEL,
             `the record must carry the model the agent reported, got ${JSON.stringify(rec.generator)}`);
-        assert(typeof rec.attestation?.contentHash === 'string' && rec.attestation.contentHash.startsWith('sha256:'),
-            `the node must hash the bytes itself, got ${rec.attestation?.contentHash}`);
+        assert(rec.attestation?.contentHash === APP_HTML_HASH,
+            `the node must hash the published bytes (${APP_HTML_HASH}), got ${rec.attestation?.contentHash}`);
     });
 
     await test('...and the served app carries that stamp in the headers a crawler reads', async () => {

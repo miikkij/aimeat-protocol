@@ -14,6 +14,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-access-code
  * @version-history
+ *   v1.2.1 — 2026-11-15 — Audit L020: the non-owner listing test requires the app to be listed for
+ *     each caller instead of asserting nothing when it is absent.
  *   v1.2.0 — 2026-10-09 — Phase 4: an agent of the owner without app:write gets neither the code nor
  *     the protected bytes; with app:write it still gets the code (secrets audit 2026-10-09, 1.5).
  *   v1.1.0 — 2026-09-26 — The unlock page types the code hidden, its eye runs under the response's
@@ -152,13 +154,15 @@ await test('The OWNER sees access_code in the /v1/apps listing', async () => {
 });
 
 await test('Another user and an anonymous caller NEVER see the code value', async () => {
-    for (const opts of [auth(tokenB), {}]) {
-        const { body } = await json('/v1/apps?limit=200', opts as RequestInit);
+    // Both callers are shown the app, marked protected and without the code: the catalogue lists it
+    // so a person can ask for the code. Absent is a failure too, so neither branch can pass empty.
+    for (const [who, opts] of [['another user', auth(tokenB)], ['anonymous', {}]] as const) {
+        const { status, body } = await json('/v1/apps?limit=200', opts as RequestInit);
+        assert(status === 200, `${who}: listing ${status}`);
         const seen = (body.data?.apps ?? []).find((a: any) => a.owner === ownerA && a.filename === FILENAME);
-        if (seen) {
-            assert(!('access_code' in seen), `code value leaked to a non-owner: ${JSON.stringify(seen.access_code)}`);
-            assert(seen.protected === true, 'boolean flag stays visible');
-        }
+        assert(!!seen, `${who}: the protected app is missing from the listing`);
+        assert(!('access_code' in seen), `${who}: code value leaked to a non-owner: ${JSON.stringify(seen.access_code)}`);
+        assert(seen.protected === true, `${who}: boolean flag stays visible`);
     }
 });
 

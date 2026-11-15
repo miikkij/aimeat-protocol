@@ -5,6 +5,7 @@
  *   workspace, the membership gate (non-member 403), and no-match returning an empty result set.
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial: workspace content search.
+ *   v1.0.1 — 2026-11-15 — Audit L099: test 2 asserts space and title separately.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-search
 
@@ -69,7 +70,9 @@ await test('2. Creator finds the record by text ("pineapple")', async () => {
     assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
     const hit = (r.body.data.results || []).find((x: any) => x.id === 't1');
     assert(!!hit, `expected a hit for t1, got ${JSON.stringify(r.body.data.results)}`);
-    assert(hit.space === 'shared' || hit.title.includes('pineapple'), 'hit carries space/title');
+    // The space is the object type's name from the manifest, not the namespace's first segment.
+    assert(hit.space === 'task' && hit.namespace === 'shared.tasks', `hit carries space 'task' in 'shared.tasks', got ${JSON.stringify([hit.space, hit.namespace])}`);
+    assert(typeof hit.title === 'string' && hit.title.includes('pineapple'), `hit carries the record title, got ${JSON.stringify(hit.title)}`);
 });
 
 await test('3. Creator finds a record by a body field ("blueberry") with a snippet', async () => {

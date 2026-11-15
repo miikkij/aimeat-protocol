@@ -5,6 +5,7 @@
  *   which creates a consent grant. Covers: discovery, denied-before-approval, request, list-requests,
  *   approve → read, and deny → revoke.
  * @version-history
+ *   2026-11-15 — 17c (audit M109): a presigned upload bound to the workspace lands bound.
  *   2026-10-25 — 19d: a non-member holding the grant of a creator removed from the organism reads
  *     neither the records nor the page (404). Failed before the fix with records 200.
  *   2026-10-24 — 19-19c: a workspace creator removed from the organism no longer reads the member
@@ -282,6 +283,23 @@ await test('17b. A CHUNKED upload bound to the workspace lands bound: member B r
     assert(done.status === 201 && done.body.data.visibility === 'workspace', `complete ${done.status}: ${JSON.stringify(done.body).slice(0, 300)}`);
 
     const url = `${BASE}/v1/pub/${encodeURIComponent(A_GHII)}/${encodeURIComponent(chunkKey)}`;
+    const b = await fetch(url, { headers: auth(B.token) });
+    assert(b.status === 200, `member with access expected 200, got ${b.status}`);
+    if (C) {
+        const c = await fetch(url, { headers: auth(C.token) });
+        assert(c.status === 403, `non-member expected 403, got ${c.status}`);
+    }
+});
+
+await test('17c. A PRESIGNED file upload carries visibility and workspace_refs in its token: member B reads it, C does not (audit M109)', async () => {
+    // The presigned upload writes the file later, from the token meta; a binding dropped there lands a
+    // workspace file nobody in the workspace can read, and the mint and the PUT both answer success.
+    const key = `wsfile-presigned-${Date.now()}`;
+    const mint = await json('/v1/memory/files', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key, mime_type: 'text/plain', mode: 'presigned', visibility: 'workspace', workspace_refs: [`${orgId}/${WS}`] }) });
+    assert(mint.status === 200 && typeof mint.body.data?.upload_url === 'string', `mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
+    const put = await fetch(mint.body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: Buffer.from('presigned workspace bytes') });
+    assert(put.status === 200, `PUT ${put.status}`);
+    const url = `${BASE}/v1/pub/${encodeURIComponent(A_GHII)}/${encodeURIComponent(key)}`;
     const b = await fetch(url, { headers: auth(B.token) });
     assert(b.status === 200, `member with access expected 200, got ${b.status}`);
     if (C) {

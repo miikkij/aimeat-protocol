@@ -4,6 +4,8 @@
  *   Tests board creation, listing, posting, reactions, replies, subscriptions,
  *   member management, deletion, and the board posts resource.
  * @version-history
+ *   v1.3.1 — 2026-11-15 — Audit M100: 4h, another owner's agent holding social:members cannot add
+ *     itself to a shared board's readers, and the REST read stays refused for it.
  *   v1.3.0 — 2026-10-08 — aiprov D4: a declaration the agent may not make is refused before the
  *     public board debits its price, so the owner's balance does not move; the same post without
  *     the declaration is charged.
@@ -416,7 +418,7 @@ await test('4h. Another owner\'s agent cannot set the rules of a board it does n
     assert(tok.body.ok === true, 'other owner token');
     const ag = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` },
-        body: JSON.stringify({ name: 'otherbrdagent', owner: other, capabilities: ['social'], model: 'gpt-4o', scopes: ['social:read', 'social:write'] }),
+        body: JSON.stringify({ name: 'otherbrdagent', owner: other, capabilities: ['social'], model: 'gpt-4o', scopes: ['social:read', 'social:write', 'social:members'] }),
     });
     assert(ag.status === 201, `other agent: ${ag.status} ${JSON.stringify(ag.body)}`);
     const otherGaii = ag.body.data.agent.gaii;
@@ -453,6 +455,10 @@ await test('4h. Another owner\'s agent cannot set the rules of a board it does n
         const r = await callBoardTool('aimeat_board_rules_set', { board_id: rulesBoardId, rules: { default_ttl_hours: 1 } }, 139);
         assert(r.isError, `another owner's agent set the rules: ${r.text}`);
         assert(r.text.includes('keeper'), `refused by the keeper rule: ${r.text}`);
+        // Audit M100: holding social:members does not let a stranger's agent add itself to the reader
+        // list of a shared board it does not own.
+        const m = await callBoardTool('aimeat_board_members', { board_id: boardId, add: [otherGaii] }, 140);
+        assert(m.isError && m.text.includes('Only the board owner'), `another owner's agent changed the readers: ${m.text}`);
     } finally {
         mcpToken = mine.mcpToken;
         sessionId = mine.sessionId;
@@ -461,6 +467,13 @@ await test('4h. Another owner\'s agent cannot set the rules of a board it does n
     const listed = await json('/v1/boards');
     const board = (listed.body.data?.boards ?? []).find((b: any) => b.id === rulesBoardId);
     assert(board?.rules === undefined, `the refused call changed nothing: ${JSON.stringify(board?.rules)}`);
+
+    // And the refused members call left the shared board closed to that agent on the REST read.
+    const ts3 = new Date().toISOString();
+    const agTok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii: otherGaii, timestamp: ts3, signature: await signMsg(ag.body.data.private_key, otherGaii + ts3) }) });
+    assert(agTok.status === 200, `other agent token: ${agTok.status}`);
+    const read = await json(`/v1/boards/${boardId}/posts`, { headers: { Authorization: `Bearer ${agTok.body.data.token}` } });
+    assert(read.status === 403 && read.body?.error?.code === 'CONSENT_REQUIRED', `a stranger's agent reads the shared board: ${read.status} ${JSON.stringify(read.body?.error)}`);
 
     await json(`/v1/owners/${other}`, { method: 'DELETE', headers: { Authorization: `Bearer ${tok.body.data.token}` } });
 });

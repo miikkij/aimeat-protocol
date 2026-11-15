@@ -30,6 +30,8 @@
  *   v1.7.0 — 2026-10-31 — 11 and 11b: the bell notice of an email invitation to an existing account
  *     gives a machine of the account nothing to register a new account with, and the invited person
  *     opens it signed in and joins as before (secaudit2026oct31w2 round 10, R-f-2026sec-07-d7).
+ *   v1.7.1 — 2026-11-15 — Audit M134: C6b, a key minted for a taken username answers 409 NAME_TAKEN
+ *     and the existing account still signs in with its own password.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invitations
 
@@ -559,6 +561,15 @@ await test('C6. Mint validates: bad email → 400, short code → 400', async ()
     assert(bad1.status === 400, `bad email expected 400, got ${bad1.status}`);
     const bad2 = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: `ok.${Date.now()}@example.com`, username: `e2ebad2${Date.now()}`, code: 'short' }) });
     assert(bad2.status === 400, `short code expected 400, got ${bad2.status}`);
+});
+
+await test('C6b. Mint with a username that is already registered → 409 NAME_TAKEN, and that account is untouched (audit M134)', async () => {
+    // The code is the new account's password, so a mint that fell through for a taken name would
+    // provision over an existing person with a password the minter chose.
+    const r = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: `taken.${Date.now()}@example.com`, username: A.name, code: 'EXC91-ABCD-EFGH-JKLM' }) });
+    assert(r.status === 409 && r.body?.error?.code === 'NAME_TAKEN', `taken username: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: A.name, password: 'InvPass1234' }) });
+    assert(lg.status === 200, `the existing account's own password stopped working: ${lg.status}`);
 });
 
 await test('C7. A non-member cannot mint a key (403)', async () => {

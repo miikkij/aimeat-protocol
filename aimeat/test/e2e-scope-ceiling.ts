@@ -27,6 +27,7 @@
  *   environment variable and the ecosystem route, not storage.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-scope-ceiling
  * @version-history
+ *   2026-11-15 — Audit M055: a hello manifest above the ecosystem ceiling fails scopes_within_ceiling.
  *   2026-10-16 — The node of its own takes the run's backend through ownNodeDb (QA audit P1-02).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F03a-01).
  */
@@ -234,6 +235,20 @@ try {
         assert(isCeilingRefusal(star), `approve *: ${star.status} ${short(star.body)}`);
         const ok = await approve(['memory:read']);
         assert(ok.status === 200 && ok.body.data?.status === 'approved', `approve inside: ${ok.status} ${short(ok.body)}`);
+    });
+
+    await test('A hello whose manifest comes with scopes above AIMEAT_MAX_ECO_SCOPES fails scopes_within_ceiling', async () => {
+        const owner = capOwner();
+        const keys = await generateKeyPair();
+        const app = `capman${stamp}`;
+        const hello = await nodeApi('/v1/ecosystem-apps/hello', {
+            method: 'POST',
+            body: JSON.stringify({ owner: owner.name, app, public_key: keys.publicKey, scopes: ['memory:read', 'memory:write'], manifest: { app, scopes: ['memory:read'] } }),
+        });
+        assert(hello.status === 200, `hello: ${hello.status} ${short(hello.body)}`);
+        const v = hello.body.data?.validation;
+        const failedChecks = (v?.checks ?? []).filter((c: any) => !c.ok).map((c: any) => c.name);
+        assert(v?.ok === false && JSON.stringify(failedChecks) === JSON.stringify(['scopes_within_ceiling']), `only scopes_within_ceiling should fail: ${short(v)}`);
     });
 } finally {
     node?.kill();

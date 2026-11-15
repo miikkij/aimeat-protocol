@@ -7,6 +7,7 @@
  *   denied the enriched list and gets no comments from the batch.
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: parity + security for the N+1 fan-out batch endpoints.
+ *   v1.0.1 — 2026-11-15 — Audit L094: test 7b, an agent write must appear in /agents/activity.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-batch
 
@@ -23,6 +24,7 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body: ct.includes('json') ? await res.json() as any : { _raw: await res.text() } };
 }
 import { ownerSignIn } from './helpers/owner-login.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 async function newOwner(name: string) {
     await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: name, password: 'Batch12345' }) });
@@ -124,6 +126,19 @@ await test('7. /agents/activity returns an agents map (empty — only human writ
     const r = await json(`/v1/organisms/${orgId}/agents/activity`, { headers: auth(token) });
     assert(r.status === 200 && r.body.data.agents && typeof r.body.data.agents === 'object', `agents/activity ${r.status}`);
     assert(Object.keys(r.body.data.agents).length === 0, 'no agent writes → empty');
+});
+
+await test('7b. /agents/activity names an agent of the creator once it writes in ws-a', async () => {
+    // Test 7 runs on an organism no agent ever wrote in, where `{ agents: {} }` is the right answer
+    // whatever the route computes. One agent write makes the map's content observable.
+    const agentName = `batchbot${Date.now() % 100000}`;
+    const agent = await connectAgentByDevice(BASE, { owner: ownerName, ownerToken: token, name: agentName, scopes: ['memory:read', 'memory:write', 'organism:read', 'organism:write'] });
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(agent.token), body: JSON.stringify({ key: `${rootA()}.shared.tasks.t3.latest`, value: { id: 't3', title: 'Agent task' }, visibility: 'private' }) });
+    assert(w.status === 201 || w.status === 200, `agent write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+    const r = await json(`/v1/organisms/${orgId}/agents/activity`, { headers: auth(token) });
+    assert(r.status === 200, `agents/activity ${r.status}`);
+    const entry = r.body.data.agents?.[agentName];
+    assert(!!entry && entry.count >= 1 && (entry.workspaces || []).includes('WS A'), `agent ${agentName} missing from the map: ${JSON.stringify(r.body.data.agents)}`);
 });
 
 await test('8. workspace-access?all=1 returns the owned workspaces rosters', async () => {

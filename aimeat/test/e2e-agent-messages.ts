@@ -1,5 +1,6 @@
 // E2E Tests for Agent Messages
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-messages.ts
+// v1.2.1 -- 2026-11-15 -- Audit L010, L011: 4b and 6 read the stored prompt and status back.
 // v1.2.0 -- 2026-06-06 -- Add Phase 5 (tests 11-15): task-based threads -- a message with
 //   linked_task_id (no thread_id) joins the task's thread, subsequent linked messages share it,
 //   the thread listing labels it by task title, and a task-less message stays in its own thread.
@@ -212,6 +213,11 @@ await test('4b. Option-prompt round-trips in outbound message metadata', async (
     assert(p.promptId === promptId, `prompt_id round-trips: ${p.promptId}`);
     assert(Array.isArray(p.options) && p.options.length === 3, 'options round-trip');
     assert(p.allowOther === true, 'allow_other round-trips');
+    // The 201 echoes what was sent; the stored record is what a client re-reading the thread sees.
+    const hist = await json(`/v1/agents/${agentName}/messages?thread_id=${firstThreadId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const stored = (hist.body.data?.messages ?? []).find((m: any) => m.id === body.data.message.id)?.metadata?.prompt;
+    assert(stored?.promptId === promptId && stored.allowOther === true && JSON.stringify(stored.options) === JSON.stringify(['color', 'black and white', 'photorealistic']),
+        `the stored message lost its prompt: ${JSON.stringify(stored ?? null)}`);
 });
 
 await test('4c. Owner prompt_answer round-trips and is correlatable via history', async () => {
@@ -263,6 +269,12 @@ await test('6. Update message status to delivered', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.message.status === 'delivered', `status: ${body.data.message.status}`);
     assert(typeof body.data.message.processedAt === 'string', 'has processedAt');
+    // Read the status back through the thread history and the pending inbox, not the PATCH answer.
+    const hist = await json(`/v1/agents/${agentName}/messages?thread_id=${firstThreadId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const row = (hist.body.data?.messages ?? []).find((m: any) => m.id === firstMessageId);
+    assert(row?.status === 'delivered' && typeof row.processedAt === 'string', `stored status not updated: ${JSON.stringify(row ? { status: row.status, processedAt: row.processedAt } : null)}`);
+    const inbox = await json(`/v1/agents/${agentName}/messages/inbox`, { headers: { Authorization: `Bearer ${agentToken}` } });
+    assert(inbox.status === 200 && !(inbox.body.data?.messages ?? []).some((m: any) => m.id === firstMessageId), 'a delivered message is still in the pending inbox');
 });
 
 // A11 (E2E test-quality audit). Tests 5 and 6 update this agent's own message and prove the status

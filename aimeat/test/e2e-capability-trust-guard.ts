@@ -19,6 +19,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-capability-trust-guard
  * @version-history
+ *   v1.1.2 — 2026-11-15 — Audit M067: a third owner's unvouch removes nothing and the vouch stands.
  *   v1.1.1 — 2026-10-23 — The operator comes from setupOperator (a password and the password sign-in);
  *     POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.1.0 — 2026-09-04 — Phase 5: a third principal who is neither the owner nor the operator.
@@ -243,6 +244,15 @@ await test('A vouch from someone else still counts', async () => {
     });
     assert(status === 200, `vouch: ${status} ${JSON.stringify(body.error ?? body)}`);
     assert(body.data.vouchCount === 1, `vouchCount should be 1, got ${body.data.vouchCount}`);
+
+    // Audit M067: a third owner who never vouched cannot take the voucher's vouch away.
+    const thirdName = `captrustx${stamp}`;
+    const thirdToken = await registerOwner(thirdName);
+    const un = await json(`/v1/capabilities/${capId}/vouch`, { method: 'DELETE', headers: { Authorization: `Bearer ${thirdToken}` } });
+    assert(un.status === 200 && un.body.data.removed === false, `a non-voucher's unvouch removed a vouch: ${un.status} ${JSON.stringify(un.body.data ?? un.body.error)}`);
+    const kept = await json(`/v1/capabilities/${capId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(kept.body.data.trust.vouchCount === 1, `the voucher's vouch must stand, vouchCount ${kept.body.data.trust.vouchCount}`);
+    await json(`/v1/owners/${thirdName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${thirdToken}` } });
     await json(`/v1/owners/${voucher}`, { method: 'DELETE', headers: { Authorization: `Bearer ${voucherToken}` } });
 });
 

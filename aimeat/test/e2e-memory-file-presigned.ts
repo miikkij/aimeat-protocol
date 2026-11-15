@@ -10,8 +10,9 @@
  *
  *   Asserted here: (1) `mode: 'presigned'` mints an upload URL whose max_size_bytes IS the node's
  *   configured per-file limit, (2) bytes larger than any JSON body survive a raw PUT and read back
- *   byte-identical, (3) tags and workspace visibility carried in the token meta actually land on the
- *   stored record (dropping them is the same class of bug as the extension `update` flag), and
+ *   byte-identical, (3) tags carried in the token meta actually land on the stored record (dropping
+ *   them is the same class of bug as the extension `update` flag; workspace visibility and
+ *   workspace_refs through the same door are asserted in e2e-organism-workspace-access 17c), and
  *   (4) a file over the limit is refused with FILE_TOO_LARGE rather than accepted and truncated.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-memory-file-presigned
@@ -21,6 +22,7 @@
  *   caller gets 401, the second owner's listing does not carry the key, and a positive control keeps
  *   the three refusals honest by proving the owner can still read their own file.
  * @version-history
+ *   v1.1.1 — 2026-11-15 — Audit M109: header names where the workspace half of point (3) is asserted.
  *   v1.1.0 — 2026-09-04 — Cross-owner and unauthenticated cases (quality plan stream B). This suite
  *     was one of the 34 seeded into security/denial-coverage-exemptions.json on 2026-08-15 as
  *     "drives its surface with one principal and never asks what a second one gets".

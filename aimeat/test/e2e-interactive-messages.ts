@@ -14,6 +14,8 @@
 // 2026-10-15 — 7b: the node refuses answers that do not fit the question (an option it never offered,
 // two answers to a single choice, free text where none is allowed, a required question unanswered, an
 // unknown question id), which until then only the inbox page restricted (feature-list audit #123).
+//
+// 2026-11-15 — Audit L063: test 5 reads the Other answer back from the agent's thread, not the POST.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -202,6 +204,13 @@ await test('5. Free-form "Other" answer round-trips (a second question, answered
     });
     assert(ans.status === 201, `answer other: ${ans.status}: ${JSON.stringify(ans.body)}`);
     assert(ans.body.data.message.interactive.answers.qx.other === 'Nordics', 'Other text preserved');
+    // The POST answer is Bob's own sender copy; the asking agent reads its stored copy from the thread.
+    const thread = await json(`/v1/messages/agent-thread/${encodeURIComponent(conversationId)}`, {
+        headers: { Authorization: `Bearer ${askbot.token}` },
+    });
+    assert(thread.status === 200, `agent-thread ${thread.status}: ${JSON.stringify(thread.body)}`);
+    const got = thread.body.data.messages.find((m: any) => m.interactive?.role === 'answers' && m.interactive.answersFor === qx);
+    assert(got?.interactive.answers.qx.other === 'Nordics', `the agent's copy lost the Other answer: ${JSON.stringify(got?.interactive ?? null)}`);
 });
 
 console.log('\nValidation — malformed specs / orphan answers are rejected');

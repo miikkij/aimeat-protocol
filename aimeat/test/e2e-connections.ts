@@ -19,6 +19,8 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   2026-11-15 — Audit M256, L042: a refused publish is read back from the history as rejected; the
+ *     swapped schedule publishes exactly once and A's own history is searched for a leak.
  *   2026-10-31 — Phase 2b-https: over https the round's cookie is one a same-site page cannot write; the
  *     binding value under the plain name finishes nothing, and the starter's browser finishes as before
  *     (secaudit2026oct31w2 round 10, W2-19).
@@ -1005,9 +1007,9 @@ async function main(): Promise<void> {
       });
       provider.rejectContent = false;
       assert(r.status === 502 && r.data.error.code === 'REJECTED', `${r.status} ${r.data?.error?.code}`);
-      // 'rejected' is the status that must never be retried; 'failed' would be.
-      const attempts = await api(`/v1/connections`, { method: 'GET', bearer: jwtA });
-      assert(attempts.status === 200, 'listing broke after a rejection');
+      // 'rejected' is the status that must never be retried; 'failed' would be. The newest attempt on the connection is this one.
+      const newest = ((await api('/v1/connections/attempts', { method: 'GET', bearer: jwtA })).data?.data?.attempts as any[] ?? []).find(i => i.connectionId === pubConn);
+      assert(newest?.status === 'rejected' && typeof newest.error === 'string' && newest.error.length > 0, `the refused publish is not stored as rejected: ${JSON.stringify(newest && { status: newest.status, error: newest.error })}`);
     });
 
     await test('a send that failed can be sent again — it is not its own permanent blocker', async () => {
@@ -2302,13 +2304,13 @@ async function main(): Promise<void> {
       // And the wall underneath holds regardless: firing it publishes to nobody else.
       const before = provider.stats.publishes;
       await api(`/v1/schedules/${id}/trigger`, { bearer: jwtA });
-      assert(provider.stats.publishes <= before + 1,
-        `a swapped schedule published more than its own post (${provider.stats.publishes - before})`);
+      assert(provider.stats.publishes === before + 1,
+        `the refused edit left A's own post, so the run publishes it exactly once: ${provider.stats.publishes - before}`);
 
-      // B's history stays empty of it: nothing was attributed to them either.
-      const bHist = await api('/v1/connections/attempts', { method: 'GET', bearer: jwtB });
-      const leaked = (bHist.data.data.attempts as any[]).filter(a => a.connectionId === bConn.id);
-      assert(leaked.length === 0, `${leaked.length} attempt(s) landed on the other principal's connection`);
+      // Nothing was attributed to B's connection. An attempt A opens is recorded under A, so A's history is where it would show.
+      const aHist = await api('/v1/connections/attempts', { method: 'GET', bearer: jwtA });
+      const leaked = (aHist.data.data.attempts as any[]).filter(a => a.connectionId === bConn.id);
+      assert(leaked.length === 0, `${leaked.length} attempt(s) by A landed on the other principal's connection`);
     });
 
     await test('an app without connections:use cannot schedule a publish', async () => {

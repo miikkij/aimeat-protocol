@@ -6,6 +6,8 @@
  *   version, ownership), drafts are consumed, an unchanged re-publish is change-guard skipped, and the
  *   route's authorization holds (non-member → 403, publish review gate → 409).
  * @version-history
+ *   v1.2.0 — 2026-11-15 — Audit M237, M238: the publish review gate refuses the batch (409) and gates
+ *     the single publish (202); parity compares owner, visibility, tags and the write guard.
  *   v1.1.0 — 2026-09-26 — A record the batch refuses opens none of its embedded files, and the record
  *     it publishes does (secaudit 2026-09, N1). Failed on the old code first.
  *   v1.0.0 — 2026-07-15 — Initial: batch publish happy path + parity-with-single + change-guard + auth.
@@ -94,6 +96,44 @@ await test('Batch publish == single publish (same draft → same version.1 + lat
     assert(sV1.value.n === bV1.value.n && sV1.value.title === bV1.value.title, 'version.1 value parity');
 });
 
+// Audit M238: the batch is its own implementation of publish, so parity covers ownership,
+// visibility and tags, and the copied write-guard branch in a create_only + requires_expected_version space.
+const metaOf = async (key: string) => {
+    const r = await json(`/v1/memory?prefix=${encodeURIComponent(key)}&include=meta&owner_scope=true`, { headers: authA() });
+    return { node: r.body.node as string, item: ((r.body.data?.items ?? []) as any[]).find(i => i.key === key) };
+};
+await test('Batch publish == single publish: owner, visibility and tags, and the write guard', async () => {
+    const draft = (inst: string, ns = NS) => json('/v1/memory', { method: 'POST', headers: authA(), body: JSON.stringify({ key: `${root()}.${ns}.${inst}.draft`, value: { id: inst, title: 'Tagged' }, visibility: 'private', tags: ['parity', 'm238'] }) });
+    await draft('s2'); await json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: NS, id: 's2' }) });
+    await draft('b2'); await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: NS, instances: ['b2'] }) });
+    for (const copy of ['latest', 'version.1']) {
+        const s = await metaOf(`${base('s2')}.${copy}`), b = await metaOf(`${base('b2')}.${copy}`);
+        assert(!!s.item && !!b.item, `${copy}: both records exist (${!!s.item}/${!!b.item})`);
+        assert(s.item.owner_gaii === `${A.name}@${s.node}` && b.item.owner_gaii === s.item.owner_gaii, `${copy} owner: single ${s.item.owner_gaii}, batch ${b.item.owner_gaii}`);
+        assert(b.item.visibility === s.item.visibility, `${copy} visibility: single ${s.item.visibility}, batch ${b.item.visibility}`);
+        assert(JSON.stringify([...(b.item.tags ?? [])].sort()) === JSON.stringify([...(s.item.tags ?? [])].sort()) && (s.item.tags ?? []).includes('m238'),
+            `${copy} tags: single ${JSON.stringify(s.item.tags)}, batch ${JSON.stringify(b.item.tags)}`);
+    }
+    // The guard: a second publish over an existing record in an append-only space is refused on both.
+    const LEDGER = 'shared.ledger';
+    const manifest = { manifestVersion: '1.0', id: orgId, name: 'WS', kind: 'project', status: 'active', objectTypes: [
+        { name: 'task', schemaRef: 'schema:task@1', namespace: NS, backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records' },
+        { name: 'ledger', schemaRef: 'schema:ledger@1', namespace: LEDGER, backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records', create_only: true, requires_expected_version: true },
+    ] };
+    const mr = await json('/v1/memory', { method: 'POST', headers: authA(), body: JSON.stringify({ key: `${root()}.meta.manifest`, value: manifest, visibility: 'private' }) });
+    assert(mr.status === 200, `manifest ${mr.status}`);
+    const single = () => json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: LEDGER, id: 'ls' }) });
+    const batch = () => json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: LEDGER, instances: ['lb'] }) });
+    await draft('ls', LEDGER); await draft('lb', LEDGER);
+    const s1 = await single(), b1 = await batch();
+    assert(s1.status === 200 && b1.status === 200 && b1.body.data.published === 1, `first publish: single ${s1.status}, batch ${JSON.stringify(b1.body.data ?? b1.body.error)}`);
+    const again = (inst: string) => json('/v1/memory', { method: 'POST', headers: authA(), body: JSON.stringify({ key: `${root()}.${LEDGER}.${inst}.draft`, value: { id: inst, title: 'Changed' }, visibility: 'private' }) });
+    await again('ls'); await again('lb');
+    const s2 = await single(), b2 = await batch();
+    assert(s2.status === 409 && s2.body?.error?.code === 'WRITE_CONFLICT' && s2.body.error.details?.violations?.[0]?.schema_rule === 'write_guard_conflict', `single re-publish: ${s2.status} ${JSON.stringify(s2.body?.error)}`);
+    assert(b2.status === 200 && b2.body.data.failed === 1 && b2.body.data.results[0].violations?.[0]?.schema_rule === 'write_guard_conflict', `batch re-publish: ${JSON.stringify(b2.body.data)}`);
+});
+
 await test('Unchanged re-publish is change-guard skipped (no new version)', async () => {
     // Re-create t1's draft with the SAME value as its published .latest, then batch publish.
     await writeDraft('t1', { id: 't1', title: 'Task t1' });
@@ -158,6 +198,24 @@ await test('A record the batch refuses opens none of its embedded files; the rec
     const landed = await publish([{ id: 'e2', value: { id: 'e2', ...embed } }]);
     assert(landed.status === 200 && landed.body.data.published === 1, `landed ${JSON.stringify(landed.body.data ?? landed.body.error)}`);
     assert(await visibility() !== 'private', 'the record that landed scoped the file to the workspace');
+});
+
+await test('With the publish review gate on, the batch answers 409 GATE_ENABLED and the single publish files an approval (audit M237)', async () => {
+    const setGate = (enabled: boolean) => json('/v1/memory', { method: 'POST', headers: authA(), body: JSON.stringify({ key: `organism.${orgId}.meta.config`, value: { gates: { publish: { enabled, approverRole: 'owner' } } }, visibility: 'private' }) });
+    const on = await setGate(true);
+    assert(on.status === 201 || on.status === 200, `gate on ${on.status}`);
+    try {
+        await writeDraft('g1', { id: 'g1', title: 'Gated' });
+        const r = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: NS, instances: ['g1'] }) });
+        assert(r.status === 409 && r.body.error?.code === 'GATE_ENABLED', `batch with the gate on: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+        const latest = await readKey(`${base('g1')}.latest`);
+        assert(latest.body.data.value === null, 'the refused batch published g1 anyway');
+        const single = await json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: NS, id: 'g1' }) });
+        assert(single.status === 202 && single.body.data?.gated === true && typeof single.body.data?.approval?.id === 'string', `single with the gate on: ${single.status} ${JSON.stringify(single.body.error ?? single.body.data)}`);
+    } finally {
+        const off = await setGate(false);
+        assert(off.status === 200, `gate off ${off.status}`);
+    }
 });
 
 await test('Missing namespace/instances → 400; non-member → 403', async () => {

@@ -4,6 +4,8 @@
  *   role allowlists are catalog-valid, every catalog tool is placed (or explicitly excluded), and the
  *   purpose boundaries hold (e.g. agent has no marketplace tools, appdev is build-only).
  * @version-history
+ *   v1.3.0 -- 2026-11-15 -- Audit M222: no admin tool outside admin/full, no memory or wallet write
+ *     tool on appdev, asserted over every listed tool.
  *   v1.2.0 -- 2026-11-02 -- The chat starts with aimeat_home_feed; at most 23 start tools.
  *   v1.1.0 -- 2026-10-02 -- The chat surface: small, carries the finder, registers what full does;
  *     its CHAT_ONLY finder is the one tool full does not carry.
@@ -69,6 +71,27 @@ describe('v2 MCP surfaces', () => {
         expect(s.has('aimeat_memory_write')).toBe(false);
         expect(s.has('aimeat_task_create')).toBe(false);
         expect(s.has('aimeat_board_read')).toBe(false);
+    });
+
+    /**
+     * The role tests in e2e-mcp-v2 compare tools/list with MCP_SURFACES itself, so a wrong entry in the
+     * table passes there. These are the rules the table encodes, asserted over every tool rather than
+     * a hand-picked few (audit M222): a table edit that breaks one fails here.
+     */
+    it('no aimeat_admin_* tool is listed outside admin and full, except the ones named here', () => {
+        // The operator's payout view sits on the money surface too. Any other admin tool off admin
+        // has to be added to this list on purpose.
+        const allowed: Partial<Record<string, string[]>> = { commerce: ['aimeat_admin_possible_payouts'] };
+        for (const role of V2_ROLES) {
+            if (role === 'admin' || role === 'full') continue;
+            const leaked = MCP_SURFACES[role].filter(t => t.startsWith('aimeat_admin_') && !(allowed[role] ?? []).includes(t));
+            expect({ role, leaked }).toEqual({ role, leaked: [] });
+        }
+    });
+
+    it('appdev carries no memory or wallet write, delete or restore tool', () => {
+        const leaked = MCP_SURFACES.appdev.filter(t => /^aimeat_(memory|wallet)_/.test(t) && /_(write|delete|restore|transfer|send|set)$/.test(t));
+        expect(leaked).toEqual([]);
     });
 
     it('agent is owner-facing: memory/task/message/knowledge + board_read, but no marketplace or admin', () => {

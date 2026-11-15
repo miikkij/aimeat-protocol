@@ -6,6 +6,8 @@
  *   v1.1.0 — 2026-08-11 — Phase 3: the three things POST /v1/flags did and the tool's own copy of
  *     the write did not (August 2026 audit step 8) — the flagCount bump on a flagged memory record,
  *     the AI Act target type and reason, and the bound on description.
+ *   v1.1.1 — 2026-11-15 — Audit M038, M039: test 7 proves the refused report is not stored; test 8
+ *     reads an app report back from the flag summary.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-flags.ts
@@ -324,6 +326,25 @@ await test('7. an oversized description is refused, not stored', async () => {
         },
     }, 106);
     assert(body.result?.isError === true, 'oversized description returns isError');
+    // Not stored: a stored row would make this valid report of the same target answer ALREADY_FLAGGED.
+    const { body: again } = await mcpRpc('tools/call', {
+        name: 'aimeat_flag_report',
+        arguments: { target_type: 'agent', target_id: 'agent-with-a-long-story', reason: 'spam', description: 'short' },
+    }, 107);
+    assert(again.result?.isError !== true, `the refused report was stored anyway: ${again.result?.content?.[0]?.text}`);
+});
+
+await test('8. an app report over MCP reaches the moderation queue with its reason', async () => {
+    const appId = `${ownerName}/mcp-flagged-app.html`;
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_flag_report',
+        arguments: { target_type: 'app', target_id: appId, reason: 'undisclosed_ai' },
+    }, 108);
+    assert(body.result?.isError !== true, `refused: ${body.result?.content?.[0]?.text ?? JSON.stringify(body.error)}`);
+    // The tool's JSON echo proves nothing about storage; the public summary reads the stored flags.
+    const s = await json(`/v1/flags/summary/app/${encodeURIComponent(appId)}`);
+    assert(s.status === 200, `summary ${s.status}: ${JSON.stringify(s.body?.error)}`);
+    assert(s.body.data.totalFlags === 1 && s.body.data.byReason?.undisclosed_ai === 1, `the app report did not reach the queue: ${JSON.stringify(s.body.data)}`);
 });
 
 // ─── Summary ───
