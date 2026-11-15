@@ -24,6 +24,8 @@
  *     test/run-e2e-ci.ts --test=memory-doors
  *
  * @version-history
+ *   2026-11-15 — The import puts a refused entry (no key, a storage_ref to a missing file) under
+ *     failed[] and writes the rest, as the bulk write does since fd9776330.
  *   2026-10-16 — The TTL sweep takes a person's expired record out of the key count, and a create-only
  *     write of the key succeeds after it (QA audit D4-01, E4-01). The comment on the read test no longer
  *     says the read deletes: only SQLite's does.
@@ -296,6 +298,29 @@ await test('import: both ?agent arms refuse, and a body with no entries is a 400
   });
   assert(noEntries.status === 400, `expected 400, got ${noEntries.status}`);
   assert(noEntries.body.error?.code === 'INVALID_INPUT', `code ${noEntries.body.error?.code}`);
+});
+
+// The bulk write once refused a whole batch for one entry its contract did not describe (fd9776330).
+// The import is the same kind of batch: an entry it refuses fails on its own and the rest is written.
+await test('import: a refused entry lands in failed[] and the other entries are written', async () => {
+  const { status, body } = await json('/v1/memory/import', {
+    method: 'POST', headers: agentAuth(),
+    body: JSON.stringify({ mode: 'overwrite', entries: [
+      { value: 'no key at all' },
+      { key: 'doors.import.ref', value: { _type: 'storage_ref', storage_key: 'doors/no-such-file.txt' } },
+      { key: 'doors.import.ok', value: { kept: true } },
+    ] }),
+  });
+  assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body?.error ?? body?.data)}`);
+  const failed = (body.data?.failed ?? []) as { key: string; reason: string }[];
+  assert(failed.length === 2, `two entries fail: ${JSON.stringify(failed)}`);
+  assert(failed.some(f => f.reason === 'missing key'), `the entry with no key: ${JSON.stringify(failed)}`);
+  assert(failed.some(f => f.key === 'doors.import.ref' && f.reason.includes('storage file not found')), `the dangling storage_ref: ${JSON.stringify(failed)}`);
+  assert(body.data.created + body.data.updated === 1, `one entry written: ${JSON.stringify(body.data)}`);
+  const kept = await json('/v1/memory/doors.import.ok', { headers: agentAuth() });
+  assert(kept.status === 200 && kept.body.data?.value?.kept === true, `the good entry is stored: ${kept.status} ${JSON.stringify(kept.body?.data?.value)}`);
+  const ref = await json('/v1/memory/doors.import.ref', { headers: agentAuth() });
+  assert(ref.status === 404, `the refused entry is not stored: ${ref.status}`);
 });
 
 await test('bulk-delete: both ?agent arms refuse, and nothing of the target\'s is removed', async () => {

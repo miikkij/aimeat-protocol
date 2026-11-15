@@ -21082,13 +21082,19 @@ paths:
                   type: array
                   items:
                     type: object
-                    required: [key, value]
+                    description: >-
+                      One record to restore. An entry the import cannot take (no key, a key it may not
+                      write, a refused organism key, a storage_ref to a missing file) fails under
+                      failed[] and the others are written.
                     properties:
                       key: { type: string }
                       value: {}
                       visibility:
                         type: string
-                        enum: [private, owner, group, members, public]
+                        description: >-
+                          private, owner, group, members or public; absent means the node's starting
+                          level. `group` keeps the group the record already has, and with none it is
+                          stored private. Any other word is stored private, its data kept.
                       tags:
                         type: array
                         items: { type: string }
