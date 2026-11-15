@@ -27,7 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { buildAppdevOverview } from '../services/appdev-overview.js';
+import { buildAppdevOverview } from '../services/appdev/overview.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';

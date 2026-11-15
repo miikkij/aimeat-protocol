@@ -64,7 +64,7 @@ import { buildAppPrompt, buildAppSpecToken } from '../services/builder/app-promp
 import { PLAYBOOKS } from '../services/home/playbooks.js';
 import { buildExtensionPrompt } from '../services/builder/extension-prompt.js';
 import { registerBuildCortexPrompt } from './prompts-cortex.js';
-import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
+import { buildAppdevFlowPrompt } from '../services/appdev/flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
 import { registerIntentPoolPrompt } from './prompts-intent-pool.js';
 import { registerHomeIdeasPrompt } from './prompts-home-ideas.js';

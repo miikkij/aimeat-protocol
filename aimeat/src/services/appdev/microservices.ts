@@ -21,7 +21,7 @@
  *   memory:read-as-owner sees it only when it is not private) and then the caller's classification
  *   reader, as every content read is.
  * @structure MICROSERVICES_RECORD_KEY · centralUrl(v) · microservicesFor(storage, config, ownerGhii, view, reader)
- * @usage import { microservicesFor } from './appdev/microservices.js'; (services/appdev-overview.ts)
+ * @usage import { microservicesFor } from './appdev/microservices.js'; (services/appdev/overview.ts)
  * @version-history
  *   v1.0.0 — 2026-11-07 — Initial (wish-mikropalvelu-osaksi-aimeatin-sovelluskehityst-ja-p-syrekiste).
  */
@@ -29,7 +29,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { ownerScopeView } from '../owner/scope-read.js';
-import type { OwnerScopeViewer } from '../appdev-kb.js';
+import type { OwnerScopeViewer } from './kb.js';
 import type { ContentReader } from '../classification/reader.js';
 import { presentMemory } from '../classification/present-memory.js';
 

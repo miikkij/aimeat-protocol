@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description GET /v1/appdev/overview — the authenticated "big picture" research surface for
- *   building apps ON AIMEAT (services/appdev-overview.ts). Query params: ?model= (indicative
+ *   building apps ON AIMEAT (services/appdev/overview.ts). Query params: ?model= (indicative
  *   model filter for proofs + learned pitfalls), ?sections=apps,library_packs,... (partial
  *   fetch for token economy). Read-only; identity via resolveIdentity (owner or agent session).
  * @structure appdevOverviewRouter(config, storage) → Router
@@ -36,7 +36,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { buildAppdevOverview } from '../services/appdev-overview.js';
+import { buildAppdevOverview } from '../services/appdev/overview.js';
 import { readerFor } from '../services/classification/reader.js';
 import { callerOf } from '../middleware/caller.js';
 import { readsAsOwner } from '../services/owner/scope-read.js';

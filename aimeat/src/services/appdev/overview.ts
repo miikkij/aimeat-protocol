@@ -1,5 +1,5 @@
 /**
- * @file appdev-overview.ts
+ * @file src/services/appdev/overview.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The "big picture" research surface for AI agents building apps ON AIMEAT —
@@ -11,7 +11,7 @@
  *   existing endpoints/tools each section names. Scope: app development on the platform only.
  * @structure buildAppdevOverview(storage, config, reader, opts) → AppdevOverview
  * @usage
- *   import { buildAppdevOverview } from '../services/appdev-overview.js';
+ *   import { buildAppdevOverview } from './overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
  *   2026-11-15 — The skills section puts aimeat-app-builder second after the Atelier skill, so the
@@ -55,27 +55,27 @@
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
  */
 
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { isGEAI, localAccountOf } from '../utils/gaii.js';
-import { getLibraryPacks } from '../data/library-packs.js';
-import { getAppTemplateIndex } from '../data/app-templates.js';
-import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../data/appdev-pitfalls.js';
-import { filterPitfalls, listLearnedPitfalls, listOwnerScopeShown, type OwnerScopeViewer } from './appdev-kb.js';
-import { ownerScopeView } from './owner/scope-read.js';
-import type { ContentReader } from './classification/reader.js';
-import { listSkills, type SkillAccessor } from './skills.js';
-import { dependencyIndex, appRef as depAppRef } from './dependency-map.js';
-import { decideAvailableFor } from './decide/settings.js';
-import { rulesRunnableBy } from './decide/rules.js';
-import { decideSetupOrderText } from './decide/setup-order.js';
-import { microservicesFor } from './appdev/microservices.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { isGEAI, localAccountOf } from '../../utils/gaii.js';
+import { getLibraryPacks } from '../../data/library-packs.js';
+import { getAppTemplateIndex } from '../../data/app-templates.js';
+import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../../data/appdev-pitfalls.js';
+import { filterPitfalls, listLearnedPitfalls, listOwnerScopeShown, type OwnerScopeViewer } from './kb.js';
+import { ownerScopeView } from '../owner/scope-read.js';
+import type { ContentReader } from '../classification/reader.js';
+import { listSkills, type SkillAccessor } from '../skills.js';
+import { dependencyIndex, appRef as depAppRef } from '../dependency-map.js';
+import { decideAvailableFor } from '../decide/settings.js';
+import { rulesRunnableBy } from '../decide/rules.js';
+import { decideSetupOrderText } from '../decide/setup-order.js';
+import { microservicesFor } from './microservices.js';
+import { logger } from '../../utils/logger.js';
 
 const CAP = 25;
 
 // In models/ since 2026-10-05: the tool catalog states them (secaudit 2026-10, M3).
-import { OVERVIEW_SECTIONS } from '../models/tool-input-vocabulary.js';
+import { OVERVIEW_SECTIONS } from '../../models/tool-input-vocabulary.js';
 export { OVERVIEW_SECTIONS };
 export type OverviewSection = (typeof OVERVIEW_SECTIONS)[number];
 

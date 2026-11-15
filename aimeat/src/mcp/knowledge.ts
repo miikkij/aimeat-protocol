@@ -65,7 +65,7 @@
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
-import { listOwnerScopeShown } from '../services/appdev-kb.js';
+import { listOwnerScopeShown } from '../services/appdev/kb.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { classificationWarningOf } from '../services/classification/present-memory.js';
 import type { AimeatConfig } from '../config.js';
@@ -103,7 +103,7 @@ export function registerKnowledgeTools(
     // the classification reader's decision (TARGET-082). One reader per call: it caches the owner's
     // memberships, which must not outlive the call.
     const reader = () => readerForAgent({ storage, config }, agentGaii, sessionScopes);
-    // Owner-scope memory aggregation is services/appdev-kb.ts — packages may sit under the owner's
+    // Owner-scope memory aggregation is services/appdev/kb.ts — packages may sit under the owner's
     // GHII (web UI import) or any of their agents, and which duplicate key wins is a priority order
     // that has to be the same answer on both surfaces.
     // An agent reads the owner's and its siblings' records only as the visibility rule admits, unless

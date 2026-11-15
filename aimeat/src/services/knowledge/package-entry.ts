@@ -47,7 +47,7 @@ import type { MemoryRecord } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
 import { writeMemoryRecord, type MemoryWriteCaller, type MemoryWriteFanout } from '../memory/write.js';
 import type { DeclaredProvenance } from '../ai/provenance.js';
-import { PITFALL_PACKAGE_ID } from '../appdev-kb.js';
+import { PITFALL_PACKAGE_ID } from '../appdev/kb.js';
 import { CAS_ATTEMPTS } from '../record-cas.js';
 
 /** An entry reference stored in a knowledge-package manifest's `entries` list. */

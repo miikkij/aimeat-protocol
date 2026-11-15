@@ -59,7 +59,7 @@ export const USAGE_REPORT_PARAMS = ['report', 'owner', 'grain', 'series', 'limit
 export const FLAG_TARGET_TYPES = ['memory', 'board_post', 'action', 'agent', 'app', 'ai_provenance'] as const;
 export const FLAG_REASONS = ['unreliable', 'inappropriate', 'illegal', 'spam', 'other', 'undisclosed_ai'] as const;
 
-/** The sections of aimeat_appdev_overview (services/appdev-overview.ts). */
+/** The sections of aimeat_appdev_overview (services/appdev/overview.ts). */
 export const OVERVIEW_SECTIONS = [
     'apps', 'library_packs', 'app_templates', 'skills',
     'pitfalls_curated', 'pitfalls_learned', 'template_proposals',

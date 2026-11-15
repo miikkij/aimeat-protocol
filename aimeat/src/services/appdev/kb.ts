@@ -1,5 +1,5 @@
 /**
- * @file appdev-kb.ts
+ * @file src/services/appdev/kb.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Shared service layer of the learned AppDev knowledge base — the one place that
@@ -12,7 +12,7 @@
  *   sharedPitfallRecords · listLearnedPitfalls · queryLearnedPitfalls · pitfallIndex · filterPitfalls ·
  *   pitfallFacets · setPitfallFlags · deletePitfallEntry · upsertPitfallManifest · pitfallEntryKey ·
  *   PITFALL_* constants
- * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
+ * @usage import { listLearnedPitfalls, setPitfallFlags } from './kb.js';
  * @version-history
  *   2026-11-08 -- Every index row carries `open`, the exact call that opens it: a real build read an
  *     own entry with the shared-entry tool, because the hint named both and the row did not say which.
@@ -64,15 +64,15 @@
  *     management operations (share/status flags, full-body listing) (AppDev KB UI phase).
  */
 
-import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { isGEAI, localAccountOf } from '../utils/gaii.js';
-import { emitRecordChangePriorUnknown } from './event-bus.js';
-import { writeMemoryRecord } from './memory/write.js';
-import type { ContentReader } from './classification/reader.js';
-import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
-import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
-import { ownerScopeView } from './owner/scope-read.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { isGEAI, localAccountOf } from '../../utils/gaii.js';
+import { emitRecordChangePriorUnknown } from '../event-bus.js';
+import { writeMemoryRecord } from '../memory/write.js';
+import type { ContentReader } from '../classification/reader.js';
+import { presentMemories, classificationWarningOf } from '../classification/present-memory.js';
+import { getAppdevPitfalls } from '../../data/appdev-pitfalls.js';
+import { ownerScopeView } from '../owner/scope-read.js';
 
 /** Who reads an owner-scope listing, for ownerScopeView: the principal and whether it reads as the owner. */
 export interface OwnerScopeViewer {

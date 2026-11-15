@@ -94,7 +94,7 @@ const SOURCES: string[] = [
     'aimeat/src/services/app-build/build-introduction-step.ts',
     'aimeat/src/services/builder/extension-prompt.ts',
     'aimeat/src/services/builder/cortex-prompt.ts',
-    'aimeat/src/services/appdev-flow-prompt.ts',
+    'aimeat/src/services/appdev/flow-prompt.ts',
     'aimeat/src/services/hello-mcp.ts',
     'aimeat/src/services/agent/connect-prompt.ts',
     'aimeat/src/services/agent/onboard-prompt.ts',

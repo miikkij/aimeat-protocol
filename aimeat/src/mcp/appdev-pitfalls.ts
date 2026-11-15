@@ -50,7 +50,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import {
     PITFALL_PACKAGE_ID,
     pitfallEntryKey, deletePitfallEntry, pitfallIndex, reportLearnedPitfall,
-} from '../services/appdev-kb.js';
+} from '../services/appdev/kb.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -83,7 +83,7 @@ export function registerAppdevPitfallTools(
             annotations: annotationsFor('aimeat_appdev_pitfall_report'),
         },
         async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
-            // The whole report is services/appdev-kb.ts reportLearnedPitfall(), the same function
+            // The whole report is services/appdev/kb.ts reportLearnedPitfall(), the same function
             // POST /v1/appdev/pitfalls/learned calls and both connector doors reach through it. The
             // entry is a memory record and answers to memory's rules (archive guard, key and size
             // ceilings, byte quota) inside that function, and it stamps the verification.
@@ -120,7 +120,7 @@ export function registerAppdevPitfallTools(
             annotations: annotationsFor('aimeat_appdev_pitfall_list'),
         },
         async (query) => {
-            // The merge, filter and page is services/appdev-kb.ts pitfallIndex(), which
+            // The merge, filter and page is services/appdev/kb.ts pitfallIndex(), which
             // GET /v1/appdev/pitfalls/index answers with too. Learned entries are user-written memory
             // records, so what this agent is shown is the classification reader's decision.
             // The owner-scope entries read as this agent may (memory:read-as-owner), as

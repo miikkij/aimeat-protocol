@@ -1,5 +1,5 @@
 /**
- * @file appdev-flow-prompt.ts
+ * @file src/services/appdev/flow-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The paste-able "research-first" flow prompt served at GET /v1/prompts/appdev-flow —
@@ -8,14 +8,14 @@
  *   coding cold. This is the user-facing promise of an MCP connection; the flow vocabulary comes
  *   from appdev-flow-constants.ts so it can never drift from the build prompt or the handbook.
  * @structure buildAppdevFlowPrompt(config) → string
- * @usage import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
+ * @usage import { buildAppdevFlowPrompt } from './flow-prompt.js';
  * @version-history
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 7).
  */
 
-import type { AimeatConfig } from '../config.js';
-import { FLOW_PHASES, FLOW_SKIP_PHRASE, FLOW_TOOLS, buildFinishChecklist } from './appdev-flow-constants.js';
+import type { AimeatConfig } from '../../config.js';
+import { FLOW_PHASES, FLOW_SKIP_PHRASE, FLOW_TOOLS, buildFinishChecklist } from '../appdev-flow-constants.js';
 
 export function buildAppdevFlowPrompt(config: AimeatConfig): string {
     const nodeUrl = config.baseUrl.replace(/\/+$/, '');

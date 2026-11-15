@@ -174,7 +174,7 @@ const DELEGATES: Record<string, string> = {
         + 'domain out of the service rather than trusting the delegation.',
     'src/mcp/agent-capabilities.ts': "services/agent/profile-write.ts, which emits 'agent-capabilities'",
     'src/mcp/agent-management.ts': "services/agent/profile-write.ts, which emits 'agents'",
-    'src/mcp/appdev-pitfalls.ts': "services/memory/write.ts and services/appdev-kb.ts, both emitting 'memory'",
+    'src/mcp/appdev-pitfalls.ts': "services/memory/write.ts and services/appdev/kb.ts, both emitting 'memory'",
     'src/mcp/appdev-proofs.ts': "services/contribution-proofs.ts, which writes through "
         + "services/memory/write.ts and emits 'memory' there. No REST twin exists for this one: the "
         + 'proof is attached from the appdev tool surface only.',

@@ -45,7 +45,7 @@ import {
 } from '../data/appdev-pitfalls.js';
 import {
   queryLearnedPitfalls, setPitfallFlags, deletePitfallEntry, reportLearnedPitfall, pitfallIndex,
-} from '../services/appdev-kb.js';
+} from '../services/appdev/kb.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { readerFor } from '../services/classification/reader.js';
 import { readsAsOwner } from '../services/owner/scope-read.js';
@@ -68,7 +68,7 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
 
   // GET /v1/appdev/pitfalls/index[?scope=own|platform|all&status=&category=&model=&applies_to=
   //   &limit=&offset=] — the merged index an agent reads before it builds: own learned entries, the
-  // curated registry and other owners' shared entries, without bodies. services/appdev-kb.ts
+  // curated registry and other owners' shared entries, without bodies. services/appdev/kb.ts
   // pitfallIndex(), the same answer aimeat_appdev_pitfall_list gives on the node's MCP.
   router.get('/v1/appdev/pitfalls/index', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
