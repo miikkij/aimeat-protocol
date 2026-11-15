@@ -63,7 +63,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { getOwnerScopeMemory } from './owner/memory.js';
 import { readHomeState, type HomeState } from './home/state.js';
-import { FIRST_MCP_CALL_KEY } from './onboarding-funnel.js';
+import { FIRST_MCP_CALL_KEY } from './onboarding/funnel.js';
 import { CHAT_AGENT_NAME } from './chat/agent.js';
 import { isNodeResidentAgent } from './node/resident-agent.js';
 import { getOwnerUsageSummary } from './usage-summary.js';

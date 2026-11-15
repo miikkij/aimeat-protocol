@@ -1,5 +1,5 @@
 /**
- * @file onboarding-test-task.ts
+ * @file src/services/onboarding/test-task.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one place the Hello Integration test task is created. Every path that creates an
@@ -24,8 +24,8 @@
  *     registration paths that created onboarding without a test task can stop doing that.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, AgentTaskRecord } from '../storage/interface.js';
-import type { AgentOnboardingStep } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
+import type { AgentOnboardingStep } from '../../storage/interface.js';
 
 /**
  * Create the Hello Integration smoke-test task and stamp its id into the `accept_test_task` step.

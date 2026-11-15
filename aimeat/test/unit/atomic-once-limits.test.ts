@@ -31,7 +31,7 @@ import { SECURITY_INCIDENT_PREFIX, securityOwner } from '../../src/services/secu
 import { firstNoticeFor } from '../../src/services/packages/compose/package-notices.js';
 import { appendInboundEcosystemLog } from '../../src/services/ecosystem/events.js';
 import { appendMailLog, readMailLog, MAIL_LOG_KEY } from '../../src/services/notification-settings.js';
-import { writeMarkerOnce, recordAiModelDetected, recordWelcomeMatPasted, ONBOARDING_KEYS } from '../../src/services/onboarding-funnel.js';
+import { writeMarkerOnce, recordAiModelDetected, recordWelcomeMatPasted, ONBOARDING_KEYS } from '../../src/services/onboarding/funnel.js';
 import { putOwnerProvider, PROVIDER_PREFIX } from '../../src/services/decide/providers.js';
 import { pulseInstanceServer } from '../../src/services/living-pulse.js';
 

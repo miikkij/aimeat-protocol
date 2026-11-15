@@ -381,7 +381,7 @@ export function registerWebVerifyRoutes(
         // Which onboarding path this account was created on (05-mittaus.md). This door is the SPA's
         // web registration and was missing the marker, so every account made here read as `legacy`
         // — the same gap that /v1/ghii and provisionOwner already closed.
-        void import('../../services/onboarding-funnel.js')
+        void import('../../services/onboarding/funnel.js')
             .then(m => m.recordTrack(storage, config, username))
             .catch(err => logger.warn('ghii register-web: track marker failed', { error: String(err) }));
 

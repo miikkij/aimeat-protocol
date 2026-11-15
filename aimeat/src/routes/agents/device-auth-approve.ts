@@ -45,7 +45,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { nodeContext } from '../../services/node/context.js';
 import { emitToolListChanged } from '../../services/resource-events.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
-import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
+import { createOnboardingTestTask } from '../../services/onboarding/test-task.js';
 import { detectPlatform } from '../../services/platform-detector.js';
 import { scopeIsCovered, SCOPES_OUTSIDE_WILDCARD, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { recordAgentScopeRequest } from '../../services/agent/refusals.js';

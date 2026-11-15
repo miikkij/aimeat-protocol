@@ -320,7 +320,7 @@ export function registerRegisterLoginRoutes(
         // the remake. Written here rather than at first sign-in because a cohort is defined by when
         // the account was CREATED — an account that never returns still belongs to its week.
         // Fire-and-forget: a funnel marker must never be able to fail a registration.
-        void import('../../services/onboarding-funnel.js')
+        void import('../../services/onboarding/funnel.js')
             .then(m => m.recordTrack(storage, config, username))
             .catch(err => logger.warn('ghii register: track marker failed', { error: String(err) }));
 

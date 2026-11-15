@@ -404,7 +404,7 @@ export async function patchMemoryRecord(deps: MemoryPatchDeps, who: MemoryPatchW
     runAutomationRecipesForWrite(storage, config, gaii, key)
         .catch(e => logger.error('ecosystem automation recipe trigger failed', { key, error: String(e) }));
     if (capCaller.kind === 'agent' && !key.startsWith('onboarding.')) {
-        void import('../onboarding-funnel.js')
+        void import('../onboarding/funnel.js')
             .then(m => m.recordActivation(storage, config, auth.owner, 'agent'))
             .catch(e => logger.warn('memory patch: activation marker is best-effort', { error: String(e) }));
     }

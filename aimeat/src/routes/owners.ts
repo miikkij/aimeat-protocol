@@ -172,7 +172,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     // Which onboarding path this account was created on (05-mittaus.md). BOTH creation doors write
     // it — an account created through this programmatic one and left untracked would be missing
     // from every cohort rather than counted in the wrong one, which is the harder bug to notice.
-    void import('../services/onboarding-funnel.js')
+    void import('../services/onboarding/funnel.js')
       .then(m => m.recordTrack(storage, config, owner.name))
       .catch(err => logger.warn('owners register: track marker failed', { error: String(err) }));
 

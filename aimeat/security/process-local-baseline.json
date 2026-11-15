@@ -1133,19 +1133,19 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/onboarding-funnel.ts :: set :: seenActivatedOwners": {
+    "src/services/onboarding/funnel.ts :: set :: seenActivatedOwners": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/onboarding-funnel.ts :: set :: seenChatTurnOwners": {
+    "src/services/onboarding/funnel.ts :: set :: seenChatTurnOwners": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/onboarding-funnel.ts :: set :: seenHelloOwners": {
+    "src/services/onboarding/funnel.ts :: set :: seenHelloOwners": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/onboarding-funnel.ts :: set :: seenMcpOwners": {
+    "src/services/onboarding/funnel.ts :: set :: seenMcpOwners": {
       "count": 1,
       "reason": "DEBT"
     },

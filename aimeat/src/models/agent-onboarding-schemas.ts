@@ -128,7 +128,7 @@ export type StepActor = 'agent' | 'server';
  * stepId -> {tool, args} contract a connector drives from, instead of fabricating a
  * non-existent `aimeat_onboarding_<stepId>` tool. Surfaced per-step (as `howTo`) and as a
  * top-level `step_guide` in both the REST GET /onboarding and MCP aimeat_onboarding_status
- * payloads via services/onboarding-guide.ts.
+ * payloads via services/onboarding/guide.ts.
  */
 export interface StepHowTo {
   /** Who performs the action: the agent calls a tool, or the server validates passively. */

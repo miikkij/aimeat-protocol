@@ -56,7 +56,7 @@ import {
 } from '../../services/ai/tool-branch.js';
 import {
     ONBOARDING_KEYS, recordOnboardingEvent, recordWelcomeMatPasted, recordAiModelDetected,
-} from '../../services/onboarding-funnel.js';
+} from '../../services/onboarding/funnel.js';
 import { readHomeState } from '../../services/home/state.js';
 import { mergeJourneyProfile, type ProfileField } from '../../services/journey-state.js';
 import { mergePortfolioConfig } from '../../services/portfolio/config.js';

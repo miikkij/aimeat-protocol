@@ -12,7 +12,7 @@
  *   reader had no way to know why.
  *
  *   The guarantee is kept and MOVED. Those events are recorded at the moment their marker is
- *   written (services/onboarding-funnel.ts), from the same fact in the same act, so the funnel and
+ *   written (services/onboarding/funnel.ts), from the same fact in the same act, so the funnel and
  *   the feed still cannot drift. What is gone is the second source, not the promise.
  *
  *   ONE ROW IS STILL NOT RECORDED, and never should be: "an agent is knocking" is LIVE state. It is
@@ -45,7 +45,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AccountEventKind } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { ONBOARDING_KEYS } from '../onboarding-funnel.js';
+import { ONBOARDING_KEYS } from '../onboarding/funnel.js';
 import { readAccountEvents, recordAccountEvent } from '../account/events.js';
 import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from '../account/event-view.js';
 import { isNodeResidentAgent } from '../node/resident-agent.js';

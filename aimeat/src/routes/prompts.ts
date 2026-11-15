@@ -401,7 +401,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     // Onboarding funnel: a signed-in owner fetching this prompt = the hello page was opened.
     // The route stays public; the marker only exists for authenticated owners.
     if (req.auth && !isAnonymousPrincipal(req.auth) && req.auth.owner) {
-      void import('../services/onboarding-funnel.js')
+      void import('../services/onboarding/funnel.js')
         .then(m => m.recordHelloPageOpened(storage, config, req.auth!.owner))
         .catch(err => logger.warn('hello-mcp: funnel marker failed', { error: String(err) }));
     }

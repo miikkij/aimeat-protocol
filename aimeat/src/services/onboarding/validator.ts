@@ -1,5 +1,5 @@
 /**
- * @file onboarding-validator.ts
+ * @file src/services/onboarding/validator.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Validates onboarding steps by checking actual system state.
@@ -18,13 +18,13 @@
  *   v1.3.0 -- 2026-10-19 -- set_avatar (optional, automatic): passes when agent.avatar can be shown.
  */
 
-import type { Storage, AgentOnboardingRecord, AgentOnboardingStep } from '../storage/interface.js';
-import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
-import { STEP_SCHEMAS } from '../models/agent-onboarding-schemas.js';
-import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
-import { bufferedTelemetryCount } from './telemetry-buffer.js';
-import { AVATAR_KEY, readAvatar } from './agent/avatar.js';
+import type { Storage, AgentOnboardingRecord, AgentOnboardingStep } from '../../storage/interface.js';
+import type { OnboardingStepId } from '../../models/agent-onboarding-schemas.js';
+import { STEP_SCHEMAS } from '../../models/agent-onboarding-schemas.js';
+import { OffersDocSchema, type Offer } from '../../models/offer-schemas.js';
+import { parseGaiiLoose } from '../../utils/gaii.js';
+import { bufferedTelemetryCount } from '../telemetry-buffer.js';
+import { AVATAR_KEY, readAvatar } from '../agent/avatar.js';
 
 export interface StepValidationResult {
   passed: boolean;

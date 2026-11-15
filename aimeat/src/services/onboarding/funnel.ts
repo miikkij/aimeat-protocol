@@ -1,5 +1,5 @@
 /**
- * @file src/services/onboarding-funnel.ts
+ * @file src/services/onboarding/funnel.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The MCP onboarding funnel made observable (UX-remake v3, P3). The connector step
@@ -22,7 +22,7 @@
  *   - readOnboardingFunnel(): the operator view's rows (activation, TTFV, rescue, remake events)
  *   - runMcpOnboardingRescueJob(): the scheduled rescue pass (core handler 'mcp-onboarding-rescue')
  * @usage
- *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
+ *   import { recordFirstMcpCall } from './funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
  *   2026-11-13 — ONBOARDING_KEYS, the track, branch and room types, writeMarkerOnce and
@@ -66,19 +66,19 @@
  *     and TTFV are computable (05-mittaus.md).
  *   v1.0.0 — 2026-08-07 — Initial (UX-remake v3, block 1.6).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { nodeContext } from './node/context.js';
-import { outboundEmailHtml } from './email/templates.js';
-import { provenOwnerAddress } from './owner/mail-address.js';
-import { sendMail } from './mail-gate.js';
-import { logger } from '../utils/logger.js';
-import { recordAccountEvent } from './account/events.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { nodeContext } from '../node/context.js';
+import { outboundEmailHtml } from '../email/templates.js';
+import { provenOwnerAddress } from '../owner/mail-address.js';
+import { sendMail } from '../mail-gate.js';
+import { logger } from '../../utils/logger.js';
+import { recordAccountEvent } from '../account/events.js';
 import {
     ONBOARDING_KEYS, ownerGhii, writeMarkerOnce, FEED_LINK_FOR_MARKER,
     type OnboardingTrack, type OnboardingBranch, type OnboardingRoom,
-} from './onboarding/markers.js';
+} from './markers.js';
 
 // The marker keys, the track/branch/room types and the write-once marker writer live in
 // onboarding/markers.ts, which home-state.ts and inactivity-nudge.ts import without importing this
@@ -86,7 +86,7 @@ import {
 export {
     ONBOARDING_KEYS, writeMarkerOnce, recordOnboardingEvent,
     type OnboardingTrack, type OnboardingBranch, type OnboardingRoom,
-} from './onboarding/markers.js';
+} from './markers.js';
 
 /** Written once, when the owner's first authenticated MCP session initializes. */
 export const FIRST_MCP_CALL_KEY = 'onboarding.first_mcp_call';
@@ -624,7 +624,7 @@ export async function runMcpOnboardingRescueJob(
         // profile". Until now nothing on the server read that setting, so the sentence was not
         // true. Checked here, after eligibility and before the marker, so someone who turns
         // notifications back on is still reachable.
-        const { mayEmailOwner } = await import('./inactivity-nudge.js');
+        const { mayEmailOwner } = await import('../inactivity-nudge.js');
         // `true`: this pass has always run without consulting the switch, and turning it off
         // for everyone who never opened the tab is not a side effect to ship quietly.
         if (!await mayEmailOwner(storage, g.ghii, true)) continue;
@@ -636,7 +636,7 @@ export async function runMcpOnboardingRescueJob(
         let step: 'welcome-mat' | 'first-agent' | null = null;
         let profileDone = false;
         if (trackVal?.track === 'remake') {
-            const { readHomeState } = await import('./home/state.js');
+            const { readHomeState } = await import('../home/state.js');
             const st = await readHomeState(storage, config, g.ownerName);
             // An initialized home needs no reminder at all — skip it entirely.
             if (st.initialized) continue;

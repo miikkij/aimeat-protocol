@@ -51,7 +51,7 @@ import { fireHook } from '../../utils/fire-hook.js';
 import { AgentRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { emitChange } from '../../services/event-bus.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
-import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
+import { createOnboardingTestTask } from '../../services/onboarding/test-task.js';
 import { detectPlatform } from '../../services/platform-detector.js';
 import { exceedsCeiling } from '../../utils/scope-coverage.js';
 import { agentListingTags } from '../../services/content-defaults.js';

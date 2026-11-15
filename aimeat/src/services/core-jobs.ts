@@ -330,7 +330,7 @@ export function registerCoreHandlers(
   // Onboarding funnel rescue: one email to a day-old account with a verified email and no MCP
   // session yet (UX-remake v3, P3). The handler no-ops when the email service is disabled.
   scheduler.registerCoreHandler('mcp-onboarding-rescue', async () => {
-    const { runMcpOnboardingRescueJob } = await import('./onboarding-funnel.js');
+    const { runMcpOnboardingRescueJob } = await import('./onboarding/funnel.js');
     await runMcpOnboardingRescueJob(config, storage);
   });
   // One friendly email to an account nobody has been seen on for a fortnight, with a prompt in it.

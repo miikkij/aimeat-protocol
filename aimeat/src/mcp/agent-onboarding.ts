@@ -39,12 +39,12 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/server';
-import { confirmOnboardingStep } from '../services/onboarding-progress.js';
+import { confirmOnboardingStep } from '../services/onboarding/progress.js';
 import { readOnboardingFor } from '../services/agent/onboarding-read.js';
 import type { CallerContext } from '../services/caller-context.js';
 import type { AimeatConfig } from '../config.js';
 import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
-import { enrichSteps, buildStepGuide, buildOnboardingSummary, buildStuckHint } from '../services/onboarding-guide.js';
+import { enrichSteps, buildStepGuide, buildOnboardingSummary, buildStuckHint } from '../services/onboarding/guide.js';
 import { createT, DEFAULT_LOCALE } from '../i18n.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
@@ -87,7 +87,7 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage, config
     }
 
     // Reading the onboarding re-runs the auto-checked steps and may complete it — the same act on
-    // both doors, so services/onboarding-progress.ts decides it (inside readOnboardingFor).
+    // both doors, so services/onboarding/progress.ts decides it (inside readOnboardingFor).
     if (!read.onboarding) return { onboarding: null, status: 'not_started' };
     const onboarding = read.onboarding;
 
@@ -137,7 +137,7 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage, config
 
 /**
  * Confirm one step and render the answer as tool text. The work is
- * services/onboarding-progress.ts, shared with POST /v1/agents/:name/onboarding/step/:id; what
+ * services/onboarding/progress.ts, shared with POST /v1/agents/:name/onboarding/step/:id; what
  * stays here is the wording an MCP client reads and the resource-updated signal.
  */
 async function confirmStepAsText(

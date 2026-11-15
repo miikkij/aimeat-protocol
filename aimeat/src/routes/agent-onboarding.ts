@@ -62,9 +62,9 @@
  */
 
 import { Router, type Request } from 'express';
-import { confirmOnboardingStep } from '../services/onboarding-progress.js';
+import { confirmOnboardingStep } from '../services/onboarding/progress.js';
 import { readOnboardingFor } from '../services/agent/onboarding-read.js';
-import { createOnboardingTestTask } from '../services/onboarding-test-task.js';
+import { createOnboardingTestTask } from '../services/onboarding/test-task.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { LIVE_TASK_STATUSES } from '../storage/types/agents-messaging.js';
@@ -74,7 +74,7 @@ import { agentGaiiFromIdentifier, mayActOnAgent } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../services/resource-events.js';
 import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
-import { enrichSteps, buildStepGuide, buildOnboardingSummary, buildStuckHint } from '../services/onboarding-guide.js';
+import { enrichSteps, buildStepGuide, buildOnboardingSummary, buildStuckHint } from '../services/onboarding/guide.js';
 import { calculateReadiness } from '../services/readiness-scorer.js';
 import { detectPlatform } from '../services/platform-detector.js';
 import { createT, detectLocale } from '../i18n.js';
@@ -163,7 +163,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     }
 
     // Failed steps, and the pending jam a missing test task causes, name who to ask — shared with
-    // the MCP status tool via services/onboarding-guide.ts so the two surfaces cannot drift.
+    // the MCP status tool via services/onboarding/guide.ts so the two surfaces cannot drift.
     const testTaskMissing = testTaskStep?.status === 'pending' && (!testTaskId || !testTaskFound);
     const stuck = buildStuckHint(onboarding.steps, agentName, testTaskMissing);
     if (stuck) hints.stuck = stuck;
@@ -276,7 +276,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
 
     // Create a test task whenever the agent's Hello Integration includes
     // accept_test_task / complete_test_task (both task-runner and the full flows do). The
-    // shared helper (services/onboarding-test-task.ts) creates it 'active' for every mode and
+    // shared helper (services/onboarding/test-task.ts) creates it 'active' for every mode and
     // records the auto-start; the owner-approval gate guards real tasks, and the smoke test is
     // not one. This route passes the requester's locale for the title and description.
     await createOnboardingTestTask(storage, agentGaii, `${req.auth!.owner}@${config.nodeId}`, steps, {
@@ -326,7 +326,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
 
     const agentGaii = resolveAgentGaii(req, agentName);
 
-    // The validate-apply-persist middle is services/onboarding-progress.ts, shared with the
+    // The validate-apply-persist middle is services/onboarding/progress.ts, shared with the
     // aimeat_onboarding_* tools. What stays here is the HTTP rendering: the status code, the
     // translated message, and the owner's webhook.
     const outcome = await confirmOnboardingStep(storage, agentGaii, stepId, req.body as Record<string, unknown> | undefined);

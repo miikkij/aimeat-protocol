@@ -26,7 +26,7 @@ import type { Router } from 'express';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { homeFeedAnswer } from '../../services/home/feed.js';
-import { ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingRoom } from '../../services/onboarding-funnel.js';
+import { ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingRoom } from '../../services/onboarding/funnel.js';
 import { ROOMS, openRooms } from '../../services/home/rooms.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';

@@ -1,5 +1,5 @@
 /**
- * @file onboarding-guide.ts
+ * @file src/services/onboarding/guide.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Builds the machine-readable Hello Integration guidance attached to the
@@ -14,7 +14,7 @@
  *   - buildOnboardingSummary() -- required/optional counts + completable + next_required_step
  *   - buildStuckHint()         -- failed steps / missing test task → support@operators + self-heal
  * @usage
- *   import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
+ *   import { enrichSteps, buildStepGuide, buildOnboardingSummary } from './guide.js';
  * @version-history
  *   v1.2.0 -- 2026-08-24 -- buildStuckHint(): the escalation hint moves here from the REST route
  *                            (the MCP status tool never had it) and gains the pending-jam shape: an
@@ -27,8 +27,8 @@
  *                            propose_todos with an empty task id).
  */
 
-import type { AgentOnboardingStep } from '../storage/interface.js';
-import { getStepHowTo, type StepHowTo } from '../models/agent-onboarding-schemas.js';
+import type { AgentOnboardingStep } from '../../storage/interface.js';
+import { getStepHowTo, type StepHowTo } from '../../models/agent-onboarding-schemas.js';
 
 export interface EnrichedStep extends AgentOnboardingStep {
   /** Localised, human-readable resolution of `description` (which is an i18n key). */

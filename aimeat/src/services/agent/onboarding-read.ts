@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Reading an agent's Hello Integration state: who may read it, the agent read, the
- *   onboarding record with its auto-checked steps re-run (services/onboarding-progress.ts), and the
+ *   onboarding record with its auto-checked steps re-run (services/onboarding/progress.ts), and the
  *   test task the accept_test_task step names. GET /v1/agents/:name/onboarding and
  *   aimeat_onboarding_status both call it and build their own hints from what it returns, so the gate
  *   and the reads are written once (structure programme 2026-11, unit 2b).
@@ -22,7 +22,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord, AgentTaskRecord, AgentOnboardingRecord } from '../../storage/interface.js';
 import { mayActOnAgent } from '../../utils/gaii.js';
-import { refreshOnboarding } from '../onboarding-progress.js';
+import { refreshOnboarding } from '../onboarding/progress.js';
 
 type Deps = { storage: Storage; config: Pick<AimeatConfig, 'nodeId'> };
 

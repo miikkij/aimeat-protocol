@@ -608,7 +608,7 @@ export async function publishWorkspaceOp(
     if (result.skipped) return { ok: true, data: { published: base, version: result.version, skipped: true } };
     await H.writeDecision(organismId, caller.writerGaii, `published ${namespace}.${id} v${result.version}`, [`${namespace}.${id}`]);
     void updateOrganismStructure(storage, config, organismId, { event: 'content published', actor: caller.writerGaii }).catch(err => { logger.warn('publish: timeline best-effort', { error: String(err) }); });
-    void import('../onboarding-funnel.js')
+    void import('../onboarding/funnel.js')
         .then(m => m.recordActivation(storage, config, caller.ownerName, 'workspace'))
         .catch(err => { logger.warn('publish: activation marker is best-effort', { error: String(err) }); });
     return { ok: true, data: { published: base, version: result.version } };

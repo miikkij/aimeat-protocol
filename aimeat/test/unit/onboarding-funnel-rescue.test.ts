@@ -17,7 +17,7 @@ import {
     runMcpOnboardingRescueJob,
     FIRST_MCP_CALL_KEY,
     MCP_RESCUE_SENT_KEY,
-} from '../../src/services/onboarding-funnel.js';
+} from '../../src/services/onboarding/funnel.js';
 import { setActiveEmailService, type EmailService } from '../../src/services/email.js';
 
 const NODE = 'aimeat-test-node';

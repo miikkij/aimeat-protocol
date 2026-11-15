@@ -694,7 +694,7 @@ export async function afterMemoryWrite(
     // through the connection. Owner-session and onboarding-marker writes are excluded — the first is
     // the person's own hand, the second is the funnel measuring itself.
     if (deps.fromAgent && deps.ownerName && !key.startsWith('onboarding.')) {
-        void import('../onboarding-funnel.js')
+        void import('../onboarding/funnel.js')
             .then(m => m.recordActivation(storage, config, deps.ownerName!, 'agent'))
             .catch(e => logger.warn('memory write: activation marker is best-effort', { error: String(e) }));
     }

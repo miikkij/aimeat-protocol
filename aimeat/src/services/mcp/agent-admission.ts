@@ -99,7 +99,7 @@ export async function recordMcpContact(deps: { storage: Storage; config: AimeatC
         return null;
     });
     if (agent && !isNodeResidentAgent(agent)) {
-        const { recordFirstMcpCall } = await import('../onboarding-funnel.js');
+        const { recordFirstMcpCall } = await import('../onboarding/funnel.js');
         void recordFirstMcpCall(storage, config, who.owner, who.platform);
     }
 

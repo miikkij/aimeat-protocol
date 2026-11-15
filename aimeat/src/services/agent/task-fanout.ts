@@ -87,7 +87,7 @@ import { reclaimTaskLiveTrace } from '../agent-tasks/live-trace.js';
 import { recordPublicActivity } from '../public-activity.js';
 import { emitChange } from '../event-bus.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from '../ai/provenance.js';
-import { isOnboardingTestTask } from '../onboarding-test-task.js';
+import { isOnboardingTestTask } from '../onboarding/test-task.js';
 import { logger } from '../../utils/logger.js';
 import { recordAccountEvent } from '../account/events.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';

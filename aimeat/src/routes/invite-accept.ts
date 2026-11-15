@@ -391,7 +391,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       // A durable mark on the account: an agent started this, and with which model (12-ai-rekisteroi.md).
       // Part of the account's history, not only a statistic — the home greets a person whose AI has
       // already been here differently.
-      void import('../services/onboarding-funnel.js').then(async (m) => {
+      void import('../services/onboarding/funnel.js').then(async (m) => {
         const agent = (inv.meta as { agent?: Record<string, unknown> } | null)?.agent ?? {};
         const K = m.ONBOARDING_KEYS;
         // The durable mark on the account, and the two halves of the door's own funnel: when the

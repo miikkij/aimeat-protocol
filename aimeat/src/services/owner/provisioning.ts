@@ -413,7 +413,7 @@ export async function provisionOwner(
   // code-key provisioning all land here — so the marker belongs here rather than at each door.
   // It was missing, and every account made through any of them read as `legacy`: created on the
   // new path, invisible to its numbers, and quietly padding the old path's instead.
-  void import('../onboarding-funnel.js')
+  void import('../onboarding/funnel.js')
     .then(m => m.recordTrack(storage, config, owner.name))
     .catch(err => logger.warn('provisionOwner: track marker failed', { error: String(err) }));
 

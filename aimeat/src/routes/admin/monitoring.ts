@@ -305,7 +305,7 @@ export function adminMonitoringRouter(
     // the decision it supports is "did the change move activation", not a dashboard.
     // ?since=<ISO> narrows the window, ?limit caps the row count (default 200, max 1000).
     router.get('/v1/admin/onboarding-funnel', requireAuth(), requireOperator(storage), async (req, res) => {
-        const { readOnboardingFunnel } = await import('../../services/onboarding-funnel.js');
+        const { readOnboardingFunnel } = await import('../../services/onboarding/funnel.js');
         const since = typeof req.query.since === 'string' ? req.query.since : undefined;
         const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : undefined;
         const rows = await readOnboardingFunnel(storage, { since, limit });

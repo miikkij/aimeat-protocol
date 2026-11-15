@@ -77,7 +77,7 @@ import { ensureChatAgent } from '../services/chat/agent.js';
 import { readAllowance, remainingOf } from '../services/ai/allowance.js';
 import { allowanceShown } from '../services/ai/node-key-balance.js';
 import { ownKeyCoverage } from '../services/own-key-coverage.js';
-import { recordFirstChatTurn } from '../services/onboarding-funnel.js';
+import { recordFirstChatTurn } from '../services/onboarding/funnel.js';
 import { openBuildOffer } from '../services/builder/with-you.js';
 import { nodeOpenRouterKey } from '../services/ai/node-openrouter-key.js';
 import { emitChange } from '../services/event-bus.js';

@@ -35,7 +35,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import type { OnboardingRoom } from '../onboarding-funnel.js';
+import type { OnboardingRoom } from '../onboarding/funnel.js';
 import { logger } from '../../utils/logger.js';
 
 export interface RoomDef {

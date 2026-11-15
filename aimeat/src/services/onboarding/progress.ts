@@ -1,5 +1,5 @@
 /**
- * @file src/services/onboarding-progress.ts
+ * @file src/services/onboarding/progress.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Re-evaluating an agent's onboarding, and completing it when the last required step
@@ -27,12 +27,12 @@
  *     step through MCP could sit at "not complete" with every remaining step objectively passable.
  *   v1.0.0 — 2026-08-11 — Extracted after the copied-logic check found the pair.
  */
-import type { Storage, AgentOnboardingRecord, AgentOnboardingStep, AgentRecord } from '../storage/interface.js';
-import { checkAutoSteps, validateStep } from './onboarding-validator.js';
-import { calculateReadiness } from './readiness-scorer.js';
-import { emitChange } from './event-bus.js';
-import { recordSelfReportedPlatform } from './agent/profile-write.js';
-import { ONBOARDING_STEP_IDS, STEP_SCHEMAS, deriveStepsForMode, type OnboardingStepId } from '../models/agent-onboarding-schemas.js';
+import type { Storage, AgentOnboardingRecord, AgentOnboardingStep, AgentRecord } from '../../storage/interface.js';
+import { checkAutoSteps, validateStep } from './validator.js';
+import { calculateReadiness } from '../readiness-scorer.js';
+import { emitChange } from '../event-bus.js';
+import { recordSelfReportedPlatform } from '../agent/profile-write.js';
+import { ONBOARDING_STEP_IDS, STEP_SCHEMAS, deriveStepsForMode, type OnboardingStepId } from '../../models/agent-onboarding-schemas.js';
 
 /**
  * Bring an in-progress onboarding up to date.

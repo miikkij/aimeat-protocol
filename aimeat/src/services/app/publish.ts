@@ -698,7 +698,7 @@ export async function publishApp(
   // Activation (05-mittaus.md): a published app is one of the three ways an account first
   // produces something durable of its own. Write-once and fire-and-forget — measuring a publish
   // must never be able to fail it.
-  void import('../onboarding-funnel.js')
+  void import('../onboarding/funnel.js')
     .then(m => m.recordActivation(storage, config, ownerName, 'app'))
     .catch(err => { logger.warn('publishApp: activation marker is best-effort', { error: String(err) }); });
 

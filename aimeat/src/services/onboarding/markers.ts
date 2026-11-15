@@ -7,7 +7,7 @@
  *   with the home-feed line a marker writes.
  *
  *   WHY A MODULE OF ITS OWN. services/home/state.ts and services/inactivity-nudge.ts read these keys,
- *   and services/onboarding-funnel.ts loads both of them in its rescue pass. While the keys lived in
+ *   and services/onboarding/funnel.ts loads both of them in its rescue pass. While the keys lived in
  *   onboarding-funnel.ts the files imported each other, two run-time import cycles. They moved here
  *   unchanged; onboarding-funnel.ts re-exports every name, so no other importer changed.
  * @structure ONBOARDING_KEYS · OnboardingTrack / OnboardingBranch / OnboardingRoom · writeMarkerOnce ·

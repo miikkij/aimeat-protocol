@@ -373,7 +373,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     void updateOrganismStructure(storage, config, id, { event: 'content published', actor: publisher }).catch(err => { logger.warn('guardHit: best-effort', { error: String(err) }); });
     // Activation (05-mittaus.md): published workspace content is the team persona's first durable
     // output. Write-once, fire-and-forget — measuring a publish must never fail it.
-    void import('../../services/onboarding-funnel.js')
+    void import('../../services/onboarding/funnel.js')
       .then(m => m.recordActivation(storage, config, req.auth!.owner, 'workspace'))
       .catch(err => { logger.warn('publish: activation marker is best-effort', { error: String(err) }); });
   });

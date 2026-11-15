@@ -2463,14 +2463,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Signal values pass presentMemory/presentMemories as the caller; the offer spec is read for a key only."
     },
-    "src/services/onboarding-funnel.ts": {
+    "src/services/onboarding/funnel.ts": {
       "reads": {
         "getMemory": 4,
         "listMemoryForOwners": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding marker and track records."
     },
-    "src/services/onboarding-validator.ts": {
+    "src/services/onboarding/validator.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
