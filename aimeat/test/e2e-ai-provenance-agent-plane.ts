@@ -20,6 +20,7 @@
  * @structure owner + two agents (one with provenance:write, one without) · write · read · lie · gate · DM
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-agent-plane
  * @version-history
+ *   2026-11-15 — Audit M203, M204: a provenance:write agent's declared authorship on aimeat_message_send is read back; the recipient's copy carries the sender's record id, same account and another owner.
  *   v1.3.0 — 2026-08-12 — The Phase 8b agent asks for `organism:write`. Three of the tools this
  *     suite drives are mapped to that scope, and the MCP surface never registers a tool the
  *     session's scopes do not allow, so two tests were failing on a setup that predated the
@@ -163,6 +164,7 @@ async function connectAgent(ownerToken: string, ownerName: string, agentName: st
     const ownerKey = `plane.owner.${Date.now()}`;
     const declaredKey = `plane.declared.${Date.now()}`;
     let mint3Id = '';
+    let dmProvId = '';
 
     // ── 1. The default: silence from an agent is recorded as model-written ──
 
@@ -326,6 +328,7 @@ async function connectAgent(ownerToken: string, ownerName: string, agentName: st
         assert(!!msg, `sent message not in the thread: ${thread.raw.slice(0, 400)}`);
         assert(msg.ai_provenance?.id === prov.id,
             `the thread lost the record: ${JSON.stringify(msg.ai_provenance)}`);
+        dmProvId = prov.id;
     });
 
     await test('The RECIPIENT sees the same record on their own copy', async () => {
@@ -336,7 +339,21 @@ async function connectAgent(ownerToken: string, ownerName: string, agentName: st
         const fromAgent = msgs.find(m => m.senderGhii === silent.gaii || m.sender_ghii === silent.gaii);
         assert(!!fromAgent, `no inbound message from the agent: ${JSON.stringify(msgs.slice(0, 2))}`);
         const id = fromAgent!.aiProvenanceId ?? fromAgent!.ai_provenance_id;
-        assert(!!id, `the recipient's copy carries no provenance id: ${JSON.stringify(fromAgent)}`);
+        assert(!!id && id === dmProvId, `the recipient's copy carries ${id}, the send stamped ${dmProvId}`);
+    });
+
+    await test('Another owner\'s mailbox copy carries the same record as the sender\'s', async () => {
+        const r = await setupOwner('r');
+        const send = await mcpCall(silent.token, 'aimeat_dm_send', { to: r.gaii, body: 'An agent wrote to somebody else.', subject: `Cross ${Date.now()}` });
+        assert(!send.isError, `dm_send failed: ${send.raw.slice(0, 300)}`);
+        const provId = send.parsed?.ai_provenance?.id;
+        assert(!!provId, `no provenance echoed on the send: ${send.raw.slice(0, 300)}`);
+        const t = await json(`/v1/messages/conversations/${encodeURIComponent(send.parsed.conversation_id)}`, { headers: { Authorization: `Bearer ${r.token}` } });
+        assert(t.status === 200, `the recipient's thread: ${t.status} ${JSON.stringify(t.body?.error)}`);
+        const copy = ((t.body.data?.messages ?? []) as Array<Record<string, any>>).find(m => m.id === send.parsed.message_id);
+        assert(!!copy, `no copy in the recipient's thread: ${JSON.stringify(t.body.data).slice(0, 300)}`);
+        const id = copy!.aiProvenanceId ?? copy!.ai_provenance_id ?? copy!.ai_provenance?.id;
+        assert(id === provId, `the recipient's copy carries ${id}, the send stamped ${provId}`);
     });
 
     // ── 6. The agent contract: the convention is something an agent AGREES to ──
@@ -487,6 +504,24 @@ async function connectAgent(ownerToken: string, ownerName: string, agentName: st
         });
         assert(m.isError, 'declaring without provenance:write must be refused, not downgraded');
         assert(m.raw.includes('provenance:write'), `the refusal must name the scope: ${m.raw.slice(0, 300)}`);
+    });
+
+    await test('aimeat_message_send from an agent HOLDING provenance:write stores the declared human authorship', async () => {
+        const relay = await connectAgent(o.token, o.name, `rel${Date.now()}`, ['memory:read', 'messages:send', 'messages:read', 'provenance:write']);
+        const m = await mcpCall(relay.token, 'aimeat_message_send', {
+            content: 'The owner dictated this sentence, word for word.',
+            ai_provenance: { level: 'original', human_involvement: 'full-human' },
+        });
+        assert(!m.isError, `message_send failed: ${m.raw.slice(0, 300)}`);
+        const id = m.parsed?.ai_provenance?.id;
+        assert(!!id, `no record echoed: ${m.raw.slice(0, 300)}`);
+        // Read back through the provenance route, not the send's own echo.
+        const r = await json(`/v1/provenance/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${o.token}` } });
+        assert(r.status === 200, `GET /v1/provenance/${id}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const doc = r.body.data?.provenance;
+        assert(doc?.level === 'original' && doc?.humanInvolvement === 'full-human',
+            `the declaration was not honoured: ${doc?.level}/${doc?.humanInvolvement}`);
+        assert(doc?.attestation?.stampedBy === 'principal', `stampedBy ${doc?.attestation?.stampedBy}`);
     });
 
     await test('aimeat_dm_ask stamps the question it puts in front of a person', async () => {

@@ -9,6 +9,7 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-appdev-pitfalls).
  * @version-history
+ *   2026-11-15 — Audit M064, M065: owner B cannot delete A's shared entry; share=false withdraws it from B's platform list.
  *   v1.3.0 — 2026-11-08 — Every row's `open` is the call that opens it: the shared row's
  *     read_public with its owner, the own row's aimeat_memory_read (which then opens it), and the
  *     curated row's GET address.
@@ -302,6 +303,28 @@ await test('share=true publishes an entry platform-wide; owner B sees it (and ON
     assert(ownBody.result?.isError !== true, `the own row's open call did not open it: ${ownBody.result?.content?.[0]?.text?.slice(0, 200)}`);
     const curated = platOut.pitfalls.find((p: any) => p.source === 'curated');
     assert(curated && /^GET https?:\/\/\S+\/v1\/appdev\/pitfalls\//.test(String(curated.open)), `curated row's open is not a GET address: ${JSON.stringify(curated)}`);
+});
+
+await test('owner B cannot delete the entry A shared, though B can read it', async () => {
+    const del = await B.call('aimeat_appdev_pitfall_delete', { category: 'mobile', slug: 'keyboard-gap' });
+    assert(del.result?.isError === true, `B deleted A's shared entry: ${JSON.stringify(del.result).slice(0, 200)}`);
+    const own = JSON.parse((await A.call('aimeat_appdev_pitfall_list', { scope: 'own', status: 'all', limit: 100 })).result.content[0].text);
+    assert(own.pitfalls.some((p: any) => p.slug === 'keyboard-gap'), 'A\'s shared entry is gone after B\'s delete');
+});
+
+await test('share=false withdraws the shared entry: gone from B\'s platform list, owner-only for A', async () => {
+    const r = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'claude-haiku-4.5', category: 'mobile', slug: 'keyboard-gap',
+        title: 'Keyboard height double-counted', symptom: 'dead gap above keyboard',
+        resolution: 'dvh already excludes the keyboard with resizes-content — never subtract it again',
+        share: false,
+    });
+    assert(r.result?.isError !== true, `re-report failed: ${r.result?.content?.[0]?.text?.slice(0, 200)}`);
+    const plat = JSON.parse((await B.call('aimeat_appdev_pitfall_list', { scope: 'platform', limit: 100 })).result.content[0].text);
+    assert(!plat.pitfalls.some((p: any) => p.slug === 'keyboard-gap'), 'the withdrawn entry is still in B\'s platform list');
+    const own = JSON.parse((await A.call('aimeat_appdev_pitfall_list', { scope: 'own', status: 'all', limit: 100 })).result.content[0].text);
+    const row = own.pitfalls.find((p: any) => p.slug === 'keyboard-gap');
+    assert(row && row.source === 'learned' && row.shared === false, `A's own row: ${JSON.stringify(row)}`);
 });
 
 await test('status=outdated hides an entry from default lists (kept, retrievable)', async () => {
