@@ -262,7 +262,7 @@ tags:
   - name: Companies
     description: The company registry — a company is a first-class entity like an app, and registering one claims {slug}.co.<apex> as its address
   - name: Outbound
-    description: The outbound messaging door — saved recipient registry, policied send (inbox-first, opt-out, bounce suppression, daily limit), append-only send log, public unsubscribe
+    description: The outbound messaging endpoints — saved recipient registry, policied send (inbox-first, opt-out, bounce suppression, daily limit), append-only send log, public unsubscribe
   - name: Signals
     description: Hit collection — one generic counter behind every channel (email opens and clicks, published page fetches, QR scans, an app's own events), a monthly roll-up per stream, and a report that separates people from machines and names the AI that came
   - name: Finance
@@ -300,7 +300,7 @@ tags:
   - name: Chat
     description: The node's built-in chat agent — conversations and one turn streamed as it happens
   - name: LLM Proxy
-    description: An OpenAI-compatible door in front of the node's own key choice, budget and usage record
+    description: An OpenAI-compatible endpoint in front of the node's own key choice, budget and usage record
 
 components:
   securitySchemes:
@@ -783,7 +783,7 @@ components:
         approvedBy:
           type: string
           description: >-
-            The operator who approved, in review mode. Read-only on the owner's own update door —
+            The operator who approved, in review mode. Read-only on the owner's own update endpoint —
             an owner who could set this would approve themselves and the mode would enforce nothing.
           readOnly: true
         approvedAt: { type: string, format: date-time, readOnly: true }
@@ -1031,7 +1031,7 @@ components:
             `0 <= ask <= act <= 1`. The result is the weakest certainty among the thresholded
             answers (a noul's probability, a choice's or a score's confidence). At or over `act`
             the outcome is `act`, at or over `ask` it is `ask`, under it `stop`.
-        use: { type: string, enum: [agent, app, both], description: Who may run it. Enforced on every door; the owner in person may always run their own rule. }
+        use: { type: string, enum: [agent, app, both], description: Who may run it. Enforced on every endpoint and MCP tool; the owner in person may always run their own rule. }
         gate: { type: boolean, default: false, description: What the gate switch starts at for an agent whose owner never set it. }
         sample: { description: A state to try the rule on. }
         provider: { type: string, description: 'The decision provider it always runs on. Refused at write time (400 PROVIDER_CANNOT_CARRY) when that provider cannot carry the questions.' }
@@ -1440,7 +1440,7 @@ components:
                 format: uri
                 pattern: '^https?://'
                 description: >-
-                  http or https ONLY, checked at the door. A declaration carrying any other scheme
+                  http or https ONLY, checked when the request arrives. A declaration carrying any other scheme
                   is refused with a validation error rather than minted.
               title: { type: string }
               retrieved_at: { type: string, format: date-time }
@@ -2272,7 +2272,7 @@ components:
           type: string
           nullable: true
           description: >-
-            The AI tool this agent last spoke from over MCP, as the MCP door names it from the
+            The AI tool this agent last spoke from over MCP, as the MCP endpoint names it from the
             client's registered name (`claude`, `claude-code`, `claude-desktop`, `chatgpt`,
             `cursor`, …), the raw client name when none match, or `unknown` when the client sent
             none. Null for an agent that has never opened an MCP session.
@@ -2281,7 +2281,7 @@ components:
           format: date-time
           nullable: true
           description: >-
-            When this agent last opened or spoke on an MCP session. Written only by the MCP door,
+            When this agent last opened or spoke on an MCP session. Written only by the MCP endpoint,
             so unlike `last_seen` it tells MCP use from any other request. Null until the first
             session.
         health:
@@ -3480,7 +3480,7 @@ components:
           default: true
           description: >-
             Whether this peer may move morsels onto this node's ledger. Off for 'contact'. This is
-            the only unauthenticated door on the node that credits a balance.
+            the only unauthenticated endpoint on the node that credits a balance.
         support_upstream:
           type: boolean
           default: false
@@ -5122,7 +5122,7 @@ components:
       type: object
       description: >-
         Did whoever published this app carry the build spec that is in force now? Reported by every
-        publish door. It never refuses a publish — the point is that neither reading the spec nor
+        publish endpoint. It never refuses a publish — the point is that neither reading the spec nor
         skipping it is silent.
       properties:
         status:
@@ -5395,7 +5395,7 @@ components:
     PackageInstallRequestFiled:
       type: object
       description: >-
-        What an install, update or migration door answers with 202 when the caller lacks the words a
+        What an install, update or migration endpoint answers with 202 when the caller lacks the words a
         memory part needs. Asking again for the same thing returns the standing request.
       required: [request_id, status, act, missing, expires_at, already_waiting, next_step]
       properties:
@@ -8951,7 +8951,7 @@ paths:
         credential), so a permission change does not reach an open tunnel by
         itself: granting one from the dashboard was honoured only after the
         socket happened to reconnect, and REMOVING one went on being honoured
-        just as long, which is the more serious half. Every door that changes an
+        just as long, which is the more serious half. Every code path that changes an
         agent's scopes — `PATCH /v1/agents/{name}/scopes`, device-auth
         re-approval, and the shared profile write — pushes `scopes_changed`
         (S→C: `{agent, message}`) to that identity's live socket.
@@ -10675,7 +10675,7 @@ paths:
       description: >
         Body `{ scopes: string[] }` names the scope words the app KEEPS; every one of them must
         already be on the grant. A word the grant does not hold is refused with `SCOPES_WIDEN`, because
-        the consent screen is the only door that adds a right (it is the only place the app's own ask
+        the consent screen is the only place that adds a right (it is the only place the app's own ask
         is on the screen), and an empty list is refused (that is what DELETE is for). The grant is
         stamped `scopes_fixed_at`, which the boot-time vocabulary migration honours, so a right the
         person took away does not come back at the next restart. The access token the app already
@@ -10811,7 +10811,7 @@ paths:
       summary: Register owner
       description: >-
         Create a new human identity on this node. No auth required. On a node whose
-        registration mode is `oauth`, `invite` or `closed` this door answers 403 REGISTRATION_CLOSED
+        registration mode is `oauth`, `invite` or `closed` this endpoint answers 403 REGISTRATION_CLOSED
         (see the `registration_mode` field in the GET / discovery document).
       tags: [Identity]
       requestBody:
@@ -10937,7 +10937,7 @@ paths:
 
         WHY IT EXISTS. Several hundred tool descriptions do not fit in a model's context. This turns
         them into something to look things up in, so an agent can work here holding a dozen tools
-        and finding the rest when it needs them. It is a door beside the existing tool surfaces and
+        and finding the rest when it needs them. It is an addition beside the existing tool surfaces and
         replaces none of them: every tool and every route answers exactly as before.
 
         A PROJECTION, not a second list: the entries are derived from the same transport-neutral
@@ -11374,7 +11374,7 @@ paths:
 
         If a `crew_def` is offered it must be able to run -- at least one agent, at least one task,
         one task taking `{{ctx.prompt}}`, and every task naming a role the definition has. The seed
-        door itself validates nothing and cannot, so a definition that could not work is refused
+        endpoint itself validates nothing and cannot, so a definition that could not work is refused
         here rather than written down and refused later by the runtime.
 
         Device authorization is untouched. An agent that brings its own runtime still connects from
@@ -11908,7 +11908,7 @@ paths:
         The repair for an agent this account owns that has no key: it was approved while the owner's
         connector was down, so nothing minted an enrolment grant for it and nothing runs it.
 
-        THE ACCOUNT HOLDER IN PERSON, like every door that hands a machine the authority to mint an
+        THE ACCOUNT HOLDER IN PERSON, like every endpoint that hands a machine the authority to mint an
         agent's key. Refuses an agent that already carries one (`ALREADY_ATTACHED`) rather than
         pinning a second key over a working one, and refuses a v1 agent (`V1_AGENT`), which moves
         through the migration route instead so the record upgrade and the key pinning stay one step.
@@ -12055,7 +12055,7 @@ paths:
       operationId: enrolAgentsV2
       summary: A connected daemon turns an enrolment grant plus signed cards into credentials
       description: |
-        The daemon's door, not the owner's. The caller must be an AGENT principal of the grant's
+        The daemon's endpoint, not the owner's. The caller must be an AGENT principal of the grant's
         owner and must be holding a live tunnel at this moment; an app or ecosystem principal is
         refused outright, and so is the owner in person.
 
@@ -12807,7 +12807,7 @@ paths:
         first status change also sets `startedAt`, which is what turns A2A's `submitted` into
         `working`.
 
-        `cancelled` is not accepted here — it is its own door, because the party allowed to do it is
+        `cancelled` is not accepted here — it has its own endpoint, because the party allowed to do it is
         a different one.
 
         A task that has already settled answers 409. So does one that settles while this change is
@@ -12875,7 +12875,7 @@ paths:
       summary: The caller changes its mind
       description: |
         ONLY WHOEVER ASKED FOR THE WORK, AND THE ACCOUNT HOLDER. A worker that will not do what it
-        was given reports it `failed` with a reason, which is recorded; refusing through a door meant
+        was given reports it `failed` with a reason, which is recorded; refusing through an endpoint meant
         for changing one's mind would leave no reason behind.
       tags: [Identity]
       security:
@@ -12918,7 +12918,7 @@ paths:
       operationId: aguiRun
       summary: Ask an agent for something and watch it work, as AG-UI events
       description: |
-        THE THIRD DOOR ONTO THE SAME WORK. A2A is another agent talking to ours, ACP is a code
+        THE THIRD INTERFACE TO THE SAME WORK. A2A is another agent talking to ours, ACP is a code
         editor, this is a browser. All three create the same V5 task through the same functions and
         read the same row; none of them stores anything of its own.
 
@@ -13048,7 +13048,7 @@ paths:
         invented id would file the agent under something it is not. The missing id is the honest
         signal that this is not taxonomy data.
 
-        `locators` are the addresses a machine can act on: the A2A JSON-RPC door, the A2A agent
+        `locators` are the addresses a machine can act on: the A2A JSON-RPC endpoint, the A2A agent
         card, and the agent's own signed AIMEAT card. The AIMEAT-specific half — the GAII, the node,
         the run mode — travels in an `aimeat.agent` extension, which is what OASF extensions are
         for: a consumer either understands it or steps over it.
@@ -13219,23 +13219,23 @@ paths:
         `SendMessage` with no task creates one and answers with it; with a task it adds a turn to the
         same exchange. The streaming methods refuse, as the card says they will.
 
-        IT STORES NOTHING OF ITS OWN. Every method projects the same records the V4 message doors and
-        the V5 task doors read and write: work created here is in `GET /v1/agents/v2/tasks`, and a
+        IT STORES NOTHING OF ITS OWN. Every method projects the same records the V4 message endpoints and
+        the V5 task endpoints read and write: work created here is in `GET /v1/agents/v2/tasks`, and a
         task moved there reads moved here. `a2a_state` on the REST answer and the state on this one
         come from the same row.
 
-        TWO ROADS IN, CHOSEN BY THE CREDENTIAL, and they reach different surfaces.
+        TWO AUTHENTICATION MODES, CHOSEN BY THE CREDENTIAL, and they reach different surfaces.
 
-        An `Authorization` header means the ACCOUNT road: the caller must be a principal of the
+        An `Authorization` header means ACCOUNT mode: the caller must be a principal of the
         agent's own owner, and anyone else is refused with 403 before the JSON-RPC layer sees the
-        request. That road is everything described above.
+        request. That mode reaches everything described above.
 
-        No `Authorization` header plus `X-A2A-Agent-Card` and `X-A2A-Assertion` means the STRANGER's
-        road. Send your own signed agent card as a compact JWS and a fresh assertion signed by the
+        No `Authorization` header plus `X-A2A-Agent-Card` and `X-A2A-Assertion` means STRANGER
+        mode. Send your own signed agent card as a compact JWS and a fresh assertion signed by the
         same key (`sub` = the GAII your card claims, `aud` = this node's id, `iat`/`exp` at most 300
         seconds apart, `jti` unique). On first sight the node fetches the JWKS your card points at
         and refuses unless the key is published there; then it pins the key. A LATER call with a
-        different key is refused with `A2A_KEY_CHANGED` rather than re-pinned, because on this road
+        different key is refused with `A2A_KEY_CHANGED` rather than re-pinned, because in this mode
         the key is the whole of the identity.
 
         AN ASSERTION IS WORTH ONE CALL. It is spent the moment its signature verifies, before
@@ -13245,7 +13245,7 @@ paths:
         with a slow clock is told the true thing. The five-minute ceiling exists for clock skew
         across machines this node does not administer; it is not a reuse window.
 
-        WHAT THE STRANGER'S ROAD REACHES: `SendMessage` against a LISTED agent-work offering of that
+        WHAT STRANGER MODE REACHES: `SendMessage` against a LISTED agent-work offering of that
         agent, `GetTask` and `CancelTask` on its own work. Nothing else. PUBLISHING THE OFFERING IS
         THE CONSENT — there is no approval screen and no new permission word, because listing agent
         work already means "I will do this for others, on these terms, at this price". The agent's
@@ -13266,7 +13266,7 @@ paths:
         charged, quoted work stays open and unpaid, and the same offering sells again after the
         operator reactivates the account.
 
-        THE SCOPE IS PER METHOD, not per door: one HTTP door with a dozen methods behind it cannot be
+        THE SCOPE IS PER METHOD, not per endpoint: one HTTP endpoint with a dozen methods behind it cannot be
         gated by one middleware without being wrong for eleven of them. `SendMessage` needs
         `messages:send` (and `task:write` when it creates work), `CancelTask` needs `task:write`, the
         push-config writes need `agent:write`, the push-config reads need `messages:read`, and the
@@ -13292,20 +13292,20 @@ paths:
           in: header
           schema: { type: string }
           description: |
-            The stranger's road only. Your own agent card as a compact JWS, self-signed by the key it
+            Stranger mode only. Your own agent card as a compact JWS, self-signed by the key it
             carries. Ignored when an Authorization header is present.
         - name: X-A2A-Assertion
           in: header
           schema: { type: string }
           description: |
-            The stranger's road only. A compact JWS signed by the same key, claiming
+            Stranger mode only. A compact JWS signed by the same key, claiming
             { sub, aud, iat, exp, jti }. At most 300 seconds of life, and SINGLE USE — sign a fresh
             one for every request; a replayed one is refused with A2A_ASSERTION_REPLAYED.
         - name: X-PAYMENT
           in: header
           schema: { type: string }
           description: |
-            The stranger's road only. The base64 x402 `exact` payment payload signed against the
+            Stranger mode only. The base64 x402 `exact` payment payload signed against the
             requirements the previous answer quoted.
       requestBody:
         required: true
@@ -13324,7 +13324,7 @@ paths:
           description: |
             A JSON-RPC response. A refusal is a JSON-RPC error with the code the A2A spec names —
             -32001 for a task that is not there, -32002 for one that will not cancel, -32602 for a
-            malformed request — plus this node's own -32040..-32043 for the stranger's road, which is
+            malformed request — plus this node's own -32040..-32043 for stranger mode, which is
             where the reason lives: `error.data` does not survive the SDK's serialiser for a code
             outside its semantic set, so the code carries the machine-readable half and the message
             the human one.
@@ -13408,7 +13408,7 @@ paths:
         **A re-issue, not an enrolment.** No grant is needed because nothing new is admitted: the
         caller is already authenticated as this agent, and the card must be signed by the key
         ALREADY ON RECORD. A card carrying a different key is refused and pointed at enrolment, so
-        this door can change what an agent SAYS and never who it IS. Self only — an owner does not
+        this endpoint can change what an agent SAYS and never who it IS. Self only — an owner does not
         hold the key, so a card they submitted would not be this agent's card.
 
         `issued_at` moves. Nothing pins the card: the A2A trust-on-first-use pin holds the key
@@ -13566,7 +13566,7 @@ paths:
         The `description` on the agent's A2A card and on its page here — the one line a stranger
         reads before deciding whether to knock.
 
-        It was write-once until 2026-09-03: registration set it and no door changed it, so an agent
+        It was write-once until 2026-09-03: registration set it and no endpoint changed it, so an agent
         whose job moved went on describing its old one for ever.
 
         **The agent's NAME is not editable, here or anywhere.** It is a component of the GAII, so
@@ -14020,7 +14020,7 @@ paths:
         said, which is where every agent starts and where one can be put back.
 
         **`null` is a value, not an absence.** A field a caller can enter and not leave makes
-        "nobody has said" a one-way door: a mistaken `spawn` would sit on the spawner's roster for
+        "nobody has said" a state that cannot be restored: a mistaken `spawn` would sit on the spawner's roster for
         good. Sending `null` clears it; omitting the field is refused, because wiping a setting
         because a key was missing is a write nobody can see coming.
 
@@ -15200,7 +15200,7 @@ paths:
             node), `chat`, or `agent_runtimes` (an agent's crew, which calls its model with the key of
             the machine it runs on). A reason is `shared_chat_key` (the operator's key pays for every
             chat turn) or `runtime_uses_machine_key`. `own_key.agents` lists each of the owner's agents
-            with `llm`, the road its runtime reported (`node`, `machine`, or null when it has not said);
+            with `llm`, the key source its runtime reported (`node`, `machine`, or null when it has not said);
             `agent_runtimes` is covered only when every agent reported `node`.
             `pays` is who pays a chat turn: `own` (the person's own provider key), `allowance` (the
             node's key, from the person's allowance), `node` (the operator's shared chat key, which is
@@ -16265,7 +16265,7 @@ paths:
         scope change. Idempotent: an agent that can already read answers `added: false`. The owner in
         person only: an app, an agent (unless the owner gave it `account:security`) and a session from
         another node are refused with 403. The owner's one-time notice about their agents' mail calls
-        this door from a button per agent.
+        this endpoint from a button per agent.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -17977,7 +17977,7 @@ paths:
                               is derived from what the account holds; `want`, `road`, `profile` and
                               the declined stages are the person's own words, kept in the owner-scope
                               memory record `journey.state`, which their AI writes with
-                              aimeat_memory_write and the home page writes for the road.
+                              aimeat_memory_write and the home page writes the `road` field.
                             properties:
                               stages:
                                 type: array
@@ -18145,7 +18145,7 @@ paths:
   /v1/registration-invites:
     post:
       operationId: postRegistrationInvite
-      summary: The agent door — an AI asks us to email someone a link that ends in an account
+      summary: Agent registration invite — an AI asks us to email someone a link that ends in an account
       description: >-
         An AI makes ONE call with a person's email address. The node emails that address a link; the
         person presses it, chooses a username, and the account exists. The AI never creates the
@@ -18251,8 +18251,8 @@ paths:
           description: A malformed address, or `agent.model` missing
         '403':
           description: >-
-            REGISTRATION_CLOSED — this self-service door is refused when the node's registration
-            mode is `oauth`, `invite` or `closed` (member-minted invitations are a different door,
+            REGISTRATION_CLOSED — this self-service endpoint is refused when the node's registration
+            mode is `oauth`, `invite` or `closed` (member-minted invitations are a different endpoint,
             and so is a first sign-in through a configured identity provider).
         '429':
           description: Too many calls from this IP
@@ -18260,7 +18260,7 @@ paths:
   /v1/prompts/agent-onboard:
     get:
       operationId: getAgentOnboardPrompt
-      summary: The front-page agent-door prompt (paste-able)
+      summary: The front-page agent registration prompt (paste-able)
       description: >-
         The payload behind the landing page's first button. A person copies it into their own AI
         chat; if that AI can make a POST request, it asks them for their email and a link arrives
@@ -18505,7 +18505,7 @@ paths:
         cannot write in another app's name.
 
         `kind` is a key, not a sentence: the app renders the wording itself, in the language the
-        person reads. `data` carries what that line interpolates and is reduced at the door to at
+        person reads. `data` carries what that line interpolates and is reduced on arrival to at
         most 12 short string values; anything larger belongs behind `link`, which must be a path on
         this node.
 
@@ -18631,7 +18631,7 @@ paths:
       summary: Record which room was entered first
       description: >-
         The destinations that open once a home exists are ROOMS, not paths: all open at once,
-        no door locks behind anyone. This records which was entered FIRST, write-once — the question
+        none locks behind anyone. This records which was entered FIRST, write-once — the question
         it answers is what someone came here to do, and a value that followed them around would
         answer "where were they last" instead.
 
@@ -18674,7 +18674,7 @@ paths:
         mean landing on whichever page happened to be the default every morning.
 
         When nothing has been chosen, `defaulted` is true and the answer is the home, for every
-        account. The home is the front room: it shows the person's own state and carries a door to
+        account. The home is the start page: it shows the person's own state and links to
         the chat and to every control.
 
         Nothing else reads this. The brand link, the header and the chat's back button go to fixed
@@ -18730,8 +18730,8 @@ paths:
         for: the two differ only on a node whose operator switched the feature off for everybody,
         which `available_here` reports.
 
-        This route is the person's own door and answers only to their session. Their AI has its own
-        way in: the setting is an ordinary owner memory key (`settings.proactive`), so an AI asked to
+        This route is for the person and answers only to their session. Their AI changes the
+        setting through memory: the setting is an ordinary owner memory key (`settings.proactive`), so an AI asked to
         stop suggesting things writes it there and then rather than sending somebody to a settings
         page. `set_by` says which of the two acted, and is null when the record does not say.
       tags:
@@ -19166,7 +19166,7 @@ paths:
           schema: { type: boolean, default: false }
         - name: status
           in: query
-          description: Default all on this door (the page hides outdated itself with status=active).
+          description: Default all on this endpoint (the page hides outdated itself with status=active).
           schema: { type: string, enum: [active, outdated, all], default: all }
         - name: severity
           in: query
@@ -20293,7 +20293,7 @@ paths:
 
         `not_covered` is part of the answer and not a footnote. Counting began the day the tally
         shipped, so a key written before that and never written since has no hands here and never
-        will; and it counts the doors a principal comes through, not the places the node writes to
+        will; and it counts the endpoints and MCP tools a principal calls, not the places the node writes to
         your store on its own behalf. A number that hides either reads as complete when it is not.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
@@ -23140,7 +23140,7 @@ paths:
       description: >
         Every part is optional and independent. A key is stored encrypted as the owner's record
         `decide.apikey.agent.<name>` or `openrouter.apikey.agent.<name>`, which no generic memory
-        door reads, writes, searches or exports. Key resolution, strongest first: the agent's own
+        endpoint reads, writes, searches or exports. Key resolution, strongest first: the agent's own
         key, the owner's own, the node's.
       tags: [Agents]
       security:
@@ -28654,7 +28654,7 @@ paths:
         applies, and a caller that may not write it there is refused (403 ACCESS_DENIED
         or CONSENT_REQUIRED, 404 NOT_FOUND for an organism that does not exist). A
         Design Book part is not copied: 403 DESIGN_BOOK_PART names GET /v1/designbook/{id},
-        the one door that reads a part. A copy takes no group id, so visibility `group` onto a
+        the one endpoint that reads a part. A copy takes no group id, so visibility `group` onto a
         record that has no group is refused with 400 INVALID_INPUT.
 
         The source is read the way GET /v1/memory/{gaii}/{key} reads it: a record the caller's
@@ -29024,7 +29024,7 @@ paths:
         '403':
           description: >
             The key is under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and
-            screenshot doors write, because they check that the bytes are a picture; an anonymous
+            screenshot endpoints write, because they check that the bytes are a picture; an anonymous
             principal wrote outside `anonymous/*`; the key is `company/{id}/index.html`, the page a
             company of the account serves, and the caller is not the owner in person, does not hold
             `company:write` and was not allowed by the owner (FORBIDDEN, the message names the request
@@ -29208,7 +29208,7 @@ paths:
         Read a public memory entry by GAII and key. No auth required for public
         entries. For shared entries, consent is checked. A Design Book part (a key
         starting `atelier.book.part.` under the node's own system identity) is read
-        through the Design Book, the one door that reads it: this door answers
+        through the Design Book, the one endpoint that reads it: this endpoint answers
         403 DESIGN_BOOK_PART, with or without `soft`, and its `details.door` names
         GET /v1/designbook/{id}.
 
@@ -30230,7 +30230,7 @@ paths:
   #    owner's agent, app grant or ecosystem app without storage:read gets 403 Forbidden on a private
   #    package, as on GET /v1/datapackages/{owner}/{name}.
   #  - there is no meter. Metering needs an authenticated caller and an entitlement coordinate, which
-  #    is a different door. A half-built meter counting anonymous reads as free would misreport.
+  #    is a different endpoint. A half-built meter counting anonymous reads as free would misreport.
   /v1/odata/{owner}/{name}:
     get:
       operationId: odataServiceDocument
@@ -31611,7 +31611,7 @@ paths:
           description: >
             An anonymous principal targeted a key outside `anonymous/*`, or any caller targeted a key
             under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot
-            doors write, because they check that the bytes are a picture. The key
+            endpoints write, because they check that the bytes are a picture. The key
             `company/{id}/index.html`, the page a company of the account serves, needs the owner in
             person, `company:write`, or the owner's one-press allowance for this caller (FORBIDDEN, the
             message names the request that asks the owner, kind `company-page-write`, and
@@ -33643,7 +33643,7 @@ paths:
                           scope_denials_total:
                             type: integer
                             description: >-
-                              A named, authenticated principal refused at a door it lacks the scope
+                              A named, authenticated principal refused at an endpoint it lacks the scope
                               for. Either a misconfigured integration or somebody testing the fence.
                           active_owners:
                             type: integer
@@ -33855,7 +33855,7 @@ paths:
 
         **It lists agents with a PUBLISHED OFFERING and nothing else.** That is not a filter bolted
         on: it is already this node's consent model for strangers — a foreign caller may reach an
-        agent because its owner published an offering, and nothing else opens that door — so the
+        agent because its owner published an offering, and nothing else grants that access — so the
         listing obeys the same sentence. An agent with no offering is not hidden; it is not for sale.
 
         Public, like the cards it points at, and it says nothing they do not.
@@ -36024,7 +36024,7 @@ paths:
       description: >-
         Where this node stands with its peers and what is waiting on a person. `needs` is the list
         to act on, in order; it includes peers that were added and never switched on, a state two
-        doors produce under two different words (`pending` and `approved`) and that no count
+        code paths produce under two different words (`pending` and `approved`) and that no count
         covered before. `signin.reaches` is how many peers a person could actually arrive from,
         because the node-wide policy and a per-peer switch must both say yes. `offer` counts only
         what somebody ticked Federate on. `versions_behind` is measured against `newest_version`,
@@ -37469,7 +37469,7 @@ paths:
       description: >-
         Returns a help prompt as raw markdown text, written for one kind of reader. `person` is the
         prompt a person who is not a developer pastes into their own AI chat: what AIMEAT gives
-        them, what each main page is for, the copy-prompt road for an AI that cannot connect, and
+        them, what each main page is for, the copy-prompt method for an AI that cannot connect, and
         the profile interview a newcomer starts with. It needs no fetch, so it works in an AI that
         cannot open addresses; this node's address is filled in. /v1/help/prompt stays the
         builder's manual. No authentication required (Tier 0).
@@ -37604,7 +37604,7 @@ paths:
         '403':
           description: >
             An anonymous principal targeted a key outside `anonymous/*`, or the key is under
-            `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot doors
+            `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot endpoints
             write, or the key is `company/{id}/index.html`, the page a company of the account serves,
             and the caller is not the owner in person, does not hold `company:write` and was not
             allowed by the owner (the message names the request that asks the owner).
@@ -37824,7 +37824,7 @@ paths:
       operationId: adminListOrganisms
       summary: Every organism on this node, and who holds it (operator)
       description: |
-        The listing the repair door needs. Installing an owner takes an organism id, and until this
+        The listing the repair endpoint needs. Installing an owner takes an organism id, and until this
         existed nothing on the operator's surface could name one.
 
         Crossed against the owner list, it is also how a screen works out whether any organism is
@@ -38210,7 +38210,7 @@ paths:
                                     how hard the prompt is, and the number it gets edited against.
                                 branch:
                                   type: object
-                                  description: A = MCP-capable client, B = needs a better one first, agent = the front-page agent door.
+                                  description: A = MCP-capable client, B = needs a better one first, agent = the front-page agent registration prompt.
                                   properties:
                                     A: { type: integer }
                                     B: { type: integer }
@@ -38987,7 +38987,7 @@ paths:
         Lists all operator-managed subdomain → site mappings. A mapping serves a
         published app at the root of `<subdomain>.<apex>` (kind `app`) or
         301-redirects to an external URL (kind `redirect`).
-        Who may call (all four subdomain doors): the node operator in person, or
+        Who may call (all four subdomain endpoints): the node operator in person, or
         an agent of the operator holding the `operator:admin` scope. No wildcard
         carries that scope; an app grant and a federated session are refused.
       tags: [Admin]
@@ -40912,7 +40912,7 @@ paths:
         latest version: its access code, its operator hide, its pacing amount and its copy
         protection apply to every version served, also one published before the setting was made.
 
-        Since 2026-08-15 that `404` has a door in it for people, because the app origin is the
+        Since 2026-08-15 that `404` lets a person enter the code, because the app origin is the
         address they hold: a **browser** (`Accept: text/html`) meeting a **code**-gated app there
         with no usable grant is sent back here with `302 …?mode=inline&unlock=1`, which is the code
         form below. Following it and typing the code produces the grant redirect again, this time
@@ -41696,7 +41696,7 @@ paths:
         app's own look at the write — a wave proven loud on a night world is refused with the
         numbers on an editorial app. A genre is never adopted: it is forked from its template,
         and the refusal carries the address. Every path writes through the same validated,
-        versioned, provenance-stamped door — the replaced layout is archived, so putting it back
+        versioned, provenance-stamped code path — the replaced layout is archived, so putting it back
         is one restore. Published parts are adoptable by anyone; a proposed one only by its own
         proposer. Adopting is the usage signal that keeps a part alive. Requires memory:write,
         and the app must belong to the caller's owner. A COMPONENT is taken before the app exists:
@@ -41768,7 +41768,7 @@ paths:
       operationId: setDesignbookPartStatus
       summary: Move a part through its lifecycle
       description: >-
-        The operator's door — publish a proposed part, mark an unused one aging, demote a broken
+        The operator's endpoint — publish a proposed part, mark an unused one aging, demote a broken
         one back to proposed. A proposer may RETIRE their own part, nothing more; a retired
         address stays retired. This is how the Book stays curated and how it forgets.
       tags: [Apps]
@@ -42361,7 +42361,7 @@ paths:
                   enum: [members-free, free, members-only, open]
                   description: >
                     What calls cost, and to whom. `members-free` (the default) carries a member and
-                    charges everybody else, so membership is the free tier rather than the door.
+                    charges everybody else, so membership is the free tier rather than the condition for access.
                     `free` charges nobody at all, and is applied BEFORE the entitlement gate so that a
                     customer who contracted while the app was priced stops paying instead of going on
                     paying unnoticed. `members-only` refuses anyone who is not a member even when they
@@ -43875,7 +43875,7 @@ paths:
         fires — saving/testing a draft never does. Requires a saved draft (`404` otherwise).
 
         The promoted bytes are stamped with a provenance record and run the same non-blocking AI
-        transparency check as `POST /v1/apps` — two doors to the same act give the same answer.
+        transparency check as `POST /v1/apps` — two endpoints for the same act give the same answer.
         Scoped principals require `app:write`; owner sessions retain access. A missing permission
         returns `403` before reading or consuming the draft.
       tags: [Apps]
@@ -46763,7 +46763,7 @@ paths:
         registered this device" instead of quietly making a second key for the same one.
 
         Account-holder only: an agent, a granted app or an ecosystem app carries the human's account
-        name and must not be able to register a way in that the human never made. The ceremony
+        name and must not be able to register a sign-in method that the human never made. The ceremony
         expires in 60 seconds.
 
         On an account with two-step sign-in armed, `authenticatorSelection.userVerification` is
@@ -46851,7 +46851,7 @@ paths:
       description: |
         Scoped to your own account, so an id alone is not enough. The removal lands on your account
         feed. Removing the last one leaves the password (and two-step sign-in, if you armed it) as
-        the way in, which is why neither is replaced when a passkey is added.
+        the sign-in method, which is why neither is replaced when a passkey is added.
       tags: [Passkeys]
       security:
         - BearerAuth: []
@@ -46904,7 +46904,7 @@ paths:
       operationId: secretSet
       summary: Store or replace one secret
       description: |
-        Replacing is this same call: a vault with a separate rotate door is a vault where somebody
+        Replacing is this same call: a vault with a separate rotate endpoint is a vault where somebody
         eventually uses the wrong one. Replacing keeps `setAt` (since when you have held this name)
         and moves `updatedAt` (when the value changed). Replacing also resets `hosts`: to the
         `host` given in this call, or to none, so the next use binds the secret to its host again.
@@ -47832,12 +47832,12 @@ paths:
         account. Naming a username narrows the offer for an older authenticator that needs it.
 
         A username that does not exist is answered exactly like one that does — an empty allow-list
-        and a real challenge — because this door takes no credential and would otherwise tell anyone
+        and a real challenge — because this endpoint takes no credential and would otherwise tell anyone
         who types a name whether an account by that name is here.
 
         For a named account that has passkeys and two-step sign-in armed, `userVerification` is
         `required`, so the browser asks for the PIN or the fingerprint up front. Otherwise, and in
-        the discoverable flow, it is `preferred`; the verify door enforces the rule either way.
+        the discoverable flow, it is `preferred`; the verify endpoint enforces the rule either way.
       tags: [Passkeys]
       requestBody:
         content:
@@ -49040,7 +49040,7 @@ paths:
       operationId: scimCreateUser
       summary: 'SCIM: create (or adopt) a user'
       description: |
-        Creates an account through the same provisioning core every other door uses; the account
+        Creates an account through the same provisioning core every other account-creating route uses; the account
         is marked as managed by this connection and joins the bound organism. An existing,
         locally-verified account whose email is in the connection's domains is ADOPTED instead of
         duplicated; any other collision answers 409 uniqueness. `active: false` and DELETE both
@@ -49138,7 +49138,7 @@ paths:
     delete:
       operationId: adminSsoDelete
       summary: Delete an SSO connection (operator)
-      description: 'Removes the door, not the people — accounts, data and memberships remain; recreating the id restores provisioning authority.'
+      description: 'Removes the connection, not the people — accounts, data and memberships remain; recreating the id restores provisioning authority.'
       tags: [SSO]
       parameters:
         - name: id
@@ -49241,7 +49241,7 @@ paths:
       description: |
         The answer to a lost phone. Removing two-step sign-in through /v1/ghii/totp needs a current
         code or an unused backup code, which is exactly what a locked-out person does not have, so
-        without this door losing both ended the account.
+        without this endpoint, losing both ended the account.
 
         Grants no access: the password still stands, and nothing is handed to the operator. Every
         field the factor is made of is cleared, not only the flag, so a secret somebody else still
@@ -52263,8 +52263,8 @@ paths:
             Imported. Returns { ws, objects, documents, rows, images, images_deduped, schemas }, and
             skipped_undeclared when the bundle carried records (or rows, role "row") in spaces its
             own manifest does not declare. The archive is untrusted input, so the restore applies the
-            same write rules as the ordinary doors: `skipped` names what was not written at all (a
-            storage key outside the new workspace, or one a write door refuses), and `clamped` names
+            same write rules as the ordinary endpoints: `skipped` names what was not written at all (a
+            storage key outside the new workspace, or one a write endpoint refuses), and `clamped` names
             what was stored at a narrower level than the archive asked for (an organism the importer
             is not a member of, a label's audience cap, the publish gate, a node closed to
             strangers, or a share password a backup never carries).
@@ -52289,7 +52289,7 @@ paths:
                             description: >-
                               Records the bundle carried in spaces its own manifest does not declare. They
                               were not written, because a write into an undeclared space is refused on every
-                              door; the import itself still succeeds. Absent when there were none.
+                              endpoint; the import itself still succeeds. Absent when there were none.
                             items:
                               type: object
                               required: [namespace, id, role]
@@ -52301,7 +52301,7 @@ paths:
                             type: array
                             description: >-
                               What the restore did not write at all: a storage key the archive named
-                              outside the new workspace root, or one a write door refuses. Absent
+                              outside the new workspace root, or one a write endpoint refuses. Absent
                               when there were none.
                             items:
                               type: object
@@ -52531,7 +52531,7 @@ paths:
         share's `access` mode gates the read, returns 401 `SHARE_PASSWORD_REQUIRED` (send a valid
         `X-Share-Token` from the unlock endpoint) or 401 `SHARE_ACCOUNT_REQUIRED` (authenticate with any
         account on this node). This is the generic anonymous read for public record spaces — any public
-        showroom / catalogue / knowledge client reads its structured data through it. An entry whose
+        demo / catalogue / knowledge client reads its structured data through it. An entry whose
         record has a provenance record carries it as `ai_provenance` (AiProvenanceItemBlock).
 
         `?format=ics` returns the same read as an RFC 5545 calendar (text/calendar) for a calendar
@@ -52619,7 +52619,7 @@ paths:
         (`objectTypes[].apps: ["owner/filename"]`) and the person approved the `organism:rows` scope
         at sign-in. With both, and while the person is an active member, the app appends to and
         reads back that one space; a space that does not name the app answers 403 and says so, a
-        grant without the scope is refused at the door, and nothing else on the organism opens.
+        grant without the scope is refused at the endpoint, and nothing else on the organism opens.
 
         An EXTENSION reaches a row space the same way, through `ctx.workspace.appendRows` and
         `readRows` rather than this route: the organism names it as `installer/name` in `objectTypes[].extensions`, its
@@ -53245,9 +53245,9 @@ paths:
         An `api` or `navigate` action may carry `i18n` ({ key, vars }), a key under `notiftext.`, so a
         client can say the button in the reader's language; `label` stays the English fallback and
         what a push shows.
-        No memory door writes a notification record (a `notif.` key): each refuses it with 403
+        No memory endpoint writes a notification record (a `notif.` key): each refuses it with 403
         RESERVED_KEY to every principal, the owner included. An `api` action is served only when its
-        `endpoint` is a door of this node's own API: a path of this node under `/v1/`, still under
+        `endpoint` is an endpoint of this node's own API: a path of this node under `/v1/`, still under
         `/v1/` once its dot segments resolve. Any other action, and one of an unknown kind, is left out
         of the answer and logged, whatever wrote the record.
 
@@ -57104,7 +57104,7 @@ paths:
 
         Deliberately separate from `POST /v1/site/import`, which keeps the template, portal
         records and KV pairs: that route is gated on the operator ROLE, and routing a layout
-        through it would mean one capability with two doors, only one of which asks for
+        through it would mean one capability with two endpoints, only one of which asks for
         `site:layout-write`.
       tags: [Site]
       security:
@@ -57202,7 +57202,7 @@ paths:
         at serve time from the registry rather than written into the prompt — so the vocabulary an
         AI is handed is the vocabulary the validator will accept.
 
-        This is the road for operators whose AI cannot reach this node over MCP. One that can asks
+        This endpoint is for operators whose AI cannot reach this node over MCP. One that can asks
         it directly and `aimeat_surface_layout_set` does the work. Operator-only.
       tags: [Site]
       security:
@@ -59340,7 +59340,7 @@ paths:
       summary: Admin import knowledge package
       description: >-
         The manifest is validated against the knowledge-package schema, the same one the agent's
-        import door uses. A refusal names the field in error.details.
+        import endpoint uses. A refusal names the field in error.details.
       tags: [Admin, Knowledge]
       security:
         - BearerAuth: []
@@ -60593,7 +60593,7 @@ paths:
 
         Serves BOTH invitation variants, distinguished by `invitation.kind`:
         `organism` (the inviter's organism summary, org role, workspace grants with names) and
-        `node` (the agent door — `organism` is null, `workspaces` empty, and `requested_by` carries
+        `node` (the agent registration invite — `organism` is null, `workspaces` empty, and `requested_by` carries
         what the AI claimed about itself alongside what the server observed, so the recipient of an
         unrequested message can judge and trace it), and `app` (the sign-up link of an app member
         invitation — `app` is { id, name, role }; it answers 404 once the app invitation behind it was
@@ -60962,7 +60962,7 @@ paths:
       operationId: getPublicFile
       summary: Download public file
       description: |
-        Download a file by owner GAII and key. This is the ONE door for reading a file the caller
+        Download a file by owner GAII and key. This is the ONE endpoint for reading a file the caller
         does not own — `GET /v1/storage/{key}` is namespaced to the caller and cannot reach it.
         Public files need no auth. Non-public files apply the same consent/visibility rules as
         memory: `visibility:'owner'` admits every agent and app of the SAME owner (this is how a
@@ -61099,8 +61099,8 @@ paths:
         INVITE. An optional `invite_token` presents a one-time invitation the receiving node minted
         earlier (POST /v1/federation/link-invites), and admits the caller at the tier THAT INVITE
         names — typically `contact`, for a node the operator is provisioning. The tier is read from
-        the stored invite and never from this body: a door that believes a caller's claim about its
-        own trust level is not a door. An unknown, expired or already-used token is not an error; it
+        the stored invite and never from this body: an endpoint that believes a caller's claim about
+        its own trust level controls no access. An unknown, expired or already-used token is not an error; it
         falls through to the ordinary pending path, so a leaked token is worth one link, at one tier,
         once.
 
@@ -62975,7 +62975,7 @@ paths:
       description: >-
         The descriptor and signature that travel inside an exported package, served on their own so
         an update check costs one small read instead of a whole archive. Carries the component
-        digests, never their content. Public on the same terms as the export door: a public package
+        digests, never their content. Public on the same terms as the export endpoint: a public package
         is readable by anyone, a private one answers 404 to everyone but its author.
       tags: [Federation, Packages]
       parameters:
@@ -63744,8 +63744,8 @@ paths:
       operationId: decidePackageInstallRequest
       summary: Approve or decline a package install request
       description: >-
-        The owner in person decides any request; this is the door the notification's Approve and
-        Decline run with the owner's session. An agent of the owner may decline any request it did not
+        The owner in person decides any request; this is the endpoint the notification's Approve and
+        Decline buttons call with the owner's session. An agent of the owner may decline any request it did not
         file, and may approve one only when it did not file it and holds packages:write, memory:write
         and memory:write-as-owner (403 OWN_REQUEST, 403 SCOPE_DENIED otherwise). An app grant, an
         ecosystem app and a visitor from another node are refused with 403 ACCESS_DENIED. Approving
@@ -66355,14 +66355,14 @@ paths:
         node, a key this node reads to decide what it does (`openrouter.*`, `ai-usage.*`,
         `commerce.*` and the rest of the reserved keys). An export-out or trigger-geai step names
         only an app of this owner on this node. Authorable by the owner or an agent holding
-        `workflow:write`, and a step costs the word its own door asks (403 SCOPE_DENIED names the
+        `workflow:write`, and a step costs the word its own endpoint asks (403 SCOPE_DENIED names the
         missing one): `work:request` for an agent step (giving an agent work), `ai:use` for an ai
         step or `llm.approved`, `ext:invoke` for an extension
         step, `memory:read` + `storage:write` + `memory:write` for a datapackage step,
         `memory:read` + `work:request` for export-out, `work:request` for trigger-geai, and
         `memory:read` for a workflow that reads the owner's records (every signal leaf and every
         agent step reads one). The owner in person passes. A run's observation of a credential
-        record is served as the memory doors show it. `maxCostUsd` caps what one run may spend on AI
+        record is served as the memory endpoints show it. `maxCostUsd` caps what one run may spend on AI
         (its ai steps and the judging of its llm signals), in US dollars, and an ai step starts only
         when what it is expected to cost fits in what is left; `costCapMorsels` does
         nothing, and a save that sets it answers with
@@ -66481,7 +66481,7 @@ paths:
         (an instant health check — the run completes synchronously) · `mode=full` executes the steps
         live (dispatches the agent tasks; poll the run for progress). `vars` overrides the workflow's
         declared variables for this run. Requires `workflow:write` (owners bypass), and a full run
-        also the word each step's own door asks, as for a save (403 SCOPE_DENIED names it; a
+        also the word each step's own endpoint asks, as for a save (403 SCOPE_DENIED names it; a
         signals-only check asks `memory:read` when the workflow reads the owner's records, and
         `ai:use` when `llm.approved` is set). Returns the runId.
       tags: [Workflows]
@@ -68937,7 +68937,7 @@ paths:
         '429':
           description: >-
             More than 30 sends a minute from this account: the owner and every agent and app acting
-            for them count together, on this door, on POST /v1/messages/broadcast and on the
+            for them count together, on this endpoint, on POST /v1/messages/broadcast and on the
             aimeat_dm_* tools. RATE_LIMITED, with Retry-After in seconds.
 
   /v1/messages/broadcast:
@@ -69006,7 +69006,7 @@ paths:
         '429':
           description: >-
             More than 30 sends a minute from this account, counting each broadcast as one: the owner
-            and every agent and app acting for them count together, on this door, on POST
+            and every agent and app acting for them count together, on this endpoint, on POST
             /v1/messages and on the aimeat_dm_* tools. RATE_LIMITED, with Retry-After in seconds.
 
   /v1/messages/broadcast/{id}:
@@ -70257,8 +70257,8 @@ paths:
       operationId: sendToContactHandle
       summary: Spend a contact handle — the node sends, the app never sees the address
       description: >-
-        The app's half. This is the outbound door with a handle in front of it rather than a second
-        way out: opt-out, suppression, the rolling daily ceiling and the append-only send log all
+        The app's half. This is the outbound endpoint with a handle in front of it rather than a second
+        send path: opt-out, suppression, the rolling daily ceiling and the append-only send log all
         apply unchanged, and the channel is chosen the same way (an AIMEAT inbox when the person has
         an identity here, email otherwise).
 
@@ -70364,7 +70364,7 @@ paths:
         uses (no enumeration or substring search). Found → the owner's GHII + display name;
         not found → can_invite signals whether an email invitation could be sent instead.
         The owner in person, or their agent holding `messages:read` (the permission the
-        `aimeat_contact_resolve_email` tool declares, which asks this door); an app grant, an
+        `aimeat_contact_resolve_email` tool declares, which calls this endpoint); an app grant, an
         ecosystem app and a session from another node are refused. One account has 20 lookups
         in 10 minutes, counted per owner: the owner and all their agents share them, a save by
         email (POST /v1/contacts) counts as one, and a refusal answers 429 with Retry-After.
@@ -70483,7 +70483,7 @@ paths:
         their agents together (POST /v1/contacts/resolve, a save by email and the
         `aimeat_contact_invite` tool share them), and past that the answer is 429 RATE_LIMITED
         with Retry-After. The owner in person, or their agent holding `messages:send` (the word
-        `aimeat_contact_invite` declares; the connector's tool asks this door); the email goes out
+        `aimeat_contact_invite` declares; the connector's tool calls this endpoint); the email goes out
         in the owner's name either way. An app grant, an ecosystem app and a session from another
         node are refused (403).
       tags: [Contacts]
@@ -71500,7 +71500,7 @@ paths:
         gets `catalog` or `none` falls back to the list this node serves.
 
         A model entry names `api_key_env`, the NAME of an environment variable on the machine that
-        runs the agent. No credential crosses this door in either direction.
+        runs the agent. No credential passes through this endpoint in either direction.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -71671,7 +71671,7 @@ paths:
       operationId: setOwnerLlmDefault
       summary: Which model every agent of this account thinks with, unless it says otherwise
       description: |
-        The same choice shape as the per-agent door, stored at `crews.llm.default` in the owner's
+        The same choice shape as the per-agent endpoint, stored at `crews.llm.default` in the owner's
         namespace. An agent's own record wins over it; a crew definition's `llm_profile` wins over
         this too, because a crew that states its need is stating it about itself.
 
@@ -71727,7 +71727,7 @@ paths:
         can never be given anything to be.
 
         REFUSED with `409 ALREADY_DEFINED` if the agent already has a published definition. This
-        door only ever adds a first one; changing an existing definition goes through `publish`,
+        endpoint only ever adds a first one; changing an existing definition goes through `publish`,
         where the agent's own runtime has the say. That is what makes a weaker validator acceptable
         here.
 
@@ -73593,7 +73593,7 @@ paths:
         never a price: they pace how much gets used and buy nothing, so a morsel price is refused with
         BAD_PRICE. A proxied call cannot take payment yet, so a priced server refuses its calls with
         PRICE_UNSUPPORTED until it can.
-        Passing command attaches a LOCAL PROCESS instead of an address, and this is the only door in
+        Passing command attaches a LOCAL PROCESS instead of an address, and this is the only endpoint in
         the system that can write one. It is refused unless AIMEAT_MCP_STDIO_ENABLED is on, and what
         may then run is decided again by AIMEAT_MCP_STDIO_ALLOWED_COMMANDS, compared whole. The
         process is started without a shell, so nothing in args is interpreted.
@@ -74061,7 +74061,7 @@ paths:
             The server could not be reached, or its credential is dead. TOOL_LIST_TOO_LARGE: its
             tool list is larger than this node keeps of one server (2 MB), or than it reads of one
             answer (16 MB); the server is parked with that reason, and the list stored before it
-            grew is dropped, so no door answers from an older copy.
+            grew is dropped, so no endpoint answers from an older copy.
         '508':
           description: LOOP_DETECTED. Asking the server would bring the call back to a node it already passed through.
   /v1/mcp-servers/{id}/call:
@@ -74290,7 +74290,7 @@ paths:
       operationId: publishToConnection
       summary: Publish to a connected account
       description: >
-        Two ways in. `connection_id` publishes to an account the CALLER connected, which needs no
+        Two modes. `connection_id` publishes to an account the CALLER connected, which needs no
         delegation because the publisher and the account holder are the same person. `app_id` +
         `action` publishes through a delegation an app owner granted over a shared channel.
 
@@ -76339,7 +76339,7 @@ paths:
   /v1/admin/auth-refusals:
     get:
       operationId: adminAuthRefusals
-      summary: The refusal log's tail — who was turned away, at which door, from where (operator Security tab)
+      summary: The refusal log's tail — who was turned away, at which endpoint, from where (operator Security tab)
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -77926,14 +77926,14 @@ paths:
         (count_kind=sample, sample_limit=1000, window_total=null). Missing comparison history
         produces zone/status unknown. The sample includes refusals, distinct
         sources, walled addresses, each with a zone decided from this instance's own readable
-        history), the refusal log grouped by door, source, credential kind and credential
+        history), the refusal log grouped by endpoint, source, credential kind and credential
         fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count
         (an incident may carry `params`, the values the page's own sentence for its type names,
         beside the English `detail`), who holds the operator role and which accounts are deactivated or use two-step sign-in,
         how apps are kept apart (`apps`, with a warning and the settings to change on a node several
         people share with no app origin), the outside parties (`parties`: total, stopped,
         stopped_by_operator, failed_key_attempts, refused_reads_7d, served_reads_7d; stop one with
-        POST /v1/admin/parties/{owner}/{name}/stop), and the door settings. The same data the
+        POST /v1/admin/parties/{owner}/{name}/stop), and the sign-in and security settings. The same data the
         `aimeat_admin_security_overview` tool returns.
         Requires the `operator` role.
       security:
@@ -78001,7 +78001,7 @@ paths:
                                   messages: { type: array, items: { type: string } }
                           refusals:
                             type: object
-                            description: Bounded sample filtered to the last 24 hours, grouped by door, source, credential kind and fingerprint; count_kind=sample, sample_limit=1000, window_total=null; the readable span and its mean per day; the newest 200 lines
+                            description: Bounded sample filtered to the last 24 hours, grouped by endpoint, source, credential kind and fingerprint; count_kind=sample, sample_limit=1000, window_total=null; the readable span and its mean per day; the newest 200 lines
                           incidents:
                             type: object
                             properties:
@@ -78025,7 +78025,7 @@ paths:
                               settings: { type: object, nullable: true, additionalProperties: { type: string }, description: "AIMEAT_APP_HOST and AIMEAT_APP_ORIGIN_ENABLED with the values this node would take" }
                           settings:
                             type: object
-                            description: The door settings as configured (rate limits, tarpit, lockout, TOTP, passkeys, CORS origins, federation sign-in, body limits, the log file)
+                            description: The sign-in and security settings as configured (rate limits, tarpit, lockout, TOTP, passkeys, CORS origins, federation sign-in, body limits, the log file)
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -78037,7 +78037,7 @@ paths:
       summary: The CORS page in one read (operator)
       description: |
         Operator-only. Which browser origins this instance answers: the default list and whether
-        it is the wildcard, the three cookie doors that take no wildcard and what is named for
+        it is the wildcard, the three cookie endpoints that take no wildcard and what is named for
         them, every person and every agent with a list of their own, how many memory records
         carry one, and the order the lists rank in (record, agent, person, default; the first
         non-empty list wins). The same data the `aimeat_admin_cors_overview` tool returns.
@@ -78067,7 +78067,7 @@ paths:
                               config_key: { type: string, enum: [cors.allowed_origins] }
                           cookie_doors:
                             type: object
-                            description: The doors that hand back a token on the sign-in cookie; they answer only an origin named in the default list
+                            description: The endpoints that hand back a token on the sign-in cookie; they answer only an origin named in the default list
                             properties:
                               paths: { type: array, items: { type: string } }
                               named: { type: array, items: { type: string } }
@@ -81354,7 +81354,7 @@ paths:
                           served:
                             type: boolean
                             description: >-
-                              Only on a JSON upload (the agent's way in): whether the page is
+                              Only on a JSON upload (the method an agent uses): whether the page is
                               public now. False means it is stored and the address shows nothing
                               yet, because `enable` was not sent or the owner switched the page off.
                           memory_read:
@@ -86169,7 +86169,7 @@ paths:
       operationId: getFinanceInvoicePdf
       tags: [Finance]
       summary: Download the invoice as an A4 PDF
-      description: Human-readable invoice document rendered deterministically from the immutable sent invoice (409 for a draft). The same PDF the outbound door attaches to invoice emails.
+      description: Human-readable invoice document rendered deterministically from the immutable sent invoice (409 for a draft). The same PDF the outbound messaging endpoints attach to invoice emails.
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses:
@@ -86178,7 +86178,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
-  # ── Outbound door (company-in-a-box phase 2) ────────────────────────────────
+  # ── Outbound endpoints (company-in-a-box phase 2) ────────────────────────────────
   /v1/outbound/contacts:
     get:
       operationId: listOutboundContacts
@@ -86279,7 +86279,7 @@ paths:
     post:
       operationId: sendOutboundMessage
       tags: [Outbound]
-      summary: Send a message through the policied door
+      summary: Send a message through the policied endpoint
       description: 'The one send path. Recipient is a SAVED contact id, never a free address. Policy chain: suppression (422 SUPPRESSED) → marketing opt-out (422 OPTED_OUT) → rolling 24 h daily limit (429 DAILY_LIMIT) → channel selection (AIMEAT inbox first when the recipient has an identity here, email fallback; marketing email carries the unsubscribe link and the headers List-Unsubscribe: <https://…/v1/outbound/unsubscribe?token=…> and List-Unsubscribe-Post: List-Unsubscribe=One-Click (RFC 2369, RFC 8058), except through an Outlook mailbox, where Microsoft Graph accepts only x- headers). When the sender keeps a sender record (memory key outbound.sender, or outbound.sender.{company_id} in the company owner''s memory for a company send; see GET /v1/outbound/sender), a marketing email carries a footer under the card with the legal name, business id, address, why the reader gets the message, the privacy notice and the unsubscribe link. Without the record the email is unchanged. Compose directly (subject+body), from a template (memory record outbound.template.{template_id} with {{var}} substitution), or from an invoice (invoice_id attaches the PDF + Finvoice XML and updates the invoice''s deliveryStatus). Every outcome lands in the send log. Only a send that went out answers 200; one that did not answers 502 or 503 SEND_FAILED, and is still in the send log.'
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -87969,7 +87969,7 @@ paths:
         On an app origin, the markdown an agent gets for the app's front page: the app's agent face
         wrapped as a root mirror, with a canonical Link header back to the app root. Served on both
         `/.md` (the page URL plus `.md`, which is what a scanner constructs) and `/index.md`, so
-        there is one document and two ways in. The apex has no such document and falls through.
+        there is one document at two URLs. The apex has no such document and falls through.
       tags: [Catalogue]
       responses:
         '200':
@@ -89617,7 +89617,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  # ── Apps: the "me" doors and the guest list ───────────────────
+  # ── Apps: the "me" endpoints and the guest list ───────────────────
   /v1/apps/me/{filename}/legal:
     get:
       operationId: getOwnAppLegal
@@ -89625,7 +89625,7 @@ paths:
       description: >-
         The same answer as GET /v1/apps/{owner}/{filename}/legal for the account the token belongs
         to. It resolves the owner name and redirects with 307, which preserves the method and the
-        query string. This is the door the connector and the command line use: they hold a filename
+        query string. This is the endpoint the connector and the command line use: they hold a filename
         and a token and no owner name.
       tags: [Apps]
       security:
@@ -90023,7 +90023,7 @@ paths:
         `client_id` URL, and the redirect URI must be one that client lists. The `owner_token` is
         checked four ways, not one: the signature, the expiry, whether the credential has been
         revoked, and whether the principal is the account holder with its CURRENT permissions rather
-        than the ones its token was minted with. This door hands out a credential carrying the
+        than the ones its token was minted with. This endpoint hands out a credential carrying the
         target agent's full permission list, so it takes the same tests every authenticated route
         takes. The agent must belong to the same account.
 
