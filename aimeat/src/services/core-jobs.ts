@@ -286,9 +286,9 @@ export function registerCoreHandlers(
     const n = await storage.cleanupExpiredDeviceAuth();
     if (n > 0) logger.info(`[device-auth-cleanup] removed ${n} expired device authorization(s)`);
   });
-  // MCP client registrations no sign-in used, past mcp.unused_client_days (services/mcp-client-cleanup.ts).
+  // MCP client registrations no sign-in used, past mcp.unused_client_days (services/mcp-client/cleanup.ts).
   scheduler.registerCoreHandler('mcp-client-cleanup', async () => {
-    const { runMcpClientCleanup } = await import('./mcp-client-cleanup.js');
+    const { runMcpClientCleanup } = await import('./mcp-client/cleanup.js');
     await runMcpClientCleanup(storage, config);
   });
   // The objects in a file store that no stored file names: an erased account's, or a failed removal's

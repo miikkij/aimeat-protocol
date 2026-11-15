@@ -77,7 +77,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { credentialRevoked, isOwnerPrincipal } from '../auth/middleware.js';
 import { withCurrentScopes } from '../auth/effective-scopes.js';
 import { recordIssuedAt } from '../auth/credential-age.js';
-import { grantCutRefusal, agentCutMark, cutHappenedSince } from '../services/mcp-oauth-grant-cut.js';
+import { grantCutRefusal, agentCutMark, cutHappenedSince } from '../services/mcp/oauth-grant-cut.js';
 import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
@@ -626,7 +626,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             // issueJWT's `?? ['*']` default, so every MCP OAuth session was a wildcard — which
             // makes the per-tool scope filter in catalog/scopes.ts decorative on exactly the
             // surface it was written for.
-            // A code from before the agent's credential cut redeems into nothing (services/mcp-oauth-grant-cut.ts).
+            // A code from before the agent's credential cut redeems into nothing (services/mcp/oauth-grant-cut.ts).
             const cut = await grantCutRefusal(storage, authCode.gaii, recordIssuedAt(authCode.issuedAt));
             if (!cut.ok) {
                 res.status(400).json({ error: 'invalid_grant', error_description: cut.refusal });
@@ -690,7 +690,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             }
 
             // A refresh token made before the agent's credential cut mints nothing, and neither does one
-            // for an agent or an account that is gone (services/mcp-oauth-grant-cut.ts; secaudit2026oct22, 2026oct26).
+            // for an agent or an account that is gone (services/mcp/oauth-grant-cut.ts; secaudit2026oct22, 2026oct26).
             const cut = await grantCutRefusal(storage, existing.gaii, recordIssuedAt(existing.createdAt));
             if (!cut.ok) {
                 res.status(400).json({ error: 'invalid_grant', error_description: cut.refusal });

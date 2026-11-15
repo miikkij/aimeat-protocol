@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The teams a person is in, as a few lines their AI reads when it connects: each team's
  *   name in the person's language, its organism id and its team skill. Served in the MCP
- *   instructions next to the person's own contexts (services/mcp-build-inputs.ts) and appended to
+ *   instructions next to the person's own contexts (services/mcp/build-inputs.ts) and appended to
  *   the handbook, so a member's AI knows on its first turn that the person works in a team, where
  *   the team's matters are written, and which call reads the team context.
  *

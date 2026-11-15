@@ -23,7 +23,7 @@ import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { runMcpClientCleanup } from '../../src/services/mcp-client-cleanup.js';
+import { runMcpClientCleanup } from '../../src/services/mcp-client/cleanup.js';
 import { deleteComponent } from '../../src/services/component-registrar.js';
 import { ensureAppSubdomain } from '../../src/services/subdomain-names.js';
 import { sweepHeldAppLabels } from '../../src/services/held-app-labels.js';

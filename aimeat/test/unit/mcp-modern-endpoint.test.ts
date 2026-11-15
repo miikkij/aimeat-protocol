@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The 2026-07-28 code path's two pieces that an E2E run cannot see: the AuthInfo the SDK
  *   handler hands the factory (mcp/modern-endpoint.ts), and the contact-record throttle a stateless
- *   request needs (services/mcp-agent-admission.ts), plus the admission refusals both eras share.
+ *   request needs (services/mcp/agent-admission.ts), plus the admission refusals both eras share.
  * @version-history
  *   v1.1.0 -- 2026-11-01 -- The first-MCP-call marker and the hello_mcp proof leave out the place's own
  *     chat and the basic agents (services/node-resident-agent.ts).
@@ -23,7 +23,7 @@ vi.mock('../../src/services/agent/mcp-touch.js', () => ({ markAgentMcpUse }));
 vi.mock('../../src/services/onboarding-funnel.js', () => ({ recordFirstMcpCall }));
 
 const { modernAuthInfo } = await import('../../src/mcp/modern-endpoint.js');
-const { admitMcpAgent, recordMcpContactThrottled, MCP_CONTACT_THROTTLE_MS } = await import('../../src/services/mcp-agent-admission.js');
+const { admitMcpAgent, recordMcpContactThrottled, MCP_CONTACT_THROTTLE_MS } = await import('../../src/services/mcp/agent-admission.js');
 const { hasHelloMcpProof } = await import('../../src/services/node/resident-agent.js');
 
 const verified: VerifiedToken = {

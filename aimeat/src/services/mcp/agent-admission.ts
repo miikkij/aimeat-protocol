@@ -1,5 +1,5 @@
 /**
- * @file src/services/mcp-agent-admission.ts
+ * @file src/services/mcp/agent-admission.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may use the node's MCP endpoint, and what a first contact records: one service for
@@ -31,13 +31,13 @@
  *   v1.0.0 — 2026-10-20 — Moved out of the MCP session code unchanged in what it decides and writes,
  *     so the 2026-07-28 path shares it (MCP SDK v2 migration step 5).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import { registerChatInstance } from './chat/instance-write.js';
-import { markAgentMcpUse } from './agent/mcp-touch.js';
-import { isNodeResidentAgent } from './node/resident-agent.js';
-import { memoGetAgent, memoGetGHIIByOwner, memoGetOwner } from './request-memo.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import { registerChatInstance } from '../chat/instance-write.js';
+import { markAgentMcpUse } from '../agent/mcp-touch.js';
+import { isNodeResidentAgent } from '../node/resident-agent.js';
+import { memoGetAgent, memoGetGHIIByOwner, memoGetOwner } from '../request-memo.js';
 
 export type McpAdmission =
     | { ok: true; owner: string }
@@ -99,7 +99,7 @@ export async function recordMcpContact(deps: { storage: Storage; config: AimeatC
         return null;
     });
     if (agent && !isNodeResidentAgent(agent)) {
-        const { recordFirstMcpCall } = await import('./onboarding-funnel.js');
+        const { recordFirstMcpCall } = await import('../onboarding-funnel.js');
         void recordFirstMcpCall(storage, config, who.owner, who.platform);
     }
 

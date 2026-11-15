@@ -324,7 +324,7 @@
     "src/services/marketplace-fee.ts": {
       "listOwners": 1
     },
-    "src/services/mcp-build-inputs.ts": {
+    "src/services/mcp/build-inputs.ts": {
       "listFederationPeers": 1
     },
     "src/services/mcp-client/transport.ts": {

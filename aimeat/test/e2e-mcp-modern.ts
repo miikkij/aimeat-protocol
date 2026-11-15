@@ -267,7 +267,7 @@ await test('Deleting the agent closes its open listen stream, and its token is r
     assert(end === 'closed', `the stream after the delete: ${end}`);
     const r = await modern('/v1/mcp', agent.token, 'tools/list');
     // A token whose agent is gone is refused 401: authenticate() refuses a revoked token, and the
-    // admission (services/mcp-agent-admission.ts) refuses an unknown agent, both with 401.
+    // admission (services/mcp/agent-admission.ts) refuses an unknown agent, both with 401.
     assert(r.status === 401, `a deleted agent's token: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
 });
 

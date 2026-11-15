@@ -106,7 +106,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import { MODEL_RECOMMENDATION as MODEL } from '../model-recommendation.js';
-import { MCP_INSTALL_SCRIPT_OS, mcpConfigFile, mcpInstallLink, mcpInstallScript, type McpInstallClientId } from '../mcp-install.js';
+import { MCP_INSTALL_SCRIPT_OS, mcpConfigFile, mcpInstallLink, mcpInstallScript, type McpInstallClientId } from '../mcp/install.js';
 import { desktopAppOffer, type DesktopAppOffer } from '../desktop-app-offer.js';
 
 export interface AiToolParam {

@@ -125,7 +125,7 @@ import { injectAgentFooter } from '../utils/agent-footer.js';
 import { canonicalPageUrl, findPublicPage } from '../data/public-pages.js';
 import { renderPageMarkdown } from './markdown-mirrors.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
-import { mcpInstallLink } from '../services/mcp-install.js';
+import { mcpInstallLink } from '../services/mcp/install.js';
 // Shell serving and public-file lookup live in the sibling; re-exported because bootstrap.ts and
 // static-files.ts have imported them from here since before the split.
 import { PROCESS_BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
@@ -156,7 +156,7 @@ import { renderPolicyNotSetPage } from './portal-policy-not-set.js';
  *  - nodeName / nodeUrl / nodeId -- this node's identity
  *  - mcpUrl -- the public Streamable HTTP MCP endpoint
  *  - cursorInstallHref / vscodeInstallHref -- the whole one-click install links,
- *    built by services/mcp-install.ts so the connect page and the setup table
+ *    built by services/mcp/install.ts so the connect page and the setup table
  *    cannot disagree about what a one-click install writes
  *  - claudeCodeConfigUrl / vscodeConfigUrl -- the downloadable config file
  *    (GET /v1/connect/mcp.json), for the clients with no install link

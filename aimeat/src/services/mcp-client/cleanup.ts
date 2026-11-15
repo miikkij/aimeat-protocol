@@ -1,5 +1,5 @@
 /**
- * @file src/services/mcp-client-cleanup.ts
+ * @file src/services/mcp-client/cleanup.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The daily cleanup of MCP client registrations nobody uses. POST /v1/mcp/register is
@@ -15,9 +15,9 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, dcr-unbounded-client-records).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

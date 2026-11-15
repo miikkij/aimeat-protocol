@@ -1,5 +1,5 @@
 /**
- * @file src/services/mcp-oauth-grant-cut.ts
+ * @file src/services/mcp/oauth-grant-cut.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Whether an MCP OAuth grant artefact (an authorization code, a refresh token row) still
@@ -20,9 +20,9 @@
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26: authorization-code-outlives-agent-credential-cut,
  *     refresh-rotation-loses-grant-lineage).
  */
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { madeAfter, ownerRefuses, type IssuedAt } from '../auth/credential-age.js';
-import { localAccountName } from '../utils/gaii.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { madeAfter, ownerRefuses, type IssuedAt } from '../../auth/credential-age.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 const GONE = 'The agent this connection was approved for no longer exists. Connect again and approve the connection once more.';
 const ROTATED = 'The agent\'s key was rotated. Connect again and approve the connection once more.';

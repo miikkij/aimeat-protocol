@@ -1,5 +1,5 @@
 /**
- * @file src/services/mcp-build-inputs.ts
+ * @file src/services/mcp/build-inputs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The values an MCP server reads from storage when it is built: the owner's
@@ -24,14 +24,14 @@
  *   v1.0.0 — 2026-10-20 — Moved out of createMcpServer (mcp/index.ts), plus the cache for the
  *     2026-07-28 path (MCP SDK v2 migration step 5).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import { proactiveGuidance } from './proactive-mode.js';
-import { resolveSupportRoute } from './message/alias.js';
-import { contextIndexLine } from './context/index-line.js';
-import { teamIndexLine } from './team/index-line.js';
-import type { ContentReader } from './classification/reader.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import { proactiveGuidance } from '../proactive-mode.js';
+import { resolveSupportRoute } from '../message/alias.js';
+import { contextIndexLine } from '../context/index-line.js';
+import { teamIndexLine } from '../team/index-line.js';
+import type { ContentReader } from '../classification/reader.js';
 
 export interface BuildInputs { guidance: string | null; supportAnsweredBy: string | null; contexts: string | null }
 

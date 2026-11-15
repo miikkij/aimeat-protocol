@@ -426,7 +426,7 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * `mcp.tasks.` (2026-10-26) is an MCP task: a tool call that answered with a handle, and the result
  * the node hands back on tasks/get as that call's own result. A principal that could write it, such as
  * an app granted the owner's memory, could put words into the owner's AI as a tool result.
- * services/mcp-tasks.ts is its one writer, straight to storage. A new prefix: nothing wrote it
+ * services/mcp/tasks.ts is its one writer, straight to storage. A new prefix: nothing wrote it
  * through the memory API before this.
  *
  * `commerce.subscription.` (2026-10-18, Comicland v3 A-5) is a subscription the buyer paid for: its end

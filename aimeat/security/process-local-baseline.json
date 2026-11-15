@@ -1065,19 +1065,19 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/mcp-agent-admission.ts :: map :: lastContact": {
+    "src/services/mcp/agent-admission.ts :: map :: lastContact": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/mcp-build-inputs.ts :: let :: supportRoute": {
+    "src/services/mcp/build-inputs.ts :: let :: supportRoute": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/mcp-build-inputs.ts :: map :: guidanceByOwner": {
+    "src/services/mcp/build-inputs.ts :: map :: guidanceByOwner": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/mcp-build-inputs.ts :: map :: contextsByReader": {
+    "src/services/mcp/build-inputs.ts :: map :: contextsByReader": {
       "count": 1,
       "reason": "A short cache (BUILD_INPUTS_TTL_MS) of the context index per connecting principal on the 2026-07-28 MCP path. A second process builds its own from the same storage; a changed context reaches a session through either process within the TTL, and nothing is lost."
     },

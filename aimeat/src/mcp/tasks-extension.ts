@@ -14,7 +14,7 @@
  *   finishes before the threshold answers with its own result. The threshold 0 makes every call of a
  *   declaring client a task, which is also how the E2E suite gets a task without a slow tool.
  *
- *   THE RECORD IS services/mcp-tasks.ts: one memory record per task in the caller's own namespace,
+ *   THE RECORD IS services/mcp/tasks.ts: one memory record per task in the caller's own namespace,
  *   gone an hour after it was made. This file holds the protocol: which call becomes a task, the
  *   wire shapes, the capability check and the error codes. An unknown id, an expired task and
  *   another principal's id all answer "not found" (-32602).
@@ -38,7 +38,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import {
     cancelMcpTask, countLiveMcpTasks, createMcpTask, readMcpTask, settleMcpTask, wireTask, type McpTask, type McpTaskError,
-} from '../services/mcp-tasks.js';
+} from '../services/mcp/tasks.js';
 import { logger } from '../utils/logger.js';
 import { wrapToolsCall } from './sdk-seams.js';
 

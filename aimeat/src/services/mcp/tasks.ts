@@ -1,5 +1,5 @@
 /**
- * @file src/services/mcp-tasks.ts
+ * @file src/services/mcp/tasks.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where an MCP task (the Tasks extension, mcp/tasks-extension.ts) lives, and when it
@@ -22,8 +22,8 @@
  *   v1.0.0 — 2026-10-26 — Initial (wish-mcp-tasks-laajennus-pitkille-ty-kalukutsuille).
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
+import type { Storage } from '../../storage/interface.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 const KEY_PREFIX = 'mcp.tasks.';
 /** One hour from creation: the Task's ttlMs and the record's ttlHours say the same thing. */

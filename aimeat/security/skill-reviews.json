@@ -71,12 +71,12 @@
       "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/context/index-line.ts",
-        "aimeat/src/services/mcp-build-inputs.ts",
+        "aimeat/src/services/mcp/build-inputs.ts",
         "aimeat/src/services/context/history-keys.ts",
         "aimeat/src/services/context/check.ts",
         "aimeat/src/services/memory-versions/history.ts"
       ],
-      "digest": "sha256:e6ae67f8f4075985a4c4a54a"
+      "digest": "sha256:a63ab3aed359325610ac7a46"
     },
     "node:aimeat-find-my-app": {
       "reviewedOn": "2026-11-15",
@@ -1011,7 +1011,7 @@
     },
     "node:aimeat-context": {
       "aimeat/src/services/context/index-line.ts": "635f3d9f01f7cc1d",
-      "aimeat/src/services/mcp-build-inputs.ts": "01efe179d7911e0d",
+      "aimeat/src/services/mcp/build-inputs.ts": "987085f802fa5e80",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
       "aimeat/src/services/context/check.ts": "f0768afe110e859c",
       "aimeat/src/services/memory-versions/history.ts": "fd78285b47179edd"

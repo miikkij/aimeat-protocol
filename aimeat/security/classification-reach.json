@@ -2330,7 +2330,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: MCP grant records."
     },
-    "src/services/mcp-tasks.ts": {
+    "src/services/mcp/tasks.ts": {
       "reads": {
         "getMemory": 1,
         "listMemory": 1

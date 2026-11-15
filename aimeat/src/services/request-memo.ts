@@ -10,7 +10,7 @@
  *   read the agent record five times and the owner record three times before the tool ran: the
  *   revocation check (auth/agent-alive.ts, auth/credential-revoked.ts), the current scopes
  *   (auth/effective-scopes.ts), CORS (middleware/cors.ts), the MCP permission check
- *   (services/permission-ask.ts) and the MCP admission (services/mcp-agent-admission.ts) each read
+ *   (services/permission-ask.ts) and the MCP admission (services/mcp/agent-admission.ts) each read
  *   for themselves (codebase analysis 2026-11-03, item C2; efficiency.md E4).
  *
  *   WHAT STAYS THE SAME. Each of those checks was already decided once per request: the record they

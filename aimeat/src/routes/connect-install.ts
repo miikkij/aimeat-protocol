@@ -13,7 +13,7 @@
  *
  *   IT IS PUBLIC, AND THAT IS SAFE BECAUSE IT HOLDS NOTHING. This node authenticates MCP over OAuth
  *   2.1 with dynamic client registration, so the file is the endpoint URL and a name. Everything
- *   personal happens afterwards, in a browser, as whoever signs in. See services/mcp-install.ts.
+ *   personal happens afterwards, in a browser, as whoever signs in. See services/mcp/install.ts.
  * @structure connectInstallRouter(config) -> Router; GET /v1/connect/mcp.json
  * @usage app.use(connectInstallRouter(config));
  * @version-history
@@ -22,7 +22,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { error } from '../middleware/envelope.js';
-import { MCP_INSTALL_CLIENTS, MCP_INSTALL_SCRIPT_OS, isMcpInstallClient, isMcpInstallScriptOs, mcpConfigFile, mcpInstallScript } from '../services/mcp-install.js';
+import { MCP_INSTALL_CLIENTS, MCP_INSTALL_SCRIPT_OS, isMcpInstallClient, isMcpInstallScriptOs, mcpConfigFile, mcpInstallScript } from '../services/mcp/install.js';
 
 export function connectInstallRouter(config: AimeatConfig): Router {
   const router = Router();

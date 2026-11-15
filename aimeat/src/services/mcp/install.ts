@@ -1,5 +1,5 @@
 /**
- * @file mcp-install.ts
+ * @file src/services/mcp/install.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one place that turns this node's MCP endpoint into something a client can accept
@@ -22,7 +22,7 @@
  *   JSON and inside a URL, so it is reduced to [a-z0-9-] before either.
  * @structure MCP_INSTALL_CLIENTS · normalizeServerName · mcpConfigFile · mcpInstallLink
  * @usage
- *   import { mcpConfigFile, mcpInstallLink } from '../services/mcp-install.js';
+ *   import { mcpConfigFile, mcpInstallLink } from './install.js';
  *   const file = mcpConfigFile('vscode', `${config.baseUrl}/v1/mcp`, 'aimeat');
  * @version-history
  *   v1.0.1 — 2026-08-26 — SECURITY (CodeQL js/polynomial-redos): normalizeServerName trimmed edge

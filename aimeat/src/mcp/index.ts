@@ -183,7 +183,7 @@ import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
 import { stableToolSchemas } from './tool-schema-cache.js';
 import { shortenChatTools } from './chat-tool-text.js';
 import { instructionsFor } from './instructions.js';
-import { readBuildInputs } from '../services/mcp-build-inputs.js';
+import { readBuildInputs } from '../services/mcp/build-inputs.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
@@ -278,7 +278,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     ): Promise<McpServer> {
         // What this account chose about being offered things it did not ask for, and who answers
         // support here. Read when the server is built, because that is the one moment every client
-        // passes through, and never allowed to fail a connection (services/mcp-build-inputs.ts). A 2026-07-28
+        // passes through, and never allowed to fail a connection (services/mcp/build-inputs.ts). A 2026-07-28
         // request builds a server per request and reads both through a short cache.
         // The person's contexts are named only to a session that can open them: one whose scopes
         // reach aimeat_memory_read (services/context/index-line.ts).

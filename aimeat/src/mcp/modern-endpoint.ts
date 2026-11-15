@@ -19,7 +19,7 @@
  *
  *   THE FACTORY IS createMcpServer, run inside the request authority (mcp/request-authority.ts), so
  *   every tool closure reads THIS request's token and scopes, as a 2025 session's do. The agent is
- *   admitted on every request (services/mcp-agent-admission.ts), because a modern request has no
+ *   admitted on every request (services/mcp/agent-admission.ts), because a modern request has no
  *   session that admitted it earlier, and the first-contact records are throttled there.
  *
  *   CHANGE NOTIFICATIONS. The handler serves `subscriptions/listen` itself; mcp/resource-events.ts
@@ -50,7 +50,7 @@ import type { Storage } from '../storage/interface.js';
 import type { VerifiedToken } from '../auth/jwt.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
 import { logger } from '../utils/logger.js';
-import { admitMcpAgent, recordMcpContactThrottled } from '../services/mcp-agent-admission.js';
+import { admitMcpAgent, recordMcpContactThrottled } from '../services/mcp/agent-admission.js';
 import { answerWithoutToken } from './unauthenticated-answer.js';
 import { mcpSessionPlatform } from './session-platform.js';
 import { noteMcpSession, forgetMcpSession } from './session-registry.js';

@@ -39,7 +39,7 @@ import { logger } from '../utils/logger.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
 import { touchChatInstance } from '../services/chat/instance-write.js';
 import { markAgentMcpUse } from '../services/agent/mcp-touch.js';
-import { admitMcpAgent, recordMcpContact } from '../services/mcp-agent-admission.js';
+import { admitMcpAgent, recordMcpContact } from '../services/mcp/agent-admission.js';
 import { answerWithoutToken } from './unauthenticated-answer.js';
 import type { VerifiedToken } from '../auth/jwt.js';
 import { sameMcpPrincipal, type mcpRequestAuthority } from './request-authority.js';
@@ -238,7 +238,7 @@ export function legacySessions(deps: LegacySessionDeps) {
         let sessionAgentInfo: { gaii: string; platform: string } | undefined;
 
         {
-            // A known agent, a real owner, a GHII account (services/mcp-agent-admission.ts, shared
+            // A known agent, a real owner, a GHII account (services/mcp/agent-admission.ts, shared
             // with the 2026-07-28 path).
             const admitted = await admitMcpAgent(storage, authenticatedGaii);
             if (!admitted.ok) {
