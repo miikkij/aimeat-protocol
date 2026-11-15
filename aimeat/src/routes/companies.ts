@@ -63,7 +63,7 @@ import {
 } from '../services/company/company-portfolio.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { resolveIdentity, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
-import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
+import { parsePageAccessInput, pageAccessOf } from '../services/page/access.js';
 import { answerPageOpen } from './page-open.js';
 import { answerAccessRequest, answerAccessRequestState, type AccessRequestTarget } from './access-request.js';
 import { companyAccessTarget } from '../services/organism-join-requests/access-targets.js';
@@ -127,7 +127,7 @@ const FrontPageSchema = z.object({
   /** Omitted: the address keeps serving what it serves, and only `access` changes. */
   kind: z.enum(['app', 'portfolio', 'redirect', 'none']).optional(),
   target: z.string().max(500).optional(),
-  /** Who may open the front page: anyone, signed-in or organism:<id> (services/page-access.ts). */
+  /** Who may open the front page: anyone, signed-in or organism:<id> (services/page/access.ts). */
   access: z.string().max(120).nullable().optional(),
 }).strict().refine(b => b.kind !== undefined || b.access !== undefined, { message: 'Send kind, access, or both.' });
 

@@ -84,7 +84,7 @@ import { initConfirmTokenKeys } from '../services/operator/confirm.js';
 import { initDownloadTokenKeys } from '../services/download-token.js';
 import { initShareTokenKeys } from '../services/share-token.js';
 import { initPartyTokenKeys } from '../services/parties/token.js';
-import { initPageFrameTokenKeys } from '../services/page-frame-token.js';
+import { initPageFrameTokenKeys } from '../services/page/frame-token.js';
 import { initDesignBookPreviewTokenKeys } from '../services/design-book/preview-token.js';
 import { initDraftTokenKeys } from '../services/draft-token.js';
 import { logger } from '../utils/logger.js';

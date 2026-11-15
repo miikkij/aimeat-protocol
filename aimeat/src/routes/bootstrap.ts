@@ -123,7 +123,7 @@ import { mountSitemapRoutes } from './sitemaps.js';
 import { templateAddress, templateAlternates } from '../services/site/template-languages.js';
 import { mountHealthRoute } from './health.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
-import { livePageMarkdown } from '../services/page-body-live.js';
+import { livePageMarkdown } from '../services/page/body-live.js';
 import { SurfaceLayoutService } from '../services/surface-layout/service.js';
 import { renderLayoutMarkdown } from '../services/surface-layout/markdown.js';
 import { logger } from '../utils/logger.js';

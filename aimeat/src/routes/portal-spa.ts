@@ -182,7 +182,7 @@ export function serveSpa(
   builtPage?: PublicPage,
   /**
    * Markdown from live data to append to the page's authored body: the apps, the change log, the
-   * members (services/page-body-live.ts). The caller awaits it, because this function is sync.
+   * members (services/page/body-live.ts). The caller awaits it, because this function is sync.
    */
   liveMarkdown?: string,
 ): void {

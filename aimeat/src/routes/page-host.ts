@@ -26,7 +26,7 @@
  *   typed into the page, is refused by the browser. Framed straight by the node's own page, the page
  *   could go wherever that page may frame, the app hosts included.
  *
- *   The token (services/page-frame-token.ts) names the one record to serve; the node minted it after
+ *   The token (services/page/frame-token.ts) names the one record to serve; the node minted it after
  *   the caller passed the page's gate. A public page's share is read again here on every load, so a
  *   page whose share ended or was turned off stops loading at once.
  * @structure pageHostRouter(config, storage) — GET /p/_/holder.js · GET/HEAD /p/:token/{*path} (the holder, index.html, the page's files)
@@ -46,7 +46,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
-import { verifyPageFrameToken, PageFrameTokenError, type PageFrameClaims } from '../services/page-frame-token.js';
+import { verifyPageFrameToken, PageFrameTokenError, type PageFrameClaims } from '../services/page/frame-token.js';
 import { findWorkspaceRecord } from '../services/workspace/write.js';
 import { listVersionRefs } from '../services/workspace/versions.js';
 import { readShareMetaOf, isDocPublicAt, publicViewerPath, shareIsOpen } from '../services/workspace/share.js';

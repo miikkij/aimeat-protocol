@@ -132,9 +132,9 @@ import { PROCESS_BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
 import { localAccountName } from '../utils/gaii.js';
 import { appHiddenFromPublicSurfaces } from '../services/app/ai-use.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
-import { livePageMarkdown } from '../services/page-body-live.js';
+import { livePageMarkdown } from '../services/page/body-live.js';
 import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '../services/portfolio/seo.js';
-import { pageAccessOf } from '../services/page-access.js';
+import { pageAccessOf } from '../services/page/access.js';
 import { datasetPageOf } from '../services/datapackage/landing-page.js';
 import { logger } from '../utils/logger.js';
 export { serveSpa, resolvePublicFile } from './portal-spa.js';
@@ -544,7 +544,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     if (spaPath) {
       const username = String(req.params.username ?? '');
       const resolved = await resolvePublishedPortfolio(storage, username);
-      // A page that opens only for some people (its `access`, services/page-access.ts) gives the shell
+      // A page that opens only for some people (its `access`, services/page/access.ts) gives the shell
       // head none of its own words: the generic head, as for a page that does not exist.
       const cfg = resolved.ok && pageAccessOf(resolved.portfolioConfig.access) === 'anyone'
         ? (resolved.portfolioConfig as PortfolioSeoConfig) : null;

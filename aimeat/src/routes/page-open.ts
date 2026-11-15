@@ -34,7 +34,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { isNodeAccount } from '../services/audience.js';
 import { isSameAccount } from '../utils/same-account.js';
-import { pageNeedsSignIn, mayOpenPage, pageOpenPath } from '../services/page-access.js';
+import { pageNeedsSignIn, mayOpenPage, pageOpenPath } from '../services/page/access.js';
 import {
   APP_ACCESS_TTL_SECONDS, generatePageAccessToken, pageAccessGranted, type PageRef,
 } from '../services/app/access-token.js';
@@ -68,7 +68,7 @@ export async function pageOriginRefused(
 
 /**
  * The open route's answer, after the route found the page. The page's owner always passes; anyone
- * else passes the page's `access` (services/page-access.ts mayOpenPage). `url` is the page origin's
+ * else passes the page's `access` (services/page/access.ts mayOpenPage). `url` is the page origin's
  * address, or null when the node serves the page on no origin of its own: then `apexUrl`, a page the
  * SPA reads with the person's session, is answered without a grant, and without it the answer is 404.
  */

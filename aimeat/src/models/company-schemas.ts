@@ -70,7 +70,7 @@ export interface CompanyRecord {
   organismId: string | null;
   frontPage: CompanyFrontPage;
   /**
-   * Who may open the front page (services/page-access.ts): null for anyone, 'signed-in', or
+   * Who may open the front page (services/page/access.ts): null for anyone, 'signed-in', or
    * 'organism:<id>'. Kept apart from `frontPage` so pointing the address elsewhere keeps it.
    */
   frontPageAccess: string | null;

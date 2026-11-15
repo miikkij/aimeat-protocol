@@ -49,7 +49,7 @@ import { organismLink } from '../notifications/links.js';
 import { answerNotifications } from '../notifications/answers.js';
 import { organismOwners, isOrganismOwner } from '../organism/ownership.js';
 import { isNodeAccount, type AudienceAuth } from '../audience.js';
-import { mayOpenPage, pageAccessLevel } from '../page-access.js';
+import { mayOpenPage, pageAccessLevel } from '../page/access.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';

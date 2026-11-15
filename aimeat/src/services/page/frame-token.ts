@@ -1,5 +1,5 @@
 /**
- * @file src/services/page-frame-token.ts
+ * @file src/services/page/frame-token.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The token in the address of an HTML page's frame (routes/page-host.ts). The node mints
@@ -25,7 +25,7 @@
  *     2026-11-03, item B9).
  */
 import { SignJWT } from 'jose';
-import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
+import { signFor, verifyFor, TokenPurposeError } from '../../auth/node-signer.js';
 
 let _privateKey: CryptoKey | null = null;
 let _publicKey: CryptoKey | null = null;

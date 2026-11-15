@@ -18,7 +18,7 @@
  */
 import { localAccountName } from '../../utils/gaii.js';
 import { mergePortfolioConfig, portfolioSwitchState, portfolioWriteGaii } from '../portfolio/config.js';
-import { pageAccessOf } from '../page-access.js';
+import { pageAccessOf } from '../page/access.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 export async function applyPortfolioPublish(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

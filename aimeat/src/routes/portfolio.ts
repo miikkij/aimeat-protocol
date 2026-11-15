@@ -100,7 +100,7 @@ import { fileTarget } from '../services/classification/labels.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai/provenance-marks.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { isNodeAccount } from '../services/audience.js';
-import { parsePageAccessInput, pageAccessOf, pageNeedsSignIn, mayOpenPage } from '../services/page-access.js';
+import { parsePageAccessInput, pageAccessOf, pageNeedsSignIn, mayOpenPage } from '../services/page/access.js';
 import { answerPageOpen } from './page-open.js';
 import { answerAccessRequest, answerAccessRequestState, type AccessRequestTarget } from './access-request.js';
 import { portfolioAccessTarget } from '../services/organism-join-requests/access-targets.js';
@@ -140,7 +140,7 @@ export { writePortfolioHtml };
 export function portfolioRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  /** The `access` a write carries (services/page-access.ts), checked for its setter; null when absent. */
+  /** The `access` a write carries (services/page/access.ts), checked for its setter; null when absent. */
   const accessInput = async (req: Request, body: Record<string, unknown>) => (!('access' in body) ? null
     : parsePageAccessInput(storage, body.access, { identity: resolveIdentity(req.auth!, config.nodeId), federated: isForeignPrincipal(req.auth) }));
 
@@ -301,7 +301,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     }
     res.json(success(config.nodeId, {
       config: value,
-      // Who may open the page: 'anyone', 'signed-in' or 'organism:<id>' (services/page-access.ts).
+      // Who may open the page: 'anyone', 'signed-in' or 'organism:<id>' (services/page/access.ts).
       access: pageAccessOf((value as Record<string, unknown> | null)?.access),
       // Where the portfolio is (or would be) served standalone — null when the
       // portfolio origin is disabled or the username isn't a valid DNS label.
@@ -462,7 +462,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     const isAuthenticated = !!req.auth && !isAnonymousPrincipal(req.auth);
     const isOwner = isAuthenticated && req.auth?.owner === username;
 
-    // Who may open the page (services/page-access.ts, V3.10): the same decision the portfolio origin
+    // Who may open the page (services/page/access.ts, V3.10): the same decision the portfolio origin
     // makes, read here with the caller's own session. The owner always reads their page.
     const access = resolved.portfolioConfig.access;
     if (!isOwner && pageNeedsSignIn(config, access) && !(await mayOpenPage(storage, config, access, req.auth))) {

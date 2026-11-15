@@ -51,7 +51,7 @@ import { publishAskedFields } from '../services/app/publish-gate.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { IDENTITY_FIELDS } from '../tool-catalog/definitions/companies.js';
-import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
+import { parsePageAccessInput, pageAccessOf } from '../services/page/access.js';
 import { toolError } from './tool-error.js';
 
 type IdentityInput = { [K in keyof typeof IDENTITY_FIELDS]?: string };
@@ -204,7 +204,7 @@ export function registerCompanyTools(
         async ({ company_id, kind, target, access: accessIn }) => {
             try {
                 if (kind === undefined && accessIn === undefined) return toolError('INVALID_FRONT_PAGE', 'Send kind, access, or both.');
-                // Who may open the front page (services/page-access.ts), checked for the owner before any write.
+                // Who may open the front page (services/page/access.ts), checked for the owner before any write.
                 const access = accessIn === undefined ? undefined : await parsePageAccessInput(storage, accessIn, { identity: ownerGhii() });
                 if (access && 'refusal' in access) return toolError(access.refusal.code, access.refusal.message);
                 // Through the publish gate, as PUT /v1/companies/:id/front-page (services/company/company-publish-gate.ts).

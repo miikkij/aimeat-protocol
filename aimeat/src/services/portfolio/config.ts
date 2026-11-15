@@ -80,7 +80,7 @@ export async function mergePortfolioConfig(
 /**
  * The switch as the reader sees it (the first identity holding a config), and when the stored page
  * was written: `enabled` true (served), false (the owner switched it off) or null (never set).
- * `access` is who may open the page as stored (null for anyone; services/page-access.ts).
+ * `access` is who may open the page as stored (null for anyone; services/page/access.ts).
  */
 export async function portfolioSwitchState(
   storage: Storage, ownerName: string, nodeId: string,

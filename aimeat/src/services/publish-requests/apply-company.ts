@@ -20,7 +20,7 @@
 import type { CompanyFrontPageKind, CompanyRecord } from '../../models/company-schemas.js';
 import { CompanyError, companyAddress, requireOwnCompany, setFrontPage } from '../company/company-service.js';
 import { companyPortfolioKey } from '../company/company-portfolio.js';
-import { pageAccessOf } from '../page-access.js';
+import { pageAccessOf } from '../page/access.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 const KINDS: readonly CompanyFrontPageKind[] = ['app', 'portfolio', 'redirect'];

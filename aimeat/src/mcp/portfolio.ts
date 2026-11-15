@@ -61,7 +61,7 @@ import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio/publi
 import { publishAskedFields } from '../services/app/publish-gate.js';
 import { mergePortfolioConfig, portfolioSwitchState } from '../services/portfolio/config.js';
 import { notePortfolioWriter } from '../services/portfolio/read-hold.js';
-import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
+import { parsePageAccessInput, pageAccessOf } from '../services/page/access.js';
 import { toolError } from './tool-error.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 
@@ -115,7 +115,7 @@ export function registerPortfolioTools(
                     size_kb: Math.round(data.length / 1024),
                 }, true);
             }
-            // Who may open the page (services/page-access.ts), checked for the agent's owner before any write.
+            // Who may open the page (services/page/access.ts), checked for the agent's owner before any write.
             const access = accessIn === undefined ? null : await parsePageAccessInput(storage, accessIn, { identity: getAgentGaii() });
             if (access && 'refusal' in access) return toolError(access.refusal.code, access.refusal.message);
 

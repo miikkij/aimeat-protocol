@@ -20,7 +20,7 @@
  *     A password share is not counted: a stranger needs the password too.
  *   - An organism: its visibility, and its member roster when the roster is set public.
  *   - The welcome page while it is switched on, and a company front page while the address serves
- *     something: their own `access` (services/page-access.ts pageAccessLevel) names who opens them.
+ *     something: their own `access` (services/page/access.ts pageAccessLevel) names who opens them.
  *
  *   Who a share or an organism belongs to: an organism counts for the people who hold it
  *   (services/organism/ownership.ts); a workspace share for its workspace's creator and for the
@@ -54,7 +54,7 @@ import { isOrganismOwner } from '../organism/ownership.js';
 import { companyAddress } from '../company/company-service.js';
 import { listPublishedMembers } from '../portfolio/members.js';
 import { portfolioSwitchState } from '../portfolio/config.js';
-import { pageAccessLevel } from '../page-access.js';
+import { pageAccessLevel } from '../page/access.js';
 import { appTarget, boardTarget, organismTarget, workspaceTarget } from '../classification/containers.js';
 import {
   type ExposureContext, type ExposureFound, type ExposureItem, type ExposureLevel, type ExposureSource,
@@ -233,7 +233,7 @@ export const portfolioSource: ExposureSource = {
     // (services/portfolio/members.ts, the same candidates resolvePublishedPortfolio serves from).
     const published = await ctx.memo('portfolios', () => listPublishedMembers(ctx.storage));
     if (!published.some(m => m.username === ownerName)) return [];
-    // Who may open it: the page's own `access` (services/page-access.ts), as the portfolio origin reads it.
+    // Who may open it: the page's own `access` (services/page/access.ts), as the portfolio origin reads it.
     const lv = pageAccessLevel((await portfolioSwitchState(ctx.storage, ownerName, ctx.config.nodeId)).access);
     return [{
       kind: 'portfolio', id: ownerName, title: 'Your welcome page', title_parts: closeAs('portfolio'), ...lv,

@@ -42,7 +42,7 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { readBodyCapped } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 import { compareVersions } from '../federation/overview.js';
-import { readChangelog, type ChangelogEntry } from '../page-body-live.js';
+import { readChangelog, type ChangelogEntry } from '../page/body-live.js';
 import { buildNodeUpdatePrompt, type InstallMethod } from './update-prompt.js';
 
 const PACKAGE = 'aimeat';

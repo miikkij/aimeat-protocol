@@ -76,7 +76,7 @@ beforeAll(async () => {
   (await import('../../src/services/draft-token.js')).initDraftTokenKeys(privateKey, publicKey);
   (await import('../../src/services/operator/confirm.js')).initConfirmTokenKeys(privateKey, publicKey);
   (await import('../../src/services/parties/token.js')).initPartyTokenKeys(privateKey, publicKey);
-  (await import('../../src/services/page-frame-token.js')).initPageFrameTokenKeys(privateKey, publicKey);
+  (await import('../../src/services/page/frame-token.js')).initPageFrameTokenKeys(privateKey, publicKey);
   (await import('../../src/services/design-book/preview-token.js')).initDesignBookPreviewTokenKeys(privateKey, publicKey);
   // Imported here for the cold start: these two pull in much of the node.
   await import('../../src/services/external-login.js');
@@ -165,7 +165,7 @@ describe('the short purpose tokens still verify', () => {
   });
 
   it('a page frame and a Design Book preview', async () => {
-    const { verifyPageFrameToken } = await import('../../src/services/page-frame-token.js');
+    const { verifyPageFrameToken } = await import('../../src/services/page/frame-token.js');
     const { designBookPreviewTokenOpens } = await import('../../src/services/design-book/preview-token.js');
     expect(await verifyPageFrameToken(T.pageFrame)).toEqual({ org: 'org-legacy', ws: 'ws-legacy', sp: 'docs', ns: 'docs', id: 'page-1', r: 'latest', k: 'pub' });
     expect(await designBookPreviewTokenOpens(T.designBookPreview, 'part-legacy')).toBe(true);

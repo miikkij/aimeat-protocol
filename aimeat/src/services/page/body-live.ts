@@ -1,5 +1,5 @@
 /**
- * @file page-body-live.ts
+ * @file src/services/page/body-live.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The part of a public page's server-rendered body that comes from live data: the
@@ -45,11 +45,11 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { appSeoIndexable } from './app/seo.js';
-import { listSearchableMembers } from './portfolio/members.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { appSeoIndexable } from '../app/seo.js';
+import { listSearchableMembers } from '../portfolio/members.js';
+import { logger } from '../../utils/logger.js';
 
 /** Owner text on one markdown line: whitespace folded, markdown syntax dropped, length capped. */
 export function mdText(s: unknown, max = 300): string {
@@ -71,7 +71,7 @@ let changelog: ChangelogEntry[] | null = null;
 export function readChangelog(): ChangelogEntry[] {
   if (changelog) return changelog;
   changelog = [];
-  for (const p of [join(here, '..', '..', 'public', 'changelog.json'), join(here, '..', '..', '..', 'public', 'changelog.json')]) {
+  for (const p of [join(here, '..', '..', '..', 'public', 'changelog.json'), join(here, '..', '..', '..', '..', 'public', 'changelog.json')]) {
     if (!existsSync(p)) continue;
     const parsed = JSON.parse(readFileSync(p, 'utf-8')) as { entries?: ChangelogEntry[] };
     changelog = Array.isArray(parsed.entries) ? parsed.entries : [];
@@ -85,7 +85,7 @@ const helpFiles = new Map<string, string | null>();
 function readHelpFile(lang: string): string | null {
   if (helpFiles.has(lang)) return helpFiles.get(lang)!;
   let text: string | null = null;
-  for (const p of [join(here, '..', '..', 'public', 'help', `help.${lang}.md`), join(here, '..', '..', '..', 'public', 'help', `help.${lang}.md`)]) {
+  for (const p of [join(here, '..', '..', '..', 'public', 'help', `help.${lang}.md`), join(here, '..', '..', '..', '..', 'public', 'help', `help.${lang}.md`)]) {
     if (existsSync(p)) { text = readFileSync(p, 'utf-8'); break; }
   }
   helpFiles.set(lang, text);

@@ -192,7 +192,7 @@ function locs(xml: string): string[] {
         }
     });
 
-    // Live data in the body (services/page-body-live.ts). Bingbot read 130 words on the front page
+    // Live data in the body (services/page/body-live.ts). Bingbot read 130 words on the front page
     // and 105 on the change log on 2026-09-23, and Bing had the site at "Discovered but not crawled".
     await test('the change log page sends every entry, not its summary', async () => {
         const log = JSON.parse(readFileSync(new URL('../public/changelog.json', import.meta.url), 'utf-8')) as

@@ -103,7 +103,7 @@ import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { verifyPassword } from '../../services/password.js';
 import { setWorkspaceShareOp, shareServedVisibility, type SetShareBody } from '../../services/workspace/share.js';
-import { servePublicDocs } from '../../services/page-frame.js';
+import { servePublicDocs } from '../../services/page/frame.js';
 import { markPageOpened, markPagesOpened } from '../../services/workspace/opened.js';
 import { generateShareToken, shareTokenVersionOf, SHARE_TOKEN_TTL_SECONDS } from '../../services/share-token.js';
 import { recordsToIcs, icsKeyMatches } from '../../services/calendar-feed.js';

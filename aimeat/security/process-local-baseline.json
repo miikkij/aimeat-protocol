@@ -1173,19 +1173,19 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/page-body-live.ts :: let :: changelog": {
+    "src/services/page/body-live.ts :: let :: changelog": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/page-body-live.ts :: map :: helpFiles": {
+    "src/services/page/body-live.ts :: map :: helpFiles": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/page-frame-token.ts :: let :: _privateKey": {
+    "src/services/page/frame-token.ts :: let :: _privateKey": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/page-frame-token.ts :: let :: _publicKey": {
+    "src/services/page/frame-token.ts :: let :: _publicKey": {
       "count": 1,
       "reason": "DEBT"
     },

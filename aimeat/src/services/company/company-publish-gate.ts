@@ -5,7 +5,7 @@
  * @description The publish gate at the doors that make a company's front page public (plan
  *   doc-mvcn6c7e4e5q, V4 and V3.10): PUT /v1/companies/:id/front-page, PUT /v1/companies/:id/portfolio
  *   and their MCP tools. The address is public when it serves something AND opens to anyone (its
- *   `frontPageAccess`, services/page-access.ts), as the exposure report counts it
+ *   `frontPageAccess`, services/page/access.ts), as the exposure report counts it
  *   (services/exposure/sources-places.ts companySource). So pointing an address that serves nothing
  *   ('none') at a page open to anyone is a raise, and so is opening a served front page to anyone.
  *
@@ -28,7 +28,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import type { CallerContext } from '../caller-context.js';
 import { companyPortfolioKey, publishCompanyPortfolio, type CompanyPortfolioStatus } from './company-portfolio.js';
 import { CompanyError, requireOwnCompany, resolveFrontPage, setFrontPage } from './company-service.js';
-import { pageAccessOf } from '../page-access.js';
+import { pageAccessOf } from '../page/access.js';
 import { publishAskOf, fileAsk } from '../publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
 import { askedOf, type AppPublishAsked, type PageGate } from '../app/publish-gate.js';

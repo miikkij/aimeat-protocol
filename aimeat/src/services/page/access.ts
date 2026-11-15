@@ -1,5 +1,5 @@
 /**
- * @file src/services/page-access.ts
+ * @file src/services/page/access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may OPEN an owner's welcome page (the portfolio) and a company's front page (plan
@@ -27,12 +27,12 @@
  * @version-history
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V3.10).
  */
-import type { Storage } from '../storage/interface.js';
-import type { ContentAccess } from '../config/visibility.js';
-import { parseAppAccessInput, appAccessOf, appAudience, type AppAccess } from './app/access.js';
-import { audienceAllows, type AudienceAuth } from './audience.js';
-import { organismVisibilityRefusal } from './organism/visibility.js';
-import type { PageRef } from './app/access-token.js';
+import type { Storage } from '../../storage/interface.js';
+import type { ContentAccess } from '../../config/visibility.js';
+import { parseAppAccessInput, appAccessOf, appAudience, type AppAccess } from '../app/access.js';
+import { audienceAllows, type AudienceAuth } from '../audience.js';
+import { organismVisibilityRefusal } from '../organism/visibility.js';
+import type { PageRef } from '../app/access-token.js';
 
 /** What an owner writes and what a read answers: the app's three words. */
 export type PageAccess = AppAccess;

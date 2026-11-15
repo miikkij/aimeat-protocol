@@ -263,7 +263,7 @@ export async function updateCompany(storage: Storage, ownerGhii: string, id: str
  * Sets what the company address serves. An 'app' front page must be an app THIS owner
  * published — pointing a company address at someone else's app would let it wear that
  * app as its own. `front` null keeps what the address serves. `access` is who may open the front
- * page as stored (null for anyone, services/page-access.ts, checked by the caller); undefined keeps it.
+ * page as stored (null for anyone, services/page/access.ts, checked by the caller); undefined keeps it.
  */
 export async function setFrontPage(
   storage: Storage, ownerGhii: string, id: string, front: CompanyFrontPage | null, access?: string | null,

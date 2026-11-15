@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description A member's two calls about one page of a document space:
  *     - POST …/documents/:space/:docId/frame — the frame address of an HTML page, the published copy
- *       or the draft (services/page-frame.ts). A member reads a page through membership, so the
+ *       or the draft (services/page/frame.ts). A member reads a page through membership, so the
  *       token is minted for a member (`k: 'mem'`), and only after the same read gate the workspace
  *       read answers to and the classification reader's show.
  *     - POST …/documents/:space/:docId/opened — the day this page was last opened, for a page the
@@ -31,8 +31,8 @@ import { findWorkspaceRecord } from '../../services/workspace/write.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { isHtmlPageValue } from '../../services/html-page.js';
-import { frameUrlFor } from '../../services/page-frame.js';
-import { PAGE_FRAME_TTL_SECONDS } from '../../services/page-frame-token.js';
+import { frameUrlFor } from '../../services/page/frame.js';
+import { PAGE_FRAME_TTL_SECONDS } from '../../services/page/frame-token.js';
 import { markPageOpened } from '../../services/workspace/opened.js';
 import { canReadWorkspaceRecords } from '../../services/workspace/access.js';
 import type { OrganismHelpers } from './shared.js';

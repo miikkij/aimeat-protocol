@@ -29,13 +29,13 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { PublicPage } from '../../data/public-pages.js';
-import { pageAccessOf } from '../page-access.js';
+import { pageAccessOf } from '../page/access.js';
 
 /** The portfolio's own config record (`portfolio.config`), as far as this decision needs it. */
 export interface PortfolioSeoConfig {
   enabled?: unknown;
   seoIndex?: unknown;
-  /** Who may open the page (services/page-access.ts); anything but anyone keeps it out of search. */
+  /** Who may open the page (services/page/access.ts); anything but anyone keeps it out of search. */
   access?: unknown;
   title?: unknown;
   tagline?: unknown;
