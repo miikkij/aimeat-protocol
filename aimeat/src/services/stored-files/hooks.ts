@@ -1,5 +1,5 @@
 /**
- * @file src/services/storage-file-hooks.ts
+ * @file src/services/stored-files/hooks.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who is told about a stored or removed file after the fact: the content class hooks
@@ -13,9 +13,9 @@
  *     storage-file-write.ts; addStorageFileListener added for the data products that run when a source
  *     changes (services/dataproduct/on-change.ts, WP9c).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
 
 /** A function told about a stored or removed file after the fact. It returns at once and never throws. */
 export type StorageFileHook = (deps: { storage: Storage; config: AimeatConfig }, ownerGaii: string, key: string) => void;

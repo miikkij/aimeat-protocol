@@ -101,7 +101,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AiProvenanceRecordRow, ContentLabelTarget } from '../../storage/interface.js';
 import { recordVersionLabelSource, hiddenBySourceLabel } from './source-labels.js';
-import { writeStorageFile } from '../storage-file-write.js';
+import { writeStorageFile } from '../stored-files/write.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../resource-events.js';
 import {
     provenanceForWrite, storeHeldProvenance, contentHashOf as recordHashOf, type DeclaredProvenance,

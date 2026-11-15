@@ -64,7 +64,7 @@
       "digest": "sha256:44df3cb8dde5babe9dd7cbfd"
     },
     "05-data-protection.md": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/classification/defaults.ts",
         "aimeat/src/services/classification/levels.ts",
@@ -72,7 +72,7 @@
         "aimeat/src/services/connections/drive-files.ts",
         "aimeat/src/services/context/history-keys.ts"
       ],
-      "digest": "sha256:9747814e64e873a3558a2e5d"
+      "digest": "sha256:1311ba54921ca8d088eb6b17"
     },
     "06-ai-and-models.md": {
       "reviewedOn": "2026-11-15",
@@ -324,7 +324,7 @@
       "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
       "aimeat/src/services/classification/levels.ts": "fdec7ded5eb8b0a5",
       "docs/data-classification.md": "6f07c519b849b178",
-      "aimeat/src/services/connections/drive-files.ts": "b49a3a7cea3b7bbe",
+      "aimeat/src/services/connections/drive-files.ts": "d539958a587e4811",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68"
     },
     "06-ai-and-models.md": {

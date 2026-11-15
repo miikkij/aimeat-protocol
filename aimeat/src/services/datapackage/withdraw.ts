@@ -53,7 +53,7 @@ import { datapackageReadable, fileVisibilityOf, type DatapackageReader } from '.
 import { trustedPackageOf, recordPackageWithdrawal } from './audience-record.js';
 import { saleTermsOf, deleteSaleTerms } from './sale-terms-record.js';
 import { latestKey, packageKeyRoot, validateName, type LatestPointer } from './contract.js';
-import { writeStorageFile } from '../storage-file-write.js';
+import { writeStorageFile } from '../stored-files/write.js';
 import { emitChange } from '../event-bus.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';

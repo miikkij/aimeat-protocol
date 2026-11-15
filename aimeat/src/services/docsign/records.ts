@@ -65,7 +65,7 @@ import { localAccountOf } from '../../utils/gaii.js';
 import { verify as verifyEd25519 } from '../../auth/keypair.js';
 import { beginSigning, finishSigning } from '../passkeys.js';
 import { notify } from '../notify.js';
-import { removeStorageFile } from '../storage-file-write.js';
+import { removeStorageFile } from '../stored-files/write.js';
 import { readerFor } from '../classification/reader.js';
 import { storedFileShownTo } from '../datapackage/source-labels.js';
 import { logger } from '../../utils/logger.js';

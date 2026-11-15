@@ -30,7 +30,7 @@ import type { ConnectContext } from './oauth.js';
 import { readResource } from './read.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { readBodyCapped } from '../../utils/read-capped.js';
-import { writeStorageFile, type StorageWriteDeps } from '../storage-file-write.js';
+import { writeStorageFile, type StorageWriteDeps } from '../stored-files/write.js';
 import type { CallerContext } from '../caller-context.js';
 import { extractFileText } from '../file-text/index.js';
 import { pdfReadLimits } from '../file-text/pdf-bounded.js';
@@ -160,7 +160,7 @@ function safeKeyName(value: string): string {
  * `writer` is the caller the route or MCP tool serves, handed to the storage write as its
  * `publishGate` the way the generic file routes hand it. A key a page origin serves
  * (`company/<id>/index.html`, `portfolio/index.html`) then asks what those routes ask
- * (services/storage-page-keys.ts): without a writer the fence reads the write as the node's own and
+ * (services/stored-files/page-keys.ts): without a writer the fence reads the write as the node's own and
  * asks nothing (secaudit2026nov02d round 13). The file is stored private either way.
  */
 export async function storeDriveFile(

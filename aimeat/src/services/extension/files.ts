@@ -83,7 +83,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, StorageFileRecord } from '../../storage/interface.js';
 import type { PublishRequester } from '../publish-requests/store.js';
 import type { ClosedNodeWarning } from '../closed-node-level.js';
-import { closedFileLevel, fileCapRefusal, keptFileLevel, fileFilePublishRequest } from '../storage-file-publish.js';
+import { closedFileLevel, fileCapRefusal, keptFileLevel, fileFilePublishRequest } from '../stored-files/publish.js';
 import { isRaiseToPublic } from '../publish-gate.js';
 import { askActors, type PublishActor } from '../publish-actors.js';
 import { authorizeRead } from '../access-guard.js';
@@ -124,7 +124,7 @@ interface WriteLevel {
 
 /**
  * The level a sandbox write stores a file at: what writeStorageFile decides for an upload
- * (services/storage-file-write.ts), asked about the run's publishers. A private write is unchanged. A
+ * (services/stored-files/write.ts), asked about the run's publishers. A private write is unchanged. A
  * public one is stored at 'members' on a node that shows its content to signed-in accounts only, is
  * refused past its label's audience cap, and, when it raises the file to public for a principal the
  * owner is asked about, is stored at the level the file had (a new one: private) with the requester
@@ -312,7 +312,7 @@ export function makeExtensionFiles(deps: {
             if (!quota.allowed) throw new Error(quota.reason ?? 'storage quota exceeded');
 
             const asked = opts?.visibility === 'public' ? 'public' : 'private';
-            // A public write meets what an upload meets (services/storage-file-write.ts): the closed
+            // A public write meets what an upload meets (services/stored-files/write.ts): the closed
             // node's level, the label's audience cap and the publish gate, asked about `publishers`.
             const level: WriteLevel = deps.publishers
                 ? await publicFileLevel({ storage, config }, callerGaii, full, asked, deps.publishers)

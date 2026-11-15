@@ -46,7 +46,7 @@ import { installWriteClassifier } from '../../src/services/classification-queue-
 import { memoryTarget } from '../../src/services/classification/labels.js';
 import { contentAfterStore, flushContentIntake } from '../../src/services/content/intake.js';
 import { getFacts, sourceIdOf } from '../../src/services/content/facts-store.js';
-import { writeStorageFile } from '../../src/services/storage-file-write.js';
+import { writeStorageFile } from '../../src/services/stored-files/write.js';
 import { initTelemetryBuffer, recordTelemetryActivity, flushTelemetryBuffer } from '../../src/services/telemetry-buffer.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { countVisit, flushVisibility } from '../../src/services/visibility/visibility-counter.js';

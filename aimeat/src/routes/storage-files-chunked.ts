@@ -60,8 +60,8 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/mid
 import { success, error } from '../middleware/envelope.js';
 import { emitRecordChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { appOwnedKeyRefusal, groupBindingRefusal, writeStorageFile } from '../services/storage-file-write.js';
-import { pageKeyWriteRefusal, pageWriterOf } from '../services/storage-page-keys.js';
+import { appOwnedKeyRefusal, groupBindingRefusal, writeStorageFile } from '../services/stored-files/write.js';
+import { pageKeyWriteRefusal, pageWriterOf } from '../services/stored-files/page-keys.js';
 import { organismVisibilityRefusal } from '../services/organism/visibility.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
@@ -333,7 +333,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             }
         }
 
-        // The shared write (services/storage-file-write.ts): the key fence, the per-file and account
+        // The shared write (services/stored-files/write.ts): the key fence, the per-file and account
         // ceilings, the group or workspace binding, the overage charge and the change events, the
         // same as POST /v1/storage and the MCP tool. This door used to create the file itself and
         // dropped the binding, so a chunked 'group' file was bound to no group (2026-09-29).

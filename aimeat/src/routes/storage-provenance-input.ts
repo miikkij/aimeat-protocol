@@ -6,7 +6,7 @@
  *   every REST door that stores a file (POST /v1/storage inline and presigned, the chunked complete,
  *   POST /v1/memory/files), and the `ai_provenance` block every upload answer carries.
  *
- *   The decision itself is services/storage-file-write.ts; this file only turns a request body into
+ *   The decision itself is services/stored-files/write.ts; this file only turns a request body into
  *   its input, with the same schema the MCP tools validate against (mcp/ai-provenance-input.ts), and
  *   refuses a block that does not validate rather than storing the file without it.
  * @structure storageProvenanceFromBody() · uploadProvenanceBlock()
@@ -18,7 +18,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { StorageProvenanceInput } from '../services/storage-file-write.js';
+import type { StorageProvenanceInput } from '../services/stored-files/write.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai/provenance-marks.js';
 

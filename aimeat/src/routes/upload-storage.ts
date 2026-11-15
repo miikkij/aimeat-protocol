@@ -31,9 +31,9 @@
 import type { Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
-import { writeStorageFile } from '../services/storage-file-write.js';
-import { requesterFromMeta } from '../services/storage-file-publish.js';
-import { pageWriterFromMeta } from '../services/storage-page-keys.js';
+import { writeStorageFile } from '../services/stored-files/write.js';
+import { requesterFromMeta } from '../services/stored-files/publish.js';
+import { pageWriterFromMeta } from '../services/stored-files/page-keys.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import type { DeclaredProvenance } from '../services/ai/provenance.js';
@@ -141,7 +141,7 @@ export async function handleStorageUpload(
     const liveGate = !requester && actorIsAgent ? await uploadPublishGate(storage, config.nodeId, actor) : undefined;
 
     // The key fence, the two size ceilings, the account-wide quota, the record shape, the overage
-    // charge and the change events are services/storage-file-write.ts, shared with POST /v1/storage
+    // charge and the change events are services/stored-files/write.ts, shared with POST /v1/storage
     // and aimeat_storage_upload. This door's own business is reading the token meta and rendering
     // the answer. `sub` is the token subject, set server-side at mint from resolveIdentity(), so the
     // owner the file lands under is never anything a client sent.
@@ -170,7 +170,7 @@ export async function handleStorageUpload(
             // state now (gone, closed to own storage) is what the write asks.
             ...(typeof meta.store === 'string' && meta.store ? { store: { id: meta.store, operator: true } } : {}),
             // The welcome page's writer as the mint knew it, from the SIGNED token, when no live caller
-            // is asked here (services/storage-page-keys.ts).
+            // is asked here (services/stored-files/page-keys.ts).
             ...(!liveGate && pageWriterFromMeta(meta.page_writer) ? { pageWriter: pageWriterFromMeta(meta.page_writer) } : {}),
         },
     );

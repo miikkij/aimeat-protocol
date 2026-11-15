@@ -64,7 +64,7 @@ import { createRequire } from 'node:module';
 import { randomBytes, createPrivateKey, createPublicKey, timingSafeEqual, X509Certificate, type KeyObject } from 'node:crypto';
 import { SignJWT } from 'jose';
 import type { CallerContext } from '../caller-context.js';
-import { writeStorageFile, removeStorageFile } from '../storage-file-write.js';
+import { writeStorageFile, removeStorageFile } from '../stored-files/write.js';
 import { logger } from '../../utils/logger.js';
 import { docsignMaxBytes } from '../../config/docsign.js';
 import { validatePdf, type SignatureReport } from './validate.js';

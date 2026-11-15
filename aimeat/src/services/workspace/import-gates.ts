@@ -24,7 +24,7 @@
  *
  *   `outsideWorkspaceRoot()` is the key fence: an image key the archive names is remapped into the
  *   NEW workspace root, and anything that falls outside it is not written at all. The storage write
- *   itself goes through services/storage-file-write.ts, which carries the key fence, the app-owned
+ *   itself goes through services/stored-files/write.ts, which carries the key fence, the app-owned
  *   key refusal and the file ceilings.
  * @structure ImportCaller · RestoreClamp · importCallerContext() · restoredLevel() ·
  *   outsideWorkspaceRoot()

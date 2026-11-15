@@ -45,7 +45,7 @@
  *   v1.0.0 — 2026-10-18 — Extracted from ./store.ts (writeLatest, upsertCatalogueEntry) with
  *     readPointer and setVersionAudience (plan doc-mvcn6c7e4e5q, V4).
  */
-import { writeStorageFile, type StorageWriteDeps } from '../storage-file-write.js';
+import { writeStorageFile, type StorageWriteDeps } from '../stored-files/write.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import {

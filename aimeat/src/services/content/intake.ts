@@ -51,7 +51,7 @@ import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { isReservedServerKey, isServerWrittenKey } from '../../utils/reserved-keys.js';
 import { onMemoryWrittenEvent, isRemoteEvent, type MemoryWriteEvent } from '../event-bus.js';
 import { callerFromAuth } from '../caller-context.js';
-import { setStorageFileHooks } from '../storage-file-write.js';
+import { setStorageFileHooks } from '../stored-files/write.js';
 import { inspectSource, memoryValueText } from './pipeline.js';
 import { readSettings } from './settings.js';
 import { getFacts, deleteFacts, deleteText, deleteProfileDetail, sourceIdOf } from './facts-store.js';

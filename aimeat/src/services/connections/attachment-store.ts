@@ -23,7 +23,7 @@
  */
 import type { ConnectContext } from './oauth.js';
 import { readResource } from './read.js';
-import { writeStorageFile, type StorageWriteDeps } from '../storage-file-write.js';
+import { writeStorageFile, type StorageWriteDeps } from '../stored-files/write.js';
 
 /** As a request body arrives: every field is checked here, so none is trusted to be present. */
 export interface StoreAttachmentInput {

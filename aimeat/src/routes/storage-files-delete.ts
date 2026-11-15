@@ -19,7 +19,7 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/mid
 import { success, error } from '../middleware/envelope.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { removeStorageFile } from '../services/storage-file-write.js';
+import { removeStorageFile } from '../services/stored-files/write.js';
 import { extractKey } from './storage-files-request.js';
 import { callerOf } from '../middleware/caller.js';
 
@@ -29,7 +29,7 @@ export function storageDeleteRouter(config: AimeatConfig, storage: Storage): Rou
 
     // DELETE /v1/storage/{*key} — delete file (agent auth)
     // The key fence, the existence and ownership checks and the change events are the shared delete
-    // (services/storage-file-write.ts), which aimeat_storage_delete calls too. This handler parses
+    // (services/stored-files/write.ts), which aimeat_storage_delete calls too. This handler parses
     // the request and renders the answer.
     router.delete('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const gaii = resolve(req);

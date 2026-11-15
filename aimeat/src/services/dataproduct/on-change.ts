@@ -14,7 +14,7 @@
  *                  which a written record, a draft, a publish and a delete in that workspace emit;
  *     app, memory  the `memoryWritten` event of a key under the app's prefix, or of the one key, by any
  *                  principal of the account that holds it;
- *     file         a stored or removed file (services/storage-file-hooks.ts addStorageFileListener);
+ *     file         a stored or removed file (services/stored-files/hooks.ts addStorageFileListener);
  *     datapackage  the source package's `latest.json` pointer, which every published version writes.
  *   An extension action has no such signal; ./definition.ts refuses `on: 'change'` for it.
  *
@@ -38,7 +38,7 @@
  */
 import type { SourceDeps } from './source-common.js';
 import { onMemoryWrittenEvent, onChangeEvent, isRemoteEvent, WORKSPACE_DOMAIN_PREFIX, type ChangeEvent, type MemoryWriteEvent } from '../event-bus.js';
-import { addStorageFileListener } from '../storage-file-hooks.js';
+import { addStorageFileListener } from '../stored-files/hooks.js';
 import { latestKey } from '../datapackage/contract.js';
 import { ownerGhiiOf, runAsNode } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';

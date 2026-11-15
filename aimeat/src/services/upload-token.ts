@@ -199,12 +199,12 @@ export const PRESIGNED_META_KEYS = {
     // `ai_provenance` / `ai_provenance_id` for the same reason as `app` above: the presigned door is
     // the one recommended for anything over 1 KB, so a speech clip or picture uploaded that way must
     // carry its statement too (2026-10-08).
-    // `publish_ask`: the requester the publish gate asked about at the mint (services/storage-file-publish.ts),
+    // `publish_ask`: the requester the publish gate asked about at the mint (services/stored-files/publish.ts),
     // set by the node, never by a client; the upload files the request when the bytes land.
     // `object`: the store reference a direct upload's bytes go to, set by the node at the mint, never by
     // a client; POST /v1/upload/{token}/complete records the file that names it.
     // `page_writer`: who asked for the URL of the welcome page key and whether it may read memory, set
-    // by the node at the mint, never by a client (services/storage-page-keys.ts).
+    // by the node at the mint, never by a client (services/stored-files/page-keys.ts).
     storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id', 'publish_ask', 'store', 'object', 'page_writer'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],

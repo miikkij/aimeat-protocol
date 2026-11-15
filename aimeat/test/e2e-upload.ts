@@ -307,7 +307,7 @@ await test('PUT file to storage upload_url succeeds', async () => {
 });
 
 await test('The storage PUT asks the shared writer again: a group deleted after the mint refuses the upload', async () => {
-    // The mint checks the group exists; the PUT must ask again (services/storage-file-write.ts),
+    // The mint checks the group exists; the PUT must ask again (services/stored-files/write.ts),
     // so a route that stored the record itself would land a file bound to a group that is gone.
     const g = await json('/v1/groups', authed({ method: 'POST', body: JSON.stringify({ name: 'upload-gone-group', members: [] }) }));
     assert(g.status === 201, `create group: ${g.status} ${JSON.stringify(g.body?.error)}`);

@@ -37,7 +37,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import { writeStorageFile } from '../storage-file-write.js';
+import { writeStorageFile } from '../stored-files/write.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import type { CallerContext } from '../caller-context.js';

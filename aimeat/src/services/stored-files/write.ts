@@ -1,5 +1,5 @@
 /**
- * @file src/services/storage-file-write.ts
+ * @file src/services/stored-files/write.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Storing and removing one binary file, once, for every surface that can do either.
@@ -123,36 +123,36 @@
  *     says nothing is stamped), and `aiProvenanceId` stores a record the node minted itself. The
  *     presigned mint asks the refusals that need no bytes and carries the statement in the token.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../storage/interface.js';
-import { checkStorageQuota, chargeOverage } from './quota.js';
-import { generateUploadToken, buildUploadMeta } from './upload-token.js';
-import { emitRecordChange, emitRecordChangePriorUnknown } from './event-bus.js';
-import { isAnonymousGaii } from '../utils/visibility-words.js';
-import { storeHeldProvenance } from './ai/provenance.js';
-import { localAccountName } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
+import { checkStorageQuota, chargeOverage } from '../quota.js';
+import { generateUploadToken, buildUploadMeta } from '../upload-token.js';
+import { emitRecordChange, emitRecordChangePriorUnknown } from '../event-bus.js';
+import { isAnonymousGaii } from '../../utils/visibility-words.js';
+import { storeHeldProvenance } from '../ai/provenance.js';
+import { localAccountName } from '../../utils/gaii.js';
 import {
     provenanceForStoredBytes, storageProvenanceMintRefusal,
     type StorageProvenanceInput, type ProvenanceRefusalCode,
-} from './storage-file-provenance.js';
-import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta, notePageKeyChange, type PageWriter } from './storage-page-keys.js';
+} from './provenance.js';
+import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta, notePageKeyChange, type PageWriter } from './page-keys.js';
 // Moved to storage-file-provenance.ts (800-line limit); re-exported so the importers are unchanged.
 export { storageProvenanceMintRefusal };
 export type { StorageProvenanceInput, ProvenanceRefusalCode };
-import { ownExtensionFileKey } from './component/address.js';
-import { organismVisibilityRefusal } from './organism/visibility.js';
-import { unknownGroupRefusal } from '../storage/memory-sharing.js';
-import { emitChange } from './event-bus.js';
-import type { CallerContext } from './caller-context.js';
+import { ownExtensionFileKey } from '../component/address.js';
+import { organismVisibilityRefusal } from '../organism/visibility.js';
+import { unknownGroupRefusal } from '../../storage/memory-sharing.js';
+import { emitChange } from '../event-bus.js';
+import type { CallerContext } from '../caller-context.js';
 import {
     fileRaiseAsk, keptFileLevel, mintPublishCarry, fileFilePublishRequest, closedFileLevel, fileCapRefusal,
     type StoragePublishGate, type FilePublishFiled,
-} from './storage-file-publish.js';
-import type { ClosedNodeWarning } from './closed-node-level.js';
-import { uploadVisibilityOf } from './content-defaults.js';
-import { resolveChoice } from './file-store/file-store-resolver.js';
-import { adoptStorageObject, directUploadTarget } from '../storage/blob/file-store-wrap.js';
-import { fileStored, fileRemoved } from './storage-file-hooks.js';
+} from './publish.js';
+import type { ClosedNodeWarning } from '../closed-node-level.js';
+import { uploadVisibilityOf } from '../content-defaults.js';
+import { resolveChoice } from '../file-store/file-store-resolver.js';
+import { adoptStorageObject, directUploadTarget } from '../../storage/blob/file-store-wrap.js';
+import { fileStored, fileRemoved } from './hooks.js';
 
 /**
  * The level of a file (plan V5.2): none named is the file default for every caller; 'default' (the
@@ -165,7 +165,7 @@ function levelOf(config: AimeatConfig, named: string | undefined, gate: StorageP
 
 // The hooks told about a stored or removed file live in ./storage-file-hooks.ts (moved at the line
 // limit); the names this module exported are exported from here still.
-export { setStorageFileHooks, addStorageFileListener, type StorageFileHook } from './storage-file-hooks.js';
+export { setStorageFileHooks, addStorageFileListener, type StorageFileHook } from './hooks.js';
 
 /** How long a presigned storage upload URL is good for. The number the caller is told and the number
  *  the token is signed with are the same value, so they cannot drift apart. */
@@ -237,7 +237,7 @@ export interface StorageFileInput {
      */
     aiProvenanceId?: string;
     /**
-     * Ask the node's publish gate when this write makes the file public (services/storage-file-publish.ts,
+     * Ask the node's publish gate when this write makes the file public (services/stored-files/publish.ts,
      * plan doc-mvcn6c7e4e5q V4). The upload routes and aimeat_storage_upload set it; a write whose file is
      * public by design (a data package, an app backup) leaves it unset.
      */
@@ -588,7 +588,7 @@ export interface StorageUploadUrlInput {
      */
     provenance?: StorageProvenanceInput & { wireBlock?: unknown };
     /**
-     * Ask the publish gate for a file asked as public (services/storage-file-publish.ts mintPublishCarry):
+     * Ask the publish gate for a file asked as public (services/stored-files/publish.ts mintPublishCarry):
      * refused when nobody on this node can be asked, and otherwise the requester rides in the token as
      * `publish_ask`, so the upload files the request when the bytes land.
      */

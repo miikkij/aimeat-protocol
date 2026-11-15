@@ -13,7 +13,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { writeStorageFile } from '../storage-file-write.js';
+import { writeStorageFile } from '../stored-files/write.js';
 import { AiCompletionError } from './completion.js';
 
 export function createVoiceResult() {

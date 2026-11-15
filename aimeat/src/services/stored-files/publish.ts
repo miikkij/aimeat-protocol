@@ -1,5 +1,5 @@
 /**
- * @file src/services/storage-file-publish.ts
+ * @file src/services/stored-files/publish.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The publish gate for a stored file (plan doc-mvcn6c7e4e5q, V4): an upload or a
@@ -30,18 +30,18 @@
  *     only, a file asked as public is stored at 'members' with PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: stored files).
  */
-import type { StorageFileRecord } from '../storage/interface.js';
-import type { CallerContext } from './caller-context.js';
-import { isRaiseToPublic } from './publish-gate.js';
-import { publishAskOf, fileAsk, publishRequestedBody } from './publish-requests/ask.js';
-import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { signedInOnly } from '../config/visibility.js';
-import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
+import type { StorageFileRecord } from '../../storage/interface.js';
+import type { CallerContext } from '../caller-context.js';
+import { isRaiseToPublic } from '../publish-gate.js';
+import { publishAskOf, fileAsk, publishRequestedBody } from '../publish-requests/ask.js';
+import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { signedInOnly } from '../../config/visibility.js';
+import { closedNodeLevel, type ClosedNodeWarning } from '../closed-node-level.js';
 import {
     audienceCapOf, audienceOfVisibility, capByOf, capRefusalOf, type LABEL_CAPS_AUDIENCE,
-} from './classification/audience-cap.js';
-import { fileTarget } from './classification/labels.js';
+} from '../classification/audience-cap.js';
+import { fileTarget } from '../classification/labels.js';
 
 /**
  * Who makes the file public: a caller the gate asks now (a route's callerOf, an MCP tool's caller()),

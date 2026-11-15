@@ -216,7 +216,7 @@ const DELEGATES: Record<string, string> = {
     'src/mcp/core.ts': "services/work-lifecycle.ts ('work' on accept and deliver), routes/work.ts "
         + "createWorkItem ('work'), services/memory/write.ts ('memory') and services/boards/post.ts ('boards')",
     'src/mcp/core-admin.ts': "services/morsel.ts mintMorsels, which emits 'config' and 'wallet'",
-    'src/mcp/core-storage.ts': "services/storage-file-write.ts, which emits 'files' and 'memory'",
+    'src/mcp/core-storage.ts': "services/stored-files/write.ts, which emits 'files' and 'memory'",
     'src/mcp/classification.ts': "services/classification/labels.ts, whose setLabel and reviewLabel "
         + "emit 'classification' on every label row they store, and services/classification/policy-admin.ts, "
         + "whose writePolicy and reviewPolicy emit 'classification' on every stored change to a level. "

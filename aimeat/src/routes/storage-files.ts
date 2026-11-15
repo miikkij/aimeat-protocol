@@ -199,7 +199,7 @@ import { denyScope403 } from '../auth/deny.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import {
     writeStorageFile, mintStorageUploadUrl, changeStorageFileVisibility, type StorageProvenanceInput,
-} from '../services/storage-file-write.js';
+} from '../services/stored-files/write.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
 import { loadServedProvenance, setProvenanceHeaders, provenanceItemBlock, type ServedProvenance } from '../services/ai/provenance-marks.js';
 import { generateDownloadToken } from '../services/download-token.js';
@@ -268,7 +268,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         let federateFlag = false;
         let groupId: string | undefined;
         let workspaceRef: string | undefined;
-        // The writer, and what it said about how the bytes were made (services/storage-file-write.ts
+        // The writer, and what it said about how the bytes were made (services/stored-files/write.ts
         // decides). A raw-body upload carries no statement: the writer alone decides its record.
         let provenance: StorageProvenanceInput & { wireBlock?: unknown } = { actor: gaii, scopes: req.auth!.scopes, pipeline: 'rest.storage' };
         // The store the writer named for the bytes (`own:<name>`, `node:<name>`): the JSON body's
@@ -292,7 +292,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             provenance = stated.provenance;
 
             // --- PRESIGNED MODE: return upload URL ---
-            // The key fence and the token meta are the shared ones (services/storage-file-write.ts).
+            // The key fence and the token meta are the shared ones (services/stored-files/write.ts).
             // Hand-writing the meta here is how `group_id` and `workspace_refs` used to be dropped at
             // mint: a presigned upload asking for visibility 'group' landed bound to no group and was
             // then readable by nobody.
@@ -357,7 +357,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         // The key fence, the two size ceilings, the record shape, the overage charge and the change
-        // events are the shared write (services/storage-file-write.ts). This handler parses the
+        // events are the shared write (services/stored-files/write.ts). This handler parses the
         // request and renders the answer; the decisions belong to every door that stores a file.
         const written = await writeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, {
             key,

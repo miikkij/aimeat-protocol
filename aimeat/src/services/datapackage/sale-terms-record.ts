@@ -38,7 +38,7 @@ import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { claimOnceOnlyStep } from '../once-only-step.js';
-import { writeStorageFile, type StorageWriteDeps } from '../storage-file-write.js';
+import { writeStorageFile, type StorageWriteDeps } from '../stored-files/write.js';
 import { fileVisibilityOf } from './audience.js';
 import {
     audienceRecordsInPlace, packageNamespaces, recordPackageWithdrawal, recordPublicConfirmation, publicConfirmationOf,

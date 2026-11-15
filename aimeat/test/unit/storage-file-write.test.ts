@@ -29,7 +29,7 @@ vi.mock('../../src/services/upload-token.js', async (importOriginal) => {
     return { ...actual, generateUploadToken };
 });
 
-const { writeStorageFile, mintStorageUploadUrl, removeStorageFile } = await import('../../src/services/storage-file-write.js');
+const { writeStorageFile, mintStorageUploadUrl, removeStorageFile } = await import('../../src/services/stored-files/write.js');
 
 const OWNER = 'bot#alice@test-node';
 const ANON = 'shared#anonymous@test-node';

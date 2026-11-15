@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for a stored file: the file becomes public, as the owner,
- *   through changeStorageFileVisibility (services/storage-file-write.ts), the change both PATCH
+ *   through changeStorageFileVisibility (services/stored-files/write.ts), the change both PATCH
  *   visibility routes make (plan doc-mvcn6c7e4e5q, V4).
  *
  *   THE OWNER APPROVED WHAT THEY SAW. The request carries the file's `created_at` and `size` when it
@@ -17,7 +17,7 @@
  */
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 import { namespaceOfOwner } from './apply-memory.js';
-import { changeStorageFileVisibility } from '../storage-file-write.js';
+import { changeStorageFileVisibility } from '../stored-files/write.js';
 import { pubEmbedUrl } from '../doc-images.js';
 
 export async function applyFilePublish(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

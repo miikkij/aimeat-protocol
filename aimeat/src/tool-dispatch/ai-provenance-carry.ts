@@ -203,7 +203,7 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // (secaudit 2026-10 follow-up, Part B).
   aimeat_workspace_write: { kind: 'recorded-by-route', route: 'POST /v1/organisms/:id/workspace/drafts' },
   // POST /v1/storage records the declaration or attaches the id against the stored bytes, inline and
-  // presigned (services/storage-file-write.ts), and names the record in its answer (2026-10-08).
+  // presigned (services/stored-files/write.ts), and names the record in its answer (2026-10-08).
   aimeat_storage_upload: { kind: 'recorded-by-route', route: 'POST /v1/storage' },
 };
 

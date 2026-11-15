@@ -16,7 +16,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { GenerateForOwnerResult } from '../ai/image.js';
-import { fileFilePublishRequest } from '../storage-file-publish.js';
+import { fileFilePublishRequest } from '../stored-files/publish.js';
 import { logger } from '../../utils/logger.js';
 
 /** File the picture's request: a part of the record's request when there is one, else on its own. */

@@ -1,5 +1,5 @@
 /**
- * @file src/services/storage-page-keys.ts
+ * @file src/services/stored-files/page-keys.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The storage keys whose bytes a page origin serves, and what the generic file write and
@@ -31,15 +31,15 @@
  *     storage-file-write:company-front-page-key-unfenced-below-company-write).
  */
 import { createHash } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import type { CallerContext } from './caller-context.js';
-import type { PublishRequester } from './publish-requests/store.js';
-import { requesterOf } from './publish-requests/ask.js';
-import { companyPageIdOf, companyPageWriteRefusal, COMPANY_PAGE_WRITE_SCOPE, type CompanyPageRefusal } from './company/company-page-key.js';
-import { PORTFOLIO_HTML_KEY } from './portfolio/config.js';
-import { notePortfolioFileChange } from './portfolio/read-hold.js';
-import { localAccountName } from '../utils/gaii.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { CallerContext } from '../caller-context.js';
+import type { PublishRequester } from '../publish-requests/store.js';
+import { requesterOf } from '../publish-requests/ask.js';
+import { companyPageIdOf, companyPageWriteRefusal, COMPANY_PAGE_WRITE_SCOPE, type CompanyPageRefusal } from '../company/company-page-key.js';
+import { PORTFOLIO_HTML_KEY } from '../portfolio/config.js';
+import { notePortfolioFileChange } from '../portfolio/read-hold.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 type Ctx = { storage: Storage; config: AimeatConfig };
 

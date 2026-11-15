@@ -17,7 +17,7 @@ import type { Storage, StorageFileRecord } from '../../src/storage/interface.js'
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { authorizeRead } from '../../src/services/access-guard.js';
-import { changeStorageFileVisibility } from '../../src/services/storage-file-write.js';
+import { changeStorageFileVisibility } from '../../src/services/stored-files/write.js';
 import { bindFileToWorkspace } from '../../src/services/record-files.js';
 
 const NODE = 'aimeat-group-binding-test';

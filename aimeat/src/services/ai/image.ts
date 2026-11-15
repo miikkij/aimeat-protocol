@@ -93,7 +93,7 @@ import { logger } from '../../utils/logger.js';
 import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account/limits.js';
 import {
   fileRaiseAsk, fileFilePublishRequest, type StoragePublishGate, type FilePublishFiled,
-} from '../storage-file-publish.js';
+} from '../stored-files/publish.js';
 import { publishAskOf } from '../publish-requests/ask.js';
 import { directiveText, type GenRuleBypass, type GenRuleMark } from './gen-rules.js';
 import { genRulesForCall } from './gen-rules-store.js';
@@ -123,7 +123,7 @@ export interface GenerateForOwnerOptions {
   publicVisibility?: boolean;
   /**
    * Ask the node's publish gate when `publicVisibility` makes the picture public, as an upload of the
-   * same bytes asks it (services/storage-file-publish.ts): the caller that asked, as the route's
+   * same bytes asks it (services/stored-files/publish.ts): the caller that asked, as the route's
    * callerOf or the MCP session's caller(). A caller the node asks the owner about gets the picture
    * stored private and a request of kind 'file'. The doors and the AI job set it; left unset, the
    * picture is public as asked, which is the node's own work.
@@ -321,7 +321,7 @@ export async function generateForOwner(
     || `ai-images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extensionFor(result.mime)}`;
   // Where the picture lives: the payer's storage, or the caller's own namespace when that differs.
   const holder = opts.storeIn ?? gaii;
-  // The publish gate, as an upload of these bytes meets it (services/storage-file-write.ts): a raise to
+  // The publish gate, as an upload of these bytes meets it (services/stored-files/write.ts): a raise to
   // public by a caller the owner is asked about stores the picture private and files a request once it
   // exists. Keeping a public file at this key public asks nothing (fileRaiseAsk).
   const raise = requester

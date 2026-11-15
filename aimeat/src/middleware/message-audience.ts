@@ -204,7 +204,7 @@ export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze
     PROVIDER_REJECTED: 'The same call fails again as it is. Change the model, the format or the voice, then send it.',
     CONTENT_REFUSED: 'The AI provider will not make this. Change what you ask for; another try with the same words gets the same answer.',
     PROVIDER_NO_CREDIT: 'The key that pays has no credit left with the AI provider. Add credit there, or use another key.',
-    // A record names the exact bytes it describes by their SHA-256 (services/storage-file-write.ts).
+    // A record names the exact bytes it describes by their SHA-256 (services/stored-files/write.ts).
     PROVENANCE_HASH_MISMATCH: 'That provenance record describes other bytes. Attach the record made for this file, or declare a new one.',
 });
 

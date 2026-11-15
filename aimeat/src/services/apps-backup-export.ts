@@ -22,7 +22,7 @@
 import { ZipArchive } from 'archiver';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { writeStorageFile, type StorageWriteRefusal } from './storage-file-write.js';
+import { writeStorageFile, type StorageWriteRefusal } from './stored-files/write.js';
 
 export const APPS_BACKUP_VERSION = '1.0';
 

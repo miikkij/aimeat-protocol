@@ -20,7 +20,7 @@
  *     When the question cannot be filed (the account's queue is full), the page waits all the same,
  *     and the next read files it.
  *   - The page routes note their writer (notePortfolioWriter), and so do the generic file write and
- *     delete (notePortfolioFileChange, from services/storage-page-keys.ts).
+ *     delete (notePortfolioFileChange, from services/stored-files/page-keys.ts).
  *   - A page whose bytes changed by a write this module did not see waits the same way, with the
  *     request naming no writer.
  *   - A page that existed at the update (secaudit2026oct31w2 round 11) was recorded as allowed once at
@@ -178,7 +178,7 @@ export async function notePortfolioWriter(ctx: Ctx, ownerName: string, caller: C
 }
 
 /**
- * After a generic file write or delete of the page key (services/storage-page-keys.ts). `writtenDigest`
+ * After a generic file write or delete of the page key (services/stored-files/page-keys.ts). `writtenDigest`
  * is the sha256 of the bytes a write stored (null for a delete, or bytes the node did not hold); a write
  * whose bytes are not the page served now changed nothing the owner sees, and a page already allowed
  * stays allowed. `writer` null: the door named no caller, and the question names no writer. Never

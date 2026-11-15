@@ -65,7 +65,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { localAccountName } from '../utils/gaii.js';
-import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/storage-file-write.js';
+import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/stored-files/write.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
@@ -84,7 +84,7 @@ import { directUploadFields } from '../services/direct-upload-answer.js';
 import { delegateReaderFor, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner/mailbox-reads.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 
-/** The refusals of a named store (services/storage-file-write.ts StoreChoiceRefusalCode), answered as `CODE: message`. */
+/** The refusals of a named store (services/stored-files/write.ts StoreChoiceRefusalCode), answered as `CODE: message`. */
 const STORE_CODES = new Set<string>(['UNKNOWN_STORE', 'STORE_NOT_SELECTABLE', 'STORE_NOT_TAKING_FILES', 'STORE_NOT_REACHABLE', 'NO_OWN_STORAGE']);
 
 /** F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a

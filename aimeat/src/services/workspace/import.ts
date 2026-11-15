@@ -12,7 +12,7 @@
  *   so the restore applies the same write rules the ordinary doors apply
  *   (services/workspace/import-gates.ts): a level this caller may not set here is narrowed and named
  *   in `clamped`, an image key that falls outside the new workspace root is not written and is named
- *   in `skipped`, and the image bytes go through services/storage-file-write.ts, which carries the
+ *   in `skipped`, and the image bytes go through services/stored-files/write.ts, which carries the
  *   key fence, the app-owned-key refusal and the file ceilings.
  * @structure importWorkspace(storage, config, { orgId, importerGaii, importerOwner, caller, zip }) -> result
  * @usage import { importWorkspace } from './import.js';
@@ -42,7 +42,7 @@ import { logger } from '../../utils/logger.js';
 import { undeclaredSpaceRefusal, isPlatformWorkspaceNamespace, type WriteObjectType } from './write-items.js';
 import { prepareRowRestore, writeRestoredRows } from './transfer-rows.js';
 import { updateRecord } from '../record-cas.js';
-import { writeStorageFile } from '../storage-file-write.js';
+import { writeStorageFile } from '../stored-files/write.js';
 import { memoryTarget } from '../classification/label-rows.js';
 import { fileTarget } from '../classification/labels.js';
 import { setWorkspaceShareOp } from './share.js';
@@ -155,7 +155,7 @@ export async function restoreWorkspace(
   // The remapped key is CONFINED to the new workspace root: the archive names the key, and one that
   // falls outside is a write into some other part of the importer's namespace, which is how an
   // app-owned key (`apps/icons/…`) was reachable through a restore (secaudit 2026-10). The bytes go
-  // through services/storage-file-write.ts, so the key fence, the app-owned-key refusal and the per-
+  // through services/stored-files/write.ts, so the key fence, the app-owned-key refusal and the per-
   // file and account ceilings hold here as they do on POST /v1/storage.
   const remapKey = (key: string): string => {
     if (key.startsWith(`${oldRoot}.`)) return `${newRoot}.${key.slice(oldRoot.length + 1)}`;

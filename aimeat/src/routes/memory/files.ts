@@ -95,9 +95,9 @@ import { sniffedContentType } from '../../utils/app-content-type.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import {
   removeStorageFile, appOwnedKeyRefusal, groupBindingRefusal, writeStorageFile, storageProvenanceMintRefusal, changeStorageFileVisibility,
-} from '../../services/storage-file-write.js';
-import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta } from '../../services/storage-page-keys.js';
-import { mintPublishCarry, closedFileLevel, fileCapRefusal } from '../../services/storage-file-publish.js';
+} from '../../services/stored-files/write.js';
+import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta } from '../../services/stored-files/page-keys.js';
+import { mintPublishCarry, closedFileLevel, fileCapRefusal } from '../../services/stored-files/publish.js';
 import { closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from '../storage-provenance-input.js';
@@ -229,7 +229,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
 
     // The per-file ceiling, the account quota, the overage charge, the change events and the
-    // provenance decision are the shared write (services/storage-file-write.ts), as on
+    // provenance decision are the shared write (services/stored-files/write.ts), as on
     // POST /v1/storage. This door wrote its own copy until 2026-10-08, which took no statement about
     // how the bytes were made.
     const parsedTags = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []);

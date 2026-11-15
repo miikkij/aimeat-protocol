@@ -159,7 +159,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | DATA-08 | met | `aimeat/src/routes/organisms/workspace-rows.ts:148` | |
 | DATA-09 | met | `aimeat/src/routes/organisms/workspace-rows.ts:205-227` | |
 | DATA-10 | met | `aimeat/src/services/workspace-rows/row-service.ts:553-574` | Retention runs after an append only; no timer calls the sweep (`row-service.ts:341`). |
-| DATA-11 | met | `aimeat/src/routes/storage-files-chunked.ts:113,216,284,388`; `aimeat/src/services/storage-file-write.ts:413-419` | |
+| DATA-11 | met | `aimeat/src/routes/storage-files-chunked.ts:113,216,284,388`; `aimeat/src/services/stored-files/write.ts:413-419` | |
 | DATA-12 | met | `aimeat/src/utils/http-range.ts:362` | |
 | DATA-13 | partial | `aimeat/src/routes/storage-files.ts:477,549,655` | With the consent layer off, a non-public file answers 404 even to a member who could read it. |
 | DATA-14 | met | `aimeat/src/routes/memory/key.ts:479-489`; `aimeat/src/services/memory/write.ts:329` | |

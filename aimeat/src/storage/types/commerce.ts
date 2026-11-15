@@ -308,7 +308,7 @@ export interface StorageFileRecord {
    *  Absent for a file whose bytes the database holds. Set by the file-store wrapper, never by a route. */
   blobRef?: string;
   /** On a write only: the store its writer named (`own:<name>`, `node:<name>`), already checked by
-   *  services/storage-file-write.ts. The file-store wrapper takes it off before the row is written. */
+   *  services/stored-files/write.ts. The file-store wrapper takes it off before the row is written. */
   storeChoice?: string;
   /** On a read only: the row's version, a random token every write of the row replaces. Absent for a
    *  row nothing has written since the column was added. A caller's value is never stored. */

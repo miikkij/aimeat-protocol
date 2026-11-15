@@ -109,7 +109,7 @@ assets/             (optional)
 | `src/routes/upload-skill.ts` | The skill upload handler |
 | `src/mcp/apps.ts` | Dual-mode `aimeat_app_publish`; inline-only `aimeat_app_draft_save` |
 | `src/mcp/apps-draft-edit.ts` | `aimeat_app_draft_write`, `_replace`, `_seed` and the draft read |
-| `src/mcp/core-storage.ts` | Dual-mode `aimeat_storage_upload` (mints through `mintStorageUploadUrl` in `src/services/storage-file-write.ts`) |
+| `src/mcp/core-storage.ts` | Dual-mode `aimeat_storage_upload` (mints through `mintStorageUploadUrl` in `src/services/stored-files/write.ts`) |
 | `src/mcp/extensions.ts` | Dual-mode `aimeat_extension_install` |
 | `src/mcp/cortex.ts` | Dual-mode `aimeat_cortex_install` (the offer is `cortexUploadOffer` in `src/services/cortex/upload-offer.ts`, shared with `POST /v1/cortex`) |
 | `src/mcp/skills.ts` | Dual-mode `aimeat_skill_publish` |

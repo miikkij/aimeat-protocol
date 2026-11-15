@@ -48,7 +48,7 @@ import { createHash } from 'node:crypto';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';
-import { writeStorageFile, removeStorageFile } from '../storage-file-write.js';
+import { writeStorageFile, removeStorageFile } from '../stored-files/write.js';
 import { ContentClassError, updateOwnRecord, type ContentDeps, type ContentWriter } from './classes.js';
 import type { ContentFacts, ContentKind, ContentSource, ProfileSection } from './types.js';
 

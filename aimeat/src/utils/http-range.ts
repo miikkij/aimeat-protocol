@@ -192,7 +192,7 @@ export function needsBytesForType(file: { mimeType: string; utf8Verified?: boole
  * The version of one stored write, as a short URL-safe token: the write time in milliseconds and the
  * size, both in base 36. Null when the record carries no write time.
  *
- * Every write stamps a new `createdAt` (services/storage-file-write.ts, and both providers overwrite
+ * Every write stamps a new `createdAt` (services/stored-files/write.ts, and both providers overwrite
  * it on conflict), so the token changes each time a key is written again, and it is read from
  * metadata alone. Two uses: the strong ETag below, and the `?v=` an upload answer puts on the file's
  * address so a re-upload is a different URL to every cache (GET /v1/pub ignores the query).

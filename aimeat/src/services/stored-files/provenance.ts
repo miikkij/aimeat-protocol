@@ -1,10 +1,10 @@
 /**
- * @file src/services/storage-file-provenance.ts
+ * @file src/services/stored-files/provenance.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The AI-provenance decision for one stored file: which record the file carries, decided
  *   with its writer before any byte is stored. Moved by pure extraction out of
- *   services/storage-file-write.ts (800-line limit), which re-exports every exported name here, so its
+ *   services/stored-files/write.ts (800-line limit), which re-exports every exported name here, so its
  *   importers are unchanged.
  * @structure StorageProvenanceInput · ProvenanceRefusalCode · ProvenanceRefusal · provenanceForStoredBytes ·
  *   storageProvenanceMintRefusal
@@ -14,13 +14,13 @@
  *   v1.0.0 — 2026-11-01 — Pure extraction from storage-file-write.ts v1.11.0 (secaudit2026oct31w2 round 11
  *     needed the room for the page-key fence).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
 import {
     provenanceForWrite, provenanceDeclarationRefusal, contentHashOf,
     ProvenanceScopeError, type DeclaredProvenance,
-} from './ai/provenance.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+} from '../ai/provenance.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 

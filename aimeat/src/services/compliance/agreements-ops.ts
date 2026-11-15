@@ -29,7 +29,7 @@ import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import type { CallerContext } from '../caller-context.js';
 import { UNCHANGED } from '../record-cas.js';
-import { writeStorageFile } from '../storage-file-write.js';
+import { writeStorageFile } from '../stored-files/write.js';
 import { createRequest } from '../docsign/records.js';
 import { documentHash } from '../docsign/records.js';
 import { SCC_2021_915_SHA256 } from '../../data/legal/eu-scc-2021-915.js';
