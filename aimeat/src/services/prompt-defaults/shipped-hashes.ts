@@ -31,6 +31,7 @@
  * @usage
  *   if (isShippedDefaultText(record.id, record)) { ...the stored text is a shipped default... }
  * @version-history
+ *   2026-11-15 — playbook-marketplace's new text (the same handler, not the same door) joins its list.
  *   2026-10-16 — Initial: the shipped default texts of the 21 operator-owned prompts, read from git
  *     history (Jouni, decision 2026-10-16).
  */
@@ -63,7 +64,7 @@ export const SHIPPED_PROMPT_HASHES: Readonly<Record<string, readonly string[]>> 
   'playbook-brain': ['d628640324f90480ef259aebe223926f'],
   'playbook-businesslauncher': ['ebf24182de5b4975db24ed9a2738ac97', 'd3213e7323e89648d754d792ac1384ee'],
   'playbook-instance': ['69776c4a9e7fc67e9c6a9b45013a9009'],
-  'playbook-marketplace': ['fa36bdbd6faf55811148fdae8835d465', '95b9f7e8d53f80cc2d637a4d3d46e88c', 'b551d0866982a6c551b08151b6421ea1'],
+  'playbook-marketplace': ['fa36bdbd6faf55811148fdae8835d465', '95b9f7e8d53f80cc2d637a4d3d46e88c', 'b551d0866982a6c551b08151b6421ea1', 'aef1dc666147a51dcb34ccf468f03e59'],
   'playbook-page': ['295bf8ffca739d687276b684196cccb0'],
   'proactive-guidance': ['145e4bbc79c220bfcc3b938c6d97c40a'],
   'workflow-create-chat': ['4df9895af83223e5cf5bb5cbbb4e499d', 'f44f6546c7b840747fb9e4be630974b3'],
