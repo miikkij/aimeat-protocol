@@ -4,6 +4,8 @@
  * @structure request, events, nodeAdapters
  * @usage nodeAdapters(config, emit).complete(messages, { signal })
  * @version-history
+ *   v1.1.2 - 2026-11-15 - The comment in speak() says the voice too is the node's choice when left out:
+ *     the defaults now hold voice '' as well (config.js v1.1.0). No code change.
  *   v1.1.1 - 2026-11-15 - speak() leaves an empty tts.model or tts.voice out of the request: POST
  *     /v1/ai/speak refuses an empty string for either, and the defaults hold model ''.
  *   v1.1.0 - 2026-10-08 - speak() follows the start frame's audio.sample_rate and channels for PCM, and
@@ -73,7 +75,9 @@ export function nodeAdapters(config, emit) {
     },
     async *speak(text, { signal }) {
       // An empty model or voice is left out, as transcribe and complete do for their model: the route
-      // takes each as an optional string of at least one character, and the speech role fills in the rest.
+      // takes each as an optional string of at least one character. The node then chooses the model by
+      // the speech role, and the voice from the owner's speech provider, then the node's default; with
+      // no voice anywhere the route answers NO_TTS_VOICE.
       const response = await request({ input: text, app_id: config.appId, model: config.tts.model || undefined,
         voice: config.tts.voice || undefined, response_format: config.tts.format, speed: config.tts.speed,
         instructions: config.tts.instructions }, '/v1/ai/speak', signal);

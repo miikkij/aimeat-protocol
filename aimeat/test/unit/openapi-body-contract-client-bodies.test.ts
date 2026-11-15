@@ -13,6 +13,7 @@
  *   shown to refuse it as well, so no correction is looser than the route.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openapi-body-contract-client-bodies.test.ts
  * @version-history
+ *   v1.2.1 — 2026-11-15 — The voice library's default speech body carries no voice (aimeat-voice 1.2.0).
  *   v1.2.0 — 2026-11-15 — The capability try panel's input, an extension action's array input, the
  *     federation key exchange the CLI and the node send, and the setup wizard's empty genesis address.
  *   v1.1.0 — 2026-11-15 — The work request and delivery, the decision review, the classification
@@ -163,7 +164,7 @@ describe('POST /v1/ai/stream and /v1/ai/speak (aimeat-voice.js node adapters)', 
     // signed app. An owner or agent caller sending '' is refused by the route itself (min 1).
     it('takes the voice library\'s default body with an empty app_id', async () => {
         await taken('POST', '/v1/ai/stream', [{ messages: [{ role: 'user', content: 'hello' }], app_id: '', temperature: 0.7, top_p: 1, reasoning: null }]);
-        await taken('POST', '/v1/ai/speak', [{ input: 'hello', app_id: '', model: 'gpt-4o-mini-tts', voice: 'alloy', response_format: 'pcm', speed: 1, instructions: '' }]);
+        await taken('POST', '/v1/ai/speak', [{ input: 'hello', app_id: '', model: 'gpt-4o-mini-tts', response_format: 'pcm', speed: 1, instructions: '' }]);
     });
 
     it('still refuses an app_id over 200 characters', async () => {

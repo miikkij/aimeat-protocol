@@ -4,6 +4,9 @@
  * @structure createSession with injected stage adapters and browser capture/playback factories
  * @usage const s = createSession(options, adapters); await s.start(); await s.sendText('Hello');
  * @version-history
+ *   v1.2.0 - 2026-11-15 - Node speech takes no voice either: an empty tts.voice (the default) is left
+ *     out of POST /v1/ai/speak, and the node applies the voice set on the owner's speech provider, then
+ *     the node's default. With neither, the turn fails with the route's NO_TTS_VOICE error.
  *   v1.1.2 - 2026-11-15 - Node speech takes no model: an empty tts.model is valid, the speech adapter
  *     leaves it out of POST /v1/ai/speak, and the node's speech role chooses the model (the owner's
  *     provider, the owner's default, then the node's default). A custom stage still needs its adapter.
@@ -16,7 +19,9 @@ import { prefetchAudio } from './prefetch.js';
 /**
  * A stage whose provider is 'node' needs no model: an empty stt.model, llm.model or tts.model is left
  * out of the request, and the node's AI role for that stage chooses (the owner's provider, the owner's
- * default, then the node's default). A stage whose provider is 'custom' needs its adapter method.
+ * default, then the node's default). An empty tts.voice is left out the same way: the node applies the
+ * voice set on the owner's speech provider, then the node's default, and answers NO_TTS_VOICE when
+ * neither is set. A stage whose provider is 'custom' needs its adapter method.
  * @param {any} options @param {any} adapters @param {any} factories
  */
 export function createSession(options, adapters, factories) {

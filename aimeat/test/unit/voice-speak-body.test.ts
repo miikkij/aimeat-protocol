@@ -5,10 +5,13 @@
  * @description The voice library's node speech adapter (src/static/sdk-libs/voice/adapters.js) sends a
  *   body POST /v1/ai/speak accepts. voiceSpeechSchema (src/models/ai-voice-contract.ts) takes model and
  *   voice as optional strings of at least one character, and the speech role fills in what is left
- *   out. The defaults (voice/config.js) hold model '', so the adapter leaves an empty model or voice
- *   out, as the transcribe and complete adapters already do for their model.
+ *   out. The defaults (voice/config.js) hold model '' and voice '', so the adapter leaves an empty model
+ *   or voice out, as the transcribe and complete adapters already do for their model.
  * @usage cd aimeat && pnpm exec vitest run test/unit/voice-speak-body.test.ts
  * @version-history
+ *   v1.2.0 - 2026-11-15 - The default configuration sends no voice (aimeat-voice 1.2.0): the node
+ *     applies the voice set on the owner's speech provider, then the node's default. A voice the app
+ *     names is still sent.
  *   v1.1.0 - 2026-11-15 - A session created from the default configuration (session.js createSession)
  *     speaks, and its speech request carries no model.
  *   v1.0.0 - 2026-11-15 - Initial: an empty model or voice is left out of the speech request.
@@ -38,10 +41,17 @@ async function speakBody(patch: Record<string, unknown> = {}): Promise<Record<st
 }
 
 describe('voice speak request body', () => {
-  it('leaves out an empty model, so the speech role chooses it, and the route takes the body', async () => {
+  it('the default configuration sends no model and no voice, so the node chooses both, and the route takes the body', async () => {
     const body = await speakBody();
     expect('model' in body).toBe(false);
-    expect(body.voice).toBe('alloy');
+    expect('voice' in body).toBe(false);
+    expect(voiceSpeechSchema.safeParse(body).success).toBe(true);
+  });
+
+  it('sends a voice the app names, without a model', async () => {
+    const body = await speakBody({ voice: 'nova' });
+    expect(body.voice).toBe('nova');
+    expect('model' in body).toBe(false);
     expect(voiceSpeechSchema.safeParse(body).success).toBe(true);
   });
 
@@ -67,14 +77,15 @@ describe('voice speak request body', () => {
       async play(stream: AsyncIterable<Uint8Array>) { for await (const bytes of stream) heard.push(bytes.byteLength); } };
     // Only the input mode differs from the defaults, so the test needs no microphone.
     const session = createSession({ appId: 'companion', input: { mode: 'text' } }, {}, { player: () => player, capture: () => null, adapters: nodeAdapters });
-    expect(session.config.tts).toMatchObject({ provider: 'node', model: '' });
+    expect(session.config.tts).toMatchObject({ provider: 'node', model: '', voice: '' });
     await session.start();
     const turn = await session.sendText('Question');
     expect(turn.spoken).toBe('Hello there.');
     expect(heard.length).toBeGreaterThan(0);
     const body = sent['/v1/ai/speak'];
-    expect(body).toMatchObject({ input: 'Hello there.', app_id: 'companion', voice: 'alloy' });
+    expect(body).toMatchObject({ input: 'Hello there.', app_id: 'companion' });
     expect('model' in body).toBe(false);
+    expect('voice' in body).toBe(false);
     expect(voiceSpeechSchema.safeParse(body).success).toBe(true);
     await session.close();
   });

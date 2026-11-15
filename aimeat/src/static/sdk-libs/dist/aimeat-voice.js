@@ -23,7 +23,8 @@
     turn: { silenceMs: 700, minSpeechMs: 250, maxSpeechMs: 3e4, threshold: 0.025, preRollMs: 200, bargeIn: false, interruptMs: 200, resumeQuietMs: 300 },
     stt: { provider: "node", model: "", language: "", temperature: 0 },
     llm: { provider: "node", model: "", temperature: 0.7, topP: 1, maxTokens: null, reasoning: null },
-    tts: { provider: "node", model: "", voice: "alloy", format: "pcm", sampleRate: 24e3, channels: 1, speed: 1, instructions: "" },
+    // An empty tts.model or tts.voice is left out of the speech request, and the node chooses it.
+    tts: { provider: "node", model: "", voice: "", format: "pcm", sampleRate: 24e3, channels: 1, speed: 1, instructions: "" },
     chunking: { mode: "sentence", minChars: 24, maxChars: 1200, maxWaitMs: 350 },
     playback: { bufferMs: 80, maxBufferedMs: 3e3, maxPendingSegments: 3, volume: 1 },
     history: { maxTurns: 12 },
@@ -916,7 +917,7 @@ registerProcessor('aimeat-voice-capture', AimeatVoiceCapture);
 
   // src/static/sdk-libs/voice/index.js
   attach("voice", {
-    version: "1.1.2",
+    version: "1.2.0",
     get defaults() {
       return structuredClone(defaults);
     },

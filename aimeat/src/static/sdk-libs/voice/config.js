@@ -2,8 +2,13 @@
  * @file voice/config.js
  * @description Serializable voice pipeline configuration, validated before any device or paid call.
  * @structure defaults, presets, configure
- * @usage configure({ preset: 'responsive', turn: { silenceMs: 600 } })
- * @version-history v1.0.0 - 2026-09-19 - Configurable STT/LLM/TTS sessions.
+ * @usage configure({ preset: 'responsive', turn: { silenceMs: 600 } }), or choose a voice: configure({ tts: { voice: 'nova' } })
+ * @version-history
+ *   v1.1.0 - 2026-11-15 - tts.voice defaults to '' instead of 'alloy'. The speech request then names no
+ *     voice, and the node applies the voice set on the owner's speech provider, then the node's default
+ *     (AIMEAT_TTS_VOICE_DEFAULT); with neither, POST /v1/ai/speak answers 400 NO_TTS_VOICE. A voice the
+ *     app sets is sent as before.
+ *   v1.0.0 - 2026-09-19 - Configurable STT/LLM/TTS sessions.
  */
 export const defaults = {
   preset: 'balanced', appId: '', language: 'fi-FI', systemPrompt: '',
@@ -11,7 +16,8 @@ export const defaults = {
   turn: { silenceMs: 700, minSpeechMs: 250, maxSpeechMs: 30000, threshold: 0.025, preRollMs: 200, bargeIn: false, interruptMs: 200, resumeQuietMs: 300 },
   stt: { provider: 'node', model: '', language: '', temperature: 0 },
   llm: { provider: 'node', model: '', temperature: 0.7, topP: 1, maxTokens: null, reasoning: null },
-  tts: { provider: 'node', model: '', voice: 'alloy', format: 'pcm', sampleRate: 24000, channels: 1, speed: 1, instructions: '' },
+  // An empty tts.model or tts.voice is left out of the speech request, and the node chooses it.
+  tts: { provider: 'node', model: '', voice: '', format: 'pcm', sampleRate: 24000, channels: 1, speed: 1, instructions: '' },
   chunking: { mode: 'sentence', minChars: 24, maxChars: 1200, maxWaitMs: 350 },
   playback: { bufferMs: 80, maxBufferedMs: 3000, maxPendingSegments: 3, volume: 1 },
   history: { maxTurns: 12 }, timeoutMs: 120000,

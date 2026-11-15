@@ -30,7 +30,10 @@ startButton.onclick = () => voice.start(); // User gesture unlocks audio and req
 stopButton.onclick = () => voice.stop();   // Cancels the turn and releases microphone/audio resources.
 ```
 
-The model strings above are placeholders. Query the provider catalogue with
+The model and voice strings above are placeholders, and each one is optional for a node stage: leave
+it out and the node chooses. The library sends `tts.voice` only when the app sets it; without one, the
+node applies the voice set on the owner's speech provider, then the node's default voice, and refuses
+the speech with 400 `NO_TTS_VOICE` when neither is set. Query the provider catalogue with
 `output_modalities=transcription` and `output_modalities=speech`; the default chat catalogue omits
 those models. Check each selected TTS model's voice, format, sample rate and channel contract.
 PCM means signed 16-bit little-endian samples; the library does not guess a WAV header or resample a
@@ -79,7 +82,7 @@ retained. history.maxTurns bounds memory; closing a session clears it.
 | turn | silenceMs 700; minSpeechMs 250; maxSpeechMs 30000; threshold 0.025 RMS; preRollMs 200; bargeIn false; interruptMs 200; resumeQuietMs 300 |
 | stt | provider node; model empty uses owner/node STT default; language empty uses session language; temperature 0 |
 | llm | provider node; model empty uses existing model selection; temperature 0.7; topP 1; maxTokens null (no default cap, optional explicit limit); reasoning null |
-| tts | provider node; model empty uses the owner's provider, then the owner's default, then the node's speech default; voice alloy; format pcm; sampleRate 24000; channels 1; speed 1; instructions empty |
+| tts | provider node; model empty uses the owner's provider, then the owner's default, then the node's speech default; voice empty uses the voice set on the owner's speech provider, then the node's default voice (`AIMEAT_TTS_VOICE_DEFAULT`), and with neither the speech request fails with 400 `NO_TTS_VOICE`; format pcm; sampleRate 24000; channels 1; speed 1; instructions empty |
 | chunking | mode sentence; minChars 24; maxChars 1200; maxWaitMs 350 (latency mode only) |
 | playback | bufferMs 80; maxBufferedMs 3000; maxPendingSegments 3; volume 1 |
 | history | maxTurns 12 |
@@ -151,7 +154,8 @@ not a successful turn. Audio frames contain base64 bytes. Abort the HTTP request
 
 The speech `start` and `done` frames carry `audio` { `mime`, `sample_rate`, `channels`,
 `sample_format` }: the provider's real format, which `AIMEAT.ai.speak()` and the voice library's node
-adapter use to type and play the bytes. Refusals before the first byte: a voice the model catalogue
+adapter use to type and play the bytes. Refusals before the first byte: a speech request with no
+voice, when the owner's speech provider and the node name none either, is 400 `NO_TTS_VOICE`; a voice the model catalogue
 says the model does not have is 400 `INVALID_VOICE`, before any paid call; a provider's permanent
 refusal is 422 `PROVIDER_REJECTED` with the provider's reason (an mp3 the model does not make says to
 ask for pcm); a provider's 429 is `RATE_LIMITED` with its `Retry-After`. After the first byte, an
