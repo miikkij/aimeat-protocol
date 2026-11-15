@@ -341,7 +341,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:832922fb3e10163f4a482fb7"
+      "digest": "sha256:e75f47a2c61c4dadcf11fab8"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-11-15",
@@ -665,7 +665,7 @@
         "docs/pitfalls.md",
         ".claude/skills/aimeat-organism-records/SKILL.md"
       ],
-      "digest": "sha256:935f37a575614c885d02f300",
+      "digest": "sha256:167981f55aaaae518554409e",
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
@@ -797,7 +797,7 @@
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "254d513415b91da4",
-      "aimeat/src/tool-catalog/scopes.ts": "d88f12bd89523563",
+      "aimeat/src/tool-catalog/scopes.ts": "f499b8c05ac25a9e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "36d516deca3f34a6",
       "aimeat/src/data/basic-agents.ts": "dbb35e8f8ad3c093"
@@ -1059,7 +1059,7 @@
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
     "agent:note-writer": {
-      "docs/pitfalls.md": "9addf494defeb785",
+      "docs/pitfalls.md": "88d50147aabc9885",
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {

@@ -33,7 +33,7 @@
  *   AFTER THE SCOPE-VOCABULARY MIGRATION, NEVER BESIDE IT. Both rewrite an agent's whole scope list,
  *   so run side by side one could write over the other's addition; the boot chains this one after it
  *   (server-bootstrap/service-init.ts), and each agent's list is written only over the list that was
- *   read (services/scope-list-swap.ts), which also holds when another node process runs the
+ *   read (services/scope/list-swap.ts), which also holds when another node process runs the
  *   vocabulary step at the same moment.
  * @structure OPERATOR_ADMIN_MIGRATION_KEY · OperatorAdminMigration · migrateOperatorAdminOnce(storage, config)
  * @usage
@@ -52,7 +52,7 @@ import { isOperatorAccount } from '../../utils/operator-account.js';
 import { recordAccountEvent } from '../account/events.js';
 import { logger } from '../../utils/logger.js';
 import { claimOnceOnlyStep } from '../once-only-step.js';
-import { changeScopeList } from '../scope-list-swap.js';
+import { changeScopeList } from '../scope/list-swap.js';
 
 /** The record that says this node has run the migration, under `system@<nodeId>`. */
 export const OPERATOR_ADMIN_MIGRATION_KEY = 'migrations.operator-admin';
@@ -97,7 +97,7 @@ export async function migrateOperatorAdminOnce(
       if (!isOperatorAccount(await storage.getOwner(owner))) continue;
       const names: string[] = [];
       for (const agent of listed) {
-        // Written on the list that was read (services/scope-list-swap.ts), because the write replaces
+        // Written on the list that was read (services/scope/list-swap.ts), because the write replaces
         // the whole list: a word another boot step or the owner adds meanwhile stays.
         const changed = await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, agent.defaultScopes,
           held => (needsTheWord({ defaultScopes: [...held] }) ? [...held, OPERATOR_ADMIN_SCOPE] : null));

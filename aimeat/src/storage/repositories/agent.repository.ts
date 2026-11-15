@@ -34,7 +34,7 @@ export interface AgentRepository {
    * Write `next` as the agent's scope list only if the stored list still equals `expected`, the list
    * the caller read (an empty `expected` also matches no list). False when another writer changed it
    * meanwhile, so the caller reads again and merges. The agent row has no version column, so the
-   * condition is the value itself (services/scope-list-swap.ts).
+   * condition is the value itself (services/scope/list-swap.ts).
    */
   setAgentScopesIf(gaii: string, expected: readonly string[], next: string[]): Promise<boolean>;
   deleteAgent(gaii: string): Promise<boolean>;

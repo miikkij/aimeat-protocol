@@ -141,7 +141,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
    * because neither carries the 'agent' role.
    *
    * NOBODY LOSES A CAPABILITY. organism:write has been in GRANDFATHERED_SCOPES since 2026-08-10
-   * (services/scope-vocabulary-migration.ts), so every agent with a recorded scope list is handed
+   * (services/scope/vocabulary-migration.ts), so every agent with a recorded scope list is handed
    * the word at boot, and a '*' agent is covered by the wildcard at this door. ── */
   router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), validateBody(OrganismCreateBody, config.nodeId), async (req, res) => {
     const ghii = req.auth!.owner as string;

@@ -25,7 +25,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
-import { migrateAgentScopeVocabulary } from '../src/services/scope-vocabulary-migration.js';
+import { migrateAgentScopeVocabulary } from '../src/services/scope/vocabulary-migration.js';
 import type { Storage } from '../src/storage/interface.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 import { registerOwner as registerWithPassword } from './helpers/owner-login.js';

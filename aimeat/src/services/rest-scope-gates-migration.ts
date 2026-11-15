@@ -66,7 +66,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { claimOnceOnlyStep } from './once-only-step.js';
-import { changeScopeList } from './scope-list-swap.js';
+import { changeScopeList } from './scope/list-swap.js';
 
 /** The record under `system@<nodeId>` that says this node has run the grant. */
 export const REST_SCOPE_GATES_KEY = 'migrations.rest-scope-gates-4-0-0';
@@ -131,7 +131,7 @@ export async function migrateAgentReadGrantOnce(storage: Storage, nodeId: string
  * One step: the words to every agent and approved ecosystem app with a recorded list, recorded under
  * `key`. The record is claimed before the work (services/once-only-step.ts), so of two node processes
  * starting together one runs it; each list is written on the list that was read
- * (services/scope-list-swap.ts), so a word another step or the owner adds meanwhile stays.
+ * (services/scope/list-swap.ts), so a word another step or the owner adds meanwhile stays.
  */
 async function grantWords(
   storage: Storage, system: string, key: string, words: ReadonlyArray<{ word: string; opens: string }>,
@@ -151,7 +151,7 @@ async function grantWords(
       // takes those back once (services/rest-scope-keep-working-migration.ts).
       if (isSharedAnonymous(agent.owner)) continue;
       // No recorded list: the agent is minted from config.defaultAgentScopes, and writing a list here
-      // would replace that fallback rather than extend it (services/scope-vocabulary-migration.ts).
+      // would replace that fallback rather than extend it (services/scope/vocabulary-migration.ts).
       // changeScopeList leaves such an agent alone.
       if (await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, agent.defaultScopes, add)) result.agents.push(agent.gaii);
     }

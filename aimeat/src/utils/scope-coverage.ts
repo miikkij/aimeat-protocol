@@ -121,7 +121,7 @@ export const WRITE_RESERVED_SCOPE = 'memory:write-reserved';
  *
  * It is out of every wildcard for the same reason the reserved-write scope is, only sharper: an
  * agent that can set the password can become the person. Nobody was grandfathered onto it either
- * (services/scope-vocabulary-migration.ts), so an agent holding it was ticked by hand.
+ * (services/scope/vocabulary-migration.ts), so an agent holding it was ticked by hand.
  */
 export const ACCOUNT_SECURITY_SCOPE = 'account:security';
 
@@ -138,7 +138,7 @@ export const ACCOUNT_SECURITY_SCOPE = 'account:security';
  * handing away the node's own development organism. A break-glass that "Full access" carries by
  * default is the same hole one level up.
  *
- * Nobody is grandfathered onto it (services/scope-vocabulary-migration.ts has no entry): this names
+ * Nobody is grandfathered onto it (services/scope/vocabulary-migration.ts has no entry): this names
  * a capability that did not exist before, so no agent can lose one it had.
  */
 export const OPERATOR_ORGANISM_REPAIR_SCOPE = 'operator:organism-repair';
@@ -162,7 +162,7 @@ export const OPERATOR_ORGANISM_REPAIR_SCOPE = 'operator:organism-repair';
  *
  * Out of every wildcard for the reason the repair word is: "Full access" is one click, and nobody
  * clicking it is deciding that an agent may administer the node. The boot-time grandfathering in
- * services/scope-vocabulary-migration.ts has no entry for it. Once per node,
+ * services/scope/vocabulary-migration.ts has no entry for it. Once per node,
  * services/operator/admin-migration.ts gave it to the operator's agents that held `*` on the day it
  * ran (the developer's ruling of 2026-09-25), because until the day before every agent of an
  * operator reached these tools; every other agent, and every agent made later, needs the tick in the
@@ -186,7 +186,7 @@ export const OPERATOR_ADMIN_SCOPE = 'operator:admin';
  *
  * Enforced by requireOperatorPrincipal(storage, scope) in auth/middleware.ts on the HTTP door and by
  * the same resolution on the MCP tools, so the two doors answer alike. Nobody is grandfathered onto
- * either (services/scope-vocabulary-migration.ts has no entry): they name a capability that did not
+ * either (services/scope/vocabulary-migration.ts has no entry): they name a capability that did not
  * exist before, so no agent can lose one it had.
  */
 export const COMPLIANCE_READ_SCOPE = 'compliance:read';
@@ -211,7 +211,7 @@ export const COMPLIANCE_WRITE_SCOPE = 'compliance:write';
  * admits the operator's browser and refuses the operator's agent — correct for a browser-only tab,
  * and the opposite of what a capability meant to be driven from a chat needs.
  *
- * Nobody is grandfathered onto it (services/scope-vocabulary-migration.ts has no entry): it names a
+ * Nobody is grandfathered onto it (services/scope/vocabulary-migration.ts has no entry): it names a
  * capability that did not exist before, so no agent can lose one it had.
  */
 export const SURFACE_LAYOUT_WRITE_SCOPE = 'site:layout-write';
@@ -246,7 +246,7 @@ export const THEME_WRITE_SCOPE = 'site:theme-write';
  * OUT OF EVERY WILDCARD, for the same reason `commerce:psp` is: "Full access" is one click, and
  * nobody clicking it is deciding that an agent may rotate or destroy the credentials their
  * extensions call the world with. Nobody is grandfathered onto it
- * (services/scope-vocabulary-migration.ts has no entry), because it names a capability that did not
+ * (services/scope/vocabulary-migration.ts has no entry), because it names a capability that did not
  * exist before — no agent can lose one it had.
  *
  * Enforced by requireScope on the three REST doors and by the same word in the MCP scope table, so
@@ -283,7 +283,7 @@ export const HELP_ANSWER_SCOPE = 'help:answer';
  * is a human act. "Full access" is one click, and nobody clicking it is deciding that an agent may
  * point their account at a server of its own choosing and store a credential there.
  *
- * Nobody is grandfathered onto it (services/scope-vocabulary-migration.ts has no entry), because it
+ * Nobody is grandfathered onto it (services/scope/vocabulary-migration.ts has no entry), because it
  * names a capability that did not exist before — no agent can lose one it had.
  *
  * Enforced by requireScope on the REST doors and by the same word deciding whether the attach and
@@ -348,7 +348,7 @@ export const RECEIVERS_MANAGE_SCOPE = 'receivers:manage';
  * and nobody clicking it is deciding that an agent may repoint their payouts.
  *
  * Every agent that could already reach one of these tools was handed the new word at boot, once, by
- * services/scope-vocabulary-migration.ts, so nothing lost a capability it had.
+ * services/scope/vocabulary-migration.ts, so nothing lost a capability it had.
  */
 const OWN_TICK_SCOPES = [
     'commerce:psp',            // write or destroy the seller's payment credentials

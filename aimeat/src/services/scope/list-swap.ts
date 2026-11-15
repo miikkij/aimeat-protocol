@@ -1,5 +1,5 @@
 /**
- * @file src/services/scope-list-swap.ts
+ * @file src/services/scope/list-swap.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Change one agent's, ecosystem app's or app grant's scope list without losing a word
@@ -19,8 +19,8 @@
  *     three are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-18 — Initial (check:atomic-writes, the boot migration sites).
  */
-import type { Storage } from '../storage/interface.js';
-import { CAS_ATTEMPTS } from './record-cas.js';
+import type { Storage } from '../../storage/interface.js';
+import { CAS_ATTEMPTS } from '../record-cas.js';
 
 /** Whose list: an agent by GAII, an ecosystem app by GEAI, an app grant by grant id. */
 export interface ScopeListTarget { kind: 'agent' | 'ecosystem-app' | 'app-grant'; id: string }

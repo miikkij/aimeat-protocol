@@ -12,7 +12,7 @@
           "requireScope('app:write')"
         ]
       },
-      "why": "Designed: app:manage is the word for deleting an app, forking one and removing a template, app:write the word for changing one (services/scope-vocabulary-migration.ts); deleting asks the stronger word."
+      "why": "Designed: app:manage is the word for deleting an app, forking one and removing a template, app:write the word for changing one (services/scope/vocabulary-migration.ts); deleting asks the stronger word."
     },
     "/v1/apps/:/:/roadmap": {
       "verbs": {
@@ -131,7 +131,7 @@
           "requireScope('app:write')"
         ]
       },
-      "why": "Designed: deleting asks app:manage and changing asks app:write, as for an app (services/scope-vocabulary-migration.ts)."
+      "why": "Designed: deleting asks app:manage and changing asks app:write, as for an app (services/scope/vocabulary-migration.ts)."
     },
     "/v1/packages/:/versions/:": {
       "verbs": {
@@ -144,7 +144,7 @@
           "requireScope('app:write')"
         ]
       },
-      "why": "Designed: deleting asks app:manage and changing asks app:write, as for an app (services/scope-vocabulary-migration.ts)."
+      "why": "Designed: deleting asks app:manage and changing asks app:write, as for an app (services/scope/vocabulary-migration.ts)."
     },
     "/v1/templates/:": {
       "verbs": {
@@ -157,7 +157,7 @@
           "requireScope('app:write')"
         ]
       },
-      "why": "Designed: app:manage is the word for removing a template (services/scope-vocabulary-migration.ts), app:write for changing one."
+      "why": "Designed: app:manage is the word for removing a template (services/scope/vocabulary-migration.ts), app:write for changing one."
     }
   }
 }

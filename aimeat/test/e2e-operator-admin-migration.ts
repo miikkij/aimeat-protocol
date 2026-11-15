@@ -333,7 +333,7 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
     plain.token = await ownerToken(plain.name);
     const tickedOffered = await adminToolsOffered(await agentToken(opTicked));
 
-    // Every boot also runs the scope-vocabulary migration (services/scope-vocabulary-migration.ts),
+    // Every boot also runs the scope-vocabulary migration (services/scope/vocabulary-migration.ts),
     // which writes its own words onto agents, so these read the one word this suite is about rather
     // than the whole list.
     await test('2a. the operator\'s full-access agent holds the word, and nothing it held is lost', async () => {

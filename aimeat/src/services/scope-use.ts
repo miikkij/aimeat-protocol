@@ -7,7 +7,7 @@
  *   WHY. An agent holding `*` keeps it: the owner gave it (Jouni, 2026-10-28). The record is what
  *   lets the owner narrow it knowing what it would lose: the agent's card shows what it used and
  *   offers that narrowing with one press, and only the owner, in person or through their AI, applies
- *   it (services/scope-narrowing.ts). Twice before it was more: ruling C (2026-10-02) put a ready `*`
+ *   it (services/scope/narrowing.ts). Twice before it was more: ruling C (2026-10-02) put a ready `*`
  *   on the task-start floor, which held 14 scheduled agents on aimeat.io at once, and from 2026-10-18
  *   the node narrowed a ready `*` agent by itself. On 2026-10-28 that narrowed the owner's own
  *   interactive agent past provenance:write, which it used and this record had not seen, and it was
@@ -29,7 +29,7 @@
  *   its own history.
  * @structure SCOPE_USE_KEY · OBSERVE_DAYS · noteScopeUse() · flushScopeUse() · initScopeUse() ·
  *   shutdownScopeUse() · holdScopeUseForErasure() · readScopeUse() · writeScopeUse() · wildcardStatus()
- *   (the narrowing itself is services/scope-narrowing.ts: this file is imported by the auth
+ *   (the narrowing itself is services/scope/narrowing.ts: this file is imported by the auth
  *   middleware and must not reach the connector, which reaches the middleware back)
  * @usage
  *   noteScopeUse(req.auth.sub, ['memory:read']);

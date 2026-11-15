@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import {
     migrateAgentScopeVocabulary, migrateScopeVocabulary, agentPredatesVocabulary, GRANDFATHERED_SCOPES,
     CONDITIONAL_SCOPES, VOCABULARY_NAMED_AT, AGENT_VOCABULARY_MIGRATION_KEY,
-} from '../../src/services/scope-vocabulary-migration.js';
+} from '../../src/services/scope/vocabulary-migration.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { sameScopeList } from '../../src/storage/scope-list.js';
 

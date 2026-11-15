@@ -61,7 +61,7 @@
         "aimeat/src/services/receivers/verify.ts",
         "aimeat/src/services/receivers/policy.ts"
       ],
-      "digest": "sha256:79f850e2190b6003cfcd94bb"
+      "digest": "sha256:fad80ecb77e81b35325ab6d4"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-15",
@@ -224,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:489f015879277ef3daf72e72"
+      "digest": "sha256:64efe3a0817e8d1a00b9e43f"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -316,7 +316,7 @@
       "aimeat/src/services/sign-in-policy.ts": "abdf689f004d2cac",
       "aimeat/src/services/two-step-setup.ts": "e8f73c13e7d1f680",
       "aimeat/src/routes/ghii/login-two-step.ts": "6f891b378570d7b8",
-      "aimeat/src/services/place-agent-scopes.ts": "632cedb6af4aa55f",
+      "aimeat/src/services/place-agent-scopes.ts": "0c1e9e8f9a79bcc1",
       "aimeat/src/services/receivers/verify.ts": "e16675f72802f2d5",
       "aimeat/src/services/receivers/policy.ts": "be9c20d1ec9ab8bb"
     },
@@ -437,7 +437,7 @@
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
-      "aimeat/security/process-local-baseline.json": "c70edb8a56c4f9cc",
+      "aimeat/security/process-local-baseline.json": "d9bf92ae5d97f7b4",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52",

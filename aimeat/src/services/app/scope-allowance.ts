@@ -54,7 +54,7 @@ import { localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { equalAppId } from './record-keys.js';
 import { resolveAppTarget } from './dev-grant.js';
-import { changeScopeList } from '../scope-list-swap.js';
+import { changeScopeList } from '../scope/list-swap.js';
 import { recordAppAudit } from './audit.js';
 import { resolveCortexLib } from '../component/versions.js';
 import { cortexLibRefs, undeclaredScopeNeeds } from './scope-needs.js';

@@ -76,7 +76,7 @@ export const commerceTools = [
         // :250, :314, :444). They used to ask for commerce:sell here — not stricter or looser, simply a
         // different gate, so an owner who withheld exchange:beneficiary still had an agent that could
         // give their revenue away, and an agent granted exchange:beneficiary could not see the tools.
-        // services/scope-vocabulary-migration.ts hands the word to agents already holding commerce:sell,
+        // services/scope/vocabulary-migration.ts hands the word to agents already holding commerce:sell,
         // so nothing loses a tool it had and nothing gains one it did not.
         scope: 'exchange:beneficiary',
         // On `commerce`: Beneficiary splits: a seller declares who else earns from a sale, releases what accrued

@@ -368,7 +368,7 @@
     "src/services/scim-users.ts": {
       "listOwners": 1
     },
-    "src/services/scope-vocabulary-migration.ts": {
+    "src/services/scope/vocabulary-migration.ts": {
       "listAgents": 1,
       "listAppGrants": 1
     },

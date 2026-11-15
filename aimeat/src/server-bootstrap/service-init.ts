@@ -153,7 +153,7 @@ import { loadCatalog } from '../services/ai/catalog/store.js';
 import { seedBundledCortexes } from '../services/cortex/seeder.js';
 import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
 import { seedExamplePackages } from '../services/packages/compose/package-seeder.js';
-import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
+import { migrateScopeVocabulary } from '../services/scope/vocabulary-migration.js';
 import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task/start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';

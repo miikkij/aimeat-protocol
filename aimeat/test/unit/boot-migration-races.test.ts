@@ -26,7 +26,7 @@ import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { migrateRestScopeGatesOnce, migrateAgentReadGrantOnce } from '../../src/services/rest-scope-gates-migration.js';
 import { migrateRestScopeKeepWorkingOnce } from '../../src/services/rest-scope-keep-working-migration.js';
-import { migrateScopeVocabulary, migrateAppGrantScopeVocabulary } from '../../src/services/scope-vocabulary-migration.js';
+import { migrateScopeVocabulary, migrateAppGrantScopeVocabulary } from '../../src/services/scope/vocabulary-migration.js';
 import { migrateToolScopeWordsOnce } from '../../src/services/tool-scope-words-migration.js';
 import { migrateOperatorAdminOnce } from '../../src/services/operator/admin-migration.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../../src/services/task/start-migrations.js';

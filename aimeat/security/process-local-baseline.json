@@ -1289,7 +1289,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/scope-narrowing.ts :: map :: queue": {
+    "src/services/scope/narrowing.ts :: map :: queue": {
       "count": 1,
       "reason": "DEBT"
     },

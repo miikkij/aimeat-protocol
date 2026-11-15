@@ -188,7 +188,7 @@ export const toolScopeWords = (entry: ToolScope | undefined): string[] =>
  * entry as PERMISSION, so any agent holding any single scope could call all of them. Adding an entry
  * does not start refusing a call: it REMOVES the tool from an agent whose scopes do not carry the word
  * (mcp/index.ts wraps mcp.tool). Every agent that existed on 2026-08-10 was therefore granted the new
- * words at boot, once, by services/scope-vocabulary-migration.ts. Without that this is changelog
+ * words at boot, once, by services/scope/vocabulary-migration.ts. Without that this is changelog
  * 1.33.1 again, where every agent tagging itself got ACCESS_DENIED and discovery broke fleet-wide.
  * The words appear in the owner's agent editor (public/views/profile/agents/scope-model.js), so any
  * of them can be taken away.

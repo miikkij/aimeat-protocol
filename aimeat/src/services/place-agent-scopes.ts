@@ -32,7 +32,7 @@
  *     the node runs (services/config/apply.ts, the Consul import and watch). One write of
  *     PLACE_DEFAULT_KEY claims every agent that has not had the default, so of two processes starting
  *     together each agent is claimed by one; that one adds the words to the list it read
- *     (services/scope-list-swap.ts), which only adds, and tells the agent's live connector to fetch a
+ *     (services/scope/list-swap.ts), which only adds, and tells the agent's live connector to fetch a
  *     fresh token (crew77 on guestkoey3wfwk, 2.11: without the frame a connector kept its old words for
  *     up to an hour). An agent that had the default is passed over at every later start, so the step
  *     runs once per agent.
@@ -62,7 +62,7 @@ import { TOOL_SCOPES } from '../tool-catalog/scopes.js';
 import { exceedsCeiling, isOutsideWildcard, scopeIsCovered } from '../utils/scope-coverage.js';
 import { TASK_START_FLOOR } from './agent/task-rules.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
-import { changeScopeList } from './scope-list-swap.js';
+import { changeScopeList } from './scope/list-swap.js';
 import { isSharedAnonymous } from './rest-scope-gates-migration.js';
 import { emitToolListChanged } from './resource-events.js';
 import { nodeContext } from './node/context.js';

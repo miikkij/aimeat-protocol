@@ -1,5 +1,5 @@
 /**
- * @file src/services/scope-vocabulary-migration.ts
+ * @file src/services/scope/vocabulary-migration.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Grandfather every existing agent onto the scope names added on 2026-08-10.
@@ -63,11 +63,11 @@
  *     always required, and that must not widen anyone's reach.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3a: the vocabulary, and not breaking anyone).
  */
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
-import { changeScopeList } from './scope-list-swap.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
+import { changeScopeList } from './list-swap.js';
 
 /**
  * The words added on 2026-08-10, and what each one covers. Every existing agent gets all of them,
@@ -168,7 +168,7 @@ export async function migrateAgentScopeVocabulary(storage: Storage, namedAt: str
         // (see the warning below) and it was previously invisible.
         if (!Array.isArray(held)) { noScopeList++; continue; }
 
-        // Written on the list that was read (services/scope-list-swap.ts): a word another boot step,
+        // Written on the list that was read (services/scope/list-swap.ts): a word another boot step,
         // another node process or the owner adds meanwhile stays, and the words are worked out again
         // from the stored list.
         if (await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, held, vocabularyFor)) changed++;
@@ -264,7 +264,7 @@ export async function migrateAppGrantScopeVocabulary(storage: Storage): Promise<
 
     for (const grant of grants) {
         if (!appGrantPredatesVocabulary(grant)) continue;
-        // Written on the list that was read (services/scope-list-swap.ts), so a refresh, the owner's
+        // Written on the list that was read (services/scope/list-swap.ts), so a refresh, the owner's
         // edit or another boot step meanwhile is kept.
         const widened = await changeScopeList(storage, { kind: 'app-grant', id: grant.grantId }, grant.scopes, held => {
             if (held.includes('*')) return null;

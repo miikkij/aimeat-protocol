@@ -481,7 +481,7 @@
         "count": 2,
         "why": "UNREVIEWED"
       },
-      "src/services/scope-vocabulary-migration.ts": {
+      "src/services/scope/vocabulary-migration.ts": {
         "count": 2,
         "why": "UNREVIEWED"
       },

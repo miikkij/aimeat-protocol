@@ -38,7 +38,7 @@ import { BASIC_AGENTS } from '../../data/basic-agents.js';
 import { notify, type NotifyInput } from '../notify.js';
 import { logger } from '../../utils/logger.js';
 import { claimOnceOnlyStep } from '../once-only-step.js';
-import { changeScopeList } from '../scope-list-swap.js';
+import { changeScopeList } from '../scope/list-swap.js';
 
 export const BASIC_AGENTS_START_KEY = 'migrations.basic-agents-task-start';
 export const PURGE_WORD_KEY = 'migrations.memory-purge-app-grants';
@@ -117,7 +117,7 @@ export async function grantPurgeToAppGrantsOnce(storage: Storage, nodeId: string
     let grants = 0;
     try {
         for (const grant of await storage.listAppGrants()) {
-            // Written on the list that was read (services/scope-list-swap.ts), so a refresh or another boot step meanwhile is kept.
+            // Written on the list that was read (services/scope/list-swap.ts), so a refresh or another boot step meanwhile is kept.
             const changed = await changeScopeList(storage, { kind: 'app-grant', id: grant.grantId }, grant.scopes,
                 held => (held.includes('memory:delete') && !held.includes('memory:purge') ? [...held, 'memory:purge'] : null));
             if (changed) grants++;

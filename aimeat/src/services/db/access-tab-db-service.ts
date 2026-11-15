@@ -32,7 +32,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { SessionRecord } from '../../storage/repositories/session.repository.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
-import { GRANDFATHERED_SCOPES } from '../scope-vocabulary-migration.js';
+import { GRANDFATHERED_SCOPES } from '../scope/vocabulary-migration.js';
 import { buildOutboundProviders, listProviderMeta, type OutboundProvider } from '../connections/providers.js';
 import { listOwnConnections, listAgentsConnections, toPublicClient } from '../connections/access.js';
 

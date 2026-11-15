@@ -11,7 +11,7 @@
  *   WHY THIS SUITE EXISTS. Each of these handlers makes a decision no REST suite reaches: the
  *   same-owner check on a sibling (services/agent/profile-write.ts), the input vocabulary of a run
  *   mode or a console address, and the narrowing rule that replaces '*' with the words an agent
- *   actually used (services/scope-narrowing.ts). A handler that dropped one of those checks stayed
+ *   actually used (services/scope/narrowing.ts). A handler that dropped one of those checks stayed
  *   green everywhere. Each tool gets a call that succeeds, read back over REST where a REST read
  *   exists, and the refusal that matters for it: another owner's agent, a value outside the
  *   vocabulary, or an agent without the word (the registration filter does not offer the tool).

@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     migrateAppGrantScopeVocabulary, appGrantPredatesVocabulary, GRANDFATHERED_SCOPES, VOCABULARY_NAMED_AT,
-} from '../../src/services/scope-vocabulary-migration.js';
+} from '../../src/services/scope/vocabulary-migration.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { sameScopeList } from '../../src/storage/scope-list.js';
 

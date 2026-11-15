@@ -1,5 +1,5 @@
 /**
- * @file src/services/scope-narrowing.ts
+ * @file src/services/scope/narrowing.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The narrowing of an agent holding `*` to the permissions it used (ruling C, Jouni
@@ -24,11 +24,11 @@
  *     comes: the node narrows by itself now, and a second caller must see the first one's result.
  *   v1.0.0 — 2026-10-02 — Extracted from services/scope-use.ts before its first commit.
  */
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { flushScopeUse, readScopeUse, writeScopeUse, wildcardStatus, type WildcardStatus } from './scope-use.js';
-import { emitChange } from './event-bus.js';
-import { emitToolListChanged } from './resource-events.js';
-import { nodeContext } from './node/context.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { flushScopeUse, readScopeUse, writeScopeUse, wildcardStatus, type WildcardStatus } from '../scope-use.js';
+import { emitChange } from '../event-bus.js';
+import { emitToolListChanged } from '../resource-events.js';
+import { nodeContext } from '../node/context.js';
 
 export type NarrowOutcome =
     | { ok: true; agent: AgentRecord; status: WildcardStatus }

@@ -195,7 +195,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
   // before an agent can begin (or begin again, after a mode change) is the shape this platform is
   // built to avoid. requireScope answers both: an owner session passes on the role, and any scoped
   // principal needs `agent:write`, the word that covers acting on an agent record. It sits in
-  // GRANDFATHERED_SCOPES (services/scope-vocabulary-migration.ts), so every agent that existed on
+  // GRANDFATHERED_SCOPES (services/scope/vocabulary-migration.ts), so every agent that existed on
   // 2026-08-10 already carries it and nothing needs re-approval.
   //
   // The scope decides WHO may act on an agent record; canAccessAgent decides WHOSE, because

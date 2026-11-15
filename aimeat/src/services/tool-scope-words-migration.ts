@@ -9,7 +9,7 @@
  *   organism read tools, which had asked nothing, and none of the scope presets or the node's default
  *   agent scopes carry it: an agent approved with them lost workspace read, overview, comments,
  *   organism search and export at the deploy. Same shape as changelog 1.33.1 and
- *   services/scope-vocabulary-migration.ts.
+ *   services/scope/vocabulary-migration.ts.
  *
  *   WHAT IT GIVES. Only words that keep reach an agent already had, to agents approved before the
  *   words shipped on aimeat.io (TOOL_SCOPE_WORDS_SHIPPED_AT), once per node:
@@ -35,9 +35,9 @@
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { agentPredatesVocabulary } from './scope-vocabulary-migration.js';
+import { agentPredatesVocabulary } from './scope/vocabulary-migration.js';
 import { claimOnceOnlyStep } from './once-only-step.js';
-import { changeScopeList } from './scope-list-swap.js';
+import { changeScopeList } from './scope/list-swap.js';
 
 /** When aimeat.io first ran the words (its build muwbbfy7). An agent approved later chose from a screen that showed today's presets. */
 export const TOOL_SCOPE_WORDS_SHIPPED_AT = '2026-10-06T06:43:27.000Z';
@@ -72,7 +72,7 @@ export async function migrateToolScopeWordsOnce(storage: Storage, nodeId: string
     try {
         for (const agent of await storage.listAgents()) {
             if (!agentPredatesVocabulary(agent, TOOL_SCOPE_WORDS_SHIPPED_AT)) continue;
-            // Written on the list that was read (services/scope-list-swap.ts); an agent with no list is left alone.
+            // Written on the list that was read (services/scope/list-swap.ts); an agent with no list is left alone.
             const changed = await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, agent.defaultScopes, held => {
                 const missing = carriedForwardWords(held);
                 return missing.length ? [...held, ...missing] : null;

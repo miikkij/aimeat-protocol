@@ -34,7 +34,7 @@ export interface AppGrantRepository {
   listAppGrantsByOwner(owner: string): Promise<AppGrantRecord[]>;
   /**
    * Every LIVE grant on the node, across all owners. One consumer, and it is the reason this exists:
-   * the scope-vocabulary migration (services/scope-vocabulary-migration.ts) has to reach every
+   * the scope-vocabulary migration (services/scope/vocabulary-migration.ts) has to reach every
    * principal a new permission word could refuse, and app grants are a principal family — the one
    * `requireScope` deliberately does NOT wave through. Walking owners and calling
    * listAppGrantsByOwner would be the same read as N+1 queries at boot.

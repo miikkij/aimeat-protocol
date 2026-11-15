@@ -97,7 +97,7 @@ import { recordAccountEvent } from './account/events.js';
 import { recordSecurityIncident } from './security-incident.js';
 import { keepWorkingAppsOnce, type KeptApp } from './app/scope-allowance.js';
 import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';
-import { changeScopeList } from './scope-list-swap.js';
+import { changeScopeList } from './scope/list-swap.js';
 import {
   AGENT_READ_GRANT_KEY, AGENT_READ_WORDS, REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS, isSharedAnonymous,
 } from './rest-scope-gates-migration.js';
@@ -356,7 +356,7 @@ function withKeptWords(kind: 'agent' | 'ecosystem') {
 
 /**
  * The agents and ecosystem apps half: each missing word onto each principal that existed before. Each
- * list is written on the list that was read (services/scope-list-swap.ts), so a word another step or
+ * list is written on the list that was read (services/scope/list-swap.ts), so a word another step or
  * the owner adds meanwhile stays.
  */
 async function keepPrincipals(storage: Storage, cutoff: number, result: KeepWorkingResult): Promise<void> {

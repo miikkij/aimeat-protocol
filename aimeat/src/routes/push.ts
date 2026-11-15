@@ -50,7 +50,7 @@ import { emitChange } from '../services/event-bus.js';
  * wildcard except `*` covers it.
  *
  * NOT GRANDFATHERED, deliberately, against the rule that a new required scope is handed to existing
- * agents at boot (services/scope-vocabulary-migration.ts, changelog 1.33.1). That rule protects a
+ * agents at boot (services/scope/vocabulary-migration.ts, changelog 1.33.1). That rule protects a
  * capability agents actually exercise. This one they cannot: a push subscription is issued by a push
  * service to a browser's service worker, no MCP tool or liaison package reaches these routes, and an
  * agent that registers an endpoint here is performing the finding rather than doing its work. The
