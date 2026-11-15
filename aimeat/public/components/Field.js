@@ -40,6 +40,8 @@
  *        html`<${Field} label=${t('x.who')} hint=${t('x.whoHint')} group>…<//>`
  *        html`<${FormActions}><${Loud} control onClick=${save}>${t('x.save')}<//><//>`
  * @version-history
+ *   v1.11.2 — 2026-11-15 — inField passes `labelNote` on, so a TextField or TextArea shows a count
+ *     beside its label (the app structure page's wish field and its 600-character limit).
  *   v1.11.1 — 2026-11-14 — typedByPerson refuses the browser's own autofill too (js/find-field-guard.js
  *     refusedInput): Edge on Android wrote the sign-in name into the App Catalog search with a
  *     trusted input event. An emptied field is never refused.
@@ -235,7 +237,7 @@ export function hasFieldWords(props) {
  * back bare. `named`: the control is a set that names itself by the label's id (ids.labelId).
  */
 export function inField(props, ids, control, named) {
-  const { label, help, hint, message, error, wide, invalid } = props;
+  const { label, labelNote, help, hint, message, error, wide, invalid } = props;
   // `bare` (set by useFieldMessage): a control with no words of its own in a form that shows
   // refusals. The control and its message are siblings in one Fragment, in both states, so the
   // control is never mounted again when a message comes or goes.
@@ -244,7 +246,7 @@ export function inField(props, ids, control, named) {
     return html`<${Fragment}>${control}${msg ? html`<${Note} kind="message" id=${ids.msgId} error=${msg.error}>${msg.text}<//>` : null}<//>`;
   }
   if (!hasFieldWords(props)) return control;
-  return html`<${Field} label=${label} help=${help} hint=${hint} message=${messageOf(message, error)} wide=${wide} invalid=${invalid}
+  return html`<${Field} label=${label} labelNote=${labelNote} help=${help} hint=${hint} message=${messageOf(message, error)} wide=${wide} invalid=${invalid}
     named=${named} id=${ids.id} labelId=${ids.labelId} hintId=${ids.hintId} msgId=${ids.msgId}>${control}<//>`;
 }
 

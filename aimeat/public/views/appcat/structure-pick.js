@@ -26,6 +26,8 @@
  *   PickSections · drawnOption · wishOf · patchOf(s, picks, wish)
  * @usage html`<${StructurePick} kind="layout" s=${structure} appRef=${ref} onSaved=${set} onBack=${back} />`
  * @version-history
+ *   v1.1.1 — 2026-11-15 — The change field stops at the route's 600 characters and shows the count;
+ *     a refused send shows the route's own reason instead of "Try again".
  *   v1.1.0 — 2026-10-30 — The layouts the AI drew for the app first, the presets after, and the person's change.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
@@ -53,6 +55,8 @@ import { readCatalogue, readGenres, writePlan, choiceName, choiceLine, aiPrompt,
 
 const html = htm.bind(h);
 const AI = '__ai';
+/** The longest note a choice may carry: PlanWriteSchema in src/routes/apps/structure.ts, safeText(600). */
+const WISH_MAX = 600;
 
 /** A block's word in the sketch: the component's name in the reader's language, or its id. */
 const blockWord = (component) => tOr(`appcat.structure.block.${component}`, component);
@@ -130,13 +134,22 @@ function patchOf(s, picks, wish) {
 
 function SendBar({ s, appRef: ref, picks, wish, onSaved }) {
   const [said, setSaid] = useState(null);
+  const [refusal, setRefusal] = useState('');
   const [busy, setBusy] = useState(false);
   const names = Object.entries(picks).map(([k, v]) => `${x(`structure.prompt.${k}`)}: ${v === AI ? x('structure.aiDecides') : optionName(s, k, v)}`).join(' · ');
   const send = async () => {
     const patch = patchOf(s, picks, wish);
     if (!patch) { setSaid('same'); return; }
     setBusy(true);
-    try { onSaved(await writePlan(ref.owner, ref.filename, patch)); setSaid('sent'); } catch (err) { swallowed('structure: send', err); setSaid('failed'); }
+    setRefusal('');
+    try {
+      onSaved(await writePlan(ref.owner, ref.filename, patch)); setSaid('sent');
+    } catch (err) {
+      swallowed('structure: send', err);
+      // A refusal from the route says what to fix in the person's language; show it as it came.
+      setRefusal(err?.status >= 400 && err.status < 500 && err.message ? err.message : '');
+      setSaid('failed');
+    }
     setBusy(false);
   };
   const words = Object.fromEntries(Object.entries(picks).filter(([, v]) => v !== AI));
@@ -145,7 +158,7 @@ function SendBar({ s, appRef: ref, picks, wish, onSaved }) {
       <${Stack} gap="tight">
         <${Mark} kind="word">${x('structure.yourChoice')}<//>
         <${Note} inline>${names}<//>
-        ${said ? html`<${Note} kind="message" error=${said === 'failed'}>${x(`structure.said.${said}`)}<//>` : null}
+        ${said ? html`<${Note} kind="message" error=${said === 'failed'}>${said === 'failed' && refusal ? x('structure.said.refused', { why: refusal }) : x(`structure.said.${said}`)}<//>` : null}
       <//>
       <${Line} wrap align="center">
         <${Action} small copy=${aiPrompt(s, words, wish?.trim())}>${x('structure.copyPrompt')}<//>
@@ -203,7 +216,8 @@ function LayoutPick({ s, appRef: ref, onSaved }) {
     <${PickSections} kind="main" cols=${3} drawn=${proposalsOf(s, 'layout')} presets=${layoutPresets} value=${layout} onChange=${setLayout} aiOption=${aiOption('layout')} />
     <${PickSections} kind="nav" cols=${4} drawn=${proposalsOf(s, 'nav')} presets=${navPresets} value=${nav} onChange=${setNav} aiOption=${aiOption('nav')} />
     <${Section} id="structure-layout-wish" title=${x('structure.wish.title')}>
-      <${TextArea} label=${x('structure.wish.label')} hint=${x('structure.wish.hint')} value=${wish} onInput=${setWish} rows=${3} grow />
+      <${TextArea} label=${x('structure.wish.label')} labelNote=${x('structure.wish.count', { n: wish.length, max: WISH_MAX })}
+        hint=${x('structure.wish.hint')} value=${wish} onInput=${setWish} rows=${3} grow maxLength=${WISH_MAX} />
     <//>
     <${Beside} wide above="section" side=${html`<${Note} kind="aside">${x('structure.fromNode.layout')}<//>`}>
       <${Box} name=${x('structure.learn.title')}>
