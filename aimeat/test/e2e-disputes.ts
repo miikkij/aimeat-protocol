@@ -6,8 +6,6 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-disputes
  * @version-history
- *   2026-11-15 — Tests 17b–17d and 18b: the operator's list of what waits (GET /v1/admin/disputes), one
- *     dispute with its trail, the party refused, and a ruled dispute leaving the list.
  *   2026-10-16 — Every dispute outcome conserves morsels: the two wallets end exactly the network fee
  *     (and a ruling's burn) below where they were before the work was created (assertConserved). Tests
  *     11, 18 and 19 asserted the second payment the audit found (accept-fault returning the whole
@@ -649,43 +647,6 @@ await test('17. Admin views audit log', async () => {
     assert(events.includes('escalated'), 'has escalated');
 });
 
-// The operator's list of what waits for a ruling (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida):
-// the escalated dispute is in it with what delivery paid and both parties; a party is refused.
-await test('17b. The operator lists the escalated dispute with what delivery paid', async () => {
-    const disputeId = disputeIds[4];
-    const { status, body } = await json('/v1/admin/disputes', { headers: { Authorization: `Bearer ${ownerToken}` } });
-    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    const row = body.data.disputes.find((d: any) => d.id === disputeId);
-    assert(row, `the escalated dispute ${disputeId} is not listed: ${JSON.stringify(body.data.disputes.map((d: any) => d.id))}`);
-    assert(row.status === 'escalated' && row.tracking_code === trackingCodes[4], `row: ${JSON.stringify(row)}`);
-    // Test 18 rules 10 back to the requester, which the ceiling admits only when delivery paid at least that.
-    assert(Number.isInteger(row.paid_morsels) && row.paid_morsels >= 10, `paid_morsels: ${row.paid_morsels}`);
-    assert(typeof row.requester === 'string' && typeof row.provider === 'string' && row.requester !== row.provider, `parties: ${row.requester} / ${row.provider}`);
-    assert(row.timed_out === false, 'an escalated dispute is not a timed-out one');
-    assert(!body.data.disputes.some((d: any) => d.status !== 'escalated'), 'the default reading lists only escalated disputes');
-    const all = await json('/v1/admin/disputes?status=all', { headers: { Authorization: `Bearer ${ownerToken}` } });
-    assert(all.body.data.disputes.some((d: any) => d.status === 'resolved'), 'status=all lists the resolved ones too');
-});
-
-await test('17c. The operator reads one dispute with its audit trail', async () => {
-    const disputeId = disputeIds[4];
-    const { status, body } = await json(`/v1/admin/disputes/${disputeId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
-    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.dispute.id === disputeId, `dispute: ${JSON.stringify(body.data.dispute)}`);
-    assert(body.data.entries.map((e: any) => e.event).includes('escalated'), 'the trail carries the escalation');
-    const missing = await json('/v1/admin/disputes/no-such-dispute', { headers: { Authorization: `Bearer ${ownerToken}` } });
-    assert(missing.status === 404, `unknown id: ${missing.status}`);
-});
-
-await test('17d. A party to the dispute cannot read the operator\'s list or one dispute', async () => {
-    for (const path of ['/v1/admin/disputes', `/v1/admin/disputes/${disputeIds[4]}`]) {
-        const { status } = await json(path, { headers: { Authorization: `Bearer ${requesterToken}` } });
-        assert(status === 403, `${path} as the requester's agent: ${status}`);
-    }
-    const bad = await json('/v1/admin/disputes?status=everything', { headers: { Authorization: `Bearer ${ownerToken}` } });
-    assert(bad.status === 400, `unknown status reading: ${bad.status}`);
-});
-
 /** What a token's owner actually holds, as the node reports it. */
 async function walletOf(token: string): Promise<number> {
     const { body } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${token}` } });
@@ -766,11 +727,6 @@ await test('Setup: Open + escalate for provider ruling', async () => {
         headers: { Authorization: `Bearer ${requesterToken}` },
     });
     assert(eBody.ok === true, `escalate: ${JSON.stringify(eBody.error)}`);
-});
-
-await test('18b. A ruled dispute leaves the list of what waits', async () => {
-    const { body } = await json('/v1/admin/disputes', { headers: { Authorization: `Bearer ${ownerToken}` } });
-    assert(!body.data.disputes.some((d: any) => d.id === disputeIds[4]), 'the ruled dispute is still listed as waiting');
 });
 
 await test('19. Operator rules in favor of provider', async () => {

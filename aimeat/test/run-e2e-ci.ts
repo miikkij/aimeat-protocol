@@ -751,6 +751,8 @@ const ALL_SUITES = [
     // network, against fake upstreams on an own in-process node (28327). Not in the guard tier.
     'test/e2e-connections-social.ts',
     'test/e2e-disputes.ts',
+    // The operator's list of disputes that wait for a ruling, and a ruling over MCP.
+    'test/e2e-disputes-operator.ts',
     // DISABLED: e2e-email.ts always fails locally/CI because there are no SMTP
     // credentials configured to actually send email. Re-enable once a test mail
     // sender (or credentials) is available. -- disabled 2026-06-14
