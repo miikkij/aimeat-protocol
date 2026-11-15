@@ -29,7 +29,7 @@ export interface RequestMemoEntry { at: number; value: Promise<unknown> }
 export interface RequestScope {
   /** True while the request is being answered. */
   open: boolean;
-  /** The request memo (services/request-memo.ts): per storage, key → entry. Dropped on every write. */
+  /** The request memo (services/request/memo.ts): per storage, key → entry. Dropped on every write. */
   memo?: WeakMap<object, Map<string, RequestMemoEntry>>;
 }
 

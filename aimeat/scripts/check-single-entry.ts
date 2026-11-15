@@ -210,12 +210,12 @@ export const RULES: Rule[] = [
   },
   {
     id: 'self-fetch',
-    label: 'A request the node makes to itself goes through services/request-injector.ts, in process with no socket; only the modules that load real pages in a headless browser address 127.0.0.1 on the node\'s port (codebase analysis 2026-11-03, D-j)',
+    label: 'A request the node makes to itself goes through services/request/injector.ts, in process with no socket; only the modules that load real pages in a headless browser address 127.0.0.1 on the node\'s port (codebase analysis 2026-11-03, D-j)',
     // A template literal that addresses 127.0.0.1 on a port expression: `http://127.0.0.1:${config.port}`.
     pattern: /127\.0\.0\.1:\$\{[\w.]*port\}/,
     // The injector builds the origin. src/cli is the connector, a process of its own whose local
     // daemon listens on a port of its own.
-    skipDirs: ['src/services/request-injector.ts', 'src/cli/'],
+    skipDirs: ['src/services/request/injector.ts', 'src/cli/'],
   },
   {
     id: 'principal-kind',

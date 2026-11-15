@@ -33,7 +33,7 @@ import type { ConnectFrame, ConnectTunnelStats } from './wire.js';
 import type { Fairness } from './multiplex.js';
 import { logger } from '../../utils/logger.js';
 import { SELF_REQUEST_HEADER } from '../../auth/loopback-pass.js';
-import { withInProcessFetch } from '../request-injector.js';
+import { withInProcessFetch } from '../request/injector.js';
 
 /** Just enough of a connection for the dispatch: whose it is, where it writes, what it may use. */
 export interface ForwardConn {
@@ -138,7 +138,7 @@ export async function forwardRequest(ctx: ForwardContext, conn: ForwardConn, fra
       headers['Content-Type'] = 'application/json';
     }
 
-    // To the node's own HTTP server in process (services/request-injector.ts), with no socket: the
+    // To the node's own HTTP server in process (services/request/injector.ts), with no socket: the
     // same request the loopback fetch made, through the same stack.
     const { status, text } = await withInProcessFetch(ctx.config, {}, async (fetchIn) => {
       const res = await fetchIn(url.href, {

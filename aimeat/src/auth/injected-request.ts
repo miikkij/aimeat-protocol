@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Whether a request is one the node dispatched to itself in process
- *   (services/request-injector.ts), and for which caller's bearer.
+ *   (services/request/injector.ts), and for which caller's bearer.
  *
  *   The injector hands the node's own HTTP server a connection that is not a socket. Before it does,
  *   it marks that connection here with the hash of the bearer the request carries, when the
@@ -22,7 +22,7 @@
  * @structure markInjectedConnection(connection, bearer) · isInjectedRequest(req) ·
  *   injectedRequestCovers(req, bearer)
  * @usage
- *   markInjectedConnection(serverSide, bearer);                       // services/request-injector.ts
+ *   markInjectedConnection(serverSide, bearer);                       // services/request/injector.ts
  *   if (injectedRequestCovers(req, token)) return 'accept';            // auth/mcp-token-on-rest.ts
  * @version-history
  *   v1.0.0 — 2026-11-04 — Initial: the mark replaces the loopback pass for the three tools that run a

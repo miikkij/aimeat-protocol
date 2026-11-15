@@ -39,7 +39,7 @@ import { visitorPeerRefuses } from './visitor-peer.js';
 import { sessionConfig, sessionStorage } from './node-auth.js';
 import { isAnonymousPrincipal } from './anonymous-principal.js';
 import { grantGivenToEarlierAuthor } from '../services/app/grant-author.js';
-import { memoGetOwner } from '../services/request-memo.js';
+import { memoGetOwner } from '../services/request/memo.js';
 
 /**
  * Has this token's session been ended? True only for a token that names a session the store has and

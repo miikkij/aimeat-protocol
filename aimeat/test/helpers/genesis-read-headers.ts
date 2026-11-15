@@ -22,7 +22,7 @@ export async function genesisReadHeaders(
     query: { gaii?: string; key?: string; prefix?: string },
 ): Promise<Record<string, string>> {
     const timestamp = new Date().toISOString();
-    // 16 random bytes as hex: the only nonce shape the node accepts (services/request-nonce.ts).
+    // 16 random bytes as hex: the only nonce shape the node accepts (services/request/nonce.ts).
     const nonce = randomBytes(16).toString('hex');
     // The key order is the wire format: source_node, timestamp, the request's fields, audience, nonce.
     const message = JSON.stringify({

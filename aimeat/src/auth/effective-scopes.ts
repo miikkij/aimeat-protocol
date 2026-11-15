@@ -41,7 +41,7 @@ import type { VerifiedToken } from './jwt.js';
 import { scopeIsCovered, SCOPES_OUTSIDE_WILDCARD } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { isForeignPrincipal, isOwnerInPerson } from '../utils/gaii.js';
-import { memoGetAgent, memoGetOwner } from '../services/request-memo.js';
+import { memoGetAgent, memoGetOwner } from '../services/request/memo.js';
 import { visitorPeerScopes } from './visitor-peer.js';
 
 /**
@@ -93,7 +93,7 @@ export function intersectScopes(token: readonly string[], record: readonly strin
  *
  * UNCACHED across requests, for the same reason the revocation check beside it is uncached and says
  * so: an owner pressing "remove" means now. Inside one request it shares the revocation check's read
- * of the same record (services/request-memo.ts), so it costs no read of its own.
+ * of the same record (services/request/memo.ts), so it costs no read of its own.
  */
 export async function withCurrentScopes(storage: Storage | null, v: VerifiedToken): Promise<VerifiedToken> {
   v = await withCurrentOperatorRole(storage, v);

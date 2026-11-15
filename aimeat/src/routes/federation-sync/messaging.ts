@@ -128,7 +128,7 @@ import { systemReader } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
 import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation/auth-consent.js';
-import { NONCE_WINDOW_MS } from '../../services/request-nonce.js';
+import { NONCE_WINDOW_MS } from '../../services/request/nonce.js';
 import { boundInboundConversationId } from '../../services/message/thread-binding.js';
 import { normalizeInboundAttachments } from './inbound-attachments.js';
 

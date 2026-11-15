@@ -104,7 +104,7 @@ import { setupCodeGateFor, setupCodeRequired } from './services/setup-code.js';
 import { signedInOnly } from './config/visibility.js';
 import { passwordOffLockoutWarning, twoStepWithoutTotpWarning } from './services/sign-in-policy.js';
 import { trackRequests, drainServer } from './server-bootstrap/drain.js';
-import { noteListeningServer } from './services/request-injector.js';
+import { noteListeningServer } from './services/request/injector.js';
 
 /** How long shutdown waits for scheduled runs in progress; it runs beside the request drain. */
 const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
@@ -326,7 +326,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   // every request (server-bootstrap/drain.ts).
   const requestTracker = trackRequests(server);
   // The node's requests to itself are handed to this server in process, as connections that are not
-  // sockets, so they meet the same request counter and the same stop (services/request-injector.ts).
+  // sockets, so they meet the same request counter and the same stop (services/request/injector.ts).
   noteListeningServer(config.port, server);
 
   // WebSocket upgrade handling for personal node tunnels + realtime P2P + connector forward tunnel

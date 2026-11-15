@@ -52,7 +52,7 @@ import { memoryRouter } from '../../src/routes/memory.js';
 import { extensionsRouter } from '../../src/routes/extensions.js';
 import { runCapabilityAggregation } from '../../src/services/capabilities/aggregator.js';
 import { LOOPBACK_PASS_HEADER, mintLoopbackPass, revokeLoopbackPass } from '../../src/auth/loopback-pass.js';
-import { registerInProcessApp, noteListeningServer } from '../../src/services/request-injector.js';
+import { registerInProcessApp, noteListeningServer } from '../../src/services/request/injector.js';
 
 const NODE_ID = 'aimeat-mcp-token-rest-test';
 const BASE_URL = 'https://node.test';
@@ -192,7 +192,7 @@ beforeAll(async () => {
     // The loopback calls go to config.port, so it names this server.
     config.port = port;
     // What server.ts and index-start.ts do for the node: the node's requests to itself reach this app
-    // in process (services/request-injector.ts).
+    // in process (services/request/injector.ts).
     registerInProcessApp(port, app);
     noteListeningServer(port, server);
 

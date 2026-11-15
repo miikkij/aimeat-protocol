@@ -6,7 +6,7 @@
  *
  *   ONE IMPLEMENTATION, AND THIS IS NOT A SECOND ONE. The dispatch goes through the shared
  *   name-to-REST table (`CONNECT_CLI_TOOLS`) and lands on the node's own Express stack in process
- *   (services/request-injector.ts: the same HTTP server, no socket), carrying the CALLER'S bearer. So `requireAuth`, `requireScope`, the ownership checks
+ *   (services/request/injector.ts: the same HTTP server, no socket), carrying the CALLER'S bearer. So `requireAuth`, `requireScope`, the ownership checks
  *   and the AIMEAT envelope all apply by construction, exactly as they do when the same capability
  *   is reached as a tool or as a route. There is no privileged path here and nothing is re-derived:
  *   an `invoke` of `aimeat_memory_write` IS a `POST /v1/memory` by the same principal.
@@ -53,7 +53,7 @@ import { findNodeCapability, NON_INVOKABLE, listAllCapabilities, asRouteCapabili
 import { invokeRouteCapability } from '../invoke/route-invoke.js';
 import { logger } from '../../utils/logger.js';
 import { movedToolMessage } from '../../tool-catalog/moved-tools.js';
-import { inProcessOrigin, withInProcessFetch } from '../request-injector.js';
+import { inProcessOrigin, withInProcessFetch } from '../request/injector.js';
 
 export interface InvokeRefusal { ok: false; status: number; code: string; message: string; details?: unknown }
 /** `status` is the route's own HTTP status, for a route capability. */
@@ -120,7 +120,7 @@ export async function invokeNodeCapability(
     ? args.input as Record<string, unknown>
     : {};
 
-  // In process (services/request-injector.ts), so the request runs through the real Express stack,
+  // In process (services/request/injector.ts), so the request runs through the real Express stack,
   // the node's own HTTP server included, with no socket. The address is the loopback one, NOT
   // config.baseUrl, which would add a public-internet hop for a call that never leaves this process.
   // The dispatch is marked for this bearer (auth/injected-request.ts): a session that signed in over

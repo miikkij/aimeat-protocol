@@ -8,7 +8,7 @@
  *   WHY. The auth chain asked storage the same question about the caller again and again inside one
  *   request: an agent's MCP tool call read the agent record five times and the owner three times
  *   before the tool ran (codebase analysis 2026-11-03, item C2; efficiency.md E4). The request memo
- *   (services/request-memo.ts) answers a repeat read of the agent, the owner and the account from the
+ *   (services/request/memo.ts) answers a repeat read of the agent, the owner and the account from the
  *   first read of the same request, and the MCP endpoint takes the sign-in check optionalAuth already
  *   made. This test holds the numbers: a new read in the auth chain fails it.
  *
@@ -41,7 +41,7 @@ import { requestIdMiddleware } from '../../src/middleware/request-id.js';
 import { corsMiddleware } from '../../src/middleware/cors.js';
 import { mcpRouter } from '../../src/mcp/index.js';
 import { MCP_PROTOCOL_VERSION } from '../../src/mcp/protocol-version.js';
-import { installRequestMemo } from '../../src/services/request-memo.js';
+import { installRequestMemo } from '../../src/services/request/memo.js';
 
 const NODE_ID = 'aimeat-request-reads-test';
 const OWNER = 'readsowner';
@@ -122,7 +122,7 @@ beforeAll(async () => {
     if (probeWrites) {
       // A write of the caller's own agent record in the middle of the request: the next read sees it.
       await storage.updateAgent(AGENT, { description: 'changed in the request' } as never);
-      const { memoGetAgent } = await import('../../src/services/request-memo.js');
+      const { memoGetAgent } = await import('../../src/services/request/memo.js');
       const agent = await memoGetAgent(storage, AGENT);
       res.json({ sub: req.auth!.sub, scopes: req.auth!.scopes, description: (agent as { description?: string } | null)?.description ?? null });
       return;

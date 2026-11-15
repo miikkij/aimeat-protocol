@@ -96,7 +96,7 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/mcp-client/capability-use-setting.ts"
       ],
-      "digest": "sha256:3062a826f606560b13faf90f"
+      "digest": "sha256:30b730b1528e2ec7e188011e"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-08",
@@ -224,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:f3fbe6a074fc915c171b2752"
+      "digest": "sha256:70547c6a97bf39dcc15e2d3b"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -337,7 +337,7 @@
     },
     "07-security.md": {
       "aimeat/src/config/posture.ts": "c0ed072cd1e3f4ca",
-      "aimeat/src/middleware/cors.ts": "98494722f522e801",
+      "aimeat/src/middleware/cors.ts": "31b4016d9952255a",
       "aimeat/src/utils/env-validator.ts": "ccbc5f8f8169ffad",
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
       "aimeat/src/services/sign-in-policy.ts": "abdf689f004d2cac",
@@ -437,7 +437,7 @@
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
-      "aimeat/security/process-local-baseline.json": "2980acd93f874ab8",
+      "aimeat/security/process-local-baseline.json": "f598655c66522e13",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52",

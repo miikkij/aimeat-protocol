@@ -1,5 +1,5 @@
 /**
- * @file src/services/request-injector.ts
+ * @file src/services/request/injector.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's request to itself, dispatched in process: the same HTTP request reaches the
@@ -57,8 +57,8 @@ import type { AddressInfo } from 'node:net';
 import { duplexPair, type Duplex } from 'node:stream';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Agent } from 'undici';
-import { markInjectedConnection } from '../auth/injected-request.js';
-import { logger } from '../utils/logger.js';
+import { markInjectedConnection } from '../../auth/injected-request.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * The async context a connection from a socket starts in: no request's stores. Taken when this

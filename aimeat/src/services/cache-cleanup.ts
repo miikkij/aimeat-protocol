@@ -38,7 +38,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { NONCE_WINDOW_MS } from './request-nonce.js';
+import { NONCE_WINDOW_MS } from './request/nonce.js';
 import { claimedSweep } from './process-lease.js';
 
 export interface CleanupResult {

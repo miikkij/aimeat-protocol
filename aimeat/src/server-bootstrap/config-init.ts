@@ -61,7 +61,7 @@ import type { AimeatConfig, HookName } from '../config.js';
 import { applyConfigOverrides } from '../config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import { instrumentStorage } from '../services/perf-trace.js';
-import { installRequestMemo } from '../services/request-memo.js';
+import { installRequestMemo } from '../services/request/memo.js';
 import { ConfigProvenance, bindConfigProvenance } from '../services/config/provenance.js';
 import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH } from '../services/config/schema.js';
 import { createConsulConfigService, applyConsulValues } from '../services/consul-config.js';
@@ -106,7 +106,7 @@ export async function initializeConfig(
   // set one (services/file-store/). The wrapper reads the config on every file, so the overrides
   // applied below and later changes on the Config tab take effect without a restart.
   installFileStores(database, config);
-  // The request memo (services/request-memo.ts): every write through this storage drops what the
+  // The request memo (services/request/memo.ts): every write through this storage drops what the
   // request memoised, so only a storage prepared here is memoised at all.
   installRequestMemo(database);
   // PostgreSQL only: a statement made while a request is answered takes storage.request_statement_ms,

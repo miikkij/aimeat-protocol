@@ -44,7 +44,7 @@ import {
 import { logger } from '../utils/logger.js';
 import { POWERFUL_AGENT_SCOPES } from '../config/posture.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
-import { memoGetAgent } from './request-memo.js';
+import { memoGetAgent } from './request/memo.js';
 import { createT, type Locale } from '../i18n.js';
 
 /**

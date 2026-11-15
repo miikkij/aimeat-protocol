@@ -17,7 +17,7 @@
  *     `/v1/mcp/` take the token in every release.
  *   - The node's own request for an MCP tool: `aimeat_invoke`, `aimeat_capabilities_invoke` and
  *     `aimeat_app_tool_invoke` send the session's bearer to the REST routes in process
- *     (services/request-injector.ts), on a connection marked for that bearer
+ *     (services/request/injector.ts), on a connection marked for that bearer
  *     (auth/injected-request.ts), and that request is accepted, not counted, in every release. A
  *     request with a loopback pass this process minted for the bearer (auth/loopback-pass.ts) is
  *     accepted the same way; nothing in the node mints one since 2026-11-04.

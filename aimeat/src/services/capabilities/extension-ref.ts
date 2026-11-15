@@ -7,7 +7,7 @@
  *
  *   WHY. An extension-backed capability is invoked as a POST the node sends to itself in process,
  *   to /v1/ext/<name>/<action> with the caller's bearer token (services/capabilities/invoke.ts,
- *   services/request-injector.ts). The ref `ext:<name>:<action>` was stored as the registrant
+ *   services/request/injector.ts). The ref `ext:<name>:<action>` was stored as the registrant
  *   wrote it and split on ':' into that path, so a ref whose segments were not an extension name and
  *   an action id made the request reach another REST route of the node, as the caller, with a body
  *   the caller chose and a route the registrant chose (secaudit2026oct22,

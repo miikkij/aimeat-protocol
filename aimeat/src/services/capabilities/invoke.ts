@@ -81,7 +81,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, CapabilityRecord } from '../../storage/interface.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { INTERNAL_PASS_HEADER } from '../extension-access/internal-pass.js';
-import { withInProcessFetch } from '../request-injector.js';
+import { withInProcessFetch } from '../request/injector.js';
 import { nodeContext } from '../node/context.js';
 import { buildGEAI, ownerGhiiOf, localAccountName, localAccountOf } from '../../utils/gaii.js';
 import { requireUsableServer } from '../mcp-client/registry.js';
@@ -288,7 +288,7 @@ export async function invokeCapability(
       // `internalPass` (when present) tells the paywall on the other end that this call was already
       // settled by the route that knows which product was bought. Absent on every other path, so a
       // capability reached any other way is charged normally.
-      // The request goes to the node's own HTTP server in process (services/request-injector.ts),
+      // The request goes to the node's own HTTP server in process (services/request/injector.ts),
       // marked for the caller's own token (auth/injected-request.ts). A session that signed in over
       // MCP OAuth holds a token bound to the MCP endpoint, which `/v1/ext` refuses from 4.0.0 when it
       // comes from outside; with the mark the route reads the same token, so the caller's identity,

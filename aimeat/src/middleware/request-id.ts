@@ -83,7 +83,7 @@ export function requestIdMiddleware() {
     };
 
     // The request's life: open now, closed once the answer is sent or the client went away. The memo
-    // goes with it, so work the request left running reads storage itself (services/request-memo.ts).
+    // goes with it, so work the request left running reads storage itself (services/request/memo.ts).
     const scope: RequestScope = { open: true };
     ctx.scope = scope;
     const close = () => { scope.open = false; scope.memo = undefined; };

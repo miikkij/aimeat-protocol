@@ -115,7 +115,7 @@ import { hideInternalErrorText } from './middleware/internal-error-text.js';
 import { notFoundHandler, errorHandler } from './middleware/fallback-handlers.js';
 import { perfTraceMiddleware } from './services/perf-trace.js';
 import { markReady } from './services/node/lifecycle.js';
-import { registerInProcessApp } from './services/request-injector.js';
+import { registerInProcessApp } from './services/request/injector.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -167,7 +167,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 async function buildServer(config: AimeatConfig, configSources?: ConfigSources): Promise<ServerResult> {
   const app = express();
   // The node's requests to itself (aimeat_invoke, the capability invoke, the connector tunnel's
-  // forward) reach this app in process, with no socket (services/request-injector.ts).
+  // forward) reach this app in process, with no socket (services/request/injector.ts).
   registerInProcessApp(config.port, app);
 
   // Per-request storage profiler (opt-in: config.perfTrace + ?trace=1). Outermost so its wall-clock

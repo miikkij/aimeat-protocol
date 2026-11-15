@@ -2,7 +2,7 @@
  * @file test/unit/request-memo.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The rules of the request memo (services/request-memo.ts): one read per request for
+ * @description The rules of the request memo (services/request/memo.ts): one read per request for
  *   the same record, and a read of storage every time the memo cannot be sure: outside a request, after
  *   the response, after any write, for a storage nobody prepared, after a failed read and after
  *   MEMO_MAX_AGE_MS.
@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { requestContext, type RequestScope } from '../../src/utils/request-context.js';
-import { installRequestMemo, memoGetAgent, memoGetOwner, MEMO_MAX_AGE_MS } from '../../src/services/request-memo.js';
+import { installRequestMemo, memoGetAgent, memoGetOwner, MEMO_MAX_AGE_MS } from '../../src/services/request/memo.js';
 import type { Storage } from '../../src/storage/interface.js';
 
 class FakeStore {

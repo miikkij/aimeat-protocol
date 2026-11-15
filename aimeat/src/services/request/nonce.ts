@@ -1,5 +1,5 @@
 /**
- * @file src/services/request-nonce.ts
+ * @file src/services/request/nonce.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one-time value a node puts in a signed request, and the record of the ones this
@@ -25,7 +25,7 @@
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, PKG-10).
  */
 import { randomBytes } from 'node:crypto';
-import { spendOnce, spendOnceHere } from './ephemeral-claims.js';
+import { spendOnce, spendOnceHere } from '../ephemeral-claims.js';
 
 /** The window a signed request is accepted in, and so how long its nonce is remembered. */
 export const NONCE_WINDOW_MS = 5 * 60 * 1000;

@@ -58,7 +58,7 @@ import type { RouteManifest } from '../types/route-manifest.js';
 import { buildHopSigningMessage, computeRelayFeeDistribution } from '../types/route-manifest.js';
 import type { RelayFeeDistribution } from '../types/route-manifest.js';
 import { emitChange } from '../services/event-bus.js';
-import { NONCE_WINDOW_MS } from '../services/request-nonce.js';
+import { NONCE_WINDOW_MS } from '../services/request/nonce.js';
 import { isUniqueViolation } from './agent-tasks/dedupe.js';
 import { settlementRoom, recordRefusedSettlement, settlementRefusalMessage } from '../services/settlement-ceiling.js';
 

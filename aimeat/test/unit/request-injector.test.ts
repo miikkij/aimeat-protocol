@@ -2,7 +2,7 @@
  * @file test/unit/request-injector.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The node's request to itself without a socket (src/services/request-injector.ts) is
+ * @description The node's request to itself without a socket (src/services/request/injector.ts) is
  *   the same request the loopback fetch made: the same headers, method, body, client address and
  *   answer, run in a fresh async context, marked for the caller's bearer and for nobody else, never
  *   taken for a person at the node's own machine, and refused as a closed port is when the server is
@@ -17,7 +17,7 @@ import express from 'express';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { registerInProcessApp, noteListeningServer, withInProcessFetch } from '../../src/services/request-injector.js';
+import { registerInProcessApp, noteListeningServer, withInProcessFetch } from '../../src/services/request/injector.js';
 import { isInjectedRequest, injectedRequestCovers } from '../../src/auth/injected-request.js';
 import { fromNodeMachine } from '../../src/auth/loopback-pass.js';
 import { RULES, lineTexts } from '../../scripts/check-single-entry.js';

@@ -39,7 +39,7 @@ import type { Storage } from '../storage/interface.js';
 import type { VerifiedToken } from './jwt.js';
 import { isForeignPrincipal, parseGaiiLoose } from '../utils/gaii.js';
 import { madeAfter, tokenIssuedAt } from './credential-age.js';
-import { memoGetAgent } from '../services/request-memo.js';
+import { memoGetAgent } from '../services/request/memo.js';
 
 /**
  * Is the agent this credential acts for gone, or newer than the credential?
@@ -49,7 +49,7 @@ import { memoGetAgent } from '../services/request-memo.js';
  * storage, and a credential whose `sub` does not name an agent (`agent#owner@node`) is not looked
  * up at all. One keyed read per agent request otherwise, uncached across requests for the reason the
  * checks beside it are uncached: an owner pressing Delete means now. Inside one request the read is
- * shared with the other checks that read the same agent (services/request-memo.ts).
+ * shared with the other checks that read the same agent (services/request/memo.ts).
  */
 export async function agentGone(storage: Storage | null, verified: VerifiedToken): Promise<boolean> {
   if (!storage || verified.anonymous || isForeignPrincipal(verified)) return false;

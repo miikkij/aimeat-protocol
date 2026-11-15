@@ -1,5 +1,5 @@
 /**
- * @file src/services/request-memo.ts
+ * @file src/services/request/memo.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The request memo: one HTTP request asks storage about its caller's agent, owner and
@@ -32,10 +32,10 @@
  * @version-history
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item C2).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AgentRecord, GHIIRecord, OwnerRecord } from '../storage/types/identity.js';
-import { requestContext } from '../utils/request-context.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AgentRecord, GHIIRecord, OwnerRecord } from '../../storage/types/identity.js';
+import { requestContext } from '../../utils/request-context.js';
+import { logger } from '../../utils/logger.js';
 
 /** How long one answer stands inside a request. The auth chain reads within milliseconds. */
 export const MEMO_MAX_AGE_MS = 10_000;

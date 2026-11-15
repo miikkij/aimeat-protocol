@@ -132,7 +132,7 @@ export class AimeatClient {
 
   /**
    * The fetch this client's direct requests use: the platform's own unless one is set. The node's own
-   * dispatcher (services/node/invoke.ts) sets the in-process fetch of services/request-injector.ts,
+   * dispatcher (services/node/invoke.ts) sets the in-process fetch of services/request/injector.ts,
    * so its requests reach the node's routes with no socket; what is sent and read is unchanged.
    */
   private fetchImpl: ((url: string, init: RequestInit) => Promise<Response>) | null = null;

@@ -33,7 +33,7 @@
  *   several REST calls for one capability, and every one of them is the same caller's.
  *
  *   SINCE 2026-11-04 NOTHING IN THE NODE MINTS A PASS. The three tools dispatch their request in
- *   process (services/request-injector.ts), with no socket, and the request's connection carries the
+ *   process (services/request/injector.ts), with no socket, and the request's connection carries the
  *   caller's mark (auth/injected-request.ts), which auth/mcp-token-on-rest.ts accepts as it accepted
  *   the pass. The functions stay, and so does the check in mcp-token-on-rest.ts, because
  *   test/unit/mcp-token-on-rest.test.ts asserts them directly; retiring them is the developer's call.

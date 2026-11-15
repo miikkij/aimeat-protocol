@@ -6,7 +6,7 @@
  *   through the node's own route.
  *
  *   THE SAME REQUEST THE CALLER COULD SEND. The request goes to the node's own HTTP server in process
- *   (services/request-injector.ts), so every middleware of the route runs as for a request from
+ *   (services/request/injector.ts), so every middleware of the route runs as for a request from
  *   outside: sign-in, scope, readiness, rate limits, the body guard, the audit and the route's own
  *   ownership checks. It carries the caller's bearer and nothing else: no cookie, no admin password,
  *   no service token. The in-process mark (auth/injected-request.ts) lets a REST route take the
@@ -28,7 +28,7 @@
  *   v1.0.0 — 2026-11-14 — Initial: REST routes reachable through aimeat_invoke.
  */
 import type { RouteCapability } from './route-capabilities.js';
-import { withInProcessFetch } from '../request-injector.js';
+import { withInProcessFetch } from '../request/injector.js';
 import { logger } from '../../utils/logger.js';
 import { readBodyCapped } from '../../utils/read-capped.js';
 

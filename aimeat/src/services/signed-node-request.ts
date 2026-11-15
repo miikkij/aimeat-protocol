@@ -66,7 +66,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GenesisPeerRecord, FederationPeerRecord } from '../storage/interface.js';
 import { sign, verify } from '../auth/keypair.js';
 import { createHash } from 'node:crypto';
-import { newNonce, nonceAccepted, nonceAcceptedHere, NONCE_WINDOW_MS } from './request-nonce.js';
+import { newNonce, nonceAccepted, nonceAcceptedHere, NONCE_WINDOW_MS } from './request/nonce.js';
 import { AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN, unprovenFormatLive } from '../config/federation.js';
 import { noteDeprecatedUse } from './deprecation.js';
 import { logger } from '../utils/logger.js';

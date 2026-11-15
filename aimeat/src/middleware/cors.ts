@@ -38,7 +38,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { memoGetAgent, memoGetGHIIByOwner } from '../services/request-memo.js';
+import { memoGetAgent, memoGetGHIIByOwner } from '../services/request/memo.js';
 
 /**
  * Routes that authenticate with the host-only `aimeat_rt` cookie and return a usable credential.
@@ -160,7 +160,7 @@ async function resolveAllowedOrigins(
         }
 
         // Phase 3: Agent-level — check agent's allowedOrigins. Through the request memo: the
-        // revocation check of this request read the same agent (services/request-memo.ts).
+        // revocation check of this request read the same agent (services/request/memo.ts).
         if (sub !== owner) {
             const agent = await memoGetAgent(storage, sub);
             if (agent?.allowedOrigins?.length) {

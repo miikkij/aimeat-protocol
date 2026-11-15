@@ -180,7 +180,7 @@ sequenceDiagram
 
 Since 2026-11-04 the forward makes no network connection: the node hands the
 request to its own HTTP server in the same process
-(`aimeat/src/services/request-injector.ts`, called from
+(`aimeat/src/services/request/injector.ts`, called from
 `aimeat/src/services/connect-tunnel/forward.ts`). The request still passes the
 server's HTTP parser, every route gate and the envelope, as a request over a
 socket does.
