@@ -531,7 +531,7 @@
       "digest": "sha256:28c44ab5d5b30609821c175c"
     },
     "project:aimeat-app-building": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/build-app-layers.ts",
         "aimeat/src/routes/app-templates.ts",
@@ -543,7 +543,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/build-data-map-step.ts"
       ],
-      "digest": "sha256:d501c95a3e0d4de87f8a3186",
+      "digest": "sha256:511ca2144a17623a8c8afa1e",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -567,7 +567,7 @@
         "aimeat/scripts/ui-compare.ts",
         "aimeat/src/services/build-app-prompt.ts"
       ],
-      "digest": "sha256:db18b1937e818524852abd09",
+      "digest": "sha256:63e26cea0f81ab926dc01e48",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -831,7 +831,7 @@
       "aimeat/src/services/build-app-layers.ts": "b97c2e397914a7ba",
       "aimeat/src/routes/app-templates.ts": "130c67847ddadf85",
       "aimeat/src/services/build-atelier-prompt.ts": "fb3c48380d28da4f",
-      "aimeat/src/services/build-app-prompt.ts": "f127a119a9b879f6",
+      "aimeat/src/services/build-app-prompt.ts": "2f531fe0d0953862",
       "aimeat/src/services/app/publish.ts": "7a87b2d1057551f2",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
@@ -850,7 +850,7 @@
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
       "aimeat/scripts/ui-compare.ts": "a9f4b0a0d091a9ee",
-      "aimeat/src/services/build-app-prompt.ts": "f127a119a9b879f6"
+      "aimeat/src/services/build-app-prompt.ts": "2f531fe0d0953862"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3",
