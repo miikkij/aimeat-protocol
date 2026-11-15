@@ -8,6 +8,8 @@
  * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged, caller)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   2026-11-15 — Takes `access_code`: another person's fork of an app behind an access code needs the
+ *     code (forkSourceFor gate `access-code`), refused with ACCESS_DENIED without it (E2E audit M093).
  *   2026-11-14 — The source read and its gates are forkSourceFor (services/app/fork-gate.ts), as on
  *     POST .../fork: the owner's agent forks its own app the operator hid, and the operator's agent
  *     holding operator:admin passes the gates, with the operator trail (unit 2b, B9).
@@ -45,6 +47,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { publishAskOf } from '../services/publish-requests/ask.js';
 import { publishAskedFields } from '../services/app/publish-gate.js';
+import { toolError } from './tool-error.js';
 
 export function registerAppForkTool(
     mcp: McpServer,
@@ -63,7 +66,7 @@ export function registerAppForkTool(
             inputSchema: zodShapeFor('aimeat_app_fork'),
             annotations: annotationsFor('aimeat_app_fork'),
         },
-        async ({ owner, filename, new_filename, version }) => {
+        async ({ owner, filename, new_filename, version, access_code }) => {
             const agentGaii = getAgentGaii();
             const scope = await resolveAppOwnerScope(storage, config, agentGaii);
             if (!scope) {
@@ -73,9 +76,14 @@ export function registerAppForkTool(
             const { ownerName: callerOwner, ownerGhii: callerGhii } = scope;
             // The source read and its three gates (hidden, open for forking, licence), with the
             // operator's pass, are the ones POST .../fork asks (services/app/fork-gate.ts).
-            const gate = await forkSourceFor(storage, config, { owner: callerOwner, gaii: agentGaii, auth: caller().auth }, { owner, filename, version });
+            const gate = await forkSourceFor(storage, config, { owner: callerOwner, gaii: agentGaii, auth: caller().auth, accessCode: access_code }, { owner, filename, version });
             if (!gate.ok) {
                 const { refusal } = gate;
+                // The access-code refusal is new on this tool and takes the toolError shape, with the
+                // code the REST door answers; the older refusals keep their sentence.
+                if (refusal.gate === 'access-code') {
+                    return toolError('ACCESS_DENIED', 'This app is protected by an access code. Pass the code as access_code to fork it; the app\'s owner can give it to you.');
+                }
                 const text = refusal.gate === 'missing' || refusal.gate === 'hidden'
                     ? `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`
                     : refusal.gate === 'not-forkable'

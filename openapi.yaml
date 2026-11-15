@@ -44027,6 +44027,10 @@ paths:
         2. **Paywall** — a paid source still requires the caller to be the seller or hold a license
            (else `402`), so a server-side copy never bypasses the read paywall.
 
+        A source behind an access code needs that code from anyone but its owner and an operator, as
+        opening it does: `access_code` in the body, or `?code=` / `X-Access-Code` as on the read route
+        (else `403 ACCESS_DENIED`).
+
         The fork is created free (source price/license terms are dropped) and not itself forkable by
         default. This is the sanctioned, provenance-recording path — prefer it over reading the bytes
         and re-publishing them, which leaves no lineage.
@@ -44050,6 +44054,9 @@ paths:
                 version:
                   type: integer
                   description: Source version to fork (defaults to latest)
+                access_code:
+                  type: string
+                  description: The access code of a source app behind one. Not needed by the app's owner or an operator.
       responses:
         '202':
           $ref: '#/components/responses/PublishRequested'

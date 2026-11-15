@@ -86,7 +86,7 @@
         "aimeat/src/services/usage/usage-read.ts",
         "aimeat/public/views/appcat.js"
       ],
-      "digest": "sha256:e3c3073a3a43ee3a234a92b2"
+      "digest": "sha256:82fdfbe57dadde9e3b481c37"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-04",
@@ -1033,7 +1033,7 @@
     },
     "node:aimeat-find-my-app": {
       "aimeat/src/mcp/apps.ts": "050fc28e0333e90c",
-      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "c288d9f20d0fc998",
+      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "3e6fffbf576765ea",
       "aimeat/src/services/usage/usage-read.ts": "7e2062c63eacffc3",
       "aimeat/public/views/appcat.js": "325750f08208eb54"
     },

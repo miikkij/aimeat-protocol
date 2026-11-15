@@ -6,6 +6,9 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — POST .../fork takes `access_code` (or ?code= / X-Access-Code, as the read gate) and
+ *     answers 403 ACCESS_DENIED when another person forks an app behind an access code without it
+ *     (forkSourceFor gate `access-code`, E2E audit M093).
  *   2026-11-15 — PATCH /v1/apps/:filename answers `install` when the request names marks: who can install
  *     the app and whether it has its own PNG icon (services/app/install-readiness.ts).
  *   2026-11-14 — POST .../fork reads the source and asks its gates through forkSourceFor
@@ -195,6 +198,9 @@ export function registerForkManageRoutes(
         const body = req.body ?? {};
         const newFilename = typeof body.new_filename === 'string' ? body.new_filename.trim() : '';
         const version = body.version !== undefined ? parseInt(String(body.version), 10) : undefined;
+        // The code of an app behind one, taken where the read gate takes it too (?code=, X-Access-Code).
+        const accessCode = typeof body.access_code === 'string' && body.access_code ? body.access_code
+            : (req.query.code as string | undefined) || (req.headers['x-access-code'] as string | undefined);
 
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const { owner: callerOwner, ownerGhii: callerGhii } = await canonicalOwner(req);
@@ -204,7 +210,7 @@ export function registerForkManageRoutes(
         // stored (audit AI-triage 2026-08-23, invariant 1). The source's owner passes all three, and the
         // operator passes them through operatorOverride, which writes the trail only for a fork that
         // needed it. aimeat_app_fork asks the same function (services/app/fork-gate.ts).
-        const gate = await forkSourceFor(storage, config, { owner: callerOwner, gaii: callerGaii, auth: req.auth },
+        const gate = await forkSourceFor(storage, config, { owner: callerOwner, gaii: callerGaii, auth: req.auth, accessCode },
             { owner: sourceOwner, filename: sourceFilename, version });
         if (!gate.ok) {
             const { refusal } = gate;
@@ -214,6 +220,8 @@ export function registerForkManageRoutes(
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${sourceFilename}" not found for owner "${sourceOwner}"${suffix}`));
             } else if (refusal.gate === 'not-forkable') {
                 res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This app is not open for forking by others. Ask the owner to enable forking.'));
+            } else if (refusal.gate === 'access-code') {
+                res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'This app is protected by an access code. Send the code as access_code in the body to fork it; the app\'s owner can give it to you.'));
             } else {
                 res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app has ${refusal.toll} morsels of pacing. Take it first via POST /v1/app-store/purchase, then fork it.`));
             }

@@ -22,6 +22,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=app-publish-provenance-doors
  * @version-history
+ *   v1.3.2 — 2026-11-15 — The fork of another owner's app behind an access code sends that code: the
+ *     fork gate asks it since E2E audit M093. The request changed, no assertion did; the fork without
+ *     the code was the hole the audit found.
  *   v1.3.1 — 2026-11-15 — Audit M088, L027: the content hash is compared to sha256 of the uploaded
  *     bytes on every door; the refused presigned handshake leaves no upload address and no app.
  *   v1.3.0 — 2026-10-08 — aiprov D13: the board announcement of an agent's publish carries a
@@ -519,7 +522,9 @@ async function main() {
         const other = `forker${Date.now() % 1000000}`;
         const otherToken = (await registerOwner(BASE, other)).token;
         const fork = await json(`/v1/apps/${encodeURIComponent(owner)}/${inlineFile}/fork`, {
-            method: 'POST', headers: auth(otherToken), body: JSON.stringify({ new_filename: 'forked-private.html' }),
+            // The forker holds the code: since 2026-11-15 a fork of an app behind one asks the code
+            // opening it asks (E2E audit M093); this case is about the record the fork carries.
+            method: 'POST', headers: auth(otherToken), body: JSON.stringify({ new_filename: 'forked-private.html', access_code: 'forkcode123' }),
         });
         assert(fork.status === 200 || fork.status === 201, `fork: ${fork.status} ${JSON.stringify(fork.body?.error)}`);
         const forked = await json(`/v1/apps/${encodeURIComponent(other)}/forked-private.html/versions`);

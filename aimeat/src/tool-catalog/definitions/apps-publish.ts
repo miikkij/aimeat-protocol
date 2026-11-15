@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-11-15 — aimeat_app_fork takes access_code, the code of a source app behind one (E2E audit M093).
  *   2026-11-14 — aimeat_app_list's `search` says it reads the file name too, as both storages do.
  *   2026-11-13 — aimeat_app_draft_save takes mime_type (unit 3b).
  *   2026-11-13 — aimeat_app_publish takes toll_morsels and license_type, as POST /v1/apps does
@@ -156,7 +157,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_app_fork',
-        description: 'Fork an app into your own catalogue as a new independent app, recording its origin (manifest.forkedFrom) and a lineage event. You may fork your own apps freely; you may fork someone else\'s only when they have marked it forkable (and, for a paid app, you hold a license). This is the sanctioned, provenance-recording path — prefer it over app_get+app_publish so the fork chain stays intact. When the node asks the owner before making something public, a fork the node would list for anyone lands unlisted and the answer carries publish_request.',
+        description: 'Fork an app into your own catalogue as a new independent app, recording its origin (manifest.forkedFrom) and a lineage event. You may fork your own apps freely; you may fork someone else\'s only when they have marked it forkable (and, for a paid app, you hold a license; for an app behind an access code, you pass that code as access_code). This is the sanctioned, provenance-recording path — prefer it over app_get+app_publish so the fork chain stays intact. When the node asks the owner before making something public, a fork the node would list for anyone lands unlisted and the answer carries publish_request.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Fork App', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -167,6 +168,7 @@ export const appPublishTools = [
             filename: { type: 'string', required: true, description: 'Filename of the source app.' },
             new_filename: { type: 'string', required: true, description: 'Filename for the fork in your catalogue.' },
             version: { type: 'number', description: 'Source version to fork (default: latest).' },
+            access_code: { type: 'string', description: 'The access code of a source app behind one, the code that opens it. Not needed for your own app.' },
         },
     },
     {

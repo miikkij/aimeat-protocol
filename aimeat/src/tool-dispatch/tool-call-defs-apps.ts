@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-11-15 -- aimeat_app_fork forwards access_code to POST /v1/apps/:owner/:filename/fork (E2E audit M093).
  *   2026-11-13 -- aimeat_app_draft_save forwards mime_type (unit 3b).
  *   2026-11-13 -- aimeat_cortex_list forwards namespace and visibility to GET /v1/cortex (unit 3b).
  *   2026-11-13 -- aimeat_app_publish forwards toll_morsels and license_type to POST /v1/apps (unit 3b).
@@ -192,6 +193,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             const filename = requiredString(input, 'filename');
             const body: JsonObject = { new_filename: requiredString(input, 'new_filename') };
             const version = optionalNumber(input, 'version'); if (version !== undefined) body.version = version;
+            const accessCode = optionalString(input, 'access_code'); if (accessCode !== undefined) body.access_code = accessCode;
             return client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/fork`, body);
         },
     },

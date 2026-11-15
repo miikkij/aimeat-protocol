@@ -14,6 +14,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-access-code
  * @version-history
+ *   v1.3.0 — 2026-11-15 — Phase 5: POST .../fork of a forkable app behind a code refuses another
+ *     user without the code or with a wrong one (403 ACCESS_DENIED, no fork made; it answered 201
+ *     before the fix, E2E audit M093), and forks with the code, for the owner and for the owner's agent.
  *   v1.2.1 — 2026-11-15 — Audit L020: the non-owner listing test requires the app to be listed for
  *     each caller instead of asserting nothing when it is absent.
  *   v1.2.0 — 2026-10-09 — Phase 4: an agent of the owner without app:write gets neither the code nor
@@ -200,6 +203,46 @@ await test('An agent of the owner WITH app:write still sees the code, because it
     const { body } = await json('/v1/apps?limit=200', auth(writer));
     const mine = (body.data?.apps ?? []).find((a: any) => a.owner === ownerA && a.filename === FILENAME);
     assert(!!mine && mine.access_code === CODE, `app:write keeps the code: ${JSON.stringify(mine?.access_code)}`);
+});
+
+console.log('\nPhase 5: a fork copies the protected bytes, so it asks the code opening asks (E2E audit M093)');
+
+const forkAs = (token: string, newFilename: string, extra: Record<string, unknown> = {}) =>
+    json(`${appPath}/fork`, auth(token, { method: 'POST', body: JSON.stringify({ new_filename: newFilename, ...extra }) }));
+const ownerAppStatus = async (owner: string, filename: string, token: string) =>
+    (await fetch(`${BASE}/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`, { headers: { Authorization: `Bearer ${token}` } })).status;
+
+await test('The owner opens the protected app for forking', async () => {
+    const r = await json(`/v1/apps/${encodeURIComponent(FILENAME)}`, auth(tokenA, { method: 'PATCH', body: JSON.stringify({ forkable: true }) }));
+    assert(r.status === 200, `PATCH forkable ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Another user forking without the code → 403 ACCESS_DENIED, and no fork is made', async () => {
+    const r = await forkAs(tokenB, 'stolen-fork.html');
+    assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED', `fork without code must be 403 ACCESS_DENIED, got ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(await ownerAppStatus(ownerB, 'stolen-fork.html', tokenB) === 404, 'no fork landed in B\'s catalogue');
+});
+
+await test('Another user forking with a wrong code → 403 ACCESS_DENIED', async () => {
+    const r = await forkAs(tokenB, 'stolen-fork2.html', { access_code: 'wrong-code' });
+    assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED', `fork with a wrong code must be 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('Another user forking with the code → the fork is made', async () => {
+    const r = await forkAs(tokenB, 'coded-fork.html', { access_code: CODE });
+    assert(r.status === 201 || r.status === 202, `fork with the code ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(r.body?.data?.filename === 'coded-fork.html', `fork filename: ${JSON.stringify(r.body?.data)}`);
+});
+
+await test('The owner forks their own protected app without the code', async () => {
+    const r = await forkAs(tokenA, 'own-fork.html');
+    assert(r.status === 201 || r.status === 202, `owner fork ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('An agent of the owner with app:write forks the owner\'s protected app without the code', async () => {
+    const writer = await agentTokenOfA(`accforker${Date.now() % 100000}`, ['app:write']);
+    const r = await forkAs(writer, 'agent-fork.html');
+    assert(r.status === 201 || r.status === 202, `owner's agent fork ${r.status}: ${JSON.stringify(r.body?.error)}`);
 });
 
 console.log(`\n=== App Access-Code: ${passed} passed, ${failed} failed ===\n`);

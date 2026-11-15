@@ -12,7 +12,8 @@
  *   (services/operator-override.ts) asks one operator question on both surfaces.
  *
  *   THE GATES, in order. A source the operator hid is not found for anyone but its owner and the
- *   operator. A source not open for forking refuses everyone but its owner and the operator. A paced
+ *   operator. A source not open for forking refuses everyone but its owner and the operator. A source
+ *   behind an access code needs that code from everyone but its owner and the operator. A paced
  *   source needs a licence on the caller's owner GHII (the coordinate the purchase receipt stored),
  *   for the version copied, from everyone but its owner and the operator. The operator is asked only
  *   where a gate would refuse a caller who is not the owner, so the trail is written only for a fork
@@ -22,6 +23,9 @@
  *   const gate = await forkSourceFor(storage, config, { owner, gaii, auth: req.auth }, { owner: srcOwner, filename, version });
  *   if (!gate.ok) return refuse(gate.refusal);
  * @version-history
+ *   v1.1.0 — 2026-11-15 — Gate `access-code`: a source behind an access code needs the code
+ *     (caller.accessCode equal to the latest row's accessCode, the read gate's rule) from everyone but
+ *     its owner and the operator. A fork copied the protected bytes with no code (E2E audit M093).
  *   v1.0.0 — 2026-11-14 — Initial (structure programme 2026-11, unit 2b part 2, phase B, B9).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -35,17 +39,19 @@ export type ForkRefusal =
     | { gate: 'missing' }
     | { gate: 'hidden' }
     | { gate: 'not-forkable' }
+    | { gate: 'access-code' }
     | { gate: 'purchase-required'; toll: number };
 
 export type ForkGate = { ok: true; source: AppRecord } | { ok: false; refusal: ForkRefusal };
 
 /**
  * The source app when `caller` may fork it. `caller.owner` is the caller's account name, `gaii` its
- * identity (the licence is asked of ownerGhiiOf(gaii)), `auth` the session for the operator's pass.
+ * identity (the licence is asked of ownerGhiiOf(gaii)), `auth` the session for the operator's pass,
+ * `accessCode` the code the caller sent for an app behind one.
  */
 export async function forkSourceFor(
     storage: Storage, config: AimeatConfig,
-    caller: { owner: string; gaii: string; auth: OperatorAuth | null | undefined },
+    caller: { owner: string; gaii: string; auth: OperatorAuth | null | undefined; accessCode?: string | undefined },
     src: { owner: string; filename: string; version?: number | undefined },
 ): Promise<ForkGate> {
     const source = await storage.getAppByOwnerName(src.owner, src.filename, src.version);
@@ -56,7 +62,10 @@ export async function forkSourceFor(
     // writes it on its new row only (QA audit F10a-01).
     const current = await currentAppRow(storage, source, src.version);
     const paced = appIsPaced(config, current.manifest);
-    const isOperator = !sameOwner && (!!source.operatorHidden || !source.forkable || paced)
+    // The access code is the latest version's, as the read gate takes it (routes/apps/read.ts): a
+    // publish writes it on its new row only.
+    const codeLocked = !!current.accessCode && current.accessCode !== caller.accessCode;
+    const isOperator = !sameOwner && (!!source.operatorHidden || !source.forkable || codeLocked || paced)
         && await operatorOverride(storage, config, caller.auth, {
             ownerOf: source.ownerName, area: 'app', action: 'fork', subject: src.filename,
         });
@@ -64,6 +73,9 @@ export async function forkSourceFor(
     // Mirrors the read gate's 404, so moderation status is not leaked through a fork.
     if (source.operatorHidden && !isOperator && !sameOwner) return { ok: false, refusal: { gate: 'hidden' } };
     if (!isOperator && !sameOwner && !source.forkable) return { ok: false, refusal: { gate: 'not-forkable' } };
+    // A fork copies the bytes the access code keeps from other people, so it asks the code the read
+    // gate asks; the owner and the operator fork without it, as they open the app without it.
+    if (codeLocked && !isOperator && !sameOwner) return { ok: false, refusal: { gate: 'access-code' } };
     if (paced && !sameOwner && !isOperator) {
         // The version copied: a single licence covers the version bought (feature-list audit #110).
         const licensed = await storage.hasValidLicense(ownerGhiiOf(caller.gaii), source.ownerGaii, src.filename, undefined, source.versionNumber);
