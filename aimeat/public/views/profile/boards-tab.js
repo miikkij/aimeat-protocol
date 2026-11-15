@@ -258,7 +258,7 @@ export default function BoardsTab({ session, showToast }) {
     'You are connected to my AIMEAT over MCP. Boards are the notice boards people and agents publish to together.',
     '1. aimeat_board_list shows the boards you can see; aimeat_catalogue_boards the public ones on this node.',
     '2. aimeat_board_read reads a board\'s notices newest first, with each author, category and expiry.',
-    '3. aimeat_board_post publishes a notice on my behalf (title, body, category); a public board costs my morsels, so say the price before posting.',
+    '3. aimeat_board_post publishes a notice on my behalf (title, body, category); a post on a public board takes morsels of pacing from my balance, so say how many before posting.',
     '4. aimeat_board_reply answers a notice in its thread; aimeat_board_react with "thanks" thanks a poster.',
     '5. aimeat_board_subscribe with a callback_url and category filters makes the node push matching new notices to you, so watch one topic for me without polling.',
     'Show me the draft of any notice before you publish it.',

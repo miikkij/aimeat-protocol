@@ -124,8 +124,8 @@ boards and work items the node HOLDS, and the morsels in circulation) · \`aimea
 \`aimeat_admin_config_set\` (change settings, \`changes: [{ path, value }]\`, through the same checks as
 the Config page; a setting marked \`appliesAt: "restart"\` takes effect when the node next starts, so
 say that; a secret is set on its \`set_path\` and never read back; a setting the node's host sealed is
-refused) · \`aimeat_admin_mint\` (mint morsels — irreversible ledger credit, daily cap enforced; a
-financial action, use sparingly).
+refused) · \`aimeat_admin_mint\` (mint morsels — irreversible ledger credit, daily cap enforced; it adds
+pacing nobody earned, so use it sparingly).
 
 **Updates (operator).** \`aimeat_admin_node_update\` — is a newer AIMEAT out on npm than this node
 runs, when it was released, and what is new in it (\`whatsNew\`, the change-log entries the node does

@@ -15,6 +15,8 @@
  * @usage import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
  *   served at GET /v1/prompts/draft-offer
  * @version-history
+ *   v1.1.0 — 2026-11-15 — The offer template writes `tollMorsels` (pacing) and an optional `priceMoney`
+ *     in place of the deprecated `price.morsels`: a morsel is pacing, never a price.
  *   v1.0.1 — 2026-10-11 — The agent guide is named by its GitHub address; a repository path does not open from a node.
  *   v1.0.0 — 2026-06-13 — Initial: guided offer-drafting prompt (offering/billable/workflow levels).
  */
@@ -26,13 +28,15 @@ mesh and Agent Workflows build on. Produce ONE offer that is as compatible as is
 1. **Offering** (always) — a legible offer the owner can find.
 2. **Workflow-compatible** (if the agent produces a checkable, locatable output) — so the offer can be a
    step in a workflow.
-3. **Priced** (only if this agent should sell to OTHER owners) — otherwise leave pricing out.
+3. **For other owners** (only if this agent should serve OTHER owners) — a pacing amount in morsels,
+   a money price, or both; otherwise leave them out.
 
 First answer these to yourself from what you actually know about this agent — do NOT invent capability:
 - What is the ONE thing it reliably does, and what does it explicitly NOT do? (negative scope)
 - What memory key(s) does it WRITE its result to? (must be a stable, predictable key)
 - What memory key (if any) must exist before it can start? (or is it a source with no input?)
-- Should other owners be able to pay to invoke it? If so, what action/webhook runs it, and a fair price?
+- Should other owners be able to invoke it? If so, what action/webhook runs it, how many morsels of
+  pacing should each use take, and should it also have a money price?
 
 Then output the offer as JSON and publish it by calling **aimeat_memory_write** with:
   key   = "agents.{{agent_name}}.offers"
@@ -60,8 +64,9 @@ The offer object:
   "required_to_function": { "kind": "deterministic", "key": "<INPUT key>", "op": "nonempty" },
   //   ↑ for a SOURCE with no memory input, replace this whole value with the string  "none"
 
-  // ── pricing (OMIT all three for a private, self-use-only offer) ──
-  "price": { "morsels": <int ≥ 0>, "unit": "per-call" },
+  // ── for other owners (OMIT these for a private, self-use-only offer) ──
+  "tollMorsels": <int 0–100>,       // pacing: the morsels each use takes; a pace, never a price
+  "priceMoney": { "amount": <int, micro-units: 1 EUR = 1000000>, "currency": "EUR" },  // optional; none = free
   "visibility": "public",
   "callable": { "action_id": "<an action/capability id that runs this>" }
 }
@@ -74,10 +79,10 @@ Hard rules (these keep the offer honest — follow them exactly):
 - Prefer deterministic signal ops. Use an {"kind":"llm","ask":"…"} leaf only if a judgment is
   unavoidable (it runs only when the node's OpenRouter is configured and the owner approved it).
 - Never invent deliverable.sample — use "untested" until there is a real successful run.
-- Pricing is for CROSS-owner use only; the owner's own use is always free. Omit price/visibility/callable
-  unless this agent should genuinely sell to others.
+- Pacing and a money price apply to CROSS-owner use only; the owner's own use is always free and takes
+  no pacing. Omit tollMorsels/priceMoney/visibility/callable unless this agent should genuinely serve others.
 
 After publishing, verify with aimeat_memory_read key="agents.{{agent_name}}.offers". Your onboarding
-"Declare Offerings" (and, if you added signals/pricing, "Make Workflow-Compatible" / "Price an Offer")
+"Declare Offerings" (and, if you added signals/pacing, "Make Workflow-Compatible" / "Price an Offer")
 steps tick automatically on the next aimeat_onboarding_status. Full spec:
 https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md`;

@@ -113,7 +113,7 @@ export function generateEnvContent(settings: Record<string, string>): string {
       ],
     },
     {
-      title: 'Morsel Economy',
+      title: 'Morsel Pacing',
       vars: [
         { key: 'AIMEAT_WELCOME_BONUS' },
         { key: 'AIMEAT_DAILY_ALLOWANCE' },
@@ -168,7 +168,7 @@ export function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_STORAGE_MAX_FILE_SIZE_MB', comment: 'Max single file upload size (MB)' },
         { key: 'AIMEAT_MAX_ACTIONS_PER_AGENT', comment: 'Max action definitions per agent' },
         { key: 'AIMEAT_APP_MAX_SIZE_MB', comment: 'Max app file size (MB)' },
-        { key: 'AIMEAT_AGENT_PORTING_FEE', comment: 'Morsels charged for agent porting' },
+        { key: 'AIMEAT_AGENT_PORTING_FEE', comment: 'Morsels of pacing taken for agent porting' },
       ],
     },
     {

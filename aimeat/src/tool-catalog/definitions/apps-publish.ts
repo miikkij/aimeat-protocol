@@ -348,10 +348,10 @@ export const appPublishTools = [
         // Server-only: operator-gated node administration. Not exposed on the connector
         // MCP or CLI fallback. Present here so the catalog is complete vs every registered tool.
         name: 'aimeat_admin_mint',
-        description: 'Operator-only. Mint morsels into an agent\'s owner balance (irreversible ledger credit). Enforces the node\'s daily mint cap. Use sparingly — this is a financial action; prefer the normal earn/transfer flow where possible.',
+        description: 'Operator-only. Mint morsels into an agent\'s owner balance (irreversible ledger credit). Enforces the node\'s daily mint cap. Use sparingly — a mint adds pacing that nobody earned; prefer the daily allowance and the normal earn/transfer flow where possible.',
         caller: 'operator',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
-        // destructiveHint: mints morsels (irreversible ledger change, financial action)
+        // destructiveHint: mints morsels (irreversible ledger change)
         annotations: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
         scope: 'operator:admin',
         surfaces: ['admin'],

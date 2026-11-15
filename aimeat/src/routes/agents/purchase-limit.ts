@@ -68,7 +68,7 @@ export function registerPurchaseLimitRoutes(router: Router, config: AimeatConfig
     const body = (req.body ?? {}) as { currency?: unknown; per_day?: unknown };
     const currency = typeof body.currency === 'string' ? body.currency.trim().toUpperCase() : '';
     if (!isSupportedMoneyCurrency(currency)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `currency must be one of ${MONEY_CURRENCIES.join(', ')}. Morsel prices have no limit: they pace, and buy nothing.`));
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `currency must be one of ${MONEY_CURRENCIES.join(', ')}. Morsels take no purchase limit: they pace, and buy nothing.`));
       return;
     }
     const perDay = body.per_day;

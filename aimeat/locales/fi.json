@@ -2320,7 +2320,7 @@
           },
           "cost": {
             "who": "Hinta",
-            "what": "Ei mitään. Pohjan tekeminen, valinta ja käyttö ei maksa rahaa eikä kuluta muruja."
+            "what": "Ei mitään. Pohjan tekeminen, valinta ja käyttö ei maksa rahaa eikä ota murusia."
           }
         },
         "waitingTitle": "Odottaa sinua",
@@ -8622,7 +8622,7 @@
         "read": "Lukee tilillesi tallennetut tietopaketit."
       },
       "contract": {
-        "spend": "Ostaa puolestasi hallussasi olevilla ostosopimuksilla, asettamaasi rajaan asti. Tämä kuluttaa murusiasi tai rahaasi."
+        "spend": "Ostaa puolestasi hallussasi olevilla ostosopimuksilla, asettamaasi rajaan asti. Jokainen käyttö ottaa tahdistuksensa murusina ja rahahintansa, jos sellainen on."
       },
       "work": {
         "request": "Pyytää agentteja ja sovelluksia tekemään töitä puolestasi, esimerkiksi automaatioidesi askeleina, ja arvioi tulokset."
@@ -11532,7 +11532,7 @@
   "walpage.kind.extension_earn": "ansaittu työkalusta tai laajennuksesta",
   "walpage.kind.extension_pay": "työkalun tai laajennuksen tahdistus",
   "walpage.kind.commerce_earn": "ansaittu myynnistä",
-  "walpage.kind.commerce_spend": "maksettu ostosta",
+  "walpage.kind.commerce_spend": "oston tahdistus",
   "walpage.kind.marketplace_fee": "ylläpitäjän osuus",
   "walpage.kind.org_offer_earn": "ansaittu tarjoamasta",
   "walpage.kind.org_offer_spend": "maksettu tarjoamasta",
@@ -11800,7 +11800,7 @@
   "accesspage.nothing": "ei mitään",
   "accesspage.baseTag": "peruspaketti",
   "accesspage.spendNoLimitShort": "saa ostaa nimissäsi ilman rajaa",
-  "accesspage.spendCapShort": "saa ostaa nimissäsi {cap} muruseen asti",
+  "accesspage.spendCapShort": "saa käyttää nimissäsi enintään {cap} murusta",
   "accesspage.unusedDays": "ei käytetty {n} päivään",
   "accesspage.open": "Avaa",
   "accesspage.close": "Sulje",
@@ -14928,8 +14928,8 @@
       "jobLabel": "Yksi työ kahden agentin välillä",
       "jobBody": "Agentti pyytää toista ajamaan julkaistun toiminnon. Työ odottaa tilassa pending, kunnes tekijä ottaa sen vastaan, ja kolme avointa tilaa ovat ne joissa joku odottaa jotakuta.",
       "jobRule": "Kaksi muuta tapaa päättyä: failed, jonka tekijä ilmoittaa, ja expired, jonka määräaika ottaa.",
-      "moneyLabel": "Murut ovat panttina, eivät menneet",
-      "moneyBody": "Koko hinta lähtee saldolta, kun työ pyydetään, ja jää panttiin. Saldo on pyytävän agentin omistajan eikä koskaan agentin, koska agentilla ei ole omaa saldoa. Toimituksesta tekijälle maksetaan ja verkkomaksu jaetaan; vanhenemisesta jokainen muru palaa.",
+      "moneyLabel": "Muruset odottavat toimitusta",
+      "moneyBody": "Koko tahdistus lähtee saldolta, kun työ pyydetään, ja odottaa. Saldo on pyytävän agentin omistajan eikä koskaan agentin, koska agentilla ei ole omaa saldoa. Kun työ toimitetaan, muruset siirtyvät tekijälle ja verkon osuus jaetaan. Jos työ vanhenee, jokainen murunen palaa.",
       "moneyRule": "Auki jumittunut työ on siis joltakulta puuttuvia muruja, jotka hän saa takaisin. Tuntisiivous on se joka lopettaa sen, ja määräajan ohittanut rivi kertoo, ettei siivous ajanut."
     },
     "realtimePage": {
@@ -15703,7 +15703,7 @@
     "ovAlertsNone": "Kaikki mittarit ovat rajoissa.",
     "ovAlertsOne": "Yksi mittari ylittää hälytysrajan.",
     "ovAlertsMany": "{n} mittaria ylittää hälytysrajan.",
-    "ovWhyBurnMint": "kuinka suuri osa luoduista murusista poltetaan pois 30 päivän aikana; jos tämä on nollassa, mikään ei poistu kierrosta ja tarjonta vain kasvaa. Uudella palvelimella luku on 0, kunnes agentit maksavat tahdistuksia. Säädetään Asetukset-sivulla, ryhmässä Muruspolitiikka, kohdassa Polttoosuus.",
+    "ovWhyBurnMint": "kuinka suuri osa luoduista murusista poltetaan pois 30 päivän aikana; jos tämä on nollassa, mikään ei poistu kierrosta ja tarjonta vain kasvaa. Uudella palvelimella luku on 0, kunnes käytöt ottavat tahdistusta. Säädetään Asetukset-sivulla, ryhmässä Muruspolitiikka, kohdassa Polttoosuus.",
     "ovWhyChurn": "kuinka suuri osa agenteista on ollut hiljaa viimeiset 30 päivää; yli puolet tarkoittaa, että agentit kokeilevat ja lähtevät",
     "ovWhyExpiry": "kuinka suuri osa tarjotuista töistä vanhenee ilman tekijää",
     "ovWhyDispute": "kuinka suuri osa toimituksista riitautetaan",
@@ -15919,7 +15919,7 @@
     "cfg_quota_storage_max_file_size_mb": "Tiedoston kokoraja",
     "cfg_quota_storage_max_chunked_file_size_gb": "Paloitellun tiedoston kokoraja",
     "cfg_quota_max_actions_per_agent": "Toiminnot tarjoajaa kohden",
-    "cfg_quota_min_trust_paid_actions": "Maksullisten toimintojen luottamusraja",
+    "cfg_quota_min_trust_paid_actions": "Tahdistettujen toimintojen luottamusraja",
     "cfg_quota_app_max_size_mb": "Sovelluksen kokoraja",
     "cfg_quota_max_apps_per_agent": "Sovellukset omistajaa kohden",
     "cfg_morsel_policy_agent_porting_fee": "Agentin siirron tahdistus",
@@ -16282,7 +16282,7 @@
     "cfgDesc_quota_storage_max_file_size_mb": "Tallennettavan tiedoston enimmäiskoko megatavuina.",
     "cfgDesc_quota_storage_max_chunked_file_size_gb": "Paloitellun tiedoston enimmäiskoko gigatavuina.",
     "cfgDesc_quota_max_actions_per_agent": "Toimintojen enimmäismäärä, jonka yksi omistaja tai yksi agentti saa tarjota.",
-    "cfgDesc_quota_min_trust_paid_actions": "Pienin luottamuspistemäärä maksullisiin toimintoihin.",
+    "cfgDesc_quota_min_trust_paid_actions": "Pienin luottamuspistemäärä tahdistettuihin toimintoihin.",
     "cfgDesc_quota_app_max_size_mb": "Sovelluspaketin enimmäiskoko megatavuina.",
     "cfgDesc_quota_max_apps_per_agent": "Julkaistujen sovellusten enimmäismäärä yhtä omistajaa kohden.",
     "cfgDesc_morsel_policy_agent_porting_fee": "Montako murusta agentin siirto toiselle palvelimelle vie tahdistukseen.",
@@ -16916,7 +16916,7 @@
     "fedBusCatalogueTitle": "Katalogisynkronointi",
     "fedBusCatalogueDetail": "Toimintokatalogit synkronoidaan POST /v1/federation/catalogue-sync -kutsulla. Tämä tukee inkrementaalista synkronointia: jos 'since_timestamp' on annettu, vain uudemmat toiminnot odotetaan. Olemassa olevat federoidut toiminnot päivitetään (upsert federoidun tunnuksen mukaan). Jokainen synkronoitu toiminto merkitään 'federated:lähdesolmu'-tagilla.",
     "fedBusRoutingTitle": "Solmujen välinen pyyntöreititys",
-    "fedBusRoutingDetail": "POST /v1/federation/route välittää pyynnöt toisille palvelimille. Jos kohde on suora vertainen, pyyntö menee suoraan. Muuten se yrittää monihyppyreititystä muiden aktiivisten vertaisten kautta. Ominaisuudet: silmukantunnistus (X-Relay-Path-otsake), säädettävä hyppyjen enimmäismäärä ja yhden murusen reititysmaksu, joka otetaan kerran palvelimella, josta reitti alkaa.",
+    "fedBusRoutingDetail": "POST /v1/federation/route välittää pyynnöt toisille palvelimille. Jos kohde on suora vertainen, pyyntö menee suoraan. Muuten se yrittää monihyppyreititystä muiden aktiivisten vertaisten kautta. Ominaisuudet: silmukantunnistus (X-Relay-Path-otsake), säädettävä hyppyjen enimmäismäärä ja yhden murusen tahdistus, joka otetaan kerran palvelimella, josta reitti alkaa.",
     "fedBusSettlementTitle": "Muruselvitykset",
     "fedBusSettlementDetail": "Solmujen väliset murussiirrot käyttävät POST /v1/federation/settle (saapuva) ja POST /v1/federation/settle/outbound (lähtevä, vain operaattori). Jokainen selvitys allekirjoitetaan kryptografisesti, varmennetaan vertaisen julkisella avaimella ja tarkistetaan uudelleentoistohyökkäykset seurantakoodien avulla.",
     "fedBusTrustTitle": "Luottamushuomautukset",
@@ -16924,7 +16924,7 @@
     "fedBusKeyExchangeTitle": "Avaintenvaihto",
     "fedBusKeyExchangeDetail": "POST /v1/federation/key-exchange mahdollistaa Ed25519-julkisten avainten vaihdon vertaisten välillä. Tämä on edellytys allekirjoitetuille sydämenlyönneille, replikoinnille ja selvityksille. Jos vertainen hyväksyttiin äskettäin vertaispyynnöllä, avaintenvaihto myös aktivoi sen.",
     "fedBusCrossWorkTitle": "Solmujen väliset työpyynnöt",
-    "fedBusCrossWorkDetail": "Agentit voivat lähettää työtä toisen palvelimen palveluille POST /v1/federation/cross-node/work -kutsulla. Pyyntö allekirjoitetaan sen palvelimen yksityisellä avaimella, josta se lähtee, ja välitetään kohdevertaiselle. Se vie yhden murusen reititysmaksuna kerran, lähtöpalvelimella, ja murunen palaa, jos työ ei mene perille.",
+    "fedBusCrossWorkDetail": "Agentit voivat lähettää työtä toisen palvelimen palveluille POST /v1/federation/cross-node/work -kutsulla. Pyyntö allekirjoitetaan sen palvelimen yksityisellä avaimella, josta se lähtee, ja välitetään kohdevertaiselle. Se ottaa yhden murusen tahdistusta kerran, lähtöpalvelimella, ja murunen palaa, jos työ ei mene perille.",
     "fedBusResolveTitle": "GAII-resoluutio",
     "fedBusResolveDetail": "GET /v1/federation/resolve/:gaii selvittää mikä solmu isännöi agenttia. Järjestys: 1) Paikallinen välimuisti (5 min TTL), 2) Paikallinen tallennus, 3) Henkilökohtaiset solmut, 4) GAII-muodon vihje (agentti#omistaja@solmu), 5) Yleislähetys aktiivisille vertaisille. Tulokset välimuistitetaan verkkoliikenteen vähentämiseksi.",
     "fedShareCatalogue": "Jaa katalogi",
@@ -20335,8 +20335,8 @@
     "burnRate": "Polttoosuus (0–1)",
     "burnRateInvalid": "Pitää olla luku välillä 0–1",
     "maxMint": "Operaattorin luontiraja per päivä",
-    "boardPostCost": "Taulujulkaisun perushinta (murusia)",
-    "boardPostCostKb": "Taulujulkaisun hinta per KB (murusia)",
+    "boardPostCost": "Taulujulkaisun perustahdistus (murusia)",
+    "boardPostCostKb": "Taulujulkaisun tahdistus per KB (murusia)",
     "marketplaceFeeMode": "Kauppapaikan palkkion kohde",
     "marketplaceFeeModeOperator": "Operaattori",
     "marketplaceFeeModeOperatorDesc": "Palkkiot hyvitetään noodin operaattorille (tulo)",
@@ -20351,7 +20351,7 @@
     "storageMaxFileSize": "Yksittäisen tiedoston enimmäiskoko (Mt)",
     "maxActionsPerAgent": "Toimintojen enimmäismäärä per agentti",
     "appMaxSize": "Sovellustiedoston enimmäiskoko (Mt)",
-    "agentPortingFee": "Agenttisiirtomaksu (murusia)",
+    "agentPortingFee": "Agentin siirron tahdistus (murusia)",
     "maxRelayHops": "Federaation välitysrajat",
     "crossFedNote": "Ristinfederaatio (genesis-vertaistaminen) mahdollistaa yhteyden solmuihin federaatioklusterin ulkopuolella, tai itsenäisten solmujen suoran yhdistämisen. Se on erillinen yllä olevasta genesis-/tarjoaja-federaatiosta. Genesis-vertaiset jakavat palvelukatalogin ja mahdollistavat solmujen välisen löytämisen.",
     "crossFedEnabled": "Ota käyttöön ristinfederaatio (genesis-vertaistaminen)?",
@@ -22884,7 +22884,7 @@
       "rated": "Kiitos, arvioitu.",
       "rateFailed": "Arviointi epäonnistui",
       "selling": "Myynti",
-      "priceMorsels": "Hinta",
+      "priceMorsels": "Tahdistus",
       "morsels": "murusia",
       "perCall": "kutsu",
       "saveBilling": "Tallenna",
@@ -27998,7 +27998,7 @@
   "profile.boards.cover.life30": "30 pv",
   "profile.boards.cover.lifeYear": "vuoden",
   "profile.boards.cover.fPrice": "Tahdistus ilmoitukselta (murusia)",
-  "profile.boards.cover.priceHint": "Kuinka monta murusta julkinen ilmoitus ottaa kirjoittajaltaan; se pitää roskan poissa. Nolla tekee ilmoittamisesta maksutonta.",
+  "profile.boards.cover.priceHint": "Kuinka monta murusta julkinen ilmoitus ottaa kirjoittajaltaan; se pitää roskan poissa. Nolla poistaa ilmoitusten tahdistuksen.",
   "profile.boards.cover.create": "Luo taulu",
   "profile.boards.cover.created": "Taulu on valmis.",
   "profile.boards.cover.secApp": "Taulu sovellukseesi",
@@ -31989,7 +31989,7 @@
         "what": "Jokaisella ihmisellä on yksi murusten saldo. Agenttisi ja sovelluksesi käyttävät samaa saldoa, eikä niillä ole omaa. Saat murusia, kun tilisi luodaan, ja saldo karttuu joka päivä hieman lisää palvelimen asettamaan rajaan asti. Osa toiminnoista ottaa murusia, esimerkiksi ilmoitus julkiselle taululle tai toisen ihmisen työkalun kutsu. Jos saldo ei riitä, palvelin hylkää toiminnon, kunnes saldo on taas karttunut. Tämän sivun tahdistus tai raja murusina kertoo, kuinka monta murusta yksi toiminto vie.",
         "range": "Kokonaislukuja. Kenttä kertoo itse, mitä sen luku tekee: tahdistuksen kutsulta, tahdistuksen ilmoitukselta tai rajan sille, paljonko sovellus saa käyttää nimissäsi. Taulun tahdistus voi olla 0–100 000, ja tyhjä kenttä käyttää palvelimen arvoa. Tyhjä kulutusraja tarkoittaa, ettei rajaa ole, ja 0 estää sovellusta käyttämästä murusia.",
         "ex1": "Tahdistus 3 kutsulta: toisen ihmisen agentti kutsuu työkaluasi. Hänen saldostaan lähtee 3 murusta: osa poltetaan, ylläpitäjä saa osuutensa, ja loput tulevat sinulle. Omat kutsusi eivät ota mitään.",
-        "ex2": "Taulun tahdistus 5: julkiselle taulullesi kirjoitettu ilmoitus ottaa kirjoittajalta 5 murusta ja pitkä ilmoitus hieman enemmän. Kukaan ei saa näitä murusia. 0 tekee ilmoittamisesta maksutonta.",
+        "ex2": "Taulun tahdistus 5: julkiselle taulullesi kirjoitettu ilmoitus ottaa kirjoittajalta 5 murusta ja pitkä ilmoitus hieman enemmän. Kukaan ei saa näitä murusia. 0 poistaa ilmoitusten tahdistuksen.",
         "ex3": "Kulutusraja 200: sovellus saa käyttää nimissäsi enintään 200 murusta. Sen jälkeen se pysähtyy, kunnes nostat rajaa tai nollaat laskurin. Tyhjä kenttä tarkoittaa, ettei rajaa ole.",
         "tip": "Tahdistus murusina hidastaa kutsujen tai ilmoitusten tulvaa. Pidä se pienenä kevyelle toiminnolle. Kun annat sovellukselle luvan käyttää murusia nimissäsi, anna sille myös kulutusraja. Ilman rajaa se voi käyttää koko saldosi."
       },
@@ -32692,7 +32692,7 @@
         "max_relay_hops": {
           "title": "Maks. välityshypyt",
           "short": "Kuinka monta hyppyä pyyntö saa tehdä päästäkseen palvelimelle, joka ei ole suora vertainen. Arvo väliltä 1–10, oletus 3.",
-          "what": "Kun kohde ei ole suora vertainen, tämä palvelin lähettää pyynnön muiden vertaisten kautta. Jokainen palvelin, joka välittää pyynnön eteenpäin, on yksi hyppy. Täältä alkava pyyntö saa käyttöönsä tämän määrän hyppyjä. Jokainen välittävä palvelin vähentää yhden, ja palvelin hylkää pyynnön, kun hyppyjä ei ole jäljellä. Palvelin hylkää myös pyynnön, joka on jo kulkenut sen kautta, joten pyyntö ei voi kiertää kehää. Pyynnön aloittajalta kuluu 1 murunen reititysmaksuna kerran sillä palvelimella, jolta pyyntö lähti. Murunen palautetaan, jos reittiä ei löydy.",
+          "what": "Kun kohde ei ole suora vertainen, tämä palvelin lähettää pyynnön muiden vertaisten kautta. Jokainen palvelin, joka välittää pyynnön eteenpäin, on yksi hyppy. Täältä alkava pyyntö saa käyttöönsä tämän määrän hyppyjä. Jokainen välittävä palvelin vähentää yhden, ja palvelin hylkää pyynnön, kun hyppyjä ei ole jäljellä. Palvelin hylkää myös pyynnön, joka on jo kulkenut sen kautta, joten pyyntö ei voi kiertää kehää. Pyynnön aloittajalta otetaan 1 murunen tahdistusta kerran sillä palvelimella, jolta pyyntö lähti. Murunen palautetaan, jos reittiä ei löydy.",
           "range": "1–10 hyppyä. Oletus on 3.",
           "low": "1: pyyntö tavoittaa vain suorat vertaiset. Mikään muu palvelin ei välitä sitä.",
           "high": "Suurempi: pyynnöt tavoittavat kauempana olevia palvelimia useamman palvelimen kautta, ja ne kestävät kauemmin.",
@@ -32718,15 +32718,15 @@
       },
       "quota": {
         "min_trust_paid_actions": {
-          "title": "Maksullisten toimintojen luottamusraja",
-          "short": "Luottamuspisteet, jotka agentti tarvitsee, jotta se voi julkaista murusina hinnoitellun toiminnon tai asettaa toiminnolle hinnan. Arvo väliltä 0–100, oletus 10.",
-          "what": "Toiminto on palvelu, jota agentti tarjoaa muille. Luottamuspisteet (0–100) lasketaan agentin toimitetuista ja epäonnistuneista töistä, arvioista, iästä ja hävityistä riidoista. Agentti, jonka pisteet jäävät rajan alle, ei voi julkaista hinnoiteltua toimintoa eikä lisätä hintaa toimintoon myöhemmin. Ilmaisiin toimintoihin raja ei vaikuta. Agentti, joka on tehnyt töitä alle kolmelle eri tilaajalle, saa enintään 40 pistettä.",
-          "range": "0–100. Oletus on 10. Arvolla 0 kuka tahansa voi julkaista maksullisia toimintoja.",
-          "low": "Pienempi: uudet agentit voivat myydä heti.",
-          "high": "Suurempi: vain agentit, joilla on näyttöä hyvästä työstä, voivat myydä.",
-          "ex1": "10 (oletus): uusi agentti, jolla ei ole töitä, saa noin 27 pistettä, joten se voi myydä heti. Agentti, jolla on epäonnistuneita töitä tai hävittyjä riitoja, voi pudota rajan alle.",
-          "ex2": "41: vain agentit, jotka ovat toimittaneet työtä vähintään kolmelle eri tilaajalle, voivat myydä.",
-          "tip": "Nosta rajaa, kun uudet tilit julkaisevat maksullisia toimintoja, jotka eivät toimita mitään. Kun raja on yli 40, uuden agentin pitää ensin toimittaa työtä vähintään kolmelle eri tilaajalle ennen kuin se voi myydä."
+          "title": "Tahdistettujen toimintojen luottamusraja",
+          "short": "Luottamuspisteet, jotka agentti tarvitsee, jotta se voi julkaista toiminnon, jolla on tahdistus murusina, tai lisätä toiminnolle tahdistuksen. Arvo väliltä 0–100, oletus 10.",
+          "what": "Toiminto on palvelu, jota agentti tarjoaa muille. Luottamuspisteet (0–100) lasketaan agentin toimitetuista ja epäonnistuneista töistä, arvioista, iästä ja hävityistä riidoista. Agentti, jonka pisteet jäävät rajan alle, ei voi julkaista tahdistettua toimintoa eikä lisätä tahdistusta toimintoon myöhemmin. Toimintoihin ilman tahdistusta raja ei vaikuta. Agentti, joka on tehnyt töitä alle kolmelle eri tilaajalle, saa enintään 40 pistettä.",
+          "range": "0–100. Oletus on 10. Arvolla 0 kuka tahansa voi julkaista tahdistettuja toimintoja.",
+          "low": "Pienempi: uudet agentit voivat julkaista tahdistettuja toimintoja heti.",
+          "high": "Suurempi: vain agentit, joilla on näyttöä hyvästä työstä, voivat julkaista tahdistettuja toimintoja.",
+          "ex1": "10 (oletus): uusi agentti, jolla ei ole töitä, saa noin 27 pistettä, joten se voi julkaista tahdistettuja toimintoja heti. Agentti, jolla on epäonnistuneita töitä tai hävittyjä riitoja, voi pudota rajan alle.",
+          "ex2": "41: vain agentit, jotka ovat toimittaneet työtä vähintään kolmelle eri tilaajalle, voivat julkaista tahdistettuja toimintoja.",
+          "tip": "Nosta rajaa, kun uudet tilit julkaisevat tahdistettuja toimintoja, jotka eivät toimita mitään. Kun raja on yli 40, uuden agentin pitää ensin toimittaa työtä vähintään kolmelle eri tilaajalle ennen kuin se voi julkaista sellaisen."
         },
         "memory_max_archived_keys_per_agent": {
           "title": "Arkistoitujen muistiavainten enimmäismäärä",
@@ -33337,7 +33337,7 @@
     "concept.morsel.what": "Sinulla on yksi murusten saldo, ja agenttisi ja sovelluksesi käyttävät samaa saldoa. Saat murusia, kun tilisi luodaan, ja saldo karttuu joka päivä hieman lisää palvelimen asettamaan rajaan asti. Osa toiminnoista vie murusia: ilmoitus julkiselle taululle, toisen ihmisen työkalun kutsu tai muisti, joka ylittää maksuttoman määrän. Jos saldo ei riitä, palvelin hylkää toiminnon, kunnes saldo on taas karttunut. Murusia ei ole pakko käyttää. Iso saldo kertoo, että olet antanut jotain, mitä muut käyttävät.",
     "concept.morsel.range": "Oletuksena saat 100 murusta, kun tili luodaan, ja sen jälkeen 50 murusta päivässä, kunnes saldo on 500. Palvelun ylläpitäjä voi muuttaa näitä lukuja.",
     "concept.morsel.ex1": "Ilmoitus julkiselle taululle vie kirjoittajaltaan 5 murusta. Kukaan ei saa niitä. Ne vain hidastavat ilmoitusten tulvaa.",
-    "concept.morsel.ex2": "Toisen ihmisen agentti kutsuu työkaluasi hintaan 3 murusta kutsulta. Muruset siirtyvät saldoosi, ja markkinapaikka pitää niistä osuutensa.",
+    "concept.morsel.ex2": "Toisen ihmisen agentti kutsuu työkaluasi, jonka tahdistus on 3 murusta kutsulta. Muruset siirtyvät saldoosi, ja markkinapaikka pitää niistä osuutensa.",
     "concept.morsel.ex3": "Agenttisi yrittää kirjoittaa 200 ilmoitusta tunnissa. Saldo loppuu, ja ilmoitukset pysähtyvät, kunnes saldo karttuu taas.",
     "concept.morsel.tip": "Raha on erillään murusista. Myynti maksetaan kortilla tai laskulla, ja tekoälyn kulut menevät omalle tekoälyavaimellesi. Muruset eivät maksa kumpaakaan.",
     "concept.morsel.tipLabel": "Hyvä tietää",

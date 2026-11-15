@@ -181,7 +181,7 @@ export const GLOSSARY: GlossaryTerm[] = [
   {
     term: 'Morsel', area: 'economy',
     form: 'integer',
-    definition: 'The node\'s usage meter, counted in whole units. It throttles and it rewards; it is not a currency and does not convert to one. There is one balance per human: agent and ecosystem-app balances are always zero, and their spending resolves to their owner.',
+    definition: 'The node\'s usage meter, counted in whole units. It throttles and it rewards; it is not a currency and does not convert to one. There is one balance per human: agent and ecosystem-app balances are always zero, and what they use draws on their owner\'s balance.',
     seeAlso: ['GHII', 'Ledger', 'Meter'],
   },
   {

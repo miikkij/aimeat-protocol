@@ -276,7 +276,7 @@ export const LIST_DEMOS = {
     { name: 'tool for sale (name-price-delivery-doors), one not listed', render: () => cat(html`<${Note} kind="lead" chapter>Tools other apps and agents can buy from this app.<//>
       <${List} cols="name-price-delivery-doors">
         <${Row}><${Name} desc="Drafts an invoice from the hours logged this month.">draft_invoice<//>
-          <${Cell}><${Label} block>Price<//>12 morsels a call <${Tinted} tone="fine">in EXCHANGE<//><//>
+          <${Cell}><${Label} block>Pacing<//>12 morsels a call <${Tinted} tone="fine">in EXCHANGE<//><//>
           <${Cell}><${Label} block>Called at once<//><${Note} kind="meta" inline mono>invoice.draft<//><//>
           <${Doors}><${Action} small onClick=${noop}>Edit details<//><${Action} small tone="danger" title="Delete the tool" onClick=${noop}>✕<//><//><//>
         <${Row} below="⚠ It needs a description before it can be listed.">
@@ -287,11 +287,11 @@ export const LIST_DEMOS = {
       <//>`) },
     { name: 'contract (name-price-rake-budget-state)', render: () => cat(html`<${List} cols="name-price-rake-budget-state">
       <${Row}><${Name} meta="Provider: harbour">image.resize<//>
-        <${Cell}><${Label} block>Price<//>3 morsels<//><${Cell}><${Label} block>Rake<//>0.3 (10%)<//>
+        <${Cell}><${Label} block>Pacing<//>3 morsels<//><${Cell}><${Label} block>Rake<//>0.3 (10%)<//>
         <${Cell}><${Label} block>Budget<//>42 / 100 <${Label}>(58 left)<//><//>
         <${Cell}><${Note} kind="state" size="small" mono tone="fine">active<//><//><//>
       <${Row}><${Name} meta="Provider: nordic">timetable.lookup<//>
-        <${Cell}><${Label} block>Price<//>1 morsel<//><${Cell}><${Label} block>Rake<//>0.1 (10%)<//>
+        <${Cell}><${Label} block>Pacing<//>1 morsel<//><${Cell}><${Label} block>Rake<//>0.1 (10%)<//>
         <${Cell}><${Label} block>Budget<//>uncapped<//>
         <${Cell}><${Note} kind="state" size="small" mono tone="attention">paused<//><//><//>
     <//>`) },

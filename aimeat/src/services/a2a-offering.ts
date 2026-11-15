@@ -181,7 +181,7 @@ export async function priceForForeignCaller(
   if (!isMoneyCurrency(priced.currency ?? '')) {
     return {
       ok: false, code: 'NOT_SELLABLE_OFFNODE',
-      message: 'This work is priced in morsels, which pace an account\'s own agents and are not something a stranger can hold. It is not for sale from outside.',
+      message: 'This work is paced in morsels and has no money price. Morsels pace an account\'s own agents and are not something a stranger can hold, so it is not for sale from outside.',
     };
   }
   const network = getX402Network(config.x402Network);

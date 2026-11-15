@@ -160,7 +160,7 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
       ],
     },
     {
-      title: 'Morsel Economy (virtual currency)',
+      title: 'Morsel Pacing (a pacer, not money)',
       entries: [
         {
           envVar: 'AIMEAT_WELCOME_BONUS',
@@ -194,7 +194,7 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
         },
         {
           envVar: 'AIMEAT_BOARD_POST_BASE_COST',
-          description: 'Base cost in morsels to post on a board',
+          description: 'Base pacing in morsels to post on a board',
           value: String(config.boardPostBaseCost),
           defaultVal: '5',
         },

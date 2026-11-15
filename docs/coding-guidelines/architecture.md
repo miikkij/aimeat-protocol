@@ -218,9 +218,9 @@ An agent declares what it can do and then has to prove it. This matters most for
 ### Economy: Offerings, Work, Tasks, Ledger
 
 The atomic primitive is an **action** (`actions.ts`, a callable unit of work). It is rarely invoked directly; the rest is built on it:
-- **Offerings** (`models/offer-schemas.ts`): the billable, discoverable face of a service (morsel-priced `callable`, workflow signals). The marketplace surface.
+- **Offerings** (`models/offer-schemas.ts`): the billable, discoverable face of a service (a `callable` with a pacing amount in morsels and an optional money price, workflow signals). The marketplace surface.
 - **Work queue** (`work.ts`, `disputes.ts`): escrow with settlement on delivery and a dispute state machine. Live, with little traffic.
-- **Agent tasks and engagements**: fleet assignment (above), **not** morsel-priced.
+- **Agent tasks and engagements**: fleet assignment (above), **not** paced in morsels.
 - **Trust** (`services/trust.ts`): an automatically computed 0 to 100 reputation that gates paid actions.
 - **Ledger and metering** (`ledger.ts`): real-currency (**USD**) accounting of actual LLM spend, fed by agent telemetry. A separate *meter*, not a second currency (see "Economy: Meters, Not Currencies" above). Budgets and CSV billing export, behind the optional payment interface.
 

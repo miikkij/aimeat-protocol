@@ -127,7 +127,7 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // its owner held — the app presented the owner's own GHII, so the money layer could not tell them
   // apart. Paired with a per-app ceiling (`spend_cap_units`) so the answer can be an amount rather
   // than a yes.
-  'contract:spend': 'Buy on your behalf using contracts you hold (spends your morsels or money)',
+  'contract:spend': 'Buy on your behalf using contracts you hold (each use takes its pacing in morsels, and its money price when it has one)',
   // The other side of the same coin: an app that manages who may use ITS owner's capability.
   // A membership gate that approves someone and cannot open the door for them is decoration, and
   // the owner is the one paying for what it gives away — so it is asked for, never assumed.

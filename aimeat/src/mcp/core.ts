@@ -272,7 +272,7 @@ export function registerCoreTools(
     mcp.registerResource(
         'agent-wallet',
         `aimeat://wallet/${encodeURIComponent(agentGaii)}`,
-        { mimeType: 'application/json', description: 'Agent morsel wallet balance' },
+        { mimeType: 'application/json', description: 'The morsel balance this agent draws on: its owner\'s pacing, not money' },
         async (uri) => {
             const agent = await storage.getAgent(agentGaii);
             if (!agent) return { contents: [{ uri: uri.toString(), text: '{}' }] };

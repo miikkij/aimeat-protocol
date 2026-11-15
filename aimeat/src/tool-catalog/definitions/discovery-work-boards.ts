@@ -238,7 +238,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_wallet_balance',
-        description: 'Check the morsel wallet: returns total balance, amount currently held in escrow for in-flight work, and the available (spendable) remainder. Morsels belong to the owner (GHII), shared across all their agents. Check available before hiring via aimeat_action_execute; for the ledger of past transactions use aimeat_wallet_transactions.',
+        description: 'Check the morsel balance (pacing, not money): returns total balance, amount currently held in escrow for in-flight work, and the available remainder. Morsels belong to the owner (GHII), shared across all their agents. Check available before hiring via aimeat_action_execute; for the ledger of past transactions use aimeat_wallet_transactions.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Wallet Balance', readOnlyHint: true },

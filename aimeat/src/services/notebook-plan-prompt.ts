@@ -54,7 +54,7 @@ export const NOTEBOOK_PLAN_TEMPLATE = [
   '- Prefer doing cheap reasoning/assessment yourself (llm_reason / librarian_assess). Delegate only when the work needs something you cannot do here (live web, image generation, external/grounded research).',
   '- Order steps so earlier results can inform later ones.',
   '- If the note contains explicit next steps or open items, do not re-derive them as llm_reason steps; they are extracted separately as actions. Focus enrichment steps on what makes the note itself more useful.',
-  '- "gate": true if the user should confirm before this step runs; default delegate steps to gate=true (they spend agent time/morsels). false only for clearly safe, cheap, self-run steps.',
+  '- "gate": true if the user should confirm before this step runs; default delegate steps to gate=true (they use agent time and morsels of pacing). false only for clearly safe, cheap, self-run steps.',
   '- Do NOT claim to browse the web or generate images yourself — that is what "delegate" is for.',
   '',
   'Answer with EXACTLY this JSON shape (omit agent/offerId for non-delegate steps):',
