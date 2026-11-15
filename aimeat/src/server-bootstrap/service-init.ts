@@ -186,7 +186,7 @@ import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai/disclosure-sweep.js';
 import { scheduleAgreementSweep } from '../services/compliance/agreements-gaps.js';
 import { scheduleGoalSweep } from '../services/goals/goals-sweep.js';
-import { sweepHeldPushes, sweepNotificationDigests } from '../services/notification-sweeps.js';
+import { sweepHeldPushes, sweepNotificationDigests } from '../services/notifications/sweeps.js';
 import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
 import { refreshOpenings } from '../services/internet-opening/opening-registry.js';
@@ -627,7 +627,7 @@ export async function initializeServices(
   scheduleAgreementSweep({ storage, config });
   scheduleGoalSweep({ storage, config });
 
-  // Notifications the owner asked to be held or folded (services/notification-sweeps.ts): every
+  // Notifications the owner asked to be held or folded (services/notifications/sweeps.ts): every
   // five minutes, the pushes held during quiet hours go out as one when the window has just ended;
   // every hour, an owner who asked for a digest gets one email for what stayed unread. Both read
   // only owners who wrote a settings record, so a node where nobody did runs them for nothing.

@@ -58,8 +58,8 @@ import type { Storage, AgentTaskRecord, MemoryRecord, GHIIRecord } from '../../s
 import type { AimeatConfig } from '../../config.js';
 import { nodeContext } from '../node/context.js';
 import { provenOwnerAddress, notificationEmailUnverified } from '../owner/mail-address.js';
-import { mailOwnerFrom } from '../notification-create.js';
-import { readNotificationSettings, prefsFor, senderKey, type NotifSource } from '../notification-settings.js';
+import { mailOwnerFrom } from '../notifications/create.js';
+import { readNotificationSettings, prefsFor, senderKey, type NotifSource } from '../notifications/settings.js';
 import { outboxPrefix } from './automation-advisories.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName, buildGEAI } from '../../utils/gaii.js';

@@ -25,7 +25,7 @@ import { createRequire } from 'node:module';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MailboxItemRecord, PersonalPushSubscriptionRecord, NotificationPreferences } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { resolveTemplate } from './notification-templates.js';
+import { resolveTemplate } from './notifications/templates.js';
 import { getStats } from './stats.js';
 import { smtpTransportOptions } from './email.js';
 

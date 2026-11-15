@@ -1,5 +1,5 @@
 /**
- * @file src/services/notification-answers.ts
+ * @file src/services/notifications/answers.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A notification that asked a question shows its answer once the question is decided,
@@ -25,11 +25,11 @@
  *     owner (codebase analysis 2026-11-03, item C7).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, the approval standard; the developer's review).
  */
-import type { Storage } from '../storage/interface.js';
-import { listOwnerNotificationRecords, findOwnerNotificationsByIds } from './notification-sweeps.js';
-import { emitChange } from './event-bus.js';
-import { updateMemoryRecord, UNCHANGED } from './record-cas.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import { listOwnerNotificationRecords, findOwnerNotificationsByIds } from './sweeps.js';
+import { emitChange } from '../event-bus.js';
+import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
+import { logger } from '../../utils/logger.js';
 
 /** How a question ended. `done`: a button ran that is neither yes nor no; `answered`: it was decided elsewhere first. */
 export type AnswerOutcome = 'allowed' | 'declined' | 'expired' | 'outdated' | 'done' | 'answered';

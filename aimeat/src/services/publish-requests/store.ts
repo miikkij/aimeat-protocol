@@ -114,7 +114,7 @@ import { notify } from '../notify.js';
 import { emitChange } from '../event-bus.js';
 import { approverGhiis, closeQuestion, tellAsker, type Approver, type ApprovalOutcome } from '../approval-standard.js';
 
-/** The ref a request's notices carry, so its decision closes them (services/notification-answers.ts). */
+/** The ref a request's notices carry, so its decision closes them (services/notifications/answers.ts). */
 const questionRef = (id: string) => `publish-request:${id}`;
 import { stableStringify } from '../../utils/stable-json.js';
 import { serialByKey } from '../../utils/serial-by-key.js';

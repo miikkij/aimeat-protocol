@@ -26,11 +26,11 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, AgentTaskRecord, ScheduledJobRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { deliverTaskResult } from '../../src/services/task/result-delivery.js';
-import { createPrincipalNotification } from '../../src/services/notification-create.js';
+import { createPrincipalNotification } from '../../src/services/notifications/create.js';
 import { notifyAutomationTaskComplete } from '../../src/services/ecosystem/automation-notify.js';
 import { pulseInstanceServer } from '../../src/services/living-pulse.js';
 import { tellAgreement } from '../../src/services/compliance/agreements-notify.js';
-import { updateNotificationSettings } from '../../src/services/notification-settings.js';
+import { updateNotificationSettings } from '../../src/services/notifications/settings.js';
 import { setActiveEmailService } from '../../src/services/email.js';
 
 const NODE = 'aimeat-test-001';

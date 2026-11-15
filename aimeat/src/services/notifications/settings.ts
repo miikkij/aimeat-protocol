@@ -1,5 +1,5 @@
 /**
- * @file notification-settings.ts
+ * @file src/services/notifications/settings.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What an owner decided about their own notifications, in one memory record
@@ -41,10 +41,10 @@
  *     UTC and woke them up. Found by no-silent-catch's fourth shape.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { serialByKey } from '../utils/serial-by-key.js';
-import { updateRecord } from './record-cas.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { serialByKey } from '../../utils/serial-by-key.js';
+import { updateRecord } from '../record-cas.js';
 
 /** Under the reserved `notifications.` prefix (utils/reserved-keys.ts): a granted app cannot write it. */
 export const NOTIF_SETTINGS_KEY = 'notifications.settings';

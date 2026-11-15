@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Which rows of the Notifications page's "Who may notify you" carry a push switch
  *   (public/views/profile/notifications/frame.js senderRows). The node's own notifications are pushed
- *   or not per group (prefsFor in src/services/notification-settings.ts), so the "AIMEAT itself" row,
+ *   or not per group (prefsFor in src/services/notifications/settings.ts), so the "AIMEAT itself" row,
  *   which has no group, draws no switch; each group under By group and every other sender does, and
  *   pressing a group's switch saves that group's push.
  * @usage cd aimeat && pnpm exec vitest run test/unit/notifications-sender-push-switch.test.ts
@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { senderRows, Switch } from '../../public/views/profile/notifications/frame.js';
-import { prefsFor, defaultSettings } from '../../src/services/notification-settings.js';
+import { prefsFor, defaultSettings } from '../../src/services/notifications/settings.js';
 
 interface VNode { type: unknown; key?: unknown; props: Record<string, unknown> & { children?: unknown } }
 const isVNode = (x: unknown): x is VNode => !!x && typeof x === 'object' && 'type' in x && 'props' in x;

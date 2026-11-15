@@ -23,7 +23,7 @@ import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { WorkflowRun } from '../../src/models/workflow-schemas.js';
 import { onRunFinished } from '../../src/services/workflow/engine-steps.js';
-import { readMailLog, updateNotificationSettings } from '../../src/services/notification-settings.js';
+import { readMailLog, updateNotificationSettings } from '../../src/services/notifications/settings.js';
 import { setActiveEmailService } from '../../src/services/email.js';
 
 const NODE = 'aimeat-test-001';

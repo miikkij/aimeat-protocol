@@ -65,7 +65,7 @@ import type { Locale } from '../i18n.js';
 import type { EmailService } from './email.js';
 import { nodeContext } from './node/context.js';
 import { sendMail } from './mail-gate.js';
-import { appendMailLog } from './notification-settings.js';
+import { appendMailLog } from './notifications/settings.js';
 import { welcomeEmail } from './email/template-welcome.js';
 import { resolveAppOriginTarget } from './app/origin-target.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';

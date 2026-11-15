@@ -61,7 +61,7 @@ export interface ApprovalKey { extension: string; installer: string; host: strin
 const sameKey = (a: ApprovalKey, b: ApprovalKey) => a.extension === b.extension && a.installer === b.installer && a.host === b.host;
 const trimBase = (baseUrl: string) => baseUrl.replace(/\/+$/, '');
 
-/** The ref of the owner's notice about one question, so its answer closes the notice (services/notification-answers.ts). */
+/** The ref of the owner's notice about one question, so its answer closes the notice (services/notifications/answers.ts). */
 export const secretQuestionRef = (secret: string, key: ApprovalKey) => `secret-approval:${secret}:${key.extension}:${key.installer}:${key.host}`;
 /** Where the owner changes a secret's approvals later: the Access page, section Secrets. */
 const SECRETS_PAGE = { link: '/v1/profile?tab=access#ac-secrets', key: 'approval_change.access_secrets' };

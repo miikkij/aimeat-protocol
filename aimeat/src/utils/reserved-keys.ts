@@ -186,7 +186,7 @@ import { isOwnerInPerson } from './gaii.js';
 export const RESERVED_OWNER_KEY_PREFIXES = [
   'openrouter.', 'ai-usage.', 'profile.', 'finance.', 'commerce.', 'chat.', 'signals.',
   // 2026-08-30: `notifications.settings` is what the owner decided about their own notifications
-  // (services/notification-settings.ts). notify() reads it to drop a muted sender's notification
+  // (services/notifications/settings.ts). notify() reads it to drop a muted sender's notification
   // before it is written, so an app that could write it could silence the security and budget
   // notifications about itself. The owner's route (PUT /v1/notifications/settings) is the one
   // legitimate writer. The prefix is broad on purpose: the extension bell list that used to live

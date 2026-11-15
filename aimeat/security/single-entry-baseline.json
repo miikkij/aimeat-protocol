@@ -285,7 +285,7 @@
         "count": 1,
         "why": "(owner || operator) without agent: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
       },
-      "src/services/notification-create.ts": {
+      "src/services/notifications/create.ts": {
         "count": 1,
         "why": "Asks whether the caller is an agent session."
       },
@@ -395,7 +395,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/notification-create.ts": {
+      "src/services/notifications/create.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },

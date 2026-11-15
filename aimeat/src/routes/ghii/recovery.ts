@@ -74,7 +74,7 @@ import { checkPassword } from '../../services/password-check.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { logger } from '../../utils/logger.js';
-import { appendMailLog } from '../../services/notification-settings.js';
+import { appendMailLog } from '../../services/notifications/settings.js';
 import { passwordResetEmail } from '../../services/email/template-reset.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';

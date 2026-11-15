@@ -30,7 +30,7 @@ import { NS_PEER_ORIGIN } from '../../src/services/peer/origin.js';
 import { SECURITY_INCIDENT_PREFIX, securityOwner } from '../../src/services/security-incident.js';
 import { firstNoticeFor } from '../../src/services/packages/compose/package-notices.js';
 import { appendInboundEcosystemLog } from '../../src/services/ecosystem/events.js';
-import { appendMailLog, readMailLog, MAIL_LOG_KEY } from '../../src/services/notification-settings.js';
+import { appendMailLog, readMailLog, MAIL_LOG_KEY } from '../../src/services/notifications/settings.js';
 import { writeMarkerOnce, recordAiModelDetected, recordWelcomeMatPasted, ONBOARDING_KEYS } from '../../src/services/onboarding/funnel.js';
 import { putOwnerProvider, PROVIDER_PREFIX } from '../../src/services/decide/providers.js';
 import { pulseInstanceServer } from '../../src/services/living-pulse.js';
@@ -39,10 +39,10 @@ requirePostgresWhenAsked('atomic-once-limits');
 
 // The modules that order their own calls in-process, twice: one copy per simulated node process.
 const intakeA = await import('../../src/services/intake-daily-count.js');
-const notifA = await import('../../src/services/notification-settings.js');
+const notifA = await import('../../src/services/notifications/settings.js');
 vi.resetModules();
 const intakeB = await import('../../src/services/intake-daily-count.js');
-const notifB = await import('../../src/services/notification-settings.js');
+const notifB = await import('../../src/services/notifications/settings.js');
 
 type TestStorage = Storage & { close(): void | Promise<void> };
 const names = ['sqlite', ...(process.env.DATABASE_URL ? ['postgres-kysely'] : [])];

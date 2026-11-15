@@ -22,7 +22,7 @@ import type { AimeatConfig } from '../../src/config.js';
 import { isSameOriginPath, safeRedirectPath, withQueryParam } from '../../src/utils/same-origin-path.js';
 import { safeNotificationLink } from '../../src/services/extension/notify.js';
 import { isSafeNotifActionEndpoint } from '../../src/services/notify.js';
-import { createPrincipalNotification } from '../../src/services/notification-create.js';
+import { createPrincipalNotification } from '../../src/services/notifications/create.js';
 
 /** Each of these is `//evil.example` to a browser: another site. */
 const OFF_SITE = [

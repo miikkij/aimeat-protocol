@@ -159,7 +159,7 @@
         "aimeat/src/static/sdk-libs/auth/last-identity.js",
         "aimeat/src/static/sdk-libs/offline/store.js"
       ],
-      "digest": "sha256:cdd6509d811e6cc5696b4b22"
+      "digest": "sha256:60bdf57b741667823c586ebe"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-15",
@@ -216,7 +216,7 @@
         "aimeat/src/storage/providers/postgres-kysely/migrate.ts",
         "aimeat/src/services/maintenance-cache.ts",
         "aimeat/src/server-bootstrap/drain.ts",
-        "aimeat/src/services/notification-sweeps.ts",
+        "aimeat/src/services/notifications/sweeps.ts",
         "aimeat/src/services/bus-relay.ts",
         "aimeat/src/server-bootstrap/bus-relay-start.ts",
         "aimeat/src/services/process-lease.ts",
@@ -224,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:f11b8f909fd0e16dafb99176"
+      "digest": "sha256:489f015879277ef3daf72e72"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -377,7 +377,7 @@
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec",
       "aimeat/src/services/receivers/receive.ts": "3495190b1619b057",
       "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87",
-      "aimeat/src/services/organism-join-requests/requests.ts": "c8007419dacc2b65",
+      "aimeat/src/services/organism-join-requests/requests.ts": "79a6600dcd786874",
       "aimeat/src/static/app-sw-offline.js": "a2d64d1dd7bfa006",
       "aimeat/src/static/sdk-libs/auth/last-identity.js": "5bf2640a302bc906",
       "aimeat/src/static/sdk-libs/offline/store.js": "ba14118fe69ad407"
@@ -441,7 +441,7 @@
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52",
-      "aimeat/src/services/notification-sweeps.ts": "21aa6dcef496b573",
+      "aimeat/src/services/notifications/sweeps.ts": "8e95bc8733b94507",
       "aimeat/src/services/bus-relay.ts": "cd9d487584979f5e",
       "aimeat/src/server-bootstrap/bus-relay-start.ts": "790633a2a1ba78eb",
       "aimeat/src/services/process-lease.ts": "56b5c28544c3d11b",

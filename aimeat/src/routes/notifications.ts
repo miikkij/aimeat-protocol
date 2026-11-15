@@ -64,14 +64,14 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { NOTIF_PREFIX, servableNotifActions, type NotifAction } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
-import { createPrincipalNotification, NotificationCreateError } from '../services/notification-create.js';
+import { createPrincipalNotification, NotificationCreateError } from '../services/notifications/create.js';
 import {
   readNotificationSettingsStrict, updateNotificationSettings, normalizeSettings, sourceOf, groupOfType, senderKey, prefsFor, readMailLog,
   NOTIF_GROUPS, type NotifSource, type NotificationSettings,
-} from '../services/notification-settings.js';
-import { listOwnerNotifications, readNotificationInbox, findOwnerNotificationsByIds } from '../services/notification-sweeps.js';
+} from '../services/notifications/settings.js';
+import { listOwnerNotifications, readNotificationInbox, findOwnerNotificationsByIds } from '../services/notifications/sweeps.js';
 import { logger } from '../utils/logger.js';
-import { answerNotifications, outcomeOfAction, type NotifAnswer } from '../services/notification-answers.js';
+import { answerNotifications, outcomeOfAction, type NotifAnswer } from '../services/notifications/answers.js';
 import { isOwnerInPerson, resolveIdentity } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 
@@ -247,7 +247,7 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
    * { action: '<button id>', already?: true }. The bell and the Notifications page call it after an
    * `api` button's own call answered (ok, or "already decided" with `already`), so the notice shows
    * the answer, who gave it and when, and never offers its buttons again, for every kind of
-   * notification (services/notification-answers.ts; the developer, 2026-10-25). Only a button the
+   * notification (services/notifications/answers.ts; the developer, 2026-10-25). Only a button the
    * notice really carries may be named, and only on the caller's own account. */
   router.post('/v1/notifications/:id/answered', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const ghii = ownerGhii(req);

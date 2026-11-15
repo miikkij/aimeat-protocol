@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The aimeat_notify MCP tool: an agent tells its OWN owner something (the bell, and
  *   their devices if they turned push on). The same call as POST /v1/notifications
- *   (services/notification-create.ts), so the owner's settings, the name in front of the title and
+ *   (services/notifications/create.ts), so the owner's settings, the name in front of the title and
  *   the same-node link rule hold on both doors. Self-targeted only.
  * @structure registerNotifyTools(mcp, storage, config, getAgentGaii, caller)
  * @usage import { registerNotifyTools } from './notify.js';
@@ -27,7 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { createPrincipalNotification, NotificationCreateError } from '../services/notification-create.js';
+import { createPrincipalNotification, NotificationCreateError } from '../services/notifications/create.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 

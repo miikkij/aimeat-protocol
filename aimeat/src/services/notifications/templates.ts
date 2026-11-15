@@ -1,5 +1,5 @@
 /**
- * @file src/services/notification-templates.ts
+ * @file src/services/notifications/templates.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Notification template service — default templates in every language the node ships
@@ -16,7 +16,7 @@
  *   v1.1.0 — 2026-08-12 — Spanish (es) defaults added for both templates.
  */
 
-import type { Storage } from '../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 
 export const TEMPLATE_IDS = ['web_push_mailbox', 'email_mailbox'] as const;
 export type TemplateId = typeof TEMPLATE_IDS[number];

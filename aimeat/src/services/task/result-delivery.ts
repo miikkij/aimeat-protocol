@@ -52,7 +52,7 @@ import { memoryTarget } from '../classification/labels.js';
 import type { AimeatConfig } from '../../config.js';
 import { notify } from '../notify.js';
 import { nodeContext } from '../node/context.js';
-import { mailOwnerFrom, ownerMailLimitReached } from '../notification-create.js';
+import { mailOwnerFrom, ownerMailLimitReached } from '../notifications/create.js';
 import { notificationEmailUnverified } from '../owner/mail-address.js';
 import { displayPrefsFor, formatForPerson, type DisplayPrefs } from '../display-prefs.js';
 import { logger } from '../../utils/logger.js';

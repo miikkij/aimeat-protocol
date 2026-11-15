@@ -2,7 +2,7 @@
  * @file test/unit/notification-sweeps-claim.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The two notification sweeps claim before they send (services/notification-sweeps.ts),
+ * @description The two notification sweeps claim before they send (services/notifications/sweeps.ts),
  *   against SqliteStorage(':memory:'): two processes running the digest sweep at once send one
  *   email, and two running the held-push sweep at once send one push. One sweep alone sends as
  *   before and not twice for one batch, and a digest that could not be sent gives its batch back so
@@ -19,8 +19,8 @@ import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
 import type { PushService } from '../../src/services/push.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { setActiveEmailService, type EmailService } from '../../src/services/email.js';
-import { sweepNotificationDigests, sweepHeldPushes } from '../../src/services/notification-sweeps.js';
-import { NOTIF_SETTINGS_KEY } from '../../src/services/notification-settings.js';
+import { sweepNotificationDigests, sweepHeldPushes } from '../../src/services/notifications/sweeps.js';
+import { NOTIF_SETTINGS_KEY } from '../../src/services/notifications/settings.js';
 import { NOTIF_PREFIX } from '../../src/services/notify.js';
 
 const NODE = 'sweep-claim-node';

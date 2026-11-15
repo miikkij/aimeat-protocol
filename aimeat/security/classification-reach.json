@@ -512,7 +512,7 @@
         "listInboxRows": 1,
         "listMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Node-written notification records listed, marked read or cleared for their owner. 2026-10-16 (QA audit F13-01): the list and mark-read go through listOwnerNotificationRecords (services/notification-sweeps.ts), on the owner's own identity. 2026-11-04 (codebase analysis C7): mark-all-read reads the owner's unread notification rows with listInboxRows, the same node-written records on the owner's own identity."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Node-written notification records listed, marked read or cleared for their owner. 2026-10-16 (QA audit F13-01): the list and mark-read go through listOwnerNotificationRecords (services/notifications/sweeps.ts), on the owner's own identity. 2026-11-04 (codebase analysis C7): mark-all-read reads the owner's unread notification rows with listInboxRows, the same node-written records on the owner's own identity."
     },
     "src/routes/openrouter.ts": {
       "reads": {
@@ -2435,13 +2435,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index; content goes through collectWorkspaceSummary with the reader."
     },
-    "src/services/notification-settings.ts": {
+    "src/services/notifications/settings.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Mail log and notification settings."
     },
-    "src/services/notification-sweeps.ts": {
+    "src/services/notifications/sweeps.ts": {
       "reads": {
         "listAllMemory": 1,
         "listMemory": 1,

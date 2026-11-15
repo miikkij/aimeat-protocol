@@ -1,5 +1,5 @@
 /**
- * @file notification-sweeps.ts
+ * @file src/services/notifications/sweeps.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Two timed passes over notifications, both best-effort and both reading the owner's
@@ -50,20 +50,20 @@
  *     regional format and their own clock, read from the record this sweep already holds.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
-import type { AimeatConfig } from '../config.js';
-import type { MemoryRecord, Storage } from '../storage/interface.js';
-import { pushLocaleOf, type PushService } from './push.js';
-import { NOTIF_PREFIX, notifLinkToUrl, pushSenderName } from './notify.js';
-import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, groupOfType, sourceOf, type NotificationSettings } from './notification-settings.js';
-import { nodeContext } from './node/context.js';
-import { provenOwnerAddress } from './owner/mail-address.js';
-import { sendMail } from './mail-gate.js';
-import { notificationDigestEmail, DIGEST_SECTIONS, type DigestSection } from './email/templates-digest.js';
-import { formatForPerson, type DisplayPrefs } from './display-prefs.js';
-import { createT, toLocale } from '../i18n.js';
-import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
-import type { NotifText } from './notify.js';
+import type { AimeatConfig } from '../../config.js';
+import type { MemoryRecord, Storage } from '../../storage/interface.js';
+import { pushLocaleOf, type PushService } from '../push.js';
+import { NOTIF_PREFIX, notifLinkToUrl, pushSenderName } from '../notify.js';
+import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, groupOfType, sourceOf, type NotificationSettings } from './settings.js';
+import { nodeContext } from '../node/context.js';
+import { provenOwnerAddress } from '../owner/mail-address.js';
+import { sendMail } from '../mail-gate.js';
+import { notificationDigestEmail, DIGEST_SECTIONS, type DigestSection } from '../email/templates-digest.js';
+import { formatForPerson, type DisplayPrefs } from '../display-prefs.js';
+import { createT, toLocale } from '../../i18n.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
+import type { NotifText } from '../notify.js';
 
 export interface StoredNotif { id: string; type: string; title: string; body: string; link: string; read: boolean; held?: boolean; createdAt: string; source?: unknown; i18n?: NotifText }
 

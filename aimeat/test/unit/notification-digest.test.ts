@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-10-18 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { digestSectionOf, digestText } from '../../src/services/notification-sweeps.js';
+import { digestSectionOf, digestText } from '../../src/services/notifications/sweeps.js';
 import { notificationDigestEmail } from '../../src/services/email/templates-digest.js';
 
 describe('digestSectionOf', () => {

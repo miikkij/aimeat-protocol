@@ -20,7 +20,7 @@
  *   RULES BOTH WAYS SHARE (fileJoinRequest): one open request per person and organism; a person whose
  *   request was declined asks again after JOIN_REQUEST_RETRY_DAYS; the owners and admins are told,
  *   with Approve and Reject on the notice, and every such notice is marked answered when one of them
- *   decides (services/notification-answers.ts).
+ *   decides (services/notifications/answers.ts).
  *
  *   A request also ends when the person becomes a member another way (a direct add, an accepted
  *   invitation): closeJoinRequestsOnMembership marks it approved, so it leaves the waiting list.
@@ -46,7 +46,7 @@ import type {
 import { emitChange } from '../event-bus.js';
 import { notify } from '../notify.js';
 import { organismLink } from '../notifications/links.js';
-import { answerNotifications } from '../notification-answers.js';
+import { answerNotifications } from '../notifications/answers.js';
 import { organismOwners, isOrganismOwner } from '../organism/ownership.js';
 import { isNodeAccount, type AudienceAuth } from '../audience.js';
 import { mayOpenPage, pageAccessLevel } from '../page-access.js';

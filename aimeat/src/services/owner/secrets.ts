@@ -77,7 +77,7 @@ import type { SecretApproval, SecretBinding, SecretRecord } from '../../storage/
 import { createHmac } from 'node:crypto';
 import { encrypt, decrypt, getEncryptionKey, keyRingOf } from '../encryption.js';
 import { logger } from '../../utils/logger.js';
-import { answerNotifications } from '../notification-answers.js';
+import { answerNotifications } from '../notifications/answers.js';
 
 /**
  * A secret name is an ADDRESS, not a label: it is typed into a header inside a document
@@ -261,7 +261,7 @@ export async function putOwnerSecret(
 /**
  * Storing a secret again or removing it ends the questions that waited on it (their approvals list is
  * emptied with the value): the owner's notices about them say so and lose their buttons
- * (services/notification-answers.ts; the ref is secret-approvals.ts secretQuestionRef).
+ * (services/notifications/answers.ts; the ref is secret-approvals.ts secretQuestionRef).
  */
 async function endSecretQuestions(storage: Storage, ownerGhii: string, name: string): Promise<void> {
   await answerNotifications(storage, ownerGhii, { refPrefix: `secret-approval:${name}:` }, { outcome: 'outdated', by: null, at: new Date().toISOString() });

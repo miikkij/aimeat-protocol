@@ -71,7 +71,7 @@ import type { PushService, PushPayload } from './push.js';
 import { logger } from '../utils/logger.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
 import { localAccountName } from '../utils/gaii.js';
-import { readNotificationSettings, prefsFor, quietState, senderKey, type NotifSource } from './notification-settings.js';
+import { readNotificationSettings, prefsFor, quietState, senderKey, type NotifSource } from './notifications/settings.js';
 import { notifWords } from './notifications/recipient-words.js';
 
 export const NOTIF_PREFIX = 'notif.';
@@ -205,7 +205,7 @@ export interface NotifyInput {
   i18n?: NotifText;
   /**
    * The question this notice asks, when it carries buttons that decide one (`publish-request:<id>`):
-   * the flow that decides it marks every notice with this ref answered (services/notification-answers.ts).
+   * the flow that decides it marks every notice with this ref answered (services/notifications/answers.ts).
    */
   ref?: string;
 }

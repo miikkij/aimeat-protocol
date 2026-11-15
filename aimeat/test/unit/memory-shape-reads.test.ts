@@ -29,7 +29,7 @@ import { randomUUID } from 'node:crypto';
 import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
-import { listOwnerNotificationRecords, readNotificationInbox, findOwnerNotificationsByIds } from '../../src/services/notification-sweeps.js';
+import { listOwnerNotificationRecords, readNotificationInbox, findOwnerNotificationsByIds } from '../../src/services/notifications/sweeps.js';
 import { NOTIF_PREFIX } from '../../src/services/notify.js';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
 

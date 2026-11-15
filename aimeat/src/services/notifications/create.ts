@@ -1,5 +1,5 @@
 /**
- * @file notification-create.ts
+ * @file src/services/notifications/create.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A principal notifying its OWN owner: the one implementation behind
@@ -45,18 +45,18 @@
  *     side-effect callers; it only holds if the answer says what happened.
  *   v1.0.0 — 2026-08-30 — Extracted from routes/notifications.ts so the MCP tool is the same call.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { notify } from './notify.js';
-import type { NotifSource } from './notification-settings.js';
-import { emitChange } from './event-bus.js';
-import { isSameOriginPath } from '../utils/same-origin-path.js';
-import type { EmailService } from './email.js';
-import { nodeContext } from './node/context.js';
-import { appendMailLog, type MailLogKind } from './notification-settings.js';
-import { provenOwnerAddress } from './owner/mail-address.js';
-import { sendMail, senderLimitReached } from './mail-gate.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { notify } from '../notify.js';
+import type { NotifSource } from './settings.js';
+import { emitChange } from '../event-bus.js';
+import { isSameOriginPath } from '../../utils/same-origin-path.js';
+import type { EmailService } from '../email.js';
+import { nodeContext } from '../node/context.js';
+import { appendMailLog, type MailLogKind } from './settings.js';
+import { provenOwnerAddress } from '../owner/mail-address.js';
+import { sendMail, senderLimitReached } from '../mail-gate.js';
+import { logger } from '../../utils/logger.js';
 
 export class NotificationCreateError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); this.name = 'NotificationCreateError'; }

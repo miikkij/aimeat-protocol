@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import {
     NOTIF_SETTINGS_KEY, defaultSettings, readNotificationSettings, readNotificationSettingsStrict,
     updateNotificationSettings, type NotificationSettings,
-} from '../../src/services/notification-settings.js';
+} from '../../src/services/notifications/settings.js';
 import type { Storage } from '../../src/storage/interface.js';
 
 const OWNER = 'alice@n1';
