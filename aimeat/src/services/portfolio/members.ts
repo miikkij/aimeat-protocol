@@ -1,5 +1,5 @@
 /**
- * @file portfolio-members.ts
+ * @file src/services/portfolio/members.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's members who have published a portfolio: the list behind
@@ -15,9 +15,9 @@
  * @version-history
  *   v1.0.0 — 2026-09-24 — Extracted from routes/portfolio.ts (the /v1/members page body reads it too).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { portfolioSeoIndexable, type PortfolioSeoConfig } from './portfolio-seo.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { portfolioSeoIndexable, type PortfolioSeoConfig } from './seo.js';
 
 export interface PublishedMember {
   username: string;

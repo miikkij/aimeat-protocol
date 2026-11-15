@@ -51,16 +51,16 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { annotationsFor } from './annotations.js';
-import { portfolioWriteGaii, switchPortfolioOnUnlessTurnedOff } from '../services/portfolio-config.js';
+import { portfolioWriteGaii, switchPortfolioOnUnlessTurnedOff } from '../services/portfolio/config.js';
 import { writePortfolioHtml } from '../services/portfolio/page-write.js';
 import { portfolioStandaloneUrl } from '../services/portfolio/standalone-url.js';
 import { emitChange } from '../services/event-bus.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
-import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
+import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio/publish-gate.js';
 import { publishAskedFields } from '../services/app/publish-gate.js';
-import { mergePortfolioConfig, portfolioSwitchState } from '../services/portfolio-config.js';
-import { notePortfolioWriter } from '../services/portfolio-read-hold.js';
+import { mergePortfolioConfig, portfolioSwitchState } from '../services/portfolio/config.js';
+import { notePortfolioWriter } from '../services/portfolio/read-hold.js';
 import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
 import { toolError } from './tool-error.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
@@ -122,7 +122,7 @@ export function registerPortfolioTools(
             // Same target the REST route writes, so the page an agent publishes is the same file the
             // browser reads. Resolving it anywhere else is how two "welcome pages" come to exist.
             const target = await portfolioWriteGaii(storage, owner, config.nodeId);
-            // The publish gate, as PUT /v1/portfolio/upload asks it (services/portfolio-publish-gate.ts):
+            // The publish gate, as PUT /v1/portfolio/upload asks it (services/portfolio/publish-gate.ts):
             // switching on a page never switched, or opening a page that is on to anyone, makes it public.
             // Asked before the page is written.
             const gate = enable === true || access

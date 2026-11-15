@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for the owner's welcome page: the page is switched on, or
- *   opened to anyone, as the owner, through services/portfolio-config.ts mergePortfolioConfig, the
+ *   opened to anyone, as the owner, through services/portfolio/config.ts mergePortfolioConfig, the
  *   write PUT /v1/portfolio/config makes (plan doc-mvcn6c7e4e5q, V4 and V3.10).
  *
  *   THE OWNER APPROVED WHAT THEY SAW. The request carries when the stored page was written. A page
@@ -17,7 +17,7 @@
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: portfolio).
  */
 import { localAccountName } from '../../utils/gaii.js';
-import { mergePortfolioConfig, portfolioSwitchState, portfolioWriteGaii } from '../portfolio-config.js';
+import { mergePortfolioConfig, portfolioSwitchState, portfolioWriteGaii } from '../portfolio/config.js';
 import { pageAccessOf } from '../page-access.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 

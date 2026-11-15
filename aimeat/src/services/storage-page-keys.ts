@@ -11,7 +11,7 @@
  *     company page route asks, company:write (services/company/company-page-key.ts).
  *   - `portfolio/index.html`, the owner's welcome page: a write or a delete that changes the page served
  *     notes its writer, so a page whose writer may not read memory waits for the owner before it reads
- *     the owner's memory (services/portfolio-read-hold.ts notePortfolioFileChange).
+ *     the owner's memory (services/portfolio/read-hold.ts notePortfolioFileChange).
  *
  *   The writer is taken from the caller the door hands the write (`publishGate`'s caller), or, for a
  *   presigned upload, from the signed token (`page_writer`, set at the mint). A write the node makes for
@@ -37,8 +37,8 @@ import type { CallerContext } from './caller-context.js';
 import type { PublishRequester } from './publish-requests/store.js';
 import { requesterOf } from './publish-requests/ask.js';
 import { companyPageIdOf, companyPageWriteRefusal, COMPANY_PAGE_WRITE_SCOPE, type CompanyPageRefusal } from './company/company-page-key.js';
-import { PORTFOLIO_HTML_KEY } from './portfolio-config.js';
-import { notePortfolioFileChange } from './portfolio-read-hold.js';
+import { PORTFOLIO_HTML_KEY } from './portfolio/config.js';
+import { notePortfolioFileChange } from './portfolio/read-hold.js';
 import { localAccountName } from '../utils/gaii.js';
 
 type Ctx = { storage: Storage; config: AimeatConfig };

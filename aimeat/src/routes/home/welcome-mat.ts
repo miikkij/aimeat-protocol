@@ -59,8 +59,8 @@ import {
 } from '../../services/onboarding-funnel.js';
 import { readHomeState } from '../../services/home-state.js';
 import { mergeJourneyProfile, type ProfileField } from '../../services/journey-state.js';
-import { mergePortfolioConfig } from '../../services/portfolio-config.js';
-import { allowOwnersOwnPage } from '../../services/portfolio-read-hold.js';
+import { mergePortfolioConfig } from '../../services/portfolio/config.js';
+import { allowOwnersOwnPage } from '../../services/portfolio/read-hold.js';
 import {
     portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml,
 } from '../portfolio.js';

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The owner's welcome page reads the owner's memory, when the owner opens it signed in,
  *   only when the page served now was written by a writer that may read memory or the owner allowed it
- *   (services/portfolio-read-hold.ts; audit H-9, f-2026aug-h-9).
+ *   (services/portfolio/read-hold.ts; audit H-9, f-2026aug-h-9).
  *
  *   Designed use, which must keep working: any agent of the owner may write the page (Jouni,
  *   2026-10-31), the owner's own page signs in silently on its origin, and a page from before the check
@@ -113,7 +113,7 @@ try {
 
     const OWNER = `ph${Date.now() % 100000}`;
     const owner = await register(OWNER);
-    // The first agent is the one the page is stored under (services/portfolio-config.ts portfolioWriteGaii).
+    // The first agent is the one the page is stored under (services/portfolio/config.ts portfolioWriteGaii).
     const writer = await agent(OWNER, owner.token, 'page-writer', ['storage:write', 'storage:read', 'memory:write']);
     const reader = await agent(OWNER, owner.token, 'page-reader', ['storage:write', 'memory:read', 'memory:write']);
     let earlierRefresh = '';

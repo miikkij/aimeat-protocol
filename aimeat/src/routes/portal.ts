@@ -133,7 +133,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { appHiddenFromPublicSurfaces } from '../services/app/ai-use.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { livePageMarkdown } from '../services/page-body-live.js';
-import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
+import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '../services/portfolio/seo.js';
 import { pageAccessOf } from '../services/page-access.js';
 import { datasetPageOf } from '../services/datapackage/landing-page.js';
 import { logger } from '../utils/logger.js';

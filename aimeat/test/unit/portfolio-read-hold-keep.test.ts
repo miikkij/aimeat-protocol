@@ -20,8 +20,8 @@ import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { agentSessionCaller } from '../../src/services/caller-context.js';
-import { portfolioReadHold, notePortfolioWriter, PORTFOLIO_READ_HOLD_KEY } from '../../src/services/portfolio-read-hold.js';
-import { markExistingPortfolioPagesOnce } from '../../src/services/portfolio-read-hold-keep.js';
+import { portfolioReadHold, notePortfolioWriter, PORTFOLIO_READ_HOLD_KEY } from '../../src/services/portfolio/read-hold.js';
+import { markExistingPortfolioPagesOnce } from '../../src/services/portfolio/read-hold-keep.js';
 import { filePublishRequest, listPublishRequests, settlePublishRequest } from '../../src/services/publish-requests/store.js';
 
 const NODE_ID = 'hold-node';

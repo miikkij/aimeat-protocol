@@ -35,7 +35,7 @@ import { indexedPages } from '../data/public-pages.js';
 import { apexOnly } from './agent-docs.js';
 import { appSeoListable } from '../services/app/seo.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
-import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
+import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio/seo.js';
 import { localAccountName } from '../utils/gaii.js';
 import { indexedDatasetPages } from '../services/datapackage/copy-origin.js';
 import { escapeHtml } from '../utils/html-escape.js';

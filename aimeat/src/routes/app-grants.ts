@@ -153,7 +153,7 @@ import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { readRefreshCookie, checkRefreshSession } from '../services/owner/session.js';
 import { appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel, appRecordForAuthorize } from '../services/app/origin-target.js';
 import { PORTFOLIO_GRANT_SCOPES, isPortfolioTarget, capPortfolioScopes } from '../services/app/grant-portfolio.js';
-import { portfolioReadHold } from '../services/portfolio-read-hold.js';
+import { portfolioReadHold } from '../services/portfolio/read-hold.js';
 import { ownAppConsentNeed } from '../services/own-app-consent.js';
 import { byAnotherAuthorsApp } from '../services/app/published-by-app.js';
 import { accountOf } from '../services/app/members.js';
@@ -613,7 +613,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // it wants and believes the answer. See capPortfolioScopes for what this does and does not fix.
     const requested = isPortfolioTarget(grantTarget) ? capPortfolioScopes(asked) : asked;
     // AUDIT H-9: the owner's own page reads their memory only when the page served now was written by a
-    // writer with memory:read or allowed by the owner (services/portfolio-read-hold.ts); else it waits.
+    // writer with memory:read or allowed by the owner (services/portfolio/read-hold.ts); else it waits.
     const readHeld = isPortfolioTarget(grantTarget) && owner === grantOwner ? await portfolioReadHold({ storage, config }, owner) : null;
     if (readHeld) return reply({ ok: false, error: 'consent_required', reason: 'portfolio_read_waits', app: grantTarget, app_name: grantName, request_id: readHeld.request_id });
 

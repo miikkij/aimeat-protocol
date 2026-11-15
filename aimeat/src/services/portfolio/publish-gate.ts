@@ -1,5 +1,5 @@
 /**
- * @file src/services/portfolio-publish-gate.ts
+ * @file src/services/portfolio/publish-gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The publish gate at the doors that make the owner's welcome page (the portfolio) public
@@ -23,12 +23,12 @@
  *     the switch or the access, and switching on a page that is not open to anyone asks nothing.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: portfolio).
  */
-import type { CallerContext } from './caller-context.js';
-import { portfolioSwitchState } from './portfolio-config.js';
-import { pageAccessOf } from './page-access.js';
-import { publishAskOf, fileAsk } from './publish-requests/ask.js';
-import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
-import { askedOf, type AppPublishAsked, type PageGate } from './app/publish-gate.js';
+import type { CallerContext } from '../caller-context.js';
+import { portfolioSwitchState } from './config.js';
+import { pageAccessOf } from '../page-access.js';
+import { publishAskOf, fileAsk } from '../publish-requests/ask.js';
+import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
+import { askedOf, type AppPublishAsked, type PageGate } from '../app/publish-gate.js';
 
 /** The one change a request about the welcome page makes. */
 export type PortfolioChange =

@@ -1,12 +1,12 @@
 /**
- * @file src/services/portfolio-read-hold-keep.ts
+ * @file src/services/portfolio/read-hold-keep.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The once-per-node boot step that records every welcome page that exists at the update
  *   as allowed to read its owner's memory, so that afterwards a page with no record is known to be one
  *   written since (secaudit2026oct31w2 round 11, portfolio-read-hold:absent-record-adopted-at-first-read).
  *
- *   WHY. services/portfolio-read-hold.ts decided "a page from before this check" by the absence of its
+ *   WHY. services/portfolio/read-hold.ts decided "a page from before this check" by the absence of its
  *   record at the first read. Absence cannot tell an old page from one an agent or app without
  *   memory:read stored later through a route that noted no writer, so such a page was adopted too and
  *   then read the owner's memory through the owner's visit.
@@ -23,11 +23,11 @@
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2 round 11).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';
-import { PORTFOLIO_PAGES_MARKED_KEY, adoptPageAtUpdate } from './portfolio-read-hold.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import { claimOnceOnlyStep, keptBefore } from '../once-only-step.js';
+import { PORTFOLIO_PAGES_MARKED_KEY, adoptPageAtUpdate } from './read-hold.js';
 
 /** Record every existing welcome page with no record as allowed, once per node. */
 export async function markExistingPortfolioPagesOnce(

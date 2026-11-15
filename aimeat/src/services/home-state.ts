@@ -56,7 +56,7 @@ import {
 } from './onboarding/markers.js';
 import { resolveAiClient, decideBranch } from './ai/tool-branch.js';
 import { portfolioStandaloneUrl } from './portfolio/standalone-url.js';
-import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';
+import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio/config.js';
 import { logger } from '../utils/logger.js';
 import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent/health.js';
 import { nodeContext } from './node/context.js';

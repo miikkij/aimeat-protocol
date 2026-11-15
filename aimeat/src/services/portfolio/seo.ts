@@ -1,5 +1,5 @@
 /**
- * @file portfolio-seo.ts
+ * @file src/services/portfolio/seo.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Whether one person's published portfolio may be found in a search engine, and what
@@ -27,9 +27,9 @@
  *   v1.1.0 — 2026-10-18 — A page whose `access` is not anyone is never indexable (V3.10).
  *   v1.0.0 — 2026-08-25 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { PublicPage } from '../data/public-pages.js';
-import { pageAccessOf } from './page-access.js';
+import type { AimeatConfig } from '../../config.js';
+import type { PublicPage } from '../../data/public-pages.js';
+import { pageAccessOf } from '../page-access.js';
 
 /** The portfolio's own config record (`portfolio.config`), as far as this decision needs it. */
 export interface PortfolioSeoConfig {

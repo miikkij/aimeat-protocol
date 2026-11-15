@@ -15,7 +15,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { provenanceForWrite, storeHeldProvenance } from '../ai/provenance.js';
-import { PORTFOLIO_HTML_KEY } from '../portfolio-config.js';
+import { PORTFOLIO_HTML_KEY } from './config.js';
 
 /**
  * Store one owner's welcome page, replacing whatever was there.

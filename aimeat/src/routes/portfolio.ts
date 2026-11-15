@@ -7,7 +7,7 @@
  *   portfolio-data endpoint consumed by the SPA viewer.
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
- *   (both in services/portfolio-config.ts, re-exported here)
+ *   (both in services/portfolio/config.ts, re-exported here)
  * @version-history
  *   2026-11-13 — portfolioStandaloneUrl moves unchanged to services/portfolio/standalone-url.ts and is
  *     re-exported here, so the home state service no longer imports a route file (structure
@@ -93,7 +93,7 @@ import { requireAuth, optionalAuth, requireScope, requireRole } from '../auth/mi
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal, refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
-import { listPublishedMembers } from '../services/portfolio-members.js';
+import { listPublishedMembers } from '../services/portfolio/members.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories } from '../services/classification/present-memory.js';
 import { fileTarget } from '../services/classification/labels.js';
@@ -111,11 +111,11 @@ import { AccessRequestBody } from '../models/write-body-schemas.js';
 import {
   PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY, portfolioWriteGaii, portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff,
   mergePortfolioConfig,
-} from '../services/portfolio-config.js';
+} from '../services/portfolio/config.js';
 import { callerOf } from '../middleware/caller.js';
-import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
+import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio/publish-gate.js';
 import { publishAskedFields, askedStatus } from '../services/app/publish-gate.js';
-import { notePortfolioWriter, portfolioReadHold } from '../services/portfolio-read-hold.js';
+import { notePortfolioWriter, portfolioReadHold } from '../services/portfolio/read-hold.js';
 import { writePortfolioHtml } from '../services/portfolio/page-write.js';
 
 export { resolvePublishedPortfolio, type PortfolioResolution } from '../services/portfolio/published.js';
@@ -123,11 +123,11 @@ export { resolvePublishedPortfolio, type PortfolioResolution } from '../services
 // without importing this route file; re-exported for every importer of this file.
 export { portfolioStandaloneUrl };
 
-// The keys, the identities and the switch writes live in services/portfolio-config.ts (a service
+// The keys, the identities and the switch writes live in services/portfolio/config.ts (a service
 // switches the page on too); re-exported here for every importer of this file.
 export {
   PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY, portfolioWriteGaii, portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff,
-} from '../services/portfolio-config.js';
+} from '../services/portfolio/config.js';
 
 // resolvePublishedPortfolio (username → published page and owner identities) lives in
 // services/portfolio/published.ts since 2026-11-12, so a service reads it without importing this
@@ -263,7 +263,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    * GET /v1/portfolio/members
    * Public showcase: node members (owners) who have PUBLISHED a portfolio (portfolio.config.enabled).
    * Cached briefly — listing all owners + reading each portfolio.config is O(owners). Doubles as the
-   * node's "discover people here" list. The listing lives in services/portfolio-members.ts.
+   * node's "discover people here" list. The listing lives in services/portfolio/members.ts.
    */
   router.get('/v1/portfolio/members', optionalAuth(), async (_req, res) => {
     const members = await listPublishedMembers(storage);

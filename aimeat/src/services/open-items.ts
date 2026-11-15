@@ -54,7 +54,7 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';
+import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio/config.js';
 import { hasHelloMcpProof } from './node/resident-agent.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';

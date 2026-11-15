@@ -1,5 +1,5 @@
 /**
- * @file src/services/portfolio-read-hold.ts
+ * @file src/services/portfolio/read-hold.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Whether the owner's welcome page (the portfolio) may read the owner's memory when the
@@ -24,7 +24,7 @@
  *   - A page whose bytes changed by a write this module did not see waits the same way, with the
  *     request naming no writer.
  *   - A page that existed at the update (secaudit2026oct31w2 round 11) was recorded as allowed once at
- *     the node's start (services/portfolio-read-hold-keep.ts), so no existing page stops working. After
+ *     the node's start (services/portfolio/read-hold-keep.ts), so no existing page stops working. After
  *     that step, a page with no record was written since, and it waits. Until the step has run (a start
  *     where it failed), a page with no record is adopted as allowed on its first read, as before.
  *
@@ -46,17 +46,17 @@
  *     any agent of the owner, and a page whose writer may not read memory asks once before it reads).
  */
 import { createHash } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import type { CallerContext } from './caller-context.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { PORTFOLIO_HTML_KEY, portfolioReadGaiis } from './portfolio-config.js';
-import { fileAsk, requesterOf } from './publish-requests/ask.js';
-import type { PublishRequester } from './publish-requests/store.js';
-import { askedOf, type AppPublishAsked } from './app/publish-gate.js';
-import { logger } from '../utils/logger.js';
-import { parseGAII } from '../utils/gaii.js';
-import { madeBefore } from './once-only-step.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { CallerContext } from '../caller-context.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { PORTFOLIO_HTML_KEY, portfolioReadGaiis } from './config.js';
+import { fileAsk, requesterOf } from '../publish-requests/ask.js';
+import type { PublishRequester } from '../publish-requests/store.js';
+import { askedOf, type AppPublishAsked } from '../app/publish-gate.js';
+import { logger } from '../../utils/logger.js';
+import { parseGAII } from '../../utils/gaii.js';
+import { madeBefore } from '../once-only-step.js';
 
 /** The record, in the owner's GHII namespace. Service-owned (utils/reserved-keys.ts). */
 export const PORTFOLIO_READ_HOLD_KEY = 'portfolio-read-hold.page';

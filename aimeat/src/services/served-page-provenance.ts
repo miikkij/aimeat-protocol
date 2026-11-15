@@ -20,7 +20,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountOf } from '../utils/gaii.js';
-import { PORTFOLIO_HTML_KEY, portfolioReadGaiis, portfolioSwitchState } from './portfolio-config.js';
+import { PORTFOLIO_HTML_KEY, portfolioReadGaiis, portfolioSwitchState } from './portfolio/config.js';
 import { companyPortfolioKey } from './company/company-portfolio.js';
 
 /** Of these record ids, the ones whose content is a page served to anyone now. */

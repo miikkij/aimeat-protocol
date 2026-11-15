@@ -2,7 +2,7 @@
  * @file e2e-portfolio-memory-gate.ts
  * @description The welcome page's switch written through a memory door asks the publish gate as
  *   PUT /v1/portfolio/config does (secaudit2026oct26,
- *   services/portfolio-config.ts:portfolio.config:unreserved-key-bypasses-publish-gate). With the node's
+ *   services/portfolio/config.ts:portfolio.config:unreserved-key-bypasses-publish-gate). With the node's
  *   gate on, an agent without publish:public that writes `portfolio.config` with `enabled: true`
  *   through POST /v1/memory, PATCH /v1/memory/:key or POST /v1/memory/bulk gets 202 with the same
  *   one-press request, and the page is not served until the owner allows it. The owner in person, an

@@ -1,5 +1,5 @@
 /**
- * @file src/services/portfolio-config.ts
+ * @file src/services/portfolio/config.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where an owner's welcome page (the portfolio) and its switch live, and the writes of
@@ -22,9 +22,9 @@
  *     portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff, and the PUT /v1/portfolio/config write as
  *     mergePortfolioConfig); portfolioSwitchState added for the publish gate (plan doc-mvcn6c7e4e5q, V4).
  */
-import type { Storage } from '../storage/interface.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { loadOwnerAgents } from './db/owner-identity.js';
+import type { Storage } from '../../storage/interface.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { loadOwnerAgents } from '../db/owner-identity.js';
 
 /** Where this owner's portfolio file and config live. */
 export const PORTFOLIO_HTML_KEY = 'portfolio/index.html';

@@ -43,7 +43,7 @@ export type PublishKind =
   | 'accountant-grant'
   // A credit card payment only the seller's own Stripe account attests, confirmed by the buyer in person (commerce/card-adult-ask.ts).
   | 'card-adult-confirm'
-  // The owner's welcome page reading their memory, when a writer without memory:read wrote it (services/portfolio-read-hold.ts).
+  // The owner's welcome page reading their memory, when a writer without memory:read wrote it (services/portfolio/read-hold.ts).
   | 'portfolio-memory-read'
   // A program a computer holds for an agent, allowed by the owner (services/connector-programs.ts).
   | 'connector-program'

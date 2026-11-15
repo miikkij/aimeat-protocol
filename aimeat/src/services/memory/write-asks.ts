@@ -6,7 +6,7 @@
  *   gate's own, asked in one place for every memory door (memory-write.ts for POST, PUT and
  *   aimeat_memory_write; routes/memory/patch.ts; the batch doors through routes/memory/batch-guards.ts),
  *   so a door cannot ask one and forget the other (secaudit2026oct26).
- *     - The welcome page's switch (services/portfolio-memory-gate.ts): a write that would make the
+ *     - The welcome page's switch (services/portfolio/memory-gate.ts): a write that would make the
  *       served page public, by a caller the publish gate asks about.
  *     - A mail refinery's definition (services/refinery/definition-ask.ts): a change of where it reads
  *       and files mail, by an app or an agent that may not run it.
@@ -21,8 +21,8 @@
 import type { MemoryPublishWriter } from './publish-gate.js';
 import type { PublishStoreCtx } from '../publish-requests/store.js';
 import type { publishRequestedBody } from '../publish-requests/ask.js';
-import { portfolioMemoryWriteGate, type PortfolioMemoryGate } from '../portfolio-memory-gate.js';
-import { filePortfolioAsk } from '../portfolio-publish-gate.js';
+import { portfolioMemoryWriteGate, type PortfolioMemoryGate } from '../portfolio/memory-gate.js';
+import { filePortfolioAsk } from '../portfolio/publish-gate.js';
 import { refineryDefinitionGate, fileRefineryDefinitionAsk, type RefineryDefinitionAsk } from '../refinery/definition-ask.js';
 
 export type MemoryWriteAsk =

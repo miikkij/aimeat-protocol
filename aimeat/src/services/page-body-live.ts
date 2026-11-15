@@ -48,7 +48,7 @@ import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { appSeoIndexable } from './app/seo.js';
-import { listSearchableMembers } from './portfolio-members.js';
+import { listSearchableMembers } from './portfolio/members.js';
 import { logger } from '../utils/logger.js';
 
 /** Owner text on one markdown line: whitespace folded, markdown syntax dropped, length capped. */

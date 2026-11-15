@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-11-12 — Extracted from routes/portfolio.ts; agents through loadOwnerAgents.
  */
 import type { Storage, GHIIRecord, AgentRecord } from '../../storage/interface.js';
-import { PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY } from '../portfolio-config.js';
+import { PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY } from './config.js';
 import { loadOwnerAgents } from '../db/owner-identity.js';
 
 /** Result of resolving a username to their published portfolio. */

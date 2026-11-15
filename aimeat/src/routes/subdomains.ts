@@ -195,7 +195,7 @@ import { appInfoMarkFor } from '../services/app/news.js';
 import { internetOpenMarkFor } from '../services/internet-opening/opening-mark.js';
 import { wantsWebmcpBridge } from '../utils/app-agent-discovery.js';
 import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage, appOwnDescription } from '../services/app/seo.js';
-import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
+import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio/seo.js';
 import { recordAppOpen } from '../services/usage/record-app-open.js';
 import { countPageView } from '../services/signals/page-views.js';
 import { geoFromHeaders } from '../utils/geo-headers.js';

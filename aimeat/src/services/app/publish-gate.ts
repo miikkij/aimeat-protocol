@@ -126,7 +126,7 @@ export function askedOf(
   return { warning: { code: 'PUBLISH_NOT_ASKED', message: `${stored}: ${filed.message}` } };
 }
 
-/** The gate's answer at a door that switches a page on (services/portfolio-publish-gate.ts, company/company-publish-gate.ts). */
+/** The gate's answer at a door that switches a page on (services/portfolio/publish-gate.ts, company/company-publish-gate.ts). */
 export type PageGate =
   | { kind: 'go' }
   | { kind: 'refused'; status: 403; code: string; message: string }

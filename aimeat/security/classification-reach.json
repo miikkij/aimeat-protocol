@@ -586,7 +586,7 @@
         "getMemory": 1,
         "getStorageFileMeta": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the builder's memory previews pass presentMemories and its images pass reader.show; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings. 2026-10-03: the two reads added for `enable` on the upload read the same portfolio config record (PORTFOLIO_CONFIG_KEY), to switch the page on unless the owner switched it off. 2026-10-18: the switch and the config merge moved to services/portfolio-config.ts."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the builder's memory previews pass presentMemories and its images pass reader.show; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings. 2026-10-03: the two reads added for `enable` on the upload read the same portfolio config record (PORTFOLIO_CONFIG_KEY), to switch the page on unless the owner switched it off. 2026-10-18: the switch and the config merge moved to services/portfolio/config.ts."
     },
     "src/routes/public-stats.ts": {
       "reads": {
@@ -2746,26 +2746,26 @@
       },
       "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the waiting peer-replacement requests (peer-replace-ask.*) under the link invites' system identity, read to answer a repeated invite and to decide one on the operator's answer. No content of a person's."
     },
-    "src/services/portfolio-config.ts": {
+    "src/services/portfolio/config.ts": {
       "reads": {
         "getMemory": 2,
         "getStorageFileMeta": 1
       },
       "why": "Reviewed 2026-10-18, moved from src/routes/portfolio.ts by pure extraction: the owner's own portfolio config record (portfolio.config), read to merge a settings write and to tell whether the page is switched on, and when the stored page was written (metadata only), for the publish gate. No content is shown to anyone."
     },
-    "src/services/portfolio-members.ts": {
+    "src/services/portfolio/members.ts": {
       "reads": {
         "listMemoryForOwners": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: portfolio.config records."
     },
-    "src/services/portfolio-memory-gate.ts": {
+    "src/services/portfolio/memory-gate.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the owner's portfolio.config records under each of the owner's identities, read to tell whether a memory write would make the served welcome page public; only the switch and who may open the page are compared, and nothing is shown to the writer."
     },
-    "src/services/portfolio-read-hold.ts": {
+    "src/services/portfolio/read-hold.ts": {
       "reads": {
         "getStorageFile": 1,
         "getMemory": 4

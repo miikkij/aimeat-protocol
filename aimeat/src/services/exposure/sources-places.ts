@@ -52,8 +52,8 @@ import { readerFor } from '../classification/reader.js';
 import { workspaceRegistrations } from '../workspace/meta-read.js';
 import { isOrganismOwner } from '../organism/ownership.js';
 import { companyAddress } from '../company/company-service.js';
-import { listPublishedMembers } from '../portfolio-members.js';
-import { portfolioSwitchState } from '../portfolio-config.js';
+import { listPublishedMembers } from '../portfolio/members.js';
+import { portfolioSwitchState } from '../portfolio/config.js';
 import { pageAccessLevel } from '../page-access.js';
 import { appTarget, boardTarget, organismTarget, workspaceTarget } from '../classification/containers.js';
 import {
@@ -230,7 +230,7 @@ export const portfolioSource: ExposureSource = {
   kind: 'portfolio',
   async list(ctx, ownerName) {
     // The members whose page is switched on, as the member showcase reads them
-    // (services/portfolio-members.ts, the same candidates resolvePublishedPortfolio serves from).
+    // (services/portfolio/members.ts, the same candidates resolvePublishedPortfolio serves from).
     const published = await ctx.memo('portfolios', () => listPublishedMembers(ctx.storage));
     if (!published.some(m => m.username === ownerName)) return [];
     // Who may open it: the page's own `access` (services/page-access.ts), as the portfolio origin reads it.

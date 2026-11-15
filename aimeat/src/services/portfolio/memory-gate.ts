@@ -1,17 +1,17 @@
 /**
- * @file src/services/portfolio-memory-gate.ts
+ * @file src/services/portfolio/memory-gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The publish gate for the welcome page's switch when it is written through a memory
  *   door (POST, PUT, PATCH /v1/memory, aimeat_memory_write, the batch doors) instead of
- *   PUT /v1/portfolio/config (secaudit2026oct26, services/portfolio-config.ts:portfolio.config:
+ *   PUT /v1/portfolio/config (secaudit2026oct26, services/portfolio/config.ts:portfolio.config:
  *   unreserved-key-bypasses-publish-gate).
  *
  *   WHY. The switch is the ordinary memory record `portfolio.config`, and the page is served from the
  *   first identity of the owner whose record says `enabled` (routes/portfolio.ts
  *   resolvePublishedPortfolio). With the node's publish gate on, PUT /v1/portfolio/config files a
  *   one-press request before an agent (or an app, under 'agents-and-apps') switches the page on or
- *   opens it to anyone (services/portfolio-publish-gate.ts). The same change written as a memory record
+ *   opens it to anyone (services/portfolio/publish-gate.ts). The same change written as a memory record
  *   asked nothing, so an agent without publish:public made the page public by writing its own copy.
  *
  *   WHAT IT DOES. The same decision as the portfolio route, measured on the page as it is served: a
@@ -27,12 +27,12 @@
  * @version-history
  *   2026-10-27 — Initial (secaudit2026oct26).
  */
-import { localAccountName, ownerGhiiOf } from '../utils/gaii.js';
-import { memoryWriterAsk, type MemoryPublishWriter } from './memory/publish-gate.js';
-import { PORTFOLIO_CONFIG_KEY, portfolioReadGaiis } from './portfolio-config.js';
-import { pageAccessOf } from './page-access.js';
-import type { PortfolioChange } from './portfolio-publish-gate.js';
-import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
+import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
+import { memoryWriterAsk, type MemoryPublishWriter } from '../memory/publish-gate.js';
+import { PORTFOLIO_CONFIG_KEY, portfolioReadGaiis } from './config.js';
+import { pageAccessOf } from '../page-access.js';
+import type { PortfolioChange } from './publish-gate.js';
+import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
 
 type Config = Record<string, unknown>;
 

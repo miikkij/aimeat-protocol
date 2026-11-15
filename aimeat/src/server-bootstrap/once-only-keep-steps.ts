@@ -105,7 +105,7 @@ import { keepAppToolInvokeOnce } from '../services/app/tool-invoke-keep.js';
 import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge/link-owner-keep.js';
 import { recordDatapackageAudiencesOnce } from '../services/datapackage/audience-record.js';
 import { recordPointerStateOnce } from '../services/datapackage/sale-terms-record.js';
-import { markExistingPortfolioPagesOnce } from '../services/portfolio-read-hold-keep.js';
+import { markExistingPortfolioPagesOnce } from '../services/portfolio/read-hold-keep.js';
 import { moveEcosystemSubscriptionsByOwnerOnce } from '../services/ecosystem-subscriptions-by-owner.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
@@ -143,7 +143,7 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   await recordPointerStateOnce(storage, config)
     .catch(err => logger.error('Failed to record the sale terms and withdrawals of the existing data packages; the next boot tries again', { error: String(err) }));
   // Every welcome page that exists at the update is recorded as allowed to read its owner's memory, so
-  // a page with no record is afterwards one written since (services/portfolio-read-hold-keep.ts).
+  // a page with no record is afterwards one written since (services/portfolio/read-hold-keep.ts).
   // Awaited, so no read meets a missing record first; until it has run, a missing record is adopted.
   await markExistingPortfolioPagesOnce(storage, config)
     .catch(err => logger.error('Failed to record the existing welcome pages; the next boot tries again', { error: String(err) }));
