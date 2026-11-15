@@ -41,6 +41,10 @@
  *   if (!link.ok) return link;                          // nothing was written
  *   await adoptPendingPeer({ storage, peers, timeoutMs }, headerNodeId, proves);   // before verifyPackageNode
  * @version-history
+ *   2026-11-15 — checkPackagePeer refuses a new node's public_key that is not an Ed25519 public key,
+ *     or is a small-order one, with 400 INVALID_PEER_KEY, so a grant, a seller and a sale repository
+ *     write no peer and no pending registration under it; adoptPendingPeer never adopts a pending
+ *     registration under such a key (ed25519PublicKeyProblem; audit 2026-11 L056).
  *   v2.5.0 — 2026-10-29 — With `thisNodeId` in the deps, linkPackagePeer refuses this node's own id
  *     (400 SELF_NODE_ID, nothing written) before the card read, and adoptPendingPeer never adopts a
  *     pending registration under it (secaudit2026oct26 round 8c, federation-07).
@@ -73,6 +77,7 @@ import type { PeerInfo } from '../../federation.js';
 import { deriveTierFlags } from '../../federation-tiers.js';
 import { selfNodeIdMessage } from '../../federation-peer-gate.js';
 import { readNodeCard } from '../../node-card.js';
+import { ed25519PublicKeyProblem } from '../../../auth/keypair.js';
 import { capRefusal, PACKAGE_PEER_SOURCES, DEFAULT_PACKAGE_PEER_CAP } from './package-peer-limits.js';
 import {
     recordPeerOrigin, readPendingPeer, writePendingPeer, deletePendingPeer, pendingExpired, type PeerOriginSource,
@@ -104,6 +109,13 @@ export function checkPackagePeer(
         if (known.status !== 'active') return { ok: false, status: 409, code: 'PEER_NOT_ACTIVE', message: `${nodeId} is a peer of this node, but not active. The operator switched it off; nothing was granted.` };
         return { ok: true, add: null };
     }
+    // A new peer is pinned to this key, so it gets the check POST /v1/federation/peers makes (audit
+    // 2026-11 L056): text that is not an Ed25519 key never verifies, and a small-order key verifies a
+    // forged signature, which adoptPendingPeer's `proves` would then accept. Checked before the
+    // pending registration and the card read, neither of which judges the key. A peer already on
+    // file under the same key returned above and is not checked again.
+    const keyProblem = ed25519PublicKeyProblem(publicKey);
+    if (keyProblem) return { ok: false, status: 400, code: 'INVALID_PEER_KEY', message: `${keyProblem} It was given as the key of ${nodeId}; nothing was written.` };
     return { ok: true, add: { nodeId, url, publicKey } };
 }
 
@@ -249,6 +261,13 @@ export async function adoptPendingPeer(
     // A registration under this node's own id, left before linkPackagePeer refused it, is never adopted.
     // It stays for the operator, who removes it with DELETE /v1/federation/peers/:nodeId.
     if (deps.thisNodeId && nodeId === deps.thisNodeId) return;
+    // A pending registration written before linkPackagePeer checked the key may hold a small-order
+    // key, for which `proves` accepts a forged signature. It is never adopted (audit 2026-11 L056).
+    // Nothing is written either: this runs before the request's signature is known to hold, and an
+    // unsigned request must change no pending record (secaudit 2026-10-10 I7). The operator removes
+    // the record with DELETE /v1/federation/peers/:nodeId, and once it expires linkPackagePeer
+    // reads it as absent, so a new grant under a checked key replaces it.
+    if (ed25519PublicKeyProblem(pending.publicKey)) return;
     if (!await proves(pending.publicKey)) return;
     if (pendingExpired(pending)) { await deletePendingPeer(deps.storage, nodeId); return; }
     const now = Date.now();

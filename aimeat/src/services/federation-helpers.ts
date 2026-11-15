@@ -12,6 +12,9 @@
  *   - performKeyExchange(peerUrl, config, storage, expectNodeId): exchange and cache peer public keys
  *
  * @version-history
+ *   2026-11-15 — performKeyExchange fails, caching nothing, when the answered node_public_key is not an
+ *     Ed25519 public key or is a small-order one, unless it is the key on file for that peer
+ *     (ed25519PublicKeyProblem; audit 2026-11 L056).
  *   2026-10-27 — The key-exchange answer is read under a ceiling, and an error copies at most 500
  *     characters of it (secaudit2026oct26, keyIsPublished:uncapped-body siblings).
  *   2026-10-16 — performKeyExchange sends no agent roster (agent_keys is an empty list) and keeps none
@@ -32,6 +35,7 @@ import { logger } from '../utils/logger.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { readJson, readText, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
 import { peerUrlRefusal } from './peer-url-policy.js';
+import { ed25519PublicKeyProblem } from '../auth/keypair.js';
 
 // ── E.4: Keyword matching helpers for cross-catalogue filtering ──
 
@@ -145,6 +149,15 @@ export async function performKeyExchange(
         if (peerData.node_id !== expectNodeId) {
             logger.warn('Key exchange answered as another node', { asked: expectNodeId, answered: peerData.node_id, peerUrl });
             return { success: false, error: `The node at ${peerUrl} answered as ${peerData.node_id}, not ${expectNodeId}` };
+        }
+        // The answered key is cached for signature checks and, on activation, adopted by a peer with
+        // none on file (routes/federation-peer/peers.ts), so it gets the check every inbound peer key
+        // gets (audit 2026-11 L056). The key already on file for this peer is not checked again.
+        const onFile = (await storage.listFederationPeers()).find(p => p.nodeId === expectNodeId)?.publicKey;
+        const keyProblem = peerData.node_public_key === onFile ? null : ed25519PublicKeyProblem(peerData.node_public_key);
+        if (keyProblem) {
+            logger.warn('Key exchange answered with an unusable key', { node: expectNodeId, peerUrl, problem: keyProblem });
+            return { success: false, error: `INVALID_PEER_KEY: the node at ${peerUrl} answered with a key this node cannot use. ${keyProblem}` };
         }
 
         // Cache the peer's node key with TTL. Agent keys an older peer still sends are not kept.

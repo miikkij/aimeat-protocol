@@ -5,6 +5,10 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — Approving a peering request whose stored key is not an Ed25519 public key, or is a
+ *     small-order one, answers 400 INVALID_PEER_KEY and marks nothing; this covers the replacement
+ *     approval of peer-replace-ask.ts too. A key equal to the peer's key on file is not checked again
+ *     (audit 2026-11 L056, the stored-request writers).
  *   2026-11-15 — POST /v1/federation/peers and PUT /v1/federation/peers/:nodeId refuse a public_key
  *     that is not an Ed25519 public key, or is a small-order one, with 400 INVALID_PEER_KEY
  *     (ed25519PublicKeyProblem); keys already stored stay as they are (audit 2026-11 L056).
@@ -125,6 +129,21 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', expiredRequestMessage(id, config.federationPeeringRequestDays)));
             emitChange('federation');
             return;
+        }
+
+        // A request stored before the introduction checked its key (audit 2026-11 L056) can hold text
+        // that is not an Ed25519 key, or a small-order key a forged signature passes for. Approving it
+        // pins a new peer to that key, or replaces a held one with it (peer-replace-ask.ts reads the
+        // same key), so the approval is refused before the request is marked; a rejection stays open.
+        // A key equal to the one already on file for that node is not checked again.
+        if (decision === 'approve' && request.publicKey) {
+            const asked = request.publicKey.trim();
+            const keyProblem = asked && asked !== peers.get(request.fromNodeId ?? request.id)?.publicKey ? ed25519PublicKeyProblem(asked) : null;
+            if (keyProblem) {
+                res.status(400).json(error(config.nodeId, 'INVALID_PEER_KEY',
+                    `${keyProblem} This request was stored before keys were checked, so nothing was approved. Reject it; that node can introduce itself again with its real key.`));
+                return;
+            }
         }
 
         // A node presenting an invite for a node id held under another key: the operator's answer

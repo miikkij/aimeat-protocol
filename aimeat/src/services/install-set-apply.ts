@@ -34,6 +34,9 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   2026-11-15 — linkRepository refuses a repository public_key that is not an Ed25519 public key, or
+ *     is a small-order one, with 400 INVALID_PEER_KEY before the card read; a repository already
+ *     linked under the same key is not checked again (ed25519PublicKeyProblem; audit 2026-11 L056).
  *   2026-11-11 — deployAgents records `present` when the owner already has the bundled agent, made by
  *     an approval (the deploy then creates no task and no proposal).
  *   2026-10-31 — `owner.welcome: false` sends the owner no welcome mail, at any apply; the owner's sign-in
@@ -106,6 +109,7 @@ import { deriveTierFlags } from './federation-tiers.js';
 import { selfNodeIdMessage } from './federation-peer-gate.js';
 import { proveNodeCard } from './packages/peer/package-peer-register.js';
 import { recordPeerOrigin } from './peer-origin.js';
+import { ed25519PublicKeyProblem } from '../auth/keypair.js';
 import { NS_INSTALL_SETS } from './install-set-trust.js';
 import { claimRun, finishRun, releaseRun, type RunClaim } from './install-set-run.js';
 import { writeAppWorkspaceLinks, type AppWorkspaceLink } from './app/workspaces.js';
@@ -294,6 +298,12 @@ async function linkRepository(
         if (known.status !== 'active' || known.shareCatalogue === false) return { ok: false, status: 409, code: 'PEER_NOT_ACTIVE', message: `${repo.nodeId} is a peer of this node, but not active with the catalogue shared. Activate it on the Federation page, then apply the set.` };
         return { ok: true, peers: deps.peers };
     }
+    // The key a new peer is pinned to, checked as POST /v1/federation/peers checks it (audit 2026-11
+    // L056). The card read below compares the card's key to this one byte for byte and does not
+    // judge it, and the card is not signed, so whoever runs the url decides what it says. A peer
+    // already linked under the same key returned above and is not checked again.
+    const keyProblem = ed25519PublicKeyProblem(repo.publicKey);
+    if (keyProblem) return { ok: false, status: 400, code: 'INVALID_PEER_KEY', message: `${keyProblem} The install set names it as the key of the repository ${repo.nodeId}; nothing was linked.` };
     const proof = await proveNodeCard(repo.nodeId, repo.url, repo.publicKey, deps.config.federationTimeoutMs ?? 10000);
     if (proof.kind === 'refused') return proof.refusal;
     if (proof.kind === 'unreachable') {

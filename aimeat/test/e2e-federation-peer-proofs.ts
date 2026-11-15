@@ -8,9 +8,11 @@
  *   same sync lands. A peer key is an Ed25519 public key (audit 2026-11 L056): text that is not one,
  *   32 bytes off the curve, and a small-order key a forged signature passes for are refused 400
  *   INVALID_PEER_KEY at peer registration, peer update, key exchange and introduction, while a
- *   generated key still registers, exchanges and introduces.
+ *   generated key still registers, exchanges and introduces. The same holds for a genesis peering.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-proofs
  * @version-history
+ *   2026-11-15 — POST /v1/federation/genesis-peer: the bad keys are refused 400 INVALID_PEER_KEY and a
+ *     generated key is requested as before (audit 2026-11 L056, the remaining writers).
  *   2026-11-15 — Initial (audit 2026-11 M130 and L056).
  */
 import * as ed from '@noble/ed25519';
@@ -205,6 +207,26 @@ await test('REFUSED: a plain owner cannot register a peer even under a valid key
         body: JSON.stringify({ node_id: `aimeat-plain-${stamp}`, url: 'http://localhost:9984', public_key: k.pub }),
     });
     expectRefusal(r, 403);
+});
+
+const genesisPeers = async (): Promise<any[]> => (await json('/v1/federation/genesis-peers', { headers: op() })).body.data.peers as any[];
+
+await test('A genesis peering under a generated key is requested as before', async () => {
+    const k = await keypair();
+    const genesisNodeId = `aimeat-goodgenesis-${stamp}`;
+    const r = await json('/v1/federation/genesis-peer', { method: 'POST', headers: op(), body: JSON.stringify({ genesisNodeId, genesisUrl: 'http://localhost:9983', publicKey: k.pub }) });
+    assert(r.status === 201 && r.body.data.peer?.publicKey === k.pub, `genesis peering: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const del = await json(`/v1/federation/genesis-peer/${r.body.data.peer.id}`, { method: 'DELETE', headers: op() });
+    assert(del.status === 200, `remove: ${del.status} ${JSON.stringify(del.body.error)}`);
+});
+
+await test('REFUSED: a genesis peering under a key that is not an Ed25519 key, off the curve, or small-order is 400 and writes no peering', async () => {
+    for (const [label, key] of BAD_KEYS) {
+        const genesisNodeId = `aimeat-badgenesis-${label.replace(/\W+/g, '-')}-${stamp}`;
+        const r = await json('/v1/federation/genesis-peer', { method: 'POST', headers: op(), body: JSON.stringify({ genesisNodeId, genesisUrl: 'http://localhost:9982', publicKey: key }) });
+        expectRefusal(r, 400, 'INVALID_PEER_KEY');
+        assert(!(await genesisPeers()).some(p => p.genesisNodeId === genesisNodeId), `${label}: no genesis peering is written`);
+    }
 });
 
 await test('Cleanup: the peer and both owners are removed', async () => {

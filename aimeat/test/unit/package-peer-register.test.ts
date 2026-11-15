@@ -5,13 +5,16 @@
  *   alert 1678). The old `replace(/\/+$/, '')` took about three seconds on 100 000 slashes.
  * @usage pnpm test -- package-peer-register
  * @version-history
+ *   2026-11-15 — KEY is a generated Ed25519 public key (audit 2026-11 L056). Test input only.
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import { checkPackagePeer } from '../../src/services/packages/peer/package-peer-register.js';
 import type { PeerInfo } from '../../src/services/federation.js';
 
-const KEY = 'ed25519-public-key';
+// A generated Ed25519 public key: checkPackagePeer checks a new node's key as one since 2026-11-15
+// (audit 2026-11 L056), and refused the text this test used before.
+const KEY = 'I7qt4pkFkDhbYzdtW+Mx97hoEUKYGBYaSnu3Otlm1a4=';
 
 describe('checkPackagePeer reads the node\'s url', () => {
   it('drops the trailing slashes of an unknown node\'s url', () => {

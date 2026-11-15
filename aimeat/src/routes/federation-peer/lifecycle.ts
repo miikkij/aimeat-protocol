@@ -5,6 +5,9 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — key-exchange's re-admission under an approved peering request refuses that request's
+ *     stored key when it is not an Ed25519 public key or is a small-order one (400 INVALID_PEER_KEY,
+ *     nothing admitted; audit 2026-11 L056, the stored-request writers).
  *   2026-11-15 — key-exchange refuses a node_public_key that is not an Ed25519 public key, or is a
  *     small-order one, with 400 INVALID_PEER_KEY (ed25519PublicKeyProblem; audit 2026-11 L056).
  *   2026-11-04 — The single use of a signed lifecycle message is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
@@ -225,6 +228,16 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             // presenting a different key gets admitted with the ESTABLISHED one, which they cannot
             // sign for, so the re-admission is worthless to anyone but the real node.
             const admittedKey = approvedRequest?.publicKey || (node_public_key as string);
+            // node_public_key was checked above; an approved request's key may have been stored before
+            // the introduction checked keys (audit 2026-11 L056), and it is the key the peer is pinned to.
+            // The key of a row already on file for this node is not checked again.
+            const admittedKeyProblem = hasApprovedRequest && approvedRequest?.publicKey && approvedRequest.publicKey !== peer?.publicKey
+                ? ed25519PublicKeyProblem(approvedRequest.publicKey) : null;
+            if (admittedKeyProblem) {
+                res.status(400).json(error(config.nodeId, 'INVALID_PEER_KEY',
+                    `${admittedKeyProblem} It is the key of the approved peering request for ${node_id}, stored before keys were checked, so nothing was admitted. That node introduces itself again with its real key.`));
+                return;
+            }
             // An approval written by this node's own join (admin-monitoring.ts) carries no key. Then the
             // key in this unauthenticated body is taken only when the card at the address the operator
             // approved publishes it under this node id: that address is the operator's choice, so its

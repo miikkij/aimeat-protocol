@@ -55322,7 +55322,7 @@ paths:
                   example: https://aimeat-usa-001-genesis.example.com
                 publicKey:
                   type: string
-                  description: Ed25519 public key for federation auth (base64url)
+                  description: Ed25519 public key for federation auth, the 32 raw bytes in base64 as the node's card publishes it. Text that is not such a key, or a small-order key, is refused with 400 INVALID_PEER_KEY.
       responses:
         '201':
           description: Genesis peering request created
@@ -62033,7 +62033,9 @@ paths:
         once the node's own /.well-known/aimeat answers with the same node id and key (409
         PEER_ID_MISMATCH or PEER_KEY_MISMATCH when it does not, 400 INVALID_URL for an address this node
         may not reach, 503 PEER_UNREACHABLE when nothing answers; nothing is written then). This node's
-        own id answers 400 SELF_NODE_ID and nothing is written. Without
+        own id answers 400 SELF_NODE_ID and nothing is written. A new node's `public_key` that is not an
+        Ed25519 public key, or is a small-order one, answers 400 INVALID_PEER_KEY before the card is read,
+        and nothing is written. Without
         `node` the node must already be an active peer (409 PEER_UNKNOWN). A peer of that id under another
         key answers 409 PEER_KEY_MISMATCH. 404 NOT_A_REPOSITORY when the repository role is off; 403
         NOT_AN_AUTHOR when the caller has no package here. Requires packages:write.
@@ -62168,7 +62170,9 @@ paths:
         the repository's answer comes back as it said it. Operator only: the operator in person, or an
         agent of the operator holding the exact scope operator:admin. `repository_url` and
         `repository_public_key` link a repository this node does not know yet as a packages-only peer
-        under that key, so the questions can be read before the first sale.
+        under that key, so the questions can be read before the first sale. A key that is not an Ed25519
+        public key, or is a small-order one, answers 400 INVALID_PEER_KEY and links nothing; the same
+        holds wherever a package-sales call names the repository as { node_id, url, public_key }.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -62899,7 +62903,8 @@ paths:
                     (`peer_pending`): the node's first signed request here reads its card and
                     registers it, within 30 days. 409 PEER_KEY_MISMATCH when a peer of that id, or a
                     waiting registration, has another key; 409 PEER_NOT_ACTIVE when it is switched
-                    off; nothing is granted then.
+                    off; 400 INVALID_PEER_KEY when a new node's public_key is not an Ed25519 public
+                    key or is a small-order one; nothing is granted then.
                   required: [url, public_key]
                   properties:
                     url: { type: string }
@@ -64128,7 +64133,8 @@ paths:
                     `{ spec: "aimeat.install-set/1", bundle: { group_id, node_id?, version? }, repository?: {
                     node_id, url, public_key } (links a repository this node does not know yet as an active
                     peer under that key; 409 PEER_KEY_MISMATCH when a peer of that id has another key; 400
-                    SELF_NODE_ID when it names this node itself), owner: { name,
+                    SELF_NODE_ID when it names this node itself; 400 INVALID_PEER_KEY when a new
+                    repository's public_key is not an Ed25519 public key or is a small-order one), owner: { name,
                     email, display_name?, welcome? }, members?: [{ email, name?, display_name?, join: invite|account,
                     memberships: [{ organism, role: admin|member, workspaces: [key | { key, role:
                     viewer|contributor }] }] }], organism_names?: { <key>: name }, config?: { <group id>: {

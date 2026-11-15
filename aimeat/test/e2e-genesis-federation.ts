@@ -31,6 +31,9 @@
  *   the 404s and the denials
  * @usage cd aimeat && node --import tsx test/e2e-genesis-federation.ts
  * @version-history
+ *   2026-11-15 — The filler, eleventh, dead and blocked genesis peerings carry generated Ed25519 keys:
+ *     POST /v1/federation/genesis-peer refuses text that is not one (400 INVALID_PEER_KEY, audit
+ *     2026-11 L056). Test inputs only; every assertion is as it was.
  *   2026-11-07 — The federable CSM is looked up by the name the node stored, which now starts with its
  *     owner's account.
  *   2026-10-31 — Phase 9b: the subscribed push sends only keys the owner's federation consent names, a
@@ -159,6 +162,11 @@ async function registerAgent(ownerName: string, ownerToken: string, name: string
     const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature }) });
     assert(tok.body.ok === true, `agent token ${name}: ${JSON.stringify(tok.body?.error)}`);
     return { gaii, token: tok.body.data.token as string };
+}
+
+/** A generated Ed25519 public key in base64, for a genesis peering whose key is never used to sign. */
+async function anyPeerKey(): Promise<string> {
+    return Buffer.from(await ed.getPublicKeyAsync(ed.utils.randomSecretKey())).toString('base64');
 }
 
 /** The keys of every genesis memory record filed under one peer, straight from the store. */
@@ -304,14 +312,14 @@ async function run(): Promise<void> {
         for (let i = 0; i < 9; i++) {
             const { status, body } = await json('/v1/federation/genesis-peer', {
                 method: 'POST', headers: auth(operatorToken),
-                body: JSON.stringify({ genesisNodeId: `aimeat-filler-${i}-${stamp}`, genesisUrl: `http://127.0.0.1:${9000 + i}`, publicKey: 'ZmlsbGVy' }),
+                body: JSON.stringify({ genesisNodeId: `aimeat-filler-${i}-${stamp}`, genesisUrl: `http://127.0.0.1:${9000 + i}`, publicKey: await anyPeerKey() }),
             });
             assert(status === 201, `filler ${i}: ${status} ${JSON.stringify(body?.error)}`);
             fillerPeerIds.push(body.data.peer.id);
         }
         const over = await json('/v1/federation/genesis-peer', {
             method: 'POST', headers: auth(operatorToken),
-            body: JSON.stringify({ genesisNodeId: `aimeat-eleventh-${stamp}`, genesisUrl: 'http://127.0.0.1:9099', publicKey: 'ZWxldmVudGg=' }),
+            body: JSON.stringify({ genesisNodeId: `aimeat-eleventh-${stamp}`, genesisUrl: 'http://127.0.0.1:9099', publicKey: await anyPeerKey() }),
         });
         assert(over.status === 409, `the eleventh must be refused, got ${over.status}: ${JSON.stringify(over.body)}`);
         assert(String(over.body.error?.message ?? '').includes('Maximum genesis peers reached'),
@@ -967,14 +975,14 @@ async function run(): Promise<void> {
     await test('a peer nothing answers at, and one whose address is blocked, are both counted failed', async () => {
         const dead = await json('/v1/federation/genesis-peer', {
             method: 'POST', headers: auth(operatorToken),
-            body: JSON.stringify({ genesisNodeId: `aimeat-dead-${stamp}`, genesisUrl: 'http://127.0.0.1:1', publicKey: 'ZGVhZA==' }),
+            body: JSON.stringify({ genesisNodeId: `aimeat-dead-${stamp}`, genesisUrl: 'http://127.0.0.1:1', publicKey: await anyPeerKey() }),
         });
         assert(dead.status === 201, `dead peering: ${dead.status}`);
         // 169.254.169.254 is the cloud metadata address: validateOutboundUrl refuses it whatever
         // AIMEAT_ALLOW_PRIVATE_EGRESS says, so this one never reaches a socket at all.
         const blocked = await json('/v1/federation/genesis-peer', {
             method: 'POST', headers: auth(operatorToken),
-            body: JSON.stringify({ genesisNodeId: `aimeat-blocked-${stamp}`, genesisUrl: 'http://169.254.169.254', publicKey: 'YmxvY2tlZA==' }),
+            body: JSON.stringify({ genesisNodeId: `aimeat-blocked-${stamp}`, genesisUrl: 'http://169.254.169.254', publicKey: await anyPeerKey() }),
         });
         assert(blocked.status === 201, `blocked peering: ${blocked.status}`);
         for (const id of [dead.body.data.peer.id, blocked.body.data.peer.id]) {

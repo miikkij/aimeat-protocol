@@ -13,6 +13,8 @@
  *   - genesis-memory-read (POST/GET): forwards reads to peers or answers peer reads under federation consent
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  * @version-history
+ *   2026-11-15 — POST /v1/federation/genesis-peer refuses a publicKey that is not an Ed25519 public
+ *     key, or is a small-order one, with 400 INVALID_PEER_KEY (ed25519PublicKeyProblem; audit 2026-11 L056).
  *   2026-11-08 — GET /v1/federation/cross-catalogue lists a local CSM only when it is public as well as
  *     federable (secaudit2026nov08 round 14).
  *   2026-10-31 — An ingested entry is stored under genesisPeerKey, which never names the operator's
@@ -53,7 +55,7 @@ import { requireAuth, requireOperator, requireScope } from '../auth/middleware.j
 import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
-import { verify } from '../auth/keypair.js';
+import { verify, ed25519PublicKeyProblem } from '../auth/keypair.js';
 import { deliveryRefusal, pinnedRefusal, genesisPeerProofPin, signNodeRequest } from '../services/signed-node-request.js';
 import { registerGenesisMemoryReadAnswer, genesisMemoryReadFields } from './federation-genesis-memory-read.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
@@ -81,6 +83,15 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
             const { genesisNodeId, genesisUrl, publicKey } = req.body;
             if (!genesisNodeId || !genesisUrl || !publicKey) {
                 res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Missing: genesisNodeId, genesisUrl, publicKey'));
+                return;
+            }
+            // Every catalogue ingest and memory read from this genesis peer is verified against this
+            // key, so it gets the check POST /v1/federation/peers makes: text that is not an Ed25519
+            // key never verifies, and a small-order key verifies a forged signature (audit 2026-11 L056).
+            // A genesis peer is created once (a second request is 409), so no stored key is re-checked.
+            const keyProblem = ed25519PublicKeyProblem(publicKey);
+            if (keyProblem) {
+                res.status(400).json(error(config.nodeId, 'INVALID_PEER_KEY', keyProblem));
                 return;
             }
             const peer = await genesisPeeringService.requestPeering(genesisNodeId, genesisUrl, publicKey);

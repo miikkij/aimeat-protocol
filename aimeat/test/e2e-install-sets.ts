@@ -28,6 +28,10 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   2026-11-15 — Phase 7: a key that is not an Ed25519 key, or is small-order, is refused 400
+ *     INVALID_PEER_KEY as a new install-set repository, a sale repository, a granted node and a
+ *     seller, with a card that publishes that very key; nothing is linked, pending or granted. A new
+ *     repository under a generated key passes to the bundle step (audit 2026-11 L056).
  *   2026-10-31 — Phase 6b: `owner.welcome: false` sends a shop-made owner no mail at any apply, keeps the
  *     sign-in link on, and a non-boolean value is refused (v28 #8).
  *   2026-10-29 — A set naming the node it is applied on as its repository is refused with 400
@@ -709,6 +713,89 @@ await test('A set naming the repository under another key than the linked peer i
         body: JSON.stringify({ install_set: installSet({ repository: { node_id: R.nodeId, url: R.baseUrl, public_key: 'AAAAnotthekey' } }), dry_run: true }),
     });
     assert(r.status === 409 && r.body.error?.code === 'PEER_KEY_MISMATCH', `expected 409 PEER_KEY_MISMATCH: ${r.status} ${JSON.stringify(r.body)}`);
+});
+
+// A new peer's key is an Ed25519 public key (audit 2026-11 L056). The card stub answers with the very
+// key it is given, as a node run by whoever names it would, so the card check alone lets it through.
+// The uses on the same paths with a generated key are Phase 7 (the repository an install set links),
+// the grants to newNode and the seller registered below (a grant and a seller), and the linked
+// repository of the package-sales test below (a sale repository).
+const SMALL_ORDER_KEY = Buffer.from([1, ...new Array(31).fill(0)]).toString('base64');
+const UNUSABLE_KEYS: Array<[string, string]> = [['not a key', 'deadbeef1234567890abcdef'], ['small-order', SMALL_ORDER_KEY]];
+async function keyCard(nodeId: string, publicKey: string): Promise<{ url: string; close: () => void }> {
+    const s = createHttpServer((_req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, data: { node_id: nodeId, public_key: publicKey } })); });
+    const port = await new Promise<number>(r => s.listen(0, '127.0.0.1', () => r((s.address() as AddressInfo).port)));
+    return { url: `http://127.0.0.1:${port}`, close: () => { s.closeAllConnections(); s.close(); } };
+}
+const hasPeer = async (node: NodeState, token: string, nodeId: string) => {
+    const r = await node.json('/v1/federation/peers', { headers: auth(token) });
+    return (r.body.data?.peers ?? []).some((p: any) => p.node_id === nodeId) || (r.body.data?.pending_registrations ?? []).some((p: any) => p.node_id === nodeId);
+};
+
+/** Runs `each` once per unusable key, against a card stub that publishes that key under its own node id. */
+async function withUnusableKeys(path: string, each: (label: string, key: string, nodeId: string, url: string) => Promise<void>): Promise<void> {
+    for (const [label, key] of UNUSABLE_KEYS) {
+        const nodeId = `aimeat-test-001-bad${path}${label.replace(/\W+/g, '')}${ts}`;
+        const card = await keyCard(nodeId, key);
+        try { await each(label, key, nodeId, card.url); } finally { card.close(); }
+    }
+}
+
+await test('REFUSED: an install set naming a new repository under such a key is 400 INVALID_PEER_KEY', async () => {
+    await withUnusableKeys('set', async (label, key, nodeId, url) => {
+        const set = await C.json('/v1/install-sets/apply', {
+            method: 'POST', headers: auth(opsToken),
+            body: JSON.stringify({ install_set: installSet({ bundle: { group_id: setupOnR, node_id: nodeId }, repository: { node_id: nodeId, url, public_key: key } }), dry_run: true }),
+        });
+        assert(set.status === 400 && set.body.error?.code === 'INVALID_PEER_KEY', `${label}: ${set.status} ${JSON.stringify(set.body.error)}`);
+        assert(!(await hasPeer(C, opsToken, nodeId)), `${label}: no peer for ${nodeId}`);
+    });
+});
+
+await test('REFUSED: a sale naming a new repository under such a key is 400 INVALID_PEER_KEY and links nothing', async () => {
+    await withUnusableKeys('sale', async (label, key, nodeId, url) => {
+        const sale = await C.json(`/v1/package-sales/config-needs?repository=${encodeURIComponent(nodeId)}&group_id=${encodeURIComponent(setupOnR)}&repository_url=${encodeURIComponent(url)}&repository_public_key=${encodeURIComponent(key)}`, { headers: auth(opsToken) });
+        assert(sale.status === 400 && sale.body.error?.code === 'INVALID_PEER_KEY', `${label}: ${sale.status} ${JSON.stringify(sale.body.error)}`);
+        assert(!(await hasPeer(C, opsToken, nodeId)), `${label}: no peer and no pending registration for ${nodeId}`);
+    });
+});
+
+await test('REFUSED: a grant naming a new node under such a key is 400 INVALID_PEER_KEY, with no peer, no pending registration and no grant', async () => {
+    await withUnusableKeys('grant', async (label, key, nodeId, url) => {
+        const grant = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements/${nodeId}`, {
+            method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ note: 'bad key', node: { url, public_key: key } }),
+        });
+        assert(grant.status === 400 && grant.body.error?.code === 'INVALID_PEER_KEY', `${label}: ${grant.status} ${JSON.stringify(grant.body.error)}`);
+        assert(!(await hasPeer(R, vendorToken, nodeId)), `${label}: no peer and no pending registration for ${nodeId}`);
+        const ents = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements`, { headers: auth(vendorToken) });
+        assert(!(ents.body.data.entitlements as any[]).some((e) => e.nodeId === nodeId), `${label}: no grant was made`);
+    });
+});
+
+await test('REFUSED: naming a new seller under such a key is 400 INVALID_PEER_KEY and registers no peer', async () => {
+    await withUnusableKeys('seller', async (label, key, nodeId, url) => {
+        const seller = await R.json(`/v1/package-sellers/${nodeId}`, {
+            method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ node: { url, public_key: key } }),
+        });
+        assert(seller.status === 400 && seller.body.error?.code === 'INVALID_PEER_KEY', `${label}: ${seller.status} ${JSON.stringify(seller.body.error)}`);
+        assert(!(await hasPeer(R, vendorToken, nodeId)), `${label}: no peer for ${nodeId}`);
+    });
+});
+
+await test('A set naming a new repository under a generated key passes the key check and reaches the bundle step', async () => {
+    // The dry run links a copy of the peers only. The card stub is no repository, so the plan stops
+    // at the bundle; the key was taken.
+    const k = await generateKeyPair();
+    const nodeId = `aimeat-test-001-goodkey${ts}`;
+    const card = await keyCard(nodeId, k.publicKey);
+    try {
+        const r = await C.json('/v1/install-sets/apply', {
+            method: 'POST', headers: auth(opsToken),
+            body: JSON.stringify({ install_set: installSet({ bundle: { group_id: setupOnR, node_id: nodeId }, repository: { node_id: nodeId, url: card.url, public_key: k.publicKey } }), dry_run: true }),
+        });
+        assert(r.body.error?.code === 'BUNDLE_UNAVAILABLE', `the plan passes the repository link: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(!(await hasPeer(C, opsToken, nodeId)), 'a dry run writes no peer');
+    } finally { card.close(); }
 });
 
 await test('A set naming this node itself as the repository is refused (SELF_NODE_ID), though its own card answers', async () => {

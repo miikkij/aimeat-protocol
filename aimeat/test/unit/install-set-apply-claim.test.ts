@@ -10,6 +10,8 @@
  *   claim behind, so the next apply is not refused.
  * @usage cd aimeat && pnpm exec vitest run test/unit/install-set-apply-claim.test.ts
  * @version-history
+ *   2026-11-15 — The set's repository key is a generated Ed25519 public key; the text it was is
+ *     refused by linkRepository since audit 2026-11 L056. Test input only.
  *   v1.0.0 — 2026-10-31 — Initial (secaudit 2026-10-31 inv-22).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -59,7 +61,8 @@ const KEY = appliedRecordKey('newowner', 'shopbundle::newowner');
 const SET = {
     spec: 'aimeat.install-set/1',
     bundle: { group_id: 'shopbundle::seller', node_id: 'repo-node' },
-    repository: { node_id: 'repo-node', url: 'https://repo.example', public_key: 'cmVwby1rZXk=' },
+    // A generated Ed25519 public key: linkRepository checks a new repository's key since 2026-11-15.
+    repository: { node_id: 'repo-node', url: 'https://repo.example', public_key: 'I7qt4pkFkDhbYzdtW+Mx97hoEUKYGBYaSnu3Otlm1a4=' },
     owner: { name: 'newowner', email: 'newowner@example.com' },
 };
 
