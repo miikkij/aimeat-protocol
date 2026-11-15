@@ -547,7 +547,7 @@
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/public/css/theme.css",
         "aimeat/public/css/poster.css",
@@ -556,7 +556,7 @@
         "aimeat/src/services/app-ui/signature-tokens.ts",
         "aimeat/src/services/themes/tiilitaivas.ts"
       ],
-      "digest": "sha256:78844ca8ff6cd7addea7d4fc",
+      "digest": "sha256:62e2be5d7ce46ff8ae13cd47",
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
@@ -843,7 +843,7 @@
       "aimeat/public/css/poster.css": "3a32b3760fd32b41",
       "aimeat/public/lib/aimeat-fonts.css": "5b1c4dde6b61c603",
       "aimeat/src/services/themes/tokens.ts": "7178b915f0c271ee",
-      "aimeat/src/services/app-ui/signature-tokens.ts": "091513a461128c03",
+      "aimeat/src/services/app-ui/signature-tokens.ts": "4464cc5e84122717",
       "aimeat/src/services/themes/tiilitaivas.ts": "5b4513bcfaeaa121"
     },
     "project:aimeat-frontend-verify": {
