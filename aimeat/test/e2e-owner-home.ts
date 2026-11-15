@@ -10,6 +10,7 @@
  *   v1.0.0 — 2026-07-15 — Initial: composite == usage + agents parity, stats consistency, auth.
  *   v1.1.0 — 2026-11-15 — Audit M094, L102: a second owner's app and file stay off A's dashboard;
  *     chatSessions and work count a real session agent and a real pending work item.
+ *   v1.2.0 — 2026-11-15 — A's agent without wallet:read is refused 403 SCOPE_DENIED; one with it reads.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-home
 
@@ -30,6 +31,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 async function setupOwner(label: string) {
     const name = `home${label}${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Home', password: 'HomeDash12' }) });
@@ -132,6 +134,19 @@ await test('Composite agents == /v1/agents (same owner agent set)', async () => 
     // stats.agents counts ALL agents; home.agents lists the non-session ones (Agents card).
     assert(home.stats.agents === (Array.isArray(list) ? list.length : 0), `stats.agents ${home.stats.agents} == /v1/agents length ${Array.isArray(list) ? list.length : 0}`);
     assert(home.agents.length === nonSession.length, `home.agents ${home.agents.length} == non-session ${nonSession.length}`);
+});
+
+await test('An agent of A without wallet:read is refused 403 SCOPE_DENIED; one with it reads A\'s figures', async () => {
+    // The dashboard carries A's balance and counts, and an agent resolves to A like A does, so the
+    // scope check is the only thing that keeps a memory-only agent off it.
+    const reader = await connectAgentByDevice(BASE, { owner: A.name, ownerToken: A.token, name: 'homereader', scopes: ['memory:read'] });
+    const r = await json('/v1/owner/home', { headers: { Authorization: `Bearer ${reader.token}` } });
+    assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(r.body?.data === undefined, `the refusal carried dashboard data: ${JSON.stringify(r.body?.data ?? null).slice(0, 200)}`);
+    // Positive control: the same route answers an agent that holds the scope, with A's own figures.
+    const wallet = await connectAgentByDevice(BASE, { owner: A.name, ownerToken: A.token, name: 'homewallet', scopes: ['wallet:read'] });
+    const ok = await json('/v1/owner/home', { headers: { Authorization: `Bearer ${wallet.token}` } });
+    assert(ok.status === 200 && ok.body.data.stats.memory >= 5, `wallet:read agent: ${ok.status}, memory ${ok.body?.data?.stats?.memory}`);
 });
 
 await test('Unauthenticated → 401', async () => {

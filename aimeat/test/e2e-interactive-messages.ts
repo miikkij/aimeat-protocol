@@ -16,6 +16,9 @@
 // unknown question id), which until then only the inbox page restricted (feature-list audit #123).
 //
 // 2026-11-15 — Audit L063: test 5 reads the Other answer back from the agent's thread, not the POST.
+//
+// 2026-11-15 — 11b, 11c: a stranger's answer to Bob's question is refused (400), and a stranger's
+// agent without messages:send is refused 403 SCOPE_DENIED; neither message lands.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -316,6 +319,35 @@ await test('11. A stranger cannot accept the first-contact request on Bob\'s beh
     // addressed to Bob is not there for anybody else. Pinned, because a drift to 403 would confirm
     // that askbot has asked this person something.
     assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('11b. A stranger cannot answer Bob\'s question, nor can a stranger\'s read-only agent ask one', async () => {
+    // The answer is looked up in the sender's own mailbox, so a question asked of Bob is not one the
+    // stranger received: 400 INVALID_INPUT. 11c reads back that neither message landed.
+    const answer = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${mallory.token}` },
+        body: JSON.stringify({
+            to: askbot.gaii, conversation_id: conversationId, reply_to: questionId, body: 'answered by a stranger',
+            interactive: { role: 'answers', v: 1, answersFor: questionId, answers: { q1: { selected: ['pw'], other: null } } },
+        }),
+    });
+    assert(answer.status === 400 && answer.body?.error?.code === 'INVALID_INPUT', `stranger's answer: ${answer.status} ${JSON.stringify(answer.body?.error)}`);
+    // An agent that may read messages and not send them is refused at the scope check.
+    const reader = await createAgent(`iqmallory${stamp}`, mallory.token, 'mreader', ['messages:read']);
+    const ask = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${reader.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: 'asked without messages:send', interactive: { role: 'questions', v: 1, questions: QUESTIONS } }),
+    });
+    assert(ask.status === 403 && ask.body?.error?.code === 'SCOPE_DENIED', `read-only agent's question: ${ask.status} ${JSON.stringify(ask.body?.error)}`);
+});
+
+// Its own block: scripts/lib/route-refusals.ts credits every route a refusing block names, and these
+// two reads are not refused.
+await test('11c. Neither refused message landed: not in askbot\'s thread, not in Bob\'s requests', async () => {
+    const thread = await json(`/v1/messages/agent-thread/${encodeURIComponent(conversationId)}`, { headers: { Authorization: `Bearer ${askbot.token}` } });
+    assert(!(thread.body.data.messages as any[]).some((m) => m.body === 'answered by a stranger'), 'the stranger\'s answer reached the thread');
+    const requests = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(requests.status === 200 && !JSON.stringify(requests.body.data).includes('asked without messages:send'), 'the refused question reached Bob');
 });
 
 await test('12. An unauthenticated caller cannot ask a question at all', async () => {

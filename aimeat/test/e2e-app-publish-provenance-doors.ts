@@ -22,6 +22,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=app-publish-provenance-doors
  * @version-history
+ *   v1.4.0 — 2026-11-15 — The other owner's fork without the access code is refused 403 ACCESS_DENIED
+ *     and leaves no fork behind.
  *   v1.3.2 — 2026-11-15 — The fork of another owner's app behind an access code sends that code: the
  *     fork gate asks it since E2E audit M093. The request changed, no assertion did; the fork without
  *     the code was the hole the audit found.
@@ -521,6 +523,12 @@ async function main() {
 
         const other = `forker${Date.now() % 1000000}`;
         const otherToken = (await registerOwner(BASE, other)).token;
+        // Without the code the other owner is refused, and no fork (and so no copy of the record) exists.
+        const noCode = await json(`/v1/apps/${encodeURIComponent(owner)}/${inlineFile}/fork`, {
+            method: 'POST', headers: auth(otherToken), body: JSON.stringify({ new_filename: 'forked-private.html' }),
+        });
+        assert(noCode.status === 403 && noCode.body?.error?.code === 'ACCESS_DENIED', `fork without the code: ${noCode.status} ${JSON.stringify(noCode.body?.error)}`);
+        assert((await json(`/v1/apps/${encodeURIComponent(other)}/forked-private.html`)).status === 404, 'a refused fork left an app behind');
         const fork = await json(`/v1/apps/${encodeURIComponent(owner)}/${inlineFile}/fork`, {
             // The forker holds the code: since 2026-11-15 a fork of an app behind one asks the code
             // opening it asks (E2E audit M093); this case is about the record the fork carries.

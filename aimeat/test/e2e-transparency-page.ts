@@ -22,6 +22,7 @@
  *   Accept negotiation on the JSON route · the openapi and namespace decisions
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=transparency-page
  * @version-history
+ *   v1.4.0 — 2026-11-15 — /mine refuses the owner's agent without wallet:read (403 SCOPE_DENIED).
  *   v1.3.1 — 2026-11-15 — Audit L120: the operator-name mirror check runs unconditionally.
  *   v1.3.0 — 2026-09-04 — The private siblings. Everything here drives routes meant to answer
  *     everybody, and the same router carries /mine and /logging-policy, which must not. A page
@@ -41,6 +42,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { PUBLIC_PAGES, findPublicPage } from '../src/data/public-pages.js';
+import { registerOwner } from './helpers/owner-login.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const here = dirname(fileURLToPath(import.meta.url));
@@ -371,6 +374,20 @@ const FORBIDDEN: Array<[string, RegExp]> = [
             const r = await fetchText(path);
             assert(r.status === 401, `${path} answered ${r.status}, expected 401`);
         }
+    });
+
+    await test('/mine refuses an agent without wallet:read (403 SCOPE_DENIED) and answers its owner', async () => {
+        // A signed-in second principal: the owner's own agent, connected to read memory only. /mine is
+        // the account's own publishing record, so the scope check is what keeps that agent off it.
+        const name = `transp${Date.now() % 100000}`;
+        const ownerTok = (await registerOwner(BASE, name)).token;
+        const reader = await connectAgentByDevice(BASE, { owner: name, ownerToken: ownerTok, name: 'transpreader', scopes: ['memory:read'] });
+        const r = await fetchText('/v1/ai-transparency/mine', { Authorization: `Bearer ${reader.token}` });
+        const err = r.ct.includes('json') ? JSON.parse(r.body)?.error : undefined;
+        assert(r.status === 403 && err?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${r.body.slice(0, 200)}`);
+        assert(!r.body.includes('unlabelled_detail'), 'the refusal carried the record');
+        const own = await fetchText('/v1/ai-transparency/mine', { Authorization: `Bearer ${ownerTok}` });
+        assert(own.status === 200 && own.body.includes('unlabelled_detail'), `the owner reads /mine: ${own.status}`);
     });
 
     await test('POSITIVE CONTROL: the public page still answers with no credential at all', async () => {

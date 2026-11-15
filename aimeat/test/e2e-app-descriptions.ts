@@ -8,6 +8,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-descriptions
  * @version-history
+ *   v1.3.0 — 2026-11-15 — The owner's agent without app:write is refused 403 SCOPE_DENIED on the PATCH.
  *   v1.2.0 — 2026-11-15 — Audit M239: description and name are asserted after the PATCH and the re-publish.
  *   v1.1.0 — 2026-09-04 — Who else can rewrite what an app says about itself. A description is the
  *     sentence a stranger reads in the catalogue before deciding whether to open the app, and the
@@ -18,6 +19,7 @@
  */
 
 import { registerOwner } from './helpers/owner-login.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ownerName = `desc${Date.now() % 100000}`;
@@ -147,6 +149,17 @@ await test('A second owner cannot rewrite this app\'s descriptions', async () =>
     assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
+await test('The owner\'s own agent without app:write cannot rewrite them (403 SCOPE_DENIED)', async () => {
+    // The same owner, a narrower principal: an agent connected to read memory reaches the app by
+    // filename like its owner does, so only the scope check stands between it and the listing.
+    const reader = await connectAgentByDevice(BASE, { owner: ownerName, ownerToken: token, name: 'descreader', scopes: ['memory:read'] });
+    const r = await json(`/v1/apps/${FILE}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${reader.token}` },
+        body: JSON.stringify({ descriptions: { en: 'written by an agent without app:write' } }),
+    });
+    assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+});
+
 await test('An unauthenticated caller cannot rewrite them either', async () => {
     const r = await json(`/v1/apps/${FILE}`, {
         method: 'PATCH', body: JSON.stringify({ descriptions: { en: 'anonymous' } }),
@@ -155,11 +168,9 @@ await test('An unauthenticated caller cannot rewrite them either', async () => {
 });
 
 await test('POSITIVE CONTROL: the owner\'s own descriptions are untouched', async () => {
-    // Two refusals in a row pass just as happily against a route that stopped writing for everyone.
+    // The refusals above pass just as happily against a route that stopped writing for everyone.
     const m = await manifest();
-    const en = m?.descriptions?.en ?? '';
-    assert(!en.includes('somebody else') && !en.includes('anonymous'),
-        `a refused write landed anyway: ${JSON.stringify(m?.descriptions)}`);
+    assert(m?.descriptions?.en === 'Edited English.', `a refused write landed anyway: ${JSON.stringify(m?.descriptions)}`);
 });
 
 // ── Summary ──
