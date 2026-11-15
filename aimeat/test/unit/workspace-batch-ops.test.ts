@@ -16,6 +16,8 @@
  *   - deleteRecords removes exactly the ids given, and refuses an append-only space
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-batch-ops.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-15 — A member without write access is refused the batch delete whole (E2E audit
+ *     M073, approved by the developer); the assertion that the row stays is unchanged.
  *   v1.0.0 — 2026-10-06 — Initial, with the batch operations (wish bulk-records-for-ai).
  */
 
@@ -278,7 +280,9 @@ describe('deleteRecordsBatchOp', () => {
     await publishRecordsBatchOp(deps(), alice, { organismId: ORG, ws: WS, namespace: CONTACT, records: contacts(1) });
     const bob = workspaceCallerOf({ principal: `bob@${NODE}`, ownerName: 'bob', roles: ['owner'] }, config);
     const r = await deleteRecordsBatchOp(deps(), bob, { organismId: ORG, ws: WS, namespace: CONTACT, ids: ['c0'] });
-    expect(r.ok && r.data.rows_removed).toBe(0);
+    // Since E2E audit M073 the batch delete asks the workspace write rule first, so a member without
+    // write access is refused whole instead of answered with nothing removed; the row stays either way.
+    expect(r.ok).toBe(false);
     expect(await latest(storage, CONTACT)).toHaveLength(1);
   });
 });

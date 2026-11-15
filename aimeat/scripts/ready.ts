@@ -31,7 +31,8 @@
 import { execFileSync } from 'node:child_process';
 
 const sh = (cmd: string, args: string[], opts: { inherit?: boolean } = {}): string =>
-    execFileSync(cmd, args, { encoding: 'utf8', stdio: opts.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'] }) ?? '';
+    // A red run's --log-failed is many MB; the default 1 MB buffer answered ENOBUFS (2026-11-15).
+    execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: opts.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'] }) ?? '';
 const git = (...args: string[]): string => sh('git', args).trim();
 const gh = (...args: string[]): string => sh('gh', args).trim();
 const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms));
