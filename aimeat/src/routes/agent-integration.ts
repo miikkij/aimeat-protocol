@@ -16,6 +16,9 @@
  *   - GET /v1/agents/:name/inbox            -- Consolidated inbox
  *   - GET /v1/agents/:name/integration-kit  -- Full integration kit JSON
  * @version-history
+ *   2026-11-15 — GET /v1/agents/:name/inbox reads the open tasks whole (up to 1000 per status) before
+ *     its cursor and limit apply; it read `limit` rows of the store's updatedAt order first, so a walk
+ *     with a small limit skipped tasks (E2E audit M037, found by the test written for it).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.3.0 -- 2026-10-11 -- GET /v1/agents/:name/tasks/wait removed: unreachable since it was added, and
  *     the inbox answer no longer points at it.
@@ -59,6 +62,25 @@ function buildCursor(timestamp: string, id: string): string {
 
 /** Max age for cursors (90 days in milliseconds) */
 const CURSOR_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+/** The most open tasks of one status the inbox reads before its cursor and limit apply. */
+const INBOX_SCAN_CAP = 1000;
+
+/**
+ * Every task of one status, page by page, up to INBOX_SCAN_CAP. The inbox orders by creation time
+ * and applies its cursor and limit itself; reading only `limit` rows of the store's own order
+ * (updatedAt, newest first) first made a paged walk skip tasks (E2E audit M037).
+ */
+async function openTasks(storage: Storage, agentGaii: string, status: 'queued' | 'active') {
+  const perPage = 200;
+  const tasks: Awaited<ReturnType<Storage['listAgentTasks']>>['tasks'] = [];
+  for (let page = 1; tasks.length < INBOX_SCAN_CAP; page++) {
+    const r = await storage.listAgentTasks(agentGaii, { status, page, perPage });
+    tasks.push(...r.tasks);
+    if (r.tasks.length < perPage || tasks.length >= r.total) break;
+  }
+  return { tasks: tasks.slice(0, INBOX_SCAN_CAP) };
+}
 
 export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -121,8 +143,8 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
     // (services/agent/stop-rules.ts). The owner, or a sibling agent, reading the same inbox sees all of it.
     const held = isStopped(agent) && resolveIdentity(req.auth!, config.nodeId) === agentGaii;
     const [queuedResult, activeResult, pendingMessages] = await Promise.all([
-      held ? { tasks: [] as Awaited<ReturnType<typeof storage.listAgentTasks>>['tasks'] } : storage.listAgentTasks(agentGaii, { status: 'queued', perPage: limit }),
-      storage.listAgentTasks(agentGaii, { status: 'active', perPage: limit }),
+      held ? { tasks: [] as Awaited<ReturnType<typeof storage.listAgentTasks>>['tasks'] } : openTasks(storage, agentGaii, 'queued'),
+      openTasks(storage, agentGaii, 'active'),
       held ? [] : storage.listPendingMessages(agentGaii),
     ]);
 

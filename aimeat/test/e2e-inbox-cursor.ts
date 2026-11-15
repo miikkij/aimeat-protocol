@@ -4,8 +4,10 @@
  *   Covers all cursor edge cases: no cursor, valid cursor with/without new events, malformed cursors,
  *   expired cursors, has_more with limit, and approximate cursor_status.
  * @version-history
- *   v1.1.1 -- 2026-11-15 -- Audit M036: a cursor poll returns only the new task. M037's walk check is
- *     held back in test 10: it fails today (the route reads `limit` tasks per status before the cursor).
+ *   v1.1.2 -- 2026-11-15 -- Test 10 asserts M037's walk: limit=1 meets every inbox item exactly once.
+ *     It was red against the route that read `limit` tasks per status before the cursor; the route
+ *     now reads the open tasks whole first (src/routes/agent-integration.ts).
+ *   v1.1.1 -- 2026-11-15 -- Audit M036: a cursor poll returns only the new task.
  *   v1.1.0 -- 2026-09-04 -- Test 7: whose inbox is it. Every poll before it carried this agent's own
  *     token against its own inbox, which proves the cursor arithmetic and says nothing about the
  *     address — and the inbox is named in the URL, so the question is what happens when the name in
@@ -372,11 +374,11 @@ await test('10. Walk through all items one at a time using cursors', async () =>
 
     assert(collected.length >= 2, `collected ${collected.length} items, expected >=2`);
     assert(iterations < maxIterations, 'pagination should terminate');
-    // Held back (audit M037, 2026-11-15): the walk skips tasks today because the route fetches only `limit` tasks per status before the cursor filter.
-    // const walked = collected.map(i => i.id);
-    // assert(new Set(walked).size === walked.length, `duplicates in the walk: ${JSON.stringify(walked)}`);
-    // const all = (fullBody.data.items as any[]).map(i => i.id).sort();
-    // assert(JSON.stringify([...walked].sort()) === JSON.stringify(all), `walk ${JSON.stringify(walked)} differs from ${JSON.stringify(all)}`);
+    // Audit M037: the walk with limit=1 meets every item of the full inbox exactly once.
+    const walked = collected.map(i => i.id);
+    assert(new Set(walked).size === walked.length, `duplicates in the walk: ${JSON.stringify(walked)}`);
+    const all = (fullBody.data.items as any[]).map(i => i.id).sort();
+    assert(JSON.stringify([...walked].sort()) === JSON.stringify(all), `walk ${JSON.stringify(walked)} differs from ${JSON.stringify(all)}`);
 });
 
 // ─── Test 6: Whose inbox is it ───
