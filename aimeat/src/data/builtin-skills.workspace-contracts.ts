@@ -14,14 +14,14 @@
  *   aimeat_skill_get or GET /v1/skills/aimeat-workspace-contracts?scope=node.
  *
  *   WHAT CHANGED ON THE WAY. The repository text described polling only. A connected agent is woken
- *   by the `workspace.record` event (services/connect-tunnel-push.ts onMemoryWrite, the connector's
+ *   by the `workspace.record` event (services/connect-tunnel/push.ts onMemoryWrite, the connector's
  *   POST /local/subscribe and GET /local/records/next), and section 5 now leads with it. The
  *   activity route it promised (`/activity?since=`) never existed; GET
  *   /v1/organisms/{id}/workspace/activity?ws= answers the newest 300 events. Agent tags may carry a
  *   colon (services/agent/profile-write.ts TAG_PATTERN), and whether an adopted task starts on its own
  *   is the agent's task-start answer (services/agent/task-rules.ts), not its mode alone.
  *
- *   WHAT IT MUST AGREE WITH. services/connect-tunnel-push.ts and connect-tunnel-wire.ts (the event
+ *   WHAT IT MUST AGREE WITH. services/connect-tunnel/push.ts and connect-tunnel-wire.ts (the event
  *   and its payload), cli/connect/mcp/local-server.ts (subscribe and the long-polls),
  *   routes/organisms/workspace-ops.ts (engagements, activity), routes/organisms/workspace-access.ts
  *   (grant), services/agent/profile-write.ts (tags), services/agent/task-rules.ts (task start),

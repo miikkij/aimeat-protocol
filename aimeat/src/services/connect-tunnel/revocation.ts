@@ -1,5 +1,5 @@
 /**
- * @file connect-tunnel-revocation.ts
+ * @file src/services/connect-tunnel/revocation.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The three ways a live tunnel socket is closed because the node has stopped honouring
@@ -24,7 +24,7 @@
  *   apply the same predicate to theirs (connect-tunnel/cross-process.ts, since 2026-11-08).
  * @structure revokeByToken() · revokeByTokenId() · revokeByGaii() · revokeByOwner()
  * @usage
- *   import { revokeByGaii } from './connect-tunnel-revocation.js';
+ *   import { revokeByGaii } from './revocation.js';
  *   revokeByGaii(this.connections, (ws, f) => this.send(ws, f), gaii);
  * @version-history
  *   2026-11-08 — revokeByOwner takes why: an erased account's sockets are told "Account deleted"
@@ -45,9 +45,9 @@
  *     by-GAII close that deleting an agent needs.
  */
 import type { WebSocket } from 'ws';
-import type { ConnectFrame } from './connect-tunnel-wire.js';
-import { tokenIdOf } from '../auth/jwt.js';
-import { logger } from '../utils/logger.js';
+import type { ConnectFrame } from './wire.js';
+import { tokenIdOf } from '../../auth/jwt.js';
+import { logger } from '../../utils/logger.js';
 
 /** Just enough of a connection for these three to do their work. */
 interface Closable {

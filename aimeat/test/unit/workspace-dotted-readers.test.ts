@@ -8,7 +8,7 @@
  *   roll-up (services/kpi-rollup.ts), the section index's "does this page still exist"
  *   (services/workspace/change-core.ts existingDocIds), the version history compaction
  *   (services/workspace/versions.ts compactWorkspaceVersions) and the connector's record wake
- *   (services/connect-tunnel-push.ts onMemoryWrite). The helpers themselves are tested first. The E2E
+ *   (services/connect-tunnel/push.ts onMemoryWrite). The helpers themselves are tested first. The E2E
  *   half is test/e2e-workspace-dotted-id.ts.
  *
  *   FIRST FAIL. On the tree before round 10b the "dotted" cases of the KPI, existingDocIds, the
@@ -23,7 +23,7 @@ import type { MemoryRecord } from '../../src/storage/interface.js';
 import { evaluateRecordsKpi } from '../../src/services/kpi-rollup.js';
 import { existingDocIds, type ChangeDeps } from '../../src/services/workspace/change-core.js';
 import { compactWorkspaceVersions } from '../../src/services/workspace/versions.js';
-import { onMemoryWrite, type RecordPushContext, type PushConn } from '../../src/services/connect-tunnel-push.js';
+import { onMemoryWrite, type RecordPushContext, type PushConn } from '../../src/services/connect-tunnel/push.js';
 import { recordRowAt, spaceRowAt, declaredNamespaceOf } from '../../src/services/workspace/record-key.js';
 
 const ORG = '00000000-0000-4000-8000-000000000001';

@@ -116,17 +116,17 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { setTokenRevokedHook, tokenIdOf, type VerifiedToken } from '../auth/jwt.js';
-import { SocketIndex, Fairness } from './connect-tunnel-multiplex.js';
-import { forwardRequest } from './connect-tunnel-forward.js';
-import { sendBacklog, pushTaskCancellations, onMemoryWrite, notifyScopesChanged } from './connect-tunnel-push.js';
+import { SocketIndex, Fairness } from './connect-tunnel/multiplex.js';
+import { forwardRequest } from './connect-tunnel/forward.js';
+import { sendBacklog, pushTaskCancellations, onMemoryWrite, notifyScopesChanged } from './connect-tunnel/push.js';
 import { isWakeDelivery } from './agent/stop-rules.js';
-import { dmPayloadForReach } from './connect-tunnel-dm-reach.js';
+import { dmPayloadForReach } from './connect-tunnel/dm-reach.js';
 import { logger } from '../utils/logger.js';
 import {
   principalsForOwner as rosterPrincipalsForOwner,
   daemonsForOwner as rosterDaemonsForOwner,
   parseRunModes, parseInstallName, parseRuntimeFeatures, type ConnectedDaemonEntry,
-} from './connect-tunnel-roster.js';
+} from './connect-tunnel/roster.js';
 import { listByWorkspace as listEngagementsByWorkspace } from './workspace/engagements.js';
 import {
   onDeliveryEvent, offDeliveryEvent, type DeliveryEvent,
@@ -140,16 +140,16 @@ export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
 
 // The wire contract (frames, space refs, stats) and its pure helpers live in the sibling module
 // and are re-exported here, so every existing importer of this file is untouched.
-export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
-import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
-import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
-import { revokeByTokenId, revokeByGaii, revokeByOwner, type GaiiCutReason, type OwnerCutWhy } from './connect-tunnel-revocation.js';
+export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel/wire.js';
+import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel/wire.js';
+import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel/wire.js';
+import { revokeByTokenId, revokeByGaii, revokeByOwner, type GaiiCutReason, type OwnerCutWhy } from './connect-tunnel/revocation.js';
 import { tellOtherProcesses, listenToOtherProcesses, type TunnelControlTarget } from './connect-tunnel/cross-process.js';
 import { recheckHeldIdentities, HELD_IDENTITY_RECHECK_MS } from './connect-tunnel/recheck.js';
 import { singleProcess } from './process-lease.js';
 // One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
-import type { ConnectConnection } from './connect-tunnel-connection.js';
-import { emitTunnelSocketOpened, emitTunnelSocketClosed } from './connect-tunnel-hooks.js';
+import type { ConnectConnection } from './connect-tunnel/connection.js';
+import { emitTunnelSocketOpened, emitTunnelSocketClosed } from './connect-tunnel/hooks.js';
 import { nodeContext, provideNodeService } from './node-context.js';
 
 

@@ -67,7 +67,7 @@ import { isOperatorAccount } from '../utils/operator-account.js';
 import { escapeHtml as esc } from '../utils/html-escape.js';
 import { logger } from '../utils/logger.js';
 import { tellAsker, closeQuestion } from './approval-standard.js';
-import { WITHHELD_DM_CALL } from './connect-tunnel-dm-reach.js';
+import { WITHHELD_DM_CALL } from './connect-tunnel/dm-reach.js';
 
 export const PERMISSION_ASK_TYPE = 'agent_permission_ask';
 /** The i18n key of the notice whose permission is given on the agent's page, not with one press. */

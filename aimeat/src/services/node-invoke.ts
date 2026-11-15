@@ -11,7 +11,7 @@
  *   is reached as a tool or as a route. There is no privileged path here and nothing is re-derived:
  *   an `invoke` of `aimeat_memory_write` IS a `POST /v1/memory` by the same principal.
  *
- *   This is the shape the connect tunnel has used since June (services/connect-tunnel-forward.ts): a
+ *   This is the shape the connect tunnel has used since June (services/connect-tunnel/forward.ts): a
  *   request to the node itself with the principal's pinned token, rather than reaching into storage
  *   behind the gates. It is the reason a wide surface is safe at all.
  *

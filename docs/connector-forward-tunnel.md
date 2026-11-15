@@ -82,7 +82,7 @@ flowchart TB
 ## Frame protocol
 
 The tunnel is full-duplex JSON frames, id-correlated where applicable. The frame
-shape is `ConnectFrame` in `aimeat/src/services/connect-tunnel-wire.ts`, which
+shape is `ConnectFrame` in `aimeat/src/services/connect-tunnel/wire.ts`, which
 lists all 19 types.
 
 One socket can carry several identities of the same owner. The first is the one
@@ -181,7 +181,7 @@ sequenceDiagram
 Since 2026-11-04 the forward makes no network connection: the node hands the
 request to its own HTTP server in the same process
 (`aimeat/src/services/request-injector.ts`, called from
-`aimeat/src/services/connect-tunnel-forward.ts`). The request still passes the
+`aimeat/src/services/connect-tunnel/forward.ts`). The request still passes the
 server's HTTP parser, every route gate and the envelope, as a request over a
 socket does.
 

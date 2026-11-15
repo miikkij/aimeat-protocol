@@ -2,7 +2,7 @@
  * @file connect-tunnel-cancel-marker.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Who a cancel marker may cancel for (services/connect-tunnel-push.ts markerMayCancel):
+ * @description Who a cancel marker may cancel for (services/connect-tunnel/push.ts markerMayCancel):
  *   the task's own account, whichever of its principals holds the marker, and the exact principal
  *   that created the task. Nobody else (secaudit 2026-10, r48). The E2E half is
  *   test/e2e-connect-tunnel-records.ts 8b-8d.
@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-10-22 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { markerMayCancel } from '../../src/services/connect-tunnel-push.js';
+import { markerMayCancel } from '../../src/services/connect-tunnel/push.js';
 
 const NODE = 'node-1';
 const task = { ownerGaii: `alice@${NODE}`, createdBy: `planner#alice@${NODE}` };

@@ -1,5 +1,5 @@
 /**
- * @file src/services/connect-tunnel-connection.ts
+ * @file src/services/connect-tunnel/connection.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One identity's entry in the connect tunnel manager's connection map.
@@ -8,13 +8,13 @@
  *   gained the run modes its connector presents. The type is the same type; the manager imports it
  *   and nothing else changed.
  * @structure ConnectConnection
- * @usage import type { ConnectConnection } from './connect-tunnel-connection.js';
+ * @usage import type { ConnectConnection } from './connection.js';
  * @version-history
  *   v1.1.0 — 2026-10-11 — `stopped`, for an agent that is stopped.
  *   v1.0.0 — 2026-10-02 — Extracted from connect-tunnel.ts, with the `runModes` field added there.
  */
 import type { WebSocket } from 'ws';
-import type { VerifiedToken } from '../auth/jwt.js';
+import type { VerifiedToken } from '../../auth/jwt.js';
 
 export interface ConnectConnection {
   principal: string;

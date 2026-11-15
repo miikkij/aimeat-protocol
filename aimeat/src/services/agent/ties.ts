@@ -207,7 +207,7 @@ export interface WatchableSpace {
 /**
  * The spaces of one workspace an agent can watch, for the owner in person: the record spaces whose
  * data lives in memory keys. A published record there is a memory write, and that write is what the
- * node pushes to a subscribed agent as `workspace.record` (services/connect-tunnel-push.ts). A row
+ * node pushes to a subscribed agent as `workspace.record` (services/connect-tunnel/push.ts). A row
  * space also says `mode: "records"`, and an appended row is no memory write, so it is left out by
  * the shared predicate isMemoryBackedSpace. A document space is left out: the crew runtime
  * subscribes record spaces only.

@@ -395,14 +395,14 @@
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-15",
       "watches": [
-        "aimeat/src/services/connect-tunnel-push.ts",
+        "aimeat/src/services/connect-tunnel/push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
         "aimeat/src/routes/organisms/workspace-ops.ts",
         "aimeat/src/routes/organisms/workspace-access.ts",
         "aimeat/src/services/agent/profile-write.ts",
         "aimeat/src/services/agent/task-rules.ts"
       ],
-      "digest": "sha256:bdff5a65f1581bb77256c17a"
+      "digest": "sha256:d70230004a57fa325fc5bf44"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-15",
@@ -432,12 +432,12 @@
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
         "aimeat/src/services/extension/ctx-contract.ts",
-        "aimeat/src/services/connect-tunnel-push.ts",
+        "aimeat/src/services/connect-tunnel/push.ts",
         "aimeat/src/services/workspace-rows/row-service.ts",
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:872fb54b74cfa2155fc3c94b"
+      "digest": "sha256:685739f9831ddf992220ea00"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-15",
@@ -921,7 +921,7 @@
       "aimeat/src/services/organism/shape-apply.ts": "dab2cf9d3dcbd17a"
     },
     "node:aimeat-workspace-contracts": {
-      "aimeat/src/services/connect-tunnel-push.ts": "7988907b4567d61b",
+      "aimeat/src/services/connect-tunnel/push.ts": "b828b403c0ce83a5",
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
       "aimeat/src/routes/organisms/workspace-ops.ts": "ef8573072fce8bef",
       "aimeat/src/routes/organisms/workspace-access.ts": "5b67b6e9bf8a2a11",
@@ -971,7 +971,7 @@
       "aimeat/src/models/app-tool-schemas.ts": "b9f5168703e0e8fc",
       "aimeat/src/commerce/app-tool-catalog.ts": "c2ddc40235643464",
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
-      "aimeat/src/services/connect-tunnel-push.ts": "7988907b4567d61b",
+      "aimeat/src/services/connect-tunnel/push.ts": "b828b403c0ce83a5",
       "aimeat/src/services/workspace-rows/row-service.ts": "49298be1c9a26910",
       "aimeat/src/services/refinery/pipeline.ts": "8e6289116821f229",
       "aimeat/src/routes/outbound.ts": "edce674a2066a36f"

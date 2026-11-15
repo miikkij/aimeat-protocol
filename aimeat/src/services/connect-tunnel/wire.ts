@@ -1,5 +1,5 @@
 /**
- * @file src/services/connect-tunnel-wire.ts
+ * @file src/services/connect-tunnel/wire.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Connector Forward Tunnel's WIRE CONTRACT and its pure helpers: the frame shape
@@ -9,7 +9,7 @@
  *   re-exports these names, so every existing import keeps working.
  * @structure ConnectFrame; WorkspaceSpaceRef; ConnectTunnelStats; parseWorkspaceRecordKey();
  *   spaceKeyOf(); coerceSpaceRef()
- * @usage import type { ConnectFrame } from './connect-tunnel-wire.js';
+ * @usage import type { ConnectFrame } from './wire.js';
  * @version-history
  *   v1.5.0 -- 2026-10-11 -- `reason` on auth_revoked ('moved' | 'deleted'), so a connector can tell
  *     an agent that went to another connector from a credential it may mint again.

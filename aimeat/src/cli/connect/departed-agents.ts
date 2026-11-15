@@ -47,7 +47,7 @@ import { join } from 'node:path';
 import { getConfigDir } from './config.js';
 import { prepareConnectorHome } from './home-dir.js';
 
-/** The two reasons the node sends with `auth_revoked` (services/connect-tunnel-revocation.ts). */
+/** The two reasons the node sends with `auth_revoked` (services/connect-tunnel/revocation.ts). */
 export type DepartureReason = 'moved' | 'deleted';
 
 export interface DepartedAgent {

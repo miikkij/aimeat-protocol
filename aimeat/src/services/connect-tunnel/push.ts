@@ -1,5 +1,5 @@
 /**
- * @file connect-tunnel-push.ts
+ * @file src/services/connect-tunnel/push.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two pushes that read STORAGE rather than react to a frame: the on-connect
@@ -15,7 +15,7 @@
  *   `ctx.x`.
  *
  * @structure PushContext · sendBacklog() · pushTaskCancellations() · onMemoryWrite()
- * @usage import { sendBacklog, pushTaskCancellations } from './connect-tunnel-push.js';
+ * @usage import { sendBacklog, pushTaskCancellations } from './push.js';
  * @version-history
  *   2026-11-01 — onMemoryWrite reads a record's id from the end of its key (recordAt), so a published
  *     record whose id holds a dot wakes its space's subscribers under its whole id; it woke nobody
@@ -30,15 +30,15 @@
  */
 import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import type { ConnectFrame, ConnectTunnelStats } from './connect-tunnel-wire.js';
-import { logger } from '../utils/logger.js';
-import type { MemoryWriteEvent } from './event-bus.js';
-import { parseWorkspaceRecordKey, spaceKeyOf } from './connect-tunnel-wire.js';
-import { isStopped } from './agent/stop-rules.js';
-import { retiredFromWorkspace, type WorkspaceEngagement } from './workspace/engagements.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { recordAt } from './workspace/record-key.js';
+import type { Storage } from '../../storage/interface.js';
+import type { ConnectFrame, ConnectTunnelStats } from './wire.js';
+import { logger } from '../../utils/logger.js';
+import type { MemoryWriteEvent } from '../event-bus.js';
+import { parseWorkspaceRecordKey, spaceKeyOf } from './wire.js';
+import { isStopped } from '../agent/stop-rules.js';
+import { retiredFromWorkspace, type WorkspaceEngagement } from '../workspace/engagements.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { recordAt } from '../workspace/record-key.js';
 
 /**
  * Just enough of a connection for a push: whose it is, whether its socket is still open, and whether

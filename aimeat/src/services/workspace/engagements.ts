@@ -84,7 +84,7 @@ export async function listByWorkspace(storage: Storage, orgId: string, ws: strin
  * is not retired from it, and one active contract beside a retired one keeps it at work. The same
  * rule as the crew runtime's own gate (aimeat-crewai `_engagement_gate`), decided here for what
  * the node sends: a retired agent is not sent that workspace's records
- * (services/connect-tunnel-push.ts).
+ * (services/connect-tunnel/push.ts).
  */
 export function retiredFromWorkspace(engagements: readonly WorkspaceEngagement[], agentGaii: string): boolean {
   const mine = engagements.filter(e => e.agent === agentGaii);

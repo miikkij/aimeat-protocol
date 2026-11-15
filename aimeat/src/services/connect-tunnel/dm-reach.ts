@@ -1,5 +1,5 @@
 /**
- * @file src/services/connect-tunnel-dm-reach.ts
+ * @file src/services/connect-tunnel/dm-reach.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a `dm.inbound` delivery over the connector tunnel carries, given the permissions
@@ -27,12 +27,12 @@
  * @version-history
  *   v1.0.0 -- 2026-10-31 -- Initial (secaudit2026oct31w2 round 10, W2-13).
  */
-import type { Storage } from '../storage/interface.js';
-import type { VerifiedToken } from '../auth/jwt.js';
-import { withCurrentScopes } from '../auth/effective-scopes.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { noteAgentRefusal } from './agent/refusals.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import type { VerifiedToken } from '../../auth/jwt.js';
+import { withCurrentScopes } from '../../auth/effective-scopes.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { noteAgentRefusal } from '../agent/refusals.js';
+import { logger } from '../../utils/logger.js';
 
 /** The permission every read of a direct message addressed to the caller asks. */
 export const DM_READ_SCOPE = 'messages:read';

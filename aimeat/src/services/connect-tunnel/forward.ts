@@ -1,5 +1,5 @@
 /**
- * @file connect-tunnel-forward.ts
+ * @file src/services/connect-tunnel/forward.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The forward half of the Connector Forward Tunnel: one `request` frame replayed
@@ -19,7 +19,7 @@
  *   became `ctx.x` and the method became a function taking what it used to reach for.
  *
  * @structure ForwardContext / ForwardConn — what the dispatch needs · forwardRequest()
- * @usage import { forwardRequest } from './connect-tunnel-forward.js';
+ * @usage import { forwardRequest } from './forward.js';
  * @version-history
  *   2026-11-04 — The forward goes to the node's own HTTP server in process (services/request-injector.ts)
  *     instead of a fetch to 127.0.0.1; the URL, its loopback pin, the headers and the answer are the same
@@ -28,12 +28,12 @@
  *   v1.0.0 — 2026-09-03 — Extracted from connect-tunnel.ts (max-file-lines).
  */
 import type { WebSocket } from 'ws';
-import type { AimeatConfig } from '../config.js';
-import type { ConnectFrame, ConnectTunnelStats } from './connect-tunnel-wire.js';
-import type { Fairness } from './connect-tunnel-multiplex.js';
-import { logger } from '../utils/logger.js';
-import { SELF_REQUEST_HEADER } from '../auth/loopback-pass.js';
-import { withInProcessFetch } from './request-injector.js';
+import type { AimeatConfig } from '../../config.js';
+import type { ConnectFrame, ConnectTunnelStats } from './wire.js';
+import type { Fairness } from './multiplex.js';
+import { logger } from '../../utils/logger.js';
+import { SELF_REQUEST_HEADER } from '../../auth/loopback-pass.js';
+import { withInProcessFetch } from '../request-injector.js';
 
 /** Just enough of a connection for the dispatch: whose it is, where it writes, what it may use. */
 export interface ForwardConn {

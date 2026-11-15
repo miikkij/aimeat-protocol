@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a connector says about its installation at connect, and how the node reads it:
- *   the reported name (cli/connect/install-id.ts getInstallName, services/connect-tunnel-roster.ts
+ *   the reported name (cli/connect/install-id.ts getInstallName, services/connect-tunnel/roster.ts
  *   parseInstallName) and the run modes its runtime declares (cli/connect/run-modes.ts readRunModes).
  *
  *   The rules held here. A name is sent URI-encoded and comes back as written, because a host name
@@ -21,7 +21,7 @@ import { hostname } from 'node:os';
 import { getInstallName } from '../../src/cli/connect/install-id.js';
 import { readRunModes, runtimeHeaders } from '../../src/cli/connect/run-modes.js';
 import { readRuntimeFeatures, featureHeaders } from '../../src/cli/connect/runtime-features.js';
-import { parseInstallName, parseRunModes, parseRuntimeFeatures, INSTALL_NAME_MAX } from '../../src/services/connect-tunnel-roster.js';
+import { parseInstallName, parseRunModes, parseRuntimeFeatures, INSTALL_NAME_MAX } from '../../src/services/connect-tunnel/roster.js';
 
 const savedName = process.env.AIMEAT_INSTALL_NAME;
 afterEach(() => {

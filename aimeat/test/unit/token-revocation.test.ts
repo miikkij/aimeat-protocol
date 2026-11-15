@@ -154,7 +154,7 @@ describe('a revoked token is refused by what it is, not by how its bytes are spe
     });
 
     it('the live tunnel held by a re-spelled copy is told and cut when the token is revoked', async () => {
-        const { revokeByToken } = await import('../../src/services/connect-tunnel-revocation.js');
+        const { revokeByToken } = await import('../../src/services/connect-tunnel/revocation.js');
         const token = await mcpToken(`tun#alice@${NODE}`, 3604);
         const conn = { principal: `tun#alice@${NODE}`, ws: {} as WebSocket, socketId: 's1', rawToken: respellings(token)[3], identity: { owner: 'alice' } };
         const sent: Array<{ type: string }> = [];

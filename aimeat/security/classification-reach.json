@@ -1298,7 +1298,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The component's key list, read only to delete those keys."
     },
-    "src/services/connect-tunnel-push.ts": {
+    "src/services/connect-tunnel/push.ts": {
       "reads": {
         "getMemory": 1
       },

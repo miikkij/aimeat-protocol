@@ -653,11 +653,11 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/connect-tunnel-hooks.ts :: set :: closeListeners": {
+    "src/services/connect-tunnel/hooks.ts :: set :: closeListeners": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/connect-tunnel-hooks.ts :: set :: listeners": {
+    "src/services/connect-tunnel/hooks.ts :: set :: listeners": {
       "count": 1,
       "reason": "DEBT"
     },

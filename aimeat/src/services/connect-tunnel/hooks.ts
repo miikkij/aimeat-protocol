@@ -1,5 +1,5 @@
 /**
- * @file src/services/connect-tunnel-hooks.ts
+ * @file src/services/connect-tunnel/hooks.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Listeners for "an identity opened a socket on the connect tunnel".
@@ -27,7 +27,7 @@
  *     connector was last seen).
  *   v1.0.0 — 2026-10-08 — Initial: the pending-enrolment offer listens for a connector connecting.
  */
-import { logger } from '../utils/logger.js';
+import { logger } from '../../utils/logger.js';
 
 /** What the tunnel knows about the socket that just opened, from the verified upgrade token. */
 export interface TunnelSocketOpened {

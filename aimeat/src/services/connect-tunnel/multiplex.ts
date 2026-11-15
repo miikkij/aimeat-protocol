@@ -1,5 +1,5 @@
 /**
- * @file connect-tunnel-multiplex.ts
+ * @file src/services/connect-tunnel/multiplex.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One socket, many identities: the bookkeeping that lets a single connector

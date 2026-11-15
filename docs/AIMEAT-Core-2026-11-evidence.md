@@ -258,7 +258,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | FED-22 | met | `aimeat/src/services/memory/replication.ts:230` | The SHOULD is not met: the reference is outside the signed payload (`:166-174`) and the receiver does not check it (`aimeat/src/routes/federation-sync/messaging.ts:215-331`). |
 | FED-23 | met | `aimeat/src/services/personal-tunnel.ts:140-141,305-342` | `sendRequest` (`:317`) has no caller: no live forwarding, as Core says. |
 | FED-24 | met | `aimeat/src/auth/ws-upgrade.ts:46` (personal and connect tunnels) | Accepts `?token=` before node 4.0.0 (AUTH-24). |
-| FED-25 | met | `aimeat/src/services/connect-tunnel.ts:4-17,138`; `aimeat/src/services/connect-tunnel-forward.ts:8-15,55-63,70-90` | Opt-in, `aimeat/src/config.ts:479`. |
+| FED-25 | met | `aimeat/src/services/connect-tunnel.ts:4-17,138`; `aimeat/src/services/connect-tunnel/forward.ts:8-15,55-63,70-90` | Opt-in, `aimeat/src/config.ts:479`. |
 | Heartbeat states | fact | `aimeat/src/services/federation.ts:289,506-529` (active, degraded after 3 misses, offline after 10) | v4.0 said `unreachable`; the code writes `offline`. |
 | Relay shares unpaid | fact | `docs/known_gaps.md:32-43` (GAP-001); `aimeat/src/services/morsel.ts:188-214` | |
 | Package repository uses signed node requests | fact | `aimeat/src/services/packages/peer/package-pull.ts:321,521,591`; `aimeat/src/services/packages/peer/package-node-auth.ts:81` | A request with no node headers returns null rather than a refusal. |
