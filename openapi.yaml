@@ -18485,8 +18485,12 @@ paths:
                   description: A key the interface translates. Namespaced by the server.
                 data:
                   type: object
-                  additionalProperties: { type: string }
-                  description: Values the rendered line interpolates. At most 12, each at most 200 characters.
+                  additionalProperties: { type: [string, number, boolean, 'null'] }
+                  description: >-
+                    Values the rendered line interpolates. A number or a boolean is stored as its text, a
+                    null value is left out, and a name that is not a letter followed by up to 31 letters,
+                    digits or underscores is left out. The row keeps the first 12 values, each cut to 200
+                    characters; more is cut, not refused.
                 link:
                   type: string
                   description: Where the row goes when clicked. Must be a path on this node.
