@@ -150,3 +150,17 @@ describe('PUT /v1/classification/label, POST /v1/classification/label/review and
         await refused('PUT', '/v1/classification/label', [{ ...target, owner: 5, label: 'internal' }]);
     });
 });
+
+describe('POST /v1/ai/stream and /v1/ai/speak (aimeat-voice.js node adapters)', () => {
+    // voice/adapters.js sends app_id: config.appId, which is '' unless the app sets it (voice/config.js).
+    // For an app grant, routes/ai-voice.ts voiceAppId reads an empty app_id as absent and uses the
+    // signed app. An owner or agent caller sending '' is refused by the route itself (min 1).
+    it('takes the voice library\'s default body with an empty app_id', async () => {
+        await taken('POST', '/v1/ai/stream', [{ messages: [{ role: 'user', content: 'hello' }], app_id: '', temperature: 0.7, top_p: 1, reasoning: null }]);
+        await taken('POST', '/v1/ai/speak', [{ input: 'hello', app_id: '', model: 'gpt-4o-mini-tts', voice: 'alloy', response_format: 'pcm', speed: 1, instructions: '' }]);
+    });
+
+    it('still refuses an app_id over 200 characters', async () => {
+        await refused('POST', '/v1/ai/stream', [{ messages: [{ role: 'user', content: 'hello' }], app_id: 'x'.repeat(201) }]);
+    });
+});

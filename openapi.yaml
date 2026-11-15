@@ -23695,7 +23695,7 @@ paths:
               additionalProperties: false
               required: [messages]
               properties:
-                app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers. For an app grant, optional: the signed app''s file name (with or without .html) or its owner/filename; another app''s id is 403 APP_ID_MISMATCH.' }
+                app_id: { type: string, maxLength: 200, description: 'Required for owner/agent callers, and not empty (the route refuses an empty one with 400). For an app grant, optional: the signed app''s file name (with or without .html) or its owner/filename, and an empty value counts as absent; another app''s id is 403 APP_ID_MISMATCH.' }
                 model: { type: string, maxLength: 200 }
                 provider: { type: string, minLength: 1, maxLength: 200, description: 'One of the caller''s provider ids, or a type. No fallback then.' }
                 role:
@@ -23804,7 +23804,7 @@ paths:
               additionalProperties: false
               required: [input]
               properties:
-                app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers. For an app grant, optional: the signed app''s file name (with or without .html) or its owner/filename; another app''s id is 403 APP_ID_MISMATCH.' }
+                app_id: { type: string, maxLength: 200, description: 'Required for owner/agent callers, and not empty (the route refuses an empty one with 400). For an app grant, optional: the signed app''s file name (with or without .html) or its owner/filename, and an empty value counts as absent; another app''s id is 403 APP_ID_MISMATCH.' }
                 input: { type: string, minLength: 1, maxLength: 4000 }
                 model: { type: string, minLength: 1, maxLength: 200, description: 'Omit to use the speech model of the owner''s provider, the owner''s, or the node''s default (AIMEAT_MODEL_DEFAULT_TTS); none of them is 400 NO_TTS_MODEL.' }
                 voice: { type: string, minLength: 1, maxLength: 200, description: 'Omit to use the provider''s speech voice, the owner''s, or the node''s default (AIMEAT_TTS_VOICE_DEFAULT); none of them is 400 NO_TTS_VOICE.' }
