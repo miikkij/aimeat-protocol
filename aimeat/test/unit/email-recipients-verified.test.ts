@@ -2,7 +2,7 @@
  * @file test/unit/email-recipients-verified.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description services/email-recipients.ts emailReach, the list the operator's group mail goes to:
+ * @description services/email/recipients.ts emailReach, the list the operator's group mail goes to:
  *   only addresses the account has verified (owner-mail-address.ts provenOwnerAddress), as every other
  *   mail to an account's own address; an address nobody verified, or one changed after the
  *   verification, is skipped and counted, for everyone and for the operators (codebase analysis
@@ -13,7 +13,7 @@
  */
 import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
-import { emailReach } from '../../src/services/email-recipients.js';
+import { emailReach } from '../../src/services/email/recipients.js';
 
 const hashOf = (a: string) => createHash('sha256').update(a.toLowerCase().trim()).digest('hex');
 const at = '2026-11-01T00:00:00.000Z';

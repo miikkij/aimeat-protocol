@@ -119,7 +119,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
 
   const sendErr = (res: Parameters<Parameters<Router['get']>[1]>[1], e: unknown): boolean => {
     if (e instanceof ContactsError) {
-      // The account's email lookups are used up (services/email-lookup-limit.ts): say when to come back.
+      // The account's email lookups are used up (services/email/lookup-limit.ts): say when to come back.
       const retry = (e.details as { retry_after_sec?: number } | undefined)?.retry_after_sec;
       if (e.code === 'RATE_LIMITED' && retry) res.setHeader('Retry-After', retry);
       res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
@@ -192,7 +192,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(201).json(success(config.nodeId, { invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl }));
     } catch (e) {
       if (e instanceof ContactInvitationError) {
-        // An invitation counts as an address lookup (services/email-lookup-limit.ts): say when to come back.
+        // An invitation counts as an address lookup (services/email/lookup-limit.ts): say when to come back.
         const retry = e.details?.retry_after_sec;
         if (e.code === 'RATE_LIMITED' && retry) res.setHeader('Retry-After', retry);
         res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
@@ -207,7 +207,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    *   { name, email, … }          a person, who may have no identity on this node
    * A blocked contact stays blocked (409) — lift the block via Messages first. Saving a person by
    * email says on the record whether the address has an account here, the lookup's answer, so the
-   * service counts it against the account's lookups (services/email-lookup-limit.ts); a save by id
+   * service counts it against the account's lookups (services/email/lookup-limit.ts); a save by id
    * is not an address question and is not counted.
    * WHO. The owner in person, or their agent holding messages:send, the word aimeat_contact_add
    * declares, as on POST /v1/contacts/invite: the node's tool, the connector's (which calls this route)
@@ -359,7 +359,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * node stays out (requireLocalSession).
    *
    * HOW OFTEN. 20 in 10 minutes per ACCOUNT, the owner and their agents together, a save by email
-   * included. The service counts it (services/email-lookup-limit.ts), after these gates, so a refused
+   * included. The service counts it (services/email/lookup-limit.ts), after these gates, so a refused
    * caller spends nothing. ── */
   router.post('/v1/contacts/resolve', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:read'), async (req, res) => {
     try {

@@ -50,7 +50,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { GHIIRecord } from '../storage/types/identity.js';
 import { nodeContext } from './node-context.js';
-import { outboundEmailHtml } from './email-templates.js';
+import { outboundEmailHtml } from './email/templates.js';
 import { readNotificationSettings, appendMailLog } from './notification-settings.js';
 import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail } from './mail-gate.js';

@@ -1,5 +1,5 @@
 /**
- * @file src/services/email-verification-start.ts
+ * @file src/services/email/verification-start.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Creates a pending 'registration' email verification (a 15-minute 6-digit code, stored
@@ -16,10 +16,10 @@
  *     so both callers share one definition instead of the route file owning it.
  */
 import { createHash, randomBytes } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import type { EmailService } from './email.js';
-import { sendMail } from './mail-gate.js';
-import { sixDigitCode } from '../utils/one-time-code.js';
+import type { Storage } from '../../storage/interface.js';
+import type { EmailService } from '../email.js';
+import { sendMail } from '../mail-gate.js';
+import { sixDigitCode } from '../../utils/one-time-code.js';
 
 export async function startRegistrationEmailVerification(
     storage: Storage, emailService: EmailService | undefined,

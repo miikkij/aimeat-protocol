@@ -6,7 +6,7 @@
  *   first attempt fails is kept in storage; a restart inside the retry window resumes it and it is
  *   delivered once; two processes sweeping at once send it once; a claim a live process holds is not
  *   taken; a delivery that succeeds the first time writes nothing; a stored mail is ciphertext only
- *   and is sent after a restart with the fields it was given (services/email-outbox.ts).
+ *   and is sent after a restart with the fields it was given (services/email/outbox.ts).
  * @usage cd aimeat && pnpm exec vitest run test/unit/outbox.test.ts
  * @version-history
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, HA stage 1 item 1.5).
@@ -18,7 +18,7 @@ import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import {
     deliverWithRetries, registerOutboxHandler, resumeOutbox, releaseOutbox, resetOutboxForTests, outboxOwner, OUTBOX_PREFIX,
 } from '../../src/services/outbox.js';
-import { createMailSender, type MailPayload } from '../../src/services/email-outbox.js';
+import { createMailSender, type MailPayload } from '../../src/services/email/outbox.js';
 
 const NODE = 'outbox-test-node';
 const OWNER = outboxOwner(NODE);

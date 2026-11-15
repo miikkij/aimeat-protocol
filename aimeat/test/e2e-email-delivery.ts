@@ -5,7 +5,7 @@
  * @description Every way this node sends mail, driven over HTTP against a real SMTP server, with the
  *   assertions made on the message that arrived.
  *
- *   WHY THIS SUITE EXISTS. `src/services/email.ts` and `src/services/email-templates.ts` were never
+ *   WHY THIS SUITE EXISTS. `src/services/email.ts` and `src/services/email/templates.ts` were never
  *   executed by any suite in the sweep. Every `.env.test.*` leaves AIMEAT_SMTP_HOST unset, so
  *   `config.emailEnabled` is false, `createEmailService()` returns the disabled stub, and every
  *   caller sits behind `if (emailSvc?.enabled)`. The templates had unit tests; the transport, the

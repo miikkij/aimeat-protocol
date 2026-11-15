@@ -300,7 +300,7 @@
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:fa3bf34b27bdf71141677b04"
+      "digest": "sha256:0fa1919bff18ef3c31a8e527"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-11-08",
@@ -437,7 +437,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:90953b83dc3ffaca140604c6"
+      "digest": "sha256:872fb54b74cfa2155fc3c94b"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-15",
@@ -778,7 +778,7 @@
     },
     "node:aimeat-node-guide": {
       "aimeat/src/routes/agents/device-auth.ts": "254d513415b91da4",
-      "aimeat/src/routes/ghii/register-login.ts": "c1cd758f77dd1e4a",
+      "aimeat/src/routes/ghii/register-login.ts": "b3db5c8ec5128a6e",
       "aimeat/src/services/first-steps.ts": "9deda60684db661e"
     },
     "node:ai-transparency": {
@@ -974,7 +974,7 @@
       "aimeat/src/services/connect-tunnel-push.ts": "7988907b4567d61b",
       "aimeat/src/services/workspace-rows/row-service.ts": "49298be1c9a26910",
       "aimeat/src/services/refinery/pipeline.ts": "8e6289116821f229",
-      "aimeat/src/routes/outbound.ts": "d5e03c7e8dcc48ef"
+      "aimeat/src/routes/outbound.ts": "edce674a2066a36f"
     },
     "node:aimeat-html-page": {
       "aimeat/src/services/html-page.ts": "4017c2f005e63477",

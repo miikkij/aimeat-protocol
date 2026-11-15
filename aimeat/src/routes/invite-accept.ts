@@ -96,7 +96,7 @@ import { establishOwnerSession } from '../services/owner/session.js';
 import { hashInviteToken, applyInvitationWorkspaceGrants, resolveInvitationReturnTarget } from '../services/invitations.js';
 import { appInviteMeta, type AppInviteMeta } from '../services/app/invite-link.js';
 import { findInvite, applyAppInvitesForVerifiedEmail } from '../services/app/member-invites.js';
-import { startRegistrationEmailVerification } from '../services/email-verification-start.js';
+import { startRegistrationEmailVerification } from '../services/email/verification-start.js';
 import { createEmailService } from '../services/email.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { logger } from '../utils/logger.js';

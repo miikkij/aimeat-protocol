@@ -1,5 +1,5 @@
 /**
- * @file email-template-welcome.ts
+ * @file src/services/email/template-welcome.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The welcome email for an account an install set created (install-set-people.ts): the
@@ -16,7 +16,7 @@
  *     password?", now that the dialog has it (auth/modal-login-link.js).
  *   v1.0.0 — 2026-09-29 — Initial (install packages: users created at install can sign in).
  */
-import { wrapHtml, esc } from './email-templates.js';
+import { wrapHtml, esc } from './templates.js';
 
 const strings: Record<string, Record<string, string>> = {
     en: {

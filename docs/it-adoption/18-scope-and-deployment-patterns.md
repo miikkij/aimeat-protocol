@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.3.1 (commit 226c692d3) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit aeaa1e9da) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -93,7 +93,7 @@ Several processes of one node can run against one PostgreSQL database with the s
 | The data key's re-encrypt job runs in one process at a time, the one that holds its lease; its progress is a stored record, so after that process stops another takes the job up from the last batch it recorded ([Key rotation](../operations/key-rotation.md)) | `aimeat/src/services/key-reencrypt/job.ts` |
 | The pages' build stamp names the code, so a page whose live stream reaches the standby does not reload | `aimeat/src/utils/build-stamp.ts` |
 | A stop drains: `GET /v1/health/ready` answers 503, new connections are refused, requests in flight get 5 s, and the process exits 0, so the load balancer moves to the standby | `aimeat/src/server-bootstrap/drain.ts`, `aimeat/src/routes/health.ts` |
-| A webhook or mail whose first attempt failed keeps its retries in a stored outbox, each attempt claimed on the record's version, so a restart resumes it and two processes send it once | `aimeat/src/services/outbox.ts`, `aimeat/src/services/email-outbox.ts` |
+| A webhook or mail whose first attempt failed keeps its retries in a stored outbox, each attempt claimed on the record's version, so a restart resumes it and two processes send it once | `aimeat/src/services/outbox.ts`, `aimeat/src/services/email/outbox.ts` |
 | The notification digest and the held pushes claim before they send: the digest bookmark and the held marks move on their version first, so two processes send one digest | `aimeat/src/services/notification-sweeps.ts` |
 | Consent and classification audit rows are written within 1 s of the decision, and at a stop. A classification audit row recorded while an organism is deleted or an account is erased is written when that delete has ended | `aimeat/src/services/consent-audit-buffer.ts`, `aimeat/src/services/classification/audit.ts` |
 | Short sign-in steps and connection tickets: MCP OAuth authorization codes (`/v1/mcp/authorize`, `/v1/mcp/authorize-consent` then `/v1/mcp/token`), app grant codes and pending requests (`/v1/app-grants/*`), passkey ceremonies, WebSocket tickets (60 s) and live stream tickets (30 s). A step begun on one process ends on another, with the same lifetime, and is used once for the node. The table stores a hash of each code or ticket and its contents sealed under a key only the code or ticket opens | `aimeat/src/services/ephemeral-claims.ts`, `aimeat/src/mcp/oauth.ts`, `aimeat/src/routes/app-grants.ts`, `aimeat/src/services/passkeys.ts`, `aimeat/src/services/single-use-tickets.ts` |

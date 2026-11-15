@@ -58,7 +58,7 @@ import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificati
 import { nodeContext } from './node-context.js';
 import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail } from './mail-gate.js';
-import { notificationDigestEmail, DIGEST_SECTIONS, type DigestSection } from './email-templates-digest.js';
+import { notificationDigestEmail, DIGEST_SECTIONS, type DigestSection } from './email/templates-digest.js';
 import { formatForPerson, type DisplayPrefs } from './display-prefs.js';
 import { createT, toLocale } from '../i18n.js';
 import { logger } from '../utils/logger.js';

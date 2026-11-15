@@ -937,7 +937,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/email-templates.ts :: let :: nodeFooter": {
+    "src/services/email/templates.ts :: let :: nodeFooter": {
       "count": 1,
       "reason": "DEBT"
     },

@@ -46,7 +46,7 @@ import { notify } from '../notify.js';
 import { nodeContext } from '../node-context.js';
 import { provenOwnerAddress } from '../owner/mail-address.js';
 import { sendMail, type MailIntent, type MailMessage } from '../mail-gate.js';
-import { wrapHtml, esc } from '../email-templates.js';
+import { wrapHtml, esc } from '../email/templates.js';
 import { displayPrefsFor, formatForPerson } from '../display-prefs.js';
 import { inForce, newest } from './agreements.js';
 import type { Agreement } from './agreements-schemas.js';

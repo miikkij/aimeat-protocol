@@ -23,7 +23,7 @@ vi.mock('nodemailer', () => ({
 }));
 
 const { createEmailService } = await import('../../src/services/email.js');
-const { notificationEmailHtml } = await import('../../src/services/email-templates.js');
+const { notificationEmailHtml } = await import('../../src/services/email/templates.js');
 type AimeatConfig = import('../../src/config.js').AimeatConfig;
 
 /** Send one notification through an EmailService whose transport records the message. */

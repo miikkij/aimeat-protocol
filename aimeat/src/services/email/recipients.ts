@@ -1,5 +1,5 @@
 /**
- * @file src/services/email-recipients.ts
+ * @file src/services/email/recipients.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who a group email would actually reach on this node: the accounts that carry a
@@ -24,9 +24,9 @@
  *   v1.0.0 — 2026-09-12 — Extracted from routes/admin-features.ts, where the group send counted
  *     recipients inline and no other surface could see the number until after it had sent.
  */
-import type { Storage } from '../storage/interface.js';
-import { isOperatorAccount } from '../utils/operator-account.js';
-import { provenOwnerAddress } from './owner/mail-address.js';
+import type { Storage } from '../../storage/interface.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
+import { provenOwnerAddress } from '../owner/mail-address.js';
 
 export interface EmailReach {
     /** GHII records on the node, whether or not they carry an address. */

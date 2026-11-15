@@ -6,13 +6,13 @@
  *
  *   WHY IT EXISTS. The node's email service has two states: off, or a real nodemailer transport
  *   against a real server. Every `.env.test.*` leaves AIMEAT_SMTP_HOST unset, so until this helper
- *   the whole of src/services/email.ts and src/services/email-templates.ts was never executed by any
+ *   the whole of src/services/email.ts and src/services/email/templates.ts was never executed by any
  *   suite, and the secrets those paths turn on (a six-digit code, a link carrying a token, an access
  *   code that is also a password) are exposed by no route. A suite that starts this, points a node
  *   at it, and reads the message back is testing the node's own transport and templates rather than
  *   a stub of them.
  *
- *   IT ANSWERS EVERY COMMAND, ALWAYS. The mail sender (src/services/email-outbox.ts) tries four times with 1/3/9 second
+ *   IT ANSWERS EVERY COMMAND, ALWAYS. The mail sender (src/services/email/outbox.ts) tries four times with 1/3/9 second
  *   delays, so a command this server leaves unanswered costs the calling suite thirteen seconds per
  *   message rather than failing outright. The default branch is 250 for that reason.
  *

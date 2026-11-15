@@ -1,5 +1,5 @@
 /**
- * @file email-templates-digest.ts
+ * @file src/services/email/templates-digest.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The notification digest email: what stayed unread in the bell for longer than the
@@ -17,7 +17,7 @@
  *     message whose whole premise is "these arrived while you were away" said nothing about when.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
-import { wrapHtml, esc, emailText } from './email-templates.js';
+import { wrapHtml, esc, emailText } from './templates.js';
 
 const STRINGS: Record<string, Record<string, string>> = {
   en: {

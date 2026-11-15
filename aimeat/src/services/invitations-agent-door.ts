@@ -35,7 +35,7 @@ import type { InvitationRecord } from '../storage/repositories/invitation.reposi
 import { hashInviteToken, inviteEmailHash, InvitationError } from './invitations.js';
 import { nodeContext } from './node-context.js';
 import { sendMail } from './mail-gate.js';
-import { registrationInviteEmail } from './email-templates.js';
+import { registrationInviteEmail } from './email/templates.js';
 import { isValidEmail } from '../utils/email-validator.js';
 import { logger } from '../utils/logger.js';
 

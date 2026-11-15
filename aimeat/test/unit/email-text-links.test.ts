@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description A plain-text notification body (ctx.email) gets a button for a `[Label](https://…)`
  *   line and a link for a bare https line, and every other shape stays escaped text
- *   (services/email-text-links.ts through textNotificationEmailHtml).
+ *   (services/email/text-links.ts through textNotificationEmailHtml).
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial.
  */
 import { describe, expect, it } from 'vitest';
-import { textNotificationEmailHtml } from '../../src/services/email-templates.js';
+import { textNotificationEmailHtml } from '../../src/services/email/templates.js';
 
 const SIGN_IN = 'https://store.example.com/v1/auth/magic?token=abc&lang=fi';
 

@@ -103,7 +103,7 @@ import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { GhiiRegistrationSchema, GhiiLoginSchema, validateBody } from '../../models/schemas.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { parseLoginIdentifier } from '../../utils/login-identifier.js';
-import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
+import { startRegistrationEmailVerification } from '../../services/email/verification-start.js';
 import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner/provisioning.js';
 import { eraseOwner } from '../../services/owner/erasure.js';
 import { passwordSignInRefusal, passwordWayInRefusal, newPasswordRefusal, twoStepCovers } from '../../services/sign-in-policy.js';

@@ -12,7 +12,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   setNodeEmailFooter, textNotificationEmailHtml, verificationEmailHtml, magicLinkEmailHtml,
-} from '../../src/services/email-templates.js';
+} from '../../src/services/email/templates.js';
 
 afterEach(() => setNodeEmailFooter(() => ''));
 
@@ -45,7 +45,7 @@ describe('the operator\'s own mail foot', () => {
 
   it('a template with its own foot keeps it', async () => {
     setNodeEmailFooter(() => 'AIMEAT · aimeat.io');
-    const { outboundEmailHtml } = await import('../../src/services/email-templates.js');
+    const { outboundEmailHtml } = await import('../../src/services/email/templates.js');
     const { html } = outboundEmailHtml('Otsikko', '<p>x</p>', 'x', 'fi');
     expect(html).not.toContain('AIMEAT · aimeat.io');
   });

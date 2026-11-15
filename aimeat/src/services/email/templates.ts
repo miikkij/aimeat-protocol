@@ -1,5 +1,5 @@
 /**
- * @file email-templates.ts
+ * @file src/services/email/templates.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Clean, minimal HTML email templates with AIMEAT branding. Supports 'en' (default),
@@ -7,7 +7,7 @@
  *   invitation, contact invitation, node registration invitation, provisioned-code access key,
  *   first-login credentials, and the outbound door's generic layout.
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
- * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
+ * @usage import { inviteEmailHtml, inviteEmailSubject } from './templates.js';
  * @version-history
  *   2026-11-15 — The login-details email opens with "Your access code worked", in en, fi and es, not an opened door.
  *   2026-11-15 — The key template's footer says who sent it ("Sent by AIMEAT"), in place of "the AIMEAT
@@ -39,8 +39,8 @@
  *   v1.3.0 — 2026-07-07 — Add keyCredentialsEmailHtml/keyCredentialsEmailSubject: durable login
  *     (username + freshly issued password) emailed on a provisioned-code account's first sign-in (TARGET-011).
  */
-import { escapeHtml as esc } from '../utils/html-escape.js';
-import { linkedTextHtml, linkedTextPlain } from './email-text-links.js';
+import { escapeHtml as esc } from '../../utils/html-escape.js';
+import { linkedTextHtml, linkedTextPlain } from './text-links.js';
 
 // ── i18n strings ─────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 /**
- * @file src/services/email-lookup-limit.ts
+ * @file src/services/email/lookup-limit.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How many email addresses one account may look up in ten minutes, on every contacts
@@ -31,8 +31,8 @@
  *   v1.0.0 — 2026-09-25 — Initial. The limit sat on the resolve door alone, so saving a person by
  *     email answered the same question without counting.
  */
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { rateBuckets } from './rate-buckets.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { rateBuckets } from '../rate-buckets.js';
 
 /** Lookups one account may make in one window: the owner and their agents together. */
 export const EMAIL_LOOKUP_LIMIT = { windowMs: 10 * 60 * 1000, max: 20 } as const;

@@ -3,7 +3,7 @@ import {
     verificationEmailHtml,
     magicLinkEmailHtml,
     notificationEmailHtml,
-} from '../../src/services/email-templates.js';
+} from '../../src/services/email/templates.js';
 
 describe('verificationEmailHtml', () => {
     it('produces HTML containing the verification code', () => {

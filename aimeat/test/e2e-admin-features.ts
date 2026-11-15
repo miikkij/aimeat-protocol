@@ -305,7 +305,7 @@ await test('GET /v1/admin/email/status \u2192 200, has enabled field', async () 
 await test('GET /v1/admin/email/status → says how many people a group send would reach', async () => {
     // The Email page prints this count on the Send button, BEFORE anything is sent. It used to be
     // computable only by sending: the group route counted its own recipients and returned the
-    // number afterwards. Both now come from services/email-recipients.ts.
+    // number afterwards. Both now come from services/email/recipients.ts.
     const { status, body } = await json('/v1/admin/email/status', authed());
     assert(status === 200, `status ${status}`);
     const r = body.data?.recipients;

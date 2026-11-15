@@ -450,7 +450,7 @@ export function registerWebVerifyRoutes(
         }
 
         // This route takes the codes it mails itself: the registration code (register-web) and the
-        // attach-email code (services/email-verification-start.ts), both stored with purpose
+        // attach-email code (services/email/verification-start.ts), both stored with purpose
         // 'registration'. The table also holds sign-in links (purpose 'login', keyed by the token's
         // hash with the same hash as code), address-change and password-reset codes. A row of
         // another purpose answers as not found and is left as it is, so a sign-in link token could

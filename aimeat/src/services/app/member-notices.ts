@@ -26,7 +26,7 @@
 import type { Storage } from '../../storage/interface.js';
 import { displayPrefsFor, formatForPerson } from '../display-prefs.js';
 import { notify, type NotifAction } from '../notify.js';
-import { wrapHtml, esc } from '../email-templates.js';
+import { wrapHtml, esc } from '../email/templates.js';
 import { logger } from '../../utils/logger.js';
 
 export type NoticeLang = 'en' | 'fi' | 'es';

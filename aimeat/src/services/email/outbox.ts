@@ -1,5 +1,5 @@
 /**
- * @file src/services/email-outbox.ts
+ * @file src/services/email/outbox.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One mail through the node's own SMTP transport, with its retries kept in the stored
@@ -21,12 +21,12 @@
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, HA stage 1 item 1.5).
  */
 import type { Transporter } from 'nodemailer';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { getStats } from './stats.js';
-import { encryptBound, decryptBound, getEncryptionKey } from './encryption.js';
-import { deliverWithRetries, registerOutboxHandler } from './outbox.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { getStats } from '../stats.js';
+import { encryptBound, decryptBound, getEncryptionKey } from '../encryption.js';
+import { deliverWithRetries, registerOutboxHandler } from '../outbox.js';
 
 const RETRY_DELAYS = [1_000, 3_000, 9_000]; // exponential backoff: 1s, 3s, 9s
 

@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { digestSectionOf, digestText } from '../../src/services/notification-sweeps.js';
-import { notificationDigestEmail } from '../../src/services/email-templates-digest.js';
+import { notificationDigestEmail } from '../../src/services/email/templates-digest.js';
 
 describe('digestSectionOf', () => {
     it('puts a direct message and a message request under messages', () => {

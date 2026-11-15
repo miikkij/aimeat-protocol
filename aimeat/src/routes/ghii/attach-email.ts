@@ -29,7 +29,7 @@ import { createHash } from 'node:crypto';
 import { checkPassword, checkSecondFactor } from '../../services/password-check.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
-import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
+import { startRegistrationEmailVerification } from '../../services/email/verification-start.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { passwordSignInRefusal, passwordWayInRefusal } from '../../services/sign-in-policy.js';
 

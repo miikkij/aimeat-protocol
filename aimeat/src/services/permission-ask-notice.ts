@@ -59,7 +59,7 @@ import { readNotificationSettings, appendMailLog } from './notification-settings
 import { nodeContext } from './node-context.js';
 import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail } from './mail-gate.js';
-import { wrapHtml } from './email-templates.js';
+import { wrapHtml } from './email/templates.js';
 import { allowUrl, agentPageUrl, plainPermission, oneClickWords, OPERATOR_WORDS } from './permission-ask.js';
 import { createT, toLocale, type Locale } from '../i18n.js';
 import { localAccountName } from '../utils/gaii.js';

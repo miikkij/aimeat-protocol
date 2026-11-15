@@ -186,7 +186,7 @@ export function registerContactTools(
     // Whether an address has an account here is an oracle, so who may ask and how often are decided
     // once. Who: an agent holding messages:read, the word POST /v1/contacts/resolve asks and this tool
     // is registered on (the session's live scopes). How often: resolveContactEmail counts it
-    // (services/email-lookup-limit.ts), 20 lookups in 10 minutes per account, the owner and their
+    // (services/email/lookup-limit.ts), 20 lookups in 10 minutes per account, the owner and their
     // agents together, a save by email included. The limit lived on the route until 2026-09-24
     // (security audit A5-2), and this tool asked the route over loopback HTTP until 2026-10-05; both
     // now call the service (secaudit 2026-10, M6).

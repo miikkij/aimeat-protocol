@@ -47,7 +47,7 @@ import { secretContext, isEncryptedValue } from '../extension/secrets.js';
 import { contextFor as transportContext } from '../mcp-client/transport-secrets.js';
 import { credentialContext as nodeStoreContext, NODE_STORES_KEY } from '../file-store/node-file-stores.js';
 import { credentialContext as ownerStoreContext, OWNER_STORE_PREFIX } from '../file-store/owner-file-store.js';
-import { contextOf as mailContext } from '../email-outbox.js';
+import { contextOf as mailContext } from '../email/outbox.js';
 import { HELD_KEY_PREFIX, NS_HELD, heldContext } from '../key-credentials.js';
 import { contextOf as settingContext, SEALED_SETTING_PREFIX } from '../config/at-rest.js';
 import { extensionConfigSecrets, sharedBindingName, sharedBindingOwner } from '../owner/secrets.js';
@@ -286,7 +286,7 @@ export const SEALED_BY: Readonly<Record<string, string>> = {
   'src/services/decide/settings.ts': 'decision provider keys',
   'src/services/file-store/node-file-stores.ts': 'node file stores',
   'src/services/file-store/owner-file-store.ts': 'personal file stores',
-  'src/services/email-outbox.ts': 'mail waiting to be sent',
+  'src/services/email/outbox.ts': 'mail waiting to be sent',
   'src/services/key-credentials.ts': 'sign-in details waiting for a verified address',
   'src/services/connections/credential.ts': 'connected accounts, connected account apps',
   'src/services/mcp-client/credential.ts': 'MCP server credentials, personal MCP sign-ins',

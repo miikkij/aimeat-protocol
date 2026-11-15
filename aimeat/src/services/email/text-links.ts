@@ -1,5 +1,5 @@
 /**
- * @file src/services/email-text-links.ts
+ * @file src/services/email/text-links.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Links in a plain-text mail body that a principal other than the node wrote (an
@@ -12,12 +12,12 @@
  *   parenthesis; anything else stays text. Nothing here lets a sender do what it could not already
  *   do by putting the address in the body.
  * @structure linkedTextHtml(body) · linkedTextPlain(body)
- * @usage import { linkedTextHtml, linkedTextPlain } from './email-text-links.js';
+ * @usage import { linkedTextHtml, linkedTextPlain } from './text-links.js';
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial: the store's ready mail showed its 200-character sign-in link as
  *     text (aimeat-commercial-1c, test lane).
  */
-import { escapeHtml as esc } from '../utils/html-escape.js';
+import { escapeHtml as esc } from '../../utils/html-escape.js';
 
 const ADDRESS = String.raw`https:\/\/[^\s"'<>()]+`;
 const BUTTON_LINE = new RegExp(String.raw`^\[([^\]\r\n]{1,80})\]\((${ADDRESS})\)$`);

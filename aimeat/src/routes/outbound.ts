@@ -139,7 +139,7 @@ const SendSchema = z.object({
  *
  * A third leaves only for the owner in person: `ghii`, the account the address belongs to. It says
  * whether the address has an account here, which is the email lookup's answer, and the lookup is
- * limited per account (services/email-lookup-limit.ts) while saving a contact here is not, so an app
+ * limited per account (services/email/lookup-limit.ts) while saving a contact here is not, so an app
  * could otherwise save addresses in bulk and read the answers back. The owner still sees it here and
  * in their own address book.
  */

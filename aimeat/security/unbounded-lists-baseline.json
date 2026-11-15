@@ -267,7 +267,7 @@
       "listOwners": 1,
       "listAgents": 1
     },
-    "src/services/email-recipients.ts": {
+    "src/services/email/recipients.ts": {
       "listOwners": 1
     },
     "src/services/exchange/projection-migrate.ts": {

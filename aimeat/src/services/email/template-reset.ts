@@ -1,5 +1,5 @@
 /**
- * @file email-template-reset.ts
+ * @file src/services/email/template-reset.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The password reset code email (POST /v1/ghii/password/reset-request, recovery.ts).
@@ -12,7 +12,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-29 — Initial.
  */
-import { wrapHtml, esc } from './email-templates.js';
+import { wrapHtml, esc } from './templates.js';
 
 const strings: Record<string, Record<string, string>> = {
     en: {

@@ -7,7 +7,7 @@
  *   magic links, notifications, invitations, access keys and raw HTML emails.
  * @structure
  *   - EmailService interface (sendVerificationCode, sendMagicLink, sendNotification, sendInvite, sendKeyInvite, sendKeyCredentials, sendRaw, sendWithAttachments)
- *   - the retries: services/email-outbox.ts createMailSender (stored outbox, unchanged schedule)
+ *   - the retries: services/email/outbox.ts createMailSender (stored outbox, unchanged schedule)
  *   - createDisabledService() stub for when SMTP is not configured
  *   - smtpTransportOptions() the transport options, with the time limits
  *   - createEmailService() factory (configures nodemailer transport)
@@ -52,8 +52,8 @@ import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { nodeContext, provideNodeService } from './node-context.js';
 import type { Storage } from '../storage/interface.js';
-import { setNodeEmailFooter } from './email-templates.js';
-import { createMailSender } from './email-outbox.js';
+import { setNodeEmailFooter } from './email/templates.js';
+import { createMailSender } from './email/outbox.js';
 import {
   verificationEmailHtml,
   magicLinkEmailHtml,
@@ -64,11 +64,11 @@ import {
   keyInviteEmailSubject,
   keyCredentialsEmailHtml,
   keyCredentialsEmailSubject,
-} from './email-templates.js';
+} from './email/templates.js';
 
 // Declared beside the sender that stores it (email-outbox.ts), so the two files do not import each other.
-export type { EmailAttachment } from './email-outbox.js';
-import type { EmailAttachment } from './email-outbox.js';
+export type { EmailAttachment } from './email/outbox.js';
+import type { EmailAttachment } from './email/outbox.js';
 
 export interface EmailService {
   readonly enabled: boolean;
@@ -76,9 +76,9 @@ export interface EmailService {
   sendMagicLink(to: string, loginUrl: string, locale?: string): Promise<boolean>;
   /** `replyTo`: where a reply goes, when not the From address (email.reply_to on an owner's report). */
   sendNotification(to: string, subject: string, body: string, opts?: { replyTo?: string | null }): Promise<boolean>;
-  sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean>;
-  sendKeyInvite(to: string, args: import('./email-templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean>;
-  sendKeyCredentials(to: string, args: import('./email-templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean>;
+  sendInvite(to: string, args: import('./email/templates.js').InviteEmailArgs, locale?: string): Promise<boolean>;
+  sendKeyInvite(to: string, args: import('./email/templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean>;
+  sendKeyCredentials(to: string, args: import('./email/templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean>;
   sendRaw(to: string, subject: string, html: string, text: string): Promise<boolean>;
   /** Attachment-carrying send (outbound door / invoice PDFs). Envelope from stays the node's; fromName + replyTo carry the business identity. */
   sendWithAttachments(to: string, subject: string, html: string, text: string, attachments: EmailAttachment[], opts?: { replyTo?: string; fromName?: string; headers?: Record<string, string> }): Promise<boolean>;
@@ -94,7 +94,7 @@ export function getActiveEmailService(): EmailService | null { return nodeContex
 
 // ── Retries ──────────────────────────────────────────────
 // The retry schedule is unchanged (1 s, 3 s, 9 s; four attempts). The retries run through the stored
-// outbox (services/email-outbox.ts) when the service has storage and the node an encryption key, so
+// outbox (services/email/outbox.ts) when the service has storage and the node an encryption key, so
 // a restart inside the 13 s resumes them; otherwise in memory as before.
 
 // ── Disabled service (returned when SMTP is not configured) ──
@@ -164,7 +164,7 @@ export function createEmailService(config: AimeatConfig, storage?: Storage | nul
 
   const from = config.smtpFrom;
 
-  // One attempt, its retries and their log lines and counters (services/email-outbox.ts).
+  // One attempt, its retries and their log lines and counters (services/email/outbox.ts).
   const sendMail = createMailSender(transporter, { config, storage });
 
   async function send(to: string, subject: string, html: string, text: string, type: string, replyTo?: string | null): Promise<boolean> {
@@ -192,19 +192,19 @@ export function createEmailService(config: AimeatConfig, storage?: Storage | nul
       return send(to, subject, html, text, 'notification', opts?.replyTo);
     },
 
-    async sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean> {
+    async sendInvite(to: string, args: import('./email/templates.js').InviteEmailArgs, locale?: string): Promise<boolean> {
       const { html, text } = inviteEmailHtml(args, locale);
       const subject = inviteEmailSubject(args.orgName, locale);
       return send(to, subject, html, text, 'invitation');
     },
 
-    async sendKeyInvite(to: string, args: import('./email-templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean> {
+    async sendKeyInvite(to: string, args: import('./email/templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean> {
       const { html, text } = keyInviteEmailHtml(args, locale);
       const subject = keyInviteEmailSubject(args.orgName, locale);
       return send(to, subject, html, text, 'key_invitation');
     },
 
-    async sendKeyCredentials(to: string, args: import('./email-templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean> {
+    async sendKeyCredentials(to: string, args: import('./email/templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean> {
       const { html, text } = keyCredentialsEmailHtml(args, locale);
       const subject = keyCredentialsEmailSubject(args.orgName, locale);
       return send(to, subject, html, text, 'key_credentials');

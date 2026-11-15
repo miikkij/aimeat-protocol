@@ -20,7 +20,7 @@
  *   promoteContactsForVerifiedEmail links the two and the projection collapses them into one row.
  *
  *   Email lookup is EXACT-match only via the same privacy-preserving hash the invite flow uses, and
- *   each account has 20 in 10 minutes, a save by email included (services/email-lookup-limit.ts).
+ *   each account has 20 in 10 minutes, a save by email included (services/email/lookup-limit.ts).
  * @structure ContactsError; normalizeContactId; resolveDisplayNames;
  *   listContactsMerged; addContact (identity | person); updatePersonContact; removeContact;
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
@@ -84,7 +84,7 @@ import { isValidEmail } from '../utils/email-validator.js';
 import type { ConversationSummary } from '../storage/repositories/direct-message.repository.js';
 import { sharedOrganisms, SHARED_LOOKUP_CAP, type SharedOrganism } from './contacts-together.js';
 import { pendingContactInvitation } from './contact-invitations.js';
-import { takeEmailLookup } from './email-lookup-limit.js';
+import { takeEmailLookup } from './email/lookup-limit.js';
 import { membersSeeEachOther, nodeColleagues } from './colleagues.js';
 import type { GHIIRecord } from '../storage/types/identity.js';
 
@@ -687,7 +687,7 @@ export type ResolveEmailResult =
 
 /**
  * Count one address lookup against the asker's account, or refuse with 429 RATE_LIMITED before
- * anything is read (services/email-lookup-limit.ts). Every door that tells whether an address has an
+ * anything is read (services/email/lookup-limit.ts). Every door that tells whether an address has an
  * account here reaches it through this file, so the limit holds whoever asks and however.
  */
 function countAddressLookup(asker: string): void {

@@ -28,8 +28,8 @@ import type { InvitationRecord } from '../storage/repositories/invitation.reposi
 import { hashInviteToken, inviteEmailHash, INVITE_DEFAULT_EXPIRY_DAYS } from './invitations.js';
 import { nodeContext } from './node-context.js';
 import { sendMail } from './mail-gate.js';
-import { contactInviteEmail } from './email-templates.js';
-import { takeEmailLookup } from './email-lookup-limit.js';
+import { contactInviteEmail } from './email/templates.js';
+import { takeEmailLookup } from './email/lookup-limit.js';
 import { isValidEmail } from '../utils/email-validator.js';
 
 /** How many invitations one person may have open at once, organism ones included. */
@@ -91,7 +91,7 @@ export async function createContactInvitation(
   const inviterGhii = `${input.inviterName}@${config.nodeId}`;
 
   // AN INVITATION IS AN ADDRESS LOOKUP. Its answer says whether the address has an account here
-  // (ALREADY_HERE), so it draws on the account's lookups (services/email-lookup-limit.ts) before the
+  // (ALREADY_HERE), so it draws on the account's lookups (services/email/lookup-limit.ts) before the
   // address is read, as the resolve door and a save by email do. The REST door and
   // aimeat_contact_invite both come here, so both count (secaudit 2026-09, A5-2).
   const turn = takeEmailLookup(inviterGhii);
