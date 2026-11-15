@@ -213,7 +213,7 @@ const DELEGATES: Record<string, string> = {
     'src/mcp/agent-tasks.ts': "services/agent/task-write.ts (create, event, plan and todo) and "
         + "services/agent/task-fanout.ts (completion and failure), both emitting 'agent-tasks' scoped to the owner",
     'src/mcp/agent-telemetry.ts': "services/telemetry-buffer.ts ('agents') and usage-metering.ts ('agent-usage')",
-    'src/mcp/core.ts': "services/work-lifecycle.ts ('work' on accept and deliver), routes/work.ts "
+    'src/mcp/core.ts': "services/work/lifecycle.ts ('work' on accept and deliver), routes/work.ts "
         + "createWorkItem ('work'), services/memory/write.ts ('memory') and services/boards/post.ts ('boards')",
     'src/mcp/core-admin.ts': "services/morsel.ts mintMorsels, which emits 'config' and 'wallet'",
     'src/mcp/core-storage.ts': "services/stored-files/write.ts, which emits 'files' and 'memory'",

@@ -43,7 +43,7 @@ import {
   type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
   claimWorkForDelivery, releaseWorkClaim,
 } from '../services/exchange/work.js';
-import { refuseWorkBetween } from '../services/work-parties.js';
+import { refuseWorkBetween } from '../services/work/parties.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import { provenanceForWrite, provenanceDeclarationRefusal } from '../services/ai/provenance.js';
 
@@ -71,7 +71,7 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such listed agent-work offering'));
     }
     // The provider of agent work is the agent that does it. No work with yourself and none between two
-    // principals of one owner: the rule for every endpoint that creates work (services/work-parties.ts).
+    // principals of one owner: the rule for every endpoint that creates work (services/work/parties.ts).
     const s = o.surface;
     const agentGaii = `${s.agentName}#${o.providerOwner}@${config.nodeId}`;
     const refused = refuseWorkBetween(consumerGaii, agentGaii);

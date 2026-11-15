@@ -1,5 +1,5 @@
 /**
- * @file work-task-bridge.ts
+ * @file src/services/work/task-bridge.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Auto-creates an AgentTask when a work item is accepted by an agent
@@ -12,10 +12,10 @@
  *     emitChange('work'), a UI refresh. Same miss as the workflow engine's. -> pitfalls 58
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  */
-import type { Storage, WorkRecord, AgentTaskRecord } from '../storage/interface.js';
+import type { Storage, WorkRecord, AgentTaskRecord } from '../../storage/interface.js';
 import { randomUUID } from 'node:crypto';
-import { emitDelivery } from './event-bus.js';
-import { isWorkPayload } from './work/work-payload.js';
+import { emitDelivery } from '../event-bus.js';
+import { isWorkPayload } from './work-payload.js';
 
 /** A field value as text: text stays as it is, anything else (a number, an object, an array) is its JSON. */
 const asText = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value) ?? String(value));

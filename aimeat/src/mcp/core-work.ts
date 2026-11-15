@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node MCP's three work tools for a provider agent: its inbox, accepting a work
- *   item, delivering one. Accept and deliver run the one implementation in services/work-lifecycle.ts.
+ *   item, delivering one. Accept and deliver run the one implementation in services/work/lifecycle.ts.
  *   PURE EXTRACTION from core.ts (max-file-lines), the road core-boards.ts and core-storage.ts took:
  *   converting every tool to registerTool (MCP SDK v2 migration, plan doc-mvguy322f9se step 3) took
  *   core.ts past 800 lines, and these three are a self-contained group that needs only storage,
@@ -21,7 +21,7 @@ import { annotationsFor } from './annotations.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { genericListOutput } from '../tool-catalog/output-schemas.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
-import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
+import { acceptWork, deliverWork } from '../services/work/lifecycle.js';
 import { listPendingWork } from '../services/work/work-inbox.js';
 
 export interface CoreWorkToolDeps {
@@ -60,7 +60,7 @@ export function registerCoreWorkTools(mcp: McpServer, deps: CoreWorkToolDeps): v
             annotations: annotationsFor('aimeat_work_accept'),
         },
         async ({ tracking_code }) => {
-            // ONE implementation (services/work-lifecycle.ts). This tool wrote the status itself and
+            // ONE implementation (services/work/lifecycle.ts). This tool wrote the status itself and
             // skipped the work→task bridge the HTTP door runs, so an agent that accepted its work
             // over MCP, the door an agent actually uses, got no task to drive the job from.
             const accepted = await acceptWork({ storage, config }, agentGaii, tracking_code);
@@ -80,7 +80,7 @@ export function registerCoreWorkTools(mcp: McpServer, deps: CoreWorkToolDeps): v
             annotations: annotationsFor('aimeat_work_deliver'),
         },
         async ({ tracking_code, output }) => {
-            // ONE implementation (services/work-lifecycle.ts). This tool settled and stored the
+            // ONE implementation (services/work/lifecycle.ts). This tool settled and stored the
             // output by hand, and that was all it did: the requester's callback_url was never
             // called, so a delivery made over MCP left a requester who is not sitting on the node
             // waiting, and neither post_settlement nor post_work_delivery ran, so an installed

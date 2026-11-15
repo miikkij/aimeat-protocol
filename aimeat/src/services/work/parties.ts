@@ -1,5 +1,5 @@
 /**
- * @file src/services/work-parties.ts
+ * @file src/services/work/parties.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may request work from whom. One rule for every code path that creates work: the
@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-09-26 — Who may request work from whom, in one place for the work queue and EXCHANGE
  *     agent work (secaudit 2026-09, R4 5).
  */
-import { ownerGhiiOf } from '../utils/gaii.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 
 /** Why work between two parties is refused, with the error code every work endpoint returns. */
 export interface WorkPartiesRefusal {

@@ -19,7 +19,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { onDeliveryEvent, offDeliveryEvent } from '../../src/services/event-bus.js';
-import { createTaskFromWork } from '../../src/services/work-task-bridge.js';
+import { createTaskFromWork } from '../../src/services/work/task-bridge.js';
 import { Scheduler } from '../../src/services/scheduler.js';
 import type { Storage, WorkRecord, AgentTaskRecord } from '../../src/storage/interface.js';
 

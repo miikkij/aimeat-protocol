@@ -406,7 +406,7 @@ export async function runWorkTimeoutJob(config: AimeatConfig, storage: Storage):
           // job runs on the node's own timer with nobody watching. fireWebhook already does that,
           // and it also retries with backoff and records the delivery in the webhook log that the
           // admin surface reads. The hand-rolled copy that stood here did none of the three.
-          const { fireWebhook } = await import('./work-lifecycle.js');
+          const { fireWebhook } = await import('./work/lifecycle.js');
           fireWebhook(work.callbackUrl, {
             event: 'work.expired',
             tracking_code: work.trackingCode,

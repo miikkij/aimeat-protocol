@@ -10,7 +10,7 @@
  *   THE STATES ARE THE ONES THE ROUTES WRITE (feature-list audit #144). Failures were counted from
  *   `failed` and `rejected`, which no route writes, and a lost dispute only from a free-text verdict
  *   spelled exactly `requester_wins`. The work states and the dispute verdicts below are the ones
- *   routes/work.ts, services/work-lifecycle.ts, routes/disputes.ts and services/core-jobs.ts store.
+ *   routes/work.ts, services/work/lifecycle.ts, routes/disputes.ts and services/core-jobs.ts store.
  *
  *   THE STORED SCORE FOLLOWS THE EVENT. `AgentRecord.trustScore` is what listings, the catalogue and
  *   the agent prompts read. It was written only when somebody opened the agent's profile, so it lagged

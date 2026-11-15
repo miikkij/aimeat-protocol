@@ -16,7 +16,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { MailboxNotificationService } from '../mailbox-notification.js';
-import { refuseWorkBetween } from '../work-parties.js';
+import { refuseWorkBetween } from './parties.js';
 import { isIdentityShaped } from '../local-identity.js';
 import { generateTrackingCode } from '../../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, routingFee } from '../morsel.js';
@@ -96,7 +96,7 @@ export async function createWorkItem(
   // SECURITY: no work with yourself (trust score manipulation), and none between two principals of
   // one owner: a person and their own agent, either way round, or two agents of one person. Every
   // work queue endpoint and MCP tool creates work here, and EXCHANGE agent work calls the same
-  // function (services/work-parties.ts), so the rule has one home.
+  // function (services/work/parties.ts), so the rule has one home.
   const refused = refuseWorkBetween(requesterGaii, provider_gaii);
   if (refused) {
     return { error: refused.message, status: 400, code: refused.code };

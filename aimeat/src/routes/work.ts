@@ -7,7 +7,7 @@
  *   delivery with exponential-backoff retries, cross-node work resolution, and a work→task bridge.
  *
  * @structure
- *   - getWebhookLog(): re-exported from services/work-lifecycle.ts, where fireWebhook now lives
+ *   - getWebhookLog(): re-exported from services/work/lifecycle.ts, where fireWebhook now lives
  *   - createWorkItem(...) and workErrorText(): in services/work/create-work-item.ts since 2026-11-13
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
@@ -94,14 +94,14 @@ import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchem
 import type { PeerInfo } from '../services/federation.js';
 import { emitChange } from '../services/event-bus.js';
 import { createWorkItem } from '../services/work/create-work-item.js';
-import { acceptWork, deliverWork, fireWebhook, type ActsForParty } from '../services/work-lifecycle.js';
+import { acceptWork, deliverWork, fireWebhook, type ActsForParty } from '../services/work/lifecycle.js';
 import { refreshTrustScore } from '../services/trust.js';
 import { identitiesActingFor } from '../services/db/owner-identity.js';
 import { listPendingWork } from '../services/work/work-inbox.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai/provenance-marks.js';
 
 // The webhook log kept its address here when fireWebhook moved to the shared service.
-export { getWebhookLog } from '../services/work-lifecycle.js';
+export { getWebhookLog } from '../services/work/lifecycle.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;

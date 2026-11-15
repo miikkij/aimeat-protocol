@@ -234,7 +234,7 @@ export const ActionUpdateSchema = z.object({
  * A work item's input and a delivery's output: a JSON object, as the MCP tools take them (decision
  * 2026-11-15). Text, a number, an array or null is refused, and the refusal reads "expected object".
  * Rows stored while these were z.unknown() (2026-02-26 to 2026-11-15) may hold any value; every
- * reader passes them through, and services/work-task-bridge.ts turns one into a single field.
+ * reader passes them through, and services/work/task-bridge.ts turns one into a single field.
  */
 const WorkPayloadSchema = z.looseObject({});
 

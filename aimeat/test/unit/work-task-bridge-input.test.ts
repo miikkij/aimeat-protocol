@@ -2,7 +2,7 @@
  * @file test/unit/work-task-bridge-input.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The task the work bridge builds from a work item's input (services/work-task-bridge.ts).
+ * @description The task the work bridge builds from a work item's input (services/work/task-bridge.ts).
  *   New work carries an object input (decision 2026-11-15), and each field becomes one task field;
  *   a nested object or array becomes its JSON, never "[object Object]". A row stored before the rule
  *   may hold a string, a number, an array or null: that becomes one field `input` holding its JSON.
@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-11-15 — Initial.
  */
 import { describe, expect, it } from 'vitest';
-import { createTaskFromWork } from '../../src/services/work-task-bridge.js';
+import { createTaskFromWork } from '../../src/services/work/task-bridge.js';
 import type { Storage, WorkRecord, AgentTaskRecord } from '../../src/storage/interface.js';
 
 const AGENT = 'translator#alice@aimeat-test-001';

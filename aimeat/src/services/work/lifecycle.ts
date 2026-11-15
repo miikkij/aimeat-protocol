@@ -1,5 +1,5 @@
 /**
- * @file src/services/work-lifecycle.ts
+ * @file src/services/work/lifecycle.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Accepting and delivering one work item, once, for every surface that can do it.
@@ -56,17 +56,17 @@
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8): the accept/deliver write moved out of
  *     src/mcp/core.ts and src/routes/work.ts into one place.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, WorkRecord } from '../storage/interface.js';
-import { settlePayment } from './morsel.js';
-import { createTaskFromWork } from './work-task-bridge.js';
-import { isWorkPayload, WORK_OUTPUT_NOT_OBJECT } from './work/work-payload.js';
-import { emitChange } from './event-bus.js';
-import { fireHook } from '../utils/fire-hook.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { logger } from '../utils/logger.js';
-import { provenanceForWrite } from './ai/provenance.js';
-import { refreshTrustScore } from './trust.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, WorkRecord } from '../../storage/interface.js';
+import { settlePayment } from '../morsel.js';
+import { createTaskFromWork } from './task-bridge.js';
+import { isWorkPayload, WORK_OUTPUT_NOT_OBJECT } from './work-payload.js';
+import { emitChange } from '../event-bus.js';
+import { fireHook } from '../../utils/fire-hook.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { logger } from '../../utils/logger.js';
+import { provenanceForWrite } from '../ai/provenance.js';
+import { refreshTrustScore } from '../trust.js';
 
 export interface WorkDeps {
     storage: Storage;

@@ -8,7 +8,7 @@
  *   /redeliver, and on POST /v1/federation/cross-node/work before the peer is looked up or the routing
  *   fee is taken. A row stored before the rule, with a string input and output, still reads back
  *   unchanged on GET /v1/work/:tc, and accepting it gives the provider's task one field `input` that
- *   holds the old value (services/work-task-bridge.ts).
+ *   holds the old value (services/work/task-bridge.ts).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-work-object
  * @version-history
  *   v1.0.0 — 2026-11-15 — Initial.

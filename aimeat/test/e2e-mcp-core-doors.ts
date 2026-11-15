@@ -292,7 +292,7 @@ await test('5. aimeat_agents_list returns the CALLER\'s owner roster, and it mat
 });
 
 await test('6. The provider publishes an action over REST, with directives so the task bridge is live', async () => {
-    // Directives are what services/work-task-bridge.ts reads as "this agent runs tasks"; without
+    // Directives are what services/work/task-bridge.ts reads as "this agent runs tasks"; without
     // them accepting work creates no task and test 11 would be asserting an absence.
     const dir = await json(`/v1/agents/${provider.name}/directives`, {
         method: 'PUT', headers: authed(providerOwner.token),

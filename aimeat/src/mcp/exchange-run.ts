@@ -100,7 +100,7 @@ import {
     type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
     claimWorkForDelivery, releaseWorkClaim,
 } from '../services/exchange/work.js';
-import { refuseWorkBetween } from '../services/work-parties.js';
+import { refuseWorkBetween } from '../services/work/parties.js';
 import {
     getProposal, listProposalsForOwner, supersedeWithProposal, putProposal, CONTRACT_ENDED_TEXT,
 } from '../services/exchange/proposals.js';
@@ -325,7 +325,7 @@ export function registerExchangeRunTools(
             }
             // The same rule as POST /v1/exchange/work and every endpoint that creates work: the agent
             // that does the work is the provider, and it belongs to another owner
-            // (services/work-parties.ts).
+            // (services/work/parties.ts).
             const s = o.surface;
             const agentGaiiOfWork = `${s.agentName}#${o.providerOwner}@${config.nodeId}`;
             const refused = refuseWorkBetween(callerGaii, agentGaiiOfWork);

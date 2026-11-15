@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AgentRecord, WorkRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { acceptWork, deliverWork } from '../../src/services/work-lifecycle.js';
+import { acceptWork, deliverWork } from '../../src/services/work/lifecycle.js';
 import { holdEscrow } from '../../src/services/morsel.js';
 
 // The accept/deliver rules these cover used to live twice: once in routes/work.ts and once in
