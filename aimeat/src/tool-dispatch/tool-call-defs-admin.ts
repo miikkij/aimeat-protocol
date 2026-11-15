@@ -12,6 +12,8 @@
  *   2026-11-14 -- aimeat_admin_usage forwards report, owner, from, to, grain, series and limit to
  *     GET /v1/admin/usage/summary when any report parameter is given.
  *   2026-11-13 -- aimeat_admin_knowledge forwards `author` (unit 3b).
+ *   v1.14.0 -- 2026-11-15 -- aimeat_admin_disputes (GET /v1/admin/disputes and /:id) and
+ *     aimeat_admin_dispute_rule (POST /v1/admin/disputes/:id/rule).
  *   v1.13.0 -- 2026-11-05 -- aimeat_admin_key_reencrypt (GET and POST /v1/admin/encryption/reencrypt;
  *     codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.12.0 -- 2026-10-31 -- aimeat_admin_federation_settlement_ceiling_set (PUT /v1/federation/peers/
@@ -235,5 +237,24 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => (optionalString(input, 'action') === 'start'
             ? client.post('/v1/admin/encryption/reencrypt', {})
             : client.get('/v1/admin/encryption/reencrypt')),
+    },
+    {
+        // → GET /v1/admin/disputes, GET /v1/admin/disputes/:id
+        name: 'aimeat_admin_disputes',
+        handler: ({ client }, input) => {
+            const id = optionalString(input, 'id');
+            return id
+                ? client.get(`/v1/admin/disputes/${encodeURIComponent(id)}`)
+                : client.get(`/v1/admin/disputes${query({ status: optionalString(input, 'status') })}`);
+        },
+    },
+    {
+        // → POST /v1/admin/disputes/:id/rule
+        name: 'aimeat_admin_dispute_rule',
+        handler: ({ client }, input) => client.post(`/v1/admin/disputes/${encodeURIComponent(requiredString(input, 'id'))}/rule`, {
+            ruling: requiredString(input, 'ruling'),
+            distribution: { to_requester: optionalNumber(input, 'to_requester') ?? 0, burned: optionalNumber(input, 'burned') ?? 0 },
+            ...(optionalString(input, 'reason') !== undefined ? { reason: optionalString(input, 'reason') } : {}),
+        }),
     },
 ];

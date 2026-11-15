@@ -5,7 +5,8 @@
  * @description The operator's administration tools and the account's own vault, access and usage
  *   tools, called over MCP and refused: SSO connections and the SCIM token (aimeat_admin_sso_*),
  *   deactivating and reactivating an account (aimeat_admin_owner_disable / _enable), the node's
- *   statistics and AI spend (aimeat_admin_statistics, aimeat_admin_usage), the hook bindings
+ *   statistics and AI spend (aimeat_admin_statistics, aimeat_admin_usage), the disputes that wait for
+ *   a ruling (aimeat_admin_disputes, aimeat_admin_dispute_rule), the hook bindings
  *   (aimeat_admin_hooks, aimeat_admin_hook_set), a person's CORS list (aimeat_admin_cors_set), the
  *   new-version check (aimeat_admin_node_update), the secret vault (aimeat_secret_list / _set /
  *   _delete), the access overview (aimeat_access_list), the usage report (aimeat_usage_report), and
@@ -38,6 +39,8 @@
  *   - The account's own tools: secrets, access, usage report, agent statistics
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-admin-tools
  * @version-history
+ *   v1.3.0 — 2026-11-15 — aimeat_admin_disputes and aimeat_admin_dispute_rule: refused to the ordinary
+ *     owner's agent, read by the operator's, an unknown dispute NOT_FOUND on both.
  *   v1.2.1 — 2026-11-15 — aimeat_admin_hooks: the overview is held to the node's own moment list
  *     (HOOK_NAMES) and to the five gates by name, not to a count of eleven, which two notify moments
  *     added on 2026-11-14 had made false (nightly 43656769268).
@@ -234,6 +237,17 @@ await test("aimeat_admin_statistics: refused to the ordinary owner's agent; the 
     assert(!r.isError && typeof r.data === 'object' && !r.data._text, `operator statistics: ${r.text.slice(0, 300)}`);
     const half = await callTool(opAdmin, 'aimeat_admin_statistics', { from: '2026-01-01' });
     assert(half.isError && /both/.test(half.text), `from without to: ${half.text.slice(0, 200)}`);
+});
+
+await test("aimeat_admin_disputes / _dispute_rule: refused to the ordinary owner's agent; the operator's agent lists, and an unknown dispute is NOT_FOUND", async () => {
+    assertHandlerRefusal(await callTool(memAdmin, 'aimeat_admin_disputes', {}), 'member disputes');
+    assertHandlerRefusal(await callTool(memAdmin, 'aimeat_admin_dispute_rule', { id: 'no-such-dispute', ruling: 'split' }), 'member ruling');
+    const r = await callTool(opAdmin, 'aimeat_admin_disputes', {});
+    assert(!r.isError && Array.isArray(r.data.disputes), `operator disputes: ${r.text.slice(0, 300)}`);
+    const one = await callTool(opAdmin, 'aimeat_admin_disputes', { id: 'no-such-dispute' });
+    assert(one.isError && /NOT_FOUND/.test(one.text), `an unknown dispute: ${one.text.slice(0, 200)}`);
+    const rule = await callTool(opAdmin, 'aimeat_admin_dispute_rule', { id: 'no-such-dispute', ruling: 'split' });
+    assert(rule.isError && /NOT_FOUND/.test(rule.text), `ruling an unknown dispute: ${rule.text.slice(0, 200)}`);
 });
 
 await test("aimeat_admin_usage: refused to the ordinary owner's agent; the operator's agent reads the AI spend", async () => {

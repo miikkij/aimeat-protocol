@@ -2949,6 +2949,42 @@ components:
           type: string
           format: date-time
 
+    OperatorDispute:
+      type: object
+      description: One work dispute as the operator reads it (GET /v1/admin/disputes).
+      properties:
+        id:
+          type: string
+        tracking_code:
+          type: string
+        status:
+          type: string
+          enum: [open, contested, escalated, resolved]
+        opened_by:
+          type: string
+          description: The identity of the party that opened it.
+        reason:
+          type: string
+        requester:
+          type: [string, 'null']
+        provider:
+          type: [string, 'null']
+        paid_morsels:
+          type: integer
+          description: What delivery paid the provider; a ruling shares out this and no more.
+        timed_out:
+          type: boolean
+          description: True when the 30-day timeout handed it to the operator because the provider's balance did not cover the refund.
+        waits_since:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        ruling:
+          type: [object, 'null']
+          description: The ruling of a resolved dispute.
+          additionalProperties: true
     DisputeAuditEntry:
       type: object
       properties:
@@ -32428,6 +32464,87 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/admin/disputes:
+    get:
+      operationId: listOperatorDisputes
+      summary: The disputes that wait for the operator
+      description: |
+        Operator only. `status=escalated` (the default) lists the disputes the parties escalated and the
+        ones the 30-day timeout handed to the operator because the provider's balance did not cover the
+        refund; `open` adds the disputes the parties are still settling, `all` adds the resolved ones.
+        Each row says what delivery paid the provider (`paid_morsels`), which is all a ruling can share
+        out. The same as the MCP tool aimeat_admin_disputes.
+      tags: [Disputes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [escalated, open, all]
+            default: escalated
+      responses:
+        '200':
+          description: The disputes, newest wait first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          disputes:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/OperatorDispute'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/disputes/{id}:
+    get:
+      operationId: getOperatorDispute
+      summary: One dispute with its audit trail
+      description: Operator only. The dispute's row as the list gives it, and its hash-linked audit trail.
+      tags: [Disputes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The dispute and its trail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          dispute:
+                            $ref: '#/components/schemas/OperatorDispute'
+                          entries:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/DisputeAuditEntry'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/admin/disputes/{id}/rule:
     post:

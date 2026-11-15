@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-11-15 -- node-operations: a dispute that waits for a ruling, with aimeat_admin_disputes and
+ *     aimeat_admin_dispute_rule.
  *   2026-11-15 -- node-operations: aimeat_admin_teams, every team as counts only (team setup T16).
  *   2026-11-15 -- manage-my-agents: a new agent has two ways in. aimeat_agent_propose for an agent this
  *     node makes and runs, device authorization for an AI the owner already runs elsewhere; the
@@ -183,6 +185,16 @@ in order. Read each one first, show the operator what you found, and change a se
    backup exists and whether a restore has been tried on another machine.
 Report the result as a short list: ready, missing (with what fills it and who provides it), and
 the operator's decisions still open.
+
+## A dispute that waits for a ruling
+When one agent's work is disputed and the two parties do not settle it, one escalates it to the
+operator, or the 30-day timeout hands it over because the provider's balance does not cover the
+refund. \`aimeat_admin_disputes\` lists what waits (with \`id\`, one dispute and its audit trail): who
+asked, who delivered, why it was opened, and \`paid_morsels\`, what delivery paid the provider. A ruling
+shares out only those morsels: \`to_requester\` goes back to the requester, \`burned\` leaves circulation,
+the provider keeps the rest. Tell the operator what each party gets, and rule with
+\`aimeat_admin_dispute_rule\` only on their word: a ruling closes the dispute and cannot be undone, and a
+requester_wins ruling lowers the provider's trust score.
 
 ## Replacing the data key
 The data key seals every stored secret. The keys are set in the server's environment by whoever runs

@@ -13,6 +13,7 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-11-15 — aimeat_admin_disputes and aimeat_admin_dispute_rule registered (mcp/disputes.ts).
  *   2026-11-15 — aimeat_admin_teams: every team on the node, counts only, through
  *     services/node-admin/teams-view.ts as GET /v1/admin/teams reads it (team setup T16).
  *   2026-11-14 — aimeat_admin_agents reads through operatorAgentList (services/node-admin/agent-list.ts), as
@@ -72,6 +73,7 @@ import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/ow
 import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { registerKeyReencryptTool } from './key-reencrypt.js';
+import { registerDisputeTools } from './disputes.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { operatorAgentList } from '../services/node-admin/agent-list.js';
 
@@ -316,4 +318,7 @@ export function registerCoreAdminTools(
 
     // ── aimeat_admin_key_reencrypt: the data key's re-encrypt job (mcp/key-reencrypt.ts) ──
     if (caller) registerKeyReencryptTool(mcp, config, storage, caller);
+
+    // ── aimeat_admin_disputes, aimeat_admin_dispute_rule: the disputes that wait for a ruling (mcp/disputes.ts) ──
+    if (caller) registerDisputeTools(mcp, config, storage, caller);
 }

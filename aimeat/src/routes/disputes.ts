@@ -7,11 +7,16 @@
  *   a resolution re-divides the toll delivery paid the provider (services/morsel.ts takeBackFromProvider).
  *
  * @structure
- *   - computeAuditHash/appendAuditEntry: build the SHA-256 hash-chained dispute audit log
- *   - resolveDisputeOnce: claim a dispute on its status, then move the morsels, in one transaction
- *   - disputesRouter(config, storage): mounts POST /v1/work/:tc/dispute and related endpoints
+ *   - disputesRouter(config, storage): mounts POST /v1/work/:tc/dispute and related endpoints, and the
+ *     operator's GET /v1/admin/disputes, GET /v1/admin/disputes/:id and POST /v1/admin/disputes/:id/rule
+ *   - the audit chain and resolveDisputeOnce: services/disputes/audit.ts
  *
  * @version-history
+ *   2026-11-15 — GET /v1/admin/disputes and GET /v1/admin/disputes/:id: what waits for the operator and
+ *     one dispute with its trail. The audit chain and resolveDisputeOnce moved unchanged to
+ *     services/disputes/audit.ts and the ruling to services/disputes/operator.ts, which
+ *     aimeat_admin_disputes and aimeat_admin_dispute_rule call too
+ *     (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-10-25 — A dispute is resolved once: every resolution (accept-fault, accept-partial,
  *     accept-redelivery, withdraw, the operator ruling) claims it active → resolved with one
  *     conditional UPDATE (storage.transitionDisputeStatus) before the refund moves, in one
@@ -65,9 +70,9 @@
  *     its own dispute.
  */
 import { Router } from 'express';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, DisputeAuditEntry } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator, requireExternalPrincipal, requireAnyScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -75,104 +80,12 @@ import { disputedAmount, takeBackFromProvider } from '../services/morsel.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { refreshTrustScore } from '../services/trust.js';
+import { appendAuditEntry, resolveDisputeOnce, ACTIVE_DISPUTE, DISPUTED_WORK } from '../services/disputes/audit.js';
+import { listOperatorDisputes, getOperatorDispute, ruleDispute, DISPUTE_LIST_STATUSES, type DisputeListStatus } from '../services/disputes/operator.js';
 import { DisputeOpenSchema, CounterDisputeSchema, PartialOfferSchema, OperatorRulingSchema, validateBody } from '../models/schemas.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
-}
-
-/**
- * JSON with object keys in a fixed order, at every depth.
- *
- * The hash below has to be computable from the entry as it is READ BACK, or the log is tamper-evident
- * in name only. Plain JSON.stringify is not, because it serialises keys in insertion order and the
- * production backend does not preserve that: `DisputeAudit.data` is JSONB (migration 0001), and
- * Postgres jsonb stores a decomposed form and returns keys in its own normalised order. So an entry
- * whose `data` has two or more keys hashed one string on the way in and serialises to a different
- * one on the way out, and anybody recomputing the hash from the API response concludes the record was
- * edited. Measured 2026-08-15 on the `operator_ruled` entry, which carries three: the recomputation
- * matched on sqlite (JSON text, exact round trip) and failed on postgres-kysely.
- *
- * Sorting the keys makes the two agree, and costs nothing else: nothing consumed these hashes before
- * — no route verified one, and the only test walked the LINKS without recomputing anything — so there
- * is no stored value whose meaning this changes for a reader that exists.
- */
-function canonicalJson(value: unknown): string {
-    if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-    const entries = Object.entries(value as Record<string, unknown>)
-        .filter(([, v]) => v !== undefined)
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
-}
-
-function computeAuditHash(entry: Omit<DisputeAuditEntry, 'hash'>, previousHash: string): string {
-    const payload = canonicalJson({ ...entry, previousHash });
-    return createHash('sha256').update(payload).digest('hex');
-}
-
-async function appendAuditEntry(
-    storage: Storage,
-    disputeId: string,
-    event: string,
-    actor: string,
-    data: Record<string, unknown>,
-): Promise<DisputeAuditEntry> {
-    const existing = await storage.getDisputeAuditLog(disputeId);
-    const sequence = existing.length + 1;
-    const previousHash = existing.length > 0 ? existing[existing.length - 1].hash : '0'.repeat(64);
-    const timestamp = new Date().toISOString();
-
-    const entry: Omit<DisputeAuditEntry, 'hash'> = {
-        sequence,
-        event,
-        actor,
-        timestamp,
-        data,
-        previousHash,
-    };
-
-    const hash = computeAuditHash(entry, previousHash);
-    const full: DisputeAuditEntry = { ...entry, hash };
-
-    return storage.addDisputeAuditEntry(disputeId, full);
-}
-
-/** The statuses of a dispute that is still open to a resolution or a move. */
-const ACTIVE_DISPUTE: readonly string[] = ['open', 'contested', 'escalated'];
-/** The statuses of a work item whose dispute is still active. */
-const DISPUTED_WORK: readonly string[] = ['disputed', 'contested', 'escalated'];
-
-/** Thrown inside the resolution transaction so the claim on the dispute rolls back with it. */
-class ProviderBalanceShort extends Error {}
-
-/**
- * Resolve a dispute once: claim it (active → resolved, one conditional UPDATE), then move the
- * morsels and settle the work, in ONE transaction. The status was read and then written apart, with
- * the refund between the two, so concurrent accept-partial, accept-fault or ruling calls each took
- * the refund back from the provider (secaudit2026oct22, dispute-resolution-without-cas). The claim is
- * the compare-and-swap: a call that did not move the status moves no morsel and answers 'closed'.
- * When `moveMorsels` answers false (the provider's balance is short) the claim rolls back, so the
- * dispute stays open for the next try.
- */
-async function resolveDisputeOnce(
-    storage: Storage,
-    disputeId: string,
-    trackingCode: string,
-    moveMorsels: () => Promise<boolean>,
-): Promise<'resolved' | 'closed' | 'short'> {
-    try {
-        return await storage.transaction(async () => {
-            const now = new Date().toISOString();
-            if (!await storage.transitionDisputeStatus(disputeId, ACTIVE_DISPUTE, 'resolved', now)) return 'closed' as const;
-            if (!await moveMorsels()) throw new ProviderBalanceShort();
-            await storage.updateWork(trackingCode, { status: 'settled', updatedAt: now });
-            return 'resolved' as const;
-        });
-    } catch (err) {
-        if (err instanceof ProviderBalanceShort) return 'short';
-        throw err;
-    }
 }
 
 export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
@@ -548,69 +461,32 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         emitChange('disputes');
     });
 
-    // POST /v1/admin/disputes/:id/rule — Operator rules on dispute
+    // GET /v1/admin/disputes — The disputes that wait for the operator (services/disputes/operator.ts,
+    // which aimeat_admin_disputes reads too). ?status=escalated (default) | open | all.
+    router.get('/v1/admin/disputes', requireAuth(), requireOperator(storage), async (req, res) => {
+        const status = (typeof req.query.status === 'string' && req.query.status ? req.query.status : 'escalated') as DisputeListStatus;
+        if (!DISPUTE_LIST_STATUSES.includes(status)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'status is escalated, open or all')); return;
+        }
+        res.json(success(config.nodeId, { disputes: await listOperatorDisputes(storage, status) }, [
+            { description: 'Rule one', method: 'POST', url: '/v1/admin/disputes/{id}/rule' },
+        ]));
+    });
+
+    // GET /v1/admin/disputes/:id — One dispute as the list reads it, with its audit trail.
+    router.get('/v1/admin/disputes/:id', requireAuth(), requireOperator(storage), async (req, res) => {
+        const one = await getOperatorDispute(storage, param(req.params.id));
+        if (!one) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Dispute not found')); return; }
+        res.json(success(config.nodeId, one));
+    });
+
+    // POST /v1/admin/disputes/:id/rule — Operator rules on dispute. The checks, the once-only claim and
+    // the audit entry are services/disputes/operator.ts ruleDispute, which aimeat_admin_dispute_rule calls too.
     router.post('/v1/admin/disputes/:id/rule', requireAuth(), requireOperator(storage), validateBody(OperatorRulingSchema, config.nodeId), async (req, res) => {
-        const disputeId = param(req.params.id);
         const me = resolveIdentity(req.auth!, config.nodeId);
-        const dispute = await storage.getDispute(disputeId);
-        if (!dispute) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Dispute not found')); return; }
-        if (dispute.status === 'resolved') { res.status(409).json(error(config.nodeId, 'DISPUTE_CLOSED', 'Dispute already resolved')); return; }
-
-        const { ruling, distribution, reason } = req.body ?? {};
-
-        const work = await storage.getWork(dispute.trackingCode);
-        if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Associated work item not found')); return; }
-
-        const { to_requester = 0, to_provider = 0, burned = 0 } = distribution;
-
-        // SECURITY (C-3, third site). A ruling DISTRIBUTES the escrow — the word the API uses is
-        // `distribution` and openapi.yaml types it as requester_wins | provider_wins | split, all of
-        // which are ways of dividing what is held. It was the only one of the three money doors on
-        // this route with no ceiling: /offer-partial refuses above the escrow (line 268) and
-        // /accept-partial clamps again, and this one credited whatever integer it was handed, so
-        // `{to_requester: 1000000}` on an 11-morsel escrow minted the difference out of nothing.
-        //
-        // An operator can already mint — but through mintMorsels(), which enforces
-        // config.maxOperatorMintPerDay. A door that creates morsels with no cap at all is not the
-        // same authority just because the same person holds it, and nothing here writes the audit
-        // trail that door writes. Refuse before you write: this sits above every credit below.
-        //
-        // What is shared out is what delivery paid the provider: a dispute opens only on delivered
-        // work, so the escrow was already settled. cost.inEscrow still read the whole escrow, and the
-        // ruling paid the requester and the provider on top of that settlement (QA audit S8-02).
-        const paid = disputedAmount(work);
-        if (to_requester + to_provider + burned > paid) {
-            res.status(400).json(error(config.nodeId, 'RULING_EXCEEDS_ESCROW',
-                `A ruling shares out the ${paid} morsels this work paid its provider. Choose how they split; `
-                + `${to_requester + to_provider + burned} were named. Nothing was written.`, 400, { paid_morsels: paid }));
-            return;
-        }
-
-        // The requester's share and the burned share come back from the provider in one debit; the
-        // provider keeps the rest of what delivery paid.
-        const outcome = await resolveDisputeOnce(storage, dispute.id, dispute.trackingCode,
-            () => takeBackFromProvider(storage, work, { toRequester: to_requester, burned }));
-        if (outcome === 'closed') { res.status(409).json(error(config.nodeId, 'DISPUTE_CLOSED', 'Dispute already resolved')); return; }
-        if (outcome === 'short') {
-            res.status(409).json(error(config.nodeId, 'PROVIDER_BALANCE_SHORT',
-                `The provider's balance holds less than the ${to_requester + burned} morsels this ruling takes back, so nothing was written. Rule a smaller share instead.`,
-                409, { take_back_morsels: to_requester + burned, dispute_id: dispute.id }));
-            return;
-        }
-        const keptByProvider = paid - to_requester - burned;
-
-        await storage.updateDispute(dispute.id, {
-            ruling: { ruling, distribution: { toRequester: to_requester, toProvider: keptByProvider, burned }, reason },
-            updatedAt: new Date().toISOString(),
-        });
-        await refreshTrustScore(storage, work.providerGaii);
-        await appendAuditEntry(storage, dispute.id, 'operator_ruled', me, { ruling, distribution: { to_requester, to_provider: keptByProvider, burned }, reason });
-
-        res.json(success(config.nodeId, {
-            dispute_id: dispute.id,
-            status: 'resolved',
-            ruling: { ruling, distribution: { to_requester, to_provider: keptByProvider, burned }, reason },
-        }));
+        const out = await ruleDispute(storage, me, param(req.params.id), req.body ?? {});
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message, out.status, out.details)); return; }
+        res.json(success(config.nodeId, out.data));
         emitChange('disputes');
     });
 

@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-15 -- definitions/disputes.ts: aimeat_admin_disputes and aimeat_admin_dispute_rule.
  *   v1.x -- 2026-11-14 -- definitions/help.ts: aimeat_help_find, _ask, _inbox, _respond, _close,
  *     _profile_set, _report_data and _report_write (Ask someone who knows).
  *   v1.x -- 2026-11-14 -- definitions/teams.ts: aimeat_team_setup and aimeat_team_status.
@@ -139,6 +140,7 @@ import { buildWithYouTools } from './definitions/build-with-you.js';
 import { dataspaceTools } from './definitions/dataspace.js';
 import { datapackageSellTools } from './definitions/datapackage-sell.js';
 import { keyReencryptTools } from './definitions/key-reencrypt.js';
+import { disputeTools } from './definitions/disputes.js';
 import { csmTools } from './definitions/csm.js';
 
 const CATALOG = [
@@ -201,6 +203,7 @@ const CATALOG = [
     ...datapackageSellTools,
     ...dataspaceTools,
     ...keyReencryptTools,
+    ...disputeTools,
     ...csmTools,
 ];
 
