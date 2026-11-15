@@ -25,7 +25,7 @@
  */
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { isOrganismOwner, organismOwners } from '../organism-ownership.js';
+import { isOrganismOwner, organismOwners } from '../organism/ownership.js';
 import { readTeamRecord, teamContextKey, teamDisplayName, teamGateOn, type TeamRecord } from './record.js';
 import { memoryTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';

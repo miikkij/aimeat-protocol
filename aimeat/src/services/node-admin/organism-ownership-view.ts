@@ -18,7 +18,7 @@
  *     the reads and the view (structure programme 2026-11, unit 2b).
  */
 import type { Storage } from '../../storage/interface.js';
-import { organismOwners } from '../organism-ownership.js';
+import { organismOwners } from '../organism/ownership.js';
 
 /** The organism's ownership view, or null when there is no such organism. */
 export async function organismOwnershipView(storage: Storage, organismId: string) {

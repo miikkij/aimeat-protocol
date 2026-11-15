@@ -8,7 +8,7 @@
  *   A refusal there comes after the provider was paid, so every part of it that does not depend on
  *   the answer itself is asked here first, at the start, and refused with the same code:
  *
- *   - an `organism.*` result key the starter may not write (services/organism-namespace-access.ts);
+ *   - an `organism.*` result key the starter may not write (services/organism/namespace-access.ts);
  *   - a result key whose record, workspace or organism is archived (services/archive.ts);
  *   - a schema lock on the key whose JSON type cannot take the answer the op produces (a text
  *     answer is a string, an image record and a JSON transcription are objects); a lock that could
@@ -32,7 +32,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { isKeyArchived } from '../archive.js';
 import { checkMemoryQuota } from '../quota.js';
 import { jobWriter } from './starter.js';

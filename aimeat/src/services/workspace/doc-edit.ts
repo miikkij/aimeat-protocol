@@ -56,7 +56,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
-import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { readWorkspaceManifest } from './meta.js';
 import { resolveSpace, type WriteObjectType } from './write-items.js';
 import { archivedRefusal } from './write-guards.js';

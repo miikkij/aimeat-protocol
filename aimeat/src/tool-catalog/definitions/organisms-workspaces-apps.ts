@@ -108,7 +108,7 @@ import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js'
 /**
  * Where an organism is, how many may join and who sees its members: fields POST /v1/organisms and
  * PUT /v1/organisms/:id both take on organism:write (structure programme 2026-11, unit 3b). The
- * service (services/organism-lifecycle.ts) validates them for every caller.
+ * service (services/organism/lifecycle.ts) validates them for every caller.
  */
 const ORGANISM_PLACE_AND_ROSTER_INPUT = {
     location: { type: 'object', description: 'Where the organism is: { city, area, country, geo: [latitude, longitude] }, each part optional. The directory searches by it.', zod: z.object({

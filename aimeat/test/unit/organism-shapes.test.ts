@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ORGANISM_SHAPES, shapeById, shapeWorkspaceInput, publicShapes } from '../../src/data/organism-shapes.js';
-import { resolveShape } from '../../src/services/organism-shape-apply.js';
+import { resolveShape } from '../../src/services/organism/shape-apply.js';
 
 describe('organism shapes', () => {
     it('six shapes, each with at least one workspace', () => {

@@ -66,7 +66,7 @@ import { toolError } from './tool-error.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { mintMorsels, morselsInCirculation } from '../services/morsel.js';
 import { nodeActivity } from '../services/node-admin/activity.js';
-import { addOrganismOwner } from '../services/organism-ownership.js';
+import { addOrganismOwner } from '../services/organism/ownership.js';
 import { organismOwnershipView } from '../services/node-admin/organism-ownership-view.js';
 import { nodeTeamsView } from '../services/node-admin/teams-view.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
@@ -279,7 +279,7 @@ export function registerCoreAdminTools(
     );
 
     // ── Tool 20: aimeat_admin_organism_owner_add ──
-    // The break-glass. ONE implementation (services/organism-ownership.ts handOverOwnership), the
+    // The break-glass. ONE implementation (services/organism/ownership.ts handOverOwnership), the
     // same function POST /v1/admin/organisms/:id/ownership calls, so the membership rules, the
     // notifications and the three-writes-together transaction cannot differ between the surfaces.
     mcp.registerTool(

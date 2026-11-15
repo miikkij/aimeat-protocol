@@ -10,7 +10,7 @@
  *   means one member's copy can replace another's. publishSkill and deleteSkill authorized that with
  *   the READ decision until 2026-10-20, so a `viewer` grant passed both (secaudit 2026-10, defect
  *   2). They ask this module now, which asks the one organism namespace rule
- *   (services/organism-namespace-access.ts) rather than keeping a second copy of it.
+ *   (services/organism/namespace-access.ts) rather than keeping a second copy of it.
  * @structure
  *   - wsWriteCaller() — the session the rule decides on, from a SkillAccessor
  *   - assertWsSkillWrite() — publish and delete: the workspace write rule on the skill's manifest key
@@ -22,7 +22,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { checkOrganismNamespaceAccess, type OrganismAccessCaller } from './organism-namespace-access.js';
+import { checkOrganismNamespaceAccess, type OrganismAccessCaller } from './organism/namespace-access.js';
 import { wsManifestKey } from './skill-refs.js';
 import { SkillAccessError, type SkillAccessor } from './skill-types.js';
 

@@ -39,7 +39,7 @@
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.0).
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
-import { agentBarred } from './organism-agent-access.js';
+import { agentBarred } from './organism/agent-access.js';
 import { ORGANISM_ID_RE } from '../utils/visibility-words.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 

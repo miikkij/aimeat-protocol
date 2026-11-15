@@ -72,7 +72,7 @@ import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
 import { scopeIsCovered } from '../../../utils/scope-coverage.js';
 import { ownerScopeView, readsAsOwner } from '../../owner-scope-read.js';
-import { organismReadableRecords } from '../../organism-namespace-access.js';
+import { organismReadableRecords } from '../../organism/namespace-access.js';
 import { readWorkspaceManifest } from '../../workspace/meta.js';
 import { shownMemoryValue } from '../../secret-records.js';
 import { appIdFromToolsKey } from '../../../models/app-tool-schemas.js';

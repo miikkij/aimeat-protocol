@@ -84,7 +84,7 @@ import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
 import { STORED_VISIBILITY_WORDS } from '../../utils/visibility-words.js';
-import { isStoredVisibility, organismVisibilityRefusal } from '../../services/organism-visibility.js';
+import { isStoredVisibility, organismVisibilityRefusal } from '../../services/organism/visibility.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../../services/doc-images.js';

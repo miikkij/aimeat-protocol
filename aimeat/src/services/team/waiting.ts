@@ -24,7 +24,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { readerFor } from '../classification/reader.js';
 import { loadWorkspaceContent } from '../workspace/content.js';
-import { isOrganismOwner } from '../organism-ownership.js';
+import { isOrganismOwner } from '../organism/ownership.js';
 import { listTeamsOf } from './status.js';
 import { teamDisplayName } from './record.js';
 

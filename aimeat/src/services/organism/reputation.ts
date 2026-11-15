@@ -1,5 +1,5 @@
 /**
- * @file src/services/organism-reputation.ts
+ * @file src/services/organism/reputation.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Organism reputation calculation service (Phase 3.4) — computes a weighted 0–1
@@ -17,9 +17,9 @@
 
 // Phase 3.4 — Organism Reputation Calculation Service
 
-import type { AimeatConfig } from '../config.js';
-import type { Storage, OrganismReputationRecord } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, OrganismReputationRecord } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
 
 // ── Weights ─────────────────────────────────────────────────────────
 const WEIGHT_MEMBERS  = 0.20;

@@ -41,7 +41,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { CompanyRecord } from '../../models/company-schemas.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { barredAgentFor } from '../organism-agent-access.js';
+import { barredAgentFor } from '../organism/agent-access.js';
 
 export interface SendingCompany {
   company: CompanyRecord;

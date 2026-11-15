@@ -42,7 +42,7 @@
 import type { CallerContext } from './caller-context.js';
 import type { Storage } from '../storage/interface.js';
 import { READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
-import { organismVisibilityAdmits } from './organism-visibility.js';
+import { organismVisibilityAdmits } from './organism/visibility.js';
 import { isOrganismVisibilityWord } from '../utils/visibility-words.js';
 
 export { READ_AS_OWNER_SCOPE };
@@ -69,7 +69,7 @@ export function ownerScopeView<T extends { ownerGaii: string; visibility: string
 
 /**
  * ownerScopeView, and also a same-owner record kept at `organism:<id>` when that organism admits this
- * reader: its account an active member and the agent not barred (services/organism-visibility.ts,
+ * reader: its account an active member and the agent not barred (services/organism/visibility.ts,
  * the rule a read of the record by its owner's address applies). Without it the owner's own agent read
  * a record the owner made visible to their family organism as absent, while a member of that organism
  * read it. Each organism is asked once per call. Used where an agent reads and lists its owner's memory

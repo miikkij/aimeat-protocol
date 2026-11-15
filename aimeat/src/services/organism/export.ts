@@ -1,5 +1,5 @@
 /**
- * @file organism-export.ts
+ * @file src/services/organism/export.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Export a whole organism as one ZIP — its settings + every workspace the exporter can
@@ -33,15 +33,15 @@
  *     classification kept out of every workspace ({ ws, key, label, reason }).
  */
 import { ZipArchive } from 'archiver';
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { collectWorkspace, type ExportTruncation } from './workspace/export.js';
-import { listOrganismWorkspaceEntries } from './workspace/meta.js';
-import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
-import { teamTransferOf } from './team/transfer.js';
-import type { ContentReader } from './classification/reader.js';
-import type { LeftOut } from './classification-exits.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { collectWorkspace, type ExportTruncation } from '../workspace/export.js';
+import { listOrganismWorkspaceEntries } from '../workspace/meta.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { teamTransferOf } from '../team/transfer.js';
+import type { ContentReader } from '../classification/reader.js';
+import type { LeftOut } from '../classification-exits.js';
 
 export const ORG_EXPORT_VERSION = '1.0';
 

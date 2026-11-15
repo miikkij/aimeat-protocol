@@ -134,7 +134,7 @@ and disputes (the other party's evidence), other people's ledger lines and recei
 records, and write counts inside other people's records. The username becomes free.
 
 The MCP tool `aimeat_organism_leave` does the same as the route (`leaveOrganism()` in
-`aimeat/src/services/organism-lifecycle.ts`).
+`aimeat/src/services/organism/lifecycle.ts`).
 
 **Limits today.** Erasure has no MCP tool and no page; a
 person calls the route from their own signed-in session, or asks the operator, who can erase on their

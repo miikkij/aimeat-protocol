@@ -1,5 +1,5 @@
 /**
- * @file src/services/organism-board.ts
+ * @file src/services/organism/board.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The visibility of an organism's discussion board (`org-<id>`), derived from the
@@ -23,9 +23,9 @@
  *   v1.0.0 — 2026-10-18 — Initial: the organism's board follows the organism's visibility (plan
  *     doc-mvcn6c7e4e5q, V3.5).
  */
-import type { Storage, OrganismRecord, BoardRecord } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
-import { boardOrganismAudience } from './board-read-access.js';
+import type { Storage, OrganismRecord, BoardRecord } from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
+import { boardOrganismAudience } from '../board-read-access.js';
 
 /** The board visibility an organism at `visibility` gives its discussion board. */
 export function organismBoardVisibility(organismId: string, visibility: string): BoardRecord['visibility'] {

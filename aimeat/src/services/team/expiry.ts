@@ -21,9 +21,9 @@ import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 import { notify } from '../notify.js';
-import { organismOwners, removeOrganismOwner } from '../organism-ownership.js';
-import { removeOrganismMember, MemberRemoveError } from '../organism-member-remove.js';
-import { organismArchiveOp } from '../organism-archive-op.js';
+import { organismOwners, removeOrganismOwner } from '../organism/ownership.js';
+import { removeOrganismMember, MemberRemoveError } from '../organism/member-remove.js';
+import { organismArchiveOp } from '../organism/archive-op.js';
 import { readTeamRecordWithVersion, writeTeamRecord, TEAM_ORGANISM_TYPES, type TeamRecord } from './record.js';
 
 /** How many days before an end the leads are told. */

@@ -26,7 +26,7 @@ vi.mock('../../src/services/workspace/provision.js', async (orig) => {
     };
 });
 
-import { applyOrganismShape } from '../../src/services/organism-shape-apply.js';
+import { applyOrganismShape } from '../../src/services/organism/shape-apply.js';
 import { shapeById } from '../../src/data/organism-shapes.js';
 import { WorkspaceProvisionError } from '../../src/services/workspace/provision.js';
 

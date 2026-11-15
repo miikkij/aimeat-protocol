@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description A person invited as a team lead becomes one when they accept. The invitation itself
  *   can only carry the organism roles member and admin, and an owner must already be an active
- *   member (services/organism-ownership.ts addOrganismOwner), so the team record keeps which
+ *   member (services/organism/ownership.ts addOrganismOwner), so the team record keeps which
  *   invitations make a lead, and the accept code path calls promotePendingLead() once the
  *   membership is active. Adding the owner is additive: the leads already there stay.
  *
@@ -17,7 +17,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
-import { addOrganismOwner } from '../organism-ownership.js';
+import { addOrganismOwner } from '../organism/ownership.js';
 import { readTeamRecordWithVersion, writeTeamRecord } from './record.js';
 
 /**

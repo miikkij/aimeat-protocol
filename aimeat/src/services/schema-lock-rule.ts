@@ -23,7 +23,7 @@
  *     2. A pattern under `organism.<id>.` is set by whoever may write that organism's meta
  *        namespace (an organism admin or creator), a workspace's meta namespace (its creator or an
  *        organism admin) or the member's own namespace (that member), asked with the same rule the
- *        memory write asks (services/organism-namespace-access.ts). A wildcard organism or
+ *        memory write asks (services/organism/namespace-access.ts). A wildcard organism or
  *        workspace id is the operator's.
  *     3. A lock that another account holds on the same pattern, under the other `apply_to`, is not
  *        shadowed by a lock beside it.
@@ -60,7 +60,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SchemaRecord, CsmRecord } from '../storage/interface.js';
-import { checkOrganismNamespaceAccess, type OrganismAccessCaller } from './organism-namespace-access.js';
+import { checkOrganismNamespaceAccess, type OrganismAccessCaller } from './organism/namespace-access.js';
 import { isOwnersLock } from './packages/compose/package-component-collisions.js';
 import { isRegisteringAccount, csmMayReadAs } from './csm/readers.js';
 

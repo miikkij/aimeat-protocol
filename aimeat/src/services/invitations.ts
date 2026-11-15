@@ -95,7 +95,7 @@ import { nodeContext } from './node-context.js';
 import { formatForPerson } from './display-prefs.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace/roles.js';
 import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';
-import { isOrganismOwner } from './organism-ownership.js';
+import { isOrganismOwner } from './organism/ownership.js';
 import { closeJoinRequestsOnMembership } from './organism-join-requests/requests.js';
 import { localAccountName } from '../utils/gaii.js';
 import { findWorkspaceRegistration, workspaceRegistrations } from './workspace/meta-read.js';
@@ -417,7 +417,7 @@ export async function createEmailInvitation(
  * active immediately, grants applied, and they are notified (they can always leave). */
 
 /** Find a workspace's registry entry across every member's registry copy (one key per creator).
- *  Standalone twin of services/organism-gate.ts findWsEntry, kept as it was written when that
+ *  Standalone twin of services/organism/gate.ts findWsEntry, kept as it was written when that
  *  helper lived in a route file. */
 export async function findWorkspaceEntry(
   storage: Storage, orgId: string, ws: string,
@@ -466,7 +466,7 @@ export async function applyInvitationWorkspaceGrants(
  * things outlive that row and both of them ARE access:
  *
  *   1. `organism.agentGaiis`. Every membership gate in the organism code treats a GAII listed there as
- *      a member in its own right (services/organism-gate.ts memberRole, the nine workspace read
+ *      a member in its own right (services/organism/gate.ts memberRole, the nine workspace read
  *      gates, the MCP workspace tools), so an ejected person kept the whole organism through their own
  *      agent's token while the roster showed them gone.
  *   2. The workspace-role consents granted to them. Those are owned by each workspace's CREATOR and

@@ -101,7 +101,7 @@ import { pullPackage } from './packages/peer/package-pull.js';
 import { getPackageFor } from './packages/compose/package-read.js';
 import { planPackageConfig, missingConfigMessage } from './packages/compose/package-config.js';
 import { expectsMissingMessage, missingExpects, type PackageExpects } from './packages/compose/package-expects.js';
-import { createOrganismRecord } from './organism-lifecycle.js';
+import { createOrganismRecord } from './organism/lifecycle.js';
 import { provisionWorkspace, checkWorkspaceManifest, type ProvisionWorkspaceInput } from './workspace/provision.js';
 import { deployAppAgent } from './app/agent-deploy.js';
 import { readProposal, settleProposal } from './agent/proposals.js';

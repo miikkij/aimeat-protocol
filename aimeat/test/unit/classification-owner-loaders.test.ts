@@ -25,8 +25,8 @@ import { readerFor, type ReaderAuth } from '../../src/services/classification/re
 import { memoryTarget } from '../../src/services/classification/labels.js';
 import { createThread, showThread, showThreads, readThread } from '../../src/services/chat-threads.js';
 import { addItem, showItems, listItems } from '../../src/services/open-items.js';
-import { addComment, listComments } from '../../src/services/organism-comments.js';
-import { setOrganismReadme, showOrganismReadme, getOrganismReadme } from '../../src/services/organism-readme.js';
+import { addComment, listComments } from '../../src/services/organism/comments.js';
+import { setOrganismReadme, showOrganismReadme, getOrganismReadme } from '../../src/services/organism/readme.js';
 import { publishSkill, resolveSkillRef, listSkills } from '../../src/services/skills.js';
 import { manifestKey, fileKey } from '../../src/services/skill-refs.js';
 import { fetchComponentContent, fetchComponentContentForAi } from '../../src/services/component-content.js';

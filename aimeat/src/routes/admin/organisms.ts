@@ -38,7 +38,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperatorPrincipal, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { addOrganismOwner, organismOwners } from '../../services/organism-ownership.js';
+import { addOrganismOwner, organismOwners } from '../../services/organism/ownership.js';
 import { organismOwnershipView } from '../../services/node-admin/organism-ownership-view.js';
 import { nodeTeamsView } from '../../services/node-admin/teams-view.js';
 import { logger } from '../../utils/logger.js';

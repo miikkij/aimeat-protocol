@@ -6,7 +6,7 @@
  *   that invite, add or remove people and owners (structure programme 2026-11, unit 2b). Each pair of
  *   surfaces held its own copy of the same read and the same test:
  *
- *   - organismForManager: an owner (isOrganismOwner, services/organism-ownership.ts) or an admin
+ *   - organismForManager: an owner (isOrganismOwner, services/organism/ownership.ts) or an admin
  *     (organism.admins). The invitation and member routes (requireInviteAdmin, requireOrgAdmin) and
  *     the invite tools (inviteAdminGate, orgForAdmin).
  *   - organismForOwner: an owner only. POST and DELETE /v1/organisms/:id/owners and
@@ -30,7 +30,7 @@
  *     mcp/organisms-name-invites.ts the same day.
  */
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
-import { isOrganismOwner } from '../organism-ownership.js';
+import { isOrganismOwner } from '../organism/ownership.js';
 import { invitePublic } from '../invitations.js';
 
 export type ManagerGate =

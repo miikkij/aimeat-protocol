@@ -1,6 +1,6 @@
 /**
  * @file test/unit/organism-lifecycle.test.ts
- * @description Unit tests for services/organism-lifecycle.ts, the create/update/join/leave writes
+ * @description Unit tests for services/organism/lifecycle.ts, the create/update/join/leave writes
  *   shared by the REST organism routes and the MCP organism tools. Each case pins one of the
  *   behaviours the two copies used to disagree about: the board owner, the approver notification on
  *   a join request, and update refusing an unrecognised enum instead of dropping it.
@@ -18,7 +18,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AimeatConfig } from '../../src/config.js';
 import {
     createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism,
-} from '../../src/services/organism-lifecycle.js';
+} from '../../src/services/organism/lifecycle.js';
 
 const NODE = 'test-node';
 const CREATOR = 'creatorowner';
@@ -90,7 +90,7 @@ describe('organism lifecycle (shared by /v1/organisms and the aimeat_organism_* 
         const board = await storage.getBoard(out.organism.boardId);
         expect(board?.ownerGaii).toBe(`${CREATOR}@${NODE}`);
         // A listed organism's board is read by its members: the organism level, not a shared board
-        // with an empty roster (services/organism-board.ts).
+        // with an empty roster (services/organism/board.ts).
         expect(board?.visibility).toBe(`organism:${out.organism.id}`);
     });
 

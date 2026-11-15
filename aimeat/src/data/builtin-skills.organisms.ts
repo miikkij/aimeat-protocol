@@ -8,7 +8,7 @@
  *   grounds and no skill explained them; the organism-setup prompt was reachable over REST only.
  *
  *   It must agree with data/organism-shapes.ts (the shapes and what they make),
- *   services/organism-lifecycle.ts (the `shape` parameter and its defaults) and the organism record's
+ *   services/organism/lifecycle.ts (the `shape` parameter and its defaults) and the organism record's
  *   agentAccess setting.
  * @structure ORGANISMS_SKILL_ENTRY
  * @usage import { ORGANISMS_SKILL_ENTRY } from './builtin-skills.organisms.js';

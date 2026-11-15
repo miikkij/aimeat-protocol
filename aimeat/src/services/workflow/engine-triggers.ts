@@ -32,7 +32,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { RowsAppendedEvent } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { globToRegExp } from './signal-eval.js';
 import { workflowEvent, rowIdsField, type WorkflowEvent } from './workflow-event.js';
 import { holdEvent, takeWaitingEvent, readWaitingEvents } from './engine-coalesce.js';

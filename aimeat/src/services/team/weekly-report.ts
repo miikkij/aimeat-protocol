@@ -21,7 +21,7 @@ import type { Storage, MemoryRecord, OrganismRecord } from '../../storage/interf
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 import { notify } from '../notify.js';
-import { organismOwners } from '../organism-ownership.js';
+import { organismOwners } from '../organism/ownership.js';
 import { readTeamRecord, TEAM_ORGANISM_TYPES, type TeamRecord } from './record.js';
 import { readerFor } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';

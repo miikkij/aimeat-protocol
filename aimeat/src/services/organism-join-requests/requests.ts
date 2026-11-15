@@ -7,7 +7,7 @@
  *   members. One implementation for the REST routes and the MCP tools.
  *
  *   TWO WAYS IN, ONE RECORD. A join request is filed either by the organism's own id
- *   (services/organism-lifecycle.ts joinOrganism, when `joinPolicy` is approval_required) or as an
+ *   (services/organism/lifecycle.ts joinOrganism, when `joinPolicy` is approval_required) or as an
  *   access request (requestAccess): a person an app or page refused asks from the refusal page, the
  *   node reads the organism from the app's or page's own `access` setting, and the requester is never
  *   told which organism it is. An access request carries `via`, the app or page it was asked from;
@@ -47,7 +47,7 @@ import { emitChange } from '../event-bus.js';
 import { notify } from '../notify.js';
 import { organismLink } from '../notifications/links.js';
 import { answerNotifications } from '../notification-answers.js';
-import { organismOwners, isOrganismOwner } from '../organism-ownership.js';
+import { organismOwners, isOrganismOwner } from '../organism/ownership.js';
 import { isNodeAccount, type AudienceAuth } from '../audience.js';
 import { mayOpenPage, pageAccessLevel } from '../page-access.js';
 import { isSameAccount } from '../../utils/same-account.js';

@@ -1,5 +1,5 @@
 /**
- * @file src/services/organism-shape-apply.ts
+ * @file src/services/organism/shape-apply.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Gives a new organism the workspaces of a starting shape (data/organism-shapes.ts):
@@ -16,11 +16,11 @@
  *     either, so the error's quoted request text never shares a variable with the shape.
  *   v1.0.0 — 2026-10-01 — Initial (guided journey P5).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { ORGANISM_SHAPES, shapeById, shapeWorkspaceInput, type OrganismShape } from '../data/organism-shapes.js';
-import { provisionWorkspace, WorkspaceProvisionError, WorkspaceMetaError } from './workspace/provision.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { ORGANISM_SHAPES, shapeById, shapeWorkspaceInput, type OrganismShape } from '../../data/organism-shapes.js';
+import { provisionWorkspace, WorkspaceProvisionError, WorkspaceMetaError } from '../workspace/provision.js';
+import { logger } from '../../utils/logger.js';
 
 export interface ShapedWorkspace { ws: string; name: string }
 /** A workspace of the shape that the node could not create: its name, its place in the shape, why. */

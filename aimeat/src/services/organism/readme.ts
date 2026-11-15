@@ -1,5 +1,5 @@
 /**
- * @file organism-readme.ts
+ * @file src/services/organism/readme.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Read/write the organism-level free-form README — a markdown description (mermaid
@@ -10,17 +10,17 @@
  *   typed accessor over the generic memory API, shared by the REST routes and the MCP update tool.
  * @structure showOrganismReadme(storage, reader, orgId); getOrganismReadme(storage, orgId);
  *   setOrganismReadme(storage, config, orgId, readme, creatorGhii)
- * @usage import { showOrganismReadme, setOrganismReadme } from './organism-readme.js';
+ * @usage import { showOrganismReadme, setOrganismReadme } from './readme.js';
  * @version-history
  *   v1.1.0 — 2026-09-29 — TARGET-082 V4: showOrganismReadme, the README as a caller may see it (the
  *     record passes the caller's ContentReader; one it may not see reads as ''). getOrganismReadme
  *     stays for the node's own echo after an update.
  *   v1.0.0 — 2026-06-22 — Initial: organism README accessor (display + edit + MCP fill).
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { memoryTarget } from './classification/labels.js';
-import type { ContentReader } from './classification/reader.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { memoryTarget } from '../classification/labels.js';
+import type { ContentReader } from '../classification/reader.js';
 
 /** The memory key holding an organism's README. */
 export function organismReadmeKey(orgId: string): string {

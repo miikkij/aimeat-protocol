@@ -28,7 +28,7 @@ import { emitChange, emitWorkspaceChange, workspaceOfKey } from '../event-bus.js
 import { updateOrganismStructure } from '../structure-snapshot.js';
 import { logger } from '../../utils/logger.js';
 import { teamDeleteGate } from '../team/action-gate.js';
-import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import {
     refuse, denyReason, fencedOpRefusal,
     type WorkspaceOpsDeps, type WorkspaceOpsCaller, type WorkspaceOpResult,
@@ -90,7 +90,7 @@ export async function deleteRecordsBatchOp(
         if (fenced) return fenced;
     }
     // Removing a workspace record is a write: the workspace's creator, an organism manager, or a
-    // member holding the creator's contributor role (services/organism-namespace-access.ts), the rule
+    // member holding the creator's contributor role (services/organism/namespace-access.ts), the rule
     // a draft write and DELETE /v1/memory/:key ask. Asked once per workspace, with a real key of it.
     // Organism membership alone let a member whose role was revoked, or a viewer, delete here.
     for (const keys of byWs.values()) {

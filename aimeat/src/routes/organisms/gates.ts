@@ -79,7 +79,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspace/tool-ops.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { fencedSpaceRefusal } from '../../services/fenced-space.js';
-import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../../services/organism/namespace-access.js';
 import { isTeamGateAction } from '../../services/team/action-gate.js';
 import { siemEmit } from '../../services/node-admin/siem-export.js';
 
@@ -126,7 +126,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     return true;
   };
   /**
-   * The organism rule's write test for the record's draft key (services/organism-namespace-access.ts):
+   * The organism rule's write test for the record's draft key (services/organism/namespace-access.ts):
    * in a workspace, its creator, an organism admin, or a holder of the creator's contributor grant.
    * A publish consumes the draft and writes the record, and a reopen writes a draft, so both ask the
    * test a draft write asks. The flat organism namespace (no ws) keeps its membership rule. True when

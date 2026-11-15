@@ -108,7 +108,7 @@ import { organismLink } from '../../services/notifications/links.js';
 import { hashPassword } from '../../services/password.js';
 import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, emailHashOf } from '../../services/owner-provisioning.js';
 import { nodeContext } from '../../services/node-context.js';
-import { isOrganismOwner } from '../../services/organism-ownership.js';
+import { isOrganismOwner } from '../../services/organism/ownership.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace/enrichment.js';
 import { isOrgManager } from '../../services/workspace/access.js';
 import { workspaceMetaReader } from '../../services/workspace/meta.js';

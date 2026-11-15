@@ -71,7 +71,7 @@ import { localAccountOf } from '../../utils/gaii.js';
 import { decideForOwner } from '../decide/service.js';
 import { completeForOwner } from '../ai/completion.js';
 import { createScrubber } from '../decide/scrub.js';
-import { organismOwners } from '../organism-ownership.js';
+import { organismOwners } from '../organism/ownership.js';
 import {
   ClassificationError, activePolicies, ownerOfScope, readSystem, runRules, scopeOrganism, setLabel, systemReader,
   UNCHANGED, updateSystem,

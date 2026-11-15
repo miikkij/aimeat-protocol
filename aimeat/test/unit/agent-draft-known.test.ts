@@ -590,7 +590,7 @@ describe('the model a person picks for a new agent', () => {
 describe('whether an agent that works on a workspace\'s records goes onto the organism\'s agent list', () => {
     // Measured on aimeat.io on 2026-10-13: an agent made on the page was put on the list of an
     // organism that admits every member's agent, and every write it made into the workspace it
-    // watched was refused (services/organism-namespace-access.ts gives a listed agent of such an
+    // watched was refused (services/organism/namespace-access.ts gives a listed agent of such an
     // organism the shared area only). Taken off the list, the same agent wrote its records.
     it('an organism that admits only listed agents: yes, the list is how the agent gets in', () => {
         expect(joinsAgentList({ agentAccess: 'listed' })).toBe(true);

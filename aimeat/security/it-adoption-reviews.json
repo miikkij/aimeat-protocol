@@ -159,7 +159,7 @@
         "aimeat/src/static/sdk-libs/auth/last-identity.js",
         "aimeat/src/static/sdk-libs/offline/store.js"
       ],
-      "digest": "sha256:5564a123eefddc418965ba0d"
+      "digest": "sha256:cf7dde33468745c998170818"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-15",
@@ -188,13 +188,13 @@
       "digest": "sha256:6868e6afcd60ca902bb49b52"
     },
     "17-exit-plan.md": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "docs/data-ownership.md",
         "LICENSE",
         ".github/SECURITY.md"
       ],
-      "digest": "sha256:6ba931491ddd23513d6dce92"
+      "digest": "sha256:03b0a685f75592719ba31b5c"
     },
     "18-scope-and-deployment-patterns.md": {
       "reviewedOn": "2026-11-15",
@@ -377,7 +377,7 @@
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec",
       "aimeat/src/services/receivers/receive.ts": "23774d484171476e",
       "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87",
-      "aimeat/src/services/organism-join-requests/requests.ts": "002ad2b4de04a124",
+      "aimeat/src/services/organism-join-requests/requests.ts": "c8007419dacc2b65",
       "aimeat/src/static/app-sw-offline.js": "a2d64d1dd7bfa006",
       "aimeat/src/static/sdk-libs/auth/last-identity.js": "5bf2640a302bc906",
       "aimeat/src/static/sdk-libs/offline/store.js": "ba14118fe69ad407"
@@ -397,7 +397,7 @@
       "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46"
     },
     "17-exit-plan.md": {
-      "docs/data-ownership.md": "a59363b6aa28f68f",
+      "docs/data-ownership.md": "f7a22b4084b9170e",
       "LICENSE": "125eb0733ed6fbb1",
       ".github/SECURITY.md": "3298fcc91e6ba5ee"
     },

@@ -57,9 +57,9 @@ import { aiScheduleFireViewer } from './schedule-ai-read.js';
 import { instructionHoldAtFire } from './schedule-instruction-hold.js';
 import { noteAgentRefusal } from './agent/refusals.js';
 import { agentSessionCaller, callerFromAuth } from './caller-context.js';
-import { organismVisibilityRefusal } from './organism-visibility.js';
+import { organismVisibilityRefusal } from './organism/visibility.js';
 import { memoryGroupRefusal } from '../storage/memory-sharing.js';
-import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from './organism/namespace-access.js';
 
 /** A workspace's manifest record, whose write rule compares the value it stores (services/fenced-space.ts). */
 const MANIFEST_KEY = /^organism\.[^.]+\.w\.[^.]+\.meta\.manifest$/;

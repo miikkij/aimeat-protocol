@@ -120,14 +120,14 @@ import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { exportOrganism } from '../services/organism-export.js';
-import { importOrganism, previewOrganismImport } from '../services/organism-import.js';
+import { exportOrganism } from '../services/organism/export.js';
+import { importOrganism, previewOrganismImport } from '../services/organism/import.js';
 import { parseTransferOptions } from '../services/team/transfer.js';
 import { registerOrganismNameInviteTools } from './organisms-name-invites.js';
 import { registerOrganismEmailInviteTools } from './organisms-email-invites.js';
-import { searchOrganismContent } from '../services/organism-search.js';
-import { organismArchiveOp } from '../services/organism-archive-op.js';
-import { addComment, listComments } from '../services/organism-comments.js';
+import { searchOrganismContent } from '../services/organism/search.js';
+import { organismArchiveOp } from '../services/organism/archive-op.js';
+import { addComment, listComments } from '../services/organism/comments.js';
 import { commentWorkspace, deleteCommentIn } from '../services/organism-read/comments.js';
 import { organismMemberGate, organismForActiveMember, organismShownTo, organismRosterFor, organismToJoin } from '../services/organism-read/member.js';
 import { organismForManager } from '../services/organism-read/manager.js';
@@ -137,12 +137,12 @@ import { toolError } from './tool-error.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { provenanceForWrite } from '../services/ai/provenance.js';
-import { createOrganismRecord, updateOrganismRecord, joinOrganism } from '../services/organism-lifecycle.js';
-import { canSeeMembers, rosterAgentsFor, type RosterCaller } from '../services/organism-privacy.js';
+import { createOrganismRecord, updateOrganismRecord, joinOrganism } from '../services/organism/lifecycle.js';
+import { canSeeMembers, rosterAgentsFor, type RosterCaller } from '../services/organism/privacy.js';
 import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
-import { organismOwners } from '../services/organism-ownership.js';
+import { organismOwners } from '../services/organism/ownership.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -369,7 +369,7 @@ export function registerOrganismsTools(
             const organism = target.organism;
 
             // The membership checks, capacity, the policy branch and the approver notifications are
-            // the shared writer's (services/organism-lifecycle.ts, same call POST /:id/join makes).
+            // the shared writer's (services/organism/lifecycle.ts, same call POST /:id/join makes).
             const result = await joinOrganism({ storage, config }, organism, getOwnerName(), message);
             if (!result.ok) {
                 // The invitation refusal names the tool that resolves it; the rest render the
@@ -397,7 +397,7 @@ export function registerOrganismsTools(
         },
         async ({ organism_id }) => {
             // Shared with POST /:id/leave (services/organism-read/leave.ts): the organism read, then
-            // the membership row and the roster/admin sync together (services/organism-lifecycle.ts).
+            // the membership row and the roster/admin sync together (services/organism/lifecycle.ts).
             const result = await leaveOrganismAs({ storage, config }, organism_id, { owner: getOwnerName() });
             if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
 
@@ -431,7 +431,7 @@ export function registerOrganismsTools(
 
             // Same-owner agents inherit a member's access implicitly, so "who can touch this
             // organism" is enumerable: the agents per member, to whom and which ones, are the REST
-            // members route's rule (services/organism-privacy.ts rosterAgentsFor). A hidden roster
+            // members route's rule (services/organism/privacy.ts rosterAgentsFor). A hidden roster
             // names none (structure programme 2026-11, unit 7).
             const admitted = await rosterAgentsFor(storage, organism, caller, canSeeRoster, members.map(m => localAccountName(m.ghii)));
             const canSeeAgents = admitted !== null;
@@ -495,7 +495,7 @@ export function registerOrganismsTools(
     );
 
     // ── Tool: aimeat_organism_archive ── (archive/unarchive content; read-only + hidden from AI)
-    // The operation is services/organism-archive-op.ts, the one POST /v1/organisms/:id/archive runs:
+    // The operation is services/organism/archive-op.ts, the one POST /v1/organisms/:id/archive runs:
     // creator or admin by archiveRoleOf (an ATTACHED organism agent is a member there, and refused,
     // whoever its owner is), the target check, the fenced-space rule, the archive, the change event
     // and the organism timeline entry. This tool renders the answer as text.
@@ -605,7 +605,7 @@ export function registerOrganismsTools(
         },
         async ({ name, description, type, join_policy, visibility, shape, lang, interests, location, max_members, member_visibility }) => {
             // Validation, the board, the record, the creator membership, the shape's workspaces and
-            // the feed/timeline side effects are the shared writer's (services/organism-lifecycle.ts,
+            // the feed/timeline side effects are the shared writer's (services/organism/lifecycle.ts,
             // same call POST /v1/organisms makes).
             const result = await createOrganismRecord({ storage, config }, getOwnerName(), {
                 name, description, type, joinPolicy: join_policy, visibility, shape, lang,
@@ -651,7 +651,7 @@ export function registerOrganismsTools(
             const gate = await organismForManager(storage, organism_id, { owner: getOwnerName() });
             if (!gate.ok) return { content: [{ type: 'text' as const, text: gate.code === 'NOT_FOUND' ? 'Organism not found' : 'Only the creator or an admin can update this organism' }], isError: true };
             const organism = gate.organism;
-            // Shared with PUT /v1/organisms/:id (services/organism-lifecycle.ts): the field
+            // Shared with PUT /v1/organisms/:id (services/organism/lifecycle.ts): the field
             // validation, the record update and the README key. An unrecognised join_policy or
             // visibility is refused here rather than dropped, so "updated" means it was.
             const result = await updateOrganismRecord({ storage, config }, organism, {

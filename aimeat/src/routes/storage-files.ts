@@ -191,7 +191,7 @@ import { decodeStrictBase64 } from '../utils/base64.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 import { resolveIdentity, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { isOrganismVisibilityWord, STORED_VISIBILITY_WORDS } from '../utils/visibility-words.js';
-import { isStoredVisibility } from '../services/organism-visibility.js';
+import { isStoredVisibility } from '../services/organism/visibility.js';
 import { callerOf } from '../middleware/caller.js';
 import { mailboxReaderOf } from '../services/owner-mailbox-reads.js';
 import { mailboxAttachmentReadable } from '../services/mailbox/attachment-read.js';

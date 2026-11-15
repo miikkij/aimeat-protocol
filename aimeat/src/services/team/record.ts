@@ -8,10 +8,10 @@
  *   invitations that make their accepter a lead.
  *
  *   WHY A META RECORD. A team is an organism; nothing about the organism changes. The organism's
- *   meta namespace is written by its owners and admins only (services/organism-namespace-access.ts),
+ *   meta namespace is written by its owners and admins only (services/organism/namespace-access.ts),
  *   which is the rule the names and the pending leads need: a member's AI must not rename the team
  *   or make itself a lead. The record is owned by the organism's creator, as the README is
- *   (services/organism-readme.ts), and written on its version.
+ *   (services/organism/readme.ts), and written on its version.
  * @structure TEAM_RECORD_TYPE · TeamRecord · PendingLead · teamRecordKey · readTeamRecord ·
  *   writeTeamRecord · teamDisplayName · teamContextKey
  * @usage

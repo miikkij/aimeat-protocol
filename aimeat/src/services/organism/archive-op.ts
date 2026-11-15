@@ -1,5 +1,5 @@
 /**
- * @file src/services/organism-archive-op.ts
+ * @file src/services/organism/archive-op.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Archive or bring back organism content, the whole operation, for
@@ -33,15 +33,15 @@
  *     services/memory-ceilings:count-returning-transitions-skip-ceiling).
  *   v1.0.0 — 2026-10-16 — Initial, out of routes/organisms/shared.ts archiveHandler and mcp/organisms.ts (QA audit D2-08).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { archiveTarget, unarchiveTarget, archiveRoleOf, archivedOwnersUnder, liveOwnersUnder, type ArchiveLevel, type ArchiveTarget } from './archive.js';
-import { archiveWithinCeiling, flipWithinCeilings } from './memory-ceilings.js';
-import { archiveFenceTarget, fencedSpaceRefusal } from './fenced-space.js';
-import { updateOrganismStructure } from './structure-snapshot.js';
-import { emitChange } from './event-bus.js';
-import { logger } from '../utils/logger.js';
-import { isSameOwner } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { archiveTarget, unarchiveTarget, archiveRoleOf, archivedOwnersUnder, liveOwnersUnder, type ArchiveLevel, type ArchiveTarget } from '../archive.js';
+import { archiveWithinCeiling, flipWithinCeilings } from '../memory-ceilings.js';
+import { archiveFenceTarget, fencedSpaceRefusal } from '../fenced-space.js';
+import { updateOrganismStructure } from '../structure-snapshot.js';
+import { emitChange } from '../event-bus.js';
+import { logger } from '../../utils/logger.js';
+import { isSameOwner } from '../../utils/gaii.js';
 
 /** Who archives: the resolved principal, the account it acts for, and the session's roles and scopes. */
 export interface OrganismArchiveCaller {

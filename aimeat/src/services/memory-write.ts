@@ -167,7 +167,7 @@ import { emitEcosystemMemoryWrite } from './ecosystem-events.js';
 import { runAutomationRecipesForWrite } from './ecosystem-automation.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
-import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from './organism/namespace-access.js';
 import { misdirectedCrewKey, crewSitesWriteRefusal } from './crews/def-envelope.js';
 import { parseGAII, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace/write-items.js';
@@ -179,7 +179,7 @@ import { agentKeyRefusal } from '../utils/agent-key-address.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { canonicalAppToolsKey } from './app/tools-key.js';
 import { classifyAfterWrite } from './classify-on-write.js';
-import { organismVisibilityRefusal } from './organism-visibility.js';
+import { organismVisibilityRefusal } from './organism/visibility.js';
 import { isNamedGroup, memoryGroupRefusal, unknownGroupRefusal } from '../storage/memory-sharing.js';
 import { isRaiseToPublic } from './publish-gate.js';
 import type { PublishAsk, publishRequestedBody } from './publish-requests/ask.js';
@@ -273,10 +273,10 @@ export async function writeMemoryRecord(
         };
     }
     // 1b'. A record made visible to one organism names an organism the writer's account is an active
-    //      member of, decided by services/audience.ts through services/organism-visibility.ts.
+    //      member of, decided by services/audience.ts through services/organism/visibility.ts.
     //      A receiver writes for its owner, and its identity (receiver:<owner>/<name>@<node>, built by the
     //      server from the verified key) names no account, so the check reads the owner it writes for:
-    //      the namespace the record lands in, which services/organism-visibility.ts accepts as the writer.
+    //      the namespace the record lands in, which services/organism/visibility.ts accepts as the writer.
     const writesForOwner = caller.roles.includes('receiver') && caller.principal.startsWith('receiver:');
     const audienceRefusal = await organismVisibilityRefusal(storage, input.visibility, {
         identity: writesForOwner ? caller.targetGaii : caller.principal, federated: isForeignPrincipal(caller),
@@ -284,7 +284,7 @@ export async function writeMemoryRecord(
     if (audienceRefusal) return { ok: false, ...audienceRefusal };
 
     // 1c. An organism.* key belongs to a shared space, and who may write one is decided by
-    //     services/organism-namespace-access.ts — the whole rule, not a floor under it. This used to
+    //     services/organism/namespace-access.ts — the whole rule, not a floor under it. This used to
     //     check only membership, because the rest of it lived in an Express middleware the MCP path
     //     could not call. What that cost: a member holding a VIEWER grant wrote another member's
     //     workspace content, any active member rewrote the meta.* workspace registry that every

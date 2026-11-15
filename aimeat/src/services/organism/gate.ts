@@ -1,5 +1,5 @@
 /**
- * @file src/services/organism-gate.ts
+ * @file src/services/organism/gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The organism and workspace gate the routes, the MCP tools and the services share.
@@ -106,35 +106,35 @@
  */
 import { v4 as uuidv4 } from 'uuid';
 import type { IncomingHttpHeaders } from 'node:http';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import type { VerifiedToken } from '../auth/jwt.js';
-import { verifyShareToken, shareTokenVersionOf } from './share-token.js';
-import { emitMemoryWritten } from './event-bus.js';
-import { normalizeDocValueImages, scopeDocImagesToWorkspace } from './doc-images.js';
-import { scopeRecordFilesToWorkspace } from './record-files.js';
-import { isSameOwner, isGEAI, localAccountName } from '../utils/gaii.js';
-import { isNodeAccount } from './audience.js';
-import { authorizeRead } from './access-guard.js';
-import { ecoMayReadKey } from './ecosystem-access.js';
-import { validateMemoryWrite, validateValueAgainstSchema } from './schema-validator.js';
-import { validateArchiveTarget } from './organism-archive-op.js';
-import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from './workspace/roles.js';
-import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from './workspace/versions.js';
-import { readPublishSpace, type UndeclaredSpaceRefusal } from './workspace/write-items.js';
-import { readWorkspaceMetaRecord, workspaceMetaReader, workspaceRegistrations } from './workspace/meta.js';
-import { createPublicCollectors } from './workspace/public-collectors.js';
-import { logger } from '../utils/logger.js';
-import { classifyAfterWrite } from './classify-on-write.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { VerifiedToken } from '../../auth/jwt.js';
+import { verifyShareToken, shareTokenVersionOf } from '../share-token.js';
+import { emitMemoryWritten } from '../event-bus.js';
+import { normalizeDocValueImages, scopeDocImagesToWorkspace } from '../doc-images.js';
+import { scopeRecordFilesToWorkspace } from '../record-files.js';
+import { isSameOwner, isGEAI, localAccountName } from '../../utils/gaii.js';
+import { isNodeAccount } from '../audience.js';
+import { authorizeRead } from '../access-guard.js';
+import { ecoMayReadKey } from '../ecosystem-access.js';
+import { validateMemoryWrite, validateValueAgainstSchema } from '../schema-validator.js';
+import { validateArchiveTarget } from './archive-op.js';
+import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../workspace/roles.js';
+import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../workspace/versions.js';
+import { readPublishSpace, type UndeclaredSpaceRefusal } from '../workspace/write-items.js';
+import { readWorkspaceMetaRecord, workspaceMetaReader, workspaceRegistrations } from '../workspace/meta.js';
+import { createPublicCollectors } from '../workspace/public-collectors.js';
+import { logger } from '../../utils/logger.js';
+import { classifyAfterWrite } from '../classify-on-write.js';
 
-import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRecordToDraft, readOrganismConfig, readOrganismMetaValue } from './organism-record-helpers.js';
+import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRecordToDraft, readOrganismConfig, readOrganismMetaValue } from './record-helpers.js';
 
 // The share shapes live in routes/organisms/share-types.ts (a type-only import).
-import type { ResolvedShare } from '../routes/organisms/share-types.js';
-import { readShareMetaOf, redactShareOf, memberRoleOf } from './workspace/share.js';
-import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from './html-page.js';
-import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
-import { holderLivingStatus } from './living/config-publish.js';
+import type { ResolvedShare } from '../../routes/organisms/share-types.js';
+import { readShareMetaOf, redactShareOf, memberRoleOf } from '../workspace/share.js';
+import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from '../html-page.js';
+import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
+import { holderLivingStatus } from '../living/config-publish.js';
 
 export type OrganismGate = ReturnType<typeof createOrganismGate>;
 

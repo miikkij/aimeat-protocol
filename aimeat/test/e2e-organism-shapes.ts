@@ -2,7 +2,7 @@
  * @file e2e-organism-shapes.ts
  * @description E2E for the organism starting shapes (data/organism-shapes.ts): GET
  *   /v1/organisms/shapes, POST /v1/organisms with `shape` and `lang` on REST and over MCP (the same
- *   service, services/organism-lifecycle.ts), and the project template applied to an existing empty
+ *   service, services/organism/lifecycle.ts), and the project template applied to an existing empty
  *   workspace through PUT /v1/organisms/:id/workspace, which is how the organism page applies it now.
  *
  *   Happy path: the shapes are listed in the asked language; a company made over REST in Finnish has

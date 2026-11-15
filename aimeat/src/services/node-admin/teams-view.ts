@@ -17,7 +17,7 @@
  *   v1.0.0 — 2026-11-15 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T16).
  */
 import type { Storage } from '../../storage/interface.js';
-import { organismOwners } from '../organism-ownership.js';
+import { organismOwners } from '../organism/ownership.js';
 import { readTeamRecord, teamDisplayName, TEAM_ORGANISM_TYPES } from '../team/record.js';
 import { teamWeekRecords } from '../team/weekly-report.js';
 import { structureKey } from '../structure-snapshot.js';

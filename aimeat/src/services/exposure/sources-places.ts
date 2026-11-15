@@ -23,7 +23,7 @@
  *     something: their own `access` (services/page-access.ts pageAccessLevel) names who opens them.
  *
  *   Who a share or an organism belongs to: an organism counts for the people who hold it
- *   (services/organism-ownership.ts); a workspace share for its workspace's creator and for the
+ *   (services/organism/ownership.ts); a workspace share for its workspace's creator and for the
  *   organism's creator, owners and admins, because each of them can close it.
  *
  *   EACH PLACE NAMES ITS CLASSIFICATION ADDRESS (`content`): the app, the board, the organism, and
@@ -50,7 +50,7 @@ import { readShareMetaOf, publicViewerPath } from '../workspace/share.js';
 import { createPublicCollectors } from '../workspace/public-collectors.js';
 import { readerFor } from '../classification/reader.js';
 import { workspaceRegistrations } from '../workspace/meta-read.js';
-import { isOrganismOwner } from '../organism-ownership.js';
+import { isOrganismOwner } from '../organism/ownership.js';
 import { companyAddress } from '../company/company-service.js';
 import { listPublishedMembers } from '../portfolio-members.js';
 import { portfolioSwitchState } from '../portfolio-config.js';

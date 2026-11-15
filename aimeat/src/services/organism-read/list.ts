@@ -26,7 +26,7 @@ import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { VerifiedToken } from '../../auth/jwt.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
-import { organismsAdmitting } from '../organism-agent-access.js';
+import { organismsAdmitting } from '../organism/agent-access.js';
 import { isOperatorCaller } from '../operator-override.js';
 
 /** What a caller who is neither the member asked about nor an operator browses: the same two
@@ -75,7 +75,7 @@ export async function listedOrganisms(
     });
 
     // A member list leaves out, for an agent, an organism that does not admit it, as
-    // aimeat_organism_list does: its name is its own (services/organism-agent-access.ts). Not an agent:
+    // aimeat_organism_list does: its name is its own (services/organism/agent-access.ts). Not an agent:
     // the list is as before. Browsing (no member filter) is the directory and is not narrowed here.
     return params.member && auth && !isAnonymousPrincipal(auth)
         ? organismsAdmitting(organisms, resolveIdentity(auth, config.nodeId))

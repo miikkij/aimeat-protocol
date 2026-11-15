@@ -87,7 +87,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
-import { agentBarred, agentBarredMessage } from '../../services/organism-agent-access.js';
+import { agentBarred, agentBarredMessage } from '../../services/organism/agent-access.js';
 import { formConfigOfRecord } from '../../services/intake/form-owner.js';
 
 /** Server-trusted intake-form config, stored at organism.{org}.w.{ws}.meta.intake.{formId}. */

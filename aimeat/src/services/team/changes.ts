@@ -19,8 +19,8 @@
  */
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { organismOwners, removeOrganismOwner } from '../organism-ownership.js';
-import { removeOrganismMember, MemberRemoveError } from '../organism-member-remove.js';
+import { organismOwners, removeOrganismOwner } from '../organism/ownership.js';
+import { removeOrganismMember, MemberRemoveError } from '../organism/member-remove.js';
 import { cancelEmailInvitation, cancelNameInvitation, InvitationError, inviteEmailHash } from '../invitations.js';
 import { readTeamRecordWithVersion, writeTeamRecord } from './record.js';
 /** The parts of a setup's person and team this file reads (services/team/setup.ts PersonInput, TeamInput). */

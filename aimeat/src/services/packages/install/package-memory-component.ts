@@ -19,7 +19,7 @@
  *     own guide. A package places a skill through a `skill` component, which refuses a node
  *     built-in's name (package-skill-component.ts) and counts as code (packages:install-code).
  *   - `organism.` is an organism's shared namespace, where membership decides who writes
- *     (services/organism-namespace-access.ts), and a workspace is provisioned through its own
+ *     (services/organism/namespace-access.ts), and a workspace is provisioned through its own
  *     routes rather than by a package. POST /v1/memory refuses the same key to a caller that is not
  *     an active member with write rights, and pressing install is not membership.
  *
@@ -90,7 +90,7 @@ export function memoryComponentEntries(content: string, registeredAs: string): M
 
 /** The installer's skill registry (services/skills.ts): a skill arrives through a `skill` component. */
 const SKILL_REGISTRY_PREFIX = 'skills.';
-/** An organism's namespace (services/organism-namespace-access.ts): membership decides who writes there. */
+/** An organism's namespace (services/organism/namespace-access.ts): membership decides who writes there. */
 const ORGANISM_NAMESPACE_PREFIX = 'organism.';
 
 /** Why one key is refused, which is what the message says and the only thing it varies on. */

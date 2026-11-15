@@ -65,7 +65,7 @@ import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
 import { notify } from '../notify.js';
 import { CAS_ATTEMPTS } from '../record-cas.js';
-import { updateOrganismRecord } from '../organism-lifecycle.js';
+import { updateOrganismRecord } from '../organism/lifecycle.js';
 import { applyOwnerSettingsUpdate, type AppSettingsInput } from '../app/settings.js';
 import { generateAccessCode } from '../app/publish-exposure.js';
 import { appAudienceOf } from '../app/publish-gate.js';

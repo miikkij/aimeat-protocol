@@ -1,5 +1,5 @@
 /**
- * @file organism-privacy.ts
+ * @file src/services/organism/privacy.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Member-roster visibility for organisms — THE one policy every surface consults
@@ -24,11 +24,11 @@
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). rosterCallerFromAuth is async and takes the storage.
  *   v1.0.0 — 2026-07-03 — Initial (privacy fix: rosters were world-readable via detail/list/members).
  */
-import type { Storage, OrganismRecord, AgentRecord } from '../storage/interface.js';
-import { isOrganismOwner } from './organism-ownership.js';
-import { agentBarred } from './organism-agent-access.js';
-import { isOperatorCaller, type OperatorAuth } from './operator-override.js';
-import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import type { Storage, OrganismRecord, AgentRecord } from '../../storage/interface.js';
+import { isOrganismOwner } from './ownership.js';
+import { agentBarred } from './agent-access.js';
+import { isOperatorCaller, type OperatorAuth } from '../operator-override.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 
 export type MemberVisibility = NonNullable<OrganismRecord['memberVisibility']>;
 

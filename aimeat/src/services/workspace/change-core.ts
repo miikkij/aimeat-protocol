@@ -16,7 +16,7 @@
  *   contributor role the creator grants (services/workspace/roles.ts), the same role that lets them
  *   write the workspace's content; a viewer reads and does not change. An agent attached to the
  *   organism works in the organism's shared area and never in a workspace, as the namespace rule
- *   already says (services/organism-namespace-access.ts).
+ *   already says (services/organism/namespace-access.ts).
  * @structure
  *   - ChangeCaller, ChangeDeps, ChangeRefusal, refusal(), isRefusal()
  *   - workspaceStanding() — the caller's place in one workspace, and the workspace's rule
@@ -58,7 +58,7 @@ import { isPlatformWorkspaceNamespace } from './write-items.js';
 import { validateMemoryWrite } from '../schema-validator.js';
 import { readStoredSections, type Section } from './sections.js';
 import { recordRowAt } from './record-key.js';
-import { attachedAsParticipant } from '../organism-agent-access.js';
+import { attachedAsParticipant } from '../organism/agent-access.js';
 import { fenceChangeRefusal } from '../fenced-space.js';
 
 /**

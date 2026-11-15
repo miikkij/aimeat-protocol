@@ -1,5 +1,5 @@
 /**
- * @file organism-comments.ts
+ * @file src/services/organism/comments.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Comments / threads on workspace objects (records + documents). A comment targets one
@@ -28,13 +28,13 @@
  *   v1.0.0 -- 2026-06-09 -- Initial: extracted so the MCP comment tools reuse the route logic.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, OrganismRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { canReadWorkspace } from './workspace/access.js';
-import { memoryTarget } from './classification/labels.js';
-import type { ContentReader } from './classification/reader.js';
-import { classificationWarningOf } from './classification/present-memory.js';
-import { isOrganismOwner } from './organism-ownership.js';
+import type { Storage, OrganismRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { canReadWorkspace } from '../workspace/access.js';
+import { memoryTarget } from '../classification/labels.js';
+import type { ContentReader } from '../classification/reader.js';
+import { classificationWarningOf } from '../classification/present-memory.js';
+import { isOrganismOwner } from './ownership.js';
 
 export interface CommentAnchor { section?: string; quote?: string }
 export interface WorkspaceComment {

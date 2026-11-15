@@ -46,7 +46,7 @@ import { decideWorkspaceRead } from '../workspace/access.js';
 import { findWorkspaceRecord } from '../workspace/write.js';
 import { instanceFromKey } from '../workspace/record-key.js';
 import { loadWorkspaceContent } from '../workspace/content.js';
-import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { readerFor, systemReader, type ContentReader } from '../classification/reader.js';
 import { memoryTarget, ClassificationError } from '../classification/labels.js';
 import { aiCallerFromCredential, OWNER_CALLER } from '../ai/caller-context.js';

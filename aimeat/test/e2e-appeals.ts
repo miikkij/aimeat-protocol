@@ -13,7 +13,7 @@
  *     - THE ORGANISM ADMIN COULD NOT REACH THE QUEUE. GET /v1/appeals and POST /v1/appeals/:id/review
  *       both admit "an admin of the organism the flagged content belongs to", and both tested it as
  *       `organism.admins.includes(<the caller's GHII>)`. Every door that WRITES admins[] writes the
- *       BARE OWNER NAME (services/organism-lifecycle.ts, routes/organisms/membership.ts via a
+ *       BARE OWNER NAME (services/organism/lifecycle.ts, routes/organisms/membership.ts via a
  *       membership row keyed the same way, routes/organisms/workspace-access.ts), so the two lists
  *       were never in the same alphabet and the organism-admin arm of both doors was unreachable.
  *     - THE OWNER OF FLAGGED MEMORY COULD NOT APPEAL IT. Every producer of a memory flag writes

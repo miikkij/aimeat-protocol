@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The `organism:<id>` visibility on memory records and stored files
- *   (services/organism-visibility.ts, utils/visibility-words.ts): which words the schemas take, the
+ *   (services/organism/visibility.ts, utils/visibility-words.ts): which words the schemas take, the
  *   refusal a writer outside the organism gets, and the read decision for each kind of reader, with
  *   the reader named by its resolved identity as the access guard names it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/organism-visibility.test.ts
@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.2 + V3.3).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { organismVisibilityRefusal, organismVisibilityAdmits, isStoredVisibility } from '../../src/services/organism-visibility.js';
+import { organismVisibilityRefusal, organismVisibilityAdmits, isStoredVisibility } from '../../src/services/organism/visibility.js';
 import { memoryWriteVisibilitySchema, storedVisibilitySchema, isOrganismVisibilityWord } from '../../src/utils/visibility-words.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import type { Storage } from '../../src/storage/interface.js';

@@ -37,7 +37,7 @@ import { globToRegExp } from './workflow/signal-eval.js';
 import { nodeContext } from './node-context.js';
 import { localAccountOf, buildGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { agentAccessOf } from './organism-agent-access.js';
+import { agentAccessOf } from './organism/agent-access.js';
 
 /** A recipe's keyGlob matches a written key using the same glob grammar the event plane uses. */
 export function matchesKeyGlob(glob: string, key: string): boolean {

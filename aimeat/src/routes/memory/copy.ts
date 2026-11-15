@@ -50,7 +50,7 @@ import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js'
 import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
-import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
+import { organismVisibilityRefusal } from '../../services/organism/visibility.js';
 import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
 import { keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from '../../services/memory-publish-gate.js';

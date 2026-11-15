@@ -12,7 +12,7 @@
  *
  *   Stored as `access` in the owner's `portfolio.config` record and as `frontPageAccess` on the
  *   company record. A setter names an organism only when the account behind it is an active member
- *   (services/organism-visibility.ts organismVisibilityRefusal, the check a memory record's
+ *   (services/organism/visibility.ts organismVisibilityRefusal, the check a memory record's
  *   visibility gets).
  *
  *   The page origins hold no session, so a page that needs a sign-in is served there only with a
@@ -31,7 +31,7 @@ import type { Storage } from '../storage/interface.js';
 import type { ContentAccess } from '../config/visibility.js';
 import { parseAppAccessInput, appAccessOf, appAudience, type AppAccess } from './app/access.js';
 import { audienceAllows, type AudienceAuth } from './audience.js';
-import { organismVisibilityRefusal } from './organism-visibility.js';
+import { organismVisibilityRefusal } from './organism/visibility.js';
 import type { PageRef } from './app/access-token.js';
 
 /** What an owner writes and what a read answers: the app's three words. */

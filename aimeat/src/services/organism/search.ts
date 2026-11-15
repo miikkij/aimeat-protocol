@@ -1,5 +1,5 @@
 /**
- * @file organism-search.ts
+ * @file src/services/organism/search.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Content search across an organism's workspaces. Backed by the INDEXED full-text
@@ -28,15 +28,15 @@
  *   2026-11-08 -- An access request or a skill file under the workspace root is no hit, whatever space a
  *     manifest declares over it (secaudit2026nov08 round 14).
  */
-import type { ArchiveFilter, Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
-import { withoutFlagHiddenMemory } from './moderation-flags.js';
-import type { AimeatConfig } from '../config.js';
-import { localAccountOf } from '../utils/gaii.js';
-import { workspaceMetaReader } from './workspace/meta.js';
-import { decideWorkspaceRead } from './workspace/access.js';
-import { memoryTarget } from './classification/labels.js';
-import type { ContentReader } from './classification/reader.js';
-import { recordRowAt, isNodeReservedPart } from './workspace/record-key.js';
+import type { ArchiveFilter, Storage, MemoryRecord, OrganismRecord } from '../../storage/interface.js';
+import { withoutFlagHiddenMemory } from '../moderation-flags.js';
+import type { AimeatConfig } from '../../config.js';
+import { localAccountOf } from '../../utils/gaii.js';
+import { workspaceMetaReader } from '../workspace/meta.js';
+import { decideWorkspaceRead } from '../workspace/access.js';
+import { memoryTarget } from '../classification/labels.js';
+import type { ContentReader } from '../classification/reader.js';
+import { recordRowAt, isNodeReservedPart } from '../workspace/record-key.js';
 
 export interface OrganismSearchHit {
   ws: string;

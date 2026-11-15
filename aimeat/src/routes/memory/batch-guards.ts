@@ -27,7 +27,7 @@ import type { Request } from 'express';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
-import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../../services/organism/namespace-access.js';
 import type { ManifestWrite } from '../../services/fenced-space.js';
 import type { BatchPublishRequest } from '../../services/memory-batch-write.js';
 import { publishAskOf, type PublishAsk } from '../../services/publish-requests/ask.js';
@@ -75,7 +75,7 @@ export function visibilityRefusal(visibility: unknown): string | null {
 }
 
 /**
- * The organism rule (services/organism-namespace-access.ts) for a key a batch route or the copy writes
+ * The organism rule (services/organism/namespace-access.ts) for a key a batch route or the copy writes
  * under `principal`, the identity the record lands under, as services/memory-write.ts asks it for
  * POST /v1/memory and the MCP write. Null for a key outside `organism.`.
  *

@@ -1,5 +1,5 @@
 /**
- * @file src/services/organism-visibility.ts
+ * @file src/services/organism/visibility.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The `organism:<id>` visibility on memory records and stored files (plan
@@ -18,10 +18,10 @@
  * @version-history
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.2 + V3.3).
  */
-import type { Storage, StoredVisibility } from '../storage/interface.js';
-import { parseAudience, isOrganismMember, audienceAllows } from './audience.js';
-import { localAccountOf } from '../utils/gaii.js';
-import { storedVisibilitySchema } from '../utils/visibility-words.js';
+import type { Storage, StoredVisibility } from '../../storage/interface.js';
+import { parseAudience, isOrganismMember, audienceAllows } from '../audience.js';
+import { localAccountOf } from '../../utils/gaii.js';
+import { storedVisibilitySchema } from '../../utils/visibility-words.js';
 
 /** True for every value the visibility column of a memory record or a stored file may hold. */
 export function isStoredVisibility(value: unknown): value is StoredVisibility {

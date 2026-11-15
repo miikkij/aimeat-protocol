@@ -30,8 +30,8 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { parseGaiiLoose, localAccountName } from '../../utils/gaii.js';
-import { isOrganismOwner } from '../organism-ownership.js';
-import { agentAccessOf } from '../organism-agent-access.js';
+import { isOrganismOwner } from '../organism/ownership.js';
+import { agentAccessOf } from '../organism/agent-access.js';
 import { emitChange } from '../event-bus.js';
 
 /** A refusal with the status and code the REST route answers. */

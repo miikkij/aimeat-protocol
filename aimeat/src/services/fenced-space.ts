@@ -42,7 +42,7 @@
  *   reads, and it is not read at all for a caller the rule allows directly: a person's write costs
  *   nothing more than before.
  *
- *   WHERE IT RUNS. checkOrganismNamespaceAccess (services/organism-namespace-access.ts) asks it for
+ *   WHERE IT RUNS. checkOrganismNamespaceAccess (services/organism/namespace-access.ts) asks it for
  *   every write-mode check made with a record's real key. The code paths that do not pass a real key
  *   there ask fencedSpaceRefusal themselves, before their first storage write: the draft write, the
  *   publish of a draft, the batch publish and delete, reopening a record, the MCP record delete, the

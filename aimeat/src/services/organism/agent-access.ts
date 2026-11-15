@@ -1,5 +1,5 @@
 /**
- * @file src/services/organism-agent-access.ts
+ * @file src/services/organism/agent-access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which of its members' agents an organism admits (OrganismRecord.agentAccess).
@@ -20,7 +20,7 @@
  *   Where it is enforced: once for every REST route under /v1/organisms/:id (routes/organisms.ts),
  *   once for every node MCP tool that takes `organism_id` (mcp/organism-agent-gate.ts), and in the
  *   shared gates reached from elsewhere: canReadWorkspace (services/workspace/access.ts), the
- *   `organism.*` key gate (services/organism-namespace-access.ts) and consent to an organism
+ *   `organism.*` key gate (services/organism/namespace-access.ts) and consent to an organism
  *   (services/consent.ts).
  * @structure agentAccessOf(), agentBarred(), organismsAdmitting(), attachedAsParticipant(), participantRefusalMessage(),
  *   agentBarredMessage(), barredAgentFor()
@@ -36,8 +36,8 @@
  *     reading it; any other value is no agent, as a missing one is (CodeQL
  *     js/type-confusion-through-parameter-tampering, alerts 1676 and 1677).
  */
-import type { Storage, OrganismRecord, OrganismMembershipRecord } from '../storage/interface.js';
-import { isGEAI } from '../utils/gaii.js';
+import type { Storage, OrganismRecord, OrganismMembershipRecord } from '../../storage/interface.js';
+import { isGEAI } from '../../utils/gaii.js';
 
 export const AGENT_ACCESS_VALUES = ['all', 'listed'] as const;
 export type AgentAccess = typeof AGENT_ACCESS_VALUES[number];

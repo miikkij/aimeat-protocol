@@ -139,7 +139,7 @@ export function shareServedVisibility(share: Pick<ResolvedShare, 'access'>): 'pu
  *
  * The account's membership decides first: a person by their own membership, and an agent by its
  * owner's, whether or not it is on the organism's agent list. Attaching an agent never narrows it
- * (services/organism-agent-access.ts v1.1.0, 2026-11-10; developer ruling 2026-11-13). An agent on
+ * (services/organism/agent-access.ts v1.1.0, 2026-11-10; developer ruling 2026-11-13). An agent on
  * the list whose owner is not an active member is a member in its own right, and nothing more.
  * Until 2026-11-13 the list was read first here, so the creator's attached agent was a plain member
  * on REST while the MCP tools gave it its owner's role (structure programme 2026-11, unit 7).

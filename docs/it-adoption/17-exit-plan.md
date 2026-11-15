@@ -1,6 +1,6 @@
 # 17 Exit plan
 
-> Checked against AIMEAT node 4.3.1 (commit 667811fb8) on 2026-11-14. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit be0e0dd68) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the system owner and the DPO of the adopting organisation. It answers three exit questions before you go live: how people and the organisation get their data out and in which formats, how a node is shut down and its data destroyed, and how you keep running and developing AIMEAT yourselves if the project or its maintainer stops. Every route and tool named here was checked in the code.
 

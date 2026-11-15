@@ -173,7 +173,7 @@ export type MemoryWriteResult =
             // the owner in person (QA audit F07b-02).
             | 'OWNER_APPROVES_SITES'
             // visibility 'organism:<id>' naming an organism the writer's account is not an active
-            // member of (services/organism-visibility.ts).
+            // member of (services/organism/visibility.ts).
             | 'NOT_ORGANISM_MEMBER'
             // Making it public, by a caller with nobody on this node to ask (services/publish-gate.ts).
             | 'PUBLISH_NOT_ALLOWED'

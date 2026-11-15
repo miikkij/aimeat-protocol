@@ -123,7 +123,7 @@ await test('CROSS-OWNER: a member cannot bulk-delete another member\'s record (R
 // ── E2E audit M073: removing a record is a write ──
 // The batch route and aimeat_workspace_object_delete asked organism membership only, so a member
 // whose contributor role the creator revoked still deleted the records they had written. Both now
-// ask the rule a write asks (services/organism-namespace-access.ts), as DELETE /v1/memory/:key does.
+// ask the rule a write asks (services/organism/namespace-access.ts), as DELETE /v1/memory/:key does.
 let mcpA!: McpSession;
 let mcpB!: McpSession;
 const bWrites = async (id: string) => {

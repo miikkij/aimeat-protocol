@@ -204,8 +204,8 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { canWriteNamespaceRule } from '../services/organism-record-helpers.js';
-import { createOrganismGate } from '../services/organism-gate.js';
+import { canWriteNamespaceRule } from '../services/organism/record-helpers.js';
+import { createOrganismGate } from '../services/organism/gate.js';
 import { registerWorkspaceCreateTool } from './workspace-create.js';
 import { registerWorkspaceRowTools } from './workspace-rows.js';
 import { registerWorkspaceDocumentTools } from './workspace-documents.js';
@@ -235,7 +235,7 @@ import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { fencedSpaceRefusal } from '../services/fenced-space.js';
-import { checkOrganismNamespaceAccess } from '../services/organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../services/organism/namespace-access.js';
 import { toolError } from './tool-error.js';
 import { setWorkspaceShareOp } from '../services/workspace/share.js';
 import { organismMemberGate } from '../services/organism-read/member.js';
@@ -598,7 +598,7 @@ export function registerWorkspaceTools(
             const root = wsRoot(organism_id, ws);
             const base = `${root}.${namespace}.${id}`;
             // Removing a record is a write: the workspace's creator, an organism manager, or a member
-            // holding the creator's contributor role (services/organism-namespace-access.ts), the rule
+            // holding the creator's contributor role (services/organism/namespace-access.ts), the rule
             // aimeat_workspace_write and DELETE /v1/memory/:key ask. Organism membership alone let a
             // member whose role was revoked, or a viewer, delete records over this tool.
             const delCaller = opsCaller();

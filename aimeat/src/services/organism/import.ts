@@ -1,5 +1,5 @@
 /**
- * @file organism-import.ts
+ * @file src/services/organism/import.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Import an organism bundle ZIP: create a NEW organism (settings from organism.json; the
@@ -29,15 +29,15 @@
  *     unzips then delegates. Behaviour unchanged for the bundle-import path.
  *   v1.0.0 -- 2026-06-09 -- Initial: organism bundle import (create org + restore all workspaces).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { unzipBuffer, restoreWorkspace } from './workspace/import.js';
-import { ORG_EXPORT_VERSION } from './organism-export.js';
-import { logger } from '../utils/logger.js';
-import { createOrganismRecord } from './organism-lifecycle.js';
-import { importCallerContext, type ImportCaller } from './workspace/import-gates.js';
-import type { PublishRequestedBody } from './publish-requests/door.js';
-import { restoreTeamAndPeople, parseTransferOptions, previewTransfer, type TransferOptions, type TransferPerson } from './team/transfer.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { unzipBuffer, restoreWorkspace } from '../workspace/import.js';
+import { ORG_EXPORT_VERSION } from './export.js';
+import { logger } from '../../utils/logger.js';
+import { createOrganismRecord } from './lifecycle.js';
+import { importCallerContext, type ImportCaller } from '../workspace/import-gates.js';
+import type { PublishRequestedBody } from '../publish-requests/door.js';
+import { restoreTeamAndPeople, parseTransferOptions, previewTransfer, type TransferOptions, type TransferPerson } from '../team/transfer.js';
 
 interface OrgJson {
   aimeatOrganismExport: string;
@@ -84,7 +84,7 @@ export async function importOrganism(
  * so the use-case template instantiate flow (Secretary P5 / S-B) can reuse organism creation without
  * re-implementing it — it unzips with a broader allowlist (to permit template.json) and then calls this.
  *
- * The organism itself is created through services/organism-lifecycle.ts, the same function
+ * The organism itself is created through services/organism/lifecycle.ts, the same function
  * POST /v1/organisms calls, so the label's audience cap and the publish gate hold for a bundle as
  * they do for a create: the settings in an organism.json are the archive's words, not the node's.
  */

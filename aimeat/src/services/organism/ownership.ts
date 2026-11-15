@@ -1,5 +1,5 @@
 /**
- * @file src/services/organism-ownership.ts
+ * @file src/services/organism/ownership.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who holds an organism, and the only place that changes it.
@@ -24,7 +24,7 @@
  *   - addOrganismOwner / removeOrganismOwner / handOverOwnership: the write side
  *
  * @usage
- *   import { isOrganismOwner, addOrganismOwner } from '../services/organism-ownership.js';
+ *   import { isOrganismOwner, addOrganismOwner } from './ownership.js';
  *   if (!isOrganismOwner(organism, callerName)) { …403… }
  *   const out = await addOrganismOwner(storage, config, organism, 'alice');
  *   if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
@@ -38,10 +38,10 @@
  *   v1.0.0 — 2026-08-15 — Extracted from the transfer route so the operator break-glass shares it.
  */
 import { v4 as uuidv4 } from 'uuid';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, OrganismRecord } from '../storage/interface.js';
-import { notify } from './notify.js';
-import { organismLink } from './notifications/links.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, OrganismRecord } from '../../storage/interface.js';
+import { notify } from '../notify.js';
+import { organismLink } from '../notifications/links.js';
 
 /**
  * Everyone who holds this organism. Falls back to the deprecated single field for a record written

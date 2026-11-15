@@ -47,7 +47,7 @@ import type { CallerContext } from '../caller-context.js';
 import type { ContentReader } from '../classification/reader.js';
 import { presentMemory } from '../classification/present-memory.js';
 import { ownerScopeView, readsAsOwner } from '../owner-scope-read.js';
-import { organismReadableRecords } from '../organism-namespace-access.js';
+import { organismReadableRecords } from '../organism/namespace-access.js';
 import { CONTEXT_PREFIX, CONTEXT_TYPE, CONTEXT_STALE_DAYS, CONTEXT_CORE_LARGE } from './index-line.js';
 
 export const CHECK_MAX_READS = 400;

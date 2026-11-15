@@ -136,9 +136,9 @@
  *     opened record, which is what a script needs to swap against.
  */
 import type { Storage, MemoryRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
-import { canWriteNamespaceRule, readOrganismConfig, fresherRec } from '../organism-record-helpers.js';
-import { createOrganismGate, type BatchPublishItemResult } from '../organism-gate.js';
-import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { canWriteNamespaceRule, readOrganismConfig, fresherRec } from '../organism/record-helpers.js';
+import { createOrganismGate, type BatchPublishItemResult } from '../organism/gate.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { workspaceRowIndex } from '../workspace-rows/row-service.js';
 import type { RowObjectType } from '../workspace-rows/row-space.js';
 import { archivedRefusal, checkWorkspaceWriteLimits } from './write-guards.js';
@@ -401,7 +401,7 @@ export async function writeWorkspaceDraftsOp(
     const { storage, config } = deps;
     const { organismId, ws } = args;
     const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
-    // The rule is services/organism-namespace-access.ts, the one the HTTP door answers to.
+    // The rule is services/organism/namespace-access.ts, the one the HTTP door answers to.
     const writeRefusal = await checkOrganismNamespaceAccess({ storage, config },
         { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes }, `${wsRoot(organismId, ws)}.probe`, 'write');
     // The rule's own status, code and reason reach the caller. Only a missing contributor role is told

@@ -132,7 +132,7 @@ import { registerOrganismGateRoutes } from './organisms/gates.js';
 import { registerOrganismIntakeRoutes } from './organisms/intake.js';
 import { registerOrganismIntakeThreadRoutes } from './organisms/intake-thread.js';
 import { error } from '../middleware/envelope.js';
-import { barredAgentFor, agentBarredMessage } from '../services/organism-agent-access.js';
+import { barredAgentFor, agentBarredMessage } from '../services/organism/agent-access.js';
 import { resolveIdentity } from '../utils/gaii.js';
 
 export function organismsRouter(config: AimeatConfig, storage: Storage): Router {

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What an organism delete releases outside the organism's own tables
- *   (releaseOrganismLinks in services/organism-lifecycle.ts, called by DELETE /v1/organisms/:id).
+ *   (releaseOrganismLinks in services/organism/lifecycle.ts, called by DELETE /v1/organisms/:id).
  *
  *   Before 2026-11-11 a deleted organism left its own remote MCP servers, with the personal sign-ins
  *   to them, and every SSO connection that joined people to it still pointing at it. Nobody could
@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, SsoConnectionRecord } from '../../src/storage/interface.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
-import { releaseOrganismLinks } from '../../src/services/organism-lifecycle.js';
+import { releaseOrganismLinks } from '../../src/services/organism/lifecycle.js';
 
 const NODE = 'test-node-001';
 const GONE = 'org-gone';

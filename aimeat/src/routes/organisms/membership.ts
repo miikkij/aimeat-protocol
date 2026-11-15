@@ -69,17 +69,17 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
 import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { canSeeMembers, rosterAgentsFor, rosterCallerFromAuth } from '../../services/organism-privacy.js';
-import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwner } from '../../services/organism-ownership.js';
+import { canSeeMembers, rosterAgentsFor, rosterCallerFromAuth } from '../../services/organism/privacy.js';
+import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwner } from '../../services/organism/ownership.js';
 import { organismForManager, organismForOwner } from '../../services/organism-read/manager.js';
 import { nameInvitationsOf, nameInvitationTo } from '../../services/organism-read/name-invitations.js';
 import { organismRosterFor } from '../../services/organism-read/member.js';
-import { removeOrganismMember, MemberRemoveError } from '../../services/organism-member-remove.js';
+import { removeOrganismMember, MemberRemoveError } from '../../services/organism/member-remove.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
   acceptNameInvitation, declineNameInvitation, addOrganismMember, NAMED_INVITE_ACCEPT_REFUSAL,
 } from '../../services/invitations.js';
-import { agentAccessOf } from '../../services/organism-agent-access.js';
+import { agentAccessOf } from '../../services/organism/agent-access.js';
 import { attachOrganismAgent, detachOrganismAgent, AgentListError } from '../../services/organism-agents/attach.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
@@ -127,7 +127,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     // audit gap. Each member row carries its owner's agents for ACTIVE members (or an operator)
     // only; outsiders/public callers get the legacy shape (agent rosters are not public data).
     // Who is shown them and which ones (the organism's admitted agents) is rosterAgentsFor
-    // (services/organism-privacy.ts), which aimeat_organism_members asks too. rosterCaller.isOperator
+    // (services/organism/privacy.ts), which aimeat_organism_members asks too. rosterCaller.isOperator
     // is isOperatorCaller's answer (the operator, or the operator's agent holding operator:admin).
     // ONE `owner IN (…)` query for every member's agents, not one getAgentsByOwner per member.
     const ownerNames = members.map(m => localAccountName(m.ghii));
@@ -282,7 +282,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     // `?ban=1` (or body { ban: true }) blocks the member from re-joining / being re-invited:
     // keep the membership row but flip it to `banned` instead of deleting it. Plain remove just
     // deletes the row (they can request to join again). The rules, the access revoke and the
-    // notice live in services/organism-member-remove.ts, which the MCP tool calls as well.
+    // notice live in services/organism/member-remove.ts, which the MCP tool calls as well.
     const ban = req.query.ban === '1' || req.query.ban === 'true' || req.body?.ban === true;
     try {
       const out = await removeOrganismMember(storage, config, {

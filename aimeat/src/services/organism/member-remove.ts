@@ -1,5 +1,5 @@
 /**
- * @file organism-member-remove.ts
+ * @file src/services/organism/member-remove.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Taking a member off an organism: the rules, once, for every door. This lived inside
@@ -27,13 +27,13 @@
  *   v1.0.0 -- 2026-08-25 -- Extracted from routes/organisms/membership.ts so the MCP surfaces can
  *     remove a member through the same rules the web door has always used.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, OrganismRecord } from '../storage/interface.js';
-import { isOrganismOwner } from './organism-ownership.js';
-import { revokeDepartedMemberAccess } from './invitations.js';
-import { membershipOwner } from './invitation-lookup.js';
-import { notify } from './notify.js';
-import { emitChange } from './event-bus.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, OrganismRecord } from '../../storage/interface.js';
+import { isOrganismOwner } from './ownership.js';
+import { revokeDepartedMemberAccess } from '../invitations.js';
+import { membershipOwner } from '../invitation-lookup.js';
+import { notify } from '../notify.js';
+import { emitChange } from '../event-bus.js';
 
 /** A refusal with the status and code the HTTP door has always sent, so no door invents its own. */
 export class MemberRemoveError extends Error {

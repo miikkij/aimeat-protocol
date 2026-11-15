@@ -19,7 +19,7 @@
  *   caller's own `wsRole`). The purpose is free text the person typed, so it decides no right. A
  *   consent filed before LEGACY_ROLE_PURPOSE_BEFORE without a wsRole still reads its role from the
  *   purpose word, because that is how the role was kept then (wsRoleOf).
- *   The write gate (services/organism-namespace-access.ts) and every listing here ask wsRoleOf.
+ *   The write gate (services/organism/namespace-access.ts) and every listing here ask wsRoleOf.
  *
  *   Before this module the exact same logic was duplicated in routes/organisms.ts (REST) and
  *   mcp/workspaces.ts (MCP). Both now delegate here, and the new aimeat_workspace_member_* MCP tools
@@ -88,7 +88,7 @@ type RoleRefusal = { ok: false; status: number; code: string; message: string };
  * What POST /v1/consent's `role` gives, decided before anything is written. `read` (the default) is
  * any consent; on one workspace, to one person on this node, filed under the workspace's creator, it
  * is that person's viewer role. `write` is the contributor role, and only that shape takes it, because
- * the write check (services/organism-namespace-access.ts) reads the creator's consents for one local
+ * the write check (services/organism/namespace-access.ts) reads the creator's consents for one local
  * person on one workspace and nothing else: any other `write` would be stored as a promise no check keeps.
  */
 export async function consentWsRole(

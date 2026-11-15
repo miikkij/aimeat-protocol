@@ -48,7 +48,7 @@
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 review: the explorer).
  */
 import type { ContentLabelKind, ContentLabelRow, ContentLabelSuggestion } from '../../storage/interface.js';
-import { agentBarred } from '../organism-agent-access.js';
+import { agentBarred } from '../organism/agent-access.js';
 import { isOrgManager } from '../workspace/access.js';
 import { audienceCheck } from './audience.js';
 import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';

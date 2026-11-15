@@ -105,7 +105,7 @@ import { aiJobKeyRefusal } from './ai/job-keys.js';
 import { readerForCaller } from './classification/reader.js';
 import { emitChange } from './event-bus.js';
 import type { FileRefAccessor } from './file-refs.js';
-import { organismVisibilityRefusal } from './organism-visibility.js';
+import { organismVisibilityRefusal } from './organism/visibility.js';
 import { memoryGroupRefusal } from '../storage/memory-sharing.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
 import { scheduleFileDenial } from './schedule-file-access.js';

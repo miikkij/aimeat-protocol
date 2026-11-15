@@ -22,7 +22,7 @@
  */
 import { ResourceTemplate } from '@modelcontextprotocol/server';
 import type { Storage } from '../storage/interface.js';
-import { barredAgentFor, agentBarredMessage } from '../services/organism-agent-access.js';
+import { barredAgentFor, agentBarredMessage } from '../services/organism/agent-access.js';
 
 /** Each resource, and the tool that reads the same thing: its scope is the resource's scope. */
 export const RESOURCE_READ_TOOL: Readonly<Record<string, string>> = {

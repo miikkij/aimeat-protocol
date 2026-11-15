@@ -19,7 +19,7 @@
  *   write its structure anyway. Never the member who made the suggestion, whatever role they have
  *   gained since. An agent decides for its owner when the owner is one of those people and the agent
  *   holds the permission the change needs, which is the organism namespace rule's write on the record
- *   the change lands in (services/organism-namespace-access.ts). A person in their own chat is always
+ *   the change lands in (services/organism/namespace-access.ts). A person in their own chat is always
  *   an agent here, so this is the road a decision from a chat takes.
  *
  *   EXPIRY FAILS CLOSED. A suggestion carries a deadline SUGGESTION_TTL_DAYS out; the gate expiry
@@ -46,9 +46,9 @@
  */
 import { v4 as uuidv4 } from 'uuid';
 import type { PendingApprovalRecord } from '../../storage/interface.js';
-import { createOrganismGate } from '../organism-gate.js';
+import { createOrganismGate } from '../organism/gate.js';
 import { expireOverdueApprovals, expireApproval, isOverdue } from '../gate-expiry.js';
-import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { canReadWorkspace } from './access.js';
 import { findWorkspaceRegistration } from './meta.js';
 import { noticeDeciders, noticeRequester, ownerNameOf, MEMBER_CHANGE_ACTIONS, isMemberChangeAction } from './suggestion-notices.js';
@@ -61,7 +61,7 @@ import { applySectionOps, summarizeSectionOps, validateSectionOps, MAX_SECTION_O
 import { emitChange } from '../event-bus.js';
 import { updateOrganismStructure } from '../structure-snapshot.js';
 import { logger } from '../../utils/logger.js';
-import { attachedAsParticipant } from '../organism-agent-access.js';
+import { attachedAsParticipant } from '../organism/agent-access.js';
 
 /** The two approval actions a member change files. The generic approval route refuses both. */
 export { MEMBER_CHANGE_ACTIONS, isMemberChangeAction };

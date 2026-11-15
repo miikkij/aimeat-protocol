@@ -92,7 +92,7 @@ import type { AimeatConfig } from '../../config.js';
 import type {
   Storage, WorkspaceRowRecord, WorkspaceRowStats, WorkspaceRowRevision,
 } from '../../storage/interface.js';
-import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { decideWorkspaceRead } from '../workspace/access.js';
 import { readWorkspaceManifest, isRowBackedSpace } from '../workspace/meta.js';
 import { emitChange, emitRowsAppended } from '../event-bus.js';

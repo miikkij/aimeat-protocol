@@ -101,21 +101,21 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
-import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism-privacy.js';
-import { showOrganismReadme } from '../../services/organism-readme.js';
+import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism/privacy.js';
+import { showOrganismReadme } from '../../services/organism/readme.js';
 import { teamNamesFor } from '../../services/team/record.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { createOrganismRecord, updateOrganismRecord, joinOrganism, deleteOrganismRecords } from '../../services/organism-lifecycle.js';
+import { createOrganismRecord, updateOrganismRecord, joinOrganism, deleteOrganismRecords } from '../../services/organism/lifecycle.js';
 import { publicShapes } from '../../data/organism-shapes.js';
 import type { OrganismHelpers } from './shared.js';
-import { isOrganismOwner } from '../../services/organism-ownership.js';
+import { isOrganismOwner } from '../../services/organism/ownership.js';
 import { organismForManager } from '../../services/organism-read/manager.js';
 import { listedOrganisms } from '../../services/organism-read/list.js';
 import { leaveOrganismAs } from '../../services/organism-read/leave.js';
 import { organismShownTo, organismToJoin } from '../../services/organism-read/member.js';
 import { openJoinRequests } from '../../services/organism-join-requests/requests.js';
 import { isOwnerInPerson, resolveIdentity } from '../../utils/gaii.js';
-import { agentBarred, organismsAdmitting } from '../../services/organism-agent-access.js';
+import { agentBarred, organismsAdmitting } from '../../services/organism/agent-access.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { callerOf } from '../../middleware/caller.js';
 import { teamDeleteGate } from '../../services/team/action-gate.js';
@@ -148,7 +148,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const { name, description, type, location, interests, join_policy, max_members, visibility, member_visibility, shape, lang } = req.body ?? {};
 
     // The record, the board, the creator membership and the feed/timeline side effects live in
-    // services/organism-lifecycle.ts, shared with aimeat_organism_create.
+    // services/organism/lifecycle.ts, shared with aimeat_organism_create.
     const result = await createOrganismRecord({ storage, config }, ghii, {
       name, description, type, location, interests,
       joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
@@ -355,7 +355,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const { name, description, type, location, interests, join_policy, max_members, visibility, readme, member_visibility, agent_access, access_requests } = req.body ?? {};
 
     // Field validation, the update itself and the README memory key live in
-    // services/organism-lifecycle.ts, shared with aimeat_organism_update.
+    // services/organism/lifecycle.ts, shared with aimeat_organism_update.
     const result = await updateOrganismRecord({ storage, config }, organism, {
       name, description, type, location, interests, readme,
       joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
@@ -401,7 +401,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const held = await teamDeleteGate({ storage, config }, callerOf(req, config.nodeId, storage), [`organism.${id}.*`], 'delete the whole team');
     if (held) { res.status(held.status).json(error(config.nodeId, held.code, held.message, held.status, held.details)); return; }
 
-    // The organism and every record that belongs to it (services/organism-lifecycle.ts).
+    // The organism and every record that belongs to it (services/organism/lifecycle.ts).
     await deleteOrganismRecords(storage, config.nodeId, id);
     res.json(success(config.nodeId, { deleted: true }));
     emitChange('organisms');
@@ -426,7 +426,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const organism = target.organism;
 
     // Membership checks, capacity, the policy branch and the approver notifications live in
-    // services/organism-lifecycle.ts, shared with aimeat_organism_join.
+    // services/organism/lifecycle.ts, shared with aimeat_organism_join.
     const result = await joinOrganism({ storage, config }, organism, ghii, message);
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
@@ -445,7 +445,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const id = req.params.id as string;
 
     // The organism read, then the membership removal, the roster/admin sync and the departed member's
-    // agents and workspace roles (revokeDepartedMemberAccess, services/organism-lifecycle.ts):
+    // agents and workspace roles (revokeDepartedMemberAccess, services/organism/lifecycle.ts):
     // services/organism-read/leave.ts, shared with aimeat_organism_leave.
     const result = await leaveOrganismAs({ storage, config }, id, { owner: ghii });
     if (!result.ok) {

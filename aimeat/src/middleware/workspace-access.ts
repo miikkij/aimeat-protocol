@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Express wrapper over the organism-namespace access rule. The rule itself lives in
- *   services/organism-namespace-access.ts, because it is not about HTTP: the MCP write path needs
+ *   services/organism/namespace-access.ts, because it is not about HTTP: the MCP write path needs
  *   the same answer and could not call a RequestHandler. This file turns a request into a caller and
  *   a refusal into a response, and decides nothing on its own.
  * @structure
@@ -30,7 +30,7 @@ import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { error } from './envelope.js';
-import { checkOrganismNamespaceAccess } from '../services/organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../services/organism/namespace-access.js';
 
 /**
  * Workspace access middleware — Phase 2.3

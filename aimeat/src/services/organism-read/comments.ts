@@ -2,7 +2,7 @@
  * @file src/services/organism-read/comments.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The organism read with the comment gate around it (services/organism-comments.ts
+ * @description The organism read with the comment gate around it (services/organism/comments.ts
  *   canAccessWorkspaceComments: whoever reads the workspace reads and writes its comments).
  *   POST/GET/DELETE /v1/organisms/:id/comments and aimeat_workspace_comment, _comments and
  *   _comment_delete each read the organism and asked that gate; they call these functions now
@@ -19,7 +19,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
-import { canAccessWorkspaceComments, deleteComment, type DeleteCommentResult } from '../organism-comments.js';
+import { canAccessWorkspaceComments, deleteComment, type DeleteCommentResult } from '../organism/comments.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 type Who = { sub: string | undefined; owner: string | undefined; gaii: string };

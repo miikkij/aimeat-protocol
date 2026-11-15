@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { createOrganismReputationService } from '../../src/services/organism-reputation.js';
+import { createOrganismReputationService } from '../../src/services/organism/reputation.js';
 import type { OrganismRecord, OrganismMembershipRecord, GHIIRecord } from '../../src/storage/interface.js';
 
 // ── Helpers ──────────────────────────────────────────────────

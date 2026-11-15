@@ -49,7 +49,7 @@
 import type { Storage, ClassificationAuditRow } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
 import { listClassificationAuditMerged } from './audit.js';
-import { agentBarred } from '../organism-agent-access.js';
+import { agentBarred } from '../organism/agent-access.js';
 import { isOrgManager } from '../workspace/access.js';
 import { askOperator } from '../operator-principal.js';
 import type { ClassificationPolicy } from './defaults.js';

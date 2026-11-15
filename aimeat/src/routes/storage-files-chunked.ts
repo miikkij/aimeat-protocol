@@ -62,7 +62,7 @@ import { emitRecordChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { appOwnedKeyRefusal, groupBindingRefusal, writeStorageFile } from '../services/storage-file-write.js';
 import { pageKeyWriteRefusal, pageWriterOf } from '../services/storage-page-keys.js';
-import { organismVisibilityRefusal } from '../services/organism-visibility.js';
+import { organismVisibilityRefusal } from '../services/organism/visibility.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';

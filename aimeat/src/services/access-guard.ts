@@ -63,9 +63,9 @@ import { isKeyShared } from './group-shares.js';
 import { parseGaiiLoose, localAccountOf, currentNodeId, isSameOwner, isGEAI, localAccountName } from '../utils/gaii.js';
 import { ecoMayReadKey } from './ecosystem-access.js';
 import { readWorkspaceMetaRecord } from './workspace/meta.js';
-import { agentBarred } from './organism-agent-access.js';
+import { agentBarred } from './organism/agent-access.js';
 import { isOrganismVisibilityWord } from '../utils/visibility-words.js';
-import { organismVisibilityAdmits } from './organism-visibility.js';
+import { organismVisibilityAdmits } from './organism/visibility.js';
 
 /**
  * Does this reader identity name a principal of ANOTHER node? A visitor is named by its home GHII

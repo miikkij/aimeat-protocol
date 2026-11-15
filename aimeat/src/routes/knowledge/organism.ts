@@ -32,7 +32,7 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import type { KnowledgeHelpers } from './helpers.js';
-import { agentBarred, agentBarredMessage, barredAgentFor } from '../../services/organism-agent-access.js';
+import { agentBarred, agentBarredMessage, barredAgentFor } from '../../services/organism/agent-access.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { updateMemoryRecord, UNCHANGED } from '../../services/record-cas.js';
 import { readerFor } from '../../services/classification/reader.js';

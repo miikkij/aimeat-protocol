@@ -52,7 +52,7 @@ import type { ContentReader } from './classification/reader.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { organismKeysCarried } from './group-shares-classification.js';
 import { ownerScopeView } from './owner-scope-read.js';
-import { organismReadableRecords, type OrganismListCaller } from './organism-namespace-access.js';
+import { organismReadableRecords, type OrganismListCaller } from './organism/namespace-access.js';
 import { withoutFlagHiddenMemory } from './moderation-flags.js';
 
 export interface LibrarianHit {

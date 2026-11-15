@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for an organism: it becomes public, as the owner, through
- *   updateOrganismRecord (services/organism-lifecycle.ts), the update PUT /v1/organisms/:id and
+ *   updateOrganismRecord (services/organism/lifecycle.ts), the update PUT /v1/organisms/:id and
  *   aimeat_organism_update run (plan doc-mvcn6c7e4e5q, V4).
  *
  *   THE OWNER APPROVED WHAT THEY SAW. The request carries the organism's updatedAt when it was asked;
@@ -15,8 +15,8 @@
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
-import { updateOrganismRecord } from '../organism-lifecycle.js';
-import { isOrganismOwner } from '../organism-ownership.js';
+import { updateOrganismRecord } from '../organism/lifecycle.js';
+import { isOrganismOwner } from '../organism/ownership.js';
 import { localAccountName } from '../../utils/gaii.js';
 
 export async function applyOrganismPublish(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

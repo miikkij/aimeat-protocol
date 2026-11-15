@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description An organism unarchive asks the memory limits of the account that brings the content
  *   back, and not of the other members whose rows it returns (secaudit2026nov08b round 15,
- *   services/organism-archive-op.ts:unarchive:other-principal-ceiling-refuses-and-charges).
+ *   services/organism/archive-op.ts:unarchive:other-principal-ceiling-refuses-and-charges).
  *
  *   The creator or an admin unarchives; a member whose rows were in the archived content cannot, and
  *   the creator cannot change that member's key count. So another member's count no longer refuses the
@@ -25,7 +25,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { organismArchiveOp } from '../../src/services/organism-archive-op.js';
+import { organismArchiveOp } from '../../src/services/organism/archive-op.js';
 import { archiveTarget } from '../../src/services/archive.js';
 
 requirePostgresWhenAsked('organism-unarchive-other-members');

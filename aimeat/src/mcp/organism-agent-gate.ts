@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Refuses a node MCP tool call that names an organism (`organism_id`) which does not
- *   admit this agent (agentAccess 'listed', services/organism-agent-access.ts). Every MCP session is
+ *   admit this agent (agentAccess 'listed', services/organism/agent-access.ts). Every MCP session is
  *   an agent, and the organism tools resolve the agent's owner and check the owner's membership, so
  *   without this an agent passes wherever its owner does. Applied at registration, like the usage
  *   measurement in tool-usage-wrap.ts, so a tool added later is covered without its author knowing
@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import type { Storage } from '../storage/interface.js';
-import { barredAgentFor, agentBarredMessage } from '../services/organism-agent-access.js';
+import { barredAgentFor, agentBarredMessage } from '../services/organism/agent-access.js';
 import { toolError } from './tool-error.js';
 
 type AnyFn = (...args: unknown[]) => unknown;

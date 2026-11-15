@@ -130,7 +130,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | AUTHZ-13 | met | `aimeat/src/routes/consent.ts:132-177`; `aimeat/src/services/consent.ts:158-160`; retention 365 days `aimeat/src/config/data-access.ts:48` | |
 | AUTHZ-14 | met | `aimeat/src/routes/consent.ts:69,126,138,171,233,268`; `aimeat/src/services/consent-write.ts:204-219` | `consent:manage` is inside the wildcard. |
 | AUTHZ-18 | met (4.0.0) | `aimeat/src/utils/consent-reach.ts` (`CONSENT_REACH_LOCAL_DEFAULT_IN`, `consentReachOf`); `grantConsent` in `aimeat/src/services/consent-write.ts` takes `local`, `federation`, `auth`, stores `private` and `dmz` as `local` (with the Deprecation headers) and gives an absent reach `local` from 4.0.0; both providers read a stored `private` or `dmz` as `local`; test `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts` | Before 4.0.0 an absent reach is still `federation`. The compliance roll-up (`consentFacets`) groups by the stored value. |
-| AUTHZ-15 | met | `aimeat/src/services/access-guard.ts:134-238`; `aimeat/src/services/consent.ts:76-181` | Boards and the organism key gate run their own consent checks (`aimeat/src/services/board-read-access.ts:115`, `aimeat/src/services/organism-namespace-access.ts:235-264`); both are stricter, not looser. |
+| AUTHZ-15 | met | `aimeat/src/services/access-guard.ts:134-238`; `aimeat/src/services/consent.ts:76-181` | Boards and the organism key gate run their own consent checks (`aimeat/src/services/board-read-access.ts:115`, `aimeat/src/services/organism/namespace-access.ts:235-264`); both are stricter, not looser. |
 | AUTHZ-16 | partial | Provenance answers one 404 (`aimeat/src/routes/ai-provenance.ts:250-307`); memory read 404 | Not verified on every route. |
 | AUTHZ-17 | partial (SHOULD) | `aimeat/src/middleware/refusal-recorder.ts`; `aimeat/src/auth/deny.ts`; `aimeat/src/services/auth-audit.ts` | Every HTTP 401 and 403 reaches the refusal log since 2026-10-16, including the 403s written directly in route handlers. A refusal inside an MCP tool is a tool result, not an HTTP status: it is noted on the agent's card, not in this log. |
 | CLS-01 | met | `aimeat/src/services/classification/reader.ts` (show, useForAi, leave); gate `aimeat/security/classification-reach.json` | |
@@ -182,12 +182,12 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 
 | ID | Status | Evidence | What is missing |
 |---|---|---|---|
-| COL-01 | met | `aimeat/src/services/organism-namespace-access.ts:53-54`; `aimeat/src/services/workspace/roles.ts:5-16` | |
+| COL-01 | met | `aimeat/src/services/organism/namespace-access.ts:53-54`; `aimeat/src/services/workspace/roles.ts:5-16` | |
 | COL-02 | partial | Roles `aimeat/src/storage/types/organisms-federation.ts:156-167`; join `aimeat/src/routes/organisms/crud.ts:407`; invitations `aimeat/src/routes/organisms/membership.ts:452` | Not verified that the last admin cannot leave; an operator repair word exists for organisms nobody can reach (`aimeat/src/utils/scope-coverage.ts:144`). |
-| COL-03 | met | `aimeat/src/services/organism-agent-access.ts:13-58`; `aimeat/src/routes/organisms.ts:135-153` | |
-| COL-04 | met | `aimeat/src/services/organism-namespace-access.ts` (content owned by the writer's identity) | |
-| COL-05 | met | `aimeat/src/services/organism-export.ts` (header); `aimeat/src/routes/organisms/workspace-transfer.ts:136,170` | |
-| COL-06 | met | `aimeat/src/services/organism-gate.ts` (publish, about 285-300); `aimeat/src/config.ts:332` (20 versions) | |
+| COL-03 | met | `aimeat/src/services/organism/agent-access.ts:13-58`; `aimeat/src/routes/organisms.ts:135-153` | |
+| COL-04 | met | `aimeat/src/services/organism/namespace-access.ts` (content owned by the writer's identity) | |
+| COL-05 | met | `aimeat/src/services/organism/export.ts` (header); `aimeat/src/routes/organisms/workspace-transfer.ts:136,170` | |
+| COL-06 | met | `aimeat/src/services/organism/gate.ts` (publish, about 285-300); `aimeat/src/config.ts:332` (20 versions) | |
 | COL-07 | met | `aimeat/src/services/write-guards.ts:189-209` | |
 | COL-08 | met | `aimeat/src/services/write-guards.ts:183-187`; `aimeat/src/routes/organisms/gates.ts:333-337`; `aimeat/src/services/memory-bin.ts:311-320` | |
 | COL-09 | partial | `aimeat/src/routes/organisms/workspace-access.ts:395-416` (`organism:invite`); `aimeat/src/services/workspace/roles.ts:46,86` | Not verified that an owner who is a plain member is refused. |

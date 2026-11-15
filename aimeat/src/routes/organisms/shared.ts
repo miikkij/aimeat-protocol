@@ -2,7 +2,7 @@
  * @file src/routes/organisms/shared.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The organism route groups' shared helpers: everything services/organism-gate.ts
+ * @description The organism route groups' shared helpers: everything services/organism/gate.ts
  *   gives (membership and role checks, workspace registry lookups, draft publish and revert, share
  *   meta, the decision log), plus the Express forms only a route needs: the gates that send their
  *   own refusal (requireWsManager, requireOrgAdmin, requireOrgMember), the invite-code middleware
@@ -28,16 +28,16 @@ import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { organismArchiveOp } from '../../services/organism-archive-op.js';
+import { organismArchiveOp } from '../../services/organism/archive-op.js';
 import { callerOf } from '../../middleware/caller.js';
 import { organismForManager } from '../../services/organism-read/manager.js';
 import { organismMemberGate } from '../../services/organism-read/member.js';
-import { createOrganismGate } from '../../services/organism-gate.js';
+import { createOrganismGate } from '../../services/organism/gate.js';
 
 // The pure rules every importer of ./shared.js reached, from where they live now.
-export { canWriteNamespaceRule, roleSatisfies, fresherRec, ownerGhiiOf, collapseKeyTo, readOrganismConfig } from '../../services/organism-record-helpers.js';
+export { canWriteNamespaceRule, roleSatisfies, fresherRec, ownerGhiiOf, collapseKeyTo, readOrganismConfig } from '../../services/organism/record-helpers.js';
 export type { ShareAccess, ShareMeta, ResolvedShare, PublicDoc, PublicRecord } from './share-types.js';
-export type { BatchPublishItemResult } from '../../services/organism-gate.js';
+export type { BatchPublishItemResult } from '../../services/organism/gate.js';
 
 export type OrganismHelpers = ReturnType<typeof createOrganismHelpers>;
 
@@ -99,7 +99,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   };
 
   // The whole operation, role rule, target check, fence, archive and timeline entry, is
-  // services/organism-archive-op.ts, which aimeat_organism_archive runs too.
+  // services/organism/archive-op.ts, which aimeat_organism_archive runs too.
   const archiveHandler = (mode: 'archive' | 'unarchive') => async (req: Request, res: Response) => {
     const session = callerOf(req, config.nodeId, storage);
     const out = await organismArchiveOp({ storage, config },

@@ -155,7 +155,7 @@ export async function findWorkspaceRegistration(
  * Which copy of a workspace meta record counts, when the key is stored under several identities.
  *
  * A copy counts when its writer is someone the organism namespace rule lets write there
- * (services/organism-namespace-access.ts): the workspace's registered creator, and after them an
+ * (services/organism/namespace-access.ts): the workspace's registered creator, and after them an
  * organism creator or admin. The creator's copies come first, including one under an agent of
  * theirs, and the newest of those wins, because they are all the same person's. Only when the creator
  * holds no copy does an organism manager's count, newest first. A plain member's copy never counts,

@@ -44,7 +44,7 @@ import type { Storage, MemoryRecord, OrganismRecord } from '../../storage/interf
 import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
 import type { AimeatConfig } from '../../config.js';
 import { decideWorkspaceRead } from './access.js';
-import { agentBarred, agentBarredMessage } from '../organism-agent-access.js';
+import { agentBarred, agentBarredMessage } from '../organism/agent-access.js';
 import { workspaceMetaReader, type WorkspaceMetaReader } from './meta.js';
 import { memoryTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';

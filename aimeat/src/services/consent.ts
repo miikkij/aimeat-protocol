@@ -42,7 +42,7 @@ export { matchesRecipient } from '../storage/consent-recipient.js';
 import { parseGaiiLoose, localAccountName, localAccountOf } from '../utils/gaii.js';
 import { bufferConsentAudit } from './consent-audit-buffer.js';
 import { logger } from '../utils/logger.js';
-import { barredAgentFor } from './organism-agent-access.js';
+import { barredAgentFor } from './organism/agent-access.js';
 import { notifyDirectoryChange } from './directory.js';
 
 /** The key space of knowledge packages: a manifest and its entries, each record with its own visibility. */

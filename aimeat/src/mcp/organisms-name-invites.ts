@@ -36,14 +36,14 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { addOrganismOwner, removeOrganismOwner } from '../services/organism-ownership.js';
+import { addOrganismOwner, removeOrganismOwner } from '../services/organism/ownership.js';
 import { organismForManager, organismForOwner } from '../services/organism-read/manager.js';
 import { nameInvitationsOf, nameInvitationTo } from '../services/organism-read/name-invitations.js';
 import {
     InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
     acceptNameInvitation, declineNameInvitation, addOrganismMember, NAMED_INVITE_ACCEPT_REFUSAL,
 } from '../services/invitations.js';
-import { removeOrganismMember, MemberRemoveError } from '../services/organism-member-remove.js';
+import { removeOrganismMember, MemberRemoveError } from '../services/organism/member-remove.js';
 import { attachOrganismAgent, detachOrganismAgent, AgentListError } from '../services/organism-agents/attach.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';

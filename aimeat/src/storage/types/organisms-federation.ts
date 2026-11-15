@@ -91,14 +91,14 @@ export interface OrganismRecord {
   interests: string[];
   /**
    * @deprecated since 2026-08-15, removed in v5.0 — read `owners` through
-   * services/organism-ownership.ts:organismOwners() and test membership with isOrganismOwner().
+   * services/organism/ownership.ts:organismOwners() and test membership with isOrganismOwner().
    *
    * It carried two different facts in one column: WHO MADE THIS, which is history and cannot change,
    * and WHO HOLDS IT, which is a role and should never have been singular. A handover wrote both, so
    * transferring authority also rewrote the past — this node's own development organism spent a month
    * claiming it was created by an account that joined five weeks after it existed.
    *
-   * It stays as a MIRROR of `owners[0]`, maintained only by services/organism-ownership.ts, so
+   * It stays as a MIRROR of `owners[0]`, maintained only by services/organism/ownership.ts, so
    * federation payloads, exports and clients built against v4 keep reading a field that is still
    * true. Nothing should compare against it.
    */
@@ -127,7 +127,7 @@ export interface OrganismRecord {
   memberVisibility?: 'public' | 'authenticated' | 'members' | 'admins';
   /** Which of its members' agents this organism admits. 'all' (the default when unset): every
    *  member's agents act with their owner's rights. 'listed': only the agents on `agentGaiis` do, and
-   *  any other agent is treated as a non-member (services/organism-agent-access.ts). */
+   *  any other agent is treated as a non-member (services/organism/agent-access.ts). */
   agentAccess?: 'all' | 'listed';
   /** Whether a person refused by an app or a page opened to this organism's members may ask for
    *  access from the refusal page. 'on' (the default when unset): the request is filed as a join

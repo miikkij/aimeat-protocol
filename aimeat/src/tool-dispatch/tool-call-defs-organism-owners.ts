@@ -7,7 +7,7 @@
  *   /v1/organisms/:id/owners (src/routes/organisms/membership.ts) and
  *   /v1/organisms/:id/invitations/email (src/routes/organisms/workspace-access.ts). Ownership is
  *   plural: adding is additive and the last owner cannot be removed, and both rules are the
- *   route's (services/organism-ownership.ts). This file adds none of its own.
+ *   route's (services/organism/ownership.ts). This file adds none of its own.
  *
  *   Until 2026-10-12 these five tools had a handler only on the connector MCP
  *   (src/cli/connect/mcp/tools/organisms.ts), so a fleet daemon and crew code could not call them.

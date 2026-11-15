@@ -143,7 +143,7 @@ import { registerCopyRoute } from './copy.js';
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
-import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
+import { organismVisibilityRefusal } from '../../services/organism/visibility.js';
 import { isNamedGroup, memoryGroupRefusal, unknownGroupRefusal } from '../../storage/memory-sharing.js';
 import { discoverMemory } from '../../services/memory-discover.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';

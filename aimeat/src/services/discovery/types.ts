@@ -40,7 +40,7 @@
  *   v0.1.0 — 2026-06-23 — Phase 0: initial contract (design doc 2026-06-23-master-directory-discovery).
  */
 import type { ContentReader } from '../classification/reader.js';
-import type { OrganismListCaller } from '../organism-namespace-access.js';
+import type { OrganismListCaller } from '../organism/namespace-access.js';
 
 /** The taxonomy an LLM filters on. Extend here + add an llms.txt word when a new kind ships (§7.3). */
 export type DiscoveryType =
@@ -165,7 +165,7 @@ export interface DiscoveryContext {
     /** Granted read-scopes — used to filter an agent's view of the owner set (design §11.3). */
     scopes: string[];
   };
-  /** The session asking, as the organism read rule takes it (services/organism-namespace-access.ts):
+  /** The session asking, as the organism read rule takes it (services/organism/namespace-access.ts):
    *  callerOf on REST, the session's caller() on MCP. The own scope asks it of every organism key. */
   organismCaller?: OrganismListCaller;
   /** The caller as a data package reader (roles and scopes too): the dataset source asks the package

@@ -54,7 +54,7 @@
 import type { Storage, ContentLabelTarget, ContentLabelKind, BoardRecord } from '../../storage/interface.js';
 import { appSlug, isGEAI, isSameOwner, ownerGhiiOf, parseGaiiLoose } from '../../utils/gaii.js';
 import type { AimeatConfig } from '../../config.js';
-import { agentBarred } from '../organism-agent-access.js';
+import { agentBarred } from '../organism/agent-access.js';
 import { decideWorkspaceRead, isOrgManager } from '../workspace/access.js';
 import { findWorkspaceRegistration } from '../workspace/meta-read.js';
 import { ClassificationError, rolesOf, type ClassificationDeps, type LabelActor } from './label-core.js';

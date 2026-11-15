@@ -34,7 +34,7 @@ import type { ContentReader } from '../classification/reader.js';
 import type { StatsCollector } from '../stats.js';
 import type { PeerInfo } from '../federation.js';
 import { resolveIdentity, isForeignPrincipal, ownerGhiiOf } from '../../utils/gaii.js';
-import { organismVisibilityRefusal } from '../organism-visibility.js';
+import { organismVisibilityRefusal } from '../organism/visibility.js';
 import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
 import { isRaiseToPublic } from '../publish-gate.js';
 import { memoryVisibilityDefault } from '../content-defaults.js';
@@ -74,7 +74,7 @@ import { stampAgentWrite, storeHeldProvenance } from '../ai/provenance.js';
 import { applyMergePatch } from '../../utils/json-merge-patch.js';
 import { mediaKindOfValue } from '../../models/ai-provenance-schemas.js';
 import { keepsHistory, HISTORY_KEEP } from '../context/history-keys.js';
-import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { visibilityToZone, isAnonymousGaii } from '../../utils/visibility-words.js';
 import { memoryContentBytes } from '../../utils/memory-content.js';
 

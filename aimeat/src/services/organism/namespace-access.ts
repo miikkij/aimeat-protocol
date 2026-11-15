@@ -1,5 +1,5 @@
 /**
- * @file organism-namespace-access.ts
+ * @file src/services/organism/namespace-access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may read or write an `organism.{id}.*` key. Membership, the namespace role
@@ -87,16 +87,16 @@
  *     manifest carries a row space's writeRole and app allowlist. The creator is read through
  *     findWorkspaceRegistration (services/workspace-meta.ts), which the consent step now shares.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ConsentRecord } from '../storage/interface.js';
-import { matchesRecipient } from '../storage/consent-recipient.js';
-import { consentMatchPattern } from '../storage/pattern-utils.js';
-import { findWorkspaceRegistration } from './workspace/meta.js';
-import { agentAccessOf, agentBarred, agentBarredMessage, attachedAsParticipant, participantRefusalMessage } from './organism-agent-access.js';
-import { isOwnerInPerson, parseGaiiLoose } from '../utils/gaii.js';
-import { fencedSpaceRefusal, type ManifestWrite } from './fenced-space.js';
-import { wsRoleOf } from './workspace/roles.js';
-import type { CallerContext } from './caller-context.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ConsentRecord } from '../../storage/interface.js';
+import { matchesRecipient } from '../../storage/consent-recipient.js';
+import { consentMatchPattern } from '../../storage/pattern-utils.js';
+import { findWorkspaceRegistration } from '../workspace/meta.js';
+import { agentAccessOf, agentBarred, agentBarredMessage, attachedAsParticipant, participantRefusalMessage } from './agent-access.js';
+import { isOwnerInPerson, parseGaiiLoose } from '../../utils/gaii.js';
+import { fencedSpaceRefusal, type ManifestWrite } from '../fenced-space.js';
+import { wsRoleOf } from '../workspace/roles.js';
+import type { CallerContext } from '../caller-context.js';
 
 /** The session asking, in the terms this rule decides on. */
 export interface OrganismAccessCaller {

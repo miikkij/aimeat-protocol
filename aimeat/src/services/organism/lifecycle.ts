@@ -1,5 +1,5 @@
 /**
- * @file organism-lifecycle.ts
+ * @file src/services/organism/lifecycle.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The organism lifecycle WRITES (create, update, join, leave) as one implementation
@@ -76,33 +76,33 @@
  *     enum handling (REST stored anything, MCP dropped invalid values silently; both now refuse).
  */
 import { v4 as uuidv4 } from 'uuid';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, OrganismRecord, OrganismMembershipRecord, JoinRequestRecord } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
-import { recordPublicActivity } from './public-activity.js';
-import { recordAccountEvent } from './account-events.js';
-import { updateOrganismStructure } from './structure-snapshot.js';
-import { resolveShape, applyOrganismShape, type ShapedWorkspace, type ShapedWorkspaceFailure } from './organism-shape-apply.js';
-import { getOrganismReadme, setOrganismReadme } from './organism-readme.js';
-import { MEMBER_VISIBILITY_VALUES } from './organism-privacy.js';
-import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
-import { isOrganismOwner } from './organism-ownership.js';
-import { AGENT_ACCESS_VALUES, agentAccessOf, type AgentAccess } from './organism-agent-access.js';
-import { ACCESS_REQUESTS_VALUES, membershipRefusal, fileJoinRequest, type AccessRequests } from './organism-join-requests/requests.js';
-import { revokeDepartedMemberAccess } from './invitations.js';
-import { isRaiseToPublic } from './publish-gate.js';
-import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
-import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
-import { organismVisibilityDefault } from './content-defaults.js';
-import { organismBoardVisibility, followOrganismVisibility } from './organism-board.js';
-import { classifyContainerAfterWrite } from './classify-on-write.js';
-import { organismTarget } from './classification/containers.js';
-import { audienceCapOf, audienceOfOrganism, capByOf, capRefusalOf } from './classification/audience-cap.js';
-import { detachMcpServer } from './mcp-client/registry-settings.js';
-import { removeWithClassificationAudit } from './classification/audit.js';
-import { purgeExceptions } from './classification/exceptions.js';
-import { removeComplianceDocs } from './compliance/docs.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, OrganismRecord, OrganismMembershipRecord, JoinRequestRecord } from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
+import { recordPublicActivity } from '../public-activity.js';
+import { recordAccountEvent } from '../account-events.js';
+import { updateOrganismStructure } from '../structure-snapshot.js';
+import { resolveShape, applyOrganismShape, type ShapedWorkspace, type ShapedWorkspaceFailure } from './shape-apply.js';
+import { getOrganismReadme, setOrganismReadme } from './readme.js';
+import { MEMBER_VISIBILITY_VALUES } from './privacy.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { isOrganismOwner } from './ownership.js';
+import { AGENT_ACCESS_VALUES, agentAccessOf, type AgentAccess } from './agent-access.js';
+import { ACCESS_REQUESTS_VALUES, membershipRefusal, fileJoinRequest, type AccessRequests } from '../organism-join-requests/requests.js';
+import { revokeDepartedMemberAccess } from '../invitations.js';
+import { isRaiseToPublic } from '../publish-gate.js';
+import { publishAskOf, type PublishAsk } from '../publish-requests/ask.js';
+import { fileAskForDoor, type DoorAsk, type PublishGateInput } from '../publish-requests/door.js';
+import { organismVisibilityDefault } from '../content-defaults.js';
+import { organismBoardVisibility, followOrganismVisibility } from './board.js';
+import { classifyContainerAfterWrite } from '../classify-on-write.js';
+import { organismTarget } from '../classification/containers.js';
+import { audienceCapOf, audienceOfOrganism, capByOf, capRefusalOf } from '../classification/audience-cap.js';
+import { detachMcpServer } from '../mcp-client/registry-settings.js';
+import { removeWithClassificationAudit } from '../classification/audit.js';
+import { purgeExceptions } from '../classification/exceptions.js';
+import { removeComplianceDocs } from '../compliance/docs.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -234,7 +234,7 @@ export async function createOrganismRecord(
   const ask = organismPublishAsk(deps, input.publishGate, undefined, visibility);
   if (ask?.kind === 'refused') return refuse(ask.status, ask.code, ask.message);
   if (ask) visibility = 'private';
-  // Roster privacy tier; unset = 'authenticated' (see services/organism-privacy.ts).
+  // Roster privacy tier; unset = 'authenticated' (see services/organism/privacy.ts).
   const memberVisibility = MEMBER_VISIBILITY_VALUES.includes(input.memberVisibility as OrganismRecord['memberVisibility'] & string)
     ? (input.memberVisibility as OrganismRecord['memberVisibility'])
     : undefined;
@@ -250,7 +250,7 @@ export async function createOrganismRecord(
     id: boardId,
     name: `${name} — Discussion`,
     description: `Discussion board for ${name}`,
-    // A listed or private organism's board is read by its active members (services/organism-board.ts).
+    // A listed or private organism's board is read by its active members (services/organism/board.ts).
     visibility: organismBoardVisibility(id, visibility),
     ownerGaii: `${creatorOwner}@${config.nodeId}`,
     allowedGaiis: [],

@@ -201,7 +201,7 @@ import { getAgentSkillLinks } from '../services/skill-agent-links.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { readsAsOwner, ownerScopeViewAdmitting } from '../services/owner-scope-read.js';
-import { organismReadableRecords } from '../services/organism-namespace-access.js';
+import { organismReadableRecords } from '../services/organism/namespace-access.js';
 import { listMemoryMetaFor, listMemoryMetaPage } from '../services/memory-query.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { scopeDeniedText } from './scope-denied-answer.js';

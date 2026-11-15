@@ -86,7 +86,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { emitRecordChange } from './event-bus.js';
 import { checkDeleteGuard, getNamespacePolicy, parseWorkspaceRecordKey } from './write-guards.js';
-import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
+import { checkOrganismNamespaceAccess } from './organism/namespace-access.js';
 import { isServiceOwnedKey, isOwnerRemovableServiceKey, isReservedServerKey, serverWrittenKeyRefusal, appMayWriteKey } from '../utils/reserved-keys.js';
 import { isGEAI, isOwnerInPerson, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
 import { settleRequestsForBinnedRecord } from './publish-requests/store.js';

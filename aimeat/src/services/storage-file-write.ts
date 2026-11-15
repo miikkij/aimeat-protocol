@@ -140,7 +140,7 @@ import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta, notePageKeyChange, t
 export { storageProvenanceMintRefusal };
 export type { StorageProvenanceInput, ProvenanceRefusalCode };
 import { ownExtensionFileKey } from './component-address.js';
-import { organismVisibilityRefusal } from './organism-visibility.js';
+import { organismVisibilityRefusal } from './organism/visibility.js';
 import { unknownGroupRefusal } from '../storage/memory-sharing.js';
 import { emitChange } from './event-bus.js';
 import type { CallerContext } from './caller-context.js';

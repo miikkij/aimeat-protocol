@@ -201,7 +201,7 @@ type OrganismOutcome = 'none' | 'removed' | 'handed-on' | 'orphaned';
  * code path may carry the GHII.
  *
  * THE SOLE OWNER. `owners` is never empty: an organism with no owner is the state nobody can repair
- * from the inside (services/organism-ownership.ts), and the rule for an owner who departs is that
+ * from the inside (services/organism/ownership.ts), and the rule for an owner who departs is that
  * somebody else holds it first. An erasure cannot ask, so it hands the organism to the first admin,
  * then to the first member, and that account's membership becomes `creator`. When nobody at all is
  * left, the holder becomes the erasure pseudonym: no account can equal it (erased-party.ts), so the

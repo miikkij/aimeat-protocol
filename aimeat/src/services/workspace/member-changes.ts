@@ -9,7 +9,7 @@
  *   (services/workspace/tool-ops.ts).
  *
  *   WHY IT EXISTS. Since the workspace's meta namespace became the creator's and the admins' alone
- *   (services/organism-namespace-access.ts, 2026-09-24), a contributor who filed a document under a
+ *   (services/organism/namespace-access.ts, 2026-09-24), a contributor who filed a document under a
  *   section, or whose notebook added a document space to someone else's workspace, was refused, and
  *   the page swallowed the refusal. The owner's ruling, 2026-09-25: a proper server path, and one rule
  *   per workspace that its creator or an admin sets. "It needs to enable instead of make everyone's

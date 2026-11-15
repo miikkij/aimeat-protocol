@@ -33,7 +33,7 @@
  */
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { organismOwners } from '../organism-ownership.js';
+import { organismOwners } from '../organism/ownership.js';
 import { localAccountOf } from '../../utils/gaii.js';
 import { createNameInvitation, InvitationError } from '../invitations.js';
 import { teamLang, type TeamLang } from '../../data/team-kit.js';

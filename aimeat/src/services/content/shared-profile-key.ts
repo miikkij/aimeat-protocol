@@ -9,7 +9,7 @@
  *   One record per document, `organism.<org>.w.<ws>.meta.fingerprint.<namespace>~<id>`, held by the
  *   node's own identity (`system@<node>`) and private. The `meta.` prefix keeps it out of the
  *   workspace read, the index and the content search, as the comments are kept out
- *   (services/organism-comments.ts); being under the workspace's prefix makes it go wherever the
+ *   (services/organism/comments.ts); being under the workspace's prefix makes it go wherever the
  *   workspace's own keys go. Readers reach it only through the content service, which asks the
  *   workspace read gate first (shared-profile.ts). Decision
  *   decision-sormenj-lki-yksi-yhteinen-per-ty-tilan-asiakirja-sama-lukulu (Jouni, 2026-11-03).
