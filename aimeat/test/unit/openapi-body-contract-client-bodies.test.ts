@@ -3,7 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Request-body contracts corrected to the bodies the node's own clients send: the served
- *   app libraries (src/static/sdk-libs/) and the portal services (public/js/services/). Each case is a
+ *   app libraries (src/static/sdk-libs/), the portal services (public/js/services/), the portal's views,
+ *   components and pages, the app catalogue, the CLI and the CrewAI package. Each case is a
  *   body a client sends and the route accepts today, which openapi.yaml refused (structure programme
  *   2026-11, batch 8). The body goes through the real request body guard (middleware/openapi-body-guard.ts)
  *   with the real openapi.yaml, in enforce mode, with a caller that has a session and with no route
@@ -12,6 +13,8 @@
  *   shown to refuse it as well, so no correction is looser than the route.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openapi-body-contract-client-bodies.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-15 — The capability try panel's input, an extension action's array input, the
+ *     federation key exchange the CLI and the node send, and the setup wizard's empty genesis address.
  *   v1.1.0 — 2026-11-15 — The work request and delivery, the decision review, the classification
  *     target's owner, the voice app_id, the TOTP backup code, the data package sale, the internet
  *     opener's end date, the agreement and contact addresses, the open item and the members plan.
@@ -277,5 +280,17 @@ describe('PUT /v1/apps/{owner}/{filename}/members/plan (aimeat-iam.js setPlan)',
 
     it('still refuses negative seats and days of 0 or below, as the route does', async () => {
         await refused('PUT', path, [{ ...plan, seats: { member: -1 } }, { ...plan, terms: { member: { days: 0 } } }, { ...plan, terms: { member: { days: -3 } } }]);
+    });
+});
+
+describe('POST /v1/capabilities/{id}/invoke (profile Capabilities tab, the try panel)', () => {
+    // views/profile/capabilities-tab.js sends { input: JSON.parse(textarea) }, so a person who types
+    // null, an array, text or a number sends that value. routes/capabilities.ts reads
+    // `req.body.input || {}` and refuses none of them: an empty value becomes {}, any other value goes
+    // on unchanged (services/capability-invoke.ts sends it as the webhook's or the action's body).
+    it('takes an input of any JSON type', async () => {
+        await taken('POST', '/v1/capabilities/cap-weather/invoke', [
+            { input: null }, { input: ['Oulu', 'Turku'] }, { input: 'Oulu' }, { input: 3 }, { input: { city: 'Oulu' } }, {},
+        ]);
     });
 });

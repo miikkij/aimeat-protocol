@@ -65758,7 +65758,12 @@ paths:
             schema:
               type: object
               properties:
-                input: { type: object }
+                input:
+                  description: >-
+                    What the capability is called with, as its input schema asks. Any JSON value: an
+                    object, an array, text, a number or null. An absent or empty value (null, false, 0,
+                    '') is sent as an empty object; any other value is sent unchanged, as the body of the
+                    extension action or the webhook.
       responses:
         '200':
           description: Invoke result
