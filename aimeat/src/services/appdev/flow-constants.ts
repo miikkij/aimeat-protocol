@@ -1,5 +1,5 @@
 /**
- * @file appdev-flow-constants.ts
+ * @file src/services/appdev/flow-constants.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Shared vocabulary of the research-first appdev flow — imported by the build-app
@@ -8,7 +8,7 @@
  *   → FRAME (tier, packs, iam) → PROPOSE (to the user) → BUILD → FINISH (face, skill, template,
  *   learnings). The user can always skip straight to building.
  * @structure FLOW_* string constants + buildResearchStep()/buildFinishChecklist() fragments
- * @usage import { FLOW_SKIP_PHRASE, buildResearchStep } from './appdev-flow-constants.js';
+ * @usage import { FLOW_SKIP_PHRASE, buildResearchStep } from './flow-constants.js';
  * @version-history
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 7).

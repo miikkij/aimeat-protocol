@@ -490,7 +490,7 @@ await test('6. The consent granted by the agent is in it', async () => {
 });
 
 await test('7. The audit entry that grant wrote a moment ago is in the export', async () => {
-    // Consent audit entries are BUFFERED (services/consent-audit-buffer.ts) and written to storage on
+    // Consent audit entries are BUFFERED (services/consent/audit-buffer.ts) and written to storage on
     // a 60-second interval. GET /v1/consent/audit merges the pending queue with the persisted rows so
     // a just-made grant shows immediately; until 2026-09-08 this export read storage alone, so the
     // trail it handed the person was missing everything from the last minute. Fixed in

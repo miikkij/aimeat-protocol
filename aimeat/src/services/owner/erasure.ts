@@ -143,10 +143,10 @@ import { ERASED_PARTY_PREFIX, erasedPartyPseudonym } from '../../storage/erased-
 import { inSavepoint } from '../tolerant-step.js';
 import { evictAgentTelemetry, holdTelemetryForErasure } from '../telemetry-buffer.js';
 import { removeWithClassificationAudit, flushClassificationAudit } from '../classification/audit.js';
-import { holdConsentAuditForErasure } from '../consent-audit-buffer.js';
+import { holdConsentAuditForErasure } from '../consent/audit-buffer.js';
 import { holdUsageForErasure } from '../usage/usage-buffer.js';
 import { holdWriteTallyForErasure } from '../data-map/write-tally-buffer.js';
-import { holdScopeUseForErasure } from '../scope-use.js';
+import { holdScopeUseForErasure } from '../scope/use.js';
 import { holdAgentRefusalsForErasure } from '../agent/refusals.js';
 import { holdCallTimingsForErasure } from '../call-timing.js';
 import { holdPartyActivityForErasure } from '../parties/activity.js';

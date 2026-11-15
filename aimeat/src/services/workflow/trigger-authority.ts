@@ -65,7 +65,7 @@ import { runKey, getWorkflow } from './store.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { loc } from './engine-util.js';
 import { missingStepScopes } from './step-authority.js';
-import { deactivatedAccountSkip } from '../account-deactivated.js';
+import { deactivatedAccountSkip } from '../account/deactivated.js';
 import { openItemLink } from '../notifications/links.js';
 import type { WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowSaver } from '../../models/workflow-schemas.js';
 
@@ -192,7 +192,7 @@ function refusalReason(saverName: string, missing: string[], gone: boolean): str
  * A deactivated account's trigger starts nothing, whoever saved the workflow: the start is skipped
  * with a log sentence that names the deactivation, no refusal record is written and the owner is not
  * told (they cannot sign in), and `runId` is empty. Reactivation lets the next event start it
- * (services/account-deactivated.ts; secaudit2026oct22).
+ * (services/account/deactivated.ts; secaudit2026oct22).
  */
 export async function refuseTriggerStart(
   deps: TriggerAuthorityDeps, ownerGhii: string, def: WorkflowDef,

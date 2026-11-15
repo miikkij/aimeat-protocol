@@ -35,7 +35,7 @@ import {
 } from '../exchange/market.js';
 import { isMoneyCurrency } from '../../commerce/money.js';
 import { buildGAII } from '../../utils/gaii.js';
-import { deactivatedSince } from '../account-deactivated.js';
+import { deactivatedSince } from '../account/deactivated.js';
 import {
   getX402Network, getX402Asset, buildExactRequirements, extractPayTo,
 } from '../../commerce/x402-facilitator.js';

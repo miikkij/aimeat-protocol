@@ -27,7 +27,7 @@
  *
  *   BACKGROUND WORK carries no credential, so no step here touches it. The scheduler fire, the
  *   workflow trigger start and the unattended extension run ask the flag themselves
- *   (services/account-deactivated.ts) and skip while it is set; nothing is deleted, so reactivation
+ *   (services/account/deactivated.ts) and skip while it is set; nothing is deleted, so reactivation
  *   resumes them (secaudit2026oct22).
  *
  * @structure

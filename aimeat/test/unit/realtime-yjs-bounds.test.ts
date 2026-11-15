@@ -18,7 +18,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EventEmitter } from 'node:events';
 import type { WebSocket } from 'ws';
-import { RealtimeManager } from '../../src/services/realtime-manager.js';
+import { RealtimeManager } from '../../src/services/realtime/manager.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 

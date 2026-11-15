@@ -120,7 +120,7 @@ import { getEncryptionKey } from '../encryption.js';
 import { findExtension, extensionHoldersOf } from '../component/address.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './secrets.js';
 import type { EmailService } from '../email.js';
-import { deactivatedAccountSkip } from '../account-deactivated.js';
+import { deactivatedAccountSkip } from '../account/deactivated.js';
 import { logger } from '../../utils/logger.js';
 
 export interface SystemRunDeps {
@@ -187,7 +187,7 @@ export interface SystemRunArgs {
      * Somebody is waiting for this run's answer: an app's markdown action for a reader
      * (services/app/format-md.ts) or an AI call through an extension provider. Such a run is not the
      * account's own background work, so a deactivated account does not stop it. Every other run is
-     * refused for a deactivated account, with the sentence of services/account-deactivated.ts.
+     * refused for a deactivated account, with the sentence of services/account/deactivated.ts.
      */
     servesWaitingCaller?: boolean;
 }
@@ -259,7 +259,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
     const { storage, config, emailService } = deps;
     const { extensionName, actionId, instanceId, ownerName, callerGaii, storageOwnerGhii, logLabel } = args;
 
-    // A deactivated account's background work waits (services/account-deactivated.ts). Thrown like
+    // A deactivated account's background work waits (services/account/deactivated.ts). Thrown like
     // every refusal here; the scheduler and the trigger start skip before they reach this point.
     if (!args.servesWaitingCaller) {
         const paused = await deactivatedAccountSkip(storage, ownerName);

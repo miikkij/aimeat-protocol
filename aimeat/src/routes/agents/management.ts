@@ -404,7 +404,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
 
   /**
    * POST /v1/agents/:name/scope-narrowing — replace the agent's `*` with the named permissions it
-   * actually used, as its usage record has them (services/scope-use.ts). One press for the owner; the
+   * actually used, as its usage record has them (services/scope/use.ts). One press for the owner; the
    * agent list says what the proposal is (`task_start_wildcard.proposal`). Only the owner decides to
    * narrow: the node never does it by itself (Jouni, 2026-10-28), and `*` holds no task.
    *

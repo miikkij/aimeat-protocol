@@ -36,7 +36,7 @@ import { registerOwner } from './helpers/owner-login.js';
 import { serverSqlitePath, serverDbUrl } from './helpers/server-db.js';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 import type { Storage } from '../src/storage/interface.js';
-import { readScopeUse, writeScopeUse } from '../src/services/scope-use.js';
+import { readScopeUse, writeScopeUse } from '../src/services/scope/use.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 

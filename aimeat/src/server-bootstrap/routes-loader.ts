@@ -83,7 +83,7 @@ import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
-import type { RealtimeManager } from '../services/realtime-manager.js';
+import type { RealtimeManager } from '../services/realtime/manager.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import type { Scheduler } from '../services/scheduler.js';
 import type { WorkflowEngine } from '../services/workflow/engine.js';

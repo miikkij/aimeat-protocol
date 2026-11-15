@@ -236,7 +236,7 @@ describe('runExtensionActionAsSystem as a provider', () => {
             name: 'example-ai', status: 'active', installedBy, config: {}, limits,
             actions: [{ id: 'ai.text', scriptContent: SCRIPT }],
         }),
-        // An active account: the run asks whether its owner was deactivated (services/account-deactivated.ts).
+        // An active account: the run asks whether its owner was deactivated (services/account/deactivated.ts).
         getOwner: async () => ({ disabledAt: null }),
     }) as unknown as Storage;
     const args = (url: string, extra: Record<string, unknown> = {}) => ({

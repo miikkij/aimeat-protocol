@@ -81,7 +81,7 @@ import { errorFields } from '../utils/error-fields.js';
 import { type WebhookEventType, buildWebhookEnvelope } from '../models/webhook-schemas.js';
 import { isStopped, isWakeWebhookEvent } from './agent/stop-rules.js';
 import { deliverWithRetries, registerOutboxHandler } from './outbox.js';
-import { deactivatedSince } from './account-deactivated.js';
+import { deactivatedSince } from './account/deactivated.js';
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -182,7 +182,7 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
     }
 
     // A deactivated account's agents get no webhook, as its schedules do not run
-    // (services/account-deactivated.ts). Nothing is switched off or counted, so reactivation resumes
+    // (services/account/deactivated.ts). Nothing is switched off or counted, so reactivation resumes
     // delivery. A failed owner read is logged and does not stop the delivery: this path never rejects.
     let deactivated: string | null = null;
     try { deactivated = await deactivatedSince(storage, agentGaii); }

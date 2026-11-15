@@ -7,7 +7,7 @@
  *   WHY. Deactivation ends every credential, and background work carries none: until 2026-10-25 a
  *   deactivated account's schedules, workflow triggers and unattended extension runs went on acting
  *   in its name (secaudit2026oct22, owner-deactivation:background-work-keeps-acting). Each of the three
- *   now asks the account first (services/account-deactivated.ts) and skips with a sentence that names
+ *   now asks the account first (services/account/deactivated.ts) and skips with a sentence that names
  *   the deactivation; nothing is deleted.
  *
  *   With the real SQLite store: a scheduled job of the account runs, is skipped after deactivation
@@ -32,7 +32,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import { Scheduler } from '../../src/services/scheduler.js';
 import { refuseTriggerStart } from '../../src/services/workflow/trigger-authority.js';
 import { runExtensionActionAsSystem } from '../../src/services/extension/system-run.js';
-import { deactivatedAccountSkip } from '../../src/services/account-deactivated.js';
+import { deactivatedAccountSkip } from '../../src/services/account/deactivated.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import type { ScheduledJobRecord, Storage } from '../../src/storage/interface.js';
 import type { WorkflowDef } from '../../src/models/workflow-schemas.js';

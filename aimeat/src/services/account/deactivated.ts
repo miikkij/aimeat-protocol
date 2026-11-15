@@ -1,5 +1,5 @@
 /**
- * @file src/services/account-deactivated.ts
+ * @file src/services/account/deactivated.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Is the account a piece of background work acts for deactivated? One read, asked at the
@@ -44,8 +44,8 @@
  *   v1.0.1 -- 2026-10-27 -- Two more callers: a workflow run in flight and the goal sweep (secaudit2026oct26).
  *   v1.0.0 -- 2026-10-25 -- Initial (secaudit2026oct22, owner-deactivation:background-work-keeps-acting).
  */
-import type { Storage } from '../storage/interface.js';
-import { localAccountOf } from '../utils/gaii.js';
+import type { Storage } from '../../storage/interface.js';
+import { localAccountOf } from '../../utils/gaii.js';
 
 /**
  * The sentence that says why work acting for `identity` is skipped, or null when its account is

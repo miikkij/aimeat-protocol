@@ -21,7 +21,7 @@ import express from 'express';
 import { EventEmitter } from 'node:events';
 import type { WebSocket } from 'ws';
 import { upgradeClientKey, EchatDoor, realtimeMaxPayload, type TrustProxyFn } from '../../src/services/realtime/upgrade-guards.js';
-import { RealtimeManager } from '../../src/services/realtime-manager.js';
+import { RealtimeManager } from '../../src/services/realtime/manager.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 

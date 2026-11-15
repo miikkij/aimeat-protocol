@@ -142,7 +142,7 @@ export function acceptedFloorOf(agent: FloorAgent | null | undefined): string[] 
  * held every task of 14 scheduled agents on aimeat.io on 2026-10-16..18, the follow-up of 2026-10-18
  * had the node narrow such an agent by itself instead. That narrowed the owner's own interactive
  * agent past a permission it used, and it was refused three minutes later, so both halves are gone:
- * the node notes what a `*` agent uses and offers the narrowing on its card (services/scope-use.ts),
+ * the node notes what a `*` agent uses and offers the narrowing on its card (services/scope/use.ts),
  * and only the owner applies it. The words a `*` agent's record names are read like any agent's.
  *
  * A floor permission the owner in person accepted for this agent (acceptedFloorOf) is not in the

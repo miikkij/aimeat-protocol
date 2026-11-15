@@ -34,7 +34,7 @@
  */
 import { recordUsageCall } from '../services/usage/usage-buffer.js';
 import { noteAgentRefusal } from '../services/agent/refusals.js';
-import { noteScopeUse } from '../services/scope-use.js';
+import { noteScopeUse } from '../services/scope/use.js';
 import { requiredScopesForTool } from '../tool-catalog/scopes.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import type { UsageActorKind } from '../storage/interface.js';
@@ -119,7 +119,7 @@ export function wrapToolHandler(register: AnyFn, principal: () => string): AnyFn
           noteMcpScopeRefusal(gaii, scopeDeniedWords(result), name);
         } else if (actorKindOf(gaii) === 'agent') {
           // The word this tool needs, for the narrowing a `*` agent's owner is offered
-          // (services/scope-use.ts decides at flush whether the agent holds `*`).
+          // (services/scope/use.ts decides at flush whether the agent holds `*`).
           const words = requiredScopesForTool(name);
           if (words.length) noteScopeUse(gaii, words);
         }

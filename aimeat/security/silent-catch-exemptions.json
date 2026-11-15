@@ -249,7 +249,7 @@
       "count": 2,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/realtime-manager.ts": {
+    "src/services/realtime/manager.ts": {
       "count": 2,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },

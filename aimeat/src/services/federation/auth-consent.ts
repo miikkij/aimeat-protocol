@@ -28,7 +28,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { PeerInfo } from '../federation.js';
 import { coerceTier, tierCeiling } from './tiers.js';
-import { deactivatedAccountSkip } from '../account-deactivated.js';
+import { deactivatedAccountSkip } from '../account/deactivated.js';
 
 /**
  * Has this auth consent's end time passed? Only a time that parses and lies at or before `now` ends

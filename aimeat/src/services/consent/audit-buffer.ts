@@ -1,5 +1,5 @@
 /**
- * @file consent-audit-buffer.ts
+ * @file src/services/consent/audit-buffer.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description In-memory write buffer for consent-audit entries. The consent layer used to
@@ -22,7 +22,7 @@
  *   - shutdownConsentAuditBuffer()   -- stop the interval + final flush (graceful exit)
  *   - holdConsentAuditForErasure(a)  -- an account erasure: drop its rows, keep none until released
  * @usage
- *   import { bufferConsentAudit } from './consent-audit-buffer.js';
+ *   import { bufferConsentAudit } from './audit-buffer.js';
  * @version-history
  *   v1.2.0 -- 2026-11-14 -- holdConsentAuditForErasure: the erasure drops the account's waiting entries
  *     and waits for a write in progress before its cascade, and no entry of the account is kept until
@@ -32,9 +32,9 @@
  *     crash loses at most that second (codebase analysis 2026-11-03, HA stage 1 item 1.6).
  *   v1.0.0 -- 2026-06-21 -- Initial: batched off-request-path consent-audit writes.
  */
-import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { ErasureHolds, type ErasedAccount } from './erasure/holds.js';
+import type { Storage, ConsentAuditEntry } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 /** The safety net: retries a failed write and catches anything the soon-flush missed. */
 const FLUSH_INTERVAL_MS = 60_000;

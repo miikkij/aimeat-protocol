@@ -28,7 +28,7 @@ import type { AgentRecord } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
 import { resolveAgentTarget, type AgentWriteDeps, type AgentWriteOutcome } from './profile-write.js';
 import { agentStartDefault, floorScopesOf, acceptedFloorOf, TASK_START_FLOOR } from './task-rules.js';
-import { readScopeUse, wildcardStatus, flushScopeUse, type AgentScopeUse, type ScopeUseRecord } from '../scope-use.js';
+import { readScopeUse, wildcardStatus, flushScopeUse, type AgentScopeUse, type ScopeUseRecord } from '../scope/use.js';
 import type { Storage } from '../../storage/interface.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 
@@ -43,7 +43,7 @@ import { ownerGhiiOf } from '../../utils/gaii.js';
  *                       (agent-task-rules.ts floorScopesOf). The switch on the agent card reads this
  *                       to say why it has no effect.
  *   task_start_wildcard for an agent holding `*`: how far its usage record is, what it used, and the
- *                       narrowing the owner may apply with one press (services/scope-use.ts); the
+ *                       narrowing the owner may apply with one press (services/scope/use.ts); the
  *                       node never applies it. Null for every other agent.
  *   task_start_floor_accepted the floor permissions the owner in person accepted for this agent and it
  *                       holds: they no longer hold its tasks (agent-task-rules.ts acceptedFloorOf).

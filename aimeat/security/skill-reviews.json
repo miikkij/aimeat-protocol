@@ -303,12 +303,12 @@
       "digest": "sha256:26dca1c3dc9bc365a6a60eff"
     },
     "node:ai-transparency": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/ai/provenance-input.ts",
         "aimeat/src/services/ai/provenance.ts"
       ],
-      "digest": "sha256:5c7fea7dd0017128af1a94f9"
+      "digest": "sha256:69a4711d69a004b114bf110b"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-11-15",
@@ -402,7 +402,7 @@
         "aimeat/src/services/agent/profile-write.ts",
         "aimeat/src/services/agent/task-rules.ts"
       ],
-      "digest": "sha256:feaa1a345b6b3abd287ac335"
+      "digest": "sha256:991ef94df4e9f74160e24e88"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-15",
@@ -451,7 +451,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:c407feacafb79c585dcade4f",
+      "digest": "sha256:4b64e945404ac243e2e3469f",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -520,7 +520,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:16f112602f68b10385e43820"
+      "digest": "sha256:b752d84f845e25c9cf8998e7"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -543,7 +543,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:aa9eef7b7d74d1b9e9fe4e61",
+      "digest": "sha256:d4edf4380bd736ae009c1623",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -567,7 +567,7 @@
         "aimeat/scripts/ui-compare.ts",
         "aimeat/src/services/builder/app-prompt.ts"
       ],
-      "digest": "sha256:e52db78369300af8f8eba662",
+      "digest": "sha256:b05fec4350e1df82e497c6d8",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -665,7 +665,7 @@
         "docs/pitfalls.md",
         ".claude/skills/aimeat-organism-records/SKILL.md"
       ],
-      "digest": "sha256:072b564532228428a6934865",
+      "digest": "sha256:9cef1424882864b24ffd953a",
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
@@ -783,7 +783,7 @@
     },
     "node:ai-transparency": {
       "aimeat/src/services/ai/provenance-input.ts": "16c4870673b47869",
-      "aimeat/src/services/ai/provenance.ts": "68296bdb24b7667c"
+      "aimeat/src/services/ai/provenance.ts": "dca506b360305b9c"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "8049e6509cfa6655"
@@ -820,7 +820,7 @@
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "1302f1e385f459ff",
       "aimeat/src/mcp/agent-schedules.ts": "7ab9f9ab149a0628",
-      "aimeat/src/services/scheduler.ts": "27ec6ce2de968dd3",
+      "aimeat/src/services/scheduler.ts": "21cc22025a2336b1",
       "aimeat/src/services/ai/route-plan.ts": "95f735f72eac78b4"
     },
     "node:aimeat-game-apps": {
@@ -831,7 +831,7 @@
       "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
       "aimeat/src/routes/app-templates.ts": "c04b6dda6dd9ed2f",
       "aimeat/src/services/builder/atelier-prompt.ts": "f22da130ddf9dcb3",
-      "aimeat/src/services/builder/app-prompt.ts": "e42d89e8ad0cee61",
+      "aimeat/src/services/builder/app-prompt.ts": "9d4157a7b44929b6",
       "aimeat/src/services/app/publish.ts": "5187be36e9d0aed7",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
@@ -850,7 +850,7 @@
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
       "aimeat/scripts/ui-compare.ts": "a9f4b0a0d091a9ee",
-      "aimeat/src/services/builder/app-prompt.ts": "e42d89e8ad0cee61"
+      "aimeat/src/services/builder/app-prompt.ts": "9d4157a7b44929b6"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3",
@@ -926,7 +926,7 @@
       "aimeat/src/routes/organisms/workspace-ops.ts": "8b30cea9feebf2f3",
       "aimeat/src/routes/organisms/workspace-access.ts": "70baa83db72f7051",
       "aimeat/src/services/agent/profile-write.ts": "f07930903c42ff93",
-      "aimeat/src/services/agent/task-rules.ts": "3d0abc3361b12a54"
+      "aimeat/src/services/agent/task-rules.ts": "d46214216b90ec51"
     },
     "node:aimeat-extension-builder": {
       "aimeat/src/services/builder/extension-prompt.ts": "91ab68a199b0d408",
@@ -942,8 +942,8 @@
       "aimeat/src/routes/memory/key.ts": "68aa87147c323b2f",
       "aimeat/src/services/memory/bin.ts": "99a904bb4e2ce94d",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
-      "aimeat/src/routes/owners/export.ts": "ad1dce804aa88c2c",
-      "aimeat/src/services/owner/erasure.ts": "d0f8f4e955564215",
+      "aimeat/src/routes/owners/export.ts": "c557a4c9fc849d0e",
+      "aimeat/src/services/owner/erasure.ts": "511722012df95bcc",
       "aimeat/src/services/archive.ts": "6ddbae831830e2e9",
       "aimeat/src/mcp/organisms.ts": "bcafa8624d90288d"
     },
@@ -1059,7 +1059,7 @@
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
     "agent:note-writer": {
-      "docs/pitfalls.md": "c35c1901968281a8",
+      "docs/pitfalls.md": "ac1987e57b1e9bc9",
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {

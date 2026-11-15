@@ -100,7 +100,7 @@ import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
 import { TunnelManager } from './services/personal-tunnel.js';
 import { ConnectTunnelManager } from './services/connect-tunnel.js';
-import { RealtimeManager } from './services/realtime-manager.js';
+import { RealtimeManager } from './services/realtime/manager.js';
 import { Scheduler } from './services/scheduler.js';
 
 // Bootstrap modules

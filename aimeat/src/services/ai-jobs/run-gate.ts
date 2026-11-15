@@ -9,7 +9,7 @@
  *   runGate: the job's ACCOUNT and its STARTER as they are now, not as they were at the start.
  *     - A deactivated account's job waits. It stays queued with a sentence that names the deactivation
  *       (`waiting`), nothing is paid and nothing is written, and it runs after the operator reactivates
- *       the account, as a schedule of that account waits (services/account-deactivated.ts). Until
+ *       the account, as a schedule of that account waits (services/account/deactivated.ts). Until
  *       2026-11-08 a restart or a takeover ran such a job, paid the provider and wrote its answer.
  *     - A job an agent (or a scoped access token) started runs with the starter's CURRENT permissions:
  *       a starter that is gone ends the job with a reason before the provider is called, and a starter
@@ -51,7 +51,7 @@ import { intersectScopes } from '../../auth/effective-scopes.js';
 import { madeAfter, recordIssuedAt } from '../../auth/credential-age.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { localAccountOf } from '../../utils/gaii.js';
-import { deactivatedAccountOf } from '../account-deactivated.js';
+import { deactivatedAccountOf } from '../account/deactivated.js';
 import { saverAuthority, type SaverNow } from '../workflow/trigger-authority.js';
 import { allowAddressFor } from '../permission-ask.js';
 import { singleProcess, sameProcess, thisProcess } from '../process-lease.js';

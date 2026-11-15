@@ -34,7 +34,7 @@ export interface StartRunOpts {
  * metric shows (a partner's intake logged a case as started on exactly that, 2026-09-09). With
  * `refused`, nothing started either: a trigger's start found its saver gone or short of a word, and
  * `runId` is the refusal's record, or empty when the account is deactivated and the start was only
- * skipped (services/account-deactivated.ts).
+ * skipped (services/account/deactivated.ts).
  */
 export type StartRunResult =
   | { runId: string; skipped: boolean; refused?: string }

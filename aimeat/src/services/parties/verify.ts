@@ -43,7 +43,7 @@ import { partyKeyMatches } from './keys.js';
 import { readParties } from './store.js';
 import { verifyPartyToken } from './token.js';
 import { noteFailedAttempt, noteKeyUse } from './activity.js';
-import { deactivatedSince } from '../account-deactivated.js';
+import { deactivatedSince } from '../account/deactivated.js';
 
 /** The parts of a request this reads; an Express request fits. Not the Express type: a service takes none. */
 export interface RequestLike {

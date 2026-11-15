@@ -186,7 +186,7 @@ import { buildPromptSessionSections } from './app-prompt-session.js';
 import { buildPromptDrivenSection } from './app-prompt-driven.js';
 import { buildDecideSection } from './app-prompt-decide.js';
 import { buildRenderedContentParagraphs, buildAgentDataSection, buildOutsideUsersParagraph } from './app-prompt-content.js';
-import { buildResearchStep, buildFinishChecklist } from '../appdev-flow-constants.js';
+import { buildResearchStep, buildFinishChecklist } from '../appdev/flow-constants.js';
 import { classicLiveUpdatesSection } from './events-first.js';
 import { buildDataMapStep } from './data-map-step.js';
 import { publishWalkthrough } from './app-publish-walkthrough.js';

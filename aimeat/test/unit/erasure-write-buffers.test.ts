@@ -35,10 +35,10 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
 import { twoProviders, NODE, now, people, holdFirst, eraseDuring, until, type People } from './erasure-test-kit.js';
-import { initConsentAuditBuffer, bufferConsentAudit, flushConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent-audit-buffer.js';
+import { initConsentAuditBuffer, bufferConsentAudit, flushConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent/audit-buffer.js';
 import { initUsageBuffer, recordUsageCall, flushUsageBuffer, resetUsageBuffer } from '../../src/services/usage/usage-buffer.js';
 import { initWriteTallyBuffer, recordMemoryTouch, flushWriteTallyBuffer, resetWriteTallyBuffer } from '../../src/services/data-map/write-tally-buffer.js';
-import { initScopeUse, noteScopeUse, flushScopeUse, SCOPE_USE_KEY } from '../../src/services/scope-use.js';
+import { initScopeUse, noteScopeUse, flushScopeUse, SCOPE_USE_KEY } from '../../src/services/scope/use.js';
 import { initAgentRefusals, noteAgentRefusal, flushAgentRefusals, agentRefusalsKey } from '../../src/services/agent/refusals.js';
 
 requirePostgresWhenAsked('erasure-write-buffers');
@@ -55,7 +55,7 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
     resetWriteTallyBuffer();
   });
 
-  // ── The consent audit (services/consent-audit-buffer.ts) ──
+  // ── The consent audit (services/consent/audit-buffer.ts) ──
   const audit = (owner: string, accessor: string) => ({
     id: randomUUID(), consentId: 'none', ownerGaii: owner, accessorGaii: accessor,
     memoryKey: 'notes.a', action: 'read' as const, timestamp: now(), allowed: false,
@@ -186,7 +186,7 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
     expect(await tally(s, p.aliceGhii)).toEqual([]);
   });
 
-  // ── The permissions a `*` agent uses (services/scope-use.ts) ──
+  // ── The permissions a `*` agent uses (services/scope/use.ts) ──
   it('scope use, WAITING: no record of the erased account is stored after the erasure (green before the fix too: the write reads the agent first)', async () => {
     const s = st();
     const p = await people(s);

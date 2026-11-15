@@ -40,7 +40,7 @@ import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
 import { consentMatchPattern } from '../storage/pattern-utils.js';
 export { matchesRecipient } from '../storage/consent-recipient.js';
 import { parseGaiiLoose, localAccountName, localAccountOf } from '../utils/gaii.js';
-import { bufferConsentAudit } from './consent-audit-buffer.js';
+import { bufferConsentAudit } from './consent/audit-buffer.js';
 import { logger } from '../utils/logger.js';
 import { barredAgentFor } from './organism/agent-access.js';
 import { notifyDirectoryChange } from './directory.js';

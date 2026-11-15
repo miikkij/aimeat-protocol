@@ -134,7 +134,7 @@ import { takeHeldLease } from './process-lease.js';
 import { withRunLimit, runLimitFor, type RUN_LIMIT_MS } from './schedule/run-limit.js';
 import { onFailedRun, noteSuccess, tellScheduleOwner, isOneShot, oneShotFailedReason } from './schedule/failures.js';
 import { missedFire, missedMessage, type MissedFire } from './schedule/catch-up.js';
-import { deactivatedAccountSkip } from './account-deactivated.js';
+import { deactivatedAccountSkip } from './account/deactivated.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -453,7 +453,7 @@ export class Scheduler {
       return { code: 'error', detail: `The handler of this job is not active on this node, because the feature it serves is turned off. Turn the feature on, or disable the job.` };
     }
 
-    // ── The account is deactivated: skip, keep the job (services/account-deactivated.ts) ──
+    // ── The account is deactivated: skip, keep the job (services/account/deactivated.ts) ──
     const paused = await deactivatedAccountSkip(this.storage, job.ownerScope);
     if (paused) {
       logger.info(`Scheduler skipped ${job.id}: ${paused}`);

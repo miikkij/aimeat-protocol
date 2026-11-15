@@ -57,7 +57,7 @@
       "count": 1,
       "reason": "Wakes this process's own audit write that waits for its merged reads to end; nothing is shared."
     },
-    "src/services/consent-audit-buffer.ts :: let :: soonTimer": {
+    "src/services/consent/audit-buffer.ts :: let :: soonTimer": {
       "count": 1,
       "reason": "The timer that writes this process's own buffered audit rows within 1 s; no other process reads it."
     },
@@ -677,27 +677,27 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/consent-audit-buffer.ts :: interval :: initConsentAuditBuffer": {
+    "src/services/consent/audit-buffer.ts :: interval :: initConsentAuditBuffer": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/consent-audit-buffer.ts :: let :: dropped": {
+    "src/services/consent/audit-buffer.ts :: let :: dropped": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/consent-audit-buffer.ts :: let :: flushing": {
+    "src/services/consent/audit-buffer.ts :: let :: flushing": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/consent-audit-buffer.ts :: let :: flushTimer": {
+    "src/services/consent/audit-buffer.ts :: let :: flushTimer": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/consent-audit-buffer.ts :: let :: queue": {
+    "src/services/consent/audit-buffer.ts :: let :: queue": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/consent-audit-buffer.ts :: let :: storageRef": {
+    "src/services/consent/audit-buffer.ts :: let :: storageRef": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -1261,7 +1261,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/realtime-manager.ts :: interval :: startCleanupJob": {
+    "src/services/realtime/manager.ts :: interval :: startCleanupJob": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -1293,23 +1293,23 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/scope-use.ts :: interval :: initScopeUse": {
+    "src/services/scope/use.ts :: interval :: initScopeUse": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/scope-use.ts :: let :: inFlight": {
+    "src/services/scope/use.ts :: let :: inFlight": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/scope-use.ts :: let :: pending": {
+    "src/services/scope/use.ts :: let :: pending": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/scope-use.ts :: let :: storageRef": {
+    "src/services/scope/use.ts :: let :: storageRef": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/scope-use.ts :: let :: timer": {
+    "src/services/scope/use.ts :: let :: timer": {
       "count": 1,
       "reason": "DEBT"
     },

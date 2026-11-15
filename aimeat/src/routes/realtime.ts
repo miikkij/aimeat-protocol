@@ -37,7 +37,7 @@ import { requireAuth, requireOperator, requireScope } from '../auth/middleware.j
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
-import { OwnerRoomLimitError, type RealtimeManager } from '../services/realtime-manager.js';
+import { OwnerRoomLimitError, type RealtimeManager } from '../services/realtime/manager.js';
 import type { PeerInfo } from '../services/federation.js';
 import { operatorOverride } from '../services/operator/override.js';
 import { turnEntryFor, type IceServer } from '../services/turn-credentials.js';

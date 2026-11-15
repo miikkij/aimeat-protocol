@@ -387,9 +387,9 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * list that asks "is this reserved" still answers yes.
  *
  * `scope-use.` (2026-10-02) is the record of which permissions each of the owner's agents holding `*`
- * actually used (services/scope-use.ts). The narrowing the owner accepts with one press is built
+ * actually used (services/scope/use.ts). The narrowing the owner accepts with one press is built
  * from it, and it decides when `*` starts to hold an agent's tasks. An agent that could write it could
- * forge its own history: claim it used everything, or nothing. services/scope-use.ts is the one
+ * forge its own history: claim it used everything, or nothing. services/scope/use.ts is the one
  * writer, straight to storage.
  *
  * `agent-workplace.` (2026-10-11) says which workspace one agent's finished work is shared with

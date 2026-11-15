@@ -20,7 +20,7 @@
  *
  *   A DEACTIVATED ACCOUNT. After the key matched, a receiver of an account the operator or SCIM
  *   deactivated answers 403 ACCOUNT_DISABLED and writes, reads and deletes nothing. The receiver is
- *   kept, so it works again on reactivation (services/account-deactivated.ts).
+ *   kept, so it works again on reactivation (services/account/deactivated.ts).
  * @structure ReceiverContext · verifyReceiverRequest · WRONG_KEY_INCIDENT_AT
  * @usage const v = await verifyReceiverRequest(deps, req); if (!v.ok) res.status(v.status).json(...)
  * @version-history
@@ -39,7 +39,7 @@ import { RECEIVER_KEY_PREFIX, RECEIVER_NAME_RE, receiverPrincipalOf, effectiveSt
 import { getReceiver } from './store.js';
 import { noteWrongKey, logDelivery } from './deliveries.js';
 import { receiversModeOf } from './policy.js';
-import { deactivatedSince } from '../account-deactivated.js';
+import { deactivatedSince } from '../account/deactivated.js';
 
 /** A receiver whose key matched, as the write path reads it. */
 export interface ReceiverContext {
@@ -130,7 +130,7 @@ export async function verifyReceiverRequest(
     };
     if (receiversModeOf(deps.config) === 'off') return logged(503, 'RECEIVERS_OFF', 'The operator of this node has switched incoming webhooks off. Nothing was written.');
     // A deactivated account's receivers wait, as its schedules do: nothing is deleted, and the key
-    // works again when the operator reactivates the account (services/account-deactivated.ts).
+    // works again when the operator reactivates the account (services/account/deactivated.ts).
     const deactivated = await deactivatedSince(deps.storage, ownerGhii);
     if (deactivated) {
         return logged(403, 'ACCOUNT_DISABLED', `The account this incoming webhook writes for was deactivated on ${deactivated}. Nothing was written. The webhook works again when the operator of this node reactivates the account.`);

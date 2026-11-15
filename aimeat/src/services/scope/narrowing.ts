@@ -5,7 +5,7 @@
  * @description The narrowing of an agent holding `*` to the permissions it used (ruling C, Jouni
  *   2026-10-02): one implementation behind POST /v1/agents/:name/scope-narrowing and
  *   aimeat_agent_scope_narrow, which the owner or their AI calls. The node never calls it by itself
- *   (Jouni 2026-10-28; from 2026-10-18 to then it did). The record it reads is services/scope-use.ts;
+ *   (Jouni 2026-10-28; from 2026-10-18 to then it did). The record it reads is services/scope/use.ts;
  *   it lives apart from the recorder because the recorder is imported by the auth middleware, and the
  *   announcements here reach the connector, which reaches the middleware back (an import cycle).
  *
@@ -25,7 +25,7 @@
  *   v1.0.0 — 2026-10-02 — Extracted from services/scope-use.ts before its first commit.
  */
 import type { Storage, AgentRecord } from '../../storage/interface.js';
-import { flushScopeUse, readScopeUse, writeScopeUse, wildcardStatus, type WildcardStatus } from '../scope-use.js';
+import { flushScopeUse, readScopeUse, writeScopeUse, wildcardStatus, type WildcardStatus } from './use.js';
 import { emitChange } from '../event-bus.js';
 import { emitToolListChanged } from '../resource-events.js';
 import { nodeContext } from '../node/context.js';

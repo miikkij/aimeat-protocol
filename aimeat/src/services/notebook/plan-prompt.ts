@@ -1,5 +1,5 @@
 /**
- * @file notebook-plan-prompt.ts
+ * @file src/services/notebook/plan-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Single source of truth for the notebook enrichment-PLANNER prompt. Imported BOTH by the

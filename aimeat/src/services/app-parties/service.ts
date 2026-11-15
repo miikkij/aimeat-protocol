@@ -69,7 +69,7 @@ import {
     type AppPartyRecord,
 } from './contract.js';
 import { appIdOf, changeAppParty, findParty, readAppParties, readParty, registrationMode, signupOpen } from './store.js';
-import { deactivatedSince } from '../account-deactivated.js';
+import { deactivatedSince } from '../account/deactivated.js';
 
 export type AppPartyAnswer<T> = { ok: true; status?: number; data: T } | { ok: false; status: number; code: string; message: string };
 type Refusal = Extract<AppPartyAnswer<never>, { ok: false }>;

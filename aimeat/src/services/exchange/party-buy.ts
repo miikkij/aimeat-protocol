@@ -107,7 +107,7 @@ import { insertParty, findPartyByUid, removeParty, changeParty } from '../partie
 import { connectionFileOf, isLiveShare, partySharesOf, setShareMeta, sharePatternOf, shareMetaOf, shareView } from '../parties/shares.js';
 import type { PartyContext } from '../parties/verify.js';
 import { emitChange } from '../event-bus.js';
-import { deactivatedSince } from '../account-deactivated.js';
+import { deactivatedSince } from '../account/deactivated.js';
 import { logger } from '../../utils/logger.js';
 
 /** How long an open purchase waits for its payment. */

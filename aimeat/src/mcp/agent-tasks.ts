@@ -586,7 +586,7 @@ export function registerAgentTaskTools(
 
     // ── Tool 3c: aimeat_agent_scope_narrow ──
     // The owner's AI accepting, on the person's word, the narrowing of a `*` agent to the permissions
-    // it used. Same implementation as POST /v1/agents/:name/scope-narrowing (services/scope-use.ts).
+    // it used. Same implementation as POST /v1/agents/:name/scope-narrowing (services/scope/use.ts).
     mcp.registerTool(
         'aimeat_agent_scope_narrow',
         {

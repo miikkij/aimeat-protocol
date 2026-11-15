@@ -38,7 +38,7 @@ export interface JobRunResult {
  *              already executing
  *   stopped  — skipped: the agent the schedule gives work to is stopped (services/agent/stop.ts).
  *              Nothing is queued for later; the next run happens at its time once it is started.
- *              Also: the account the job acts for is deactivated (services/account-deactivated.ts);
+ *              Also: the account the job acts for is deactivated (services/account/deactivated.ts);
  *              the next run happens at its time once the account is reactivated
  *   limited  — skipped by a constraint (daily_limit / max_runs / budget)
  *   error    — the job ran but failed (detail = error message)

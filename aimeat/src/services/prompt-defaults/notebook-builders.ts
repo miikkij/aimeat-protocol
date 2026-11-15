@@ -10,7 +10,7 @@
 
 import type { PromptSeedEntry } from '../prompt-defaults.js';
 import { NOTEBOOK_CLASSIFY_TEMPLATE } from '../notebook/classify-prompt.js';
-import { NOTEBOOK_PLAN_TEMPLATE } from '../notebook-plan-prompt.js';
+import { NOTEBOOK_PLAN_TEMPLATE } from '../notebook/plan-prompt.js';
 import { NOTEBOOK_DISTRIBUTE_TEMPLATE } from '../notebook/distribute-prompt.js';
 import { LIVING_AUTHOR_TEMPLATE } from '../living/author-prompt.js';
 

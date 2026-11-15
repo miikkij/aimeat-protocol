@@ -15,7 +15,7 @@
  */
 
 import type { AimeatConfig } from '../../config.js';
-import { FLOW_PHASES, FLOW_SKIP_PHRASE, FLOW_TOOLS, buildFinishChecklist } from '../appdev-flow-constants.js';
+import { FLOW_PHASES, FLOW_SKIP_PHRASE, FLOW_TOOLS, buildFinishChecklist } from './flow-constants.js';
 
 export function buildAppdevFlowPrompt(config: AimeatConfig): string {
     const nodeUrl = config.baseUrl.replace(/\/+$/, '');

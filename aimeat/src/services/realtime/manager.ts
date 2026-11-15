@@ -1,5 +1,5 @@
 /**
- * @file src/services/realtime-manager.ts
+ * @file src/services/realtime/manager.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description In-memory WebSocket room manager for realtime apps — rooms, peers, presence/signal
@@ -41,23 +41,23 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { runAsNode, isSameOwner } from '../utils/gaii.js';
-import { emitChange } from './event-bus.js';
-import { keepYjsSnapshot, saveYjsSnapshots } from './realtime/yjs.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { runAsNode, isSameOwner } from '../../utils/gaii.js';
+import { emitChange } from '../event-bus.js';
+import { keepYjsSnapshot, saveYjsSnapshots } from './yjs.js';
 
 /** Live domain for "the room list moved": a room appeared or closed, or a player came or went. */
 const ROOMS_DOMAIN = 'realtime-rooms';
-import { peerFetch } from '../utils/peer-fetch.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
 import type {
   RealtimeMessage,
   PeerConnection,
   RealtimeRoom,
   CreateRoomOpts,
   RealtimeStats,
-} from './realtime/types.js';
+} from './types.js';
 
 // Re-export the wire + internal types so existing importers keep working.
 export type {
@@ -66,7 +66,7 @@ export type {
   RealtimeRoom,
   CreateRoomOpts,
   RealtimeStats,
-} from './realtime/types.js';
+} from './types.js';
 
 /** createRoom refuses past realtime.rooms_per_owner: the rooms the caller's owner holds, and the limit. */
 export class OwnerRoomLimitError extends Error {

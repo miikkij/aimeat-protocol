@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Storage, ConsentAuditEntry, ClassificationAuditRow } from '../../src/storage/interface.js';
-import { initConsentAuditBuffer, bufferConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent-audit-buffer.js';
+import { initConsentAuditBuffer, bufferConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent/audit-buffer.js';
 import {
     initClassificationAudit, recordClassificationAudit, shutdownClassificationAudit, resetClassificationAudit,
 } from '../../src/services/classification/audit.js';

@@ -38,7 +38,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isOwnerInPerson } from '../utils/gaii.js';
 import { removedFrom, noteDeprecatedUse } from '../services/deprecation.js';
-import { noteScopeUse } from '../services/scope-use.js';
+import { noteScopeUse } from '../services/scope/use.js';
 import { logger } from '../utils/logger.js';
 import { deny401, denyScope403 } from './deny.js';
 import { isSelfAgentTarget } from './self-or-scope.js';
@@ -88,7 +88,7 @@ export function requireRestScope(word: string, opts: RestScopeGateOptions = {}) 
     const covered = words.find((w) => scopeIsCovered(held, w));
     if (covered) {
       // A `*` agent's admitted word feeds the narrowing its owner is offered, as in requireScope.
-      // services/scope-use.ts decides at flush whether the principal is an agent holding `*`, and
+      // services/scope/use.ts decides at flush whether the principal is an agent holding `*`, and
       // ignores everything else, so the call needs no test of its own here.
       noteScopeUse(req.auth.sub, [covered]);
       next();

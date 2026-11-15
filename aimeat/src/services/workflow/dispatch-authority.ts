@@ -26,7 +26,7 @@
  *
  *   A run whose account is deactivated dispatches nothing (waits()): its steps stay as they are, the
  *   run is not ended, and a tick after reactivation dispatches them, as a schedule of that account
- *   waits (services/account-deactivated.ts).
+ *   waits (services/account/deactivated.ts).
  * @structure runPrincipalAtStart(def, caller, ownerGhii) · runPrincipal(run) · dispatchGate(storage, run, ownerGhii)
  * @usage
  *   const gate = dispatchGate(storage, run, ownerGhii);
@@ -43,7 +43,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { deactivatedAccountSkip } from '../account-deactivated.js';
+import { deactivatedAccountSkip } from '../account/deactivated.js';
 import { missingStepScopes, saverFromCaller, type WorkflowCaller } from './step-authority.js';
 import { saverOfDef, saverAuthority, openInFlightRefusal, type SaverNow, type TriggerAuthorityDeps } from './trigger-authority.js';
 import type { WorkflowDef, WorkflowRun, WorkflowSaver, WorkflowStep } from '../../models/workflow-schemas.js';

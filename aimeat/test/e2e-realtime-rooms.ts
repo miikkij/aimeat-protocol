@@ -4,7 +4,7 @@
  *   /v1/realtime (plus /v1/admin/realtime) and the WebSocket at /v1/realtime/ws.
  *
  *   WHY THIS EXISTS. Nothing in test/ had ever opened ws://.../v1/realtime/ws or called a single
- *   /v1/realtime route. src/services/realtime-manager.ts is 750 lines and 23 of its 28 members were
+ *   /v1/realtime route. src/services/realtime/manager.ts is 750 lines and 23 of its 28 members were
  *   never executed by the whole E2E sweep; src/routes/realtime.ts ran at a fifth of its lines. Every
  *   message type, every error code and every refusal below was reachable in production and asserted
  *   by nobody, which is also how two dead members (getRoomCount, loadYjsSnapshot) survived in a file

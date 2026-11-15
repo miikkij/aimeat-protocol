@@ -29,7 +29,7 @@ import { stripCodeblock } from '../llm-strip.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './ai.js';
 import type { AiCallerContext } from '../ai/caller-context.js';
 import { buildPlacementContext, type PlacementOrganism } from './classify.js';
-import { NOTEBOOK_PLAN_SYSTEM, NOTEBOOK_PLAN_TEMPLATE } from '../notebook-plan-prompt.js';
+import { NOTEBOOK_PLAN_SYSTEM, NOTEBOOK_PLAN_TEMPLATE } from './plan-prompt.js';
 import { logger } from '../../utils/logger.js';
 import type { ContentReader } from '../classification/reader.js';
 

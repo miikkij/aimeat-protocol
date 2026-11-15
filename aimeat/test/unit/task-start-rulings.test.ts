@@ -23,7 +23,7 @@ import type { Storage, AgentRecord, AppGrantRecord } from '../../src/storage/int
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce, BASIC_AGENTS_START_TYPE } from '../../src/services/task/start-migrations.js';
 import {
     noteScopeUse, flushScopeUse, readScopeUse, wildcardStatus, OBSERVE_DAYS,
-} from '../../src/services/scope-use.js';
+} from '../../src/services/scope/use.js';
 import { narrowAgent } from '../../src/services/scope/narrowing.js';
 import { provenanceForWrite } from '../../src/services/ai/provenance.js';
 import { decideTaskStart, floorScopesOf } from '../../src/services/agent/task-rules.js';

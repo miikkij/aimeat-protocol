@@ -14,7 +14,7 @@ import {
   flushConsentAudit,
   getPendingConsentAudit,
   pendingConsentAuditCount,
-} from '../../src/services/consent-audit-buffer.js';
+} from '../../src/services/consent/audit-buffer.js';
 
 function entry(owner: string, over: Partial<ConsentAuditEntry> = {}): ConsentAuditEntry {
   return {

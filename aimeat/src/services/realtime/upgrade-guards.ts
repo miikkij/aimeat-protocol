@@ -30,7 +30,7 @@ import type { IncomingMessage } from 'node:http';
 import type { AimeatConfig } from '../../config.js';
 import { ipRateKey } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
-import type { RealtimeManager, RealtimeRoom } from '../realtime-manager.js';
+import type { RealtimeManager, RealtimeRoom } from './manager.js';
 import { ECHAT_ANONYMOUS_CREATOR } from './yjs.js';
 
 /** UTF-8 takes at most three bytes for one UTF-16 code unit, so this keeps every frame the size check passes. */

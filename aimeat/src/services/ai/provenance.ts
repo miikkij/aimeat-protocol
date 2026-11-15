@@ -107,7 +107,7 @@ import { disclosureWording } from './disclosure-served.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { parseReceiverPrincipal } from '../receivers/contract.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
-import { noteScopeUse } from '../scope-use.js';
+import { noteScopeUse } from '../scope/use.js';
 import { createT, LOCALES } from '../../i18n.js';
 import { logger } from '../../utils/logger.js';
 

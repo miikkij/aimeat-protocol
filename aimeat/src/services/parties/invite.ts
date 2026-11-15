@@ -67,7 +67,7 @@ import { mintPartyToken } from './token.js';
 import { connectionFileOf, descriptorFor, isLiveShare, packageOfPattern, partySharesOf, setShareMeta, shareMetaOf, shareView } from './shares.js';
 import { shareWithParty, type PartyAnswer, type PartyServiceCtx } from './service.js';
 import { OWNER_DEACTIVATED } from './verify.js';
-import { deactivatedSince } from '../account-deactivated.js';
+import { deactivatedSince } from '../account/deactivated.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 type Refusal = Extract<PartyAnswer<never>, { ok: false }>;

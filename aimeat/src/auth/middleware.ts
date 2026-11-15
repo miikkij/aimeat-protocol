@@ -164,7 +164,7 @@ import { mcpTokenOnRestVerdict, MCP_TOKEN_ON_REST_MESSAGE } from './mcp-token-on
 import { credentialRevoked } from './credential-revoked.js';
 import { withCurrentScopes } from './effective-scopes.js';
 import { noteVerifiedJwt } from './verified-on-request.js';
-import { noteScopeUse } from '../services/scope-use.js';
+import { noteScopeUse } from '../services/scope/use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
 import { PARTY_TOKEN_PREFIX, takesPartyToken } from '../services/parties/contract.js';
 import { RECEIVER_KEY_PREFIX, takesReceiverKey } from '../services/receivers/contract.js';
@@ -757,7 +757,7 @@ export function requireScope(...requiredScopes: string[]) {
         return;
       }
     }
-    // A `*` agent's admitted words feed the narrowing its owner is offered (services/scope-use.ts).
+    // A `*` agent's admitted words feed the narrowing its owner is offered (services/scope/use.ts).
     if (req.auth.roles.includes('agent') && agentScopes.includes('*')) noteScopeUse(req.auth.sub, requiredScopes);
 
     next();

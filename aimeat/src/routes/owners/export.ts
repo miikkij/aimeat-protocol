@@ -69,7 +69,7 @@ import type { Storage, WorkRecord, MemoryRecord } from '../../storage/interface.
 import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../../auth/middleware.js';
 import { error, success } from '../../middleware/envelope.js';
 import { calculateTrustScore } from '../../services/trust.js';
-import { getPendingConsentAudit } from '../../services/consent-audit-buffer.js';
+import { getPendingConsentAudit } from '../../services/consent/audit-buffer.js';
 import { presentMemories } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';

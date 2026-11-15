@@ -43,7 +43,7 @@ import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { grantConsent, revokeConsent } from '../services/consent/write.js';
 import { consentRecordFor, listConsentsFor } from '../services/consent/consent-read.js';
-import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
+import { getPendingConsentAudit } from '../services/consent/audit-buffer.js';
 import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
 import { callerOf } from '../middleware/caller.js';
 import { consentCollectionMethod } from '../services/mydata-receipt.js';

@@ -16,7 +16,7 @@ import type { Express } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
-import { RealtimeManager } from '../services/realtime-manager.js';
+import { RealtimeManager } from '../services/realtime/manager.js';
 import { realtimeRouter } from '../routes/realtime.js';
 import { logger } from '../utils/logger.js';
 

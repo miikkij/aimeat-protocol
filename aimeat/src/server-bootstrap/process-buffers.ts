@@ -60,11 +60,11 @@ import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { bindUsageSettings } from '../services/usage/usage-settings.js';
 import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js';
-import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
+import { initConsentAuditBuffer } from '../services/consent/audit-buffer.js';
 import { initClassificationAudit } from '../services/classification/audit.js';
 import { initAgentRefusals } from '../services/agent/refusals.js';
 import { sendPermissionAsk } from '../services/permission-ask-notice.js';
-import { initScopeUse } from '../services/scope-use.js';
+import { initScopeUse } from '../services/scope/use.js';
 import { startBuildWithYou } from '../services/builder/with-you.js';
 import { logger } from '../utils/logger.js';
 
@@ -101,7 +101,7 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // recorded before this, so there is no history to seed it from.
   initWriteTallyBuffer(storage, config.tallyBufferMs);
   // Which permissions each `*` agent uses, for the narrowing its owner is offered and for when `*`
-  // starts to hold its tasks (services/scope-use.ts). Like the tally, it fills only from now on.
+  // starts to hold its tasks (services/scope/use.ts). Like the tally, it fills only from now on.
   initScopeUse(storage);
   // "Build it with you": the usage listener that opens the place's one build offer on an outside AI's
   // first MCP call, and the sweep that asks the build queue where the request stands.
@@ -154,11 +154,11 @@ export async function flushProcessBuffers(): Promise<void> {
   await shutdownTelemetryBuffer();
   const { shutdownUsageBuffer } = await import('../services/usage/usage-buffer.js');
   await shutdownUsageBuffer();
-  const { shutdownScopeUse } = await import('../services/scope-use.js');
+  const { shutdownScopeUse } = await import('../services/scope/use.js');
   await shutdownScopeUse();
   const { shutdownWriteTallyBuffer } = await import('../services/data-map/write-tally-buffer.js');
   await shutdownWriteTallyBuffer();
-  const { shutdownConsentAuditBuffer } = await import('../services/consent-audit-buffer.js');
+  const { shutdownConsentAuditBuffer } = await import('../services/consent/audit-buffer.js');
   await shutdownConsentAuditBuffer();
   const { shutdownClassificationAudit } = await import('../services/classification/audit.js');
   await shutdownClassificationAudit();

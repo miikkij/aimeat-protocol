@@ -179,7 +179,7 @@ describe("an extension's ctx.fetch", () => {
                 name: 'probe', status: 'active', installedBy: 'alice', config: {}, limits,
                 actions: [{ id: 'pull', scriptContent: SCRIPT_LETS_IT_THROUGH }],
             }),
-            // An active account: the run asks whether its owner was deactivated (services/account-deactivated.ts).
+            // An active account: the run asks whether its owner was deactivated (services/account/deactivated.ts).
             getOwner: async () => ({ disabledAt: null }),
         } as unknown as Storage;
         await expect(runExtensionActionAsSystem({ storage, config }, {

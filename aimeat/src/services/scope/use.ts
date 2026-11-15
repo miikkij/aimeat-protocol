@@ -1,5 +1,5 @@
 /**
- * @file src/services/scope-use.ts
+ * @file src/services/scope/use.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which permissions an agent holding `*` actually uses, and the narrowing built from it.
@@ -45,11 +45,11 @@
  *     narrows the agent (services/scope-auto-narrow.ts startFactsOf, which replaces withWildcardFacts).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { isOutsideWildcard } from '../utils/scope-coverage.js';
-import { logger } from '../utils/logger.js';
-import { ErasureHolds, type ErasedAccount } from './erasure/holds.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { isOutsideWildcard } from '../../utils/scope-coverage.js';
+import { logger } from '../../utils/logger.js';
+import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 export const SCOPE_USE_KEY = 'scope-use.agents';
 /** How long the record must run before its narrowing is worth offering: two weeks catches a weekly job twice. */

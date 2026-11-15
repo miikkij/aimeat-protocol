@@ -26,7 +26,7 @@
  *   /v1/instances/:id/status) and aimeat_package_instances, all of which asked no word before.
  *
  *   TO WHOM. Usage cannot be known: the node never recorded a REST call per principal before the gates
- *   (services/scope-use.ts records from 2026-10-02 and only what a `*` agent was admitted for). So the
+ *   (services/scope/use.ts records from 2026-10-02 and only what a `*` agent was admitted for). So the
  *   rule is the fallback the brief names: every existing principal that could reach those routes
  *   before, which is every agent and every approved ecosystem app with a recorded scope list, because
  *   the three routes asked nothing but a session. A principal whose words already cover it (`*`,

@@ -8,7 +8,7 @@
  *   hidden from or refused to a reader) and a label CHANGE are always recorded, whatever the label.
  *   Deciding which events to record is the caller's job; this module only records them.
  *
- *   BOUNDED FROM THE START, because the earlier per-read audit (services/consent-audit-buffer.ts)
+ *   BOUNDED FROM THE START, because the earlier per-read audit (services/consent/audit-buffer.ts)
  *   grew production to 1.2 million rows. Three limits:
  *   1. Recording is synchronous and returns void. It never awaits and never throws, so a slow
  *      database cannot slow a read. Rows wait in memory and are flushed in one batch within a second

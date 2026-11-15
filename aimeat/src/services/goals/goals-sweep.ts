@@ -37,7 +37,7 @@ import { checkModelWorks, settleModelJob } from './goals-model.js';
 import { settleModelReadAsks } from './goals-model-reach.js';
 import { settleModelSpendAsks } from './goals-model-spend.js';
 import { onAiJobFinished } from '../ai-jobs/finished-listeners.js';
-import { deactivatedAccountSkip } from '../account-deactivated.js';
+import { deactivatedAccountSkip } from '../account/deactivated.js';
 import { claimedSweep } from '../process-lease.js';
 import { GOAL_PREFIX, MAX_ATTEMPTS, MODEL_TAKER, goalSettled, type GoalRecord } from './goals-types.js';
 
@@ -95,7 +95,7 @@ export async function sweepOne(deps: GoalDeps, ownerGhii: string, goal: GoalReco
   if (goalSettled(goal.status) || goal.status === 'proposed') return;
   // The sweep acts in the account's name with no token, as a schedule fire does: while the account is
   // deactivated the goal waits as it is (no round, no model work, no expiry), and the first sweep after
-  // reactivation moves it on (services/account-deactivated.ts; secaudit2026oct26).
+  // reactivation moves it on (services/account/deactivated.ts; secaudit2026oct26).
   if (await deactivatedAccountSkip(deps.storage, ownerGhii)) return;
   const ended = (goal.endsAt && Date.parse(goal.endsAt) <= now) || (goal.renewBy && Date.parse(goal.renewBy) <= now);
   if (ended) {

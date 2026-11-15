@@ -171,7 +171,7 @@ vi.mock('../../src/server-bootstrap/routes-loader.js', () => ({
         const { initProcessBuffers } = await import('../../src/server-bootstrap/process-buffers.js');
         const { startBackgroundJobs } = await import('../../src/server-bootstrap/background-jobs.js');
         const { sseRouter } = await import('../../src/routes/sse.js');
-        const { RealtimeManager } = await import('../../src/services/realtime-manager.js');
+        const { RealtimeManager } = await import('../../src/services/realtime/manager.js');
         const { localAccountName } = await import('../../src/utils/gaii.js');
         const { webhookDispatcher } = await initProcessBuffers(config as never, storage as never);
         // The rooms manager, as realtime-mount.ts makes it on a node with realtime switched on.
@@ -254,7 +254,7 @@ vi.mock('../../src/services/usage/usage-buffer.js', async (importOriginal) => ({
 vi.mock('../../src/services/data-map/write-tally-buffer.js', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), initWriteTallyBuffer: () => {},
 }));
-vi.mock('../../src/services/consent-audit-buffer.js', async (importOriginal) => ({
+vi.mock('../../src/services/consent/audit-buffer.js', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), initConsentAuditBuffer: () => {},
 }));
 vi.mock('../../src/services/cache.js', async (importOriginal) => {

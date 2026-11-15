@@ -45,7 +45,7 @@ import { callerOf } from '../middleware/caller.js';
 import { denyScope403 } from '../auth/deny.js';
 import { isForeignPrincipal, isOwnerInPerson } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { noteScopeUse } from '../services/scope-use.js';
+import { noteScopeUse } from '../services/scope/use.js';
 import { permissionAskText } from '../services/permission-ask.js';
 import { APP_TOOL_INVOKE_WORD, appToolInvokeKept } from '../services/app/tool-invoke-keep.js';
 import { logger } from '../utils/logger.js';
