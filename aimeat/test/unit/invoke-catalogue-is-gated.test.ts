@@ -26,7 +26,7 @@
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, post-audit item 2).
  */
 import { describe, it, expect } from 'vitest';
-import { listNodeCapabilities, NON_INVOKABLE } from '../../src/services/node-capabilities.js';
+import { listNodeCapabilities, NON_INVOKABLE } from '../../src/services/node/capabilities.js';
 import { TOOL_SCOPES, SCOPE_EXEMPT_TOOLS } from '../../src/tool-catalog/scopes.js';
 import { TOOL_ANNOTATIONS } from '../../src/mcp/annotations.js';
 

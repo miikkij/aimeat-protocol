@@ -1,5 +1,5 @@
 /**
- * @file node-templates.ts
+ * @file src/services/node/templates.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The templates the node ships (shells, components, use cases, genres), shaped for
@@ -21,10 +21,10 @@
  *     Five game-genre templates are 26 to 32 kB and did not reach a chat as one tool result.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
-import { getAppTemplates, getAppTemplateIndex } from '../data/app-templates.js';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { DesignBookService } from './design-book/service.js';
+import { getAppTemplates, getAppTemplateIndex } from '../../data/app-templates.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { DesignBookService } from '../design-book/service.js';
 
 const HOW_TO_START = 'This is a starting file the node ships. Write your app on top of `content`: keep its head, its script tags and the way it signs the person in, and replace the body.';
 

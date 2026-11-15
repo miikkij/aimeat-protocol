@@ -77,7 +77,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { OutboundContactRecord, OutboundContactLink, OutboundKind, OutboundMessageRecord, OutboundStatus, OutboundChannel } from '../../models/outbound-schemas.js';
 import type { EmailAttachment } from '../email.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { inviteEmailHash } from '../invitations.js';
 import { sendDirectMessage } from '../message-send.js';
 import { emitChange } from '../../services/event-bus.js';

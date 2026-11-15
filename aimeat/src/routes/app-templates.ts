@@ -48,7 +48,7 @@ export function appTemplatesRouter(config: AimeatConfig, storage: Storage): Rout
       return;
     }
     // A genre that grew out of an app: a public page its owner opened for forking, whole, as a
-    // shipped template is here. The tool doors cut it into parts (services/node-templates.ts).
+    // shipped template is here. The tool doors cut it into parts (services/node/templates.ts).
     const grown = await new DesignBookService(storage, config).grownGenre(id);
     if (!grown) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No app template "${id}"`));

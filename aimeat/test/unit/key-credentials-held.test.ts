@@ -19,7 +19,7 @@
 import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { issueFirstLoginKeyCredentials, sendHeldKeyCredentials, NS_HELD, heldKey } from '../../src/services/key-credentials.js';
-import { provideNodeService } from '../../src/services/node-context.js';
+import { provideNodeService } from '../../src/services/node/context.js';
 import type { EmailService } from '../../src/services/email.js';
 
 const NODE = 'node-test';

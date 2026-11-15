@@ -49,7 +49,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { hasHelloMcpProof } from './node-resident-agent.js';
+import { hasHelloMcpProof } from './node/resident-agent.js';
 import {
     ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingTrack, type OnboardingBranch,
     type OnboardingRoom,
@@ -59,7 +59,7 @@ import { portfolioStandaloneUrl } from './portfolio/standalone-url.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';
 import { logger } from '../utils/logger.js';
 import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent/health.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { loadOwnerAgents, loadOwnerOnboardings } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
 import { readAvatarsOrEmpty, type AvatarView } from './agent/avatar.js';

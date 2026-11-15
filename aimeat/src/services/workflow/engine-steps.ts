@@ -96,7 +96,7 @@ import { logger } from '../../utils/logger.js';
 import { globToRegExp } from './signal-eval.js';
 import { collectSignalKeys, type ResolvedStep } from './store.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner/memory.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { emitDelivery } from '../event-bus.js';
 import { runExtensionActionAsSystem } from '../extension/system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';

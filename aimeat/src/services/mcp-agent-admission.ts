@@ -36,7 +36,7 @@ import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { registerChatInstance } from './chat-instance-write.js';
 import { markAgentMcpUse } from './agent/mcp-touch.js';
-import { isNodeResidentAgent } from './node-resident-agent.js';
+import { isNodeResidentAgent } from './node/resident-agent.js';
 import { memoGetAgent, memoGetGHIIByOwner, memoGetOwner } from './request-memo.js';
 
 export type McpAdmission =

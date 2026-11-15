@@ -48,7 +48,7 @@ import { logger } from '../utils/logger.js';
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
 import { readAccountEvents, recordAccountEvent } from './account-events.js';
 import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from './account-event-view.js';
-import { isNodeResidentAgent } from './node-resident-agent.js';
+import { isNodeResidentAgent } from './node/resident-agent.js';
 import { displayPrefsFor, formatForPerson } from './display-prefs.js';
 import { personZone, personLocale } from './person-zone.js';
 import { createT, toLocale, type Locale } from '../i18n.js';

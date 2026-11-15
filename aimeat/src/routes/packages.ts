@@ -98,7 +98,7 @@ import {
   listPackagesFor, getPackageFor, getPackageVersionFor, listPackageVersionsFor,
 } from '../services/packages/compose/package-read.js';
 import { withdrawVersion } from '../services/packages/compose/package-withdrawals.js';
-import { nodeContext } from '../services/node-context.js';
+import { nodeContext } from '../services/node/context.js';
 import { packageSheet } from '../services/packages/compose/package-sheet.js';
 import { importParsedPackage, upstreamFromZip } from '../services/packages/compose/package-import.js';
 import type { PeerInfo } from '../services/federation.js';

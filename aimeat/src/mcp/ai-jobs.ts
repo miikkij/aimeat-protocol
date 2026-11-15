@@ -52,7 +52,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
 import { AiJobError } from '../services/ai-jobs/index.js';
-import { nodeContext } from '../services/node-context.js';
+import { nodeContext } from '../services/node/context.js';
 import type { AiJobState, AiJobViewer } from '../services/ai-jobs/types.js';
 import { startedByOf } from '../services/ai-jobs/starter.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';

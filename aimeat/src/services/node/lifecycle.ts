@@ -1,5 +1,5 @@
 /**
- * @file node-lifecycle.ts
+ * @file src/services/node/lifecycle.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where this process is in its life: starting, ready to take requests, or draining on
@@ -21,7 +21,7 @@
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, HA stage 1: liveness and readiness).
  */
 
-import { logger } from '../utils/logger.js';
+import { logger } from '../../utils/logger.js';
 
 export type NodePhase ='starting' | 'ready' | 'draining';
 

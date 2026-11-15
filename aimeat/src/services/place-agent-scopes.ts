@@ -65,7 +65,7 @@ import { updateRecord, UNCHANGED } from './record-cas.js';
 import { changeScopeList } from './scope-list-swap.js';
 import { isSharedAnonymous } from './rest-scope-gates-migration.js';
 import { emitToolListChanged } from './resource-events.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { logger } from '../utils/logger.js';
 
 /** The setting that makes a node a store place. */

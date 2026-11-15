@@ -63,7 +63,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import type { Locale } from '../i18n.js';
 import type { EmailService } from './email.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { sendMail } from './mail-gate.js';
 import { appendMailLog } from './notification-settings.js';
 import { welcomeEmail } from './email/template-welcome.js';

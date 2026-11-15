@@ -57,7 +57,7 @@ import { logger } from '../../../utils/logger.js';
 import { stripTrailingSlashes } from '../../../utils/url-validator.js';
 import { firstNoticeFor } from '../compose/package-notices.js';
 import { actOnWithdrawn } from '../compose/package-withdrawals.js';
-import { nodeContext } from '../../node-context.js';
+import { nodeContext } from '../../node/context.js';
 
 
 /** What the owner reads when the update service has ended. */

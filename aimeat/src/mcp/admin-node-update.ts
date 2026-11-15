@@ -6,7 +6,7 @@
  *   released, what is new in it, and the prompt that updates the node. The header notice an operator
  *   sees in the browser, over MCP, so "is my node up to date?" can be asked in chat.
  *
- *   It calls services/node-update-check.ts, the one implementation GET /v1/admin/node-update calls,
+ *   It calls services/node/update-check.ts, the one implementation GET /v1/admin/node-update calls,
  *   and honours the same switch: with node.update_check off it asks npm nothing and says so.
  *   The update prompt tells the AI that runs it to call this tool afterwards to confirm the version.
  * @structure registerAdminNodeUpdateTools(mcp, storage, config, getAgentGaii, scopes)
@@ -23,7 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
-import { getNodeUpdateStatus } from '../services/node-update-check.js';
+import { getNodeUpdateStatus } from '../services/node/update-check.js';
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 

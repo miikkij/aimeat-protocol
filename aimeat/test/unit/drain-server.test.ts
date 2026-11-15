@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { trackRequests, drainServer } from '../../src/server-bootstrap/drain.js';
-import { endOnDrain, nodePhase } from '../../src/services/node-lifecycle.js';
+import { endOnDrain, nodePhase } from '../../src/services/node/lifecycle.js';
 
 interface Harness { server: http.Server; port: number; release: () => void; tracker: ReturnType<typeof trackRequests> }
 

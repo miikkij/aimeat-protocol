@@ -1,6 +1,6 @@
 # 02 Architecture
 
-> Checked against AIMEAT node 4.3.1 (commit 776f8fa94) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 96f9ee302) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request. How many nodes and processes to run, and what runs beside a node, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 
@@ -85,7 +85,7 @@ Every outbound call whose address is not a constant in the code goes through `sa
 
 | Destination | Why | Setting | Default | Source |
 |---|---|---|---|---|
-| `registry.npmjs.org`, `unpkg.com` | New-version check: at most every six hours, when an operator opens a page. Sends nothing about the node | `AIMEAT_UPDATE_CHECK`, `AIMEAT_UPDATE_CHECK_SOURCE` (a mirror) | On | `aimeat/src/services/node-update-check.ts`, `aimeat/src/config/update-check.ts` |
+| `registry.npmjs.org`, `unpkg.com` | New-version check: at most every six hours, when an operator opens a page. Sends nothing about the node | `AIMEAT_UPDATE_CHECK`, `AIMEAT_UPDATE_CHECK_SOURCE` (a mirror) | On | `aimeat/src/services/node/update-check.ts`, `aimeat/src/config/update-check.ts` |
 | `models.dev`, `openrouter.ai`, `raw.githubusercontent.com` | Model catalogue refresh: capabilities and prices of models. The build ships a seed, so it works without network | `AIMEAT_AI_CATALOG_REFRESH` (`weekly`, `daily`, `off`), `AIMEAT_AI_CATALOG_SOURCES` | On, weekly | `aimeat/src/services/ai/catalog/sources.ts` |
 | `ec.europa.eu` (EU list of trusted lists), the trusted lists it names, and the OCSP, CRL and issuer addresses inside certificates | Signature validation, only when somebody checks a signed document | `AIMEAT_DOCSIGN_ENABLED`, `AIMEAT_DOCSIGN_ONLINE_CHECKS`, `AIMEAT_DOCSIGN_LOTL_URL` | On, on demand | `aimeat/src/services/docsign/trust-list.ts`, `aimeat/src/services/docsign/revocation.ts` |
 | `api.elevenlabs.io`, `openrouter.ai`, `api.anthropic.com`, `api.openai.com`, `api.stripe.com`, `api.github.com` | The check of a deposited secret share: one GET to the service's fixed account address with the key, only when a person shares or deposits a key of that service. The addresses are constants in the code; no person or agent can name another | `AIMEAT_SECRET_SHARE_CHECK` | On, on demand | `aimeat/src/services/secret-shares/check.ts` |

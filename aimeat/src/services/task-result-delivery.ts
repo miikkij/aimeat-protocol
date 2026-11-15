@@ -51,7 +51,7 @@ import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
 import type { AimeatConfig } from '../config.js';
 import { notify } from './notify.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { mailOwnerFrom, ownerMailLimitReached } from './notification-create.js';
 import { notificationEmailUnverified } from './owner/mail-address.js';
 import { displayPrefsFor, formatForPerson, type DisplayPrefs } from './display-prefs.js';

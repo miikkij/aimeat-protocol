@@ -1,5 +1,5 @@
 /**
- * @file src/services/node-invoke.ts
+ * @file src/services/node/invoke.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Run one node capability by name, with the caller's own credential.
@@ -46,14 +46,14 @@
  *   2026-09-27 — A capability that moved into aimeat_app_manage answers 410 TOOL_MOVED with the replacing call.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
-import type { AimeatConfig } from '../config.js';
-import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
-import { AimeatClient } from '../tool-dispatch/api-client.js';
-import { findNodeCapability, NON_INVOKABLE, listAllCapabilities, asRouteCapability } from './node-capabilities.js';
-import { invokeRouteCapability } from './invoke/route-invoke.js';
-import { logger } from '../utils/logger.js';
-import { movedToolMessage } from '../tool-catalog/moved-tools.js';
-import { inProcessOrigin, withInProcessFetch } from './request-injector.js';
+import type { AimeatConfig } from '../../config.js';
+import { CONNECT_CLI_TOOLS } from '../../tool-dispatch/index.js';
+import { AimeatClient } from '../../tool-dispatch/api-client.js';
+import { findNodeCapability, NON_INVOKABLE, listAllCapabilities, asRouteCapability } from './capabilities.js';
+import { invokeRouteCapability } from '../invoke/route-invoke.js';
+import { logger } from '../../utils/logger.js';
+import { movedToolMessage } from '../../tool-catalog/moved-tools.js';
+import { inProcessOrigin, withInProcessFetch } from '../request-injector.js';
 
 export interface InvokeRefusal { ok: false; status: number; code: string; message: string; details?: unknown }
 /** `status` is the route's own HTTP status, for a route capability. */

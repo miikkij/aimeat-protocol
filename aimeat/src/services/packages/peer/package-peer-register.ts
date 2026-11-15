@@ -76,7 +76,7 @@ import { stripTrailingSlashes } from '../../../utils/url-validator.js';
 import type { PeerInfo } from '../../federation.js';
 import { deriveTierFlags } from '../../federation/tiers.js';
 import { selfNodeIdMessage } from '../../federation/peer-gate.js';
-import { readNodeCard } from '../../node-card.js';
+import { readNodeCard } from '../../node/card.js';
 import { ed25519PublicKeyProblem } from '../../../auth/keypair.js';
 import { capRefusal, PACKAGE_PEER_SOURCES, DEFAULT_PACKAGE_PEER_CAP } from './package-peer-limits.js';
 import {

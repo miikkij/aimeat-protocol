@@ -55,7 +55,7 @@ import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { escapeHtml } from '../../utils/html-escape.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { sendMail } from '../mail-gate.js';
 import { resolveAppUrls } from '../app/urls.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';

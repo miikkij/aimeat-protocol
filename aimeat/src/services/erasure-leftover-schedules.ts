@@ -44,7 +44,7 @@ import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { claimOnceOnlyStep } from './once-only-step.js';
 import { recordSecurityIncident, type IncidentEntry } from './security-incident.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { emitChange } from './event-bus.js';
 
 /** The record under `system@<nodeId>` that says this node has run the step. */

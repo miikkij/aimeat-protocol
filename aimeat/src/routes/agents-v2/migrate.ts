@@ -52,7 +52,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { credentialHealthForOwner } from '../../services/agent/credential-health.js';
 import { connectedDaemons } from '../../services/basic-agents.js';
 import { enrolTarget } from '../../services/agent/enrolment-offer.js';
-import { nodeContext } from '../../services/node-context.js';
+import { nodeContext } from '../../services/node/context.js';
 import { emitChange } from '../../services/event-bus.js';
 import { ENROL_CAPABILITY } from './basic-agents.js';
 import { MAX_CARDS_PER_SUBMIT } from './enrolment.js';

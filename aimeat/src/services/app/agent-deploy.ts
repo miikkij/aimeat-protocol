@@ -59,7 +59,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord, AgentTaskRecord, AgentTaskScope, AppRecord } from '../../storage/interface.js';
 import { emitChange, emitDelivery } from '../event-bus.js';
 import { emitResourceUpdated } from '../resource-events.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { deployedAgentName, proposedAgentName, crewDefHash } from '../../models/crew-def-schemas.js';
 import { presentOfferPacing, type Offer } from '../../models/offer-schemas.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config/pacing.js';

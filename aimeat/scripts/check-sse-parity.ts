@@ -140,7 +140,7 @@ const DELEGATES: Record<string, string> = {
         + 'the account for something none of them shows. Verified by reading the two notification '
         + 'paths out of sendAgentV2Message. When a view for them is built, this entry becomes an '
         + 'emit rather than a note.',
-    'src/mcp/invoke.ts': 'services/node-invoke.ts, which does not write anything itself: it '
+    'src/mcp/invoke.ts': 'services/node/invoke.ts, which does not write anything itself: it '
         + 'dispatches over loopback to the node\'s OWN route for the named capability, carrying the '
         + 'caller\'s bearer, so the write happens in that route and whatever it emits is emitted '
         + 'there, unchanged. Naming one domain here would be wrong in every case but one \u2014 the '

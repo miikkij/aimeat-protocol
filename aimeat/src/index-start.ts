@@ -585,7 +585,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     // No new scheduled fire and no workflow sweep from here on; the runs in progress get a bounded
     // wait beside the request drain, and one still going after it is written to its run log as cut
     // off (Scheduler.shutdown).
-    const { nodeContext } = await import('./services/node-context.js');
+    const { nodeContext } = await import('./services/node/context.js');
     nodeContext().workflow?.stop();
     const schedulerStopped = nodeContext().scheduler?.shutdown(SCHEDULER_SHUTDOWN_GRACE_MS)
       .catch(err => logger.warn('index-start: scheduler shutdown failed', { error: String(err) }));

@@ -1,8 +1,8 @@
 /**
  * @file test/unit/node-update-version.test.ts
  * @description The registry's "latest" version reaches the shell commands of the update prompt the
- *   operator's AI runs (services/node-update-prompt.ts), so only a semantic version is taken
- *   (services/node-update-check.ts, secaudit 2026-10, PKG-11). A local stand-in registry answers.
+ *   operator's AI runs (services/node/update-prompt.ts), so only a semantic version is taken
+ *   (services/node/update-check.ts, secaudit 2026-10, PKG-11). A local stand-in registry answers.
  * @version-history
  *   v1.0.0 — 2026-10-05 — Initial.
  */
@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { AimeatConfig } from '../../src/config.js';
-import { getNodeUpdateStatus, SEMVER_RE } from '../../src/services/node-update-check.js';
+import { getNodeUpdateStatus, SEMVER_RE } from '../../src/services/node/update-check.js';
 
 let server: Server;
 let base = '';

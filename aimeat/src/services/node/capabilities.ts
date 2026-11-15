@@ -1,5 +1,5 @@
 /**
- * @file src/services/node-capabilities.ts
+ * @file src/services/node/capabilities.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's own capabilities as DATA: what `discover` finds and `invoke` runs.
@@ -35,16 +35,16 @@
  *   - findNodeCapability() / searchNodeCapabilities() — over both
  *   - NON_INVOKABLE — the ids `invoke` refuses, and why
  * @usage
- *   import { searchNodeCapabilities } from '../services/node-capabilities.js';
+ *   import { searchNodeCapabilities } from './capabilities.js';
  * @version-history
  *   v1.1.0 — 2026-11-14 — Route capabilities: the catalogue lists the REST routes beside the tools,
  *     and a tool outranks a route at the same search score.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../tool-catalog/definitions.js';
-import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
-import type { ToolInputField } from '../tool-catalog/definitions/types.js';
-import { listRouteCapabilities, findRouteCapability, type RouteCapability } from './invoke/route-capabilities.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../tool-catalog/definitions.js';
+import { CONNECT_CLI_TOOLS } from '../../tool-dispatch/index.js';
+import type { ToolInputField } from '../../tool-catalog/definitions/types.js';
+import { listRouteCapabilities, findRouteCapability, type RouteCapability } from '../invoke/route-capabilities.js';
 
 /** One capability, as a caller sees it: enough to decide, and enough to call. */
 export interface NodeCapability {

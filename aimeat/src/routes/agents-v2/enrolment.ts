@@ -59,7 +59,7 @@ import { buildGAII } from '../../utils/gaii.js';
 import { readCardJws, verifyCardJws, cardUri, jwksUri } from '../../services/agent/card.js';
 import type { CardDefect } from '../../models/agent-card.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
-import { nodeContext } from '../../services/node-context.js';
+import { nodeContext } from '../../services/node/context.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';

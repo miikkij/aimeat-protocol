@@ -255,7 +255,7 @@ export const RULES: Rule[] = [
   },
   {
     id: 'service-locator',
-    label: 'The node\'s running scheduler, mail service, AI job service, workflow engine and connector tunnel manager are read from nodeContext() (services/node-context.ts), which initializeServices fills; the five getActive* handles that held them one by one may only be called fewer times (codebase analysis 2026-11-03, D-i)',
+    label: 'The node\'s running scheduler, mail service, AI job service, workflow engine and connector tunnel manager are read from nodeContext() (services/node/context.ts), which initializeServices fills; the five getActive* handles that held them one by one may only be called fewer times (codebase analysis 2026-11-03, D-i)',
     pattern: /\bgetActive(Scheduler|EmailService|AiJobService|WorkflowEngine|ConnectTunnelManager)\(/,
     // email.ts defines getActiveEmailService, the one handle kept for a unit test that mocks that module.
     skipDirs: ['src/services/email.ts'],

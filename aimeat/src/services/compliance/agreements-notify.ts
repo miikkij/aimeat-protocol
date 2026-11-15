@@ -43,7 +43,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { notify } from '../notify.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { provenOwnerAddress } from '../owner/mail-address.js';
 import { sendMail, type MailIntent, type MailMessage } from '../mail-gate.js';
 import { wrapHtml, esc } from '../email/templates.js';

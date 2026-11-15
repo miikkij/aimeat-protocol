@@ -50,7 +50,7 @@
 import { createTransport, type Transporter } from 'nodemailer';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { nodeContext, provideNodeService } from './node-context.js';
+import { nodeContext, provideNodeService } from './node/context.js';
 import type { Storage } from '../storage/interface.js';
 import { setNodeEmailFooter } from './email/templates.js';
 import { createMailSender } from './email/outbox.js';
@@ -85,7 +85,7 @@ export interface EmailService {
 }
 
 /**
- * The node's mail service is `nodeContext().email` (services/node-context.ts), set once during service
+ * The node's mail service is `nodeContext().email` (services/node/context.ts), set once during service
  * init. These two stay for the unit and E2E tests that put a test transport in its place, and for the
  * one caller a unit test reaches by mocking this module (services/inactivity-nudge.ts).
  */

@@ -99,7 +99,7 @@ Copy the rows into your application register, CMDB or ISMS form; most such forms
 |---|---|---|
 | Server administration | [ORGANIZATION] *Team, access method, and privileged access management.* | The supplied unit runs the node as user `aimeat` (`aimeat/deploy/aimeat.service`) |
 | Application updates | Stop, install, start; database migrations run by themselves at start, in order, each once; going back means restoring the backup taken before the update | [Upgrading](../../operations/upgrading.md) |
-| Update notices | The node asks `registry.npmjs.org` and `unpkg.com` for a newer version and shows operators a notice; `AIMEAT_UPDATE_CHECK` turns the check off, and `AIMEAT_UPDATE_CHECK_SOURCE` points it at a mirror | `aimeat_admin_node_update`, `aimeat/src/services/node-update-check.ts`, [upgrading](../../operations/upgrading.md) |
+| Update notices | The node asks `registry.npmjs.org` and `unpkg.com` for a newer version and shows operators a notice; `AIMEAT_UPDATE_CHECK` turns the check off, and `AIMEAT_UPDATE_CHECK_SOURCE` points it at a mirror | `aimeat_admin_node_update`, `aimeat/src/services/node/update-check.ts`, [upgrading](../../operations/upgrading.md) |
 | Update window and approver | [ORGANIZATION] *When updates are applied and who approves them.* | [12 Updates and releases](../12-updates-releases.md) |
 | Operating system patching | [ORGANIZATION] *Patch process and interval.* | Not part of AIMEAT |
 | Database patching | [ORGANIZATION] *Patch process for PostgreSQL.* | Not part of AIMEAT |

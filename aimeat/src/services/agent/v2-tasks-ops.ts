@@ -41,7 +41,7 @@ import { V2_TASK_STATUSES } from '../../storage/types/agent-v2-tasks.js';
 import { resolveIdentity, isOwnerInPerson } from '../../utils/gaii.js';
 import { validateTaskInput, validateStatusInput, allowedFrom, isTerminal } from '../../models/agent-v2-task.js';
 import { resolveRecipient, type Principal, type OpResult } from './v2-messaging-ops.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { emitDelivery, emitTaskMoved } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { provenanceForWrite, storeHeldProvenance } from '../ai/provenance.js';

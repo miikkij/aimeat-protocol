@@ -8,7 +8,7 @@
  *   WHO USES IT. Three code paths run a capability through the node's own routes with a caller's
  *   credential, so that every gate of the route (sign-in, scope, ownership, paywall, envelope) runs
  *   exactly as it does for a request from outside: `aimeat_invoke` and POST /v1/invoke
- *   (services/node-invoke.ts), `aimeat_capabilities_invoke` and `aimeat_app_tool_invoke` over
+ *   (services/node/invoke.ts), `aimeat_capabilities_invoke` and `aimeat_app_tool_invoke` over
  *   POST /v1/ext/:name/:action (services/capability-invoke.ts), and the connector tunnel's forward of
  *   an agent's request frame (services/connect-tunnel/forward.ts). Until 2026-11-04 each did this with
  *   a fetch to http://127.0.0.1:<port>, which needed the port to be reachable on loopback, needed the

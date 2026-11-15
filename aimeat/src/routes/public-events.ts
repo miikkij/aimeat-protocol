@@ -27,7 +27,7 @@ import type { PublicActivityEvent } from '../services/event-bus.js';
 import { readPublicActivity } from '../services/public-activity.js';
 import type { PublicActivityCategory } from '../services/public-activity.js';
 import { logger } from '../utils/logger.js';
-import { endOnDrain } from '../services/node-lifecycle.js';
+import { endOnDrain } from '../services/node/lifecycle.js';
 
 const VALID_CATEGORIES = new Set<PublicActivityCategory>(['apps', 'organisms', 'agents']);
 const MAX_SSE_CONNECTIONS = 200; // cap concurrent public streams

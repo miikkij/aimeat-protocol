@@ -44,7 +44,7 @@ import {
   listTemplateProposals, getTemplateProposal, deleteTemplateProposal, proposeTemplate,
   type ProposeTemplateInput,
 } from '../services/app/template-proposals.js';
-import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
+import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node/templates.js';
 import { templateSourceApp } from '../services/appdev/template-source.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
@@ -107,7 +107,7 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     const found = await getTemplateProposal(storage, config, identity, req.params.id as string);
     if (!found) {
       // A template the node ships answers here too, as it does on the MCP tool: this route is
-      // what the connector's aimeat_app_template_get calls (services/node-templates.ts).
+      // what the connector's aimeat_app_template_get calls (services/node/templates.ts).
       // ?part=N: a shipped file too large for one tool result comes one part at a time.
       const rawPart = typeof req.query.part === 'string' ? Number(req.query.part) : undefined;
       const shipped = await templateAnswer(storage, config, req.params.id as string, rawPart);

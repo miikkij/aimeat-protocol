@@ -78,7 +78,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 import { recordTaskCompleted, recordTaskFailed } from '../activity-recorder.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { notifyAutomationTaskComplete } from '../ecosystem-automation-notify.js';
 import { deliverTaskResult } from '../task-result-delivery.js';
 import { processAutomationAdvisories } from '../ecosystem-automation-advisories.js';

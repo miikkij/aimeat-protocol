@@ -1,5 +1,5 @@
 /**
- * @file src/services/node-update-check.ts
+ * @file src/services/node/update-check.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Is a newer AIMEAT on npm than the one this node runs, when was it released, and what
@@ -36,14 +36,14 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AimeatConfig } from '../config.js';
-import { getSoftwareVersion } from '../utils/version.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { readBodyCapped } from '../utils/read-capped.js';
-import { logger } from '../utils/logger.js';
-import { compareVersions } from './federation/overview.js';
-import { readChangelog, type ChangelogEntry } from './page-body-live.js';
-import { buildNodeUpdatePrompt, type InstallMethod } from './node-update-prompt.js';
+import type { AimeatConfig } from '../../config.js';
+import { getSoftwareVersion } from '../../utils/version.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
+import { logger } from '../../utils/logger.js';
+import { compareVersions } from '../federation/overview.js';
+import { readChangelog, type ChangelogEntry } from '../page-body-live.js';
+import { buildNodeUpdatePrompt, type InstallMethod } from './update-prompt.js';
 
 const PACKAGE = 'aimeat';
 const DEFAULT_REGISTRY = 'https://registry.npmjs.org';
@@ -94,7 +94,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 /** The directory holding the running package's package.json: aimeat/ in a clone, the package root once installed. */
 function packageDir(): string | null {
-  for (const p of [join(here, '..', '..'), join(here, '..', '..', '..')]) {
+  for (const p of [join(here, '..', '..', '..'), join(here, '..', '..', '..', '..')]) {
     const pj = join(p, 'package.json');
     if (!existsSync(pj)) continue;
     try {

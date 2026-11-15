@@ -40,7 +40,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
 import type { JobRunResult } from '../scheduler.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { buildGEAI, localAccountName } from '../../utils/gaii.js';
 import { scheduleActor } from './actor.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';

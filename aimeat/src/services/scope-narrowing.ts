@@ -28,7 +28,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { flushScopeUse, readScopeUse, writeScopeUse, wildcardStatus, type WildcardStatus } from './scope-use.js';
 import { emitChange } from './event-bus.js';
 import { emitToolListChanged } from './resource-events.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 
 export type NarrowOutcome =
     | { ok: true; agent: AgentRecord; status: WildcardStatus }

@@ -2129,7 +2129,7 @@
       "reads": {
         "listMemoryForOwners": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks. 2026-11-01: the hello_mcp read moved to services/node-resident-agent.ts. 2026-11-09: the welcome page's existence check asks storageFileHolders, which returns identities and no content."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks. 2026-11-01: the hello_mcp read moved to services/node/resident-agent.ts. 2026-11-09: the welcome page's existence check asks storageFileHolders, which returns identities and no content."
     },
     "src/services/hook-log.ts": {
       "reads": {
@@ -2417,7 +2417,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's network policy record."
     },
-    "src/services/node-resident-agent.ts": {
+    "src/services/node/resident-agent.ts": {
       "reads": {
         "getOwnerScopeMemory": 1
       },
@@ -2501,7 +2501,7 @@
         "getMemory": 2,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Items reach callers through showItems; the other reads are read-modify-write and existence checks. 2026-11-01: the hello_mcp read moved to services/node-resident-agent.ts."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Items reach callers through showItems; the other reads are read-modify-write and existence checks. 2026-11-01: the hello_mcp read moved to services/node/resident-agent.ts."
     },
     "src/services/openrouter-settings-migration.ts": {
       "reads": {

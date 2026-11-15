@@ -91,7 +91,7 @@ import type { InvitationRecord, InvitationWorkspaceGrant } from '../storage/repo
 import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { organismLink } from './notifications/links.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { formatForPerson } from './display-prefs.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace/roles.js';
 import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';

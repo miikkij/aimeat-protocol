@@ -132,7 +132,7 @@ export class AimeatClient {
 
   /**
    * The fetch this client's direct requests use: the platform's own unless one is set. The node's own
-   * dispatcher (services/node-invoke.ts) sets the in-process fetch of services/request-injector.ts,
+   * dispatcher (services/node/invoke.ts) sets the in-process fetch of services/request-injector.ts,
    * so its requests reach the node's routes with no socket; what is sent and read is unchanged.
    */
   private fetchImpl: ((url: string, init: RequestInit) => Promise<Response>) | null = null;
@@ -262,7 +262,7 @@ export class AimeatClient {
     const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
     // Only a client that knows whose credential it carries (the connector's own, for one agent)
     // resolves it now and keeps the refusal record. A client built with just a bearer sends that
-    // bearer, as before: the node's own loopback dispatcher (services/node-invoke.ts) uses this
+    // bearer, as before: the node's own loopback dispatcher (services/node/invoke.ts) uses this
     // class with a caller's token, and must neither read nor write a connector home.
     const own = !path.startsWith('http') && !!this.agent && !!this.owner && !!this.credentials;
     const token = own ? await this.currentToken() : this.token;

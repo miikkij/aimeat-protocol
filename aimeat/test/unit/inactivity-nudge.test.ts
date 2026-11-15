@@ -25,8 +25,8 @@ const sendRaw = vi.hoisted(() => vi.fn(async () => true));
 const nodeContext = vi.hoisted(() => vi.fn(() => ({
     scheduler: null, email: { enabled: true, sendRaw }, aiJobs: null, workflow: null, tunnel: null,
 })));
-vi.mock('../../src/services/node-context.js', async (importOriginal) => ({
-    ...(await importOriginal<typeof import('../../src/services/node-context.js')>()), nodeContext,
+vi.mock('../../src/services/node/context.js', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../../src/services/node/context.js')>()), nodeContext,
 }));
 
 const {

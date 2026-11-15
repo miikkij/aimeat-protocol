@@ -166,7 +166,7 @@ import { appendRequest, removeAppDocsOfOwner } from '../compliance/docs.js';
 import { eraseNameBoundGrants } from '../name-bound-grants-erasure.js';
 import { serviceNamespaceOf } from '../../utils/service-namespace.js';
 import { isValidGHII } from '../../utils/gaii.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { emitAccountErased } from '../event-bus.js';
 
 export interface OwnerErasureResult {

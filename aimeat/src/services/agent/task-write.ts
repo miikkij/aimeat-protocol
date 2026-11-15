@@ -85,7 +85,7 @@ import { resolveTaskFileInputs } from '../task-files.js';
 import type { FileRefAccessor } from '../file-refs.js';
 import { recordTaskStarted } from '../activity-recorder.js';
 import { emitChange, emitDelivery } from '../event-bus.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { logger } from '../../utils/logger.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;

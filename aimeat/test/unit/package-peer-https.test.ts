@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // A generated Ed25519 public key: a new peer's key is checked as one since 2026-11-15 (audit 2026-11
 // L056), and the text 'key-b' this test used was refused before the address rule was reached.
-vi.mock('../../src/services/node-card.js', () => ({
+vi.mock('../../src/services/node/card.js', () => ({
   readNodeCard: vi.fn(async () => ({ ok: true, nodeId: 'node-b', publicKey: 'I7qt4pkFkDhbYzdtW+Mx97hoEUKYGBYaSnu3Otlm1a4=' })),
 }));
 const KEY_B = 'I7qt4pkFkDhbYzdtW+Mx97hoEUKYGBYaSnu3Otlm1a4=';

@@ -142,7 +142,7 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
 export async function flushProcessBuffers(): Promise<void> {
   // First, so no AI job starts a model call while the buffers flush: the running jobs are marked as
   // stopped by the node, and the next start queues each one again once (services/ai-jobs/restart.ts).
-  const { nodeContext } = await import('../services/node-context.js');
+  const { nodeContext } = await import('../services/node/context.js');
   await nodeContext().aiJobs?.markStoppingJobs()
     .catch(err => logger.warn('process-buffers: marking the running AI jobs failed', { error: String(err) }));
   // The webhook and mail retries this process holds in the stored outbox: no further attempt here,

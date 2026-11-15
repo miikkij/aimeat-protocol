@@ -43,7 +43,7 @@ import { standingWorkOf, noticeStandingWork } from '../agent/standing-work.js';
 import { receiversMadeBy, noticeReceiversKept } from '../receivers/makers.js';
 import { forgetAgentAccess } from '../agent/refusals.js';
 import { evictAgentTelemetry } from '../telemetry-buffer.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 

@@ -42,8 +42,8 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
-import { listAllCapabilities, findNodeCapability, searchNodeCapabilities, asRouteCapability } from '../services/node-capabilities.js';
-import { invokeNodeCapability } from '../services/node-invoke.js';
+import { listAllCapabilities, findNodeCapability, searchNodeCapabilities, asRouteCapability } from '../services/node/capabilities.js';
+import { invokeNodeCapability } from '../services/node/invoke.js';
 import { listRouteCapabilities, routeCapabilityContract } from '../services/invoke/route-capabilities.js';
 
 /** Never send the whole catalogue at once by accident; a caller that wants it all asks page by page. */

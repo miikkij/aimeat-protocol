@@ -35,7 +35,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import {
     proposeTemplate, listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
 } from '../services/app/template-proposals.js';
-import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
+import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node/templates.js';
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { appToll } from '../services/app/pacing.js';
@@ -106,7 +106,7 @@ export function registerAppTemplateProposalTools(
                 // build text says "start from the shell at GET /v1/app-templates", and a chat
                 // connected over MCP cannot make that call: a cold-agent build run asked this
                 // tool for `shell-pure-client` and was told it did not exist (2026-09-18). Same
-                // registry and same fields as GET /v1/app-templates/:id (services/node-templates.ts).
+                // registry and same fields as GET /v1/app-templates/:id (services/node/templates.ts).
                 // And a genre that grew out of an app, while that app stands (design-book/grown-genre.ts).
                 const shipped = await templateAnswer(storage, config, id, part);
                 if (!shipped) return toolError('NOT_FOUND', unknownTemplateMessage(id));

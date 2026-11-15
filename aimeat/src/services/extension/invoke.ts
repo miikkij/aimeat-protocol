@@ -91,7 +91,7 @@ import { buildExtensionChanged } from '../extension-live/changed.js';
 import { capabilitiesOfRecord } from './capability-declaration.js';
 import { attachExtensionWorkspace, workspaceRefusalFor, type ExtensionWorkspaceCapability } from './workspace.js';
 import { maybeExtensionAi } from '../ai-jobs/index.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../call-timing.js';
 import { countCapabilityCall } from '../capability-record.js';

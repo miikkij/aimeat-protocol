@@ -21,7 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { nodeContext } from '../services/node-context.js';
+import { nodeContext } from '../services/node/context.js';
 
 export function connectTunnelRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

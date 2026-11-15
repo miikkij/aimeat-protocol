@@ -150,7 +150,7 @@ import { singleProcess } from './process-lease.js';
 // One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
 import type { ConnectConnection } from './connect-tunnel/connection.js';
 import { emitTunnelSocketOpened, emitTunnelSocketClosed } from './connect-tunnel/hooks.js';
-import { nodeContext, provideNodeService } from './node-context.js';
+import { nodeContext, provideNodeService } from './node/context.js';
 
 
 /**
@@ -838,7 +838,7 @@ export class ConnectTunnelManager implements TunnelControlTarget {
   }
 }
 
-// The running manager is `nodeContext().tunnel` (services/node-context.ts), so a read-only stats route
+// The running manager is `nodeContext().tunnel` (services/node/context.ts), so a read-only stats route
 // exposes connection metrics (the single-socket invariant test reads them) without threading the
 // instance through route mounting. This setter stays for the unit tests that put in a test manager.
 export function setActiveConnectTunnelManager(m: ConnectTunnelManager | null): void { provideNodeService('tunnel', m); }

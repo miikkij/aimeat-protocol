@@ -52,7 +52,7 @@ import type { NotifSource } from './notification-settings.js';
 import { emitChange } from './event-bus.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
 import type { EmailService } from './email.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { appendMailLog, type MailLogKind } from './notification-settings.js';
 import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail, senderLimitReached } from './mail-gate.js';

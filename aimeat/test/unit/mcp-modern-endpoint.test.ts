@@ -24,7 +24,7 @@ vi.mock('../../src/services/onboarding-funnel.js', () => ({ recordFirstMcpCall }
 
 const { modernAuthInfo } = await import('../../src/mcp/modern-endpoint.js');
 const { admitMcpAgent, recordMcpContactThrottled, MCP_CONTACT_THROTTLE_MS } = await import('../../src/services/mcp-agent-admission.js');
-const { hasHelloMcpProof } = await import('../../src/services/node-resident-agent.js');
+const { hasHelloMcpProof } = await import('../../src/services/node/resident-agent.js');
 
 const verified: VerifiedToken = {
     sub: 'claude#alice@test', owner: 'alice', node: 'test', roles: ['agent'],

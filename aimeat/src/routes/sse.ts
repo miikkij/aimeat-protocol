@@ -93,7 +93,7 @@ import { allowedDomains, filterDomains, isOwnerPrincipal } from '../auth/sse-dom
 import { isOrganismMember, type AudienceAuth } from '../services/audience.js';
 import { streamCredentialOf, streamCredentialRevoked, type StreamCredential } from '../auth/stream-credential.js';
 import { logger } from '../utils/logger.js';
-import { endOnDrain } from '../services/node-lifecycle.js';
+import { endOnDrain } from '../services/node/lifecycle.js';
 import { createChangeJournal } from '../services/live/change-journal.js';
 
 interface Ticket {

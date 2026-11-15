@@ -42,7 +42,7 @@ import { recordAccountEvent } from '../../services/account-events.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { issueJWT, generateSessionId } from '../../auth/jwt.js';
 import { emitChange } from '../../services/event-bus.js';
-import { nodeContext } from '../../services/node-context.js';
+import { nodeContext } from '../../services/node/context.js';
 import { emitToolListChanged } from '../../services/resource-events.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';

@@ -162,7 +162,7 @@ import { emitChange, emitRecordChange } from '../event-bus.js';
 import { enqueueMemoryReplication } from './replication.js';
 import { emitMemoryWritten } from '../event-bus.js';
 import { reconcileAfterSourceWrite } from '../exchange/projection.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { emitEcosystemMemoryWrite } from '../ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../ecosystem-automation.js';
 import { logger } from '../../utils/logger.js';

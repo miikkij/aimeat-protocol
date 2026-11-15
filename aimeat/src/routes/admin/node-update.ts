@@ -7,7 +7,7 @@
  *   header asks it for an operator and shows a notice when `updateAvailable` is true; the dialog
  *   behind the notice renders the rest.
  *
- *   Thin over services/node-update-check.ts, which the aimeat_admin_node_update MCP tool calls too.
+ *   Thin over services/node/update-check.ts, which the aimeat_admin_node_update MCP tool calls too.
  *   `?refresh=true` skips the six-hour cache, for the dialog's "check again".
  * @structure adminNodeUpdateRouter(config, storage)
  * @usage router.use(adminNodeUpdateRouter(config, storage));   // in routes/admin.ts
@@ -20,7 +20,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success } from '../../middleware/envelope.js';
-import { getNodeUpdateStatus } from '../../services/node-update-check.js';
+import { getNodeUpdateStatus } from '../../services/node/update-check.js';
 
 export function adminNodeUpdateRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();

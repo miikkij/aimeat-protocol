@@ -59,7 +59,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { EnrolmentGrantKind } from '../../storage/types/identity.js';
 import { connectedDaemons } from '../basic-agents.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { recordPlacement } from '../connector-registry.js';
 import { cardUri, jwksUri } from './card.js';
 import { logger } from '../../utils/logger.js';

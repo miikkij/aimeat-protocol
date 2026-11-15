@@ -36,7 +36,7 @@
  *     goals:model-work-runs-as-owner-without-requesting-agent-authority).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import type { AiJobRecord, AiJobLogEntry } from '../ai-jobs/types.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';

@@ -18,7 +18,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { buildGAII } from '../../utils/gaii.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import type { WorkflowStep } from '../../models/workflow-schemas.js';
 
 // ── agent reachability (agent-offline fast-fail) ──────────────────────────────────

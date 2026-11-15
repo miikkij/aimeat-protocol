@@ -34,7 +34,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { parseGEAI, buildGEAI } from '../utils/gaii.js';
-import { nodeContext } from '../services/node-context.js';
+import { nodeContext } from '../services/node/context.js';
 import { getOwnerScopeMemory } from '../services/owner/memory.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemory } from '../services/classification/present-memory.js';

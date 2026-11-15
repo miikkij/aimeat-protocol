@@ -1,5 +1,5 @@
 /**
- * @file services/node-context.ts
+ * @file src/services/node/context.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's running services in one object: the scheduler, the mail service, the AI job
@@ -18,17 +18,17 @@
  *   five handles did, so a node that runs no tunnel keeps the manager the earlier node set.
  * @structure NodeContext · nodeContext() · provideNodeService(name, service)
  * @usage
- *   import { nodeContext } from './node-context.js';
+ *   import { nodeContext } from './context.js';
  *   nodeContext().scheduler?.removeJob(id);
  * @version-history
  *   v1.0.0 — 2026-11-04 — Initial: the five service locators become fields of one context
  *     (codebase analysis 2026-11-03, item D-i).
  */
-import type { Scheduler } from './scheduler.js';
-import type { EmailService } from './email.js';
-import type { AiJobService } from './ai-jobs/service.js';
-import type { WorkflowEngine } from './workflow/engine.js';
-import type { ConnectTunnelManager } from './connect-tunnel.js';
+import type { Scheduler } from '../scheduler.js';
+import type { EmailService } from '../email.js';
+import type { AiJobService } from '../ai-jobs/service.js';
+import type { WorkflowEngine } from '../workflow/engine.js';
+import type { ConnectTunnelManager } from '../connect-tunnel.js';
 
 /** The node's running services. A field is null when the node has not made that service. */
 export interface NodeContext {

@@ -49,7 +49,7 @@
  */
 import type { Storage, AgentTaskRecord, MemoryRecord, EcoAutomationRecipe } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { buildGEAI, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { systemReader } from './classification/reader.js';

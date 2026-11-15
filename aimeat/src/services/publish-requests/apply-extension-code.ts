@@ -19,7 +19,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { actionCodeDigest } from '../extension/email-policy-ask.js';
 import { heldCodeRequest, withoutCodeHold } from '../extension/code-hold.js';
 import { activateExtension } from '../extension/lifecycle.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 export async function applyExtensionCode(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

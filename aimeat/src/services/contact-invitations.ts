@@ -26,7 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { hashInviteToken, inviteEmailHash, INVITE_DEFAULT_EXPIRY_DAYS } from './invitations.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { sendMail } from './mail-gate.js';
 import { contactInviteEmail } from './email/templates.js';
 import { takeEmailLookup } from './email/lookup-limit.js';

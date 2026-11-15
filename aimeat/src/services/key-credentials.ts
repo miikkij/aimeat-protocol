@@ -68,7 +68,7 @@ import type { Storage, GHIIRecord } from '../storage/interface.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { hashPassword } from './password.js';
 import { generateReadablePassword } from '../utils/password-generation.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { sendMail, type MailMessage } from './mail-gate.js';
 import { getEncryptionKey, encryptBound, decryptBound } from './encryption.js';
 import { provenOwnerAddress } from './owner/mail-address.js';

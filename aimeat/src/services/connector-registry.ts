@@ -53,7 +53,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { connectedDaemons } from './basic-agents.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { onTunnelSocketOpened, onTunnelSocketClosed, type TunnelSocketOpened } from './connect-tunnel/hooks.js';
 import { INSTALL_NAME_MAX } from './connect-tunnel/roster.js';
 import { emitChange } from './event-bus.js';

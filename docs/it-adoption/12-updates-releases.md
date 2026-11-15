@@ -77,7 +77,7 @@ What you can verify yourself:
 
 | Channel | What it gives | Source |
 |---|---|---|
-| Notice in the node | An operator sees a header notice when npm has a newer version. `aimeat_admin_node_update` (`GET /v1/admin/node-update`) gives the running and newest versions, what is new, the detected install method and the steps for it | [Upgrading](../operations/upgrading.md#find-out-what-is-available), `aimeat/src/services/node-update-check.ts` |
+| Notice in the node | An operator sees a header notice when npm has a newer version. `aimeat_admin_node_update` (`GET /v1/admin/node-update`) gives the running and newest versions, what is new, the detected install method and the steps for it | [Upgrading](../operations/upgrading.md#find-out-what-is-available), `aimeat/src/services/node/update-check.ts` |
 | Turning it off | `AIMEAT_UPDATE_CHECK=false`; `AIMEAT_UPDATE_CHECK_SOURCE` points it at an internal mirror | `aimeat/src/config/update-check.ts` |
 | Change log | `/changelog.json` and `/v1/changelog` on every node; entries of kind `security` carry an impact sentence | `aimeat/public/changelog.json` |
 | npm | `npm view aimeat version` | `.github/SECURITY.md` |
@@ -108,7 +108,7 @@ The rollback point is the backup. Its recovery point is the moment you took it: 
 | How to report | Privately: GitHub private vulnerability reporting, or the e-mail address in the policy. Not in a public issue | `.github/SECURITY.md` |
 | Response aim | Acknowledge within 48 hours, assess within a week, fix within two weeks | `.github/SECURITY.md` |
 | How a fix ships | In a new release; only the newest release receives fixes | `.github/SECURITY.md` |
-| How it is announced | A change log entry of kind `security` in `aimeat/public/changelog.json` when the maintainer writes one, shown on every node that has the version. The update notice tells operators of older nodes that a newer version exists | `aimeat/public/changelog.json`, `aimeat/src/services/node-update-check.ts` |
+| How it is announced | A change log entry of kind `security` in `aimeat/public/changelog.json` when the maintainer writes one, shown on every node that has the version. The update notice tells operators of older nodes that a newer version exists | `aimeat/public/changelog.json`, `aimeat/src/services/node/update-check.ts` |
 | A release that cannot wait | May go out over a red nightly sweep with a named reason; CI must be green | `aimeat/scripts/release-ready.mjs` |
 
 ## Limits

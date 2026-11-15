@@ -118,7 +118,7 @@ import { codeHoldRefusal, takeHoldOff } from '../services/extension/code-hold.js
 import {
     writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
 } from '../services/extension/lifecycle.js';
-import { nodeContext } from '../services/node-context.js';
+import { nodeContext } from '../services/node/context.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { annotationsFor } from './annotations.js';

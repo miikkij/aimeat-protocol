@@ -18,7 +18,7 @@
  *     (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  */
 import { emitToolListChanged } from '../../services/resource-events.js';
-import { nodeContext } from '../../services/node-context.js';
+import { nodeContext } from '../../services/node/context.js';
 
 /**
  * An agent's permissions changed: tell the two places that hold the old list. Moved unchanged out of

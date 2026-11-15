@@ -33,7 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { hashInviteToken, inviteEmailHash, InvitationError } from './invitations.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { sendMail } from './mail-gate.js';
 import { registrationInviteEmail } from './email/templates.js';
 import { isValidEmail } from '../utils/email-validator.js';

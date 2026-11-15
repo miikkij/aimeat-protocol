@@ -41,7 +41,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { buildGAII, isOwnerInPerson } from '../utils/gaii.js';
 import { browserDomainsError } from './crew-browser-domains.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import {
   readCrewState, saveCrewDraft, discardCrewDraft, publishCrewDef, readCrewRevision, crewKeysFor,
   CREW_VERSION_WINDOW, type CrewState,

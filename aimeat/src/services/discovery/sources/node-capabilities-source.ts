@@ -30,7 +30,7 @@
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
-import { searchNodeCapabilities, asRouteCapability, type NodeCapability } from '../../node-capabilities.js';
+import { searchNodeCapabilities, asRouteCapability, type NodeCapability } from '../../node/capabilities.js';
 
 export const NODE_CAPABILITIES_SOURCE_ID = 'node-capabilities';
 const MAX_LIMIT = 100;

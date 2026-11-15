@@ -32,7 +32,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage, AgentV2MessageRecord, AgentV2PushConfigRecord, MessagePart } from '../../storage/interface.js';
 import { MESSAGE_SPEC, type MessageRole } from '../../models/agent-v2-message.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { emitDelivery } from '../event-bus.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { logger } from '../../utils/logger.js';

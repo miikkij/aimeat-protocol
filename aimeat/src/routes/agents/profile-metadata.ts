@@ -106,7 +106,7 @@ import {
 } from '../../services/agent/profile-write.js';
 import { logger } from '../../utils/logger.js';
 import { computeAgentHealthMany } from '../../services/agent/health.js';
-import { nodeContext } from '../../services/node-context.js';
+import { nodeContext } from '../../services/node/context.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
 import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent/credential-health.js';
 import { portRedirectFor } from '../../services/agent/port-redirect.js';

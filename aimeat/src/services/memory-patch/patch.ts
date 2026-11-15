@@ -53,7 +53,7 @@ import { enqueueMemoryReplication } from '../memory/replication.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange, emitMemoryWritten, emitRecordChange } from '../event-bus.js';
 import { reconcileAfterSourceWrite } from '../exchange/projection.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { emitEcosystemMemoryWrite } from '../ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../ecosystem-automation.js';
 import { ecoMayWriteKey } from '../ecosystem-access.js';

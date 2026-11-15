@@ -109,7 +109,7 @@ import { setPackageVersionStatus } from '../services/packages/compose/package-cr
 import { composeWithPublishGate, composeSetWithPublishGate } from '../services/packages/compose/package-publish-ask.js';
 import { pullPackage, listRepositoryPackages } from '../services/packages/peer/package-pull.js';
 import type { PeerInfo } from '../services/federation.js';
-import { nodeContext } from '../services/node-context.js';
+import { nodeContext } from '../services/node/context.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { localAccountName } from '../utils/gaii.js';
 import { agentAttribution } from '../services/visibility/attribution.js';

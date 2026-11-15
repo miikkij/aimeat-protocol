@@ -52,7 +52,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { takeMailSendOnNode, MAIL_SEND_LIMIT } from '../account-limits.js';
 import { sendMail, type AccountTurnTaken } from '../mail-gate.js';
 import { logger } from '../../utils/logger.js';

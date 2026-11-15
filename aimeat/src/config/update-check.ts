@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Whether this node asks npm for a newer AIMEAT, and where it asks. Read by
- *   services/node-update-check.ts, which the operator's header notice, GET /v1/admin/node-update
+ *   services/node/update-check.ts, which the operator's header notice, GET /v1/admin/node-update
  *   and the aimeat_admin_node_update MCP tool all call.
  *
  *   ON BY DEFAULT. A node that never learns a newer version exists keeps running the old one, and

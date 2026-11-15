@@ -115,7 +115,7 @@ import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-pack
 import { buildLlmsHumanPages, buildLlmsOptionalPages, findPublicPage } from '../data/public-pages.js';
 import { injectStaticPageHead, injectTemplatePageHead } from '../utils/page-head.js';
 import { buildGettingStarted } from '../data/getting-started.js';
-import { nodeContext } from '../services/node-context.js';
+import { nodeContext } from '../services/node/context.js';
 import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
 import { buildFirstSteps } from '../services/first-steps.js';
 import { apexOnly } from './agent-docs.js';

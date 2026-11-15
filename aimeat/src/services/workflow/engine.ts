@@ -13,7 +13,7 @@
  *   docs/plans/2026-06-13-agent-workflows-node-plan.md §4.
  * @structure
  *   - WorkflowEngine — startRun / onTaskTerminal / sweep / resumeInflight / start / stop
- *   - the running engine is nodeContext().workflow (services/node-context.ts), so the task route +
+ *   - the running engine is nodeContext().workflow (services/node/context.ts), so the task route +
  *     scheduler reach the live engine without threading it through every signature
  *   - computeReadySteps / runOutcome — pure decision helpers (exported for tests)
  * @usage
@@ -168,7 +168,7 @@ export { isAgentReachable } from './engine-reachability.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
-// The node's running engine is `nodeContext().workflow` (services/node-context.ts), set once during
+// The node's running engine is `nodeContext().workflow` (services/node/context.ts), set once during
 // service init, so the task route and the scheduler reach it without threading it through.
 
 /** Default wait for a human-input step's answer: lives in engine-human.ts, exported here for the routes. */

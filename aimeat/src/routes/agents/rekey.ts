@@ -24,7 +24,7 @@ import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { emitChange } from '../../services/event-bus.js';
-import { nodeContext } from '../../services/node-context.js';
+import { nodeContext } from '../../services/node/context.js';
 import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { logger } from '../../utils/logger.js';
 

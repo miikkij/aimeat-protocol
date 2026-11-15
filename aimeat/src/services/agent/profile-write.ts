@@ -76,7 +76,7 @@ import type { AgentRecord, AgentTechnicalCapability, Storage } from '../../stora
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { requireUsableServer } from '../mcp-client/registry.js';
 import { emitChange } from '../event-bus.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { emitToolListChanged } from '../resource-events.js';
 import { deriveStepsForMode, VALID_MODES } from '../../models/agent-onboarding-schemas.js';
 import { AgentCapabilitiesUpdateSchema } from '../../models/agent-capabilities-schemas.js';

@@ -59,7 +59,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
-import { nodeContext } from '../services/node-context.js';
+import { nodeContext } from '../services/node/context.js';
 import { HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
 import {
   saveWorkflow, getWorkflow, listWorkflows, listRuns, getRun, validateWorkflow, buildBlueprint,

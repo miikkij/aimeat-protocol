@@ -58,7 +58,7 @@ import { decideTaskStart, autoStartEvent } from './task-rules.js';
 import { readAgentDmInbox } from './dm-reads.js';
 import { messagePreview } from '../../utils/messaging.js';
 import { recordTaskStarted } from '../activity-recorder.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { emitChange, emitDelivery } from '../event-bus.js';
 import { isStopped } from './stop-rules.js';
 import { createWebhookDispatcher } from '../webhook-dispatcher.js';

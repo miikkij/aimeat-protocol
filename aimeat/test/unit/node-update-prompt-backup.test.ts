@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-10-10 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { buildNodeUpdatePrompt } from '../../src/services/node-update-prompt.js';
+import { buildNodeUpdatePrompt } from '../../src/services/node/update-prompt.js';
 
 const base = {
     current: '3.25.0', latest: '3.26.0', releasedAt: null, baseUrl: 'http://localhost:40050',

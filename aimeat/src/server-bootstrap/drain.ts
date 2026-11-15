@@ -13,7 +13,7 @@
  *   ORDER. Mark the process draining (GET /v1/health/ready answers 503), close the listening socket
  *   (a new connection is refused, so a load balancer tries the next process), answer every later
  *   request on an open connection with `Connection: close`, end the live notification streams
- *   (services/node-lifecycle.ts endOnDrain; the browser reconnects by itself), close idle
+ *   (services/node/lifecycle.ts endOnDrain; the browser reconnects by itself), close idle
  *   keep-alive connections, and wait for the requests in flight up to the drain limit. Whatever is
  *   still open then is cut, and the caller goes on with the rest of the stop.
  * @structure
@@ -24,7 +24,7 @@
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, HA stage 1: drain-first shutdown).
  */
 import type { Server, IncomingMessage, ServerResponse } from 'node:http';
-import { markDraining, nodePhase, endDrainableStreams } from '../services/node-lifecycle.js';
+import { markDraining, nodePhase, endDrainableStreams } from '../services/node/lifecycle.js';
 
 export interface RequestTracker {
   /** Requests whose response has not finished, the registered live streams included until they end. */

@@ -34,7 +34,7 @@
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { globToRegExp } from './workflow/signal-eval.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { localAccountOf, buildGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { agentAccessOf } from './organism/agent-access.js';

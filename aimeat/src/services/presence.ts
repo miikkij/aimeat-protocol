@@ -53,7 +53,7 @@ import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { emitChange } from './event-bus.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { logger } from '../utils/logger.js';
 
 export type RawStatus = 'available' | 'busy' | 'away' | 'offline';

@@ -15,7 +15,7 @@ import {
     listRouteCapabilities, findRouteCapability, buildRouteCapabilities, routeExclusion, routeCapabilityContract,
 } from '../../src/services/invoke/route-capabilities.js';
 import { routeRequestOf } from '../../src/services/invoke/route-invoke.js';
-import { listNodeCapabilities, listAllCapabilities, findNodeCapability } from '../../src/services/node-capabilities.js';
+import { listNodeCapabilities, listAllCapabilities, findNodeCapability } from '../../src/services/node/capabilities.js';
 
 describe('route capabilities from openapi.yaml', () => {
     const caps = listRouteCapabilities();

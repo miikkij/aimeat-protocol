@@ -35,7 +35,7 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // scope that matters is the target capability's and it is checked there, on the same code path a
     // direct call would take. A word here would be a second, weaker opinion in front of the real
     // one, and it would have to guess which scope the target wants. `aimeat_invoke` can do exactly
-    // what its caller can already do and nothing more; see services/node-invoke.ts.
+    // what its caller can already do and nothing more; see services/node/invoke.ts.
     'aimeat_invoke',
     // One tool, many actions, each with its own word (catalog/action-scopes.ts): the handler checks
     // the action's word on every call. Its reads need none, so one word for the tool would take

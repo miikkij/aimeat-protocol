@@ -116,7 +116,7 @@ import { findExtension } from '../component-address.js';
 import { aiScheduleInputRefusal } from './ai-read.js';
 import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './instruction-hold.js';
 import type { Scheduler, JobOutcome } from '../scheduler.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { withSchedulePrompt } from './prompt.js';
 import { withDeliver } from '../task-result-delivery.js';
 import { dropNotifyOfAgent } from '../delivery-crew.js';

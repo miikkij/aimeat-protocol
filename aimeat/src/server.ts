@@ -114,7 +114,7 @@ import { systemFaultReporter } from './middleware/system-fault.js';
 import { hideInternalErrorText } from './middleware/internal-error-text.js';
 import { notFoundHandler, errorHandler } from './middleware/fallback-handlers.js';
 import { perfTraceMiddleware } from './services/perf-trace.js';
-import { markReady } from './services/node-lifecycle.js';
+import { markReady } from './services/node/lifecycle.js';
 import { registerInProcessApp } from './services/request-injector.js';
 
 export interface ServerResult {

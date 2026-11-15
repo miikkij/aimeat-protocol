@@ -39,7 +39,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { addItem, listItems } from './open-items.js';
 import { readAvatarsOrEmpty, type AvatarView } from './agent/avatar.js';
 import { logger } from '../utils/logger.js';

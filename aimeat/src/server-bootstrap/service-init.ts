@@ -174,7 +174,7 @@ import { setStepMemoryWrite } from '../services/workflow/step-write.js';
 import { writeMemoryRecord } from '../services/memory/write.js';
 import { AiJobService } from '../services/ai-jobs/index.js';
 import { createEmailService } from '../services/email.js';
-import { provideNodeService } from '../services/node-context.js';
+import { provideNodeService } from '../services/node/context.js';
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
@@ -237,7 +237,7 @@ export async function initializeServices(
 
   // Internal Scheduler System — centralized cron-based job scheduler
   // With storage, a mail whose first attempt failed keeps its retries in the stored outbox (services/outbox.ts).
-  // Each service goes into the node context (services/node-context.ts) as it is made, in this order.
+  // Each service goes into the node context (services/node/context.ts) as it is made, in this order.
   const emailService = createEmailService(config, storage);
   provideNodeService('email', emailService);
   const scheduler = new Scheduler(config, storage, emailService);

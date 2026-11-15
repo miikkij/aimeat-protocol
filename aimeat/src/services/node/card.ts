@@ -1,5 +1,5 @@
 /**
- * @file services/node-card.ts
+ * @file src/services/node/card.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Read another node's card (GET /.well-known/aimeat): the node id and the public key it
@@ -21,8 +21,8 @@
  *   v1.0.0 — 2026-10-01 — Initial, for proving a packages-only peer before it is registered (the
  *     peer-registration incident, finding F of https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e).
  */
-import { safeFetch, stripTrailingSlashes, validateOutboundUrl } from '../utils/url-validator.js';
-import { readBodyCapped } from '../utils/read-capped.js';
+import { safeFetch, stripTrailingSlashes, validateOutboundUrl } from '../../utils/url-validator.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
 
 /** The most a node card may be: a few hundred bytes of identity and key in the standard envelope. */
 const MAX_NODE_CARD_BYTES = 64 * 1024;

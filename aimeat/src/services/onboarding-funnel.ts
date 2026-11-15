@@ -69,7 +69,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { outboundEmailHtml } from './email/templates.js';
 import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail } from './mail-gate.js';

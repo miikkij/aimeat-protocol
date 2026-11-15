@@ -82,7 +82,7 @@ import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { INTERNAL_PASS_HEADER } from './extension-access/internal-pass.js';
 import { withInProcessFetch } from './request-injector.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { buildGEAI, ownerGhiiOf, localAccountName, localAccountOf } from '../utils/gaii.js';
 import { requireUsableServer } from './mcp-client/registry.js';
 import { callRemoteTool, statusForRemoteRefusal } from './mcp-client/invoke.js';

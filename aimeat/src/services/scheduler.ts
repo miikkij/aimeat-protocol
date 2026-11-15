@@ -138,7 +138,7 @@ import { deactivatedAccountSkip } from './account-deactivated.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
-// The node's running Scheduler is `nodeContext().scheduler` (services/node-context.ts), set once during
+// The node's running Scheduler is `nodeContext().scheduler` (services/node/context.ts), set once during
 // service init, so a surface made per request (the MCP server) reaches the live cron.
 
 // The result types live in scheduler-types.ts (max-file-lines); re-exported so importers stay as they are.

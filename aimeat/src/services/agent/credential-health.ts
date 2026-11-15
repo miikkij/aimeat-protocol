@@ -30,7 +30,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { readCardJws } from './card.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { logger } from '../../utils/logger.js';
 
 /**

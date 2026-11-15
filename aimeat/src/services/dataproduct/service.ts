@@ -54,7 +54,7 @@ import type { CallerContext } from '../caller-context.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { createScheduleRecord, type ScheduleWriteCaller } from '../schedule/write.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { recordFailure } from '../datapackage/store.js';
 import { readPointer } from '../datapackage/version-audience.js';
 import { logger } from '../../utils/logger.js';

@@ -23,7 +23,7 @@
  */
 import type { ConsentRecord, Storage } from '../../storage/interface.js';
 import { bare } from './contract.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { sendMail } from '../mail-gate.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';

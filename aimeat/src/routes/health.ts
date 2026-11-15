@@ -26,7 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
 import { success, error } from '../middleware/envelope.js';
-import { nodePhase } from '../services/node-lifecycle.js';
+import { nodePhase } from '../services/node/lifecycle.js';
 import { getSiteSyncState } from '../services/site-sync.js';
 import { logger } from '../utils/logger.js';
 import { runningBuild } from '../utils/build-stamp.js';

@@ -29,7 +29,7 @@
       "count": 1,
       "reason": "openapi.yaml read once per process; every process reads the same file and builds the same route capabilities."
     },
-    "src/services/node-capabilities.ts :: let :: allCache": {
+    "src/services/node/capabilities.ts :: let :: allCache": {
       "count": 1,
       "reason": "The tool catalog and openapi.yaml read once per process; every process builds the same list."
     },
@@ -1101,27 +1101,27 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/node-capabilities.ts :: let :: cache": {
+    "src/services/node/capabilities.ts :: let :: cache": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/node-context.ts :: let :: context": {
+    "src/services/node/context.ts :: let :: context": {
       "count": 1,
       "reason": "The services this process runs (scheduler, mail transport, AI job queue, workflow engine, connector tunnel sockets); each process makes its own at boot. It replaces the five getActive* handles, which were five entries here (codebase analysis 2026-11-03, D-i)."
     },
-    "src/services/node-lifecycle.ts :: let :: phase": {
+    "src/services/node/lifecycle.ts :: let :: phase": {
       "count": 1,
       "reason": "Each process answers its own readiness; nothing to share."
     },
-    "src/services/node-lifecycle.ts :: set :: drainableStreams": {
+    "src/services/node/lifecycle.ts :: set :: drainableStreams": {
       "count": 1,
       "reason": "The open live streams of this process, ended when this process drains; another process holds its own."
     },
-    "src/services/node-update-check.ts :: let :: cached": {
+    "src/services/node/update-check.ts :: let :: cached": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/node-update-check.ts :: let :: inflight": {
+    "src/services/node/update-check.ts :: let :: inflight": {
       "count": 1,
       "reason": "DEBT"
     },

@@ -9,7 +9,7 @@
  *   take and should not start taking for one tool. `registerCapabilitiesTools` already gets
  *   `getToken` for the same reason, and this follows it.
  *
- *   The call runs as the CALLER: services/node-invoke.ts dispatches over loopback with this bearer
+ *   The call runs as the CALLER: services/node/invoke.ts dispatches over loopback with this bearer
  *   through the node's real routes, so this tool can do exactly what its caller can do and nothing
  *   more. That is also why there is no scope on it — the scope that matters belongs to whatever it
  *   dispatches to, and is checked there.
@@ -25,7 +25,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
-import { invokeNodeCapability } from '../services/node-invoke.js';
+import { invokeNodeCapability } from '../services/node/invoke.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';

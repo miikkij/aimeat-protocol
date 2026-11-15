@@ -48,7 +48,7 @@ import { slugOf, sameApp, accountOf, updateAppRecord } from './members.js';
 import { approveMember, appStem } from './member-approve.js';
 import { appMemberInviteEmail, type NoticeLang } from './member-notices.js';
 import { inviteEmailHash } from '../invitations.js';
-import { nodeContext } from '../node-context.js';
+import { nodeContext } from '../node/context.js';
 import { sendMail, type AccountTurnTaken } from '../mail-gate.js';
 import { mintAppInviteLink, cancelAppInviteLinks } from './invite-link.js';
 import type { AimeatConfig } from '../../config.js';

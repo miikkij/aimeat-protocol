@@ -174,7 +174,7 @@ async function httpPhase(): Promise<Seeded> {
     }
     process.stdout.write('\n');
     // A heavy account's home is the finished one: a live agent (the workers above are new, which
-    // counts) and the hello-from-MCP proof (services/node-resident-agent.ts hasHelloMcpProof).
+    // counts) and the hello-from-MCP proof (services/node/resident-agent.ts hasHelloMcpProof).
     // Without it the Home shows the onboarding layout and none of the blocks a real account loads.
     await api('/v1/memory', owner.token, 'POST', {
         key: 'onboarding.hello_mcp', value: { at: new Date().toISOString(), client: 'perf-seed' }, visibility: 'private',

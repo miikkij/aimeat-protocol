@@ -138,7 +138,7 @@ import { markStopped } from './restart.js';
 import { reclaimJobs, ADOPT_MS, type ReclaimDeps } from './reclaim.js';
 import { runGate, stillHeld } from './run-gate.js';
 import { processLeaseReady, thisProcess } from '../process-lease.js';
-import { provideNodeService } from '../node-context.js';
+import { provideNodeService } from '../node/context.js';
 import { emitAiJobCancel, onAiJobCancelEvent, isRemoteEvent, type AiJobCancelEvent } from '../event-bus.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
@@ -882,7 +882,7 @@ export class AiJobService implements AiJobStarter {
 }
 
 /**
- * The node's running service is `nodeContext().aiJobs` (services/node-context.ts), set once during
+ * The node's running service is `nodeContext().aiJobs` (services/node/context.ts), set once during
  * service init, so surfaces created per request (the MCP server, the sandbox context) reach it. This
  * setter stays for the unit tests that put a test service in its place.
  */

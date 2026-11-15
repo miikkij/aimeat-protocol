@@ -1,5 +1,5 @@
 /**
- * @file src/services/node-update-prompt.ts
+ * @file src/services/node/update-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The prompt an operator copies from the new-version dialog into Claude Code or Codex,

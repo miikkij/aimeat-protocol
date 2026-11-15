@@ -70,7 +70,7 @@ import type { OutboundContactRecord, OutboundContactLink } from '../models/outbo
 import { conversationIdFor } from '../utils/messaging.js';
 import { emitChange } from './event-bus.js';
 import { inviteEmailHash } from './invitations.js';
-import { nodeContext } from './node-context.js';
+import { nodeContext } from './node/context.js';
 import { ensureContact, updateContactCard, sendOutbound, OutboundError } from './outbound/outbound-service.js';
 import { revokeContactHandles } from './contact-handles.js';
 import { parseGaiiLoose, localAccountName, ownerCoordinate } from '../utils/gaii.js';
