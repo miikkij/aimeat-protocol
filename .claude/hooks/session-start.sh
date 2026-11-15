@@ -130,8 +130,9 @@ aimeat_app_tool_invoke; skill `aimeat-dev-session` on the node (aimeat_skill_get
      the open incidents (what is broken on main), the active claims (who holds which area
      and which E2E port), and what the goals your project serves have broken, ruled and asked.
   3. WRITE YOUR OWN CLAIM before editing: claim_open with the project, the area you will
-     touch, the E2E port (a free one in 40251-40499 that no active claim names; pass it to
-     pnpm test:env:init as AIMEAT_E2E_PORT), your intent, and the session id printed above.
+     touch, the E2E port (a free one in 40251-40499 that no active claim names; apply it with
+     AIMEAT_E2E_PORT=<port> pnpm test:env:init --force, because the worktree already has its
+     env files), your intent, and the session id printed above.
      A claim without a project is refused. A claim written afterwards protected nobody.
   4. Heartbeat it at least hourly (claim_heartbeat), and whenever the area changes. Three
      hours old reads as stale to everyone else.

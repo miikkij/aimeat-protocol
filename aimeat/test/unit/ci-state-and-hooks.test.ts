@@ -20,6 +20,9 @@
  *   v1.0.0 -- 2026-10-16 -- Initial (QA audit W07, W09).
  *   v1.1.0 -- 2026-11-15 -- AIMEAT_SESSION marks an agent session; the session-start ritual names the
  *     project and the port range.
+ *   v1.2.0 -- 2026-11-15 -- The hooks run in findBash()'s bash (Git Bash on Windows), not the first
+ *     `bash` on PATH, which from PowerShell is WSL's; the tests skip with a reason when none is
+ *     found. The ritual must name `pnpm test:env:init --force`.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -27,6 +30,15 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findBash } from '../../scripts/agent-session.mjs';
+
+// The hooks run in the bash that `pnpm agent:start` uses: on Windows that is Git Bash, found from
+// git itself. The first `bash` on PATH from PowerShell is C:\Windows\System32\bash.exe, the WSL
+// launcher, which runs the hook in a Linux distribution with another git and mangled paths, so 8
+// of these tests failed there for a reason that was never in the hooks.
+const BASH = findBash();
+const NO_BASH = !BASH;
+if (NO_BASH) console.warn('[ci-state-and-hooks] skipping the hook tests: no Git Bash found. Install Git for Windows or set AIMEAT_BASH to a bash.exe; the WSL bash on PATH is not used.');
 
 const AIMEAT = fileURLToPath(new URL('../..', import.meta.url));
 const REPO = join(AIMEAT, '..');
@@ -71,7 +83,7 @@ function env(fixtureFile: string, extra: Record<string, string> = {}): NodeJS.Pr
 }
 
 const sessionStart = (cwd: string, e: NodeJS.ProcessEnv) =>
-    execFileSync('bash', [SESSION_START], { cwd, env: e, encoding: 'utf8', input: '', timeout: 30_000 });
+    execFileSync(BASH as string, [SESSION_START],{ cwd, env: e, encoding: 'utf8', input: '', timeout: 30_000 });
 
 function gitRepo(dir: string): (...a: string[]) => string {
     mkdirSync(dir, { recursive: true });
@@ -83,7 +95,7 @@ function gitRepo(dir: string): (...a: string[]) => string {
     return git;
 }
 
-describe('the session-start hook says what CI on main says', { timeout: 90_000 }, () => {
+describe.skipIf(NO_BASH)('the session-start hook says what CI on main says', { timeout: 90_000 }, () => {
     it('prints a red CI run with its streak and failed job, and the nightly state', () => {
         const out = sessionStart(REPO, env(RED));
         expect(out).toMatch(/CI on main: RED \(ccccccccc, 2026-10-16 10:00 UTC\), 2 run\(s\) in a row since 2026-10-16 09:00 UTC; failed: unit/);
@@ -113,7 +125,7 @@ describe('the session-start hook says what CI on main says', { timeout: 90_000 }
     });
 });
 
-describe('the session-start hook says whether the git hooks are on', { timeout: 90_000 }, () => {
+describe.skipIf(NO_BASH)('the session-start hook says whether the git hooks are on', { timeout: 90_000 }, () => {
     it('OFF on a clone without core.hooksPath, ON once it names .githooks', () => {
         const dir = join(scratch, 'hooks-state');
         const git = gitRepo(dir);
@@ -123,7 +135,7 @@ describe('the session-start hook says whether the git hooks are on', { timeout: 
     });
 });
 
-describe('the session-start ritual is the Lifecycle Central flow', { timeout: 90_000 }, () => {
+describe.skipIf(NO_BASH)('the session-start ritual is the Lifecycle Central flow', { timeout: 90_000 }, () => {
     it('names the session and the project, reads the board with the project, and gives the port range', () => {
         const unnamed = sessionStart(REPO, env(OFFLINE));
         expect(unnamed).toContain('Project: NOT SET');
@@ -132,6 +144,8 @@ describe('the session-start ritual is the Lifecycle Central flow', { timeout: 90
         expect(named).toContain('Project: aimeat-protocol');
         expect(named).toContain('board_read');
         expect(named).toContain('40251-40499');
+        // The worktree hook already wrote the env files; without --force the claimed port is never applied.
+        expect(named).toContain('pnpm test:env:init --force');
         // The workspace ids belong to the skill, which can move them; the hook names none.
         expect(named).not.toMatch(/ws-[a-z0-9]{11}/);
     });
@@ -145,18 +159,18 @@ describe('an agent other than Claude Code is a session when AIMEAT_SESSION is se
     const prepare = (extra: Record<string, string>) => {
         const msg = join(dir, `msg-${Math.random().toString(36).slice(2)}.txt`);
         writeFileSync(msg, 'fix(x): a subject\n');
-        const r = spawnSync('bash', [PREPARE, msg, 'message'], { cwd: dir, env: env(OFFLINE, extra), encoding: 'utf8' });
+        const r = spawnSync(BASH as string, [PREPARE, msg, 'message'], { cwd: dir, env: env(OFFLINE, extra), encoding: 'utf8' });
         return { status: r.status, stderr: r.stderr, text: readFileSync(msg, 'utf8') };
     };
 
-    it('the commit hook stamps its Session: and Project: trailers', () => {
+    it.skipIf(NO_BASH)('the commit hook stamps its Session: and Project: trailers', () => {
         const r = prepare({ AIMEAT_SESSION: 'cx-alice-fix', AIMEAT_PROJECT: 'aimeat-protocol' });
         expect(r.status).toBe(0);
         expect(r.text).toContain('Session: cx-alice-fix');
         expect(r.text).toContain('Project: aimeat-protocol');
     });
 
-    it('the developer\'s own commit is neither stamped nor refused', () => {
+    it.skipIf(NO_BASH)('the developer\'s own commit is neither stamped nor refused', () => {
         const r = prepare({});
         expect(r.status).toBe(0);
         expect(r.text).not.toContain('Session:');
@@ -227,7 +241,7 @@ describe('a push on top of a red CI needs a named reason', { timeout: 90_000 }, 
     });
 });
 
-describe('a worktree made by the WorktreeCreate hook runs the git hooks', { timeout: 90_000 }, () => {
+describe.skipIf(NO_BASH)('a worktree made by the WorktreeCreate hook runs the git hooks', { timeout: 90_000 }, () => {
     it('the first commit in the new worktree runs pre-commit', () => {
         const origin = join(scratch, 'origin');
         const og = gitRepo(origin);
@@ -243,7 +257,7 @@ describe('a worktree made by the WorktreeCreate hook runs the git hooks', { time
 
         const clone = join(scratch, 'clone');
         execFileSync('git', ['clone', '-q', origin, clone]);
-        const made = execFileSync('bash', [WORKTREE_CREATE], {
+        const made = execFileSync(BASH as string, [WORKTREE_CREATE], {
             cwd: clone, encoding: 'utf8', timeout: 60_000,
             input: JSON.stringify({ name: 'cc-test-hooks', cwd: clone }),
             env: { ...process.env, AIMEAT_WORKTREE_HOOK_SKIP_INSTALL: '1' },

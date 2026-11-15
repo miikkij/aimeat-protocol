@@ -13,8 +13,10 @@ its members, its apps, organisms, customers or projects, a data map copied from 
 its compliance register. Write a fix found on such a node in general words in code, tests and
 commit messages ("an organisation node", "an app that keeps colleagues' ratings"). Fixtures use
 invented names (alice, bob, carol). The `commit-msg` and `pre-push` hooks refuse a term from that
-node's lists, and refuse your commit outright when the list is missing on the machine
-(`node aimeat/scripts/check-private-terms.mjs --where` says where it is). Push `main` only.
+node's lists. Once `AIMEAT_SESSION` is exported, they also refuse your commit when the list is
+missing on the machine (`node aimeat/scripts/check-private-terms.mjs --where` says where it is).
+An outside contributor holds no such names: point `AIMEAT_PRIVATE_TERMS` at an empty file of your
+own, as `CONTRIBUTING.md` says. Push `main` only.
 
 ## The rules that bite first
 
@@ -114,16 +116,16 @@ node's lists, and refuse your commit outright when the list is missing on the ma
   nightly state, and the board to read before the first edit. Claude Code runs it by itself; you
   run it. On Windows the hooks run in Git Bash, which the command finds from git itself; the
   `bash` in `C:\Windows\System32` is WSL and is never used. `AIMEAT_BASH` names another bash.
-- Every session works in its own git worktree under `.worktrees/`, never in the main checkout.
-  `pnpm agent:worktree <name>` makes it the way Claude Code's WorktreeCreate hook does:
-  `.worktrees/<name>` at `origin/main`, its own `pnpm install`, `pnpm test:env:init` and the git
-  hooks on. Then work from that folder. Never copy `.env.test.*` by hand: the
-  examples name one port and one database for everybody, and the test runner empties that
-  database between suites, so two sessions testing at once wipe each other.
+- Every session works in its own git worktree, never in the main checkout: `pnpm agent:worktree
+  <name>` makes it the way Claude Code's WorktreeCreate hook does. Never copy `.env.test.*` by
+  hand: the examples name one port and one database, and the runner empties that database between
+  suites, so two sessions testing at once wipe each other.
 - Coordination lives on aimeat.io, not in chat. Export the session and the project in the shell
   that commits (`AIMEAT_SESSION=<tool>-<owner>-<tag>`, `AIMEAT_PROJECT=aimeat-protocol`), read the
   Lifecycle Central board with your project (`board_read { project }`), and claim the paths and the
-  E2E port before you edit (a free port in 40251-40499 that no active claim names). Skill
+  E2E port before you edit (a free port in 40251-40499 that no active claim names). Apply that
+  port with `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force` from `aimeat/`: the worktree
+  already has its env files, and without `--force` the script keeps them and the old port. Skill
   `aimeat-dev-session` on the node has the ritual. With `AIMEAT_SESSION` set, the git hooks treat
   you as a session: they stamp the `Session:` and `Project:` trailers and hold your commits and
   pushes to the session rules below.

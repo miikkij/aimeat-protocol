@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The day's morsels: once per person per day, to the person and never per agent, with a
  *   ledger row every time. Morsels accrue to the human on their own, idle or not, and an agent's
- *   balance is always 0 (CLAUDE.md, Identity). Both doors that add the day's morsels call this: the
+ *   balance is always 0 (docs/coding-guidelines/identity-model.md, "Morsel pacing"). Both doors that add the day's morsels call this: the
  *   daily job and POST /v1/wallet/request.
  *
  *   WHAT IT REPLACED (feature-list audit 135). The daily job credited once per AGENT, and a credit
@@ -20,6 +20,8 @@
  *   runDailyAllowance(storage, config)
  * @usage const { credited, already } = await grantDailyAllowance(storage, config, ghii);
  * @version-history
+ *   v1.0.2 — 2026-11-15 — The morsel rule is cited where it is now (identity-model.md); CLAUDE.md
+ *     no longer holds it. Comment only.
  *   v1.0.1 — 2026-10-25 — One person's grants run one at a time, so overlapping requests credit the
  *     day once (secaudit2026oct22).
  *   v1.0.0 — 2026-10-15 — Initial (feature-list audit 135).

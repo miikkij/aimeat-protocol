@@ -12,6 +12,8 @@
  * @usage Prepended to the `test:e2e:*` package scripts (mirrors how `pnpm dev` prepends kill-port.ts).
  *   Override the port with AIMEAT_TEST_PORT. Best-effort: every failure is swallowed.
  * @version-history
+ *   v1.1.1 — 2026-11-15 — The stop message names `--force`, without which test-env-init keeps the
+ *     existing env files and the new port is never applied.
  *   v1.1.0 — 2026-10-11 — Also clears the session's own lane ports, which are now computed from
  *     its base port and so belong to it alone (lib/e2e-ports.ts). Stops, and stops nothing, when
  *     the base port is held by a run in progress: two worktree names can hash to one port, and
@@ -105,7 +107,7 @@ if (running) {
   console.error(`\n  STOP: port ${port} is the base port of a test run in progress: ${running.session}`
     + `${running.worktree ? ` in ${running.worktree}` : ''} (pid ${running.pid}, since ${running.at}).`
     + `\n  Nothing was stopped. Wait for that run, or give this worktree a port of its own:`
-    + `\n    AIMEAT_E2E_PORT=<port> pnpm test:env:init   (40251 to 40499, one no claim on the board names)\n`);
+    + `\n    AIMEAT_E2E_PORT=<port> pnpm test:env:init --force   (40251 to 40499, one no claim on the board names)\n`);
   process.exit(1);
 }
 

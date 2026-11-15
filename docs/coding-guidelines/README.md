@@ -36,8 +36,8 @@ coordination their own sessions follow.
 ## Verification
 
 Use a private `pnpm sandbox` for interactive checks. Initialize the checkout's own
-test environment with `pnpm test:env:init` (a maintainer session passes the port
-from its claim as `AIMEAT_E2E_PORT`).
+test environment with `pnpm test:env:init` (a maintainer session applies the port
+from its claim with `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force`).
 
 Run the targeted suites the change requires and `pnpm gate` once on the finished
 change. A green gate is what "done" needs; do not wait for GitHub CI. The full E2E

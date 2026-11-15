@@ -48,6 +48,8 @@
  *   const held = await acquirePortLocks(suiteOwnPorts(src, lanePort), { suite, session });
  *   try { await run(); } finally { releasePortLocks(held); }
  * @version-history
+ *   v1.1.1 — 2026-11-15 — The base-port refusal names `--force`: a worktree already has its env
+ *     files, and without it test-env-init keeps them and the claimed port is never applied.
  *   v1.1.0 — 2026-10-27 — suiteOwnPorts reads 28000-29999: the suites' fixed ports moved there from
  *     40000-41999, the range the claims board hands out, because a claim is not a runner and these
  *     locks never covered it (a claim on 40672 refused e2e-secrets).
@@ -279,7 +281,7 @@ export function holdBasePort(port: number, owner: { session: string; worktree: s
         throw new Error(`Port ${port} is the base port of a test run in progress: ${who}. `
             + (same
                 ? 'That is a run of this same worktree. Wait for it to end, or stop it; two runs on one port and one database destroy each other.'
-                : `Two worktrees have the same test port. Take a free one for this worktree: \`AIMEAT_E2E_PORT=<port> pnpm test:env:init\` (40251 to 40499, and one no claim on the board names).`)
+                : `Two worktrees have the same test port. Take a free one for this worktree: \`AIMEAT_E2E_PORT=<port> pnpm test:env:init --force\` (40251 to 40499, and one no claim on the board names; --force because the env files already exist).`)
             + ` If that run is gone, remove ${dir}.`);
     }
     return () => rmSync(dir, { recursive: true, force: true });

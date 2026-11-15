@@ -26,10 +26,10 @@ pnpm test:env:init      # writes .env.test.sqlite and .env.test.postgres-kysely 
 pnpm codeql:install     # once per machine: pnpm gate needs CodeQL for one of its checks
 ```
 
-`pnpm test:env:init` writes the test settings from the committed `*.example` files with a port
-and a Postgres database name of this checkout's own. Do not copy the example files by hand: they
-all name the same port and database, and the test runner empties that database between suites.
-When no PostgreSQL server is running, the command says so and the SQLite file still works.
+Do not copy the example test settings by hand: they all name the same port and database, and the
+test runner empties that database between suites. For a second working copy of the same clone,
+`pnpm agent:worktree <name>` makes a worktree with settings of its own. When no PostgreSQL server
+is running, `pnpm test:env:init` says so and the SQLite file still works.
 
 The root `package.json` holds the commands people run most, and most of them run the script of
 the same name in `aimeat/`. Every other script of the node runs from the root with

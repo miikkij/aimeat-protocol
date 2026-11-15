@@ -64,7 +64,9 @@ pnpm test:env:init
 This creates `.env.test.sqlite` and `.env.test.postgres-kysely` with a port derived from the
 checkout's folder name and a Postgres database of its own. Test runners empty their database, so
 copying another checkout's configuration can erase its test data. A maintainer session passes the
-port from its Lifecycle Central claim instead: `AIMEAT_E2E_PORT=<port> pnpm test:env:init`.
+port from its Lifecycle Central claim instead: `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force`
+(40251 to 40499; any other port is refused). `--force` is needed because the worktree already has
+the files, and without it the script keeps them and the old port.
 
 ## Personal-node hosting settings
 

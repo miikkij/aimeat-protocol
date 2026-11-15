@@ -109,7 +109,7 @@ Git: **every session works in its own worktree, and starts or moves into it thro
 
 ## Ask the developer first
 
-Release tags and CI builds. When he asks for a release, the full test run its release check needs is part of that request, not a new question: start it with `pnpm nightly:preflight --dispatch`; the tag and the publish stay his. New entries in `docs/known_gaps.md`. Publishing roadmap items or rulings, not dev notes. Entries in `aimeat/public/changelog.json` (platform work only): ask at the end of every feature, with the proposed entry (→ `feature-documentation.md`).
+Release tags and CI builds. When he asks for a release, the full test run its release check needs is part of that request, not a new question: start it with `pnpm nightly:preflight --dispatch`; the tag and the publish stay his. New entries in `docs/known_gaps.md`. Publishing roadmap items or rulings, not dev notes. Changelog entries (when and how to ask: `feature-documentation.md`, row 6).
 
 **What Jouni wants built next lives on the node, not in this repo or in any one session.** Organism **AIMEAT CODING CENTRAL** (`da438a5f-609b-41e5-ad9f-8dd2cc76cbe1`), workspace **wish bucket** (`ws-mtemu9rieuk`): one `wish` record per thing he asked for, in his words, and a `brief` document when it needs more than a paragraph. A wish is born in a **shared goal** and gets its **project** when someone takes it to build; until then it sits in the goal's "no project yet" column on the Tavoitteet door of Lifecycle Central, which is the question "who builds?". When he says "teeppä X" and X is not on the screen, read the bucket before building; when he asks for something new, write it there first (the `wish_add` tool, with `goals`) and give him the id. Skill `user:happydude500001/aimeat-wish-bucket` (`aimeat_skill_get`) carries the flows and the record's fields; the workspace readme is the process.
 
@@ -158,7 +158,7 @@ Name the pass-criterion before accepting a checkpoint, then verify against that 
 
 ## Identity
 
-Three principal types: a person (GHII, `alice@node-id`), who owns everything and sees and can remove every agent; an AI agent (GAII, `claude#alice@node-id`) with scoped permissions; and an ecosystem app (GEAI, `eco:drum-news#alice@node-id`), consented like an agent. **A morsel is a pacer, not a currency and not a credit**: it paces what agents may push into the store so that what lands is refined, it buys nothing, and it belongs to the human in whose name an agent acts. The code detail is in `security.md` and `docs/coding-guidelines/identity-model.md`.
+Three principal types: a person (GHII, `alice@node-id`), who owns everything and sees and can remove every agent; an AI agent (GAII, `claude#alice@node-id`) with scoped permissions, which may approve another agent of the same owner; and an ecosystem app (GEAI, `eco:drum-news#alice@node-id`), consented like an agent. **A morsel is a pacer, not a currency and not a credit**: it paces what agents may push into the store so that what lands is refined, it buys nothing, and it belongs to the human in whose name an agent acts. The code detail is in `security.md` and `docs/coding-guidelines/identity-model.md`.
 
 ## Commands
 

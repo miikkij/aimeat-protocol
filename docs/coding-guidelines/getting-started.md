@@ -17,12 +17,12 @@ pnpm test:env:init      # this checkout's .env.test.sqlite and .env.test.postgre
 pnpm codeql:install     # once per machine: one check in pnpm gate needs CodeQL
 ```
 
-`pnpm test:env:init` writes the test settings from the committed `*.example` files, with a port
-derived from the checkout's folder name and a Postgres database of its own, and creates that
-database when PostgreSQL is running. Never copy the example files by hand: they all name one port
-and one database, and the test runner empties that database between suites, so two checkouts
-that share it wipe each other's runs. `AIMEAT_E2E_PORT=<port> pnpm test:env:init` takes an
-explicit port (40251 to 40499); `--force` rewrites existing files.
+`pnpm test:env:init` writes the test settings with a port and a Postgres database of this
+checkout's own. Never copy the example files by hand: they all name one port and one database, and
+the test runner empties that database between suites, so two checkouts that share it wipe each
+other's runs. `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force` takes an explicit port: 40251 to
+40499, and the script refuses any other. Without `--force`, a checkout that already has the files
+keeps them and its old port.
 
 [CONTRIBUTING.md](../../CONTRIBUTING.md) is the same path for an outside contributor, through to
 the pull request.
@@ -67,14 +67,12 @@ The maintainers' Claude Code sessions add a coordination ritual on top of the se
 described in [CLAUDE.md](../../CLAUDE.md) and in the `aimeat-dev-session` skill on the node, and in
 short:
 
-- Every session works in its own worktree under `.worktrees/`, created by `claude --worktree
-  cc-<owner>-<tag>` or the `EnterWorktree` tool. The `WorktreeCreate` hook
-  (`.claude/hooks/worktree-create.sh`) runs the setup above in it. The main checkout belongs to the
-  developer.
+- Every session works in its own worktree, made by the `WorktreeCreate` hook in Claude Code or by
+  `pnpm agent:worktree <name>` elsewhere. The main checkout belongs to the developer.
 - The session sets `AIMEAT_SESSION` and `AIMEAT_PROJECT`, which the hooks stamp on each commit as
   `Session:` and `Project:` trailers.
 - Before editing, the session reads the Lifecycle Central board and claims the paths and the E2E
-  port it will use, and passes that port to `pnpm test:env:init` as `AIMEAT_E2E_PORT`.
+  port it will use, and applies that port with `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force`.
 
 ## See a change locally
 
