@@ -1,6 +1,6 @@
 # 14 Compliance mapping
 
-> Checked against AIMEAT node 4.3.1 (commit f25c4a828) on 2026-11-14. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 41f69d7e4) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the DPO, the compliance officer and the auditor. It maps GDPR, the EU AI Act, ISO/IEC 27001:2022 Annex A and NIS2 Article 21 to what the AIMEAT node does, and says what stays with the organisation. AIMEAT is not certified, and the repository holds no external audit or attestation. "Yes" below means the node has the mechanism; it never means the organisation is compliant by running it. The node's own compliance features say the same: every risk or framework verdict is served with a not-legal-advice note (`aimeat/src/data/compliance-questionnaire.ts`).
 
@@ -73,7 +73,7 @@ Controls the node touches ([ISO/IEC 27001:2022](https://www.iso.org/standard/270
 | 8.12 Data leakage prevention | partial | classification exits, AI provider allowlist and type list, egress guard on server-side fetches ([06 AI and models](06-ai-and-models.md)) | network egress control |
 | 8.13 Information backup | no | the node makes no backups ([Backup and restore](../operations/backup-and-restore.md)) | back up database, `.env` and key file; test restores |
 | 8.15 Logging | partial | account events, classification audit, consent audit, AI usage, provenance, security incidents (`aimeat/src/services/security-incident.ts`, [10 Logging and monitoring](10-logging-monitoring.md)) | central log collection and retention |
-| 8.16 Monitoring activities | partial | metrics endpoint (`aimeat/src/middleware/metrics.ts`, `AIMEAT_METRICS_ACCESS`), admin Security page ([Observability guide](../../aimeat/docs/observability-guide.md)) | SIEM, alerting |
+| 8.16 Monitoring activities | partial | metrics endpoint (`aimeat/src/middleware/metrics.ts`, `AIMEAT_METRICS_ACCESS`), admin Security page ([Observability guide](../../aimeat/docs/observability-guide.md)), security events pushed to a SIEM (`aimeat/src/services/siem-export.ts`, [SIEM and Wazuh](../operations/siem-wazuh.md)) | the SIEM itself, alerting |
 | 8.24 Use of cryptography | partial | AES-256-GCM for secrets (`aimeat/src/services/encryption.ts`), Ed25519 signatures for federation and tokens (`aimeat/src/auth/node-keys.ts`) | TLS, key custody, disk encryption |
 | 8.25 Secure development life cycle | partial | security invariants ([Security DNA](../coding-guidelines/security-development-dna.md)), gates before merge | own acceptance of releases |
 | 8.26 Application security requirements | partial | [Threat model](../security/threat-model.md), [Verification matrix](../security/verification-matrix.md) | requirements for the organisation's apps on the node |

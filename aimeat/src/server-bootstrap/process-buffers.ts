@@ -18,6 +18,7 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-11-15 — configureSiem: security events to the organisation's monitoring (team setup T10).
  *   2026-11-04 — The running AI job service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveAiJobService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The cache listener's rule moves to services/cache-invalidation.ts, where a memory
@@ -54,6 +55,7 @@ import { dropCachesForChange } from '../services/cache-invalidation.js';
 import { runAsNode } from '../utils/gaii.js';
 import { initStats } from '../services/stats.js';
 import { configureAuthAudit } from '../services/auth-audit.js';
+import { configureSiem } from '../services/siem-export.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { bindUsageSettings } from '../services/usage/usage-settings.js';
@@ -81,6 +83,9 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // The refusal log. Wired before any route exists, because the first thing a node does on a public
   // address is refuse somebody, and the point of this file is that those refusals are not lost.
   configureAuthAudit(config);
+  // The same refusals, and the other security events, to the organisation's monitoring when the
+  // operator named a syslog or OTLP target (services/siem-export.ts).
+  configureSiem(config);
 
   // In-memory accumulator for high-frequency agent signals (telemetry + heartbeat),
   // flushed to storage on an interval instead of per request.

@@ -80,6 +80,7 @@ import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input
 import { fencedSpaceRefusal } from '../../services/fenced-space.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
 import { isTeamGateAction } from '../../services/team/action-gate.js';
+import { siemEmit } from '../../services/siem-export.js';
 
 /**
  * The policy for an action in a workspace: the workspace manifest's autonomy when it sets one, else the
@@ -567,6 +568,10 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const updated = await storage.updatePendingApproval(aid, updates);
     const verb = d === 'approve' ? 'approved' : d === 'reject' ? 'rejected' : 'edited & approved';
     await writeDecision(id, decider, `${verb} gate: ${approval.action}`, [aid]);
+    // A team's approval decided by a lead goes to the organisation's monitoring (services/siem-export.ts, T10).
+    if (isTeamGateAction(approval.action)) {
+      siemEmit('team', { approval_id: aid, organism_id: id, action: approval.action, actor: approval.actor, status: newStatus, decided_by: decider });
+    }
 
     res.json(success(config.nodeId, { approval: updated, decision: d }, [
       { description: 'View the decision log', method: 'GET', url: `/v1/organisms/${id}/workspace` },

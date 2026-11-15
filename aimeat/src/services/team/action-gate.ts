@@ -38,6 +38,7 @@ import type { AimeatConfig } from '../../config.js';
 import { isOwnerInPerson, parseGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { readWorkplace } from '../agent/ties.js';
 import { emitChange } from '../event-bus.js';
+import { siemEmit } from '../siem-export.js';
 import { readTeamRecord, teamGateOn, teamDisplayName } from './record.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -117,6 +118,7 @@ async function gateIn(deps: Deps, caller: TeamGateCaller, orgId: string, kind: T
         };
         await storage.createPendingApproval(record);
         emitChange('organisms');
+        siemEmit('team', { approval_id: id, organism_id: orgId, action, actor: caller.principal, status: 'pending', summary: summary.slice(0, 200) });
     }
     return {
         status: 403, code: 'TEAM_APPROVAL_REQUIRED',

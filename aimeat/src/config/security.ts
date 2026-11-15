@@ -74,6 +74,14 @@ export interface SecurityDoorConfig {
   /** Byte ceiling before the refusal log rotates (one generation kept). AIMEAT_AUTH_LOG_MAX_BYTES. */
   authLogMaxBytes: number;
 
+  // ── Export to the organisation's monitoring (services/siem-export.ts) ──
+  /** Syslog target for security events, `udp://host:port` or `tcp://host:port`; empty sends nothing. AIMEAT_SIEM_SYSLOG. */
+  siemSyslog: string;
+  /** OTLP/HTTP logs endpoint (e.g. https://collector:4318/v1/logs); empty sends nothing. AIMEAT_SIEM_OTLP_URL. */
+  siemOtlpUrl: string;
+  /** Which kinds go out: refusal, operator, incident, team, trail. Empty: every kind but trail. AIMEAT_SIEM_EVENTS. */
+  siemEvents: string;
+
   // ── Credential-door tarpit (per IP, growing with each refusal) ──
   loginTarpitEnabled: boolean;
   /** Refusals that cost nothing, so a mistyped password is not punished. */
@@ -172,6 +180,9 @@ export function securityDoorDefaults(): SecurityDoorConfig {
   return {
     authLogPath: process.env.AIMEAT_AUTH_LOG_PATH ?? './data/auth-failures.log',
     authLogMaxBytes: parseInt(process.env.AIMEAT_AUTH_LOG_MAX_BYTES ?? '5242880', 10),
+    siemSyslog: process.env.AIMEAT_SIEM_SYSLOG ?? '',
+    siemOtlpUrl: process.env.AIMEAT_SIEM_OTLP_URL ?? '',
+    siemEvents: process.env.AIMEAT_SIEM_EVENTS ?? '',
     loginTarpitEnabled: process.env.AIMEAT_LOGIN_TARPIT_ENABLED !== 'false',
     loginTarpitFreeFailures: parseInt(process.env.AIMEAT_LOGIN_TARPIT_FREE ?? '2', 10),
     loginTarpitStepMs: parseInt(process.env.AIMEAT_LOGIN_TARPIT_STEP_MS ?? '4000', 10),

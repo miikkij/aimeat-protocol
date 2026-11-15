@@ -119,7 +119,6 @@ What the repository does not answer. Each one names who can answer it; most are 
 
 ### [10 Logging and monitoring](10-logging-monitoring.md)
 
-- OPEN: Is a push export of the usage trail and operator actions (syslog, OTLP or a webhook stream) planned? (the maintainer named in `.github/SECURITY.md`)
 - OPEN: Are human (non-AI) reads of Confidential content recorded anywhere the operator can export? (the maintainer)
 - OPEN: How long does the account event archive keep entries, and does an account erasure remove them? (the maintainer)
 

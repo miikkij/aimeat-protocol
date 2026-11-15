@@ -1,6 +1,6 @@
 # 10 Logging and monitoring
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 41f69d7e4) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the sysadmin and the SOC that must watch a node. It lists what the node records, where each record lives and how long it is kept, what the process log looks like and what it masks, how to get the records into a SIEM, which health and metrics endpoints exist, what to alert on, and which compliance reports the node keeps. The operator's own monitoring guide is [aimeat/docs/observability-guide.md](../../aimeat/docs/observability-guide.md); health checks are in [Production deployment](../operations/production-deployment.md#health-checks).
 
@@ -53,7 +53,17 @@ Records in the database are in every database backup, so the backup retention in
 
 ## Export to a SIEM
 
-The node has no syslog, OTLP or SIEM-specific exporter; a search of the node source found none. What exists to build an export on:
+The node pushes its security events to your SIEM as they happen, as syslog lines (RFC 5424 over UDP or TCP, facility 13 log audit) to `AIMEAT_SIEM_SYSLOG` and as OTLP log records (JSON over HTTP) to `AIMEAT_SIEM_OTLP_URL`. Both are off while empty, and both can be changed on the admin Config page without a restart (`aimeat/src/services/siem-export.ts`). An event carries names, codes, routes and ids, never a record's content and never a credential (a refusal carries the same truncated digest as the refusal log). A collector that is down never slows or refuses a request: the events are dropped and the process log warns once. A Wazuh decoder and rules for the syslog stream are in [SIEM and Wazuh](../operations/siem-wazuh.md).
+
+| Kind (`AIMEAT_SIEM_EVENTS`) | One event per | Default |
+|---|---|---|
+| `refusal` | 401 and 403 the node answered, and a wrong reset code: the refusal log line | on |
+| `operator` | operator act on the node (a setting changed) or in a person's account (data read, deleted, exported) | on |
+| `incident` | security incident opened (category, code, actor, whether evidence was kept) | on |
+| `team` | a team's approval gate holding an AI's delete, send or payment, and a lead's decision | on |
+| `trail` | MCP tool call and authenticated REST change (who, what, outcome) | off: name it to send it |
+
+Other sources to collect from:
 
 | Source | How to collect | Notes |
 |---|---|---|
@@ -113,13 +123,12 @@ The compliance register and records of processing are described in [Data classif
 - The consent audit and the classification audit wait in memory for up to one second before they are written. A stop of the node (a deploy, SIGTERM) writes them first; a process that ends without stopping (a kill, a crash) loses at most that last second. A failed database write is tried again every 60 s.
 - Rate limit hits are counters only; there is no per-hit log line that names the caller.
 - Allowed reads of records are not audited by the consent audit. The classification audit records shows and uses only for labels with audit on, and only while classification is on (off by default).
-- Every record listed is stored on the node itself, where an operator with host or database access can change it. Tamper resistance needs an export to a store outside the operator's reach.
+- Every record listed is stored on the node itself, where an operator with host or database access can change it. Tamper resistance needs an export to a store outside the operator's reach: the SIEM export above, sent to a SIEM the node's operator does not administer.
 - No scheduled job deletes usage rows, so watch their growth. The operator deletes archived rows before a chosen date with `POST /v1/admin/usage/archive/prune` (`aimeat/src/routes/admin/usage.ts`). When to do that is the organisation's decision.
 - `/v1/health` answers 200 when degraded; a check that reads only the status code misses it. `/v1/health/ready` answers 503 instead, but it checks only that the process takes requests and reaches its database.
 - No job was found that prunes kept compliance reports; they accumulate.
 
 ## Open questions
 
-- OPEN: Is a push export of the usage trail and operator actions (syslog, OTLP or a webhook stream) planned? (the maintainer named in `.github/SECURITY.md`)
 - OPEN: Are human (non-AI) reads of Confidential content recorded anywhere the operator can export? (the maintainer)
 - OPEN: How long does the account event archive keep entries, and does an account erasure remove them? (the maintainer)

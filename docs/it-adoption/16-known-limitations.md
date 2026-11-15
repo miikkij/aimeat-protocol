@@ -1,6 +1,6 @@
 # 16 Known limitations
 
-> Checked against AIMEAT node 4.3.1 (commit 667811fb8) on 2026-11-14. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 41f69d7e4) on 2026-11-15. Maintained with the code: see the README for how.
 
 Every known limitation of AIMEAT in one place, for the IT, security and data protection staff deciding whether to run it. Each row says what the limitation is, what follows from it, what the organisation can do about it, and where it is recorded. A limitation that has a setting is listed with that setting; "off by default" means the protection exists and the organisation must turn it on. The pages of this package carry their own `## Limits`; those the tables do not already carry are in the section "From the other pages" below.
 
@@ -29,7 +29,7 @@ Every known limitation of AIMEAT in one place, for the IT, security and data pro
 | Protections off by default: data classification (`AIMEAT_CLASSIFICATION`), SAML and SCIM (`AIMEAT_SSO_ENABLED`), cookie banner (`AIMEAT_COOKIE_CONSENT_ENABLED`), metrics (`AIMEAT_METRICS_ENABLED`), publish gate (`AIMEAT_PUBLISH_GATE`, code default), email confirmation (`AIMEAT_EMAIL_CONFIRMATION_REQUIRED`) | The node starts without them | Turn on the ones the organisation needs ([00 Go-live checklist](00-go-live-checklist.md)) | `aimeat/.env.example` |
 | Defaults that are open: storage `memory`, registration `open`, content access `open`, indexing `on`, AI provider allowlist empty, extension installs by any owner (`AIMEAT_EXT_INSTALL_ROLE`), statistics `public` in code (`AIMEAT_STATS_ACCESS`), CORS `*` | A node started from defaults loses data at restart and is open to registration and reading | Set each one ([15 Operations runbook, configuration](15-operations-runbook.md#configuration-an-organisation-must-decide)) | `aimeat/src/config.ts`, `aimeat/.env.example` |
 | The Security page's refusal statistics read at most the last megabyte of each of the two generations of a log that rotates at `AIMEAT_AUTH_LOG_MAX_BYTES` (5 MiB by default) | Long-range trends are not available from the node | Ship logs to the organisation's own log store | `aimeat/src/services/security-overview.ts`, `aimeat/src/services/auth-audit.ts`, `aimeat/src/config/security.ts` |
-| The application log goes to standard output only, and the refusal log to a local file (`AIMEAT_AUTH_LOG_PATH`, `./data/auth-failures.log` by default); there is no built-in SIEM or syslog forwarder | Log retention and correlation are the host's job | Collect standard output and the refusal log file with the process manager or a log shipper | `aimeat/src/utils/logger.ts`, `aimeat/src/config/security.ts` |
+| The application log goes to standard output only. Security events go to a syslog or OTLP target when one is set, and a collector that is down loses what arrives meanwhile: nothing is buffered | Log retention and correlation are the host's job; the refusal log file (`AIMEAT_AUTH_LOG_PATH`) is the node's own copy of refusals | Collect standard output with the process manager or a log shipper, and set `AIMEAT_SIEM_SYSLOG` or `AIMEAT_SIEM_OTLP_URL` ([SIEM and Wazuh](../operations/siem-wazuh.md)) | `aimeat/src/utils/logger.ts`, `aimeat/src/services/siem-export.ts` |
 | EUDIW (EU Digital Identity Wallet) verification is blocked at start until holder binding and replay defences are implemented | Wallet-based identity verification is not available | None today | [threat model](../security/threat-model.md#current-limitations), [EUDIW status](../aimeat-eudiw-integration.md) |
 
 ## Identity and sign-in
@@ -156,7 +156,7 @@ carry are below, grouped by topic, each with the page that explains it.
 
 ### Logging and monitoring ([10](10-logging-monitoring.md), [15](15-operations-runbook.md))
 
-- No native syslog, OTLP or SIEM exporter. The usage trail and operator actions reach a SIEM only by polling admin routes.
+- The SIEM export sends events as they happen and keeps no queue across a restart or a collector outage; the usage trail goes out only when `trail` is named in `AIMEAT_SIEM_EVENTS`.
 - The shipped systemd unit does not set `NODE_ENV=production`, so its log is text, not JSON, until the operator adds it.
 - The refusal log keeps one older generation after 5 MiB; under a long attack the oldest refusals are lost. Rate limit hits are counters, with no line naming the caller.
 - Allowed reads are not audited by the consent audit; the classification audit records only labels with audit on, and only while classification is on.

@@ -31,6 +31,8 @@
  *     operatorGhii, actorGaii: operatorGhii, ownerOf: rec.ownerGaii, action: 'read', key: rec.key,
  *   });
  * @version-history
+ *   2026-11-15 — Each of the three acts also goes to the organisation's monitoring as an `operator`
+ *     event (services/siem-export.ts, team setup T10).
  *   2026-10-25 — secaudit2026oct22: action 'export', written by GET /v1/admin/backup once per person
  *     whose entries the backup holds, with their count.
  *   2026-10-16 — recordOperatorAction also writes an info log line; recordOperatorNodeAct(): the usage row
@@ -47,6 +49,7 @@ import { ownerGhiiOf, isValidGHII } from '../utils/gaii.js';
 import { recordUsageCall } from './usage/usage-buffer.js';
 import { recordAccountEvent } from './account-events.js';
 import { logger } from '../utils/logger.js';
+import { siemEmit } from './siem-export.js';
 
 /** What the operator did, as the person's feed names it. */
 export type OperatorAccessAction = 'read' | 'search' | 'delete' | 'restore' | 'export';
@@ -79,6 +82,10 @@ export async function recordOperatorAccess(
   const ownerGhii = ownerGhiiOf(access.ownerOf);
   if (!isValidGHII(ownerGhii) || ownerGhii === ownerGhiiOf(access.operatorGhii)) return;
 
+  siemEmit('operator', {
+    operator: access.operatorGhii, actor: access.actorGaii, account: ownerGhii, act: `memory.${access.action}`,
+    ...(access.key !== undefined ? { key: access.key } : {}), ...(access.count !== undefined ? { count: access.count } : {}),
+  });
   recordUsageCall({
     ownerGhii: access.operatorGhii,
     actorGaii: access.actorGaii,
@@ -143,6 +150,10 @@ export async function recordOperatorAction(
   logger.info(`operator: ${act.area}.${act.action} in ${ownerGhii}`, {
     operator: act.operatorGhii, actor: act.actorGaii, account: ownerGhii, ...(act.subject !== undefined ? { subject: act.subject } : {}),
   });
+  siemEmit('operator', {
+    operator: act.operatorGhii, actor: act.actorGaii, account: ownerGhii, act: `${act.area}.${act.action}`,
+    ...(act.subject !== undefined ? { subject: act.subject } : {}),
+  });
   recordUsageCall({
     ownerGhii: act.operatorGhii,
     actorGaii: act.actorGaii,
@@ -184,6 +195,7 @@ export interface OperatorNodeAct {
  */
 export function recordOperatorNodeAct(act: OperatorNodeAct): void {
   logger.info(`operator: ${act.area}.${act.action}`, { operator: act.operatorGhii, actor: act.actorGaii, ...(act.meta ?? {}) });
+  siemEmit('operator', { operator: act.operatorGhii, actor: act.actorGaii, act: `${act.area}.${act.action}`, ...(act.meta ?? {}) });
   recordUsageCall({
     ownerGhii: act.operatorGhii,
     actorGaii: act.actorGaii,

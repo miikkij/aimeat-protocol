@@ -33,6 +33,8 @@
  *   configureAuthAudit(config);                       // once, at boot
  *   recordAuthFailure(ctx, { status: 401, code: 'AUTH_REQUIRED', reason: 'no credential' });
  * @version-history
+ *   2026-11-15 — recordAuthFailure sends the same fields to the organisation's monitoring
+ *     (services/siem-export.ts, team setup T10), also when the file is off.
  *   2026-10-16 — markRefusalRecorded/refusalMarkOf: a writer marks the response it recorded, so the
  *     response recorder (middleware/refusal-recorder.ts) writes every other 401 and 403 once; status
  *     400 for a wrong one-time code, which that route answers with 400 (QA audit S1-02, E2-03).
@@ -47,6 +49,7 @@ import { createHash } from 'node:crypto';
 import { dirname } from 'node:path';
 import type { AimeatConfig } from '../config-types.js';
 import { logger } from '../utils/logger.js';
+import { siemEmit } from './siem-export.js';
 
 /**
  * Everything about the refused request this log needs, as PLAIN DATA.
@@ -165,11 +168,9 @@ function rotateIfNeeded(): void {
  * a buffer — which is exactly the one an operator went looking for.
  */
 export function recordAuthFailure(ctx: AuthFailureContext, record: AuthFailureRecord): void {
-  if (!filePath) return;
   try {
     const cred = credentialOf(ctx);
-    const line = JSON.stringify({
-      ts: new Date().toISOString(),
+    const fields = {
       status: record.status,
       code: record.code,
       reason: record.reason,
@@ -183,7 +184,12 @@ export function recordAuthFailure(ctx: AuthFailureContext, record: AuthFailureRe
       credential: cred.kind,
       credential_digest: cred.digest,
       ...(ctx.principal ? { principal: ctx.principal } : {}),
-    });
+    };
+    // The same line to the organisation's monitoring when the operator named one (services/siem-export.ts),
+    // whether or not the file is kept.
+    siemEmit('refusal', fields);
+    if (!filePath) return;
+    const line = JSON.stringify({ ts: new Date().toISOString(), ...fields });
     const dir = dirname(filePath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     rotateIfNeeded();
