@@ -77,3 +77,22 @@ describe('POST /v1/account/events (aimeat-events.js record)', () => {
         await refused('POST', '/v1/account/events', [{ data: { count: 3 } }, { kind: 'Order placed' }]);
     });
 });
+
+describe('POST /v1/work/request, /v1/work and /v1/work/batch (aimeat-work.js request, batch)', () => {
+    // work/index.js passes input and opts through as given; WorkRequestSchema (models/schemas.ts) reads
+    // input as z.unknown() (any value, the key required) and ttl_hours as a positive number up to 720.
+    const req = (input: unknown, extra: Record<string, unknown> = {}) => ({ action_id: 'translate-text', provider_gaii: 'bot#alice@node-a', input, ...extra });
+
+    it('takes an input of any JSON type, and a ttl_hours that is not a whole number', async () => {
+        const bodies = [req('translate this'), req(3), req(['a', 'b']), req(null), req({ text: 'x' }, { ttl_hours: 1.5, priority: 'high' })];
+        await taken('POST', '/v1/work/request', bodies);
+        await taken('POST', '/v1/work', bodies);
+        await taken('POST', '/v1/work/batch', [{ requests: bodies }]);
+    });
+
+    it('refuses a request without input, or with a ttl_hours of 0 or over 720, as the route does', async () => {
+        const { input: _drop, ...noInput } = req('x');
+        await refused('POST', '/v1/work/request', [noInput, req('x', { ttl_hours: 0 }), req('x', { ttl_hours: 721 })]);
+        await refused('POST', '/v1/work/batch', [{ requests: [noInput] }]);
+    });
+});

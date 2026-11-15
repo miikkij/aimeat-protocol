@@ -2825,11 +2825,18 @@ components:
         provider_gaii:
           $ref: '#/components/schemas/WorkParty'
         input:
-          type: object
-          description: Must conform to action's input_schema
+          description: >-
+            Must conform to the action's input_schema. Any JSON value: an object, text, a number,
+            an array or null. The field itself must be present.
         ttl_hours:
-          type: integer
+          type: number
+          exclusiveMinimum: 0
+          maximum: 720
           default: 24
+          description: Hours the request waits for the provider, at most 720 (30 days).
+        priority:
+          type: string
+          enum: [low, normal, high]
         callback_url:
           type: string
           nullable: true
