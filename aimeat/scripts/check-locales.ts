@@ -222,6 +222,18 @@ const PICTURE_WORDS: PictureWord[] = [
     baseline: new URL('../security/locale-wall-baseline.json', import.meta.url),
     fix: 'name the list: the public app list, the front page\'s app list, a grid of cards; a blocked sign-in is "blocked"',
   },
+  {
+    // Single pictures the sweep met once or twice each. "stepladder" in a picture caption is a
+    // different word, and "auction house" does not match "the house".
+    word: 'shop window / shelf / knock / ladder / cockpit / fence / the house',
+    byLocale: {
+      en: /\b(?:shop window|shelf|shelves|knock(?:s|ed|ing)?|ladder|cockpit|fences?|the house)\b|the window has closed/i,
+      fi: /(?<![\p{L}])(?:hylly\p{L}*|koputu\p{L}*|koputt\p{L}*|ohjaamo\p{L}*|aidan|aita|talosta|taloon|talossa)(?![\p{L}])/iu,
+      es: /\b(?:vitrina|estantes?|cabina|valla)\b/i,
+    },
+    baseline: new URL('../security/locale-image-baseline.json', import.meta.url),
+    fix: 'name the thing: on offer here, nothing offered, automated requests, the price tiers, every setting, sent elsewhere',
+  },
 ];
 
 function jargonOffenders(
