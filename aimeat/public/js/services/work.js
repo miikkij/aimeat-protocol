@@ -11,6 +11,8 @@
  *   - submitRating: rate a completed work item
  *
  * @version-history
+ *   v1.2.1 — 2026-11-15 — deliverWork sends the delivery text as `output`, the field POST
+ *     /v1/work/:tc/deliver reads; it sent `result`, which the route refused for a missing output.
  *   v1.2.0 — 2026-11-15 — submitRating sends rating 'positive' (four or five stars) or 'negative' (one
  *     to three), the values POST /v1/work/:tc/rate reads; it sent the star count, which the route refused.
  *   v1.1.0 — 2026-07-16 — Add getWorkOverview (GET /v1/work/overview) folding the inbox + sent mount reads.
@@ -67,11 +69,11 @@ export async function rejectWork(tc) {
   return api(`/v1/work/${encodeURIComponent(tc)}/reject`, { method: 'POST' });
 }
 
-/** Deliver completed work with optional result. */
+/** Deliver completed work. POST /v1/work/:tc/deliver reads the delivered result as `output`. */
 export async function deliverWork(tc, result) {
   return api(`/v1/work/${encodeURIComponent(tc)}/deliver`, {
     method: 'POST',
-    body: JSON.stringify({ result }),
+    body: JSON.stringify({ output: result }),
   });
 }
 
