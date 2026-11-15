@@ -12,6 +12,9 @@
  *   shown to refuse it as well, so no correction is looser than the route.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openapi-body-contract-client-bodies.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-15 — The work request and delivery, the decision review, the classification
+ *     target's owner, the voice app_id, the TOTP backup code, the data package sale, the internet
+ *     opener's end date, the agreement and contact addresses, the open item and the members plan.
  *   v1.0.0 — 2026-11-15 — Initial: POST /v1/account/events (structure programme 2026-11, batch 8).
  */
 import { describe, it, beforeAll, afterAll, vi } from 'vitest';
@@ -256,5 +259,23 @@ describe('POST /v1/open-items (portal open-items.js addOpenItem)', () => {
 
     it('still refuses a body without a title, or with a closes_when check the route does not know', async () => {
         await refused('POST', '/v1/open-items', [{ prompt_ref: null }, { title: 'x', closes_when: { check: 'never' } }]);
+    });
+});
+
+describe('PUT /v1/apps/{owner}/{filename}/members/plan (aimeat-iam.js setPlan)', () => {
+    // iam/index.js documents seats and terms days as numbers. services/app/roster-write.ts takes any
+    // finite number of seats from 0 up and any number of days above 0; the contract said integer.
+    const path = '/v1/apps/alice/club.html/members/plan';
+    const plan = { roles: { member: [] }, access: 'members-free' };
+
+    it('takes seats and days the route takes', async () => {
+        await taken('PUT', path, [
+            { ...plan, seats: { member: 0, editor: 2.5 }, terms: { member: { days: 0.5, renewal: 'manual' } } },
+            { ...plan, seats: { member: 10 }, terms: { member: { days: 30 } } },
+        ]);
+    });
+
+    it('still refuses negative seats and days of 0 or below, as the route does', async () => {
+        await refused('PUT', path, [{ ...plan, seats: { member: -1 } }, { ...plan, terms: { member: { days: 0 } } }, { ...plan, terms: { member: { days: -3 } } }]);
     });
 });

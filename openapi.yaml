@@ -42242,14 +42242,14 @@ paths:
                   description: "Who may read the roster. `owner` (the default) suits a paid service, where the customer list is nobody else's business. `members` suits an app where seeing each other IS the product, and that view is redacted."
                 seats:
                   type: object
-                  additionalProperties: { type: integer }
+                  additionalProperties: { type: number, minimum: 0 }
                   description: "Role key to how many people may hold it at once. An approval past the last seat is refused with 409 SEATS_FULL and says how many are taken. A role that is absent is uncapped."
                 terms:
                   type: object
                   additionalProperties:
                     type: object
                     properties:
-                      days: { type: integer, description: "How long this role lasts. Absent means it does not lapse." }
+                      days: { type: number, exclusiveMinimum: 0, description: "How long this role lasts, in days above 0. Absent means it does not lapse." }
                       renewal:
                         type: string
                         enum: [manual, self-serve, none]
