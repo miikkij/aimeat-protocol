@@ -5,6 +5,8 @@
  *   and the agent-registration discovery documents (/auth.md + the agent_auth block on
  *   /.well-known/oauth-authorization-server).
  * @version-history
+ *   v1.6.3 -- 2026-11-15 -- Audit M158, L081, L082: a closed session answers 404; resources/subscribe
+ *     answers -32601 always; an anonymous or foreign-owner DELETE is refused and the session survives.
  *   v1.6.2 -- 2026-11-01 -- Test 5b: the authorize step passes OAuth's ui_locales to the consent page as lang.
  *   v1.6.1 -- 2026-10-20 -- Test 15 asserts the server does not declare resources.subscribe, which no
  *     handler serves (test 29 still accepts -32601 for the method).
@@ -870,16 +872,14 @@ await test('28. SSE stream opens with valid session', async () => {
     }
 });
 
-await test('29. Subscribe to memory resource (or graceful error)', async () => {
-    // resources/subscribe may not be implemented — verify no crash
+await test('29. Subscribe to memory resource → -32601 (not served)', async () => {
+    // resources.subscribe is not declared (test 15), so the method must answer method-not-found:
+    // a handler that returns success while subscribing to nothing would mislead the client.
     const { status, body } = await mcpRpc('resources/subscribe', {
         uri: 'aimeat://memory/mcp-test-key',
     }, 30);
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    // Either success (no error) or method not found — both are acceptable
-    if (body.error) {
-        assert(body.error.code === -32601, `unexpected error: ${JSON.stringify(body.error)}`);
-    }
+    assert(body.error?.code === -32601, `expected -32601, got ${JSON.stringify(body)}`);
 });
 
 await test('30. SSE without session ID → 400', async () => {
@@ -892,6 +892,25 @@ await test('30. SSE without session ID → 400', async () => {
 
 // ─── Phase 8: Session Close ───
 console.log('\nPhase 8 — Session Close');
+
+await test('30b. DELETE without a token → 401, by another owner → 403; the session survives both', async () => {
+    const del = (auth?: string) => fetch(`${BASE}/v1/mcp`, {
+        method: 'DELETE',
+        headers: { ...(auth ? { Authorization: `Bearer ${auth}` } : {}), 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26' },
+    });
+    const anon = await del();
+    const anonBody = await anon.json() as any;
+    assert(anon.status === 401 && anonBody.error?.code === -32001, `anonymous: ${anon.status} ${JSON.stringify(anonBody)}`);
+    const otherName = `mcpother${Date.now()}`;
+    const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: otherName, display_name: 'Other', password: 'McpTest1234' }) });
+    assert(reg.status === 201, `second owner: ${reg.status}`);
+    const other = (await ownerSignIn(BASE, otherName, 'McpTest1234')).body.data.token;
+    const foreign = await del(other);
+    const foreignBody = await foreign.json() as any;
+    assert(foreign.status === 403 && foreignBody.error?.code === -32003, `foreign owner: ${foreign.status} ${JSON.stringify(foreignBody)}`);
+    const { status, body } = await mcpRpc('tools/list', {}, 31);
+    assert(status === 200 && Array.isArray(body.result?.tools), `session must still serve: ${status} ${JSON.stringify(body).slice(0, 200)}`);
+});
 
 await test('31. Close MCP session', async () => {
     const res = await fetch(`${BASE}/v1/mcp`, {
@@ -907,8 +926,8 @@ await test('31. Close MCP session', async () => {
     assert(body.closed === true, 'closed');
 });
 
-await test('32. Request on closed session → new session', async () => {
-    // After closing, sending to old session should create a new one or error
+await test('32. Request on closed session → 404 session not found', async () => {
+    // After closing, the old session id must be unknown: the spec's 404, never a 200 from the old transport
     const res = await fetch(`${BASE}/v1/mcp`, {
         method: 'POST',
         headers: {
@@ -920,12 +939,11 @@ await test('32. Request on closed session → new session', async () => {
         },
         body: JSON.stringify({ jsonrpc: '2.0', id: 99, method: 'tools/list', params: {} }),
     });
-    // The old session is gone. The server either creates a new session or returns an error.
-    // With the StreamableHTTPServerTransport, unknown session generates a new session.
-    const body = await res.json() as any;
-    // Should get a result (new session) or a JSON-RPC error — not a crash
-    assert(res.status === 200 || res.status === 400 || res.status === 404,
-        `status ${res.status}: ${JSON.stringify(body)}`);
+    // The old session is gone: the POST handler answers 404 -32600 so the client re-initializes.
+    const text = await res.text();
+    let code: unknown;
+    try { code = JSON.parse(text).error?.code; } catch { /* an SSE answer from a live transport */ }
+    assert(res.status === 404 && code === -32600, `status ${res.status}: ${text.slice(0, 200)}`);
 });
 
 // ─── A client_id that is a URL ───

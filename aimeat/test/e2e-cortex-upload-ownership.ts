@@ -9,6 +9,7 @@
  *   that B's own upload still installs and can still be replaced by B.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=cortex-upload-ownership
  * @version-history
+ *   2026-11-15 — Audit M232: after B's 1.0.1 re-upload, B activates the cortex and the served lib holds the v2 bytes.
  *   2026-10-05 — POST /v1/cortex mode presigned answers an upload URL that installs, and the same gate
  *     refuses a ZIP naming another owner's cortex. Both failed on the old route (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-26 — A ZIP redeploy of an ACTIVE cortex takes the old activation down and
@@ -389,6 +390,13 @@ await test('Owner B CAN re-upload their own cortex (replace, not a duplicate-nam
     ]);
     const { status, body } = await putZip(url, zip);
     assert(status === 200, `re-upload status ${status}: ${JSON.stringify(body)}`);
+    // The 200 alone could be an upload that wrote nothing: read the served lib back (audit M232).
+    // Only an active cortex serves its libs, so B activates it first.
+    const act = await json(`/v1/cortex/${encodeURIComponent(ownName)}/activate`, { method: 'POST', headers: { Authorization: `Bearer ${B.ownerToken}` } });
+    assert(act.status === 200, `activate B's cortex: ${act.status} ${JSON.stringify(act.body)}`);
+    const lib = await json(`/v1/cortex/${encodeURIComponent(ownName)}/libs/${LIB}`, { headers: { Authorization: `Bearer ${B.ownerToken}` } });
+    const served = typeof lib.body === 'string' ? lib.body : (lib.body._raw ?? JSON.stringify(lib.body));
+    assert(lib.status === 200 && served.includes('from owner B v2'), `B's lib after the re-upload: ${lib.status} ${served.slice(0, 120)}`);
 });
 
 // ── A ZIP redeploy of an ACTIVE cortex ─────────────────────────────────────────────────────────

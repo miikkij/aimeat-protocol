@@ -5,6 +5,8 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.13.9 — 2026-11-15 — Audit M114: social.subscribe, data.set and work.request run from the served
+ *     files through a stubbed session, and their method, path and body are asserted.
  *   v1.13.8 — 2026-11-04 — The five office and corporate looks are among the presets looks.css must carry.
  *   v1.13.7 — 2026-10-22 — The tdr look's block is among the presets the served looks.css must carry.
  *   v1.13.6 — 2026-10-19 — Atelier's boundary names six calls: the layout read goes through
@@ -860,6 +862,24 @@ async function loadServedLib(name: string, extraGlobals: Record<string, unknown>
     vm.runInContext(src, ctx);
     return win.AIMEAT;
 }
+
+await test('served social.subscribe, data.set and work.request send the right method, path and body', async () => {
+    // Executed through a stubbed session, not grepped: a wrong path or payload in the wrapper fails here (audit M114).
+    const calls: { path: string; method?: string; body: any }[] = [];
+    const auth = { getSession: () => ({ fetch: async (path: string, opts: any = {}) => {
+        calls.push({ path, method: opts.method, body: opts.body ? JSON.parse(opts.body) : undefined });
+        return { ok: true, data: {} };
+    } }) };
+    const load = async (name: string) => { const A = await loadServedLib(name); A.auth = auth; return A; };
+    await (await load('aimeat-social.js')).social.subscribe('b1');
+    await (await load('aimeat-data.js')).data.set('k1', { v: 1 });
+    await (await load('aimeat-work.js')).work.request('act1', 'bot#p@n', { q: 1 });
+    const [sub, set, work] = calls;
+    assert(sub?.method === 'POST' && sub.path === '/v1/boards/b1/subscribe', `subscribe: ${JSON.stringify(sub)}`);
+    assert(set?.method === 'POST' && set.path === '/v1/memory' && set.body.key === 'k1' && set.body.value.v === 1, `data.set: ${JSON.stringify(set)}`);
+    assert(work?.method === 'POST' && work.path === '/v1/work/request' && work.body.action_id === 'act1'
+        && work.body.provider_gaii === 'bot#p@n' && work.body.input.q === 1, `work.request: ${JSON.stringify(work)}`);
+});
 
 await test('aimeat-exchange fmtUnit — money is money, morsels are morsels, and a bad unit THROWS', async () => {
     // aimeat-commerce owns money formatting; this library must delegate to it. The stub is that

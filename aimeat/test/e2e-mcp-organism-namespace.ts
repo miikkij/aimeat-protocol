@@ -21,6 +21,8 @@
  *   its own: an unregistered tool, a malformed argument and a working gate all read as isError.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-organism-namespace
  * @version-history
+ *   v1.1.0 — 2026-11-15 — Audit M047: after A bans B, B's write to its own member namespace is refused
+ *     ACCESS_DENIED over MCP and HTTP (the active-membership floor).
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit: the organism rule moves to a shared service).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -308,6 +310,20 @@ async function run() {
             value: { title: 'by the creator' },
         });
         assert(!r.isError, `the workspace creator was refused their own workspace: ${r.text.slice(0, 300)}`);
+    });
+
+    // The floor under the three rules: only an ACTIVE member writes (audit M047). A ban keeps B's
+    // membership row with status `banned`, so this is the one case a missing-row check cannot catch.
+    await test('B, once banned, cannot write B\'s own member namespace on either door', async () => {
+        const ban = await callTool(A, 'aimeat_organism_member_remove', { organism_id: orgId, ghii: B.owner, ban: true });
+        assert(!ban.isError, `ban failed: ${ban.text.slice(0, 300)}`);
+        const key = `organism.${orgId}.member.${B.owner}.notes`;
+        const viaMcp = await callTool(B, 'aimeat_memory_write', { key, value: { note: 'after the ban' } });
+        assert(viaMcp.isError && viaMcp.text.includes('ACCESS_DENIED'), `MCP after the ban: ${viaMcp.text.slice(0, 300)}`);
+        const viaHttp = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${B.agentToken}` }, body: JSON.stringify({ key, value: { note: 'after the ban' } }),
+        });
+        assert(viaHttp.status === 403 && viaHttp.body?.error?.code === 'ACCESS_DENIED', `HTTP after the ban: ${viaHttp.status} ${JSON.stringify(viaHttp.body?.error)}`);
     });
 
     console.log('\nCleanup');

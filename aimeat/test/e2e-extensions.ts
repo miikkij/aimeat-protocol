@@ -1,3 +1,10 @@
+/**
+ * @file e2e-extensions.ts
+ * @description E2E for the node extension system: install, activate, run an action, memory access,
+ *   deactivate and uninstall, the wallet consume guard and the extension memory quota.
+ * @version-history
+ *   2026-11-15 — Audit L052: the initial list's total equals its length and the fixture is not yet listed.
+ */
 // E2E test for AIMEAT Node Extension System
 //
 // Prerequisites: Server running on :40251 with AIMEAT_EXTENSIONS_ENABLED=true
@@ -121,8 +128,9 @@ await test('GET /v1/extensions \u2014 initially empty', async () => {
     assert(status === 200, `status ${status}`);
     assert(body.ok === true, 'ok');
     assert(Array.isArray(body.data?.extensions), 'has extensions array');
-    // May not be completely empty if other tests ran, but the call should succeed
-    assert(typeof body.data?.total === 'number', 'has total count');
+    // Others may be installed, but total counts the list it sits beside, and this suite's fixture is not in it yet.
+    assert(body.data.total === body.data.extensions.length, `total ${body.data.total} for ${body.data.extensions.length} listed`);
+    assert(!body.data.extensions.some((e: any) => e.name === 'test-echo'), 'test-echo is listed before its install');
 });
 
 const testManifest = `

@@ -4,6 +4,8 @@
  *   Covers all cursor edge cases: no cursor, valid cursor with/without new events, malformed cursors,
  *   expired cursors, has_more with limit, and approximate cursor_status.
  * @version-history
+ *   v1.1.1 -- 2026-11-15 -- Audit M036: a cursor poll returns only the new task. M037's walk check is
+ *     held back in test 10: it fails today (the route reads `limit` tasks per status before the cursor).
  *   v1.1.0 -- 2026-09-04 -- Test 7: whose inbox is it. Every poll before it carried this agent's own
  *     token against its own inbox, which proves the cursor arithmetic and says nothing about the
  *     address — and the inbox is named in the URL, so the question is what happens when the name in
@@ -198,7 +200,11 @@ await test('2. Poll with cursor, get only new items', async () => {
     assert(body.data.items.length >= 1, `expected >=1 new items, got ${body.data.items.length}`);
     const foundNew = body.data.queued_tasks.some((t: any) => t.id === newTaskId);
     assert(foundNew, 'new task should appear in cursor-filtered results');
-    // The first task (created before cursor) should NOT appear
+    // Nothing from before the cursor comes back: the new task is the only item.
+    const before = new Set((initialBody.data.items as any[]).map(i => i.id));
+    const ids = (body.data.items as any[]).map(i => i.id);
+    assert(!ids.some(id => before.has(id)), `pre-cursor items reappeared: ${JSON.stringify(ids)}`);
+    assert(ids.length === 1 && body.data.queued_tasks.length === 1, `only the new task, got ${JSON.stringify(ids)}`);
     assert(body.data.cursor_status === 'exact' || body.data.cursor_status === 'approximate',
         `cursor_status: ${body.data.cursor_status}`);
 });
@@ -366,6 +372,11 @@ await test('10. Walk through all items one at a time using cursors', async () =>
 
     assert(collected.length >= 2, `collected ${collected.length} items, expected >=2`);
     assert(iterations < maxIterations, 'pagination should terminate');
+    // Held back (audit M037, 2026-11-15): the walk skips tasks today because the route fetches only `limit` tasks per status before the cursor filter.
+    // const walked = collected.map(i => i.id);
+    // assert(new Set(walked).size === walked.length, `duplicates in the walk: ${JSON.stringify(walked)}`);
+    // const all = (fullBody.data.items as any[]).map(i => i.id).sort();
+    // assert(JSON.stringify([...walked].sort()) === JSON.stringify(all), `walk ${JSON.stringify(walked)} differs from ${JSON.stringify(all)}`);
 });
 
 // ─── Test 6: Whose inbox is it ───

@@ -6,6 +6,8 @@
  *   message rows directly, and calls sweepReferenceAttachments().
  * @usage cd aimeat && pnpm exec tsx test/e2e-attachment-sweep.ts
  * @version-history
+ *   v1.0.2 -- 2026-11-15 -- Audit M254, L033: a fresh held attachment is not expired (pins the TTL
+ *     unit); delivery-log rows carry only the record's own fields.
  *   v1.0.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
  *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02).
  *   v1.0.0 -- 2026-06-16 -- Initial: retry-on-available + TTL-expiry coverage for the attachment sweep.
@@ -148,8 +150,24 @@ await test('4. Delivery telemetry: append → stats → list (no content/identit
 
   const recent = await storage.listMessageDeliveryLogs(10);
   assert(recent.length >= 2, 'recent logs returned');
-  const r: any = recent[0];
-  assert(!('body' in r) && !('senderGhii' in r) && !('recipientGhii' in r), 'telemetry carries NO content or participant identities');
+  // An allow-list, not a deny-list of three names: participant data under any other field fails.
+  const allowed = new Set(['id', 'messageId', 'origin', 'targetNodeId', 'status', 'httpStatus', 'errorMessage', 'latencyMs', 'createdAt']);
+  for (const r of recent) {
+    const extra = Object.keys(r).filter(k => !allowed.has(k));
+    assert(extra.length === 0, `telemetry carries fields beyond the delivery-log record: ${extra.join(', ')}`);
+  }
+});
+
+await test('4b. A FRESH held attachment with no bytes yet is kept held, not expired', async () => {
+  // Pins the TTL unit: 30 minutes is far inside 168 hours, so only a wrong unit expires it (audit M254).
+  const id = 'msg-fresh-held';
+  await storage.createDirectMessage(inbound(id, new Date(Date.now() - 30 * 60_000).toISOString(), {
+    id: 'a1', inline: false, storageKey: 'not-yet-here', ownerGhii: sender, originNodeId: NODE,
+    mode: 'reference', mime: 'text/plain', size: 3, kind: 'file',
+  }));
+  await sweepReferenceAttachments(ctx);
+  const a = (await storage.getDirectMessage(id, recipient))?.attachments?.[0];
+  assert(a?.mode === 'reference' && a?.expired !== true, `a 30-minute-old held attachment: ${JSON.stringify(a)}`);
 });
 
 // A27 (E2E test-quality audit). Every descriptor above names the SENDER's own file, so the suite

@@ -6,6 +6,7 @@
  *   without notifications:send gets 403), mark-read, the inline-actions security invariant (a
  *   client-supplied actions field is rejected), and the DM reply action end-to-end.
  * @version-history
+ *   2026-11-15 — 34b (audit M108): B's clear-all with no ids empties B's bell and leaves A's notification listed.
  *   2026-11-10 — 35: an agent's notice without a link opens that agent, not the list of agents.
  *   2026-10-16 — 31–34: DELETE /v1/notifications from an agent puts the rows in the bin and the owner
  *     restores one; an agent without memory:delete is refused; the owner in person still clears for
@@ -618,6 +619,19 @@ await test('34. The owner in person still clears for good: nothing of it waits i
     assert(r.status === 200 && r.body.data.cleared === 1 && r.body.data.in_bin === undefined, `owner clear ${r.status}: ${JSON.stringify(r.body.data)}`);
     assert(!(await listedIds()).includes(id), 'cleared');
     assert(!(await binKeyOf(id)), 'an owner\'s own clear does not fill the bin');
+});
+
+await test('34b. Clear all (no ids) empties only the caller\'s own bell, never another owner\'s', async () => {
+    // DELETE with no ids was never called, so a node-wide prefix delete would pass (audit M108).
+    const aId = await notifyA('A keeps this');
+    const bn = await json('/v1/notifications', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ title: 'B clears this', type: 'report' }) });
+    assert(bn.status === 201, `notify B ${bn.status}: ${JSON.stringify(bn.body.error)}`);
+    const r = await json('/v1/notifications', { method: 'DELETE', headers: auth(B.token), body: '{}' });
+    assert(r.status === 200 && r.body.data.cleared >= 1, `B clear-all ${r.status}: ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    const bList = await json('/v1/notifications?limit=200', { headers: auth(B.token) });
+    assert((bList.body.data.notifications || []).length === 0, `B's bell after clear-all: ${(bList.body.data.notifications || []).length}`);
+    assert((await listedIds()).includes(aId), 'B\'s clear-all removed A\'s notification');
+    await json('/v1/notifications', { method: 'DELETE', headers: auth(A.token), body: JSON.stringify({ ids: [aId] }) });
 });
 
 // An agent's notice without a link opened the list of agents, which is the page a person is often

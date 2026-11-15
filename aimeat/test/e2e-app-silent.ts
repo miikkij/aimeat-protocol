@@ -8,6 +8,8 @@
  *   subdomain-served app HTML and the bridge page is framable only by app origins.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-silent.ts
  * @version-history
+ *   2026-11-15 — Audit L028: the own-origin test asserts A's token names app-a and B's session on the
+ *     same origin gets consent_required for app-a; it repeated the test above it.
  *   2026-11-02 — Phase 8: a never-published app's draft signs in from its draft origin (it answered 404
  *     APP_NOT_FOUND), and its own origin and the shared host still answer 404.
  *   2026-10-27 — An access token minted from a consent to an erased author's app stops working once the
@@ -334,9 +336,13 @@ async function main() {
             assert(r.ok === false && r.error === 'consent_required', `expected consent_required, got ${JSON.stringify(r)}`);
         });
         await test('an app is bound to its OWN subdomain origin — cannot request another app', async () => {
-            // origin aaa always resolves to A's app; there is no way to ask for bbb's app from aaa.
-            const r = await silent(ORIGIN_A, 'memory:read', A.rt);
-            assert(r.ok === true, 'aaa → A own app ok'); // and bbb (above) is gated — apps can't cross.
+            // origin aaa resolves to A's app and only A's: A's token names it, and B's session gets
+            // the consent screen for that same app, not a token (audit L028; the body used to repeat test above).
+            const own = await silent(ORIGIN_A, 'memory:read', A.rt);
+            assert(own.ok === true && (own as any).app === `${a}/app-a.html` && own.own === true, `aaa for A: ${JSON.stringify(own)}`);
+            const other = await silent(ORIGIN_A, 'memory:read', B.rt) as any;
+            assert(other.ok === false && other.error === 'consent_required' && other.app === `${a}/app-a.html` && !other.access_token,
+                `aaa for B: ${JSON.stringify(other)}`);
         });
         await test('no session cookie → login_required (cannot authenticate silently)', async () => {
             const r = await silent(ORIGIN_A, 'memory:read', null);

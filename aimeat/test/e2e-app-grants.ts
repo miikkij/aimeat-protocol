@@ -8,6 +8,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
+ *   2026-11-15 -- Audit L023: the owner's write to ai-usage.* is 201 and reads back, not merely "not RESERVED_KEY".
  *   2026-10-31 -- GET /v1/app-grant is served with the static developer footer hidden (v27 follow-up B).
  *   2026-10-31 -- GET /authorize carries `lang` (en, fi, es) to the consent page and drops any other (v27 P1).
  *   2026-10-20 -- A catalogue:read app gets no owner memory record from GET /v1/discover or its
@@ -344,7 +345,10 @@ async function main() {
             method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
             body: JSON.stringify({ key: 'ai-usage.e2e-owner-marker', value: { total_cost_usd: 0 } }),
         });
-        assert(r.body?.error?.code !== 'RESERVED_KEY', `owner must not be RESERVED_KEY-blocked, got ${r.status} ${JSON.stringify(r.body)}`);
+        // Not merely "some other refusal": the owner's write lands and reads back (audit L023).
+        assert(r.status === 201, `owner write to a reserved key: ${r.status} ${JSON.stringify(r.body)}`);
+        const back = await json(`/v1/memory/${encodeURIComponent('ai-usage.e2e-owner-marker')}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(back.status === 200 && back.body?.data?.value?.total_cost_usd === 0, `read-back: ${back.status} ${JSON.stringify(back.body?.data ?? back.body)}`);
     });
 
     console.log('\nPhase 3: Refresh + manage + revoke');

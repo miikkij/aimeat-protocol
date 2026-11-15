@@ -1,3 +1,10 @@
+/**
+ * @file e2e-sharing-groups.ts
+ * @description E2E for sharing groups: create, list, detail, members and their permissions,
+ *   rename, delete, and member-name and input validation.
+ * @version-history
+ *   2026-11-15 — Audit M133: test 10 reads the updated member permissions back through GET /v1/groups/:id.
+ */
 // E2E Tests for Sharing Groups
 // Run: cd aimeat && pnpm exec tsx test/e2e-sharing-groups.ts
 
@@ -197,6 +204,10 @@ await test('10. Update member permissions', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const member = body.data.group.members.find((m: any) => m.identifier === owner2Ghii);
     assert(member.permissions.write === false, 'write should be false after update');
+    // Read back through GET: the PATCH response alone could be the handler's own merge (audit M133).
+    const back = await json(`/v1/groups/${groupId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const stored = back.body.data?.group?.members?.find((m: any) => m.identifier === owner2Ghii);
+    assert(back.status === 200 && stored?.permissions?.write === false, `stored permissions: ${back.status} ${JSON.stringify(stored)}`);
 });
 
 await test('11. Remove owner3 from group', async () => {

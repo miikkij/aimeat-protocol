@@ -12,6 +12,8 @@
  *   delivered over SMTP (absent here), so it is covered by the unchanged verify-email path + the wrong-code
  *   assertion below.
  * @version-history
+ *   2026-11-15 — Audit M105, L069: with the lockout on, attach-email locks an account and then refuses
+ *     the right password; a missing account gets the same 401 as a wrong password.
  *   2026-11-06 — A code key's holder who confirms the address before the first sign-in still gets the
  *     new password at that sign-in, and the key stops working: POST /v1/ghii/verify-email counted as
  *     the first sign-in, so the key was never replaced. The same for a holder who enters by a sign-in
@@ -84,6 +86,8 @@ async function startServer(gateOn: boolean, freshDb: boolean): Promise<ChildProc
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_RL_WORK: '1000',
         AIMEAT_RL_MEMORY: '1000', AIMEAT_RL_BOARDS: '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
+        // The per-account lock is off by default; on here so attach-email's lock is under test.
+        AIMEAT_SIGN_IN_LOCKOUT: 'on', AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS: '5',
     };
     const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
@@ -117,6 +121,7 @@ async function stopServer(child: ChildProcess): Promise<void> {
 
 async function main() {
     const legacy = `legacy${Date.now() % 1000000}`;      // no-email account (the fatalii case)
+    const lockName = `locktarget${Date.now() % 1000000}`; // takes the wrong guesses, so `legacy` stays usable
     const password = 'LegacyPass123';
     const emailOwner = `hasmail${Date.now() % 1000000}`;  // holds a taken (verified) email
     const takenEmail = `taken-${Date.now()}@example.com`;
@@ -139,6 +144,8 @@ async function main() {
                 method: 'POST', body: JSON.stringify({ username: legacy, display_name: 'Legacy User', password }),
             });
             assert(status === 201, `status ${status}: ${JSON.stringify(body.error)}`);
+            const lock = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: lockName, display_name: 'Lock Target', password }) });
+            assert(lock.status === 201, `lock target: ${lock.status} ${JSON.stringify(lock.body.error)}`);
         });
         await test('provision an account with a VERIFIED email (code-invite)', async () => {
             // emailHash is a verified-email binding, so the "email taken" case below needs a VERIFIED
@@ -256,6 +263,28 @@ async function main() {
             });
             assert(status === 401, `expected 401, got ${status}`);
             assert(body.error?.code === 'AUTH_REQUIRED', `code ${body.error?.code}`);
+        });
+        await test('attach-email for an account that does not exist → the same 401 as a wrong password', async () => {
+            const attach = (username: string) => json('/v1/ghii/login/attach-email', {
+                method: 'POST', body: JSON.stringify({ username, password: 'wrong', email: 'a@b.com' }),
+            });
+            const missing = await attach(`nobody${Date.now() % 1000000}`);
+            const wrong = await attach(lockName);
+            assert(missing.status === 401 && missing.body.error?.code === 'AUTH_REQUIRED', `missing account: ${missing.status} ${JSON.stringify(missing.body.error)}`);
+            assert(missing.body.error?.message === wrong.body.error?.message, `messages differ: ${missing.body.error?.message} / ${wrong.body.error?.message}`);
+        });
+        await test('attach-email locks the account after the lockout count, and then refuses the RIGHT password', async () => {
+            let last = { status: 0, body: {} as any };
+            for (let i = 0; i < 6; i++) {
+                last = await json('/v1/ghii/login/attach-email', {
+                    method: 'POST', body: JSON.stringify({ username: lockName, password: `wrong${i}`, email: 'a@b.com' }),
+                });
+            }
+            assert(last.status === 429 && last.body.error?.code === 'PASSWORD_LOCKED', `after 6 wrong: ${last.status} ${JSON.stringify(last.body.error)}`);
+            const right = await json('/v1/ghii/login/attach-email', {
+                method: 'POST', body: JSON.stringify({ username: lockName, password, email: 'a@b.com' }),
+            });
+            assert(right.status === 429 && right.body.error?.code === 'PASSWORD_LOCKED', `right password while locked: ${right.status} ${JSON.stringify(right.body.error)}`);
         });
         await test('attach-email federated username → 400 FEDERATION_UNSUPPORTED', async () => {
             const { status, body } = await json('/v1/ghii/login/attach-email', {

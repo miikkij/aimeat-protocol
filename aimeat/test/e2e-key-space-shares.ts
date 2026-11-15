@@ -20,6 +20,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-key-space-shares
  * @version-history
+ *   v1.1.0 — 2026-11-15 — Audit M009, L064: a read:false member reads nothing and sees no incoming
+ *     share; the two share lists refuse an anonymous caller.
  *   v1.0.0 — 2026-08-11 — Initial, written before the table existed.
  */
 import * as ed from '@noble/ed25519';
@@ -193,6 +195,28 @@ async function main() {
         const anon = await readForeign(null, A.ghii, `${SPACE}.day1`);
         assert(asHuman.status === 403 && asAgent.status === 403, `non-member: ${asHuman.status}/${asAgent.status}`);
         assert(!gotValue(anon), 'anonymous reads nothing');
+    });
+
+    await test('a member admitted with read:false reads nothing and is offered no share', async () => {
+        // Every other member here is read:true, so mayRead() in isKeyShared and listIncomingShares
+        // is only a variable in this test (audit M009).
+        const D = await registerOwner(BASE, `ksd${stamp}`);
+        const add = await json(`/v1/groups/${g1}/members`, {
+            method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
+            body: JSON.stringify({ identifier: `ksd${stamp}@${NODE_ID}`, identifier_type: 'ghii', permissions: { read: false, write: false } }),
+        });
+        assert(add.status === 201, `add read:false member: ${add.status} ${JSON.stringify(add.body)}`);
+        const r = await readForeign(D.token, A.ghii, `${SPACE}.day1`);
+        assert(r.status === 403 && r.body?.error?.code === 'CONSENT_DENIED', `read:false member: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const inc = await json('/v1/shares/incoming', { headers: { Authorization: `Bearer ${D.token}` } });
+        assert(inc.status === 200 && (inc.body.data.shares as unknown[]).length === 0, `read:false member is offered: ${JSON.stringify(inc.body.data?.shares)}`);
+    });
+
+    await test('the share lists answer 401 AUTH_REQUIRED without a token', async () => {
+        for (const p of ['/v1/shares', '/v1/shares/incoming']) {
+            const r = await json(p);
+            assert(r.status === 401 && r.body?.error?.code === 'AUTH_REQUIRED', `${p} anonymous: ${r.status} ${JSON.stringify(r.body)}`);
+        }
     });
 
     // ── 2. Several shares over the same record ───────────────────────────────

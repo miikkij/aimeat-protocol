@@ -9,6 +9,8 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-template-proposals).
  * @version-history
+ *   v1.2.1 — 2026-11-15 — Audit M208: after a public agent face and a bound skill, a republish's
+ *     next_steps reports agent_face_present true and bound_skills_count 1.
  *   v1.2.0 — 2026-10-12 — The REST routes are called with the agent's own token from POST
  *     /v1/auth/token, the one the connector holds; the MCP OAuth token stays on /v1/mcp, because node
  *     4.0.0 refuses it on a REST route (401 INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN).
@@ -167,9 +169,10 @@ const ownerB = `tpownb${stamp}`;
 const FILENAME = 'template-demo.html';
 let A: McpSession;
 let B: McpSession;
+let ownerAToken = '';
 
 await test('Setup: two owners + agents; A publishes an app over MCP (next_steps present)', async () => {
-    ({ session: A } = await setupOwnerAgentSession(ownerA, 'tpagenta'));
+    ({ session: A, ownerToken: ownerAToken } = await setupOwnerAgentSession(ownerA, 'tpagenta'));
     ({ session: B } = await setupOwnerAgentSession(ownerB, 'tpagentb'));
     const pub = await A.call('aimeat_app_publish', {
         filename: FILENAME,
@@ -182,6 +185,26 @@ await test('Setup: two owners + agents; A publishes an app over MCP (next_steps 
     assert(out.next_steps.agent_face_present === false, 'fresh app should have no face yet');
     assert(out.next_steps.bound_skills_count === 0, 'fresh app should have no bound skills');
     assert(/aimeat_app_template_propose/.test(out.next_steps.template_proposal_hint), 'template hint missing');
+});
+
+await test('next_steps sees a published agent face and a bound skill after a republish', async () => {
+    // The present direction of the nudge (audit M208): only the empty state was ever measured.
+    const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerAToken}` };
+    const face = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({
+        key: `apps.${FILENAME}.agentface`, visibility: 'public', value: { title: 'Template Demo', sections: [] } }) });
+    assert(face.status === 201, `face write ${face.status}: ${JSON.stringify(face.body)}`);
+    const skill_md = `---\nname: template-demo-guide\ndescription: How to use the template demo. Use when working inside it.\nmetadata:\n  binding: app:${ownerA}/${FILENAME}\n---\n\n# Guide\nOpen it.\n`;
+    const sk = await json('/v1/skills', { method: 'POST', headers: auth, body: JSON.stringify({ skill_md, visibility: 'public' }) });
+    assert(sk.status === 201, `skill publish ${sk.status}: ${JSON.stringify(sk.body)}`);
+    const pub = await A.call('aimeat_app_publish', {
+        filename: FILENAME,
+        content_base64: b64('<!doctype html><meta name="aimeat-app" content="template-demo.html"><h1>tpl demo v2</h1>'),
+        name: 'Template Demo', description: 'source app for template proposal', category: 'utility', tags: ['demo'],
+    });
+    assert(!pub.result?.isError, `republish failed: ${JSON.stringify(pub).slice(0, 250)}`);
+    const ns = JSON.parse(pub.result.content[0].text).next_steps;
+    assert(ns?.agent_face_present === true && ns?.bound_skills_count === 1,
+        `face ${ns?.agent_face_present}, skills ${ns?.bound_skills_count}`);
 });
 
 await test('propose: happy path (model mandatory, derived_from validated)', async () => {

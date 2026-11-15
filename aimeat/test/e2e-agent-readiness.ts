@@ -10,6 +10,7 @@
  *   The suite grows with the programme in docs/internal/agentscanner/ — sitemap.md, AGENTS.md,
  *   llms.txt structure and llms-full.txt land here as their phases ship.
  * @version-history
+ *   2026-11-15 — Audit L015: /mcp and /v1/mcp give the same 401 answer to the same unauthenticated body.
  *   2026-10-31 — The help page's body is checked against public/help/help.en.md, the new page's text, and must not carry the old page's morsels.
  *   2026-10-15 — visibleText decodes the HTML entities a reader sees decoded: the newest change log title holds "&", which the page sends as &amp;, and the test failed on a correct page.
  *   v0.5.0 - 2026-10-03 - Glossary plain layer: ?lang=fi gives Finnish plain sentences, an unknown lang is English.
@@ -720,13 +721,12 @@ function locs(xml: string): string[] {
     });
 
     await test('the MCP server answers on /mcp as well as /v1/mcp', async () => {
-        // Unauthenticated: any status but 404 proves the route exists. 404 would mean the alias is gone.
-        for (const p of ['/mcp', '/v1/mcp']) {
-            const r = await fetch(`${BASE}${p}`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-            });
-            assert(r.status !== 404, `${p} → 404, the MCP server is not reachable there`);
-        }
+        // Same handler, so the same unauthenticated body gets the same answer on both paths.
+        const [alias, canonical] = await Promise.all(['/mcp', '/v1/mcp'].map(async p => {
+            const r = await fetch(`${BASE}${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            return `${r.status} ${await r.text()}`;
+        }));
+        assert(canonical.startsWith('401 ') && alias === canonical, `/mcp → ${alias}; /v1/mcp → ${canonical}`);
     });
 
     // The app-origin half of this — that the node's file does not answer there — moved to

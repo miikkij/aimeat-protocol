@@ -27,6 +27,8 @@
  *   rather than only that it passes.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-cross-owner
  * @version-history
+ *   v1.1.1 — 2026-11-15 — Audit M063: the private-capability and draft tests require the create to
+ *     succeed (the runner's node is self_only), so B's invoke refusal always runs.
  *   v1.1.0 — 2026-08-15 — The cortex line above was a claim, not a test: the body contained zero
  *     aimeat_cortex_* calls, and only e2e-cortex-upload-ownership.ts touched those tools at all —
  *     for install and namespace squatting, never for the lifecycle. Removing the three
@@ -314,23 +316,11 @@ spec:
             id: capId, name: 'private probe', summary: 'cross-owner e2e', visibility: 'private',
             usage: 'test only',
         });
-        // AIMEAT_CAPABILITY_PUBLISHING defaults to 'disabled', so on an ordinary node nobody but the
-        // operator can create a capability at all and there is no private one to protect. That is
-        // itself worth asserting — it is the gate cfb1c13b added — so the test checks whichever case
-        // this node is in rather than returning early and passing for the wrong reason.
-        if (made.isError) {
-            assert(/PUBLISHING_DISABLED/i.test(made.text),
-                `owner A could not create the capability for an unexpected reason: ${made.text.slice(0, 200)}`);
-            // Publishing is off: prove it is off for everyone, which is the whole of the policy.
-            const asB = await callTool(B.session, 'aimeat_capabilities_create', {
-                id: `${capId}b`, name: 'probe', summary: 'cross-owner e2e', visibility: 'private', usage: 'test only',
-            });
-            assert(asB.isError && /PUBLISHING_DISABLED/i.test(asB.text),
-                `publishing is disabled for owner A but not for owner B: ${asB.text.slice(0, 200)}`);
-            return;
-        }
-        // Publishing is on: the private-invoke gate is testable, and needs a positive control for
-        // the same reason the schedule one does.
+        // The runner's node boots with capabilityPublishing 'self_only' (run-e2e-server.ts), so the
+        // create must succeed: an early return on PUBLISHING_DISABLED let the invoke gate below go
+        // untested while the test reported green (audit M063).
+        assert(!made.isError, `owner A could not create the capability: ${made.text.slice(0, 200)}`);
+        // The private-invoke gate needs a positive control for the same reason the schedule one does.
         const mine = await callTool(A.session, 'aimeat_capabilities_invoke', { id: capId, input: {} });
         assert(!mine.isError || !/not found/i.test(mine.text),
             `the capability's owner was told it does not exist: ${mine.text.slice(0, 200)}`);
@@ -355,11 +345,7 @@ spec:
         const made = await callTool(A.session, 'aimeat_capabilities_create', {
             id, name: 'state probe', summary: 'capability state e2e', visibility: 'private', usage: 'test only',
         });
-        if (made.isError) {
-            assert(/PUBLISHING_DISABLED/i.test(made.text),
-                `create failed for an unexpected reason: ${made.text.slice(0, 200)}`);
-            return;   // publishing is off on this node; the sibling test below proves that policy
-        }
+        assert(!made.isError, `create failed: ${made.text.slice(0, 200)}`);
         assert(JSON.parse(made.text).status === 'draft',
             `a new capability must be a draft: ${made.text.slice(0, 200)}`);
 
