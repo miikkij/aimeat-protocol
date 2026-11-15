@@ -41,9 +41,9 @@ import { settleAudienceAfterRise } from '../src/services/classification-run/audi
 import { memoryTarget } from '../src/services/classification/labels.js';
 import { DEFAULT_LABELS } from '../src/services/classification/defaults.js';
 import { listSecurityIncidents } from '../src/services/security-incident.js';
-import { rememberClaimedRepository, installSetRepositories, NS_INSTALL_SETS } from '../src/services/install-set-trust.js';
-import { appliedRecordKey, appliedValue, newAppliedRecord } from '../src/services/install-set-apply.js';
-import { claimRun, finishRun, RUN_CLAIM_MS } from '../src/services/install-set-run.js';
+import { rememberClaimedRepository, installSetRepositories, NS_INSTALL_SETS } from '../src/services/install/set-trust.js';
+import { appliedRecordKey, appliedValue, newAppliedRecord } from '../src/services/install/set-apply.js';
+import { claimRun, finishRun, RUN_CLAIM_MS } from '../src/services/install/set-run.js';
 import { publishSkill, setSkillVisibility } from '../src/services/skills.js';
 import { manifestKey, versionKey, scopeOwnerGhii } from '../src/services/skill/refs.js';
 import { mergePortfolioConfig, switchPortfolioOnUnlessTurnedOff, PORTFOLIO_CONFIG_KEY } from '../src/services/portfolio-config.js';

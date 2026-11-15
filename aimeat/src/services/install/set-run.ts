@@ -1,5 +1,5 @@
 /**
- * @file src/services/install-set-run.ts
+ * @file src/services/install/set-run.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One run at a time of one applied install set record (install-set-apply.ts
@@ -40,9 +40,9 @@
  *   v1.0.0 — 2026-10-18 — Initial (atomic-write round: applyInstallSet and installSetForOwner).
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { CAS_ATTEMPTS } from './record-cas.js';
-import { NS_INSTALL_SETS } from './install-set-trust.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { CAS_ATTEMPTS } from '../record-cas.js';
+import { NS_INSTALL_SETS } from './set-trust.js';
 
 /** How long a run's claim holds before a later run may take it over. */
 export const RUN_CLAIM_MS = 30 * 60_000;

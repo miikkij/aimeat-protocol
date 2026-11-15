@@ -31,7 +31,7 @@
  */
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage, PackageRecord, InstalledComponent } from '../../../storage/interface.js';
-import { bundleOfPackage } from '../../install-set-spec.js';
+import { bundleOfPackage } from '../../install/set-spec.js';
 import { planPackageConfig, configPreview } from './package-config.js';
 import { packageVisibleTo } from './package-read.js';
 import type { NetworkHostField } from '../../extension/network-hosts.js';

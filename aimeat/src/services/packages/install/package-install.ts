@@ -80,7 +80,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../../config.js';
-import type { AppGrantStep } from '../../install-set-grants.js';
+import type { AppGrantStep } from '../../install/set-grants.js';
 import type {
     Storage,
     PackageRecord,

@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const applyInstallSet = vi.hoisted(() => vi.fn());
-vi.mock('../../src/services/install-set-apply.js', () => ({ applyInstallSet }));
+vi.mock('../../src/services/install/set-apply.js', () => ({ applyInstallSet }));
 // The schedule tests run on a fake clock, which does not wait for disk I/O, so they read the set from
 // here; the file tests read real files.
 const readFile = vi.hoisted(() => ({ fake: null as string | null }));
@@ -29,9 +29,9 @@ vi.mock('node:fs/promises', async (original) => {
   return { ...real, readFile: (...a: Parameters<typeof real.readFile>) => readFile.fake !== null ? Promise.resolve(readFile.fake) : real.readFile(...a) };
 });
 
-import { applyStartupInstallSet } from '../../src/services/install-set-startup.js';
+import { applyStartupInstallSet } from '../../src/services/install/set-startup.js';
 import { logger } from '../../src/utils/logger.js';
-import type { ApplyDeps } from '../../src/services/install-set-apply.js';
+import type { ApplyDeps } from '../../src/services/install/set-apply.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const SECRET = 'sk-live-abc123-very-secret';

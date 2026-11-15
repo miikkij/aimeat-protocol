@@ -42,7 +42,7 @@ import { generateEnvContent, generateIniContent, generateJsonContent } from './i
 import { askCoreSettings } from './init-wizard/steps-core.js';
 import { askOperatorSettings } from './init-wizard/steps-operator.js';
 import { askAllAdvancedSettings, askEconomySettings } from './init-wizard/steps-advanced.js';
-import { parseInstallSet } from '../services/install-set-spec.js';
+import { parseInstallSet } from '../services/install/set-spec.js';
 
 // Package root: from dist/src/cli/init-wizard.js -> go up 3 levels to aimeat/
 const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');

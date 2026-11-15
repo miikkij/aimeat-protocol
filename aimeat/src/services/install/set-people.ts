@@ -1,5 +1,5 @@
 /**
- * @file services/install-set-people.ts
+ * @file src/services/install/set-people.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The people an install set names: the owner user, whose account is created when it
@@ -36,14 +36,14 @@
  *   v1.1.0 — 2026-09-29 — welcomeCreated(): the welcome sign-in link for accounts the install created.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, OrganismRecord, GHIIRecord } from '../storage/interface.js';
-import { validateOwnerName } from '../utils/gaii.js';
-import { provisionOwner, emailHashOf, registrationRefusal, ProvisionEmailTakenError, RegistrationClosedError } from './owner/provisioning.js';
-import { deriveUniqueUsername } from './external-login.js';
-import { addOrganismMember, createEmailInvitation, InvitationError } from './invitations.js';
-import { sendWelcomeLink } from './login-link.js';
-import type { InstallSet, InstallSetUser, WorkspaceRole, OrganismRole } from './install-set-spec.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, OrganismRecord, GHIIRecord } from '../../storage/interface.js';
+import { validateOwnerName } from '../../utils/gaii.js';
+import { provisionOwner, emailHashOf, registrationRefusal, ProvisionEmailTakenError, RegistrationClosedError } from '../owner/provisioning.js';
+import { deriveUniqueUsername } from '../external-login.js';
+import { addOrganismMember, createEmailInvitation, InvitationError } from '../invitations.js';
+import { sendWelcomeLink } from '../login-link.js';
+import type { InstallSet, InstallSetUser, WorkspaceRole, OrganismRole } from './set-spec.js';
 
 export type Refusal = { ok: false; status: number; code: string; message: string };
 

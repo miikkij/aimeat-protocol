@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The one place an owner's live grant for an app is written: refresh the existing row,
  *   else create it. The silent bridge and the authorization_code exchange (routes/app-grants.ts) and
- *   the install set's grants (services/install-set-grants.ts) all write through here, so none of them
+ *   the install set's grants (services/install/set-grants.ts) all write through here, so none of them
  *   can stack a second live grant for the same (owner, app).
  *
  *   PURE EXTRACTION from routes/app-grants.ts on 2026-10-04 (it was the closure upsertGrant), moved

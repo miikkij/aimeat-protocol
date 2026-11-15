@@ -29,7 +29,7 @@
       "count": 3,
       "why": "The heartbeat loop: availability, version and status from a ping signed by this node. Status and statistics only; never the url or the key."
     },
-    "src/services/install-set-apply.ts": {
+    "src/services/install/set-apply.ts": {
       "count": 1,
       "why": "linkRepository, behind the operator check (requireOperatorPrincipal with operator:admin, or the operator's own start-up file): the repository the set names is written only after its own card answers with the same node id and key (2026-10-01)."
     },

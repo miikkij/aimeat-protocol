@@ -1,5 +1,5 @@
 /**
- * @file services/install-set-startup.ts
+ * @file src/services/install/set-startup.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A new customer node applies its install set at start-up (install packages, phase 4,
@@ -34,8 +34,8 @@
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import { readFile } from 'node:fs/promises';
-import { logger } from '../utils/logger.js';
-import { applyInstallSet, type ApplyDeps } from './install-set-apply.js';
+import { logger } from '../../utils/logger.js';
+import { applyInstallSet, type ApplyDeps } from './set-apply.js';
 
 /**
  * A JSON file, or what is wrong with it. `problem` names the kind and never carries the file's path or

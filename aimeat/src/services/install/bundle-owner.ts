@@ -1,5 +1,5 @@
 /**
- * @file services/install-bundle-owner.ts
+ * @file src/services/install/bundle-owner.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A person installs a set they bought, for themselves (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e,
@@ -31,19 +31,19 @@
  *     in `app_grants`; the plan names each package's apps and whether the install approves them.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 4).
  */
-import type { InstallBundle } from './install-set-spec.js';
-import { bundleOfComponents } from './install-set-spec.js';
-import { getPackageFor } from './packages/compose/package-read.js';
-import { installOrRequest, type PackageActCaller } from './packages/install/package-install-requests.js';
-import { installPackage } from './packages/install/package-install.js';
-import { checkWorkspaceManifest } from './workspace/provision.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { isOwnerInPerson } from '../utils/gaii.js';
+import type { InstallBundle } from './set-spec.js';
+import { bundleOfComponents } from './set-spec.js';
+import { getPackageFor } from '../packages/compose/package-read.js';
+import { installOrRequest, type PackageActCaller } from '../packages/install/package-install-requests.js';
+import { installPackage } from '../packages/install/package-install.js';
+import { checkWorkspaceManifest } from '../workspace/provision.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../../utils/gaii.js';
 import {
     reach, localGroupOf, installedInstanceOf, appliedValue, appliedRecordKey,
     newAppliedRecord, createOrganisms, linkAppsToWorkspaces, type ApplyDeps, type AppliedRecord,
-} from './install-set-apply.js';
-import { claimRun, finishRun } from './install-set-run.js';
+} from './set-apply.js';
+import { claimRun, finishRun } from './set-run.js';
 
 export interface SetInstallInput {
     groupId: string;

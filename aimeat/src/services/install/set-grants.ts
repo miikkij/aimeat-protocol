@@ -1,5 +1,5 @@
 /**
- * @file services/install-set-grants.ts
+ * @file src/services/install/set-grants.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What an install set does for the apps it installs once they exist: it records the
@@ -28,11 +28,11 @@
  *     alike (secaudit 2026-10, PKG-4). DEFAULT_APP_SCOPES moved there.
  *   v1.0.0 — 2026-10-04 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, PackageInstanceRecord } from '../storage/interface.js';
-import { APP_GRANTABLE_SCOPES } from './app/grant-vocabulary.js';
-import { appScopesOf } from './protected-resource.js';
-import { upsertAppGrant } from './app/grant-upsert.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, PackageInstanceRecord } from '../../storage/interface.js';
+import { APP_GRANTABLE_SCOPES } from '../app/grant-vocabulary.js';
+import { appScopesOf } from '../protected-resource.js';
+import { upsertAppGrant } from '../app/grant-upsert.js';
 
 /** One app's grant, as the apply record keeps it, by grant target `owner/filename`. */
 export interface AppGrantStep {

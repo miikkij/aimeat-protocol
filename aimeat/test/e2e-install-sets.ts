@@ -626,7 +626,7 @@ await test('A new node started with an install set links the repository, waits f
         repository: { node_id: R.nodeId, url: R.baseUrl, public_key: card.body.data.public_key },
     })));
     // Package federation stays off, as on a node nobody configured beyond its install set: the
-    // repository the set names is reached anyway (services/install-set-trust.ts).
+    // repository the set names is reached anyway (services/install/set-trust.ts).
     D = await bootNode(28735, `aimeat-test-001-isnew${ts}`, false, { installSetPath: setFile, packageFederationEnabled: false });
     // A node booted in this process takes over the token signing the earlier two used, so their
     // tokens are minted again.
@@ -648,7 +648,7 @@ await test('A new node started with an install set links the repository, waits f
     assert(dOnR?.status === 'active' && dOnR?.tier === 'contact' && dOnR?.share_catalogue === false,
         `D is a packages-only peer on R: ${JSON.stringify(dOnR)}`);
     // Until the start-up run has FINISHED, not until the record exists: since 2026-10-18 the run writes
-    // the record first with its claim (`running`, services/install-set-run.ts) and fills it at the end,
+    // the record first with its claim (`running`, services/install/set-run.ts) and fills it at the end,
     // so a record that has appeared can still be the empty claim.
     let sets: any[] = [];
     for (let i = 0; i < 40 && (sets.length === 0 || sets[0].running); i++) {

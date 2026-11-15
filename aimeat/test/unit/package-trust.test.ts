@@ -22,7 +22,7 @@ import { appScopesOf, parseAppScopes } from '../../src/services/protected-resour
 import { grantEntitlement, readEntitlements } from '../../src/services/packages/sale/package-entitlements.js';
 import { createClaim, redeemClaim } from '../../src/services/packages/sale/package-claims.js';
 import { isOwnPackage } from '../../src/services/packages/install/package-approvals.js';
-import { installSetRepositories } from '../../src/services/install-set-trust.js';
+import { installSetRepositories } from '../../src/services/install/set-trust.js';
 import { peerCarriesAgents } from '../../src/services/federation.js';
 import { signedPackageHeaders, verifyPackageNode } from '../../src/services/packages/peer/package-node-auth.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';

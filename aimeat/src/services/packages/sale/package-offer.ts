@@ -40,7 +40,7 @@ import type { Storage, PackageComponent } from '../../../storage/interface.js';
 import type { AimeatConfig } from '../../../config.js';
 import { NS_PACKAGE_ENTITLEMENTS } from './package-entitlements.js';
 import { packageCapabilities } from '../install/package-capabilities.js';
-import { bundleOfComponents } from '../../install-set-spec.js';
+import { bundleOfComponents } from '../../install/set-spec.js';
 import { MONEY_CURRENCIES, integerMicros } from '../../../commerce/money.js';
 
 export type OfferGrant = 'payment' | 'approval' | 'automatic';

@@ -28,8 +28,8 @@ const people = vi.hoisted(() => ({
     checkOwner: vi.fn(),
     ensureOwner: vi.fn(),
 }));
-vi.mock('../../src/services/install-set-people.js', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../../src/services/install-set-people.js')>();
+vi.mock('../../src/services/install/set-people.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../src/services/install/set-people.js')>();
     return {
         ...actual,
         checkOwner: people.checkOwner,
@@ -48,13 +48,13 @@ vi.mock('../../src/services/packages/compose/package-read.js', () => ({
 }));
 vi.mock('../../src/services/packages/peer/package-peer-register.js', () => ({ proveNodeCard: vi.fn(async () => ({ kind: 'proven' })) }));
 vi.mock('../../src/services/peer-origin.js', () => ({ recordPeerOrigin: vi.fn(async () => undefined) }));
-vi.mock('../../src/services/install-set-grants.js', () => ({
+vi.mock('../../src/services/install/set-grants.js', () => ({
     grantInstalledApps: vi.fn(async () => undefined),
     landingPath: vi.fn(async () => null),
 }));
 
-const { applyInstallSet, appliedRecordKey, newAppliedRecord } = await import('../../src/services/install-set-apply.js');
-const { NS_INSTALL_SETS } = await import('../../src/services/install-set-trust.js');
+const { applyInstallSet, appliedRecordKey, newAppliedRecord } = await import('../../src/services/install/set-apply.js');
+const { NS_INSTALL_SETS } = await import('../../src/services/install/set-trust.js');
 
 const config = { nodeId: 'customer-node', baseUrl: 'https://customer.example', federationTimeoutMs: 1000 } as unknown as AimeatConfig;
 const KEY = appliedRecordKey('newowner', 'shopbundle::newowner');

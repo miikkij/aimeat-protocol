@@ -79,7 +79,7 @@ import { registerExtensionSchedules } from './schedules.js';
 import { aggregateExtensionNow } from '../capability-aggregator.js';
 import { reconcileAfterExtensionWrite } from '../exchange/projection.js';
 import { odpsWriteRefusal, extensionOdpsKey } from '../exchange/odps-write.js';
-import { extensionInstallRefusal } from '../install-quotas.js';
+import { extensionInstallRefusal } from '../install/quotas.js';
 import { prepareSecretConfigForWrite, decryptSecretFields, getExtSecretKeys } from './secrets.js';
 import { getEncryptionKey } from '../encryption.js';
 import { emitChange } from '../event-bus.js';
@@ -179,7 +179,7 @@ export async function writeExtensionRecord(
         // A name with the node's prefix is kept for what the node ships next (component-name-prefix.ts).
         const prefixed = await nodePrefixRefusal(storage, 'extension', name, { ownerName: ctx.ownerName, isOperator: ctx.isOperator });
         if (prefixed) return { ok: false, ...prefixed };
-        // Both ceilings, node-wide and per-owner, from services/install-quotas.ts. Only a new name
+        // Both ceilings, node-wide and per-owner, from services/install/quotas.ts. Only a new name
         // counts: replacing your own extension in place adds nothing to either number.
         const overQuota = await extensionInstallRefusal({ storage, config }, ctx.ownerName, ctx.isOperator);
         if (overQuota) return { ok: false, ...overQuota };

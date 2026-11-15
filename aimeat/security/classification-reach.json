@@ -2161,19 +2161,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's IndexNow run log."
     },
-    "src/services/install-set-apply.ts": {
+    "src/services/install/set-apply.ts": {
       "reads": {
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Applied install-set records."
     },
-    "src/services/install-set-run.ts": {
+    "src/services/install/set-run.ts": {
       "reads": {
         "getMemory": 3
       },
       "why": "Reviewed 2026-10-18 (atomic-write round), the node's own read: the applied install-set record in the install-sets system namespace, read to claim one run of a set and to write its end on the version read. The record reads moved here from install-set-apply.ts. 2026-10-31 (secaudit inv-22): releaseRun reads the same record to take back a claim that a refused apply made, on the version read. No content."
     },
-    "src/services/install-set-trust.ts": {
+    "src/services/install/set-trust.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 1

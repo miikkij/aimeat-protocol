@@ -104,7 +104,7 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  * 43 after aimeat_memory_write moved onto services/memory/write.ts — the capability whose same
  * defect had been fixed three separate times. Lower this line with every tool that follows.
  *
- * 44 on 2026-08-11 after mcp/apps-fork.ts moved its quota onto services/install-quotas.ts.
+ * 44 on 2026-08-11 after mcp/apps-fork.ts moved its quota onto services/install/quotas.ts.
  * 45 earlier that day, and the two extra files were NOT new offenders: apps-fork.ts and
  * workspace-create.ts are pure extractions out of apps.ts and workspaces.ts, which grew past
  * max-file-lines while their gates were being fixed. The same code, counted in two places instead

@@ -103,7 +103,7 @@ import { listEntitlements, grantEntitlement, revokeEntitlement } from '../servic
 import { packageConfigNeeds } from '../services/packages/compose/package-config-needs.js';
 import { packageSheet } from '../services/packages/compose/package-sheet.js';
 import { listSellers, addSeller, removeSeller } from '../services/packages/sale/package-sellers.js';
-import { installSetRepositories } from '../services/install-set-trust.js';
+import { installSetRepositories } from '../services/install/set-trust.js';
 import { toolError } from './tool-error.js';
 import { setPackageVersionStatus } from '../services/packages/compose/package-create.js';
 import { composeWithPublishGate, composeSetWithPublishGate } from '../services/packages/compose/package-publish-ask.js';
@@ -120,7 +120,7 @@ import { createSession } from '../commerce/session-service.js';
 import { setAccountPrice, saleView, salesOf, refundPurchase, purchasesOf, listForSale, listingFor, buyLine } from '../services/packages/sale/package-account-sale.js';
 import { readAccountSale } from '../services/packages/sale/package-account-entitlement.js';
 import { PACKAGE_ACCOUNT_KIND } from '../services/packages/sale/package-account-checkout.js';
-import { bundleInstallOf, installSetForOwner } from '../services/install-bundle-owner.js';
+import { bundleInstallOf, installSetForOwner } from '../services/install/bundle-owner.js';
 import { withdrawVersion } from '../services/packages/compose/package-withdrawals.js';
 import { INSTALL_CODE_SCOPE } from '../services/packages/install/package-approvals.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -432,7 +432,7 @@ export function registerPackageTools(
         const owner = localAccountName(gaii);
         const ownerGhii = await resolveGhii(storage, owner, config);
 
-        // A package that carries an install bundle is a set (services/install-bundle-owner.ts), the
+        // A package that carries an install bundle is a set (services/install/bundle-owner.ts), the
         // same branch POST /v1/packages/:groupId/install takes.
         const setDeps = { storage, config, peers, scheduler: nodeContext().scheduler ?? undefined };
         if (await bundleInstallOf(setDeps, group_id, owner)) {

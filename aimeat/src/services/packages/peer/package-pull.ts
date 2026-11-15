@@ -75,7 +75,7 @@ import { gatePeer } from '../../federation/peer-gate.js';
 import { safeFetch, stripTrailingSlashes } from '../../../utils/url-validator.js';
 import { readBodyCapped } from '../../../utils/read-capped.js';
 import { parseZip, ZipValidationError, type ParsedPackage } from '../compose/package-zip.js';
-import { installSetRepositories } from '../../install-set-trust.js';
+import { installSetRepositories } from '../../install/set-trust.js';
 import {
     verifyAttestation, verifyComponentDigests, verifyComponentMetadata, type AttestationDoc,
 } from './package-attestation.js';

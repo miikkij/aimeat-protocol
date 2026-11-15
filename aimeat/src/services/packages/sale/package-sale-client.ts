@@ -37,7 +37,7 @@ import { signedSaleHeaders, CLAIM_PURPOSE } from './package-sale-auth.js';
 import { linkPackagePeer } from '../peer/package-peer-register.js';
 import { safeFetch, stripTrailingSlashes } from '../../../utils/url-validator.js';
 import { readBodyCapped } from '../../../utils/read-capped.js';
-import { rememberClaimedRepository } from '../../install-set-trust.js';
+import { rememberClaimedRepository } from '../../install/set-trust.js';
 
 export type SaleRepositoryRef = string | { node_id?: unknown; url?: unknown; public_key?: unknown };
 

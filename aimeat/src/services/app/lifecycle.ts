@@ -105,7 +105,7 @@ import { DesignBookReasons } from '../design-book/reasons.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange, emitAppChange } from '../event-bus.js';
 import { isAnnounceable, recordAppActivity } from './announce.js';
-import { appQuotaRefusal } from '../install-quotas.js';
+import { appQuotaRefusal } from '../install/quotas.js';
 import { lintAppAiDisclosure } from './ai-posture.js';
 import { stripServedMarks, type ServedMarkRemoval } from './serve-marks-strip.js';
 import { publishApp, type PublishAppRefusal, type PublishAppResult } from './publish.js';
@@ -499,7 +499,7 @@ export async function forkApp(
     };
   }
 
-  // The per-owner app quota, from the one place that holds it (services/install-quotas.ts).
+  // The per-owner app quota, from the one place that holds it (services/install/quotas.ts).
   const overQuota = await appQuotaRefusal({ storage, config }, callerGhii);
   if (overQuota) return { refusal: overQuota };
 

@@ -7,7 +7,7 @@
  *   be made and every problem, such as a config value the set does not give, so the operator's AI
  *   asks the person for it before anything is created.
  *
- *   ONE IMPLEMENTATION. The work is services/install-set-apply.ts, the same function
+ *   ONE IMPLEMENTATION. The work is services/install/set-apply.ts, the same function
  *   POST /v1/install-sets/apply calls. The operator test is the one every admin tool here asks
  *   (services/owner/lifecycle.ts resolveOperatorAgentName): the agent's account is an operator
  *   account, and the agent holds the exact word operator:admin, which no wildcard carries.
@@ -34,7 +34,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
-import { applyInstallSet, listAppliedSets } from '../services/install-set-apply.js';
+import { applyInstallSet, listAppliedSets } from '../services/install/set-apply.js';
 import { nodeContext } from '../services/node/context.js';
 import { saleConfigNeeds, saleGrant, saleRevoke, saleOffer, saleClaim, claimPackageHere } from '../services/packages/sale/package-sale-client.js';
 import { readCatalogue, readRequests, setCatalogueEntry } from '../services/packages/sale/package-sale-catalogue.js';

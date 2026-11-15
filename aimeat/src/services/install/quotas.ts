@@ -1,5 +1,5 @@
 /**
- * @file src/services/install-quotas.ts
+ * @file src/services/install/quotas.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How many of a thing one node and one owner may hold.
@@ -23,8 +23,8 @@
  *   v1.0.0 — 2026-08-11 — Extracted after the audit's own diff was checked for duplication and these
  *     three were found copied into the tool surface rather than shared.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
 
 export interface QuotaRefusal {
     status: number;

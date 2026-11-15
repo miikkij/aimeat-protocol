@@ -46,7 +46,7 @@ import type { Storage } from '../src/storage/interface.js';
 import { setActiveEmailService, type EmailService } from '../src/services/email.js';
 import { hostRequest } from './helpers/host-request.js';
 import { sign } from '../src/auth/keypair.js';
-import { installSetRepositories } from '../src/services/install-set-trust.js';
+import { installSetRepositories } from '../src/services/install/set-trust.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { ownerToken, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
 

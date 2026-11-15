@@ -1,5 +1,5 @@
 /**
- * @file services/install-set-apply.ts
+ * @file src/services/install/set-apply.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Apply an install set to this node: the one implementation behind the REST endpoint,
@@ -89,33 +89,33 @@
  *     is reached with package federation off (install-set-trust.ts); NS_INSTALL_SETS moved there.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, PackageRecord, PackageComponent, InstalledComponent } from '../storage/interface.js';
-import type { Scheduler } from './scheduler.js';
-import type { PeerInfo } from './federation.js';
-import { parseInstallSet, parseGroupConfig, bundleOfComponents, type InstallSet, type InstallBundle, type BundlePackage } from './install-set-spec.js';
-import { registerSkillComponent } from './packages/install/package-skill-component.js';
-import { checkOwner, ensureOwner, joinMember, ownerToWelcome, welcomeCreated, type MemberOutcome, type CreatedOrganisms } from './install-set-people.js';
-import { installPackage, type PackageInstallCaller, type PackageInstallPreview } from './packages/install/package-install.js';
-import { pullPackage } from './packages/peer/package-pull.js';
-import { getPackageFor } from './packages/compose/package-read.js';
-import { planPackageConfig, missingConfigMessage } from './packages/compose/package-config.js';
-import { expectsMissingMessage, missingExpects, type PackageExpects } from './packages/compose/package-expects.js';
-import { createOrganismRecord } from './organism/lifecycle.js';
-import { provisionWorkspace, checkWorkspaceManifest, type ProvisionWorkspaceInput } from './workspace/provision.js';
-import { deployAppAgent } from './app/agent-deploy.js';
-import { readProposal, settleProposal } from './agent/proposals.js';
-import { deriveTierFlags } from './federation/tiers.js';
-import { selfNodeIdMessage } from './federation/peer-gate.js';
-import { proveNodeCard } from './packages/peer/package-peer-register.js';
-import { recordPeerOrigin } from './peer-origin.js';
-import { ed25519PublicKeyProblem } from '../auth/keypair.js';
-import { NS_INSTALL_SETS } from './install-set-trust.js';
-import { claimRun, finishRun, releaseRun, type RunClaim } from './install-set-run.js';
-import { writeAppWorkspaceLinks, type AppWorkspaceLink } from './app/workspaces.js';
-import { grantInstalledApps, landingPath, type AppGrantStep } from './install-set-grants.js';
-import { recordOperatorAction } from './operator-access-audit.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, PackageRecord, PackageComponent, InstalledComponent } from '../../storage/interface.js';
+import type { Scheduler } from '../scheduler.js';
+import type { PeerInfo } from '../federation.js';
+import { parseInstallSet, parseGroupConfig, bundleOfComponents, type InstallSet, type InstallBundle, type BundlePackage } from './set-spec.js';
+import { registerSkillComponent } from '../packages/install/package-skill-component.js';
+import { checkOwner, ensureOwner, joinMember, ownerToWelcome, welcomeCreated, type MemberOutcome, type CreatedOrganisms } from './set-people.js';
+import { installPackage, type PackageInstallCaller, type PackageInstallPreview } from '../packages/install/package-install.js';
+import { pullPackage } from '../packages/peer/package-pull.js';
+import { getPackageFor } from '../packages/compose/package-read.js';
+import { planPackageConfig, missingConfigMessage } from '../packages/compose/package-config.js';
+import { expectsMissingMessage, missingExpects, type PackageExpects } from '../packages/compose/package-expects.js';
+import { createOrganismRecord } from '../organism/lifecycle.js';
+import { provisionWorkspace, checkWorkspaceManifest, type ProvisionWorkspaceInput } from '../workspace/provision.js';
+import { deployAppAgent } from '../app/agent-deploy.js';
+import { readProposal, settleProposal } from '../agent/proposals.js';
+import { deriveTierFlags } from '../federation/tiers.js';
+import { selfNodeIdMessage } from '../federation/peer-gate.js';
+import { proveNodeCard } from '../packages/peer/package-peer-register.js';
+import { recordPeerOrigin } from '../peer-origin.js';
+import { ed25519PublicKeyProblem } from '../../auth/keypair.js';
+import { NS_INSTALL_SETS } from './set-trust.js';
+import { claimRun, finishRun, releaseRun, type RunClaim } from './set-run.js';
+import { writeAppWorkspaceLinks, type AppWorkspaceLink } from '../app/workspaces.js';
+import { grantInstalledApps, landingPath, type AppGrantStep } from './set-grants.js';
+import { recordOperatorAction } from '../operator-access-audit.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 
 // The namespace lives with the trust check (install-set-trust.ts), which package-pull.ts reads
 // without importing this file back.

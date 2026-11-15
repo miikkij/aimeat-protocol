@@ -55,7 +55,7 @@ import { resolveGhii } from '../../utils/ghii-resolver.js';
 import type { Scheduler } from '../../services/scheduler.js';
 import { actCallerOf } from './install-requests.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { bundleInstallOf, installSetForOwner } from '../../services/install-bundle-owner.js';
+import { bundleInstallOf, installSetForOwner } from '../../services/install/bundle-owner.js';
 import { keepErrorMessage } from '../../middleware/internal-error-text.js';
 import { redactCredentialText } from '../../utils/redact-credentials.js';
 
@@ -87,7 +87,7 @@ export function registerInstallRoutes(
     }
 
     // A package that carries an install bundle is a set: its packages, its organisms and workspaces,
-    // for this owner (services/install-bundle-owner.ts). `config` is then per package group.
+    // for this owner (services/install/bundle-owner.ts). `config` is then per package group.
     if (await bundleInstallOf({ storage, config, peers }, groupId, owner)) {
       const set = await installSetForOwner({ storage, config, peers, scheduler }, actCallerOf(req, owner, ownerGhii), {
         groupId, config: installConfig, organismNames, dryRun: dryRun === true, grantApps,

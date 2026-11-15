@@ -58,7 +58,7 @@
 import type { CortexExtensionRecord } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../cortex-manifest.js';
-import { cortexInstallRefusal } from '../install-quotas.js';
+import { cortexInstallRefusal } from '../install/quotas.js';
 import {
   libsWithoutContent, missingLibsMessage, reservedNameRefusal, type CortexCaller,
   type CortexDeps, type CortexOutcome, type CortexRefusal,

@@ -68,7 +68,7 @@
 import type { Storage, PackageRecord } from '../../../storage/interface.js';
 import type { PeerInfo } from '../../federation.js';
 import { verifyPackageNode, fieldsOf } from '../peer/package-node-auth.js';
-import { bundleOfPackage } from '../../install-set-spec.js';
+import { bundleOfPackage } from '../../install/set-spec.js';
 import { linkPackagePeer, adoptPendingPeer } from '../peer/package-peer-register.js';
 import { nodeRequestSignedBy } from '../../signed-node-request.js';
 import { withdrawnVersions } from '../compose/package-withdrawals.js';

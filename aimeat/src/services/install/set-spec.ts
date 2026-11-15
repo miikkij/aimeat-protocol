@@ -1,5 +1,5 @@
 /**
- * @file services/install-set-spec.ts
+ * @file src/services/install/set-spec.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two documents that set up a customer node, parsed and checked before anything is
@@ -40,8 +40,8 @@
  *     design, phase 4: the set composer writes it, and the install links the apps to the workspace).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
-import type { PackageRecord } from '../storage/interface.js';
-import { isValidEmail } from '../utils/email-validator.js';
+import type { PackageRecord } from '../../storage/interface.js';
+import { isValidEmail } from '../../utils/email-validator.js';
 
 export const BUNDLE_SPEC = 'aimeat.install-bundle/1';
 export const INSTALL_SET_SPEC = 'aimeat.install-set/1';

@@ -105,7 +105,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../storage/interface.js';
 import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manifest.js';
-import { cortexInstallRefusal } from './install-quotas.js';
+import { cortexInstallRefusal } from './install/quotas.js';
 import { emitChange } from './event-bus.js';
 import { activateExtension, activationRefusal, deactivateExtension, type CortexActor } from './cortex/activation.js';
 import { refreshCortexDependencies, forgetDependencies } from './dependency-map.js';
@@ -302,7 +302,7 @@ export async function installCortex(
             `Manifest size ${Math.round(manifestSizeKb)}KB exceeds limit of ${config.cortexMaxLibSizeKb}KB`);
     }
 
-    // The node's cortex ceiling, from services/install-quotas.ts.
+    // The node's cortex ceiling, from services/install/quotas.ts.
     const overQuota = await cortexInstallRefusal({ storage, config }, true);
     if (overQuota) return refuse(overQuota.status, overQuota.code, overQuota.message);
 

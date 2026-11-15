@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The operator sets up this node from an install set (install packages, phase 4): the
  *   owner user, the packages of a bundle, the organisms and workspaces, the other users and the crew
- *   agents. The work is services/install-set-apply.ts; the MCP tool aimeat_install_set calls it too.
+ *   agents. The work is services/install/set-apply.ts; the MCP tool aimeat_install_set calls it too.
  *
  *   ONLY THE OPERATOR. The call creates accounts and installs for another person, so it stands behind
  *   requireOperatorPrincipal() with the word `operator:admin`: the operator in person, or an agent of
@@ -23,7 +23,7 @@ import { requireAuth, requireOperatorPrincipal, requireLocalSession } from '../.
 import { success, error } from '../../middleware/envelope.js';
 import { OPERATOR_ADMIN_SCOPE } from '../../utils/scope-coverage.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { applyInstallSet, listAppliedSets } from '../../services/install-set-apply.js';
+import { applyInstallSet, listAppliedSets } from '../../services/install/set-apply.js';
 
 export function registerInstallSetRoutes(
     router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, scheduler?: Scheduler,

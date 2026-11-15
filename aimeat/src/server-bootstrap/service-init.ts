@@ -493,7 +493,7 @@ export async function initializeServices(
   scheduler.registerCoreHandler('package-upstream-check', async () => {
     // With federation off, the repository an install set named is still checked (install-set-trust.ts).
     if (!config.packageFederationEnabled) {
-      const { installSetRepositories } = await import('../services/install-set-trust.js');
+      const { installSetRepositories } = await import('../services/install/set-trust.js');
       if ((await installSetRepositories(storage)).size === 0) return;
     }
     const { refreshInstalledPackages } = await import('../services/packages/peer/package-upstream-refresh.js');
@@ -528,7 +528,7 @@ export async function initializeServices(
   // The install set a new customer node applies at start-up (AIMEAT_INSTALL_SET). It needs the peers
   // to reach the repository, so it runs here; not awaited, so a slow repository never holds the boot.
   if (config.installSetPath) {
-    void import('../services/install-set-startup.js')
+    void import('../services/install/set-startup.js')
       .then(({ applyStartupInstallSet }) => applyStartupInstallSet({ storage, config, peers, scheduler }))
       .catch(err => logger.error('[install-set] start-up apply did not run', { error: String(err) }));
   }

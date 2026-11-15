@@ -64,7 +64,7 @@ import { emitChange } from '../../event-bus.js';
 import { resolveGhii } from '../../../utils/ghii-resolver.js';
 import { callerPrincipal, isForeignPrincipal, isOwnerInPerson } from '../../../utils/gaii.js';
 import { scopeIsCovered } from '../../../utils/scope-coverage.js';
-import { grantAppsOfInstance, type AppGrantStep } from '../../install-set-grants.js';
+import { grantAppsOfInstance, type AppGrantStep } from '../../install/set-grants.js';
 import { stableStringify } from '../../../utils/stable-json.js';
 import { decisionRefusal, requestExpired, type InstallRequestDecider } from './package-install-request-policy.js';
 import {

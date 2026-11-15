@@ -307,7 +307,7 @@
     "src/services/indexnow-site.ts": {
       "listSubdomainSites": 1
     },
-    "src/services/install-set-grants.ts": {
+    "src/services/install/set-grants.ts": {
       "listSubdomainSites": 1
     },
     "src/services/knowledge/link-owner-keep.ts": {

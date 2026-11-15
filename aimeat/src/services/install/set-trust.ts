@@ -1,5 +1,5 @@
 /**
- * @file services/install-set-trust.ts
+ * @file src/services/install/set-trust.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which package repositories this node takes packages from because an install set named
@@ -28,10 +28,10 @@
  *     (package sale design, phase 3).
  *   v1.0.0 — 2026-09-29 — Initial (install packages: the named repository needs no federation switch).
  */
-import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
-import { isOperatorAccount } from '../utils/operator-account.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
+import type { Storage } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 /** The system namespace of the applied install set records (install-set-apply.ts). */
 export const NS_INSTALL_SETS = 'install-sets';
