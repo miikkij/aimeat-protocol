@@ -100,7 +100,7 @@ describe('every enforced scope has a checkbox', () => {
 
     it('the exemption list is honest — every entry is a real scope somewhere', () => {
         // Deliberately NOT enforcedScopes(): contract:spend is gated by a hand-written comparison
-        // in services/metered-access.ts rather than requireScope, and that is precisely the kind of
+        // in services/metered/access.ts rather than requireScope, and that is precisely the kind of
         // scope this list exists to account for. The bar is that the string is real — an exemption
         // for a scope nothing reads would quietly license removing a checkbox that mattered.
         for (const scope of Object.keys(NOT_AN_AGENT_CHECKBOX)) {

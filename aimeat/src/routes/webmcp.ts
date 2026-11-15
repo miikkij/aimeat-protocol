@@ -92,12 +92,12 @@ import { appToolsKey, isToolPriced, toolMoneyPrices, presentToolPacing, applyLoc
 import { loadPublicToolManifest } from '../services/app-tools/manifest-read.js';
 import { paymentChallenge } from '../commerce/x402.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
-import { pacingReceipt } from '../services/metered-settlement.js';
+import { pacingReceipt } from '../services/metered/settlement.js';
 import { publicManifestTools, toolPacing, paceFreeToolUse } from '../commerce/app-tool-catalog.js';
 import { checkAppToolInput } from '../services/app/tool-input.js';
 import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
-import { authoriseMeteredCall, type ProductRefusal } from '../services/metered-access.js';
-import type { MeteredEntitlement } from '../services/metered-entitlements.js';
+import { authoriseMeteredCall, type ProductRefusal } from '../services/metered/access.js';
+import type { MeteredEntitlement } from '../services/metered/entitlements.js';
 import { refuseAppToolInvokeWithoutWord } from './webmcp-invoke-gate.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { respondMeteredRefusal } from '../services/extension-access/metered-response.js';

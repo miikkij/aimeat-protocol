@@ -16,7 +16,7 @@
  *
  *   (a) AND THE NODE'S OWN AI (D7.5). NODE_SIDE_READERS_OF_EXCHANGED_DATA lists every node-side analytics
  *   or AI code path that reads data delivered through EXCHANGE. It is empty: a metered call's result is
- *   handed to the buyer and to nothing else (services/metered-access.ts states it where the call is
+ *   handed to the buyer and to nothing else (services/metered/access.ts states it where the call is
  *   settled). A code path that starts reading exchanged data for the node's own use adds itself here,
  *   and the row then reads `check` with the path named.
  * @structure NODE_SIDE_READERS_OF_EXCHANGED_DATA · Art12Input · art12Rows

@@ -30,7 +30,7 @@ import { eraseOwner } from '../../src/services/owner/erasure.js';
 import {
   authorizeAndCharge, entitlementKey, grantKey, issueGrant, persistEntitlement, readContractForCall,
   readEntitlementForCall, readGrantForCall, NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement,
-} from '../../src/services/metered-entitlements.js';
+} from '../../src/services/metered/entitlements.js';
 
 requirePostgresWhenAsked('entitlement-erasure');
 

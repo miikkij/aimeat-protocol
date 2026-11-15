@@ -67,11 +67,11 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { createEntitlement, readContractForCall, listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from '../metered-entitlements.js';
+import { createEntitlement, readContractForCall, listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from '../metered/entitlements.js';
 import type { Provenance, OdpsExtras } from '../../models/odps-schemas.js';
 import type { FreshnessBrief } from '../datapackage/freshness.js';
 import { readCallTiming } from '../call-timing.js';
-import { resolvePacingToll } from '../metered-settlement.js';
+import { resolvePacingToll } from '../metered/settlement.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config/pacing.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
@@ -254,7 +254,7 @@ export function presentOffering(
  * A contract's money price and pacing as a response shows them, for the REST and MCP contract views.
  * A money contract keeps `unit`, `currency` and `price_per_call` (micro-units) and adds `toll_morsels`.
  * A morsel-rail contract is free: its per-call amount is pacing charged beside the toll
- * (services/metered-settlement.ts settleMorsels), so `toll_morsels` counts both, and `unit`, `currency`
+ * (services/metered/settlement.ts settleMorsels), so `toll_morsels` counts both, and `unit`, `currency`
  * and `price_per_call` are deprecated mirrors of it until MORSEL_PRICE_FIELDS_REMOVED_IN, gone from it.
  */
 export function presentContractTerms(

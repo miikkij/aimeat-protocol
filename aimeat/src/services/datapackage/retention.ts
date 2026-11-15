@@ -30,7 +30,7 @@ import { bare, packageKeyRoot, type PublishInput } from './contract.js';
 import { isLiveShare, isNamedShare, packageOfPattern, shareMetaOf } from '../parties/shares.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { listEntitlementsByProvider } from '../metered-entitlements.js';
+import { listEntitlementsByProvider } from '../metered/entitlements.js';
 import { contractVersionHashes, datapackageCoordinate } from '../exchange/datapackage.js';
 
 export type RetentionPolicy = NonNullable<PublishInput['retentionPolicy']>;

@@ -58,7 +58,7 @@ import { saleTermsOf, writeSaleTerms } from '../datapackage/sale-terms-record.js
 import { currentNodeId } from '../../utils/gaii.js';
 import { hashDef, getInterfaceVersion, type InterfaceDef } from '../app/tool-interfaces.js';
 import { resolveActionPricing, type OfferingPlan } from './action-pricing.js';
-import type { EntitlementUnit, PricingSpec, DatapackageSurface } from '../metered-entitlements.js';
+import type { EntitlementUnit, PricingSpec, DatapackageSurface } from '../metered/entitlements.js';
 import { dataListingRefusal } from '../data-intermediation/gate.js';
 import { logger } from '../../utils/logger.js';
 

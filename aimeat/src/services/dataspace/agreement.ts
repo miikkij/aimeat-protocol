@@ -57,7 +57,7 @@ import { UNCHANGED } from '../record-cas.js';
 import { getOffering } from '../exchange/market.js';
 import {
     createEntitlement, persistEntitlement, readContractForCall, revokeEntitlement, type PricingSpec,
-} from '../metered-entitlements.js';
+} from '../metered/entitlements.js';
 import { PER_MONTH_SECONDS } from '../exchange/datapackage.js';
 import { getPaymentHandler } from '../../commerce/payment-handlers.js';
 import { INVOICE_HANDLER_ID } from '../../commerce/invoice-handler.js';

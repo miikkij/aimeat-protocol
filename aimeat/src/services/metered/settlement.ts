@@ -1,5 +1,5 @@
 /**
- * @file src/services/metered-settlement.ts
+ * @file src/services/metered/settlement.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Moving the value for one authorised metered call — the half of the chokepoint that
@@ -46,17 +46,17 @@
  *     instead of sending 402s, so every door can reach it directly.
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { percentFee } from '../commerce/money.js';
-import { commerceFeePercent, resolveOperatorFeeGhii } from './marketplace-fee.js';
-import { settleEntitlementMoney, refundEntitlementMoney } from './entitlement-money.js';
-import { commitSpend, refundSpend, type MeteredEntitlement, type PricingSpec } from './metered-entitlements.js';
-import type { DynamicDesignation, SplitResult } from '../commerce/beneficiary-split.js';
-import { reverseAccrual } from '../commerce/beneficiary-book.js';
-import { settlePurchase } from '../commerce/settle-purchase.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { percentFee } from '../../commerce/money.js';
+import { commerceFeePercent, resolveOperatorFeeGhii } from '../marketplace-fee.js';
+import { settleEntitlementMoney, refundEntitlementMoney } from '../entitlement-money.js';
+import { commitSpend, refundSpend, type MeteredEntitlement, type PricingSpec } from './entitlements.js';
+import type { DynamicDesignation, SplitResult } from '../../commerce/beneficiary-split.js';
+import { reverseAccrual } from '../../commerce/beneficiary-book.js';
+import { settlePurchase } from '../../commerce/settle-purchase.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Book this call's beneficiary shares, optionally including destinations the capability named for

@@ -21,7 +21,7 @@ import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { enforcePaywall } from '../../src/services/extension-access/paywall.js';
 import { createRefusalRecorder } from '../../src/services/extension-access/metered-response.js';
-import { persistEntitlement, type MeteredEntitlement } from '../../src/services/metered-entitlements.js';
+import { persistEntitlement, type MeteredEntitlement } from '../../src/services/metered/entitlements.js';
 import { clearCache } from '../../src/services/cache.js';
 
 const NODE = 'paywall-tool-node';

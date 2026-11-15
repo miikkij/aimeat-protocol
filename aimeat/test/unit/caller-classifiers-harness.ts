@@ -27,7 +27,7 @@ import { aiPayerOf } from '../../src/services/agent/ai-keys.js';
 import { aiCallerFromCredential, aiCallerOfPrincipal } from '../../src/services/ai/caller-context.js';
 import { actorKindOf as toolActorKindOf } from '../../src/mcp/tool-usage-wrap.js';
 import { actorKindOf as appOpenActorKindOf } from '../../src/services/usage/record-app-open.js';
-import { actorKindOf as meteredActorKindOf } from '../../src/services/metered-access.js';
+import { actorKindOf as meteredActorKindOf } from '../../src/services/metered/access.js';
 
 export const NODE_ID = 'aimeat-local-001-dev';
 const PEER = 'aimeat-peer-002-dev';

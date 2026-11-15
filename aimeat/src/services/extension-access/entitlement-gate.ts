@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description The HTTP adapter over the metered chokepoint — thin on purpose.
  *
- *   The decision and the settlement moved to `services/metered-access.ts` and
- *   `services/metered-settlement.ts` when it became clear that sharing the SETTLEMENT while every door
+ *   The decision and the settlement moved to `services/metered/access.ts` and
+ *   `services/metered/settlement.ts` when it became clear that sharing the SETTLEMENT while every door
  *   re-derived the decisions around it was the shape producing the bugs: owner-free lived in four
  *   places and was missing from a fifth, and each door had to remember the sequence. What is left here
  *   is the express-shaped convenience the raw-invoke paywall wants — call the chokepoint, render a
@@ -31,7 +31,7 @@
 import type { PaywallResponder } from './metered-response.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ExtensionRecord } from '../../storage/interface.js';
-import { authoriseMeteredCall } from '../metered-access.js';
+import { authoriseMeteredCall } from '../metered/access.js';
 import { respondMeteredRefusal } from './metered-response.js';
 import type { PaywallOutcome } from './paywall.js';
 

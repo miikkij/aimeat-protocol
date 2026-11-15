@@ -50,7 +50,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { OffersDocSchema, normalizeOfferPacing, presentOfferPacing, type Offer } from '../../models/offer-schemas.js';
 import { evaluateOfferPrereqs, offerHasPrereqs } from '../../services/offer-prereqs.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { chargePacing, pacingReceipt, resolvePacingToll } from '../../services/metered-settlement.js';
+import { chargePacing, pacingReceipt, resolvePacingToll } from '../../services/metered/settlement.js';
 import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../../config/pacing.js';

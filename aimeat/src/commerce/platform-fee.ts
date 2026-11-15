@@ -5,7 +5,7 @@
  * @description The operator's platform fee on a MONEY sale, recorded as a receivable memory record, and
  *   the commerce memory-record upsert it shares with the checkout. Extracted from session-service.ts so
  *   the money accrual rail (services/entitlement-money.ts) can record the fee without importing the
- *   checkout, which itself charges pacing through services/metered-settlement.ts: the three formed an
+ *   checkout, which itself charges pacing through services/metered/settlement.ts: the three formed an
  *   import cycle once the checkout charged pacing.
  * @structure putRecord · sumPlatformFees · recordMoneyPlatformFee
  * @usage

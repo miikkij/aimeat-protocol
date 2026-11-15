@@ -16,7 +16,7 @@
  *
  *   WHICH PRINCIPALS. An agent or an approved or active ecosystem app that existed before the step,
  *   does not hold exchange:write (scopeIsCovered, so `*` and `exchange:*` already pass), and has at
- *   least one call on the `apptool` usage surface in the hot usage table (services/metered-access.ts
+ *   least one call on the `apptool` usage surface in the hot usage table (services/metered/access.ts
  *   records every signed-in call of the route there, refused ones included; the table keeps 90 days,
  *   services/usage/archive-job.ts). Anonymous mode's shared agent is left out: anyone may hold it.
  *

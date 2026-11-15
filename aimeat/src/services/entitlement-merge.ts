@@ -36,7 +36,7 @@ import { ownerGhiiOf } from '../utils/gaii.js';
 import {
   entitlementKey, grantKey, archiveEntitlement, persistEntitlement, serviceRows,
   NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement,
-} from './metered-entitlements.js';
+} from './metered/entitlements.js';
 
 /**
  * Every live right on the node, contracts and grants alike — the input to the owner-key migration,

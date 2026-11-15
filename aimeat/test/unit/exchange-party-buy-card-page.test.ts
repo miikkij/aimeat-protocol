@@ -65,7 +65,7 @@ import { stripeCheckoutHandler } from '../../src/commerce/stripe-checkout.js';
 import { completeFromStripeCheckout } from '../../src/commerce/stripe-checkout-complete.js';
 import { microsToStripeMinor } from '../../src/commerce/money.js';
 import { putOffering, type Offering } from '../../src/services/exchange/market.js';
-import { createEntitlement, readContractForCall } from '../../src/services/metered-entitlements.js';
+import { createEntitlement, readContractForCall } from '../../src/services/metered/entitlements.js';
 import { insertParty, findParty } from '../../src/services/parties/store.js';
 import { partyRefOf, type PartyRecord } from '../../src/services/parties/contract.js';
 import { partyKeyMatches } from '../../src/services/parties/keys.js';

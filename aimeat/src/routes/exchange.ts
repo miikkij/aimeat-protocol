@@ -76,7 +76,7 @@ import {
   issueGrant, revokeGrant, readGrantForCall, listGrantsByProvider,
   listEntitlementHistoryByConsumer, listEntitlementHistoryByProvider,
   type MeteredEntitlement, type EntitlementHistoryEntry,
-} from '../services/metered-entitlements.js';
+} from '../services/metered/entitlements.js';
 import { mergeOwnerEntitlements, listAllEntitlementsForMerge } from '../services/entitlement-merge.js';
 import { listPayables } from '../commerce/payable-book.js';
 import {

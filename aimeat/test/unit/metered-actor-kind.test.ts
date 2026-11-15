@@ -2,7 +2,7 @@
  * @file test/unit/metered-actor-kind.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The metered chokepoint (services/metered-access.ts authoriseMeteredCall) records each
+ * @description The metered chokepoint (services/metered/access.ts authoriseMeteredCall) records each
  *   decision in the usage stream with the kind of principal that called. An ecosystem app's session
  *   carries the role `ecosystem` (auth/middleware.ts), and the recorder tested a role `eco` that no
  *   token carries, so an ecosystem app's metered call was recorded as the owner's (codebase analysis
@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { authoriseMeteredCall } from '../../src/services/metered-access.js';
+import { authoriseMeteredCall } from '../../src/services/metered/access.js';
 import { resetUsageBuffer, pendingUsageCalls } from '../../src/services/usage/usage-buffer.js';
 
 const NODE = 'meter-kind-node';

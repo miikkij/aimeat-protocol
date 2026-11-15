@@ -80,14 +80,14 @@ import { checkoutBeneficiaryStep } from './checkout-shares.js';
 import { refundCollected, refundSentence, recordUndeliveredPayment } from './undelivered-payment.js';
 import { PossiblePaymentError, recordPossiblePaymentOf } from './possible-payment.js';
 import { getPaymentHandler, listPaymentHandlers, LEGACY_MORSEL_HANDLER_ID } from './payment-handlers.js';
-import { chargePacing, pacingReceipt } from '../services/metered-settlement.js';
+import { chargePacing, pacingReceipt } from '../services/metered/settlement.js';
 import { insufficientMorselsMessage } from './pacing-pack.js';
 import { putRecord } from './platform-fee.js';
 import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
 import { createFulfillmentTask } from './fulfillment.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
-import { appSpendRefusal } from '../services/metered-access.js';
+import { appSpendRefusal } from '../services/metered/access.js';
 import { isMoneyCurrency, percentFee, MONEY_CURRENCIES } from './money.js';
 import { recordAccountEvent } from '../services/account/events.js';
 import { logger } from '../utils/logger.js';
@@ -587,7 +587,7 @@ async function completeSessionInner(
   if (reserved) { await releaseSessionClaim(storage, session, key); throw reserved; }
   // Pacing first, before any money moves: a buyer who cannot cover it is refused having paid nothing.
   // The quoted amount, like the quoted prices. Part burns, the checkout's existing operator share is
-  // kept, the rest goes to the seller (services/metered-settlement.ts chargePacing).
+  // kept, the rest goes to the seller (services/metered/settlement.ts chargePacing).
   const paced = await chargePacing({
     config, storage, caller: session.buyerIdentity || session.buyerGhii, payer: session.buyerGhii,
     providerGhii: session.sellerGhii, amount: session.pacingMorsels ?? 0,

@@ -29,7 +29,7 @@ import type { PaymentHandler, RefundOutcome } from '../../src/commerce/types.js'
 import { writePsp } from '../../src/commerce/psp-record.js';
 import { UNDELIVERED_PREFIX } from '../../src/commerce/undelivered-payment.js';
 import { putOffering, type Offering } from '../../src/services/exchange/market.js';
-import { createEntitlement, readContractForCall } from '../../src/services/metered-entitlements.js';
+import { createEntitlement, readContractForCall } from '../../src/services/metered/entitlements.js';
 import { insertParty, findParty } from '../../src/services/parties/store.js';
 import { partyRefOf, type PartyRecord } from '../../src/services/parties/contract.js';
 import type { PartyContext } from '../../src/services/parties/verify.js';

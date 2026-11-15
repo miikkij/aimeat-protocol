@@ -16,7 +16,7 @@
  *   - The owner in person, with no word (isOwnerInPerson).
  *   - An app grant (role `app`): the served aimeat-webmcp.js calls this route with the app page's
  *     session, and a published app's permissions change only when its author republishes it. Its
- *     metered call keeps asking contract:spend in services/metered-access.ts appSpendRefusal.
+ *     metered call keeps asking contract:spend in services/metered/access.ts appSpendRefusal.
  *   - A visitor from another node and an anonymous session: neither is an agent or an ecosystem app of
  *     this node, and the route's own rules for them stay as they were.
  *   - An agent or ecosystem app holding exchange:write (or `*`, or `exchange:*`).

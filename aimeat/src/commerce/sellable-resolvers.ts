@@ -63,7 +63,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { normalizeOfferPacing, type Offer } from '../models/offer-schemas.js';
-import { resolvePacingToll } from '../services/metered-settlement.js';
+import { resolvePacingToll } from '../services/metered/settlement.js';
 import { AppToolsDocSchema, appToolsKey, applyLockedInput, toolMoneyPrices, type AppTool } from '../models/app-tool-schemas.js';
 import type { Sellable } from './types.js';
 import { CommerceError } from './errors.js';
@@ -246,7 +246,7 @@ export function appToolSellableResolver(): SellableResolver {
       // has to honour that, or "approved" would mean free everywhere except the one place a buyer is
       // most likely to click. Checked against the buyer's owner GHII — the identity a checkout is
       // opened under — and never against the seller's other customers.
-      const { readGrantForCall } = await import('../services/metered-entitlements.js');
+      const { readGrantForCall } = await import('../services/metered/entitlements.js');
       const granted = await readGrantForCall(
         storage, `${buyerOwner}@${config.nodeId}`, `apptool:${sellerOwner}/${appId}`, toolName,
       );

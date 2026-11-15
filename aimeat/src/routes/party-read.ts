@@ -37,7 +37,7 @@ import { partyReadVerdict } from '../services/parties/read-gate.js';
 import { logPartyRead } from '../services/parties/activity.js';
 import type { DatapackageReader } from '../services/datapackage/audience.js';
 import { meterPackageRead } from '../services/datapackage/contract-read.js';
-import type { MeteredOutcome } from '../services/metered-access.js';
+import type { MeteredOutcome } from '../services/metered/access.js';
 import { meteredRefusalText } from '../services/extension-access/metered-response.js';
 import { logger } from '../utils/logger.js';
 
@@ -89,7 +89,7 @@ export function renderMeteredRead(
     res: Response, config: AimeatConfig, odata: boolean | undefined, outcome: MeteredOutcome, label: string,
 ): boolean {
     if (outcome.kind === 'settled') {
-        // The beneficiary book (services/metered-settlement.ts) never throws; a failure here is logged and the read goes on.
+        // The beneficiary book (services/metered/settlement.ts) never throws; a failure here is logged and the read goes on.
         void outcome.accrue().catch(err => logger.warn('party-read: the beneficiary accrual of a metered read failed', { label, error: String(err) }));
         return true;
     }

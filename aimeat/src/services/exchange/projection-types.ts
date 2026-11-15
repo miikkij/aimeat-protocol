@@ -16,7 +16,7 @@
  *     message now also describe the list-once skip (DUPLICATE_OF {app}/{tool} with a sentence).
  */
 import type { Offering, OfferingPlan, UsageTerms } from './market.js';
-import type { EntitlementUnit } from '../metered-entitlements.js';
+import type { EntitlementUnit } from '../metered/entitlements.js';
 import type { Provenance, OdpsExtras } from '../../models/odps-schemas.js';
 
 /** One outcome line of a reconcile — the dry-run report is exactly this list. */

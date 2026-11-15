@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Turning one {@link MeteredOutcome} into an HTTP response.
  *
- *   The decision is made once, in `services/metered-access.ts`. This is the other side of that split:
+ *   The decision is made once, in `services/metered/access.ts`. This is the other side of that split:
  *   status codes and wording, which are genuinely a door's business and differ between them — the raw
  *   route names the listings to contract, the app-tool route offers a checkout, MCP renders text. What
  *   must NOT differ is whether the call was allowed and what it cost, and keeping that out of here is
@@ -34,7 +34,7 @@ import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { formatMoneyMajor } from '../../commerce/money.js';
 import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
-import type { MeteredOutcome } from '../metered-access.js';
+import type { MeteredOutcome } from '../metered/access.js';
 
 /** A refusal is anything that is neither a settled call, a free one, nor "you hold no right". */
 type Refusal = Exclude<MeteredOutcome, { kind: 'settled' } | { kind: 'free_owner' } | { kind: 'no_right' }>;

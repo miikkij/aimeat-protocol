@@ -30,7 +30,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import type { MeteredEntitlement } from './metered-entitlements.js';
+import type { MeteredEntitlement } from './metered/entitlements.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';

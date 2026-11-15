@@ -17,11 +17,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CapabilityRecord, ExtensionRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 
-vi.mock('../../src/services/metered-access.js', () => ({ authoriseMeteredCall: vi.fn() }));
+vi.mock('../../src/services/metered/access.js', () => ({ authoriseMeteredCall: vi.fn() }));
 
 const { SqliteStorage } = await import('../../src/storage/providers/sqlite/index.js');
 const { buyForExtension } = await import('../../src/services/extension/purchase.js');
-const { authoriseMeteredCall } = await import('../../src/services/metered-access.js');
+const { authoriseMeteredCall } = await import('../../src/services/metered/access.js');
 const { resolveExtensionForCall } = await import('../../src/services/component/versions.js');
 
 const NODE = 'buy-node';

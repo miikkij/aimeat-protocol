@@ -1,5 +1,5 @@
 /**
- * @file src/services/metered-access.ts
+ * @file src/services/metered/access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description THE chokepoint for "may this principal make this priced call, and what does it cost?".
@@ -64,23 +64,23 @@
  *     whole sequence, and the owner-free rule finally applies on every door (an owner calling their own
  *     app-tool was paying the platform rake to themselves).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import {
   readEntitlementForCall, budgetAllows, computeCharge,
   type MeteredEntitlement,
-} from './metered-entitlements.js';
+} from './entitlements.js';
 import {
   settleMeteredCharge, chargePacing, resolvePacingToll,
   type SettlementResult, type BeneficiaryAccrual,
-} from './metered-settlement.js';
-import { commerceFeePercent } from './marketplace-fee.js';
-import { recordUsageCall } from './usage/usage-buffer.js';
-import { isPartyRef } from './parties/contract.js';
-import type { UsageActorKind, UsageOutcome, UsageSurface } from '../storage/interface.js';
-import { usageActorOfRoles } from './caller-facts.js';
+} from './settlement.js';
+import { commerceFeePercent } from '../marketplace-fee.js';
+import { recordUsageCall } from '../usage/usage-buffer.js';
+import { isPartyRef } from '../parties/contract.js';
+import type { UsageActorKind, UsageOutcome, UsageSurface } from '../../storage/interface.js';
+import { usageActorOfRoles } from '../caller-facts.js';
 
 /** The permission a hosted app needs before it may draw on its owner's contracts. */
 export const SPEND_SCOPE = 'contract:spend';

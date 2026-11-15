@@ -1545,7 +1545,7 @@ await test('MERGE · a right stored under the OLD key is folded in, deleted, and
     // how the first version of this migration failed on production: it recomputed the key, got the
     // survivor's own, deleted nothing, and left the source behind so its 118 calls were counted twice
     // in the provider's totals. A second run would have folded them in again and read back 236.
-    const { entitlementKey } = await import('../src/services/metered-entitlements.js');
+    const { entitlementKey } = await import('../src/services/metered/entitlements.js');
     const { createHash } = await import('node:crypto');
     const person = await setupOwner('mrg');
     const bot = await setupAgent(person, 'mrgbot');
@@ -1637,7 +1637,7 @@ await test('APP GRANT · a grant given BEFORE the permission existed keeps worki
     // Shipped without this, and it broke a live app mid-use: the owner had approved it under rules
     // that had no such question, and the first they learned of the new one was a 403 in their browser.
     // A permission invented today cannot reach backwards and cancel consent properly given yesterday.
-    const { authoriseMeteredCall } = await import('../src/services/metered-access.js');
+    const { authoriseMeteredCall } = await import('../src/services/metered/access.js');
     const person = await setupOwner('gfa');
     await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(person.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 400 }) });
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The exchange part of erasing an account: one step of eraseOwner
  *   (services/owner/erasure.ts). Revokes the paid contracts and the free-access grants of
- *   services/metered-entitlements.ts that the erased account is a party to.
+ *   services/metered/entitlements.ts that the erased account is a party to.
  *
  *   WHY IT EXISTS. Contracts (namespace `metered-entitlement`, keys `entitlement.<hash>`) and grants
  *   (namespace `metered-grant`, keys `entgrant.<hash>`) live in platform-owned namespaces, keyed by a
@@ -45,7 +45,7 @@
  */
 import type { MemoryRecord, Storage } from '../storage/interface.js';
 import { localAccountOf, runAsNode } from '../utils/gaii.js';
-import { NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement } from './metered-entitlements.js';
+import { NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement } from './metered/entitlements.js';
 
 /** How many records the step revoked. A record where the account is both parties counts once, as consumer. */
 export interface EntitlementErasure {

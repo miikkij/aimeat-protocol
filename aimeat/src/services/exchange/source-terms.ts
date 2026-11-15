@@ -23,7 +23,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { UsageTerms } from './market.js';
-import type { EntitlementUnit } from '../metered-entitlements.js';
+import type { EntitlementUnit } from '../metered/entitlements.js';
 import type { Provenance } from '../../models/odps-schemas.js';
 import { ODPS_VERSION } from './odps.js';
 
@@ -69,7 +69,7 @@ export type ListingRow = { unit: EntitlementUnit; basePrice: number; currency: s
  *     with money and a morsel figure used to project a morsel listing beside the money one, which
  *     made two purchasable products out of one; that stays gone.
  *   - No money: the item is free and paced. It lists on the morsel rail, whose per-call amount is
- *     charged as pacing (services/metered-settlement.ts settleMorsels). A legacy figure keeps its old
+ *     charged as pacing (services/metered/settlement.ts settleMorsels). A legacy figure keeps its old
  *     row and toll exactly, so a listing projected by 3.26.1 reads as unchanged. A source with only a
  *     declared toll (an agent offer, whose old price the offers route folds into `tollMorsels`) lists
  *     with that amount on the rail and a toll of 0, so the one amount is charged once.

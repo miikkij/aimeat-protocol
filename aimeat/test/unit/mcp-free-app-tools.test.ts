@@ -13,15 +13,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
-import type { MeteredOutcome } from '../../src/services/metered-access.js';
+import type { MeteredOutcome } from '../../src/services/metered/access.js';
 import { registerExchangeRunTools } from '../../src/mcp/exchange-run.js';
-import { authoriseMeteredCall } from '../../src/services/metered-access.js';
+import { authoriseMeteredCall } from '../../src/services/metered/access.js';
 import { invokeCapability, appToolBindingRefusal } from '../../src/services/capabilities/invoke.js';
 import { consumeInternalPass } from '../../src/services/extension-access/internal-pass.js';
 import { membersOnlyRefusalForCapability } from '../../src/services/members-only.js';
 import { getInterfaceVersion } from '../../src/services/app/tool-interfaces.js';
 
-vi.mock('../../src/services/metered-access.js', () => ({ authoriseMeteredCall: vi.fn() }));
+vi.mock('../../src/services/metered/access.js', () => ({ authoriseMeteredCall: vi.fn() }));
 vi.mock('../../src/services/capabilities/invoke.js', () => ({ invokeCapability: vi.fn(), appToolBindingRefusal: vi.fn() }));
 vi.mock('../../src/services/call-timing.js', () => ({ recordCallDuration: vi.fn() }));
 vi.mock('../../src/services/members-only.js', () => ({ membersOnlyRefusalForCapability: vi.fn(), MEMBERS_ONLY_MESSAGE: 'Members only.' }));

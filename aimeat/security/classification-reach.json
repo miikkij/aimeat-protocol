@@ -2404,7 +2404,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An attachment existence check through metadata."
     },
-    "src/services/metered-entitlements.ts": {
+    "src/services/metered/entitlements.ts": {
       "reads": {
         "getMemory": 2,
         "listAllMemory": 1

@@ -2,7 +2,7 @@
  * @file test/unit/pacing-reverse.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The reversal of a pacing charge (services/metered-settlement.ts chargePacing) against
+ * @description The reversal of a pacing charge (services/metered/settlement.ts chargePacing) against
  *   real in-memory SQLite. A use that fails after the charge gives the payer everything back when the
  *   provider still holds its share; when the provider no longer does, the payer gets back only what
  *   was recovered plus the burned part, so a reversal never adds morsels (secaudit2026oct22).
@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { chargePacing } from '../../src/services/metered-settlement.js';
+import { chargePacing } from '../../src/services/metered/settlement.js';
 
 const PAYER = 'payer@node';
 const PROVIDER = 'provider@node';

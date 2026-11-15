@@ -14,7 +14,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-13 — Pure extraction from services/exchange-market.ts (v1.12.1).
  */
-import type { EntitlementUnit, PricingSpec } from '../metered-entitlements.js';
+import type { EntitlementUnit, PricingSpec } from '../metered/entitlements.js';
 
 /** The action `commercial` block an offering/contract prices against. */
 export interface ActionCommercial {
@@ -35,7 +35,7 @@ export interface ActionCommercial {
  * consumer can never undercut the provider. Money (payMoney) takes precedence over morsels.
  *
  * `unit: 'morsels'` names the contract's RAIL, not a currency: a morsel-rail contract is free, and its
- * per-call amount is charged as pacing (services/metered-settlement.ts settleMorsels, through
+ * per-call amount is charged as pacing (services/metered/settlement.ts settleMorsels, through
  * chargePacing). Responses present that amount as `toll_morsels` (presentOffering).
  */
 export function resolveActionPricing(

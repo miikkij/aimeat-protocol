@@ -94,7 +94,7 @@ import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { readEntitlementForCall } from '../services/metered-entitlements.js';
+import { readEntitlementForCall } from '../services/metered/entitlements.js';
 import { getOffering } from '../services/exchange/market.js';
 import {
     type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
@@ -104,8 +104,8 @@ import { refuseWorkBetween } from '../services/work/parties.js';
 import {
     getProposal, listProposalsForOwner, supersedeWithProposal, putProposal, CONTRACT_ENDED_TEXT,
 } from '../services/exchange/proposals.js';
-import { authoriseMeteredCall, type ProductRefusal } from '../services/metered-access.js';
-import type { MeteredEntitlement } from '../services/metered-entitlements.js';
+import { authoriseMeteredCall, type ProductRefusal } from '../services/metered/access.js';
+import type { MeteredEntitlement } from '../services/metered/entitlements.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { meteredRefusalText } from '../services/extension-access/metered-response.js';
@@ -123,7 +123,7 @@ import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../servic
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { paceFreeToolUse } from '../commerce/app-tool-catalog.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
-import { pacingReceipt } from '../services/metered-settlement.js';
+import { pacingReceipt } from '../services/metered/settlement.js';
 import { appToolBindingRefusal } from '../services/capabilities/invoke.js';
 import { findBackingCapability } from '../services/component/address.js';
 

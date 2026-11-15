@@ -36,7 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { readEntitlementForCall } from '../services/metered-entitlements.js';
+import { readEntitlementForCall } from '../services/metered/entitlements.js';
 import { getOffering } from '../services/exchange/market.js';
 import { settleMeteredCoordinate } from '../services/extension-access/entitlement-gate.js';
 import {

@@ -15,7 +15,7 @@
  *        package and the versions of the interface the contract pins, a read without a version reads the
  *        newest of them, and another version is refused (403 VERSION_NOT_IN_CONTRACT).
  *     3. A data read admitted so (an OData entity set, a row window, a CSV) is metered and charged through
- *        the chokepoint every metered call shares (services/metered-access.ts), after the rows were read
+ *        the chokepoint every metered call shares (services/metered/access.ts), after the rows were read
  *        and before they are sent: a read that fails or is refused is not charged, and a budget cap or
  *        an inactive contract answers 402 as the extension paywall does.
  *   A paused or revoked contract admits nothing; an exhausted one still opens the descriptor, so its
@@ -34,8 +34,8 @@ import type { DatapackageReader } from './audience.js';
 import { datapackageReadable } from './audience.js';
 import { trustedPackageOf } from './audience-record.js';
 import { bare } from './contract.js';
-import { readEntitlementForCall, type MeteredEntitlement } from '../metered-entitlements.js';
-import { authoriseMeteredCall, type MeteredOutcome } from '../metered-access.js';
+import { readEntitlementForCall, type MeteredEntitlement } from '../metered/entitlements.js';
+import { authoriseMeteredCall, type MeteredOutcome } from '../metered/access.js';
 import { contractVersionHashes, datapackageCoordinate } from '../exchange/datapackage.js';
 import { resolveIdentity, isForeignPrincipal } from '../../utils/gaii.js';
 

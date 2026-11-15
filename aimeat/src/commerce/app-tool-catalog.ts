@@ -60,7 +60,7 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { cached, TTL } from '../services/cache.js';
 import { AppToolsDocSchema, appIdFromToolsKey, isToolOffered, presentToolPacing, toolMoneyPrices, toolTollMorsels, type AppTool } from '../models/app-tool-schemas.js';
 import { localAccountName } from '../utils/gaii.js';
-import { chargePacing, resolvePacingToll, type PacingCharge } from '../services/metered-settlement.js';
+import { chargePacing, resolvePacingToll, type PacingCharge } from '../services/metered/settlement.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 
 /** One sellable app-tool as every discovery surface sees it. */
@@ -309,7 +309,7 @@ export const OWNER_TOOL_DESCRIPTION_MAX = 300;
  * Every tool an agent of this owner can call on the owner's own apps, by app id (the published
  * filename), in the manifest's order: the tools of the owner's PUBLIC manifests that have something
  * to run (`action_id`), priced or not. The owner's own principals run both free on the WebMCP
- * invoke route (services/metered-access.ts answers `free_owner` before any price is asked).
+ * invoke route (services/metered/access.ts answers `free_owner` before any price is asked).
  *
  * A tool with no `action_id` is left out whether or not it has a price. It is fulfilled as a task,
  * and only through a checkout session (commerce/sellable-resolvers.ts); a direct call answers 422

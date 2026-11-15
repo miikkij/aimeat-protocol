@@ -31,7 +31,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import {
   archiveEntitlement, createEntitlement, pauseEntitlement, readContractForCall,
   type EntitlementUnit, type MeteredEntitlement,
-} from '../metered-entitlements.js';
+} from '../metered/entitlements.js';
 
 const NS = 'exchange-proposal';
 const keyOf = (id: string): string => `xprop.${id}`;

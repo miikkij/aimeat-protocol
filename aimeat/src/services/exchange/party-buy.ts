@@ -21,7 +21,7 @@
  *
  *   PAID IN ADVANCE. A party has no balance to charge per read, so the contract is prepaid: `per_month`
  *   buys whole months (a subscription whose period runs to the end of what was bought), `per_read` a
- *   block of reads (a bundle). Every read inside it settles at 0 (services/metered-access.ts); the next
+ *   block of reads (a bundle). Every read inside it settles at 0 (services/metered/access.ts); the next
  *   one past it is 402 PREPAID_ENDED, and the party buys again with its own credential, which tops up
  *   the same contract and keeps the same key.
  *
@@ -87,7 +87,7 @@ import { getOffering, type Offering } from './market.js';
 import {
     createEntitlement, readContractForCall, persistEntitlement, revokeEntitlement,
     type MeteredEntitlement, type PricingSpec, type DatapackageSurface,
-} from '../metered-entitlements.js';
+} from '../metered/entitlements.js';
 import { PER_MONTH_SECONDS } from './datapackage.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { getPaymentHandler, PaymentError } from '../../commerce/payment-handlers.js';

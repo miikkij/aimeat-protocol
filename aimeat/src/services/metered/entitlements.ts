@@ -1,5 +1,5 @@
 /**
- * @file src/services/metered-entitlements.ts
+ * @file src/services/metered/entitlements.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description G1 — the durable METERED ENTITLEMENT primitive (EXCHANGE / TARGET-045). Generalises the
@@ -56,10 +56,10 @@
  *     concurrency note on authorizeAndCharge (a dedicated atomic counter is deferred to G5).
  */
 import { createHash, randomUUID } from 'node:crypto';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { recordAccountEvent } from './account/events.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { recordAccountEvent } from '../account/events.js';
 
 /** System namespace — server-side only, never surfaced to a client (mirrors `ext-pay-token`). */
 export const NS_ENTITLEMENT = 'metered-entitlement';

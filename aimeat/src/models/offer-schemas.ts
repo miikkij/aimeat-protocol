@@ -168,7 +168,7 @@ export const OfferSchema = z.object({
   /**
    * The pacing amount: morsels per use, set by the offer's maker within the node's default and
    * ceiling. Each use debits it from the user's owner; part burns and the rest is credited to the
-   * maker's owner (services/metered-settlement.ts chargePacing). A pace, never a price.
+   * maker's owner (services/metered/settlement.ts chargePacing). A pace, never a price.
    */
   tollMorsels: z.number().int().min(0).max(100).optional(),
   price: PriceSchema.optional(),

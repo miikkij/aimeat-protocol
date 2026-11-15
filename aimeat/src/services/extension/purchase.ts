@@ -59,7 +59,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, CapabilityRecord } from '../../storage/interface.js';
 import { buildGEAI, appSlug, localAccountName } from '../../utils/gaii.js';
 import { AppToolsDocSchema, appToolsKey, applyLockedInput } from '../../models/app-tool-schemas.js';
-import { authoriseMeteredCall } from '../metered-access.js';
+import { authoriseMeteredCall } from '../metered/access.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { logger } from '../../utils/logger.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../members-only.js';

@@ -2,7 +2,7 @@
  * @file test/unit/metered-pacing-order.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The metered chokepoint (services/metered-access.ts authoriseMeteredCall) refuses a
+ * @description The metered chokepoint (services/metered/access.ts authoriseMeteredCall) refuses a
  *   call for an inactive contract, a full rate window, a spent budget or a provider's carried
  *   ceiling before it charges the pacing, so a refused call writes no pacing rows and moves no
  *   morsels (secaudit 2026-10-31, f-secaudit2026oct31-extra-metered-pacing-order). Usage kept: an
@@ -17,8 +17,8 @@ import { randomUUID } from 'node:crypto';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { authoriseMeteredCall } from '../../src/services/metered-access.js';
-import { persistEntitlement, type MeteredEntitlement } from '../../src/services/metered-entitlements.js';
+import { authoriseMeteredCall } from '../../src/services/metered/access.js';
+import { persistEntitlement, type MeteredEntitlement } from '../../src/services/metered/entitlements.js';
 
 const NODE = 'meter-node';
 const CALLER = `bob@${NODE}`;

@@ -357,7 +357,7 @@ await test('14c. B invokes a free offer with 25 morsels of pacing: the buyer is 
         assert(t.status === 200, `transactions ${t.status}`);
         return (t.body.data.transactions ?? []) as any[];
     };
-    // Every row of one pacing charge carries the same tracking code (services/metered-settlement.ts).
+    // Every row of one pacing charge carries the same tracking code (services/metered/settlement.ts).
     const family = (x: any) => String(x.tracking_code ?? '').startsWith(pacing.trackingCode);
     const buyerRows = (await rows(B.token)).filter(family);
     const paid = buyerRows.filter(x => x.type === 'pacing_charge' || x.type === 'pacing_burn');

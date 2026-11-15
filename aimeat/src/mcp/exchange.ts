@@ -63,7 +63,7 @@ import { percentFee } from '../commerce/money.js';
 import {
     createEntitlement, readContractForCall, listEntitlementsByConsumer,
     pauseEntitlement, revokeEntitlement, type MeteredEntitlement,
-} from '../services/metered-entitlements.js';
+} from '../services/metered/entitlements.js';
 import {
     type Offering, type Need, type Bid,
     resolveExtActionPricing, extActionDeclaredToll, resolveOfferingPricing, newNeedId, newBidId,

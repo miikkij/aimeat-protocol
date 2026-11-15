@@ -88,7 +88,7 @@ import { getEncryptionKey } from '../services/encryption.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { openStripeCheckout, STRIPE_CHECKOUT_HANDLER_ID } from '../commerce/stripe-checkout.js';
 import { rememberCardPage } from '../commerce/session-claim.js';
-import { appSpendRefusal } from '../services/metered-access.js';
+import { appSpendRefusal } from '../services/metered/access.js';
 import { listSubscriptions, cancelSubscription } from '../commerce/subscriptions.js';
 
 const ItemsSchema = z.array(z.object({

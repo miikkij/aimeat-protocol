@@ -53,10 +53,10 @@ import type { Storage } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
-import { chargePacing, type PacingCharge } from '../metered-settlement.js';
+import { chargePacing, type PacingCharge } from '../metered/settlement.js';
 import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
 
-export { resolvePacingToll } from '../metered-settlement.js';
+export { resolvePacingToll } from '../metered/settlement.js';
 
 /**
  * Charge the pacing amount of one uncontracted use. The caller's own calls to their own capability are

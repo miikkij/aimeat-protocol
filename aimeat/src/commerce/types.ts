@@ -66,7 +66,7 @@ export interface Sellable {
   unitPrice: number;
   /**
    * Pacing amount per unit: morsels charged from the buyer's owner at completion, part burned and the
-   * rest credited to the seller (services/metered-settlement.ts chargePacing). Never a price. 0 for
+   * rest credited to the seller (services/metered/settlement.ts chargePacing). Never a price. 0 for
    * self-purchase and for an item that declares none.
    */
   tollMorsels: number;

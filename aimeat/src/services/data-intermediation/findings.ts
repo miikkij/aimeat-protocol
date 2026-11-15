@@ -36,7 +36,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
 import { listOfferings, type Offering } from '../exchange/market.js';
-import { listAllEntitlements } from '../metered-entitlements.js';
+import { listAllEntitlements } from '../metered/entitlements.js';
 import { allDatasetFacts } from '../datapackage/catalogue-facts.js';
 import { isOrgManager } from '../workspace/access.js';
 import { PARTIES_KEY, parsePartiesValue } from '../parties/contract.js';
