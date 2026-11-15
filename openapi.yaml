@@ -23238,7 +23238,7 @@ paths:
               properties:
                 outcome: { type: string, enum: [confirmed, overridden] }
                 note: { type: string, maxLength: 2000 }
-                override: { type: object, description: What the person decided instead. }
+                override: { description: 'What the person decided instead, stored as sent: any JSON value (a class name, an object).' }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

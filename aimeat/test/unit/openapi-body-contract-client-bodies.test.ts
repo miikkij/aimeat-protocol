@@ -113,3 +113,23 @@ describe('POST /v1/work/{tc}/deliver and /redeliver (aimeat-work.js deliver)', (
         await refused('POST', path, [{}, { result: 'x' }]);
     });
 });
+
+describe('POST /v1/ai/decisions/{id}/review (aimeat-decide.js review, aimeat-refinery.js teach)', () => {
+    // decide/index.js documents override as any; refinery/index.js teach() sends the class name the
+    // person chose, a string. services/decide/service.ts reviewDecision stores override as given and
+    // checks only outcome and note.
+    const path = '/v1/ai/decisions/dec-1/review';
+
+    it('takes an override of any JSON type', async () => {
+        await taken('POST', path, [
+            { outcome: 'overridden', override: 'invoice' },
+            { outcome: 'overridden', override: 3 },
+            { outcome: 'overridden', override: { class: 'invoice' }, note: 'it was an invoice' },
+            { outcome: 'confirmed' },
+        ]);
+    });
+
+    it('refuses a body without an outcome the route knows, or with a note over 2000 characters, as the route does', async () => {
+        await refused('POST', path, [{ override: 'x' }, { outcome: 'maybe' }, { outcome: 'confirmed', note: 'x'.repeat(2001) }]);
+    });
+});
