@@ -1,5 +1,5 @@
 /**
- * @file notebook-classify.ts
+ * @file src/services/notebook/classify.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Notebook slice B — AI placement classifier. Given a free-text note and the user's
@@ -28,16 +28,16 @@
  *   v1.4.0 — 2026-09-29 — classify and distribute take the caller's classification reader, which the
  *     placement context's workspace summaries pass (TARGET-082).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { stripCodeblock } from './llm-strip.js';
-import { collectWorkspaceSummary } from './structure-overview.js';
-import type { ContentReader } from './classification/reader.js';
-import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
-import type { AiCallerContext } from './ai/caller-context.js';
-import { NOTEBOOK_CLASSIFY_SYSTEM, NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';
-import { NOTEBOOK_DISTRIBUTE_SYSTEM, NOTEBOOK_DISTRIBUTE_TEMPLATE } from './notebook-distribute-prompt.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { stripCodeblock } from '../llm-strip.js';
+import { collectWorkspaceSummary } from '../structure-overview.js';
+import type { ContentReader } from '../classification/reader.js';
+import { NotebookAiError, resolveOwnerModel, completeOwner } from './ai.js';
+import type { AiCallerContext } from '../ai/caller-context.js';
+import { NOTEBOOK_CLASSIFY_SYSTEM, NOTEBOOK_CLASSIFY_TEMPLATE } from './classify-prompt.js';
+import { NOTEBOOK_DISTRIBUTE_SYSTEM, NOTEBOOK_DISTRIBUTE_TEMPLATE } from './distribute-prompt.js';
+import { logger } from '../../utils/logger.js';
 
 export interface PlacementSpace { namespace: string; name: string; examples?: string[] }
 export interface PlacementWorkspace { id: string; name: string; documentSpaces: PlacementSpace[] }

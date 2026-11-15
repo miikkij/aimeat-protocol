@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The notebook AI features (classify, distribute, plan, tracked triage and fill, the
  *   living author) ask the same question every other AI call asks before they start: can any key pay
- *   for this person (services/ai/completion.ts prepareAiCall). resolveOwnerModel (services/notebook-ai.ts)
+ *   for this person (services/ai/completion.ts prepareAiCall). resolveOwnerModel (services/notebook/ai.ts)
  *   refused a person with no key of their own with NO_OPENROUTER_KEY even on a node whose shared key
  *   would pay from their allowance, so chat worked and these six features did not (codebase analysis
  *   2026-11-03, item A10). Usage kept: a person with no key on a node with no shared key gets the same
@@ -20,7 +20,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { loadCatalog } from '../../src/services/ai/catalog/store.js';
-import { resolveOwnerModel } from '../../src/services/notebook-ai.js';
+import { resolveOwnerModel } from '../../src/services/notebook/ai.js';
 import { debitAllowance } from '../../src/services/ai/allowance.js';
 
 const NODE = 'node-notebook';

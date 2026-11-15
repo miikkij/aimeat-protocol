@@ -1,5 +1,5 @@
 /**
- * @file notebook-distribute-prompt.ts
+ * @file src/services/notebook/distribute-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Single source of truth for the notebook DISTRIBUTE prompt. Imported BOTH by the

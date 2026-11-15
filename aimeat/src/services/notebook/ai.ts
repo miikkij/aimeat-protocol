@@ -1,5 +1,5 @@
 /**
- * @file notebook-ai.ts
+ * @file src/services/notebook/ai.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Shared owner-model plumbing for the notebook AI features (classify, plan, triage, the
@@ -44,14 +44,14 @@
  *     found. The owner in person is the default (secaudit2026nov08 round 14,
  *     aimeat/notebook-ai/payer-is-caller-identity-not-owner).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import type { CompletionOptions } from './openrouter.js';
-import { completeForOwner, prepareAiCall, AiCompletionError, type CompleteForOwnerResult } from './ai/completion.js';
-import { getEncryptionKey } from './encryption.js';
-import { hasOwnAiKey } from './own-key-coverage.js';
-import { OWNER_CALLER, type AiCallerContext } from './ai/caller-context.js';
-import { nodeAiProviders } from './ai/providers.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { CompletionOptions } from '../openrouter.js';
+import { completeForOwner, prepareAiCall, AiCompletionError, type CompleteForOwnerResult } from '../ai/completion.js';
+import { getEncryptionKey } from '../encryption.js';
+import { hasOwnAiKey } from '../own-key-coverage.js';
+import { OWNER_CALLER, type AiCallerContext } from '../ai/caller-context.js';
+import { nodeAiProviders } from '../ai/providers.js';
 
 /** Raised with a stable `code` so routes can map it to the right HTTP status + envelope. */
 export class NotebookAiError extends Error {

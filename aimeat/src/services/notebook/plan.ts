@@ -1,5 +1,5 @@
 /**
- * @file notebook-plan.ts
+ * @file src/services/notebook/plan.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Notebook stage 2 — AI enrichment PLANNER. Given a free-text note and the user's
@@ -23,15 +23,15 @@
  *     plan is minted and metered as `notebook:plan`.
  *   v1.3.0 — 2026-09-29 — planNote takes the caller's classification reader (TARGET-082).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { stripCodeblock } from './llm-strip.js';
-import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
-import type { AiCallerContext } from './ai/caller-context.js';
-import { buildPlacementContext, type PlacementOrganism } from './notebook-classify.js';
-import { NOTEBOOK_PLAN_SYSTEM, NOTEBOOK_PLAN_TEMPLATE } from './notebook-plan-prompt.js';
-import { logger } from '../utils/logger.js';
-import type { ContentReader } from './classification/reader.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { stripCodeblock } from '../llm-strip.js';
+import { NotebookAiError, resolveOwnerModel, completeOwner } from './ai.js';
+import type { AiCallerContext } from '../ai/caller-context.js';
+import { buildPlacementContext, type PlacementOrganism } from './classify.js';
+import { NOTEBOOK_PLAN_SYSTEM, NOTEBOOK_PLAN_TEMPLATE } from '../notebook-plan-prompt.js';
+import { logger } from '../../utils/logger.js';
+import type { ContentReader } from '../classification/reader.js';
 
 /** Step kinds the planner is allowed to emit (and the client can execute). `delegate` hands work to a
  *  fleet agent offer (async task); the others are self-run over OpenRouter + the librarian. */

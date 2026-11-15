@@ -5,7 +5,7 @@
  *   openrouter.apikey record.
  *
  *   WHY. Node 4.0.0 removes PUT /v1/openrouter/settings, so a key is set only on a provider from then
- *   on. resolveOwnerModel (services/notebook-ai.ts) read only the legacy record and answered
+ *   on. resolveOwnerModel (services/notebook/ai.ts) read only the legacy record and answered
  *   NO_OPENROUTER_KEY to every owner with a provider key; usage-summary.ts said `own_key: false`.
  *   Found by the 4.0.0 sweep's review of first-party readers of the removed route's records.
  * @usage cd aimeat && pnpm vitest run test/unit/notebook-ai-provider-key.test.ts
@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-10-13 — Initial (the 4.0.0 sweep).
  */
 import { describe, it, expect } from 'vitest';
-import { resolveOwnerModel } from '../../src/services/notebook-ai.js';
+import { resolveOwnerModel } from '../../src/services/notebook/ai.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 

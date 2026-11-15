@@ -2423,13 +2423,13 @@
       },
       "why": "Reviewed 2026-11-01, the node's own read: an existence check of the owner's onboarding.hello_mcp proof key for home-state and open-items (moved here from both). Only true or false leaves the function; no content is shown to anyone."
     },
-    "src/services/notebook-ai.ts": {
+    "src/services/notebook/ai.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key presence and AI settings."
     },
-    "src/services/notebook-classify.ts": {
+    "src/services/notebook/classify.ts": {
       "reads": {
         "listAllMemory": 1
       },

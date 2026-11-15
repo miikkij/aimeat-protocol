@@ -26,7 +26,7 @@ import { stripCodeblock } from './llm-strip.js';
 import { collectWorkspaceSummary } from './structure-overview.js';
 import type { ContentReader } from './classification/reader.js';
 import { validateMemoryWrite } from './schema-validator.js';
-import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
+import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook/ai.js';
 
 export interface TriageRecordType { namespace: string; name: string }
 export interface TriageWorkspace { id: string; name: string; recordTypes: TriageRecordType[] }

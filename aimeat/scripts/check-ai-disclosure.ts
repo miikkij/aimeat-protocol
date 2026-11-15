@@ -165,7 +165,7 @@ const LLM_CHOKEPOINT = 'src/services/ai/completion.ts';
  * Callers of the raw transport that are NOT the chokepoint.
  *
  * EMPTY, and that is the assertion. Phase 8 froze two real second paths here by name — the
- * owner-facing `POST /v1/openrouter/complete` and `services/notebook-ai.ts` — because naming a gap
+ * owner-facing `POST /v1/openrouter/complete` and `services/notebook/ai.ts` — because naming a gap
  * is better than hiding it. Phase 8b closed both, and emptying this list is what lets Phase 9 write
  * "content this node generates carries a record" in public without a footnote.
  *

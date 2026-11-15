@@ -41,7 +41,7 @@ import {
 import { triageMessage, fillRecord } from '../services/tracked-classify.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemory } from '../services/classification/present-memory.js';
-import { NotebookAiError } from '../services/notebook-ai.js';
+import { NotebookAiError } from '../services/notebook/ai.js';
 
 export function trackedResponsesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();

@@ -68,9 +68,9 @@ import { librarianSearch } from '../services/librarian.js';
 import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner/scope-read.js';
 import { readerFor } from '../services/classification/reader.js';
 import { aiCallerFromCredential, type AiCallerContext } from '../services/ai/caller-context.js';
-import { classifyNote, distributeNote } from '../services/notebook-classify.js';
-import { NotebookAiError } from '../services/notebook-ai.js';
-import { planNote } from '../services/notebook-plan.js';
+import { classifyNote, distributeNote } from '../services/notebook/classify.js';
+import { NotebookAiError } from '../services/notebook/ai.js';
+import { planNote } from '../services/notebook/plan.js';
 
 const MAX_LIMIT = 100;
 

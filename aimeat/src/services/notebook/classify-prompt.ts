@@ -1,5 +1,5 @@
 /**
- * @file notebook-classify-prompt.ts
+ * @file src/services/notebook/classify-prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Single source of truth for the notebook placement-classifier prompt. Imported BOTH by

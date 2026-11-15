@@ -23,7 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { NotebookAiError } from '../services/notebook-ai.js';
+import { NotebookAiError } from '../services/notebook/ai.js';
 import { authorLivingTemplate } from '../services/living-author.js';
 import { scanOwnerDue } from '../services/living-pulse.js';
 import { createLivingDocsService } from '../services/db/living-docs-db-service.js';
