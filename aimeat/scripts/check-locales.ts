@@ -18,7 +18,8 @@
  *         pnpm check:locales --list    (coverage only, always exit 0)
  * @version-history
  *   v1.6.0 — 2026-11-15 — PICTURE_WORDS: the door ratchet's model for the other words used as a
- *     picture of something else (road and way in first), one baseline file per word.
+ *     picture of something else (road and way in, hand, room, wall, and single images such as a
+ *     shelf or a shop window), one baseline file per word.
  *   v1.5.0 — 2026-11-15 — The same ratchet for "door" (fi "ovi", es "puerta"), with its own
  *     baseline security/locale-door-baseline.json, a map from id to the reason a real door or an
  *     idiom is allowed. The word had reached 64 English, 47 Finnish and 58 Spanish strings as a name
@@ -188,6 +189,17 @@ const PICTURE_WORDS: PictureWord[] = [
     },
     baseline: new URL('../security/locale-road-baseline.json', import.meta.url),
     fix: 'name what the reader does: sign in, three ways, this prompt, a link, all the steps',
+  },
+  {
+    // "by hand", "hands-on" and "into the wrong hands" are ordinary English and stay out of the pattern.
+    word: 'hand',
+    byLocale: {
+      en: /\b(?:by (?:your|my|their|his|her) own hands?|(?:your|my|their|own) hands\b|gets hands|a hand reaches|through your hands)/i,
+      fi: /(?<![\p{L}])(?:käsiisi|käsiesi|käsissään|käsissäsi|kädet|käsi ulottuu)(?![\p{L}])/iu,
+      es: /\b(?:en tus (?:propias )?manos|a través de tus manos|en la mano)\b/i,
+    },
+    baseline: new URL('../security/locale-hand-baseline.json', import.meta.url),
+    fix: 'say who does it: you revoke it yourself, your AI gets tools, it is the easiest button to find',
   },
 ];
 

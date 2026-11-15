@@ -293,7 +293,7 @@ const RATCHETS: Ratchet[] = [
     // Every entry is an answer (a real door, an idiom), so nothing in it is open.
     { file: 'aimeat/security/locale-door-baseline.json', label: 'Strings saying "door" to a person', check: 'check:locales', count: raw => Object.keys(JSON.parse(raw) as Record<string, string>).length, open: () => 0 },
     // The other picture words of check:locales: every entry is an answer too.
-    ...['road'].map(w => ({ file: `aimeat/security/locale-${w}-baseline.json`, label: `Strings using "${w}" as a picture`, check: 'check:locales', count: (raw: string) => Object.keys(JSON.parse(raw) as Record<string, string>).length, open: () => 0 })),
+    ...['road', 'hand'].map(w => ({ file: `aimeat/security/locale-${w}-baseline.json`, label: `Strings using "${w}" as a picture`, check: 'check:locales', count: (raw: string) => Object.keys(JSON.parse(raw) as Record<string, string>).length, open: () => 0 })),
     { file: 'aimeat/security/plain-language-baseline.json', label: 'Messages not in plain language', check: 'check:plain-language', count: listLength('messages'), open: listLength('messages') },
     { file: 'aimeat/security/mcp-schema-single-source.json', label: 'MCP schemas written by hand', check: 'check:mcp-schemas', count: listLength('tools'), open: listLength('tools') },
     { file: 'aimeat/security/connector-own-handlers.json', label: 'Connector handlers off dispatch', check: 'check:mcp-schemas', count: listLength('tools'), open: listLength('tools') },
