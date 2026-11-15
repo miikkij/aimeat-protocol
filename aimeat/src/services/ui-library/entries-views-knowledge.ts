@@ -7,6 +7,7 @@
  * @structure KNOWLEDGE_VIEW_ENTRIES
  * @usage import { KNOWLEDGE_VIEW_ENTRIES } from './entries-views-knowledge.js';
  * @version-history
+ *   v1.2.1 — 2026-11-15 — The count band and the setup guide name links and Copy buttons, not doors.
  *   v1.2.0 — 2026-09-27 — PagePreview's email and live (SitePreview folded in), from the admin pages.
  *   v1.1.1 — 2026-09-27 — SetupGuide draws its own names from setup-guide.css (formerly .ast-* in
  *     hello-mcp.css; a move).
@@ -197,17 +198,17 @@ export const KNOWLEDGE_VIEW_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'number-band', name: 'NumberBand', kind: 'component', status: 'active',
-        summary: 'The numbers of an account on a diagonal coral band with a sun stripe under it: each number big in the poster face with its word in small capitals under it, a door to the page it counts that turns sun under the pointer. No numbers, no band. The fitted band is as tall as its numbers, so a second row still stands on the coral; on a phone it is a solid coral block in two columns with the sun flat along its foot.',
+        summary: 'The numbers of an account on a diagonal coral band with a sun stripe under it: each number big in the poster face with its word in small capitals under it, a link to the page it counts that turns sun under the pointer. No numbers, no band. The fitted band is as tall as its numbers, so a second row still stands on the coral; on a phone it is a solid coral block in two columns with the sun flat along its foot.',
         module: '/components/NumberBand.js', sheet: '/css/components/number-band.css',
         data: {
             shape: 'NumberBand({ items, fitted })',
             fields: {
                 items: '[{ key, icon, n, label, onOpen, fine }]: the number, its word, where it leads; `fine` marks something earned (morsels); `icon` is said to nobody',
-                fitted: 'the band as tall as its numbers, the sun stripe near its foot, the words in the body face; in it a number without onOpen is a figure, not a door',
+                fitted: 'the band as tall as its numbers, the sun stripe near its foot, the words in the body face; in it a number without onOpen is a figure, not a link',
             },
         },
         useFor: ['The overview of Settings & Controls: how much the person has, each number a way to where it is.',
-            'The app catalogue\'s counts over its lists and over an opened app (fitted): numbers to read, not doors.'],
+            'The app catalogue\'s counts over its lists and over an opened app (fitted): numbers to read, not links.'],
         variants: [
             { name: 'earned', class: 'number-band-value--fine', prop: 'items[].fine', when: 'a number that counts something earned, such as morsels' },
             { name: 'fitted', class: 'number-band--fitted', prop: 'fitted', when: 'numbers to read, one row or two, on a band that fits them' },
@@ -258,7 +259,7 @@ export const KNOWLEDGE_VIEW_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'setup-guide', name: 'SetupGuide', kind: 'component', status: 'active',
-        summary: 'How to attach this node to one AI tool: a lead, the tools to pick from (the library\'s tab row, or the guide\'s own classic buttons) with a small "recommended" word, the one-click install row, the steps, the command with its copy door, what to put in each field with its copy door, and the vendor\'s own instructions as a more link. InstructionsDialog puts the organism\'s instruction block and where it goes in the reader\'s tool in the site\'s dialog. The tool picked is remembered in this browser.',
+        summary: 'How to attach this node to one AI tool: a lead, the tools to pick from (the library\'s tab row, or the guide\'s own classic buttons) with a small "recommended" word, the one-click install row, the steps, the command with its Copy button, what to put in each field with its Copy button, and the vendor\'s own instructions as a more link. InstructionsDialog puts the organism\'s instruction block and where it goes in the reader\'s tool in the site\'s dialog. The tool picked is remembered in this browser.',
         module: '/components/SetupGuide.js', sheet: '/css/components/setup-guide.css',
         classes: ['setup-guide', 'setup-guide-lead', 'setup-guide-tools', 'setup-guide-tool', 'setup-guide-tool--active', 'setup-guide-reco', 'setup-guide-plans', 'setup-guide-warn', 'setup-guide-steps', 'setup-guide-cmd', 'setup-guide-cmd-text', 'setup-guide-code', 'setup-guide-params', 'setup-guide-params-head', 'setup-guide-param', 'setup-guide-param-label', 'setup-guide-param-value', 'setup-guide-param-note', 'setup-guide-param-empty', 'setup-guide-note', 'setup-guide-modal', 'setup-guide-label', 'setup-guide-select', 'setup-guide-where', 'setup-guide-where-head', 'setup-guide-where-path'],
         data: {

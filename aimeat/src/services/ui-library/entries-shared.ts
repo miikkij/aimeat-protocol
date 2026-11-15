@@ -9,6 +9,7 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.10.2 — 2026-11-15 — The instruction block and StoreDoor name a button and a link, not doors.
  *   v1.10.1 — 2026-11-15 — mcp-install's summary reads "Quick setup", as its heading does.
  *   v1.10.0 — 2026-10-18 — ClassificationBadge (components/ClassificationBadge.js): how sensitive one thing
  *     is, beside the AudienceBadge, with a conflict as its own mark (plan doc-mvdipuyqraas, L4.2).
@@ -177,7 +178,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'instruction-block', name: 'InstructionBlock', kind: 'component', status: 'active',
-        summary: 'The copyable instruction block of one organism, in the three formats people paste it into (the AI chat\'s instructions, CLAUDE.md, AGENTS.md): the formats as the tab row, a line that says where the chosen one goes, the block in the typewriter face, and a row with its copy door and a grey line naming the organism and how many workspaces it was made from. A grey line while it loads or when it cannot be read.',
+        summary: 'The copyable instruction block of one organism, in the three formats people paste it into (the AI chat\'s instructions, CLAUDE.md, AGENTS.md): the formats as the tab row, a line that says where the chosen one goes, the block in the typewriter face, and a row with its Copy button and a grey line naming the organism and how many workspaces it was made from. A grey line while it loads or when it cannot be read.',
         module: '/components/InstructionBlock.js', sheet: '/css/components/instruction-block.css',
         data: {
             shape: 'InstructionBlock({ orgId })',
@@ -268,7 +269,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         data: {
             shape: 'StoreDoor({ class, label, newTab?, href?, soon?, code? }) · StoreSoonCode({ code }) · StoreSoonNote({ class, soon? })',
             fields: {
-                class: 'the page\'s own classes for the control (a door, a slab), kept on the "Opens soon" label',
+                class: 'the page\'s own classes for the control (a link, a slab), kept on the "Opens soon" label',
                 label: 'the link\'s words while the store is open',
                 newTab: 'false keeps a link that always opened in the same tab doing so',
                 href: 'the store\'s address; defaults to this node\'s store link',
@@ -279,7 +280,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         useFor: ['Any "get your own", pricing or store link on a public page.', 'The store section\'s "opens soon" sentence (StoreSoonNote): the operator\'s note for the page\'s language, or the default.'],
         variants: [],
         example: { class: 'ld-sh-door showroom-door', label: 'Get your own →' },
-        note: 'Added 2026-10-06 for aimeat.io, whose store showed its prices while its payments ran in test mode. .store-soon takes the pointer away and drops a door\'s link underline; nothing carries it while the store is open.',
+        note: 'Added 2026-10-06 for aimeat.io, whose store showed its prices while its payments ran in test mode. .store-soon takes the pointer away and drops a link\'s underline; nothing carries it while the store is open.',
     },
     {
         id: 'fingerprint', name: 'Fingerprint', kind: 'component', status: 'active',

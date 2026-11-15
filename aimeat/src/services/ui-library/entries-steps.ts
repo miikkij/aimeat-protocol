@@ -8,6 +8,7 @@
  * @structure STEP_ENTRIES
  * @usage import { STEP_ENTRIES } from './entries-steps.js';
  * @version-history
+ *   v1.2.2 — 2026-11-15 — PromptCard says prompt-driven workflow; FrontDoor's navigate serves buttons, not doors.
  *   v1.2.1 — 2026-11-15 — front-door's summary names the first block and its buttons, not a way in and doors.
  *   v1.2.0 — 2026-09-27 — PromptCard's loud and quiet (the copy's weight as a meaning, not a class).
  *   v1.1.0 — 2026-09-23 — AgentCard, LinkRow, AppList, TeachNote and the step card's done and limit
@@ -53,7 +54,7 @@ export const STEP_ENTRIES: UiEntryWritten[] = [
                 agents: 'connected agents it can be handed to', showPrompt: 'false folds the text away',
             },
         },
-        useFor: ['The prompt-driven road: a person runs the prompt in their own chat and brings the result back.'],
+        useFor: ['The prompt-driven workflow: a person runs the prompt in their own chat and brings the result back.'],
         variants: [
             { name: 'loud', prop: 'loud', when: 'the copy is the next move: the dark slab (.poster-slab)' },
             { name: 'quiet', prop: 'quiet', when: 'the prompt is copied, or one way among others: the action link (.poster-action)' },
@@ -130,7 +131,7 @@ export const STEP_ENTRIES: UiEntryWritten[] = [
         id: 'front-door', name: 'FrontDoor', kind: 'component', status: 'active',
         summary: 'The front page\'s first block: a headline, the let-your-AI-do-it box, and the register and sign-in buttons.',
         module: '/components/FrontDoor.js', sheet: '/css/components/front-door.css',
-        data: { shape: 'FrontDoor({ onNavigate })', fields: { onNavigate: 'the router\'s navigate, for the sign-in and register doors' } },
+        data: { shape: 'FrontDoor({ onNavigate })', fields: { onNavigate: 'the router\'s navigate, for the sign-in and register buttons' } },
         useFor: ['The front page (portal.welcome-door block). It reads its own prompt from the node.'],
         variants: [],
         example: {},

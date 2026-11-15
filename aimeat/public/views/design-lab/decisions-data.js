@@ -31,6 +31,7 @@
  *   What was built from them is in built-data.js (BUILT, BUILT_WITHOUT_DECISION).
  * @usage import { DECISIONS } from './decisions-data.js';
  * @version-history
+ *   v3.15.1 — 2026-11-15 — The action link's home sample names the top actions, not the top doors.
  *   v3.15.0 — 2026-09-27 — The admin crops find what the admin pages draw now that they are made of
  *     components (the menu count, the status mark, the tag on the sun, the filter tab).
  *   v3.14.0 — 2026-09-27 — Every crop names what its page draws now for the same thing (the
@@ -276,7 +277,7 @@ export const DECISIONS = [
       text: '.poster-action: Archivo .9rem 800 caps, 3px ink underline, coral on hover. The classic .btn-outline and .btn-ghost leave the poster pages.',
     },
     variants: [
-      { id: 'poster-action', name: 'Underlined capitals ("Settings")', code: '.poster-action (poster.css)', becomes: 'this is the proposal', look: 'Archivo .9rem 800 caps, 3px ink underline', where: 'the home: the top doors, the settings dialog', crop: home('.poster-masthead-actions .poster-action') },
+      { id: 'poster-action', name: 'Underlined capitals ("Settings")', code: '.poster-action (poster.css)', becomes: 'this is the proposal', look: 'Archivo .9rem 800 caps, 3px ink underline', where: 'the home: the top actions, the settings dialog', crop: home('.poster-masthead-actions .poster-action') },
       { id: 'fold', name: '"Show all" under a list', code: '.poster-fold (fold-button.css)', becomes: 'underlined capitals', look: 'mono coral words with an underline', where: 'the home: under a shortened list', crop: home('.poster-action--more') },
       { id: 'rail-action', name: 'The chat column actions ("Copy conversation")', code: '.poster-rail-action (rail-action.css)', becomes: 'underlined capitals', look: 'small ink underline, grey words', where: 'the chat: the side column', crop: { url: '/v1/chat', selector: '.poster-rail-action' } },
       { id: 'back', name: 'The back link ("Back to your home")', code: '.poster-back (back-link.css)', becomes: 'underlined capitals', look: 'mono coral words with ↩', where: 'the history page', crop: { url: '/v1/home?history=1', selector: '.poster-back' } },

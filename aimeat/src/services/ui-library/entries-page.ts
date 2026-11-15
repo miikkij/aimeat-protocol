@@ -9,6 +9,7 @@
  * @structure PAGE_ENTRIES
  * @usage import { PAGE_ENTRIES } from './entries-page.js';
  * @version-history
+ *   v1.8.2 — 2026-11-15 — Masthead and SettingsDoor summaries name actions and a link, not doors.
  *   v1.8.1 — 2026-11-03 — PageStart's example identity ends in a node id (alice@aimeat-fi-001-genesis), not
  *     a web host: an identity is name@node-id, and an agent copying alice@aimeat.io sent a DM nowhere.
  *   v1.8.0 — 2026-10-03 — PageStart: what a page is for, what to do first and what happens next (guidance part B).
@@ -185,11 +186,11 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'masthead', name: 'Masthead', kind: 'component', status: 'active',
-        summary: 'The top of a person\'s page: the avatar in its frame, the name as a headline, the identity line, and the doors on the right.',
+        summary: 'The top of a person\'s page: the avatar in its frame, the name as a headline, the identity line, and the actions on the right.',
         module: '/components/Masthead.js', sheet: '/css/components/masthead.css',
         data: {
             shape: 'Masthead({ avatarSvg, name, identity, identityTitle, plate, onAvatar, avatarTitle, children }) · MastheadButton({ onClick, children }) · MastheadCog',
-            fields: { avatarSvg: 'the avatar as an SVG string', name: 'the person\'s name', identity: 'their address on this node', identityTitle: 'the full identity on hover', plate: 'what a page adds under the address (the Settings overview: this AIMEAT\'s address and its marks)', onAvatar: 'makes the picture a control that opens something', avatarTitle: 'the name of that control', children: 'the doors: links with poster-action, or a MastheadButton' },
+            fields: { avatarSvg: 'the avatar as an SVG string', name: 'the person\'s name', identity: 'their address on this node', identityTitle: 'the full identity on hover', plate: 'what a page adds under the address (the Settings overview: this AIMEAT\'s address and its marks)', onAvatar: 'makes the picture a control that opens something', avatarTitle: 'the name of that control', children: 'the actions: links with poster-action, or a MastheadButton' },
         },
         useFor: ['The home, the Settings overview and any page that belongs to one person.'],
         variants: [],
@@ -438,9 +439,9 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'settings-door', name: 'SettingsDoor', kind: 'component', status: 'active',
-        summary: 'A way out of a dialog to the full settings, as a row under the 3px ink rule.',
+        summary: 'A link from a dialog to the full settings, as a row under the 3px ink rule.',
         module: '/components/SettingsDoor.js', sheet: '/css/components/settings-door.css',
-        data: { shape: 'SettingsDoor({ href, title, hint })', fields: { href: 'the full settings', title: 'the door words', hint: 'what is there' } },
+        data: { shape: 'SettingsDoor({ href, title, hint })', fields: { href: 'the full settings', title: 'the link\'s words', hint: 'what is there' } },
         useFor: ['The last row of a small settings dialog.'],
         variants: [],
         example: { href: '/v1/profile', title: 'All settings →', hint: 'Your account, your agents and your keys.' },

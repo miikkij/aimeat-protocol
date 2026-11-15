@@ -9,6 +9,7 @@
  * @structure PAGE_KIT_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { PAGE_KIT_DEMOS } from './demos-page-kit.js';
  * @version-history
+ *   v1.5.1 — 2026-11-15 — Demo names and sample words say actions, not doors.
  *   v1.5.0 — 2026-11-01 — PageSection's `step`: three numbered steps in a raised box (WP9b).
  *   v1.4.0 — 2026-10-11 — PageSection's `ends`, shown as two small bands in a row.
  *   v1.3.0 — 2026-09-27 — What appcat added: Tabs' line, glyph, caption and fill; Layout's step 'part'
@@ -137,7 +138,7 @@ export const PAGE_KIT_DEMOS = {
         doors=${html`<${Action} small onClick=${noop}>Open<//>`}><${Note} kind="lead">Lumo Bakery's order page, as its visitors see it.<//><//>
         <${Section} chapter="02 / 19" id="dl-pk-s10" title="About"><${Note} kind="lead">The next chapter stands far below the one before.<//><//>`) },
     { name: 'chapter, long title', render: () => inPage(html`<${Section} chapter="07 / 19" id="dl-pk-s11" title=${LONG}
-        doors=${html`<${Action} small onClick=${noop}>Edit<//>`}><${Note} kind="lead">A long title wraps on the slab and the doors go under it.<//><//>`) },
+        doors=${html`<${Action} small onClick=${noop}>Edit<//>`}><${Note} kind="lead">A long title wraps on the slab and the actions go under it.<//><//>`) },
     { name: 'part of a dialog', render: () => html`<${SettingsRoot}><${Section} part id="dl-pk-s12" title="Appearance"><${Note} kind="lead">The look and the language of the catalogue.<//><//>
         <${Section} part id="dl-pk-s13" title="Server"><${Note} kind="lead">Where the catalogue keeps your apps.<//><//><//>` },
   ] },
@@ -299,11 +300,11 @@ export const PAGE_KIT_DEMOS = {
     { name: 'list that folds, shut', render: () => inPage(html`<${PageSection} list id="dl-pk-p7" title="Community apps" count=${44}
         onFold=${noop} folded foldLabel="Show or hide the community apps"><${Note} kind="lead">Hidden while the list is folded.<//><//>`) },
     { name: 'list, its place before the headline', render: () => inPage(html`<${PageSection} list plain id="dl-pk-p8"><${Note} kind="loading">Loading your apps…<//><//>`) },
-    { name: 'chapter, its doors and lead', render: () => inPage(html`<${PageSection} chapter="03 / 19" id="dl-pk-p9" title="About"
+    { name: 'chapter, its actions and lead', render: () => inPage(html`<${PageSection} chapter="03 / 19" id="dl-pk-p9" title="About"
         doors=${html`<${Action} small onClick=${noop}>Edit<//>`}>
         <${Note} kind="lead" chapter>The seasonal timetable of Nordic Ferries, with the harbour notices beside each crossing.<//>
         <${Actions} chapter><${Loud} control onClick=${noop}>Launch<//><${Action} small onClick=${noop}>Copy the link<//><${Action} small disabled>Publish<//><//><//>`) },
-    { name: 'record lead, doors apart and tight', render: () => inPage(html`<${PageSection} id="dl-pk-p10" num="05" title="Who answers for this app">
+    { name: 'record lead, actions apart and tight', render: () => inPage(html`<${PageSection} id="dl-pk-p10" num="05" title="Who answers for this app">
         <${Note} kind="lead" size="record">Reviewed by sandbox, declared on 2026-09-20.<//>
         <${Actions} apart><${Action} small onClick=${noop}>Change the wording<//><//>
         <${Actions} tight><${Action} small onClick=${noop}>Add a skill<//><${Action} small onClick=${noop}>ferry-notices<//><${Action} small onClick=${noop}>Bind<//><//><//>`) },

@@ -9,6 +9,7 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.18.1 — 2026-11-15 — Quick setup's sample lead and the front-page section samples drop "way in" and "room".
  *   v1.18.0 — 2026-11-09 — Fingerprint's demo: panel and row on a small invented profile.
  *   v1.17.0 — 2026-10-18 — ClassificationBadge's demo: the four default classifications, one from a
  *     workspace, a conflict and an exception beside the AudienceBadge.
@@ -150,7 +151,7 @@ export const SHARED_DEMOS = {
     { name: 'compact', render: () => html`<${ManagedEnvNote} compact=${true} />` },
   ] },
   'mcp-install': { variants: [
-    { name: 'quick connect', render: (ex) => html`<${McpQuickConnect} serverName=${ex.serverName} title=${ex.title} lead="The shortest way in, for each tool." />` },
+    { name: 'quick connect', render: (ex) => html`<${McpQuickConnect} serverName=${ex.serverName} title=${ex.title} lead="The quickest setup, for each tool." />` },
   ] },
   'contact-picker': { height: 320, variants: [
     { name: 'default', render: (ex) => html`<${ContactPicker} value=${ex.value} placeholder=${ex.placeholder} onChange=${noop} onSubmit=${noop} />` },
@@ -262,8 +263,8 @@ export const SHAPE_DEMOS = {
     { name: 'sun', render: () => el('section', 'showroom-band showroom-band--sun', 'The sun band.') },
   ] },
   'showroom-section': { variants: [
-    { name: 'default', render: () => el('div', 'showroom-section', 'A room on the front page.') },
-    { name: 'coral', render: () => el('div', 'showroom-section showroom-section--coral', 'A room with a coral shadow.') },
+    { name: 'default', render: () => el('div', 'showroom-section', 'A section on the front page.') },
+    { name: 'coral', render: () => el('div', 'showroom-section showroom-section--coral', 'A section with a coral shadow.') },
   ] },
   'showroom-door': { variants: [{ name: 'default', render: () => html`<a class="showroom-door" href="#">See how it works</a>` }] },
   'showroom-slab': { variants: [

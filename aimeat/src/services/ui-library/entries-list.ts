@@ -7,6 +7,7 @@
  * @structure LIST_ENTRIES
  * @usage import { LIST_ENTRIES } from './entries-list.js';
  * @version-history
+ *   v1.3.1 — 2026-11-15 — Catalogue summaries name actions, not doors.
  *   v1.3.0 — 2026-09-27 — What appcat added to the List: index, tone (nine tones, drawn by list-tones.css), Row
  *     order, SearchLine big and id.
  *   v1.2.0 — 2026-09-27 — What the admin pages added to the List: labels, stackWide, the sortable head, the notice
@@ -20,7 +21,7 @@ import type { UiEntryWritten } from './types.js';
 export const LIST_ENTRIES: UiEntryWritten[] = [
     {
         id: 'list', name: 'List', kind: 'component', status: 'active',
-        summary: 'Things in rows of columns, one thing per row, between hairlines: a mark at the start (a picture, a tick, a thumbnail or a check box), the name in bold with a small grey typewriter line under it, what it is in grey, who has it, its figures at the right, its dates, and the doors at the end with the ⋯ menu. A row can open a raised panel under it, be picked, be selected, be dragged or carry a heavy rail in a warn or a chosen colour. The list says when it is loading or empty and groups rows under headings that fold; around it stand the filters with their counts, the search line and the line that shows more. As the app catalogue\'s index it is a numbered line per thing, the opened one on the sun; its tones draw the catalogue\'s detail lists (a history of versions, switches, a table of counts, entries, a log, pages, a tree, the saves of a working copy).',
+        summary: 'Things in rows of columns, one thing per row, between hairlines: a mark at the start (a picture, a tick, a thumbnail or a check box), the name in bold with a small grey typewriter line under it, what it is in grey, who has it, its figures at the right, its dates, and the actions at the end with the ⋯ menu. A row can open a raised panel under it, be picked, be selected, be dragged or carry a heavy rail in a warn or a chosen colour. The list says when it is loading or empty and groups rows under headings that fold; around it stand the filters with their counts, the search line and the line that shows more. As the app catalogue\'s index it is a numbered line per thing, the opened one on the sun; its tones draw the catalogue\'s detail lists (a history of versions, switches, a table of counts, entries, a log, pages, a tree, the saves of a working copy).',
         module: '/components/List.js', sheet: '/css/components/list.css',
         data: {
             shape: 'List({ cols, keepCols, head, empty, loading, dense, under, small, scroll, apart, labels, stackWide, index, tone, id, rows, render, children }) · '
@@ -42,7 +43,7 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 'List.head': 'the heading row: a string or a node per column, or { label, num: true, title } for a label over a figure column (at the right); { label, onSort, sorted } makes the column\'s name the button that sorts the list by it, coral while sorted',
                 'List.labels': 'when the rows stack on a phone, each cell after the first says its column\'s name (the head\'s words) before its value, in grey',
                 'List.stackWide': 'a list of many columns stacks already under 1180px, not 860px, its labels said from there',
-                'List.index': 'the app catalogue\'s numbered index (with the cut n-mark-name-desc-state-n-arrow): each row its own line on the page\'s ground, the row under the pointer on the surface, the opened row on the sun, its panel a line of doors with the words about it at the right over an ink rule; the rows come in one after another; on a phone a row wraps',
+                'List.index': 'the app catalogue\'s numbered index (with the cut n-mark-name-desc-state-n-arrow): each row its own line on the page\'s ground, the row under the pointer on the surface, the opened row on the sun, its panel a line of actions with the words about it at the right over an ink rule; the rows come in one after another; on a phone a row wraps',
                 'List.tone': 'history | switches | counts | entries | log | pages | releases | tree | checkpoints: the app catalogue\'s detail lists, each with the old catalogue\'s own shape (list-tones.css draws them)',
                 'List.empty': 'what stands in the list\'s place when there are no rows: a string (the quiet line) or a node (words and a button)',
                 'List.loading': 'true (the loading line) or the words to say, in the list\'s place',
@@ -73,7 +74,7 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 'Row.onDragStart': 'the drag begins', 'Row.onDragOver': 'a drag moves over the row', 'Row.onDragLeave': 'a drag leaves the row',
                 'Row.onDrop': 'a row is dropped here', 'Row.onDragEnd': 'the drag ends',
                 'Row.hover': 'a row that opens nothing still answers the pointer: the name turns coral, a linked name too',
-                'Row.quietDoors': 'the row\'s doors show only while the pointer or the keyboard is on the row, or it is open or selected; they stay in the tab order, and on a phone they show on the opened or selected row only',
+                'Row.quietDoors': 'the row\'s actions show only while the pointer or the keyboard is on the row, or it is open or selected; they stay in the tab order, and on a phone they show on the opened or selected row only',
                 'Row.below': 'what always shows under the row, across it, without a frame (the row\'s rule falls under it)',
                 'Row.panel': 'what the opened row shows, drawn in a Panel', 'Row.panelDoors': 'the actions at the foot of that panel',
                 'Row.id': 'the anchor a page scrolls to (the first cell carries it)',
@@ -139,7 +140,7 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 'SearchLine.id': 'the field\'s own id, for a key that brings the focus to it',
                 'SearchLine.children': 'a button, a hint or a loading line after the field',
                 'More.label': 'the words of "show N more"', 'More.onMore': 'shows more; the action stands only while it is given', 'More.disabled': 'the action cannot be pressed now',
-                'More.note': 'how many are shown ("12 of 40")', 'More.wrap': 'the line wraps on a phone', 'More.children': 'the other doors of the list\'s foot',
+                'More.note': 'how many are shown ("12 of 40")', 'More.wrap': 'the line wraps on a phone', 'More.children': 'the other actions of the list\'s foot',
             },
         },
         useFor: [
@@ -184,26 +185,26 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
             { name: 'filter at the end', class: 'list-filter--end', prop: 'Filter end', when: 'the filter that stands apart at the row\'s end' },
             { name: 'time warn', class: 'list-when--warn', prop: 'When warn', when: 'a time that needs a look' },
             { name: 'lines', class: 'list-lines--3', prop: 'Desc lines={3}', when: 'a long description kept to its first lines' },
-            { name: 'more wraps', class: 'list-more--wrap', prop: 'More wrap', when: 'a list foot with several doors' },
+            { name: 'more wraps', class: 'list-more--wrap', prop: 'More wrap', when: 'a list foot with several actions' },
             { name: 'labels', class: 'list--labels', prop: 'List labels head', when: 'a table of many columns: stacked on a phone, each value says its column\'s name' },
             { name: 'stacks wide', class: 'list--stack-wide', prop: 'List stackWide', when: 'so many columns that they stack already under 1180px' },
             { name: 'sorts', class: 'list-sort', prop: 'head [{ label, onSort, sorted }]', when: 'a column\'s name that sorts the list; coral while the list is sorted by it (.is-sorted)' },
             { name: 'notice rail', class: 'list-row--notice', prop: 'Row rail="notice"', when: 'a thing past its limit: the heavy coral line at the row\'s start' },
-            { name: 'quiet doors', class: 'list-row--quiet-doors', prop: 'Row quietDoors', when: 'a long list whose doors belong to one row at a time: they show under the pointer, in focus, open or selected' },
+            { name: 'quiet actions', class: 'list-row--quiet-doors', prop: 'Row quietDoors', when: 'a long list whose actions belong to one row at a time: they show under the pointer, in focus, open or selected' },
             { name: 'name marks', class: 'list-marks', prop: 'Name marks', when: 'the parts a thing carries, as tags under its name' },
             { name: 'followed link', prop: 'Name href onFollow', when: 'a name that opens the thing in place and keeps its address for a new tab' },
             { name: 'menu divider', prop: 'Doors menu [{ divider: true }]', when: 'a ⋯ menu whose rows fall in two groups' },
             { name: 'find', prop: 'SearchLine find', when: 'an operator page\'s search, with the magnifier before the field (.search-line-glass, search-line.css)' },
-            { name: 'index', class: 'list--index', prop: 'List index cols="n-mark-name-desc-state-n-arrow"', when: 'the app catalogue\'s numbered index: one line per app, the opened row on the sun with its doors in a line under it' },
+            { name: 'index', class: 'list--index', prop: 'List index cols="n-mark-name-desc-state-n-arrow"', when: 'the app catalogue\'s numbered index: one line per app, the opened row on the sun with its actions in a line under it' },
             { name: 'coming in', prop: 'Row order', when: 'the rows of an index come in one after another, each a little later than the one before' },
             { name: 'big search', prop: 'SearchLine big id', when: 'the page\'s one search, bold on a heavy underline, its order row at its foot (.search-line--big, search-line.css)' },
-            { name: 'history', prop: 'List tone="history"', when: 'the states a thing had, newest first: one line each, its number in the poster face, its facts in typewriter, its doors coral typewriter words' },
-            { name: 'switches', prop: 'List tone="switches"', when: 'a setting per row: its name, what its state means, the door that changes it' },
+            { name: 'history', prop: 'List tone="history"', when: 'the states a thing had, newest first: one line each, its number in the poster face, its facts in typewriter, its actions coral typewriter words' },
+            { name: 'switches', prop: 'List tone="switches"', when: 'a setting per row: its name, what its state means, the action that changes it' },
             { name: 'counts', prop: 'List tone="counts"', when: 'a small table of counts: the head in coral capitals over the ink rule, the counts in typewriter at the right' },
             { name: 'entries', prop: 'List tone="entries"', when: 'named entries, each a paragraph under its name, the heavy rule over the first' },
             { name: 'log', prop: 'List tone="log"', when: 'what was done, newest first: one wrapping line each, the date and who in grey typewriter, the act in coral typewriter capitals, the name bold' },
-            { name: 'pages', prop: 'List tone="pages"', when: 'a page a thing ought to have per row: its name with its marks after it and why under it, the doors beside both, its editor under the row' },
-            { name: 'releases', prop: 'List tone="releases"', when: 'every version kept, in a dialog: the history\'s look with smaller facts and plain typewriter doors' },
+            { name: 'pages', prop: 'List tone="pages"', when: 'a page a thing ought to have per row: its name with its marks after it and why under it, the actions beside both, its editor under the row' },
+            { name: 'releases', prop: 'List tone="releases"', when: 'every version kept, in a dialog: the history\'s look with smaller facts and plain typewriter actions' },
             { name: 'tree', prop: 'List tone="tree"', when: 'a tree of plain lines, each level 16px further in, its state a small coloured word; Name attention marks the one the tree is about' },
             { name: 'checkpoints', prop: 'List tone="checkpoints"', when: 'the saves a working copy passed: the history\'s rows with the time bold and the note under it' },
         ],

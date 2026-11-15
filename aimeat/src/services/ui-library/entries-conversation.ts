@@ -8,6 +8,7 @@
  * @structure CONVERSATION_ENTRIES
  * @usage import { CONVERSATION_ENTRIES } from './entries-conversation.js';
  * @version-history
+ *   v1.6.2 — 2026-11-15 — PaneDoor's onClick is named a button, not a door.
  *   v1.6.1 — 2026-11-03 — The AI status example's agent identity ends in a node id, not a web host
  *     (an identity is name#owner@node-id).
  *   v1.6.0 — 2026-09-27 — What the chat and the admin pages added: ConversationCopy and ConversationCap ways,
@@ -382,7 +383,7 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
                 picture: 'PaneHead: a seed for the Avatar', name: 'who', nameTitle: 'the name\'s tooltip (the address)', presence: 'a GHII whose presence word is shown (fetched from the node)',
                 subject: 'the conversation\'s subject', via: '"sent by your agent"', address: 'the address, kept for a screen reader', before: 'what stands before the picture',
                 mark: 'PaneDoor: the mark that stays when the words go (🔊)', label: 'the words; ReplyBar: "↩ Replying to …"', title: 'the tooltip',
-                pressed: 'PaneDoor: it is on (read aloud)', onClick: 'what the door does', text: 'ReplyBar: the quoted words', onJump: 'ReplyBar: jumps to the quoted message',
+                pressed: 'PaneDoor: it is on (read aloud)', onClick: 'PaneDoor: what the button does', text: 'ReplyBar: the quoted words', onJump: 'ReplyBar: jumps to the quoted message',
                 cancelLabel: 'ReplyBar: the ✕\'s name', onCancel: 'ReplyBar: drops the quote', grey: 'PaneStrip: on the grey ground (a command to fill in, a schedule)',
                 children: 'what each part holds',
             },

@@ -15,6 +15,7 @@
  * @structure CONFLICT_SAMPLES — { [decisionId]: [{ id, measure, solo?, render(), after }] } · CONFLICT_PROPOSALS — { [decisionId]: { measure, render() } }
  * @usage import { CONFLICT_SAMPLES, CONFLICT_PROPOSALS } from './decision-samples-conflicts.js';
  * @version-history
+ *   v1.4.4 — 2026-11-15 — The sample Concierge is the first contact, not the front door.
  *   v1.4.3 — 2026-10-12 — The walkthrough line names the ecosystem app guide, which took in the
  *     automation how-to (docs audit phase 5b).
  *   v1.4.2 — 2026-10-11 — The ecosystem sample's walkthrough line names the guide's GitHub address.
@@ -228,7 +229,7 @@ const WALLET_STEPS = [['Create a Stripe account and activate payments:', 'dashbo
 const CAL_PROPOSALS = ['Ask for the answer in one sentence first, then the reasons.', 'Name the reader the answer is for.', 'Drop the example that shows a list: the target output has none.'];
 const MCP_STEPS = ['Open claude.ai and go to Settings, then Connectors. On Pro and Max the path is Customize > Connectors.', 'Click + and then Add custom connector.',
   'Fill the fields with the values below and click Add.', 'Sign in to this node in the tab that opens, with your own account.', 'Start a NEW conversation.'];
-const BASIC_AGENTS = [['Concierge', 'Always on', 'The front door. Takes what arrives, works out what it is about, answers what it can, and hands the rest to whoever should have it.'],
+const BASIC_AGENTS = [['Concierge', 'Always on', 'The first contact. Takes what arrives, works out what it is about, answers what it can, and hands the rest to whoever should have it.'],
   ['Workflow manager', 'On demand', 'Orders work from your other agents and keeps track of what came back.']];
 /** The words of a server's setup steps carry their own number (profile.nodes.setupStep1-4). */
 const NODE_STEPS = ['1. Open a WebSocket tunnel to the address above, sending your token in the Authorization header.', '2. Send a heartbeat message every 30 seconds. Without it the server is marked offline.',

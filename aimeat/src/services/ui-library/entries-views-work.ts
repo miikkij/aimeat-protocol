@@ -7,6 +7,7 @@
  * @structure WORK_VIEW_ENTRIES
  * @usage import { WORK_VIEW_ENTRIES } from './entries-views-work.js';
  * @version-history
+ *   v1.2.1 — 2026-11-15 — EcoAutomation's note names a job's actions, not its doors.
  *   v1.2.0 — 2026-09-27 — The Score chart, Offer map, Offer request, Rating stars, Week rhythm, Job chips,
  *     Workflow steps, Morsel flow, Schedule calendar and Ecosystem automation move here from
  *     entries-settings.ts (past its length limit), each rewritten to its component's API; the Offer
@@ -91,7 +92,7 @@ export const WORK_VIEW_ENTRIES: UiEntryWritten[] = [
                 before: 'what stands before the title: the step\'s kind as a tag',
                 title: 'the step, in bold',
                 after: 'what stands after the title: the agent it goes to, a status, where a piece goes',
-                doors: 'the ways at the step\'s foot',
+                doors: 'the actions at the step\'s foot',
                 children: 'the lines under the head, often a PlanNote',
                 PlanNote: 'the grey line in italics: the plan\'s summary, a step\'s reason, what a step waits for',
             },
@@ -376,6 +377,6 @@ export const WORK_VIEW_ENTRIES: UiEntryWritten[] = [
             { name: 'run log', class: 'eco-automation-log', prop: 'RunLog', when: 'a job\'s past runs' },
         ],
         example: { steps: ['1. What this app produces', '2. Run on a schedule'], stages: [{ state: 'ok', label: 'Published' }, { state: 'wait', label: 'Processed' }, { state: 'off', label: 'Delivered' }] },
-        note: 'Moved unchanged out of views/profile.css on 2026-09-25; on 2026-09-26 it became components/EcoAutomation.js, which the ecosystem tab gives its data for each connected app. On 2026-09-27 it took its own class names (.pf-eco-auto-* and .pf-eco-recipe-head → .eco-automation-*), and the card\'s poster rule moved in from profile-poster.css; every rule kept. The produced facts, the schedule\'s controls, a job\'s facts and doors and the agents\' tags are drawn by the kit now (Stack, Row, Check, Actions, Marks), so their rules went.',
+        note: 'Moved unchanged out of views/profile.css on 2026-09-25; on 2026-09-26 it became components/EcoAutomation.js, which the ecosystem tab gives its data for each connected app. On 2026-09-27 it took its own class names (.pf-eco-auto-* and .pf-eco-recipe-head → .eco-automation-*), and the card\'s poster rule moved in from profile-poster.css; every rule kept. The produced facts, the schedule\'s controls, a job\'s facts and actions and the agents\' tags are drawn by the kit now (Stack, Row, Check, Actions, Marks), so their rules went.',
     },
 ];

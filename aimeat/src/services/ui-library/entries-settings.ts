@@ -8,6 +8,7 @@
  * @structure SETTINGS_ENTRIES
  * @usage import { SETTINGS_ENTRIES } from './entries-settings.js';
  * @version-history
+ *   v1.91.1 — 2026-11-15 — Catalogue summaries name actions, links and options, not doors, roads or the showroom face.
  *   v1.91.0 — 2026-11-01 — PageSection step: a numbered step of a procedure on a page (WP9b).
  *   v1.90.0 — 2026-10-11 — PageSection ends: a section that shows where it stops (the home's agent pages).
  *   v1.89.0 — 2026-09-27 — What appcat added: the Rail's ink tone; the crumb sheet's dashed, inline and file
@@ -230,9 +231,9 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         variants: [
             { name: 'link', class: 'og-crumb-link', prop: '{ label, onClick } | { label, href }', when: 'a step you can go back to' },
             { name: 'here', class: 'og-crumb-here', prop: 'the last string | { label, here: true }', when: 'the page you are on' },
-            { name: 'dashed word', class: 'og-crumb-link--dashed', prop: 'Action tone="dashed" (Action.js)', when: 'a door inside running text: the coral word over a dashed coral line that turns solid under the pointer (the app catalogue\'s "generated" in its Add dialog)' },
+            { name: 'dashed word', class: 'og-crumb-link--dashed', prop: 'Action tone="dashed" (Action.js)', when: 'a link inside running text: the coral word over a dashed coral line that turns solid under the pointer (the app catalogue\'s "generated" in its Add dialog)' },
             { name: 'inline word', class: 'og-crumb-link--inline', prop: 'Action tone="inline" (Action.js; small for .og-crumb-link--small)', when: 'an ink word inside running text, bold, over an ink line that turns coral under the pointer (the app catalogue\'s "Read Article 50 →" and a legal page\'s "Open →")' },
-            { name: 'file link', class: 'og-crumb-link--file', prop: 'Action tone="file" (Action.js)', when: 'a link to a file: the coral word in the typewriter face, a step smaller, underlined only under the pointer; a row of doors holding one keeps its words 18px apart (the app catalogue\'s "View odps.yaml")' },
+            { name: 'file link', class: 'og-crumb-link--file', prop: 'Action tone="file" (Action.js)', when: 'a link to a file: the coral word in the typewriter face, a step smaller, underlined only under the pointer; a row of actions holding one keeps its words 18px apart (the app catalogue\'s "View odps.yaml")' },
         ],
         example: { steps: ['Settings', { label: 'Organisms', onClick: '…' }, 'Harbour Studio'] },
         note: 'It replaced the crumb() helper in each views/profile/<page>/frame.js and the og-crumb markup the pages wrote by hand. Its link word is also the look of Action tone="link", and on 2026-09-27 appcat, the app catalogue rebuilt on components, added three more Action tones here: dashed (the old catalogue\'s .cat-dashed), inline (.mk-legal-link, .lg-open) and file (.od-link). Action.js draws them; the action entry describes the component.',
@@ -272,7 +273,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'page-section', name: 'PageSection', kind: 'component', status: 'active',
-        summary: 'An open section of a page: the heavy rule on top (or the section title\'s own), the ink section title with a small coral mono number or count beside it, the section\'s actions at the right, and the body. The plain cut has no head, only the rule and the body. A list\'s headline is the dark slab across the column with the count in the slab\'s letters and can fold the list; a chapter of a long page of one thing has its coral "03 / 19" over the slab, its doors on the slab and much air above; a part of a dialog\'s body has a smaller slab title.',
+        summary: 'An open section of a page: the heavy rule on top (or the section title\'s own), the ink section title with a small coral mono number or count beside it, the section\'s actions at the right, and the body. The plain cut has no head, only the rule and the body. A list\'s headline is the dark slab across the column with the count in the slab\'s letters and can fold the list; a chapter of a long page of one thing has its coral "03 / 19" over the slab, its actions on the slab and much air above; a part of a dialog\'s body has a smaller slab title.',
         module: '/components/PageSection.js', sheet: '/css/components/page-section.css',
         data: {
             shape: 'PageSection({ id, num, title, count, doors, first, plain, band, group, ends, chapter, list, onFold, folded, foldLabel, foot, spaced, part, step, children })',
@@ -300,7 +301,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'group', class: 'og-sec--group', prop: 'group', when: 'a section that holds a group of sections, its band smaller and across the column (the admin Config domains)' },
             { name: 'ends', class: 'og-sec--ends', prop: 'ends', when: 'several sections follow each other on one long page and each must show where it stops (the home\'s agent page: "Give it a task", "Talk to it", "Latest work")' },
             { name: 'split', class: 'og-split', prop: 'Split (Layout.js)', when: 'a part of a section set off by a hairline: its last actions, a group inside it' },
-            { name: 'side split', class: 'og-split--side', prop: 'Split side (Layout.js)', when: 'the line at the part\'s start and the part indented: a quieter side door' },
+            { name: 'side split', class: 'og-split--side', prop: 'Split side (Layout.js)', when: 'the line at the part\'s start and the part indented: a quieter extra part that belongs to what is above it' },
             { name: 'list', class: 'og-sec--list', prop: 'list', when: 'the headline over a list of things with its count on the slab (the app catalogue\'s "Your apps · 12")' },
             { name: 'list that folds', class: 'og-sec-fold', prop: 'list onFold folded foldLabel', when: 'a list a person may put away: its headline folds it, the arrow at its end says open or shut (the app catalogue\'s community list)' },
             { name: 'list, its place', prop: 'list plain', when: 'the place of a list whose headline is not shown yet: its waiting and empty blocks, the list\'s air, no rule' },
@@ -309,14 +310,14 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'chapter', class: 'og-sec--chapter', prop: 'chapter="03 / 19"', when: 'a chapter of a long page of one thing (an app\'s detail): the big air above says the previous one ended' },
             { name: 'dialog part', prop: 'part', when: 'a part of a dialog\'s body under its own slab title (the app catalogue\'s Settings and Help dialogs)' },
             { name: 'step', class: 'og-sec--step', prop: 'step num="1"', when: 'one of the numbered steps a person takes in order on one page, each with its own controls (the share link page: accept the terms, take the key, connect)' },
-            { name: 'chapter doors', class: 'og-doors--chapter', prop: 'Actions chapter (Action.js)', when: 'the door row of a chapter: its words and slabs a step smaller and 24px apart, a door that cannot be pressed at half strength' },
-            { name: 'doors apart', class: 'og-doors--apart', prop: 'Actions apart (Action.js)', when: 'a row of one door with 10px of air above and below it' },
-            { name: 'doors tight', class: 'og-doors--tight', prop: 'Actions tight (Action.js)', when: 'a picker\'s row of a door, a choice and a door, 8px apart' },
+            { name: 'chapter actions', class: 'og-doors--chapter', prop: 'Actions chapter (Action.js)', when: 'the row of actions of a chapter: its words and slabs a step smaller and 24px apart, an action that cannot be pressed at half strength' },
+            { name: 'actions apart', class: 'og-doors--apart', prop: 'Actions apart (Action.js)', when: 'a row of one action with 10px of air above and below it' },
+            { name: 'actions tight', class: 'og-doors--tight', prop: 'Actions tight (Action.js)', when: 'a picker\'s row of an action, a choice and an action, 8px apart' },
             { name: 'chapter lead', class: 'og-lead--chapter', prop: 'Note kind="lead" chapter (Note.js)', when: 'a chapter\'s opening words: ink at the reading size, 14px over what follows' },
             { name: 'record lead', class: 'og-lead--record', prop: 'Note kind="lead" size="record" (Note.js)', when: 'a statement on the record in semibold ink ("Reviewed by …, declared …")' },
         ],
         example: { id: 'og-people', num: '02', title: 'People', doors: 'Invite', children: '…' },
-        note: 'The sheet also holds the lead (.og-lead, drawn by Note kind="lead"), the hint (.og-hint) and its label cut (.og-hint--label), which no page writes now, and the split\'s lines that Layout\'s Split draws. On 2026-09-27 appcat, the app catalogue rebuilt on components, added list with its fold, foot and spaced (the old catalogue\'s .cat-list-title, .published-header, .cat-list-foot and #local-apps-header), chapter (its detail sections, .dtl-section), part (its dialogs\' section.poster-section), and in this sheet the door rows Actions chapter, apart and tight (.dtl-btn-row, .dtl-seo-switch, the skill picker row) and the leads Note chapter and size record (.dtl-desc, .mk-author-is); Action.js and Note.js draw those.',
+        note: 'The sheet also holds the lead (.og-lead, drawn by Note kind="lead"), the hint (.og-hint) and its label cut (.og-hint--label), which no page writes now, and the split\'s lines that Layout\'s Split draws. On 2026-09-27 appcat, the app catalogue rebuilt on components, added list with its fold, foot and spaced (the old catalogue\'s .cat-list-title, .published-header, .cat-list-foot and #local-apps-header), chapter (its detail sections, .dtl-section), part (its dialogs\' section.poster-section), and in this sheet the action rows Actions chapter, apart and tight (.dtl-btn-row, .dtl-seo-switch, the skill picker row) and the leads Note chapter and size record (.dtl-desc, .mk-author-is); Action.js and Note.js draw those.',
     },
     {
         id: 'fold-row', name: 'FoldSection', kind: 'component', status: 'active',
@@ -337,14 +338,14 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'lead', prop: 'lead', when: 'a line that says what the section holds before it is opened' },
             { name: 'clip', class: 'og-fold-r--clip', prop: 'clip', when: 'a detail that is a whole phrase (the MCP page\'s folds)' },
             { name: 'wrap', class: 'og-fold-sec--wrap', prop: 'wrap', when: 'a detail that must be read whole on a narrower screen (the Offers pages\' folds)' },
-            { name: 'inner', class: 'og-fold-sec--inner', prop: 'inner', when: 'several folds inside one part (the Agents page\'s three developer roads)' },
+            { name: 'inner', class: 'og-fold-sec--inner', prop: 'inner', when: 'several folds inside one part (the Agents page\'s three developer options)' },
         ],
         example: { id: 'og-map', num: '04', title: 'Map', sub: '12 spaces', open: false },
         note: 'Its sheet also holds the rows of Folds (the folds entry): the event, toggle, done and plain rows, and a row\'s own actions.',
     },
     {
         id: 'space-table', name: 'Space table', kind: 'component', status: 'active',
-        summary: 'A table of spaces: number, name with its marks, size, last change and a door; the head row in coral capitals, hidden on a phone with the last-change column.',
+        summary: 'A table of spaces: number, name with its marks, size, last change and the action that opens it; the head row in coral capitals, hidden on a phone with the last-change column.',
         module: null, sheet: '/css/components/space-table.css', classes: ['og-tbl', 'og-tbl-name', 'og-tbl-last', 'og-tbl-door'],
         data: { shape: '<div class="og-tbl og-tbl--head">…</div><div class="og-tbl"><div class="og-tbl-n">01</div><div class="og-tbl-nm"><button class="og-tbl-name">…</button></div>…</div>', fields: { n: 'the number', name: 'the space', last: 'the last change', door: 'open it' } },
         useFor: ['The spaces of an organism or a workspace, one row each.'],
@@ -355,7 +356,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
     // first, unused until the tabs move onto them.
     {
         id: 'listing', name: 'Listing', kind: 'component', status: 'active',
-        summary: 'Things in rows of columns under a heading row: the name in bold with a small typewriter line, a grey description, who or where, the doors on the right; a row can open a framed panel under it. On a phone one column, or the narrow columns of its cut (listing--cols). The List component (components/List.js) draws it in Settings & Controls and on the operator pages: List with its cut and head, Row, and the Name, Desc, Who, Num, When, Cell, Doors and Panel cells; a page writes none of these classes.',
+        summary: 'Things in rows of columns under a heading row: the name in bold with a small typewriter line, a grey description, who or where, the actions on the right; a row can open a framed panel under it. On a phone one column, or the narrow columns of its cut (listing--cols). The List component (components/List.js) draws it in Settings & Controls and on the operator pages: List with its cut and head, Row, and the Name, Desc, Who, Num, When, Cell, Doors and Panel cells; a page writes none of these classes.',
         module: null, sheet: '/css/components/listing.css', classes: ['listing', 'listing-row', 'listing-name', 'listing-desc', 'listing-who', 'listing-doors', 'listing-open', 'listing-meta'],
         data: { shape: 'List({ cols, keepCols, head, index, tone }) › Row({ open, below }) › Name · Desc · Who · Num · When · Cell · Doors · Panel (components/List.js)', fields: { cols: 'the cut, named by its columns (List cols)', index: 'with the cut n-mark-name-desc-state-n-arrow: the app catalogue\'s index (List index, list.css)', tone: 'a detail list of the app catalogue drawn over its cut (List tone, list-tones.css)', name: 'the thing (Name)', desc: 'what it is (Desc)', who: 'whose it is or where (Who)', doors: 'what a person can do with it (Doors)', open: 'the panel one row opens (Panel, Row open)' } },
         useFor: ['A list of things a person owns or can install, when each needs a few columns: in Settings and on the operator pages, through the List.'],
@@ -367,7 +368,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'count per place', class: 'listing--name-n', prop: 'List cols="name-n"', when: 'a name and one count at the right (the old .vis-table); in the sheet, no page draws it today' },
             { name: 'audit log', class: 'listing--when-name-who', prop: 'List tone="log" cols="when-name-who"', when: 'when, what was done, by whom in grey typewriter (the old .mk-log)' },
             { name: 'declarations log', class: 'listing--when-kind-name-who', prop: 'List tone="log" cols="when-kind-name-who"', when: 'the log with the act\'s word after the date (Cell sign), the declarations of who made an app' },
-            { name: 'tool for sale', class: 'listing--name-price-delivery-doors', prop: 'List cols="name-price-delivery-doors"', when: 'a tool an app sells: its name and what it does, its price with a coral label over it, how a bought call is delivered, the doors; one rule under the whole row, the reason it cannot be listed under the row in the warning colour (Row below); one column under 900px (the old .mz-tool)' },
+            { name: 'tool for sale', class: 'listing--name-price-delivery-doors', prop: 'List cols="name-price-delivery-doors"', when: 'a tool an app sells: its name and what it does, its price with a coral label over it, how a bought call is delivered, the actions; one rule under the whole row, the reason it cannot be listed under the row in the warning colour (Row below); one column under 900px (the old .mz-tool)' },
             { name: 'contract', class: 'listing--name-price-rake-budget-state', prop: 'List cols="name-price-rake-budget-state"', when: 'a contract an app sources: each one a wrapping line of facts without rules, the capability first with its provider in coral small capitals under it, each other fact a coral label over its bold value (the old cost rows, .dtl-status-row)' }],
         example: { rows: [['aimeat-writing', 'How prose is written', 'sandbox']] },
         note: 'Built on 2026-09-25 with the look six Settings tabs draw as identical copies; the Settings listings moved onto it the same day, each with a cut named by its columns. On 2026-09-27 the operator pages\' tables moved onto the List too, each with its own cut here (the operator cuts variant). Also on 2026-09-27 appcat (the app catalogue rebuilt at /v1/appcat) added its cuts: n-mark-name-desc-state-n-arrow for its index (the old .cat-row grid), name-meaning-doors, key-desc-who, name-n, when-name-who and when-kind-name-who for the detail\'s rows (the old .mk-row, .dtl-dm-head, .vis-table, .mk-log), name-price-delivery-doors (the old .mz-tool, drawn whole here) and name-price-rake-budget-state (the old cost rows). Where a List tone (list-tones.css) or List index (list.css) draws the row, the cut gives only its columns. No module of its own: the List (entry list) draws these classes everywhere.',
@@ -446,7 +447,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'more-line', name: 'More line', kind: 'component', status: 'active',
-        summary: 'The line under a list: the way to show more, and how many are shown in small grey typewriter letters beside it. In Settings & Controls the List\'s More (components/List.js) draws it, with the list\'s other doors after the count.',
+        summary: 'The line under a list: the way to show more, and how many are shown in small grey typewriter letters beside it. In Settings & Controls the List\'s More (components/List.js) draws it, with the list\'s other actions after the count.',
         module: null, sheet: '/css/components/more-line.css', classes: ['more-line'],
         data: { shape: 'More({ label, onMore, disabled, note, wrap, children }) (components/List.js) · as markup in the admin: <div class="more-line"><button class="poster-action poster-action--more">Show 20 more</button><small>20 of 55</small></div>', fields: { button: 'show more (label, onMore)', small: 'how many are shown of how many (note)' } },
         useFor: ['Under a list that shows a page at a time.'],
@@ -485,7 +486,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
                 unsorted: 'the items no section holds, under "Unsorted", or null',
                 items: 'a document { kind: \'doc\', id, title, draft, colour, active } or a series { kind: \'series\', key, name, draft, open, parts }',
                 empty: 'the words when the space has no section and no document', editing: 'the id of the section whose name is being edited',
-                archived: 'the space shows its archived documents: the door is "unarchive"', busy: 'the documents\' doors wait for an answer',
+                archived: 'the space shows its archived documents: the action is "unarchive"', busy: 'the documents\' actions wait for an answer',
                 words: '{ drag, draft, archive, unarchive, remove, delete, rename, newDocHere, addSub, sectionName, unnamed, unsorted, colour, noColour }',
                 onMove: '(docId, sectionId or null): a document dropped on a section or on "Unsorted"',
                 children: 'the open document, beside the tree',
@@ -504,7 +505,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'file-preview', name: 'FilePreview', kind: 'component', status: 'active',
-        summary: 'A stored file shown in the site\'s dialog, up to 920px wide: on a grey ground in a thin frame, a picture, a PDF in a frame, a video or a sound with its controls, or text in the typewriter face; one grey line when it is loading, cannot be read, or has no preview; its doors at the dialog\'s foot. Escape and a press outside close it.',
+        summary: 'A stored file shown in the site\'s dialog, up to 920px wide: on a grey ground in a thin frame, a picture, a PDF in a frame, a video or a sound with its controls, or text in the typewriter face; one grey line when it is loading, cannot be read, or has no preview; its actions at the dialog\'s foot. Escape and a press outside close it.',
         module: '/components/FilePreview.js', sheet: '/css/components/file-preview.css',
         data: {
             shape: 'FilePreview({ title, kind, src, text, loading, error, loadingLabel, errorLabel, noneLabel, doors, onClose, children })',
@@ -598,7 +599,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
     // The Schedule calendar and the Ecosystem automation moved to entries-views-work.ts on 2026-09-27.
     {
         id: 'signed-out-door', name: 'SignedOutDoor', kind: 'component', status: 'active',
-        summary: 'What a visitor who is not signed in sees at an address that opens only for its owner: the address in a mono frame with a coral word, a two-line headline with the sun\'s shadow, where the address leads under a heavy rule with an "owner only" tag, a lead, the loud Sign in and the Create an account link, a line after them, and a dashed aside that says what this place is. The showroom face, since the visitor is outside.',
+        summary: 'What a visitor who is not signed in sees at an address that opens only for its owner: the address in a mono frame with a coral word, a two-line headline with the sun\'s shadow, where the address leads under a heavy rule with an "owner only" tag, a lead, the loud Sign in and the Create an account link, a line after them, and a dashed aside that says what this place is. It has the look of the public pages, because the visitor is not signed in.',
         module: '/components/SignedOutDoor.js', sheet: '/css/components/signed-out-door.css',
         data: {
             shape: 'SignedOutDoor({ address, kicker, title, titleAccent, targetLabel, path, tag, lead, action, second, after, aside })',
@@ -615,7 +616,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'with a tab', class: 'signed-out-door-crumb-arrow', prop: 'path={[profile, tab]}', when: 'the address names a tab: "Settings & Controls → the tab"' },
             { name: 'the profile alone', prop: 'path={[profile]}', when: 'the address names no tab' },
         ],
-        example: { address: 'aimeat.io/v1/profile?tab=security', kicker: 'This address leads inside', title: 'You are at the right door.', titleAccent: 'Sign in, and it opens.', path: ['Settings & Controls', 'Security'], tag: 'owner only' },
+        example: { address: 'aimeat.io/v1/profile?tab=security', kicker: 'This address leads inside', title: 'This page is yours.', titleAccent: 'Sign in, and it opens.', path: ['Settings & Controls', 'Security'], tag: 'owner only' },
         note: 'Moved unchanged on 2026-09-25 (the sheet was views/profile-door.css); on 2026-09-26 its markup became components/SignedOutDoor.js, and views/profile/door.js passes it the words. Since 2026-09-27 it draws its own names (.signed-out-door-*, formerly .pf-door-*).',
     },
 ];

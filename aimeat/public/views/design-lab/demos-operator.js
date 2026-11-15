@@ -9,6 +9,7 @@
  * @structure OPERATOR_DEMOS — { [id]: { variants: [{ name, render() }] } } · admin(title, part) · menu(active)
  * @usage import { OPERATOR_DEMOS } from './demos-operator.js';
  * @version-history
+ *   v1.4.1 — 2026-11-15 — Demos say other choices, a link and By endpoint, not ways in and doors.
  *   v1.4.0 — 2026-10-14 — menu-find: at rest, found, found by another word, nothing found, and on the
  *     operator menu.
  *   v1.3.0 — 2026-10-06 — store-door's discount code: the control to press and the code shown;
@@ -178,7 +179,7 @@ export const OPERATOR_DEMOS = {
       doors=${html`<${Action} onClick=${noop}>Not now<//><${Loud} onClick=${noop}>Allow<//>`}>
       <${Note} kind="lead">It may read the documents in your Recipes workspace. It cannot change them.<//>
     <//>` },
-    { name: 'with other ways in', render: () => html`<${AskPage} title="Join Nordic Ferries"
+    { name: 'with other choices', render: () => html`<${AskPage} title="Join Nordic Ferries"
       who=${{ name: 'sandbox', meta: 'sandbox@aimeat-local-001-dev', text: 'S' }}
       doors=${html`<${Action} onClick=${noop}>Decline<//><${Loud} onClick=${noop}>Join<//>`}
       or="or" ways=${html`<${Action} small onClick=${noop}>Sign in with another account<//>`}>
@@ -241,7 +242,7 @@ export const OPERATOR_DEMOS = {
       <${StoreDoor} href="https://store.example.com" soon=${true} code=""
         class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Step into the store →" />
     </div>` },
-    { name: 'a door, opens soon', render: () => html`<${StoreDoor} href="https://store.example.com" soon=${true} code=""
+    { name: 'a link, opens soon', render: () => html`<${StoreDoor} href="https://store.example.com" soon=${true} code=""
       class="ld-sh-door showroom-door" label="Get your own →" />` },
     { name: 'opens soon, with a code to press for', render: () => html`<${StoreDoor} href="https://store.example.com" soon=${true} code="EARLY20"
       class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Step into the store →" />` },
@@ -326,7 +327,7 @@ export const OPERATOR_DEMOS = {
 
   'count-bars': { variants: [
     { name: 'set, with hot keys', render: () => admin('Security', html`<${CountBarsSet}>
-      <${CountBars} label="By door" rows=${[{ key: '/v1/memory', count: 412 }, { key: '/v1/auth/login', count: 96 }, { key: '/v1/apps', count: 12 }]} />
+      <${CountBars} label="By endpoint" rows=${[{ key: '/v1/memory', count: 412 }, { key: '/v1/auth/login', count: 96 }, { key: '/v1/apps', count: 12 }]} />
       <${CountBars} label="By source" hot=${['203.0.113.7']} more=${{ name: '12 more sources', count: 40 }}
         rows=${[{ key: '203.0.113.7', count: 380 }, { key: '198.51.100.23', count: 88 }, { key: '192.0.2.14', count: 12 }]} />
       <${CountBars} label="By credential" words rows=${[{ key: 'agent token', count: 301 }, { key: 'no credential', count: 219 }]} />
@@ -335,9 +336,9 @@ export const OPERATOR_DEMOS = {
       <${CountBars} wide title="By author" why="Who wrote the packages on this node."
         rows=${[{ key: 'sandbox', name: 'sandbox', count: 14, onPick: noop, title: 'Show only sandbox' }, { key: 'bot', name: 'bot', count: 6, onPick: noop }, { key: 'x', name: 'unknown author', count: 2, tone: 'warn', note: 'unverified' }]} />
       <${CountBars} wide last title="By kind" rows=${[{ key: 'skill', count: 18 }, { key: 'cortex', count: 4 }]} />`) },
-    { name: 'long keys', render: () => admin('Security', html`<${CountBars} label="By door"
+    { name: 'long keys', render: () => admin('Security', html`<${CountBars} label="By endpoint"
       rows=${[{ key: '/v1/organisms/fbb51de5-0000-4000-8000-000000000000/workspaces/ws-mslunjvcgxj/documents', count: 44 }, { key: '/v1/memory', count: 12 }]} />`) },
-    { name: 'empty', render: () => admin('Security', html`<${CountBars} label="By door" rows=${[]} />`) },
+    { name: 'empty', render: () => admin('Security', html`<${CountBars} label="By endpoint" rows=${[]} />`) },
   ] },
 
   'print-page': { variants: [

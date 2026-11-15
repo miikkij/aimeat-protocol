@@ -11,6 +11,7 @@
  * @structure KNOWLEDGE_VIEW_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { KNOWLEDGE_VIEW_DEMOS } from './demos-views-knowledge.js';
  * @version-history
+ *   v1.2.1 — 2026-11-15 — The signed-out sample title matches the live page; the band's demo says links, not doors.
  *   v1.2.0 — 2026-09-27 — PagePreview's email and live page (the live one reads /v1/portal from the node
  *     the lab runs on), in the operator's frame.
  *   v1.1.1 — 2026-09-27 — The instruction block's demos are keyed by its entry id instruction-block
@@ -104,7 +105,7 @@ const docTree = (props) => html`<${SettingsRoot}><${DocTree} words=${DOC_WORDS} 
   onRemoveSection=${noop} onMove=${noop} ...${props}><p>The open document.</p><//><//>`;
 
 const DOOR = {
-  kicker: 'This address leads inside', title: 'You are at the right door.', titleAccent: 'Sign in, and it opens.',
+  kicker: 'This address leads inside', title: 'This page is yours.', titleAccent: 'Sign in, and it opens.',
   targetLabel: 'Where this address leads', tag: 'owner only',
   lead: 'The address you opened leads to a page inside your Settings & Controls, and that page opens only for you.',
   action: { label: 'Sign in', onClick: noop }, second: { label: 'Create an account', onClick: noop },
@@ -222,7 +223,7 @@ export const KNOWLEDGE_VIEW_DEMOS = {
       { key: 'apps', n: 2, label: 'Apps', onOpen: noop }, { key: 'morsels', n: 420, label: 'Morsels', fine: true, onOpen: noop },
     ]} /><//>` },
     { name: 'no numbers', render: () => html`<${SettingsRoot}><${NumberBand} items=${[]} /><//>` },
-    { name: 'fitted: numbers to read, not doors', render: () => html`<${SettingsRoot}><${NumberBand} fitted items=${[
+    { name: 'fitted: numbers to read, not links', render: () => html`<${SettingsRoot}><${NumberBand} fitted items=${[
       { key: 'apps', n: '30', label: 'Apps' }, { key: 'listed', n: '12', label: 'Listed' },
       { key: 'drafts', n: '2', label: 'Draft waiting' }, { key: 'opens', n: '1,480', label: 'Opens all time' },
     ]} /><//>` },

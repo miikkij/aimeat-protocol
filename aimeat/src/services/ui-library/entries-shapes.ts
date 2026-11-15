@@ -9,6 +9,7 @@
  * @structure SHAPE_ENTRIES
  * @usage import { SHAPE_ENTRIES } from './entries-shapes.js';
  * @version-history
+ *   v1.19.1 — 2026-11-15 — Shape purposes name links, actions, buttons and sections, not doors and rooms.
  *   v1.19.0 — 2026-09-27 — The action's plain tone, poster-action--plain (Action tone 'plain', appcat).
  *   v1.18.0 — 2026-09-27 — The box and the choice tile are box-shape and choice-shape: their old ids name the Box and
  *     Choice components (components/Box.js, Choice.js), which own box.css and choice.css and wear these shapes.
@@ -68,7 +69,7 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
     shape('label', 'Label', ['poster-label'], '<span class="poster-label">…</span>',
         'A small coral word in capitals that names what follows.', 'Above a value, a prompt or a group of controls.'),
     shape('action', 'Action', ['poster-action', 'poster-tab', 'poster-action--small', 'poster-action--lower', 'poster-action--row', 'poster-action--more', 'poster-action--quiet', 'poster-action--back', 'poster-action--text', 'poster-action--danger', 'poster-action--notice', 'poster-action--jump', 'poster-action--plain', 'poster-tab--fold', 'poster-tab--tile', 'poster-tab--filter'], '<a class="poster-action" href="…">…</a>',
-        'An ink-underlined action in capitals; the same cut is the unselected tab. Its tones are the quiet ways on Jouni kept.', 'A secondary action or a door in a masthead, or a tab.',
+        'An ink-underlined action in capitals; the same cut is the unselected tab. Its tones are the quiet ways on Jouni kept.', 'A secondary action or a link in a masthead, or a tab.',
         [
             { name: 'tab', class: 'poster-tab', when: 'one tab in a row; is-on puts the chosen one on the sun' },
             { name: 'small', class: 'poster-action--small', when: 'a way on in a Settings page head or section: smaller, with a thinner line' },
@@ -89,7 +90,7 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
     shape('slab', 'Slab', ['poster-slab', 'poster-slab--large', 'poster-slab--control', 'poster-slab--danger'], '<button class="btn-primary poster-slab">…</button>',
         'The loud action: a filled block that moves when pressed (in the built-in look, a dark block with a yellow shadow).', 'The one primary action of a place.',
         [
-            { name: 'large', class: 'poster-slab--large', when: 'the home\'s large door' },
+            { name: 'large', class: 'poster-slab--large', when: 'the home\'s large button' },
             { name: 'control', class: 'poster-slab--control', when: 'a 44px button in a row of controls (New conversation, Send, a dialog\'s Save)' },
             { name: 'danger', class: 'poster-slab--danger', when: 'an action that cannot be undone (a dialog\'s Delete): coral with an ink shadow' },
         ]),
@@ -125,7 +126,7 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
     shape('choice-shape', 'Choice tile', ['poster-choice'], '<button class="poster-choice"><b>…</b>…</button>',
         'One of a few boxed answers, the chosen one on the sun with an ink shadow.', 'A choice where each answer needs a line of explanation.'),
     shape('sticker', 'Sticker', ['poster-sticker'], '<div class="poster-sticker">…</div>',
-        'A small sun-ground box with a short headline and one door.', 'The one fact about a thing that must be seen before its name.'),
+        'A small sun-ground box with a short headline and one action.', 'The one fact about a thing that must be seen before its name.'),
     shape('aside', 'Aside', ['poster-aside', 'poster-aside--small', 'poster-aside--large', 'poster-aside--irreversible', 'poster-aside--waiting', 'poster-aside--suggestion'], '<aside class="poster-aside">…</aside>',
         'A dashed coral frame for a note beside the main flow.', 'A caution, a tip or a consequence the person should read.',
         [
@@ -175,12 +176,12 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
         'A full-width ink band, or a sun one, for the front page.', 'A band of the landing page.',
         [{ name: 'sun', class: 'showroom-band--sun', when: 'the sun band' }]),
     shape('showroom-section', 'Showroom section', ['showroom-section', 'showroom-section--coral'], '<div class="showroom-section">…</div>',
-        'A framed room on the front page with a sun shadow.', 'One room of the landing page.',
+        'A framed section on the front page with a sun shadow.', 'One section of the landing page.',
         [{ name: 'coral', class: 'showroom-section--coral', when: 'a coral shadow instead of the sun' }]),
     shape('showroom-door', 'Showroom door', ['showroom-door'], '<a class="showroom-door" href="…">…</a>',
-        'Bold words over a 3px coral underline.', 'A door out of a landing room.'),
+        'Bold words over a 3px coral underline.', 'A link out of one section of the landing page.'),
     shape('showroom-slab', 'Showroom slab', ['showroom-slab', 'showroom-slab--hot', 'showroom-slab--sun', 'showroom-slab--ink'], '<a class="showroom-slab showroom-slab--hot" href="…">…</a>',
-        'The front page\'s big button: a framed block with a hard shadow.', 'The landing page\'s main doors.',
+        'The front page\'s big button: a framed block with a hard shadow.', 'The landing page\'s main actions.',
         [
             { name: 'hot', class: 'showroom-slab--hot', when: 'coral' },
             { name: 'sun', class: 'showroom-slab--sun', when: 'sun' },

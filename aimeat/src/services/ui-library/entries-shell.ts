@@ -10,6 +10,7 @@
  * @structure SHELL_ENTRIES
  * @usage import { SHELL_ENTRIES } from './entries-shell.js';
  * @version-history
+ *   v1.8.1 — 2026-11-15 — Card and Modal summaries name links, buttons and actions, not doors.
  *   v1.8.0 — 2026-11-01 — DataTable's `stack` and `form` (the data product wizard's columns, WP9c).
  *   v1.7.0 — 2026-09-30 — NodeUpdateNotice: the operator's new-version tag and its dialog.
  *   v1.6.0 — 2026-09-27 — StartPageSetting's dialog (and its footer, named) and ToastBox's hold and role: the
@@ -74,17 +75,17 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
         data: {
             shape: 'Card({ tone, state, mark, kicker, name, sub, text, clamp, code, meta, lines, codeLine, doors, onOpen, openLabel, title, aside, note, rule, wide, inRow, figure, id, children }) · Card({ title, subtitle, onClick, hoverable, variant, className, children }) (the classic card) · CardGrid({ cols, children }) · tileParts(props) (for Road only)',
             fields: {
-                tone: 'none (the ruled tile) | framed (the tile in the Object box) | section (an older Settings group under the thick rule) | panel (one part of the overview) | figure (a number that is a door to its tab)',
+                tone: 'none (the ruled tile) | framed (the tile in the Object box) | section (an older Settings group under the thick rule) | panel (one part of the overview) | figure (a number that is a link to its tab)',
                 state: 'framed: current (the one you are on, a coral frame) | off (switched off: dashed, grey) | raised (the one that stands out)',
                 mark: 'an Avatar or a sign before the name', kicker: 'a small coral typewriter line over the name', name: 'the tile\'s name in bold',
                 sub: 'the same small line under the name', text: 'the sentence; clamp cuts it after two lines', code: 'a code block to copy',
                 meta: 'the grey typewriter line', lines: '[{ key, label, count, dim }]: named counts under the meta line, a hairline over each, the count at the right',
                 codeLine: 'a line of code at the foot', doors: 'the row of actions at the foot (never with onOpen)',
-                onOpen: 'the whole tile (or a panel\'s headline, or a figure) is the door: a press, Enter or Space opens it; openLabel is its tooltip',
+                onOpen: 'the whole tile (or a panel\'s headline, or a figure) is one button: a press, Enter or Space opens it; openLabel is its tooltip',
                 title: 'section and panel: the headline', aside: 'section: what stands at the right of the title', note: 'panel: a grey typewriter line after the headline',
                 rule: 'panel: the thick rule on top', wide: 'section and panel: spans every column of its grid', inRow: 'section: stands inside a list row, row air and no margin',
                 figure: 'figure: the number; name is its word', children: 'a field or a form inside a tile; the content of a section or a panel',
-                cols: 'CardGrid: three (the default) | two | fill (as many 180px tiles as fit) | one | sections (340px or wider) | panels (the overview\'s two columns) | figures (figure doors in a line) | strip (the tiles in one line that scrolls sideways, each at least 160px wide); three and two fold to one column under 860px',
+                cols: 'CardGrid: three (the default) | two | fill (as many 180px tiles as fit) | one | sections (340px or wider) | panels (the overview\'s two columns) | figures (figures that open their tab, in a line) | strip (the tiles in one line that scrolls sideways, each at least 160px wide); three and two fold to one column under 860px',
                 subtitle: 'classic card: the line under the title', variant: 'classic card: "glass" for the glass ground',
             },
         },
@@ -94,14 +95,14 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
         variants: [
             { name: 'ruled tile', prop: 'name (no tone)', class: 'card-tile--ruled', when: 'one thing among many: name, words, meta line, a thin rule under it' },
             { name: 'framed tile', prop: 'tone="framed"', class: 'card-tile--framed', when: 'a thing with its own actions, in the Object box' },
-            { name: 'door tile', prop: 'onOpen', class: 'card-tile--door', when: 'the whole tile opens the thing: coral name and frame on hover and focus' },
+            { name: 'tile that opens', prop: 'onOpen', class: 'card-tile--door', when: 'the whole tile opens the thing: coral name and frame on hover and focus' },
             { name: 'clamp', prop: 'clamp', class: 'card-tile-text--clamp', when: 'a description cut after two lines' },
             { name: 'lines', prop: 'lines', class: 'card-tile-lines', when: 'named counts under the meta line (a place and its workspaces)' },
             { name: 'section', prop: 'tone="section"', class: 'card-section', when: 'an older Settings group under the thick rule, no frame (Jouni\'s decision "Classic cards")' },
             { name: 'wide section', prop: 'tone="section" wide', class: 'card-section--wide', when: 'a section that spans the grid' },
             { name: 'section in a row', prop: 'tone="section" inRow', class: 'card-section--in-row', when: 'a section inside a list row' },
             { name: 'panel', prop: 'tone="panel"', class: 'card-panel', when: 'one part of the overview: its headline over its content' },
-            { name: 'panel door', prop: 'tone="panel" onOpen', class: 'card-panel-title--door', when: 'the headline opens its tab' },
+            { name: 'panel headline that opens', prop: 'tone="panel" onOpen', class: 'card-panel-title--door', when: 'the headline opens its tab' },
             { name: 'figure', prop: 'tone="figure"', class: 'card-figure', when: 'a number that opens its tab, a small grey word beside it' },
             { name: 'grid', prop: 'CardGrid cols', class: 'card-grid', when: 'the tiles in three, two or one columns, as many as fit, sections, panels or figures' },
             { name: 'strip', prop: 'CardGrid cols="strip"', class: 'card-grid--strip', when: 'a few tiles in one line that scrolls sideways; a framed tile in it is small and soft: a hairline frame with the small corner on the card ground, its name in semibold, its meta line small and grey in the body face, the surface ground under the pointer (the app catalogue\'s active extensions)' },
@@ -348,7 +349,7 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
             shape: 'Modal({ open, onClose, title, titleRef, children, footer, footerStart, showClose, size, guard, className, bodyClass, leading }) · ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger, className, leading }) · useConfirm()',
             fields: {
                 title: 'the header', titleRef: 'the thing the dialog is about (a filename), after the title in the typewriter face',
-                children: 'the body', footer: 'the actions', footerStart: 'a side door at the footer\'s other end',
+                children: 'the body', footer: 'the actions', footerStart: 'a secondary action at the footer\'s other end',
                 showClose: 'the X (true by default)', size: 'sm 440 | md 560 | lg 840 | xl 1080',
                 guard: 'Escape and the page behind do not close it once something has been typed (true by default)',
                 leading: '"normal": the dialog reads at the browser\'s own line spacing, as the app catalogue\'s dialogs do',

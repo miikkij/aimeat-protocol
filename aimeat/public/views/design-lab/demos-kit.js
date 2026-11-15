@@ -9,6 +9,7 @@
  * @structure KIT_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { KIT_DEMOS } from './demos-kit.js';
  * @version-history
+ *   v1.4.1 — 2026-11-15 — Demo names say actions and tiles that open, not doors.
  *   v1.4.0 — 2026-10-19 — The AgentAvatar demos, their own entry: a picture (an SVG as a data: URL) at both sizes, an emoji without its address, and the stand-in.
  *   v1.3.0 — 2026-10-18 — The figure strip's stacked cut.
  *   v1.2.0 — 2026-09-27 — What the admin pages added: Loud quiet, SettingBox pre, Meter's tones, Result and a
@@ -144,7 +145,7 @@ export const KIT_DEMOS = {
   ] },
   box: { variants: [
     { name: 'default', render: () => root(html`<${Box}><b>Recovery key</b> Keep it where you keep passwords.<//>`) },
-    { name: 'head and doors', render: () => root(html`<${Box} name="Lumo Bakery package" marks=${html`<${Mark}>v1.2.0<//><${Mark} tone="sun">3 apps<//>`}
+    { name: 'head and actions', render: () => root(html`<${Box} name="Lumo Bakery package" marks=${html`<${Mark}>v1.2.0<//><${Mark} tone="sun">3 apps<//>`}
       end=${html`<${Icon} small label="Hide" onClick=${noop}>✗<//>`} doors=${html`<${Action} small onClick=${noop}>Install<//><${Action} small soft onClick=${noop}>Read the manifest<//>`}>
       Three apps and their records, ready to install.<//>`) },
     { name: 'raised', render: () => root(html`<${Box} tone="raised">The way to take first: ask your own AI.<//>`) },
@@ -222,7 +223,7 @@ export const KIT_DEMOS = {
       <${Card} tone="framed" state="current" name="Firefox on this laptop" meta="push · since 2026-09-02" doors=${html`<${Action} small onClick=${noop}>Send a test<//>`} />
       <${Card} tone="framed" state="off" name="Weekly digest" meta="off" />
       <${Card} tone="framed" state="raised" kicker="new" name="Nordic Ferries" text="Timetables your agents can read." codeLine="aimeat_app_get nordic-ferries" /><//>`) },
-    { name: 'door tiles', render: () => root(html`<${CardGrid} cols="fill">
+    { name: 'tiles that open', render: () => root(html`<${CardGrid} cols="fill">
       <${Card} name="Lumo Bakery" mark=${html`<${Avatar} text="LB" />`} text=${LONG} clamp meta="sandbox" onOpen=${noop} openLabel="Open" />
       <${Card} name="Invoice drafts" meta=${html`<${Mark} kind="status" tone="attention">Not in the catalog<//>`} onOpen=${noop} openLabel="Open" /><//>`) },
     { name: 'sections', render: () => root(html`<${CardGrid} cols="sections">

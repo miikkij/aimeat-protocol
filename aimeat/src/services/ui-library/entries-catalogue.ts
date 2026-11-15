@@ -10,6 +10,7 @@
  * @structure CATALOGUE_ENTRIES
  * @usage import { CATALOGUE_ENTRIES } from './entries-catalogue.js';
  * @version-history
+ *   v1.0.1 — 2026-11-15 — Catalogue summaries name buttons and actions, not doors.
  *   v1.0.0 — 2026-09-27 — Initial: index-frame, overlay, stops, slot-bars, world-map, world-map-model,
  *     data-map, day-window, list-tones and modal (the catalogue pass, appcat).
  */
@@ -78,7 +79,7 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'stops', name: 'Stops', kind: 'component', status: 'active',
-        summary: 'Where a piece of work stands, as the stops it passes: one row per stop under the heavy rule, its name in the coral label, where it stands now in the poster figures (on the sun for the stop that holds the work), and one bold line of what that means. The rows are as wide as the widest stop. Under them a picture of the thing in the heavy frame, the sentence of what to do next, the doors, and a small typewriter line.',
+        summary: 'Where a piece of work stands, as the stops it passes: one row per stop under the heavy rule, its name in the coral label, where it stands now in the poster figures (on the sun for the stop that holds the work), and one bold line of what that means. The rows are as wide as the widest stop. Under them a picture of the thing in the heavy frame, the sentence of what to do next, the actions, and a small typewriter line.',
         module: '/components/Stops.js', sheet: '/css/components/stops.css',
         data: {
             shape: 'Stops({ items, picture, lead, foot, children })',
@@ -86,7 +87,7 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
                 items: '[{ key, label, value, note, on }]: a stop\'s name, where it stands, what that means, and `on` for the stop that holds the work now; a falsy item is left out',
                 picture: '{ src, alt }: the thing\'s picture, cut from its top, at most 260×160; it goes when it does not load',
                 lead: 'the sentence of what to do next, set in under the figures',
-                children: 'the doors, at the column\'s start',
+                children: 'the actions (buttons and links), at the column\'s start',
                 foot: 'a small grey typewriter line set in under the figures (a size)',
             },
         },
@@ -95,7 +96,7 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
             { name: 'on', prop: 'items[].on', class: 'stops-row--on', when: 'the stop that holds the work now: its figure on the sun' },
             { name: 'picture', prop: 'picture', class: 'stops-picture', when: 'the thing has a picture' },
             { name: 'lead', prop: 'lead', class: 'stops-lead', when: 'a sentence says what to do next' },
-            { name: 'foot', prop: 'foot', class: 'stops-foot', when: 'a small fact under the doors' },
+            { name: 'foot', prop: 'foot', class: 'stops-foot', when: 'a small fact under the actions' },
         ],
         example: { items: [{ key: 'wc', label: 'Working copy', value: 'Saved 2 min ago', note: 'Only you see it.', on: true }, { key: 'pub', label: 'Published', value: 'v4', note: 'Others see this one.' }], lead: 'Publish when the copy is ready.', foot: 'Size: 24 KB' },
         note: 'Came with appcat: the old app catalogue\'s "Where your work is" band (detail.js statusHtml: .wc-row, .wc-band, .wc-stop, .wc-explain, .wc-size). appcat draws it in views/appcat/sections/work.js.',
@@ -215,7 +216,7 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
                 days: 'the window shown now; its word is the loud slab',
                 presets: 'the ready windows in days, 0 for today (0, 7, 30, 90, 360 by default)',
                 max: 'the largest number the field takes',
-                busy: 'the doors wait at half strength while a count is read',
+                busy: 'the buttons wait at half strength while a count is read',
                 id: 'the number field\'s id, which its label points at',
                 words: '{ today, days(n), label, show }',
                 onDays: 'onDays(n): a ready window was pressed, or a typed one was asked for with Enter or Show (as typed; the page decides)',
@@ -225,14 +226,14 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
         variants: [
             { name: 'chosen', prop: 'days', when: 'the window in force: the loud slab among the words' },
             { name: 'typed', prop: 'id, max', class: 'day-window-days', when: 'a number of days the ready windows do not offer' },
-            { name: 'busy', prop: 'busy', when: 'a count is being read: the doors at half strength' },
+            { name: 'busy', prop: 'busy', when: 'a count is being read: the buttons at half strength' },
         ],
         example: { days: 30, presets: [0, 7, 30, 90, 360], max: 360, id: 'vis-days', words: { label: 'Days', show: 'Show' } },
         note: 'Came with appcat: the old app catalogue\'s visitor window (js/visitors.js windowHtml, .vis-window, .vis-days-input).',
     },
     {
         id: 'list-tones', name: 'List tones', kind: 'component', status: 'active',
-        summary: 'The List\'s tones for the lists of one thing\'s long page, each with its own shape over the Listing\'s grid: a history of versions with coral typewriter doors, a setting per row with its meaning and its door, a small table of counts, named entries each with a paragraph under its name, a log of what was done on wrapping lines, the pages a thing ought to have with their doors and editor, and a tree of forks on plain indented lines.',
+        summary: 'The List\'s tones for the lists of one thing\'s long page, each with its own shape over the Listing\'s grid: a history of versions with coral typewriter actions, a setting per row with its meaning and its action, a small table of counts, named entries each with a paragraph under its name, a log of what was done on wrapping lines, the pages a thing ought to have with their actions and editor, and a tree of forks on plain indented lines.',
         module: '/components/List.js', sheet: '/css/components/list-tones.css',
         data: {
             shape: 'List({ tone, cols, rows, render, children }) with Row, Name, Desc, When, Who, Num, Cell and Doors',
@@ -243,14 +244,14 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
         },
         useFor: ['A list on one thing\'s long page that must read as that list reads: its versions, its settings, its counts, its skills, its log, its legal pages, its forks.'],
         variants: [
-            { name: 'history', prop: 'tone="history"', class: 'list--history', when: 'the states a thing had, newest first: the version in the poster face, the current one tagged on the sun, the facts under it, the doors coral typewriter words' },
-            { name: 'releases', prop: 'tone="releases"', class: 'list--releases', when: 'the history in a dialog: the facts a step smaller, the doors plain typewriter words 6px apart' },
-            { name: 'checkpoints', prop: 'tone="checkpoints"', class: 'list--checkpoints', when: 'the saves a working copy passed: the time bold, the note under it in full, a loud door among them' },
-            { name: 'switches', prop: 'tone="switches"', class: 'list--switches', when: 'a setting per row: its name bold, what its state means in grey, its door at the right' },
+            { name: 'history', prop: 'tone="history"', class: 'list--history', when: 'the states a thing had, newest first: the version in the poster face, the current one tagged on the sun, the facts under it, the actions coral typewriter words' },
+            { name: 'releases', prop: 'tone="releases"', class: 'list--releases', when: 'the history in a dialog: the facts a step smaller, the actions plain typewriter words 6px apart' },
+            { name: 'checkpoints', prop: 'tone="checkpoints"', class: 'list--checkpoints', when: 'the saves a working copy passed: the time bold, the note under it in full, a loud button among them' },
+            { name: 'switches', prop: 'tone="switches"', class: 'list--switches', when: 'a setting per row: its name bold, what its state means in grey, its action at the right' },
             { name: 'counts', prop: 'tone="counts"', class: 'list--counts', when: 'a small table of counts: coral capital heads over the rule, the counts in typewriter, a name that turns coral under the pointer' },
             { name: 'entries', prop: 'tone="entries"', class: 'list--entries', when: 'named entries under a heavy rule: the name, its version and a faint ×, and its words under them' },
             { name: 'log', prop: 'tone="log"', class: 'list--log', when: 'what was done, newest first: the date in grey typewriter, the act in coral capitals, the name bold, who in grey' },
-            { name: 'pages', prop: 'tone="pages"', class: 'list--pages', when: 'a page a thing ought to have per row: its name with its marks, why under it, its doors beside, its editor below' },
+            { name: 'pages', prop: 'tone="pages"', class: 'list--pages', when: 'a page a thing ought to have per row: its name with its marks, why under it, its actions beside, its editor below' },
             { name: 'tree', prop: 'tone="tree"', class: 'list--tree', when: 'the forks of a thing: plain lines, each level 16px further in, its state a small coloured word' },
         ],
         example: { tone: 'history', rows: [{ name: 'v4', meta: '24 KB · 27 Sep 2026' }, { name: 'v3', meta: '23 KB · 20 Sep 2026' }] },

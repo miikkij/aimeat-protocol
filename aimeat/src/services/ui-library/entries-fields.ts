@@ -8,6 +8,7 @@
  * @structure FIELD_ENTRIES
  * @usage import { FIELD_ENTRIES } from './entries-fields.js';
  * @version-history
+ *   v1.4.1 — 2026-11-15 — The select's summary names the body face, not the showroom face.
  *   v1.4.0 — 2026-10-29 — Choice's picture (an option's `pic`), and the entries layout-sketch and
  *     look-sample, the pictures of the app structure page's pickers.
  *   v1.3.0 — 2026-09-27 — The options appcat added: Fields plain, beside, chapter, ruled, spaced, column,
@@ -227,7 +228,7 @@ export const FIELD_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'select-field', name: 'Select', kind: 'component', status: 'active',
-        summary: 'A drop-down: the browser\'s select in an ink frame on the page ground, its words in the showroom face, as wide as its place; the frame turns coral while it has the focus. With `line` it has no frame: the ink line under it, bold words and a small grey arrow at its right end. The options are data; given a label it stands in a Field.',
+        summary: 'A drop-down: the browser\'s select in an ink frame on the page ground, its words bold in the body face, as wide as its place; the frame turns coral while it has the focus. With `line` it has no frame: the ink line under it, bold words and a small grey arrow at its right end. The options are data; given a label it stands in a Field.',
         module: '/components/Select.js', sheet: '/css/components/select-field.css',
         data: {
             shape: 'Select({ value, onChange, options, placeholder, placeholderDisabled, fit, line, invalid, attention, disabled, required, name, ariaLabel, title, onFocus, onBlur, id, label, hint, message, error, wide })',

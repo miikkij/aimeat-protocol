@@ -8,6 +8,7 @@
  * @structure PAGE_KIT_ENTRIES
  * @usage import { PAGE_KIT_ENTRIES } from './entries-page-kit.js';
  * @version-history
+ *   v1.4.1 — 2026-11-15 — Catalogue summaries name a component, actions and a part, not doors.
  *   v1.4.0 — 2026-09-27 — What appcat added: Tabs' line, glyph, caption and fill; Layout's step 'part'
  *     and Space inset.
  *   v1.3.0 — 2026-09-27 — Section's group (the admin Config domains' band).
@@ -60,7 +61,7 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'section-component', name: 'Section', kind: 'component', status: 'active',
-        summary: 'One door to a section of a page, open or folded. Open, it is PageSection: the heavy rule on top, the ink section title with a small coral number or count, the actions at the right, the body; as a chapter of a long page of one thing, a coral "03 / 19" over a slab across the column with the actions on it; as a part of a dialog\'s body, the slab a size smaller. With fold, it is FoldSection: one row that opens in place.',
+        summary: 'One component for a section of a page, open or folded. Open, it is PageSection: the heavy rule on top, the ink section title with a small coral number or count, the actions at the right, the body; as a chapter of a long page of one thing, a coral "03 / 19" over a slab across the column with the actions on it; as a part of a dialog\'s body, the slab a size smaller. With fold, it is FoldSection: one row that opens in place.',
         module: '/components/Section.js', sheet: '/css/components/page-section.css', classes: ['og-sec', 'og-sec--first', 'og-sec-h'],
         data: {
             shape: 'Section({ id, num, title, count, doors, first, plain, band, group, chapter, part, fold, sub, lead, open, onToggle, clip, wrap, inner, children }) · PageSection · FoldSection (both re-exported)',
@@ -85,7 +86,7 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'plain', prop: 'plain', when: 'a box that stands as a section of its own without a title' },
             { name: 'band', prop: 'band', when: 'the title\'s band across the column, as the classic pages drew it (PageSection band)' },
             { name: 'group', prop: 'group', when: 'a section holding a group of sections: a smaller band across the column (PageSection group)' },
-            { name: 'chapter', prop: 'chapter="03 / 19"', class: 'og-sec--chapter', when: 'a chapter of a long page of one thing (an app\'s detail): its number over the slab, the doors on the slab, 112px of air above' },
+            { name: 'chapter', prop: 'chapter="03 / 19"', class: 'og-sec--chapter', when: 'a chapter of a long page of one thing (an app\'s detail): its number over the slab, the actions on the slab, 112px of air above' },
             { name: 'part', prop: 'part', when: 'a part of a dialog\'s body (Settings, Help): the slab title a size smaller, the parts 2rem apart' },
             { name: 'fold', prop: 'fold', when: 'a section closed by default, one row until opened (FoldSection)' },
             { name: 'fold inner', prop: 'fold inner', when: 'one of several folds under one rule inside a part' },
@@ -174,7 +175,7 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
                 justify: 'Row: \'between\' | \'end\'', list: 'Stack: the parts are the items of a list (no bullets), which a screen reader hears as a list',
                 narrow: 'Stack: kept to 60rem, for a page of settings forms; Beside: the side part is 18rem',
                 heavy: 'Split: the part starts a new thing, under the poster face\'s heavy rule instead of the hairline',
-                side: 'Split: the line at the part\'s start and the part indented, a quieter side door; Beside: the side part',
+                side: 'Split: the line at the part\'s start and the part indented, a quieter extra part that belongs to what is above it; Beside: the side part',
                 wide: 'Beside: the side part takes two fifths', rule: 'Beside: the heavy rule over it', id: 'the anchor a page scrolls to',
                 start: 'Beside: the side part stands before the main part (a headline figure with its chart beside it); on a phone over it',
                 stick: 'Beside: the side part stays in sight under the top bar while the main part scrolls, and stands over the main part when the two no longer fit side by side',

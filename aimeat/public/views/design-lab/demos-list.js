@@ -7,6 +7,7 @@
  * @structure LIST_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { LIST_DEMOS } from './demos-list.js';
  * @version-history
+ *   v1.3.1 — 2026-11-15 — Demo names say actions, not doors.
  *   v1.3.0 — 2026-09-27 — What appcat added, in the app catalogue's frame (IndexFrame dense): List index with Row
  *     order, SearchLine big, the nine List tones, and the catalogue's listing cuts.
  *   v1.2.0 — 2026-09-27 — What the admin pages added, in the operator's frame: labels, a sorted head, Name
@@ -89,7 +90,7 @@ export const LIST_DEMOS = {
       <${Row} onToggle=${noop} faded><${Name} meta="archived 2026-08-02">Old invoices<//><${Desc}>Last year's billing, kept for the record.<//><${Doors} /><//>
       <${Row} hover><${Name} meta="a row that opens nothing">claude-code<//><${Desc}>Connected over MCP.<//><${Doors} /><//>
     <//><//>` },
-    { name: 'an opened record: its title, status, text and doors (Panel)', render: () => html`<${SettingsRoot}><${List} cols="name-doors" keepCols>
+    { name: 'an opened record: its title, status, text and actions (Panel)', render: () => html`<${SettingsRoot}><${List} cols="name-doors" keepCols>
       <${Row} open onToggle=${noop}><${Name} meta="bot · today 06:00">Morning digest<//><${Doors}><${Action} small onClick=${noop}>Close<//><//>
         <${Panel} title="Morning digest" mark=${html`<${Mark} kind="status" tone="fine">done<//>`} text=${'Read every workspace I belong to.\nList the open questions first.'}
           doors=${html`<${Action} small onClick=${noop}>Run again<//>`} />
@@ -180,7 +181,7 @@ export const LIST_DEMOS = {
       <${Row}><${Name} meta="nordic-ferries.apps.aimeat.io" marks=${['app']}>Nordic Ferries timetable<//><${Who}>second<//>
         <${Num}>88<//><${Num}>40<//><${Num} dim>12 KB<//><${When}>Sep 20<//><${Doors} menu=${APP_MENU} menuLabel="More for Nordic Ferries timetable" /><//>
     <//>`) },
-    { name: 'quiet doors on a list that stacks wide', render: () => op('Owners', html`<${List} cols="n-name-n-when-doors" labels stackWide
+    { name: 'quiet actions on a list that stacks wide', render: () => op('Owners', html`<${List} cols="n-name-n-when-doors" labels stackWide
         head=${['#', 'Owner', { label: 'Records', num: true }, 'Last seen', '']}>
       <${Row} quietDoors><${Num} dim>01<//><${Name} meta="sandbox@aimeat-local-001-dev">sandbox<//><${Num}>1,204<//><${When}>today<//>
         <${Doors}><${Action} small row onClick=${noop}>Open<//><${Action} small row tone="danger" onClick=${noop}>Disable<//><//><//>
@@ -243,7 +244,7 @@ export const LIST_DEMOS = {
   ] },
   listing: { variants: [
     { name: 'head, rows, one open (the List draws it)', render: () => html`<${SettingsRoot}>${skills(true)}<//>` },
-    { name: 'who, words and doors, keeping columns', render: () => html`<${SettingsRoot}><${List} cols="name-who-desc-doors" keepCols head=${['Package', 'Whose', 'What it holds', '']}>
+    { name: 'who, words and actions, keeping columns', render: () => html`<${SettingsRoot}><${List} cols="name-who-desc-doors" keepCols head=${['Package', 'Whose', 'What it holds', '']}>
       <${Row}><${Name} meta="v2">Harbour brand kit<//><${Who} sub="shared">sandbox<//><${Desc} sub="3 parts">Colours, fonts and the logo.<//><${Doors}><${Action} small onClick=${noop}>Install<//><//><//>
     <//><//>` },
     { name: 'meta, outside a row', render: () => html`<${SettingsRoot}><${BoxList}><${BoxLine} name="Harbour Studio" meta="an organism's board · 12 notices" /><//><//>` },
@@ -308,7 +309,7 @@ export const LIST_DEMOS = {
   'more-line': { variants: [
     { name: 'default (the List\'s More)', render: () => html`<${SettingsRoot}><${More} label="Show 20 more" onMore=${noop} note="20 of 55" /><//>` },
     { name: 'all shown', render: () => html`<${SettingsRoot}><${More} note="5 of 5" /><//>` },
-    { name: 'with more doors, wrapping', render: () => html`<${SettingsRoot}><${More} label="Show 20 more" onMore=${noop} note="20 of 55" wrap><${Action} small onClick=${noop}>Copy the list<//><${Action} small onClick=${noop}>Download as CSV<//><//><//>` },
+    { name: 'with more actions, wrapping', render: () => html`<${SettingsRoot}><${More} label="Show 20 more" onMore=${noop} note="20 of 55" wrap><${Action} small onClick=${noop}>Copy the list<//><${Action} small onClick=${noop}>Download as CSV<//><//><//>` },
   ] },
   'key-name': { variants: [
     { name: 'a key as a row\'s name (Name asKey)', render: () => html`<${SettingsRoot}><${List} cols="key-doors" keepCols>

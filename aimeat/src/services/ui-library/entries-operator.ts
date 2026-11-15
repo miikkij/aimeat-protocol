@@ -9,6 +9,7 @@
  * @structure OPERATOR_ENTRIES
  * @usage import { OPERATOR_ENTRIES } from './entries-operator.js';
  * @version-history
+ *   v1.3.2 — 2026-11-15 — ask-page's summary says "other choices"; count-bars counts per endpoint, not per door.
  *   v1.3.1 — 2026-11-15 — ask-page names its `or` + `ways` "other choices", not "other ways in".
  *   v1.3.0 — 2026-10-16 — menu-find: onSearchStart, busyNote and a group's byScore/max (the person's
  *     own things in the find).
@@ -114,7 +115,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'ask-page', name: 'AskPage', kind: 'component', status: 'active',
-        summary: 'A page that asks the person one thing, in a narrow column in the middle of the window (it often opens as a small popup). The question stands in the Object box: who asks (a large picture or first letter, their bold name, their address in typewriter letters and a mark at the right), a tag over the question, the question as the headline, what the person needs to know, the ways to answer at the foot, and other ways in under a word such as "or". While there is nothing to ask yet, one quiet sentence stands in the box\'s place.',
+        summary: 'A page that asks the person one thing, in a narrow column in the middle of the window (it often opens as a small popup). The question stands in the Object box: who asks (a large picture or first letter, their bold name, their address in typewriter letters and a mark at the right), a tag over the question, the question as the headline, what the person needs to know, the ways to answer at the foot, and other choices under a word such as "or". While there is nothing to ask yet, one quiet sentence stands in the box\'s place.',
         module: '/components/AskPage.js', sheet: '/css/components/ask-page.css',
         data: {
             shape: 'AskPage({ message, who, tag, title, doors, or, ways, children })',
@@ -403,7 +404,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
                 children: 'CountBarsSet: the groupings, side by side and one under the other on a narrow screen',
             },
         },
-        useFor: ['Where the refusals or the packages come from: counts per door, per address, per author, read at a glance and pressed to narrow a list.'],
+        useFor: ['Where the refusals or the packages come from: counts per endpoint, per address, per author, read at a glance and pressed to narrow a list.'],
         variants: [
             { name: 'hot', class: 'count-bars-bar--hot', prop: 'hot', when: 'a key the page names hot (an address the tarpit walled)' },
             { name: 'warn', class: 'count-bars-bar--warn', prop: 'rows[].tone="warn"', when: 'a key the page cannot vouch for' },
@@ -412,7 +413,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
             { name: 'last', class: 'count-bars--last', prop: 'wide last', when: 'the last wide grouping of its section' },
             { name: 'set', class: 'count-bars-set', prop: 'CountBarsSet', when: 'several groupings side by side' },
         ],
-        example: { label: 'By door', rows: [{ key: '/v1/memory', count: 412 }, { key: '/v1/auth/login', count: 96 }, { key: '/v1/apps', count: 12 }] },
+        example: { label: 'By endpoint', rows: [{ key: '/v1/memory', count: 412 }, { key: '/v1/auth/login', count: 96 }, { key: '/v1/apps', count: 12 }] },
         note: 'Replaced the Security page\'s three groupings of the refusal log (Grouping in views/admin/security-tab.refusals.js, .adm-sec-* in admin-security.css) and the Knowledge page\'s facets (FacetBars, .adm-kn-cut and .adm-kn-part in admin-knowledge.css), one kind of thing. The bar lengths are SVG widths, not styles.',
     },
     {
