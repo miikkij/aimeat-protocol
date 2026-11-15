@@ -3,6 +3,33 @@
   "entries": [
     {
       "date": "2026-11-15",
+      "kind": "security",
+      "id": "2026-11-15-requests-are-checked-against-the-api-description",
+      "highlight": false,
+      "audience": [
+        "operator",
+        "developer",
+        "agent"
+      ],
+      "title": {
+        "en": "Requests are checked against the API description",
+        "fi": "Pyynnöt tarkistetaan API-kuvausta vasten"
+      },
+      "summary": {
+        "en": "A signed-in program's request is compared with the published API description; a field that does not fit is refused and named.",
+        "fi": "Kirjautuneen ohjelman pyyntö verrataan julkaistuun API-kuvaukseen; sopimaton kenttä hylätään ja nimetään."
+      },
+      "body": {
+        "en": "Every request from a signed-in program is compared with the published API description before anything is stored. A field that does not fit is refused, and the answer names the field. If a program that worked before is refused, the operator switches to report-only on the Config page. The change applies at once, without a restart.",
+        "fi": "Palvelin vertaa jokaista kirjautuneen ohjelman pyyntöä julkaistuun API-kuvaukseen ennen kuin se tallentaa mitään. Jos kenttä ei sovi kuvaukseen, palvelin hylkää pyynnön ja nimeää kentän. Jos ennen toiminut ohjelma saa hylkäyksen, ylläpitäjä vaihtaa Asetukset-sivulla tilaan Vain raportoi. Muutos tulee voimaan heti, eikä palvelinta tarvitse käynnistää uudelleen."
+      },
+      "impact": {
+        "en": "A program that sends a body the API description does not allow now gets a 400 that names the field; the operator can switch back to report-only at once.",
+        "fi": "Ohjelma, joka lähettää API-kuvaukseen sopimattoman pyynnön, saa nyt virheen 400, joka nimeää kentän; ylläpitäjä voi palata raportointitilaan heti."
+      }
+    },
+    {
+      "date": "2026-11-15",
       "kind": "feature",
       "id": "2026-11-15-your-ai-reaches-every-page-action",
       "highlight": false,
