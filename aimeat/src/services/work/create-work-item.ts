@@ -10,6 +10,7 @@
  * @structure workErrorText · createWorkItem
  * @usage const result = await createWorkItem(config, storage, requesterGaii, body, peers, notificationService);
  * @version-history
+ *   v1.1.0 — 2026-11-15 — createWorkItem refuses an input that is not a JSON object (work-payload.ts).
  *   v1.0.0 — 2026-11-13 — Moved out of routes/work.ts unchanged (structure programme unit 2).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -25,6 +26,7 @@ import { resolveGaii } from '../federation.js';
 import type { PeerInfo } from '../federation.js';
 import { safeFetch, validateOutboundUrl } from '../../utils/url-validator.js';
 import { readJson, OUTBOUND_READ_MAX_BYTES } from '../../utils/read-capped.js';
+import { isWorkPayload, WORK_INPUT_NOT_OBJECT } from './work-payload.js';
 
 /**
  * The text an MCP tool shows for a createWorkItem refusal: `CODE: message`. For PEER_REFUSED it
@@ -73,6 +75,10 @@ export async function createWorkItem(
 
   if (!action_id || !provider_gaii || input === undefined) {
     return { error: 'action_id, provider_gaii, and input are required', status: 400, code: 'INVALID_INPUT' };
+  }
+  // Every caller gets the same rule, whichever schema it ran before this (decision 2026-11-15).
+  if (!isWorkPayload(input)) {
+    return { error: WORK_INPUT_NOT_OBJECT, status: 400, code: 'INVALID_INPUT' };
   }
 
   // The provider is named by its full identity: a person's GHII, an agent's GAII or an ecosystem app's

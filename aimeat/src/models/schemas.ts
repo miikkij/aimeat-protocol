@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   2026-11-15 — WorkRequestSchema.input and WorkDeliverySchema.output are JSON objects again (they
+ *     were z.unknown() since 2026-02-26), as the MCP tools take them; output stays optional here.
  *   2026-11-08 — ConsentCreateSchema takes `role` (read | write) for POST /v1/consent: what the
  *     recipient may do, never read off the purpose text.
  *   2026-11-02 — TwoStepStartSchema and TwoStepFinishSchema for POST /v1/ghii/login/two-step/start and
@@ -228,10 +230,18 @@ export const ActionUpdateSchema = z.object({
 
 // ── Work Queue ──────────────────────────────────────────────
 
+/**
+ * A work item's input and a delivery's output: a JSON object, as the MCP tools take them (decision
+ * 2026-11-15). Text, a number, an array or null is refused, and the refusal reads "expected object".
+ * Rows stored while these were z.unknown() (2026-02-26 to 2026-11-15) may hold any value; every
+ * reader passes them through, and services/work-task-bridge.ts turns one into a single field.
+ */
+const WorkPayloadSchema = z.looseObject({});
+
 export const WorkRequestSchema = z.object({
     action_id: z.string().min(1).max(INPUT_LIMITS.id),
     provider_gaii: z.string().min(1).max(INPUT_LIMITS.id),
-    input: z.unknown(),
+    input: WorkPayloadSchema,
     callback_url: z.string().url().max(INPUT_LIMITS.url).optional(),
     ttl_hours: z.number().positive().max(720).optional(), // max 30 days
     priority: z.enum(['low', 'normal', 'high']).optional(),
@@ -242,7 +252,8 @@ export const WorkBatchSchema = z.object({
 });
 
 export const WorkDeliverySchema = z.object({
-    output: z.unknown(),
+    // Optional at this layer, as z.unknown() was; openapi.yaml's WorkDelivery asks for the field.
+    output: WorkPayloadSchema.optional(),
     metadata: z.unknown().optional(),
 });
 

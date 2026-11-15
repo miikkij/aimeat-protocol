@@ -37,6 +37,8 @@
  *   const out = await acceptWork({ storage, config }, providerGaii, trackingCode);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-15 — deliverWork() refuses a present output that is not a JSON object before anything is
+ *     read or written (work/work-payload.ts); an absent output is left to the caller's schema.
  *   2026-10-27 — acceptWork() moves pending to accepted with storage.transitionWorkStatus, so an accept
  *     that read the status before a reject or an expiry cannot reopen the refunded item (secaudit2026oct26,
  *     work-status-overwrite-after-stale-read).
@@ -56,6 +58,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, WorkRecord } from '../storage/interface.js';
 import { settlePayment } from './morsel.js';
 import { createTaskFromWork } from './work-task-bridge.js';
+import { isWorkPayload, WORK_OUTPUT_NOT_OBJECT } from './work/work-payload.js';
 import { emitChange } from './event-bus.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { safeFetch } from '../utils/url-validator.js';
@@ -210,6 +213,10 @@ export async function deliverWork(
     trackingCode: string,
     output: Record<string, unknown> | undefined,
 ): Promise<WorkLifecycleResult> {
+    // The REST schema and the MCP catalog refuse it first; this keeps every caller to one rule.
+    if (output !== undefined && !isWorkPayload(output)) {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: WORK_OUTPUT_NOT_OBJECT };
+    }
     const loaded = await loadForProvider(storage, providerGaii, trackingCode, ['accepted', 'in_progress'], 'deliver');
     if (!loaded.ok) return loaded;
     const work = loaded.work;

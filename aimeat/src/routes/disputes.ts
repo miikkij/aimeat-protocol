@@ -12,6 +12,8 @@
  *   - the audit chain and resolveDisputeOnce: services/disputes/audit.ts
  *
  * @version-history
+ *   2026-11-15 — POST /v1/work/:tc/redeliver refuses an output that is not a JSON object, as /deliver
+ *     does (services/work/work-payload.ts).
  *   2026-11-15 — GET /v1/admin/disputes and GET /v1/admin/disputes/:id: what waits for the operator and
  *     one dispute with its trail. The audit chain and resolveDisputeOnce moved unchanged to
  *     services/disputes/audit.ts and the ruling to services/disputes/operator.ts, which
@@ -82,6 +84,7 @@ import { isOperatorCaller } from '../services/operator-override.js';
 import { refreshTrustScore } from '../services/trust.js';
 import { appendAuditEntry, resolveDisputeOnce, ACTIVE_DISPUTE, DISPUTED_WORK } from '../services/disputes/audit.js';
 import { listOperatorDisputes, getOperatorDispute, ruleDispute, DISPUTE_LIST_STATUSES, type DisputeListStatus } from '../services/disputes/operator.js';
+import { isWorkPayload, WORK_OUTPUT_NOT_OBJECT } from '../services/work/work-payload.js';
 import { DisputeOpenSchema, CounterDisputeSchema, PartialOfferSchema, OperatorRulingSchema, validateBody } from '../models/schemas.js';
 
 function param(p: string | string[]): string {
@@ -243,6 +246,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         const { output } = req.body ?? {};
         if (output === undefined) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'output is required')); return; }
+        if (!isWorkPayload(output)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', WORK_OUTPUT_NOT_OBJECT)); return; }
 
         await storage.updateWork(tc, { output, updatedAt: new Date().toISOString() });
         await appendAuditEntry(storage, dispute.id, 're_delivery', me, { output_provided: true });

@@ -13,6 +13,9 @@
  *   shown to refuse it as well, so no correction is looser than the route.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openapi-body-contract-client-bodies.test.ts
  * @version-history
+ *   v1.3.0 — 2026-11-15 — A work request's input and a delivery's output are JSON objects (decision of
+ *     2026-11-15): the two cases that took any JSON value now take an object, and two new cases refuse
+ *     text, a number, an array and null. The route changed with them, so the contract still follows it.
  *   v1.2.1 — 2026-11-15 — The voice library's default speech body carries no voice (aimeat-voice 1.2.0).
  *   v1.2.0 — 2026-11-15 — The capability try panel's input, an extension action's array input, the
  *     federation key exchange the CLI and the node send, and the setup wizard's empty genesis address.
@@ -87,14 +90,22 @@ describe('POST /v1/account/events (aimeat-events.js record)', () => {
 
 describe('POST /v1/work/request, /v1/work and /v1/work/batch (aimeat-work.js request, batch)', () => {
     // work/index.js passes input and opts through as given; WorkRequestSchema (models/schemas.ts) reads
-    // input as z.unknown() (any value, the key required) and ttl_hours as a positive number up to 720.
+    // input as a JSON object (the key required) and ttl_hours as a positive number up to 720. Input was
+    // any JSON value here until the decision of 2026-11-15 made it an object on every route.
     const req = (input: unknown, extra: Record<string, unknown> = {}) => ({ action_id: 'translate-text', provider_gaii: 'bot#alice@node-a', input, ...extra });
 
-    it('takes an input of any JSON type, and a ttl_hours that is not a whole number', async () => {
-        const bodies = [req('translate this'), req(3), req(['a', 'b']), req(null), req({ text: 'x' }, { ttl_hours: 1.5, priority: 'high' })];
+    it('takes an object input, and a ttl_hours that is not a whole number', async () => {
+        const bodies = [req({ text: 'x' }), req({}), req({ text: 'x' }, { ttl_hours: 1.5, priority: 'high' })];
         await taken('POST', '/v1/work/request', bodies);
         await taken('POST', '/v1/work', bodies);
         await taken('POST', '/v1/work/batch', [{ requests: bodies }]);
+    });
+
+    it('refuses an input that is text, a number, an array or null, as the route does', async () => {
+        const bodies = [req('translate this'), req(3), req(['a', 'b']), req(null)];
+        await refused('POST', '/v1/work/request', bodies);
+        await refused('POST', '/v1/work', bodies);
+        for (const b of bodies) await refused('POST', '/v1/work/batch', [{ requests: [b] }]);
     });
 
     it('refuses a request without input, or with a ttl_hours of 0 or over 720, as the route does', async () => {
@@ -105,15 +116,22 @@ describe('POST /v1/work/request, /v1/work and /v1/work/batch (aimeat-work.js req
 });
 
 describe('POST /v1/work/{tc}/deliver and /redeliver (aimeat-work.js deliver)', () => {
-    // work/index.js sends { output, metadata? } as given; WorkDeliverySchema reads output as z.unknown()
-    // (any value, the key required) and metadata as z.unknown().optional(). The re-delivery after a
-    // dispute (routes/disputes.ts) shares the schema and refuses only a missing output.
+    // work/index.js sends { output, metadata? } as given; WorkDeliverySchema reads output as a JSON
+    // object and metadata as z.unknown().optional(). The re-delivery after a dispute (routes/disputes.ts)
+    // shares the contract schema and refuses a missing output or one that is not an object. Output was
+    // any JSON value here until the decision of 2026-11-15 made it an object on every route.
     const path = '/v1/work/tc-a1b2c3d4-e5f6-7890-abcd-ef1234567890/deliver';
 
-    it('takes an output and metadata of any JSON type', async () => {
-        const bodies = [{ output: 'the translation' }, { output: 42 }, { output: null }, { output: { text: 'x' }, metadata: 'model x' }, { output: [1, 2], metadata: { ms: 3 } }];
+    it('takes an object output and metadata of any JSON type', async () => {
+        const bodies = [{ output: { text: 'x' }, metadata: 'model x' }, { output: {}, metadata: { ms: 3 } }, { output: { items: [1, 2] } }];
         await taken('POST', path, bodies);
         await taken('POST', path.replace(/deliver$/, 'redeliver'), bodies);
+    });
+
+    it('refuses an output that is text, a number, an array or null, as the routes do', async () => {
+        const bodies = [{ output: 'the translation' }, { output: 42 }, { output: null }, { output: [1, 2], metadata: { ms: 3 } }];
+        await refused('POST', path, bodies);
+        await refused('POST', path.replace(/deliver$/, 'redeliver'), bodies);
     });
 
     it('refuses a delivery without output, as the route does', async () => {

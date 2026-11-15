@@ -5,6 +5,8 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — POST /v1/federation/cross-node/work refuses an input that is not a JSON object before
+ *     the peer lookup and the routing fee (services/work/work-payload.ts).
  *   2026-10-29 — GET /v1/federation/resolve/:gaii asks no peer for an identity that names this node or
  *     a peer this node knows but does not list (404), and asks at most federation.resolve_max_peers
  *     peers (default 500, 0 no limit) for an identity that names no known node (secaudit2026oct26
@@ -65,6 +67,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { routingFee } from '../../services/morsel.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { isWorkPayload, WORK_INPUT_NOT_OBJECT } from '../../services/work/work-payload.js';
 
 /**
  * The HTTP status of every PEER_REFUSED answer. A gateway error, never the far node's own status: a
@@ -524,6 +527,11 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
         if (!target_node || !action_id || !provider_gaii || input === undefined) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
                 'target_node, action_id, provider_gaii, and input are required'));
+            return;
+        }
+        // Refused here, before the peer lookup and the routing fee: the receiving node refuses it too.
+        if (!isWorkPayload(input)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', WORK_INPUT_NOT_OBJECT));
             return;
         }
 

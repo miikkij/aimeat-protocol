@@ -2825,9 +2825,13 @@ components:
         provider_gaii:
           $ref: '#/components/schemas/WorkParty'
         input:
+          type: object
+          additionalProperties: true
           description: >-
-            Must conform to the action's input_schema. Any JSON value: an object, text, a number,
-            an array or null. The field itself must be present.
+            A JSON object that conforms to the action's input_schema, for example { "text": "..." }.
+            Text, a number, an array or null is refused with 400 (until 2026-11-15 any JSON value was
+            taken). A work item stored before then may hold another value, and GET /v1/work/{tc}
+            returns it as stored.
         ttl_hours:
           type: number
           exclusiveMinimum: 0
@@ -2903,9 +2907,13 @@ components:
       required: [output]
       properties:
         output:
+          type: object
+          additionalProperties: true
           description: >-
-            Must conform to the action's output_schema. Any JSON value: an object, text, a number,
-            an array or null. The field itself must be present.
+            A JSON object that conforms to the action's output_schema, for example { "text": "..." }.
+            Text, a number, an array or null is refused with 400 (until 2026-11-15 any JSON value was
+            taken). A work item delivered before then may hold another value, and GET /v1/work/{tc}
+            returns it as stored.
         metadata:
           description: Anything the provider adds about the delivery. Any JSON value.
 
@@ -61383,7 +61391,8 @@ paths:
         (until 2026-10-15 this was a success envelope, `ok: true`, beside the error status, and until
         2026-10-16 the far node's status was this response's status, so its 401 read as the caller's
         own session ending). Work requests do not cross nodes yet: the receiving node asks for a
-        signed-in caller, so a real node refuses and `peer_status` is 401.
+        signed-in caller, so a real node refuses and `peer_status` is 401. An `input` that is not a
+        JSON object is refused with 400 INVALID_INPUT before the peer is looked up or the fee is taken.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -61393,6 +61402,11 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                input:
+                  type: object
+                  additionalProperties: true
+                  description: The work item's input, a JSON object, as POST /v1/work/request takes it.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
