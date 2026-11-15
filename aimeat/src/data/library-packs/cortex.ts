@@ -219,7 +219,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-canvas/libs/aimeat-canvas.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-canvas/libs/aimeat-canvas.js"></script>'],
     requires: [],
-    version: '1.0.1',
+    version: '1.0.2',
     license: 'MIT',
     apiSurface: 'AIMEAT.canvas',
     aiDoc: [
@@ -229,7 +229,9 @@ export const CORTEX_PACKS: LibraryPack[] = [
       "<canvas> paint loop. Example: AIMEAT.canvas.DrawingCanvas({ elementId:'pad', storageKey:'drawing:note1', nodeUrl: NODE });",
       'For sprite/WebGL rendering or games use the pixi/phaser packs instead.',
     ].join('\n'),
-    changelog: [],
+    changelog: [
+      { version: '1.0.2', date: '2026-11-15', summary: 'Fix: saving works. The first save creates the drawing record (POST /v1/memory with expected_version 0) and later saves update it with the version the node returned; every save used to fail with "Save failed" because the update route needs a version. No API change.' },
+    ],
     tierHint: 'T2',
     interviewTriggers: ['draw', 'drawing', 'sketch', 'piirto', 'piirustus'],
     sizeEstimate: '~10KB',
