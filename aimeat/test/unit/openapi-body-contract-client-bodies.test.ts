@@ -243,3 +243,18 @@ describe('POST /v1/contacts (portal contacts.js savePerson)', () => {
         await refused('POST', '/v1/contacts', [{ ...person, note: 'x'.repeat(1001) }, { ...person, email: 'carol at example' }]);
     });
 });
+
+describe('POST /v1/open-items (portal open-items.js addOpenItem)', () => {
+    // views/profile/appdev-tab.js sends prompt_ref: null for an item that has no prompt. routes/open-items.ts
+    // stores null for an absent or null kind, prompt_ref, prompt_args, origin, object and closes_when.
+    it('takes null for each optional field the route stores as null', async () => {
+        await taken('POST', '/v1/open-items', [
+            { title: 'Plan the flow', kind: 'app', prompt_ref: null, origin: 'appdev' },
+            { title: 'Plan the flow', kind: null, prompt_ref: null, prompt_args: null, origin: null, object: null, closes_when: null },
+        ]);
+    });
+
+    it('still refuses a body without a title, or with a closes_when check the route does not know', async () => {
+        await refused('POST', '/v1/open-items', [{ prompt_ref: null }, { title: 'x', closes_when: { check: 'never' } }]);
+    });
+});

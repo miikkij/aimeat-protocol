@@ -14364,17 +14364,17 @@ paths:
               required: [title]
               properties:
                 title: { type: string, maxLength: 200 }
-                kind: { type: string, description: One of the /v1/discover types. }
-                prompt_ref: { type: string, description: A prompt NAME, never prompt text. }
-                prompt_args: { type: object, additionalProperties: true }
-                origin: { type: string, description: Which surface it was switched on from. }
+                kind: { type: [string, 'null'], description: 'One of the /v1/discover types. Null or absent: none.' }
+                prompt_ref: { type: [string, 'null'], description: 'A prompt NAME, never prompt text. Null or absent: none.' }
+                prompt_args: { type: [object, 'null'], additionalProperties: true }
+                origin: { type: [string, 'null'], description: 'Which surface it was switched on from. Null or absent: none.' }
                 object:
-                  type: object
+                  type: [object, 'null']
                   properties:
                     type: { type: string }
                     id: { type: string }
                 closes_when:
-                  type: object
+                  type: [object, 'null']
                   properties:
                     check: { type: string, enum: [hello_mcp, welcome_mat, first_agent] }
                 by:
