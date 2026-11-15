@@ -1029,11 +1029,11 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/goose-chat-config.ts :: let :: warnedOperatorFile": {
+    "src/services/goose/chat-config.ts :: let :: warnedOperatorFile": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/goose-chat-config.ts :: map :: checkedRoots": {
+    "src/services/goose/chat-config.ts :: map :: checkedRoots": {
       "count": 1,
       "reason": "DEBT"
     },

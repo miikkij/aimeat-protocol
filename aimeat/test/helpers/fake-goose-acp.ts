@@ -11,7 +11,7 @@
  *   the node is the client. So this is the other end of the pipe: real JSON-RPC, one object per
  *   line, on stdin and stdout.
  *
- *   HOW IT BECOMES THE "BINARY". services/goose-acp.ts spawns `spawn(bin, ['acp'])` with the
+ *   HOW IT BECOMES THE "BINARY". services/goose/acp.ts spawns `spawn(bin, ['acp'])` with the
  *   argument list fixed, and Node 24 on Windows refuses to spawn a .cmd or .bat without `shell:true`
  *   (EINVAL, thrown synchronously, not even an `error` event). So the shim is not a script file at
  *   all: `bin` is node itself, and NODE_OPTIONS carries `--import tsx --import <this file>`. This
@@ -139,7 +139,7 @@ async function runPeer(): Promise<void> {
         leaked: Object.keys(process.env).filter(k => /^AIMEAT_|^DATABASE_URL$/i.test(k)),
     });
 
-    /** A request BACK to the node, answered by services/goose-acp.ts answerAgentRequest(). */
+    /** A request BACK to the node, answered by services/goose/acp.ts answerAgentRequest(). */
     function ask(method: string, params: Record<string, unknown>): Promise<JsonRpcMessage> {
         const id = nextId++;
         return new Promise((resolve) => {

@@ -42,7 +42,7 @@ import type { Locale } from '../../i18n.js';
 import { prepareAiCall, type AiCallPlan } from '../ai/completion.js';
 import { AiCompletionError } from '../ai/errors.js';
 import { chatEnabled } from './session.js';
-import { chatUsesSharedKey } from '../goose-env.js';
+import { chatUsesSharedKey } from '../goose/env.js';
 import { CHAT_AGENT_NAME } from './agent.js';
 import { readRouting } from '../ai/routing.js';
 import { agentAiView } from '../agent/ai-keys.js';

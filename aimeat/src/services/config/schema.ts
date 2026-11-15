@@ -712,7 +712,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'gooseProvider', dotPath: 'ai.chat_agent_provider', envVar: 'AIMEAT_GOOSE_PROVIDER', type: 'string', validate: () => true, immutable: false, description: "Provider the chat agent runs on when the chat agent key below is set (e.g. openrouter). Without that key the chat calls this node's /v1/llm and this setting is not used" },
   { key: 'gooseModel', dotPath: 'ai.chat_agent_model', envVar: 'AIMEAT_GOOSE_MODEL', type: 'string', validate: () => true, immutable: false, description: 'Model the chat agent runs on. With the shared chat key it is also what the node records as the model that answered a turn; without it, the owner\'s providers choose each call' },
   // Names, never values, and immutable: an operator who could add DATABASE_URL here from the admin
-  // screen would hand it to the agent again (services/goose-env.ts).
+  // screen would hand it to the agent again (services/goose/env.ts).
   { key: 'gooseEnvPassthrough', dotPath: 'ai.chat_agent_env_passthrough', envVar: 'AIMEAT_GOOSE_ENV_PASSTHROUGH', type: 'object',
     validate: v => Array.isArray(v) && v.every(item => typeof item === 'string'), immutable: true,
     description: 'Environment variable names the chat agent may see beside its allow-list, for a provider key passed in the environment. Set by whoever runs this node' },

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two halves of the chat's prompt cost (hosted fleet report, 2026-10-04):
- *   - services/goose-chat-config.ts: the chat's goose config switches off every goose extension but
+ *   - services/goose/chat-config.ts: the chat's goose config switches off every goose extension but
  *     todo, gives an empty working directory, and leaves an operator's own config.yaml alone.
  *   - routes/llm-proxy.ts cacheSessionId: the session_id OpenRouter routes a conversation by is the
  *     system message's hash, so every round and every conversation on the same prefix share it, and
@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { parse } from 'yaml';
 import {
   ensureChatGooseConfig, chatGooseConfigYaml, CHAT_GOOSE_EXTENSIONS, NODE_CONFIG_MARKER,
-} from '../../src/services/goose-chat-config.js';
+} from '../../src/services/goose/chat-config.js';
 import { cacheSessionId } from '../../src/routes/llm-proxy.js';
 
 const fresh = () => ({ goosePathRoot: mkdtempSync(join(tmpdir(), 'aimeat-goose-test-')), nodeId: 'aimeat-test-node' });

@@ -6,7 +6,7 @@
  *
  *   WHY THIS EXISTS. Until now every money figure on this node was something the node had counted
  *   itself, and two of the operator's keys are spent where the node cannot count. The chat agent's
- *   key is handed to a child process as an environment variable (services/goose-acp.ts), so its
+ *   key is handed to a child process as an environment variable (services/goose/acp.ts), so its
  *   turns never pass through the metering and appear in no total anywhere. The house key is metered
  *   per call, but only for the calls that reached the metering. An operator asking "what is this
  *   costing me" was being answered with a sum of what we happened to see.

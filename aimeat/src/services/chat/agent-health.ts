@@ -28,7 +28,7 @@
  *   v1.0.0 — 2026-11-07 — Initial (Jouni, 2026-11-07).
  */
 import type { AimeatConfig } from '../../config.js';
-import { GooseAcpClient } from '../goose-acp.js';
+import { GooseAcpClient } from '../goose/acp.js';
 import { logger } from '../../utils/logger.js';
 
 export type ChatAgentHealth = { ok: true } | { ok: false; error: string };

@@ -1,5 +1,5 @@
 /**
- * @file src/services/goose-chat-config.ts
+ * @file src/services/goose/chat-config.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The goose configuration and working directory the node's chat agent runs with.
@@ -12,7 +12,7 @@
  *   app building (apps), an extension manager that can switch the others back on, sub-agents
  *   (summon), a skills index of 11 279 characters, and, from the working directory, this repository's
  *   AGENTS.md as "project hints". The node chat uses none of them. The shell also ran on the node's
- *   own machine: the child environment is allow-listed (services/goose-env.ts), but a shell on the
+ *   own machine: the child environment is allow-listed (services/goose/env.ts), but a shell on the
  *   host is a shell on the host.
  *
  *   WHAT IT DOES. The chat gets a goose root of its own (AIMEAT_GOOSE_PATH_ROOT, or a directory under
@@ -38,8 +38,8 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
 
 /** The first line of a config.yaml the node wrote. A file without it belongs to the operator. */
 export const NODE_CONFIG_MARKER = '# Written by the AIMEAT node for its chat agent (services/goose-chat-config.ts). The node rewrites this file.';

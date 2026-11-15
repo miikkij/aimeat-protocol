@@ -1,5 +1,5 @@
 /**
- * @file src/services/goose-env.ts
+ * @file src/services/goose/env.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The environment the built-in chat agent (a `goose acp` child) starts with.
@@ -48,8 +48,8 @@
  *     budget and the metering apply to the chat. The shared key is the operator's special case.
  *   v1.0.0 — 2026-09-16 — Initial. The child had the node's whole environment.
  */
-import type { AimeatConfig } from '../config.js';
-import { chatGooseRoot } from './goose-chat-config.js';
+import type { AimeatConfig } from '../../config.js';
+import { chatGooseRoot } from './chat-config.js';
 
 /** Names every process needs, on Linux, macOS and Windows. None of them holds a credential. */
 export const GOOSE_BASE_ENV = [
@@ -112,7 +112,7 @@ export function gooseChildEnv(
     if (allowed.has(upper) || upper.startsWith('LC_') || upper.startsWith('GOOSE_')) env[name] = value;
   }
   // Always the chat's own root, so goose reads the config the node wrote for it and never a human's
-  // goose profile (services/goose-chat-config.ts). A GOOSE_PATH_ROOT the host passed is overridden.
+  // goose profile (services/goose/chat-config.ts). A GOOSE_PATH_ROOT the host passed is overridden.
   for (const name of Object.keys(env)) if (name.toUpperCase() === 'GOOSE_PATH_ROOT') delete env[name];
   env.GOOSE_PATH_ROOT = chatGooseRoot(config);
 

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The chat agent processes that are running, one per key: one per person on the node
- *   route, one for everybody on the shared key (services/goose-env.ts).
+ *   route, one for everybody on the shared key (services/goose/env.ts).
  *
  *   WHY ONE PER PERSON. Goose reads its provider, model and key from the process environment, so a
  *   process speaks to one provider with one key. On the node route that key is one person's own chat

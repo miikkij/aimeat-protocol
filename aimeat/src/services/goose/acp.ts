@@ -1,5 +1,5 @@
 /**
- * @file goose-acp.ts
+ * @file src/services/goose/acp.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An ACP client for a goose agent, over stdio, that answers the agent's callbacks.
@@ -68,12 +68,12 @@
  */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import { cardFromToolResult, type ChatCard } from './chat/cards.js';
-import { chatUsesSharedKey, gooseChildEnv } from './goose-env.js';
-import { decideRegion, regionBaseUrl, regionChoiceFor } from './ai/openrouter-region.js';
-import { DEFAULT_RULES } from './ai/routing.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import { cardFromToolResult, type ChatCard } from '../chat/cards.js';
+import { chatUsesSharedKey, gooseChildEnv } from './env.js';
+import { decideRegion, regionBaseUrl, regionChoiceFor } from '../ai/openrouter-region.js';
+import { DEFAULT_RULES } from '../ai/routing.js';
 
 /**
  * Where the shared key's chat calls go: the node's OpenRouter region for the chat model, as a host
@@ -90,7 +90,7 @@ async function sharedKeyOpenRouterHost(config: AimeatConfig): Promise<string | u
     const base = decided?.ok ? decided.baseUrl : regionBaseUrl(config, choice.region);
     return base.endsWith('/api/v1') ? base.slice(0, -'/api/v1'.length) : undefined;
 }
-import { ensureChatGooseConfig } from './goose-chat-config.js';
+import { ensureChatGooseConfig } from './chat-config.js';
 
 /** An MCP server handed to one session. `http` is the transport goose reports as supported. */
 /** One picture handed to the model with a turn: the bytes, and what they are. */
@@ -189,17 +189,17 @@ export class GooseAcpClient {
      * offer a hosted agent, and claiming otherwise then failing the callback is worse than saying no
      * up front — the agent plans around what the client says it can do.
      *
-     * `personal` is the node route (services/goose-env.ts): the token of the one person whose turns
+     * `personal` is the node route (services/goose/env.ts): the token of the one person whose turns
      * this child runs, which the child sends to /v1/llm as its API key. Without it the child runs on
      * the shared key or on goose's own configuration.
      */
     static async start(config: AimeatConfig, personal?: { token: string }): Promise<GooseAcpClient> {
         const bin = config.gooseBin || 'goose';
-        // Only what the agent needs, never the node's whole environment (services/goose-env.ts): the
+        // Only what the agent needs, never the node's whole environment (services/goose/env.ts): the
         // agent talks to people and can run the tools goose's own config switches on.
         const env = gooseChildEnv(config, process.env, personal, await sharedKeyOpenRouterHost(config));
         // The config that switches off the goose extensions the chat does not use, written before goose
-        // reads it (services/goose-chat-config.ts).
+        // reads it (services/goose/chat-config.ts).
         ensureChatGooseConfig(config);
 
         const child = spawn(bin, ['acp'], { stdio: ['pipe', 'pipe', 'pipe'], env });

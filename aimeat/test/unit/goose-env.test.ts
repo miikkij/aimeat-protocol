@@ -1,6 +1,6 @@
 /**
  * @file goose-env.test.ts
- * @description Unit tests for the chat agent child's environment (src/services/goose-env.ts): the
+ * @description Unit tests for the chat agent child's environment (src/services/goose/env.ts): the
  *   node's secrets stay out, what a process needs to run stays in, and the host's passthrough list
  *   and the node's own provider settings arrive.
  *
@@ -16,8 +16,8 @@
 import { describe, it, expect } from 'vitest';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { gooseChildEnv, chatUsesSharedKey, NODE_CHOOSES_MODEL } from '../../src/services/goose-env.js';
-import { chatGooseRoot } from '../../src/services/goose-chat-config.js';
+import { gooseChildEnv, chatUsesSharedKey, NODE_CHOOSES_MODEL } from '../../src/services/goose/env.js';
+import { chatGooseRoot } from '../../src/services/goose/chat-config.js';
 
 const parent: NodeJS.ProcessEnv = {
   Path: 'C:\\Windows;C:\\bin', SystemRoot: 'C:\\Windows', HOME: '/home/node', LANG: 'en_US.UTF-8',
@@ -65,7 +65,7 @@ describe('gooseChildEnv', () => {
     expect(env.GOOSE_MODEL).toBe('some/model');
     expect(env.GOOSE_PATH_ROOT).toBe('/var/lib/aimeat/goose');
     // With nothing configured the child still gets the chat's own goose root, where the node's config
-    // switches goose's unused extensions off (services/goose-chat-config.ts), and nothing else.
+    // switches goose's unused extensions off (services/goose/chat-config.ts), and nothing else.
     const bareCfg = cfg({ gooseProviderApiKey: '', gooseProvider: '', gooseModel: '', goosePathRoot: '' });
     expect(gooseChildEnv(bareCfg, {})).toEqual({ GOOSE_PATH_ROOT: chatGooseRoot(bareCfg) });
     expect(chatGooseRoot(bareCfg)).toBe(join(tmpdir(), 'aimeat-goose-aimeat-test-node'));

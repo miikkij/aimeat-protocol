@@ -5,7 +5,7 @@
  * @description One turn of the chat, end to end: the person's identity, the agent process, the
  *   conversation record, and what came back.
  *
- *   WHICH PROCESS RUNS A TURN (services/goose-env.ts, services/chat/agent-pool.ts).
+ *   WHICH PROCESS RUNS A TURN (services/goose/env.ts, services/chat/agent-pool.ts).
  *   - The node route, the default (no AIMEAT_GOOSE_PROVIDER_API_KEY): each person has an agent
  *     process of their own, started on their first turn and closed when idle. Its model calls go to
  *     this node's /v1/llm with that person's chat token, so the owner's model policy, budget and
@@ -108,7 +108,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { GooseAcpClient, McpServerNotLoadedError, aimeatMcpServer, type PromptImage, type SessionUpdate } from '../goose-acp.js';
+import { GooseAcpClient, McpServerNotLoadedError, aimeatMcpServer, type PromptImage, type SessionUpdate } from '../goose/acp.js';
 import {
     TURN_LIMITS, TurnWatch, stepForTool, turnNote, clockLine, wrapUpPrompt, withTicks, progressText, stoppedText, noAnswerText, appReadyText, publishedAppUrl,
     type GuardReason, type NodeUpdate, type ProgressStep,
@@ -116,8 +116,8 @@ import {
 import { DEFAULT_LOCALE, createT, type Locale } from '../../i18n.js';
 import { CHAT_AGENT_NAME, ensureChatAgent, mintChatAgentToken } from './agent.js';
 import { AgentPool, type AgentLease, type PoolStart } from './agent-pool.js';
-import { chatUsesSharedKey } from '../goose-env.js';
-import { ensureChatGooseConfig } from '../goose-chat-config.js';
+import { chatUsesSharedKey } from '../goose/env.js';
+import { ensureChatGooseConfig } from '../goose/chat-config.js';
 import { prepareAiCall } from '../ai/completion.js';
 import { AiCompletionError } from '../ai/errors.js';
 import type { BalanceChoice } from '../ai/ai-fix-words.js';
@@ -367,7 +367,7 @@ async function sessionFor(
         sessionId = await lease.client.newSession({
             mcpServers: [aimeatMcpServer(config.baseUrl, token)],
             // An empty directory: in the node's own, goose read the repository's AGENTS.md into every
-            // round as project hints (services/goose-chat-config.ts).
+            // round as project hints (services/goose/chat-config.ts).
             cwd: ensureChatGooseConfig(config).cwd,
             // A turn without the person's own tools is not this chat: it is refused here, and the
             // person reads why, rather than watching a model pretend to call them.

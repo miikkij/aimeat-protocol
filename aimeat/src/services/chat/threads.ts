@@ -201,7 +201,7 @@ export async function deleteThread(storage: Storage, gaii: string, id: string): 
 /**
  * Whether the chat tool (goose) keeps its own copy of a conversation after the node deletes it.
  *
- * goose stores its sessions and logs under its own root (services/goose-chat-config.ts), in a format
+ * goose stores its sessions and logs under its own root (services/goose/chat-config.ts), in a format
  * that is goose's and that this node has no call to delete from. A thread only knows its current
  * goose session, not the ones a reset or a restart left behind, and goose's logs carry what was sent.
  * So the node cannot find and delete that copy with certainty, and says so: `kept` for a conversation

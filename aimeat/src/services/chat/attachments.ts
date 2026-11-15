@@ -26,7 +26,7 @@
  */
 import { readAiFile, type AiFileSource } from '../ai/inputs.js';
 import type { ContentReader } from '../classification/reader.js';
-import type { PromptImage } from '../goose-acp.js';
+import type { PromptImage } from '../goose/acp.js';
 import { extractFileText, extractableKind, isLegacyOfficeFile, NAME, type ExtractOptions } from '../file-text/index.js';
 import { logger } from '../../utils/logger.js';
 

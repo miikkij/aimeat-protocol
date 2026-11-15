@@ -2,7 +2,7 @@
  * @file test/unit/goose-chat-config.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The node chat's default goose root (services/goose-chat-config.ts) on a system with
+ * @description The node chat's default goose root (services/goose/chat-config.ts) on a system with
  *   user ids: a directory of that predictable name that another local account created first, or a
  *   symbolic link, is not used, and its config.yaml is not taken as the operator's; the node's own
  *   directory is used as before, and an operator's AIMEAT_GOOSE_PATH_ROOT is used as given
@@ -34,7 +34,7 @@ vi.mock('node:fs', async (orig) => {
   };
 });
 
-const { chatGooseRoot, ensureChatGooseConfig, NODE_CONFIG_MARKER } = await import('../../src/services/goose-chat-config.js');
+const { chatGooseRoot, ensureChatGooseConfig, NODE_CONFIG_MARKER } = await import('../../src/services/goose/chat-config.js');
 
 const realGetuid = process.getuid;
 const made: string[] = [];

@@ -10,7 +10,7 @@
  *   three as peers: the per-owner daily table split by whose key paid, the LLM ledger rollup, and
  *   the AI-apps aggregate. None of them is the operator's bill, because the money the operator
  *   actually pays is the house key and the chat agent's key, and the second of those is spent by a
- *   child process the node hands the key to (services/goose-acp.ts) and never sees again.
+ *   child process the node hands the key to (services/goose/acp.ts) and never sees again.
  *
  *   SO THE PAYLOAD IS ORGANISED BY WHOSE MONEY IT IS, not by which system counted it. `house` is
  *   the operator's, `own` is other people's own provider accounts, and `ledger` is named as the
@@ -43,7 +43,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { chatUsesSharedKey } from '../goose-env.js';
+import { chatUsesSharedKey } from '../goose/env.js';
 import { getAdminLedger } from '../ledger/admin.js';
 import { readKeySpend, type KeySpend } from '../openrouter-key.js';
 import { nodeOpenRouterKey } from '../ai/node-openrouter-key.js';
@@ -180,7 +180,7 @@ export async function buildUsagePage(
       enabled: !!(config.gooseBin || '').trim(),
       model: config.gooseModel || null,
       // On the shared chat key every turn is spent from that key by a child process, so no figure
-      // the node counts includes any of it. Without it (the node route, services/goose-env.ts) each
+      // the node counts includes any of it. Without it (the node route, services/goose/env.ts) each
       // person's turns go through /v1/llm and are metered like any other call: they are already in
       // the house and own figures, and saying "not measured" would be false.
       metered_here: !chatUsesSharedKey(config),
