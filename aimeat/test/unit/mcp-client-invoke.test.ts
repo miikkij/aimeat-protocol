@@ -44,7 +44,7 @@ import {
 import { sealMcpCredential } from '../../src/services/mcp-client/credential.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
 import { attachMcpServer } from '../../src/services/mcp-client/registry.js';
-import { invokeCapability } from '../../src/services/capability-invoke.js';
+import { invokeCapability } from '../../src/services/capabilities/invoke.js';
 import type { CapabilityRecord } from '../../src/storage/interface.js';
 
 // Loopback egress is gated, and the whole point of this suite is a real socket. RFC1918 and

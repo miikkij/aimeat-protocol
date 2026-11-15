@@ -8,7 +8,7 @@
  *   - invoke: the private-capability check, then the shared invoke and its recorded outcome
  *   - write tools: create, update, delete, vouch, each rendering what capability-record.ts decided
  * @usage Registered by mcp/index.ts per agent session; the shared write lives in
- *   services/capability-record.ts, which the REST routes call as well.
+ *   services/capabilities/record.ts, which the REST routes call as well.
  * @version-history
  *   2026-11-14 — aimeat_capabilities_get and _invoke reach a capability through capabilityFor
  *     (services/capabilities/capability-for.ts), as the REST routes do: the operator's pass into another
@@ -53,7 +53,7 @@ import { withCaughtError } from './tool-fault.js';
 import {
     createCapability, updateCapability, deleteCapability, vouchCapability, recordCapabilityInvocation,
     type CapabilityCreateInput,
-} from '../services/capability-record.js';
+} from '../services/capabilities/record.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { capabilityFor } from '../services/capabilities/capability-for.js';
@@ -140,7 +140,7 @@ export function registerCapabilitiesTools(
             annotations: annotationsFor('aimeat_capabilities_get'),
         },
         async ({ id }) => {
-            // The REST twin's rule (services/capability-reach.ts): this tool served any capability by
+            // The REST twin's rule (services/capabilities/reach.ts): this tool served any capability by
             // id, a private one or a draft of another owner included (secaudit2026oct22).
             const found = await capabilityForSession(id, 'read');
             if (!found.ok) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
@@ -162,7 +162,7 @@ export function registerCapabilitiesTools(
             // What the read path hides, invoke hides too, and it answers "not found" rather than
             // "forbidden" so the id is not confirmed: a private capability, an unknown visibility word
             // and a capability never published reach the owner's side and the operator only
-            // (services/capability-reach.ts; secaudit2026oct22). This tool once invoked anything by
+            // (services/capabilities/reach.ts; secaudit2026oct22). This tool once invoked anything by
             // id, including another owner's private manual webhook capability.
             const found = await capabilityForSession(args.id, 'invoke');
             if (!found.ok) return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
@@ -179,7 +179,7 @@ export function registerCapabilitiesTools(
             const input = args.input || {};
 
             try {
-                const { invokeCapability } = await import('../services/capability-invoke.js');
+                const { invokeCapability } = await import('../services/capabilities/invoke.js');
                 // An MCP session is an agent, never the owner in person: it holds its own scopes.
                 const result = await invokeCapability(config, storage, cap, input, callerGhii, getToken() ?? '',
                     args.mode || 'normal', undefined, { scopes });

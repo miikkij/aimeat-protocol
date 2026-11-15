@@ -471,7 +471,7 @@ export function registerExtensionsTools(
                 }
                 // Actions may have changed (or just went live) — refresh aggregated capabilities.
                 if (status === 'active') {
-                    import('../services/capability-aggregator.js')
+                    import('../services/capabilities/aggregator.js')
                         .then(m => m.runCapabilityAggregation(config, storage))
                         .catch(err => logger.error('Capability aggregation after MCP extension install failed', { error: String(err) }));
                 }
@@ -542,7 +542,7 @@ export function registerExtensionsTools(
                 );
 
                 // Trigger capability aggregation so the extension appears immediately
-                import('../services/capability-aggregator.js')
+                import('../services/capabilities/aggregator.js')
                     .then(m => m.runCapabilityAggregation(config, storage))
                     .catch(err => logger.error('Capability aggregation after MCP extension activate failed', { error: String(err) }));
 

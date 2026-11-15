@@ -95,7 +95,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/capability-invoke.ts": {
+      "src/services/capabilities/invoke.ts": {
         "count": 2,
         "why": "UNREVIEWED"
       },
@@ -445,7 +445,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/capability-record.ts": {
+      "src/services/capabilities/record.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },

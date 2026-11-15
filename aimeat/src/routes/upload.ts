@@ -636,7 +636,7 @@ async function handleExtensionUpload(
     // declare, and refresh aggregated capabilities when the extension is live.
     await reconcileAfterExtensionWrite(storage, ownerName, config.nodeId, saved.name);
     if (saved.status === 'active') {
-        import('../services/capability-aggregator.js')
+        import('../services/capabilities/aggregator.js')
             .then(m => m.runCapabilityAggregation(config, storage))
             .catch(err => logger.error('Capability aggregation after extension upload failed', { error: String(err) }));
     }

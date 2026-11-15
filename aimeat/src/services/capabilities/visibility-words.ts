@@ -1,5 +1,5 @@
 /**
- * @file src/services/capability-visibility-words.ts
+ * @file src/services/capabilities/visibility-words.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A once-per-node step: a stored capability whose visibility is a word the node does not
@@ -9,9 +9,9 @@
  *   WHY. Until 2026-10-26 POST and PUT /v1/capabilities stored any visibility word they were given.
  *   Such a word means nothing to the node: the list showed the capability to its owner only, and the
  *   read and the invoke by id hid only 'private', so they served it to anyone with the id. Writes now
- *   take only private, owner or public (services/capability-record.ts), and a capability with any
+ *   take only private, owner or public (services/capabilities/record.ts), and a capability with any
  *   other word is closed to everyone but its owner's side and the operator
- *   (services/capability-reach.ts; secaudit2026oct22, developer decision 2026-10-26).
+ *   (services/capabilities/reach.ts; secaudit2026oct22, developer decision 2026-10-26).
  *
  *   WHY THE OWNER AND NOT THE OPERATOR. Only the owner knows whom the word was meant for. The first
  *   version of this step asked the operator on the Security page to make each one private or keep the
@@ -32,12 +32,12 @@
  *     Security page incident that asked the operator (developer decision 2026-10-27).
  *   v1.0.0 — 2026-10-26 — Initial (secaudit2026oct22; developer decision 2026-10-26).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityRecord } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
-import { CAPABILITY_VISIBILITIES } from './capability-reach.js';
-import { notify } from './notify.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, CapabilityRecord } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
+import { CAPABILITY_VISIBILITIES } from './reach.js';
+import { notify } from '../notify.js';
 
 /** The record under `system@<nodeId>` that says this node has run the step. */
 export const CAPABILITY_VISIBILITY_WORDS_KEY = 'migrations.secaudit2026oct22.capability-visibility-words';

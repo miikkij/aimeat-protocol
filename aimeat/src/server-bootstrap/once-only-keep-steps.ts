@@ -108,7 +108,7 @@ import { recordPointerStateOnce } from '../services/datapackage/sale-terms-recor
 import { markExistingPortfolioPagesOnce } from '../services/portfolio/read-hold-keep.js';
 import { moveEcosystemSubscriptionsByOwnerOnce } from '../services/ecosystem/subscriptions-by-owner.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
-import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
+import { disableMalformedExtensionRefsOnce } from '../services/capabilities/extension-ref.js';
 import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain-site-origin-keep.js';
 import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js';
 import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
@@ -117,7 +117,7 @@ import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover
 import { moveErasedLockHoldersOnce } from '../services/csm/erased-lock-holders.js';
 import { moveCsmLockHoldersOnce } from '../services/csm/csm-lock-holders.js';
 import { moveAppPartiesToTablesOnce } from '../services/app-parties/move-to-tables.js';
-import { settleUnknownCapabilityVisibilityOnce } from '../services/capability-visibility-words.js';
+import { settleUnknownCapabilityVisibilityOnce } from '../services/capabilities/visibility-words.js';
 import { markPlatformFeeWritersOnce } from '../commerce/platform-fee-writers.js';
 import { askUncertainAccountantGrantsOnce } from '../services/finance/accountant-grant-ask.js';
 import { givePlaceDefaultToEveryAgent } from '../services/place-agent-scopes.js';
@@ -204,7 +204,7 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   await keepTaskContentForAppGrantsOnce(storage, config, { existedBefore: scopeStepsBegan })
     .catch(err => logger.error('Failed to keep the task content reads of the earlier app grants; the next boot tries again', { error: String(err) }));
   // A stored extension capability whose ref names no extension action gets the operator's disable
-  // switch with a note, and nothing is deleted (services/capability-extension-ref.ts). Awaited, so no
+  // switch with a note, and nothing is deleted (services/capabilities/extension-ref.ts). Awaited, so no
   // invoke meets such a ref first.
   await disableMalformedExtensionRefsOnce(storage, config)
     .catch(err => logger.error('Failed to switch off the extension capabilities whose ref names no action; the next boot tries again', { error: String(err) }));
@@ -255,7 +255,7 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   await moveAppPartiesToTablesOnce(storage, config)
     .catch(err => logger.error('Failed to move the people registered to apps to their tables; the next boot tries again', { error: String(err) }));
   // The capabilities stored with a visibility word the node does not know are set to private, which
-  // changes no reach, and each owner is told (services/capability-visibility-words.ts).
+  // changes no reach, and each owner is told (services/capabilities/visibility-words.ts).
   await settleUnknownCapabilityVisibilityOnce(storage, config)
     .catch(err => logger.error('Failed to look for the capabilities with an unknown visibility word; the next boot tries again', { error: String(err) }));
   // The platform-fee records an account or an agent wrote into its own memory before the prefix was

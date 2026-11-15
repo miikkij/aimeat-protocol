@@ -176,7 +176,7 @@ export const capabilityMethods = {
     if (filters.ownerGhii) { query += ' AND ownerGhii = ?'; params.push(filters.ownerGhii); }
     if (filters.visibility) { query += ' AND visibility = ?'; params.push(filters.visibility); }
     // Another owner's entry is listed only when it is public AND active, the same rule a single read and
-    // the MCP search apply (services/capability-reach.ts); the caller's own entries in any state.
+    // the MCP search apply (services/capabilities/reach.ts); the caller's own entries in any state.
     if (filters.publicOrOwner) { query += ' AND ((visibility = ? AND status = ?) OR ownerGhii = ?)'; params.push('public', 'active', filters.publicOrOwner); }
     if (filters.status) { query += ' AND status = ?'; params.push(filters.status); }
     if (filters.sourceType) { query += ' AND sourceType = ?'; params.push(filters.sourceType); }

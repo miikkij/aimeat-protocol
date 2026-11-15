@@ -2,7 +2,7 @@
  * @file test/unit/capability-reach.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Who reaches one capability by its id (services/capability-reach.ts): the owner's side
+ * @description Who reaches one capability by its id (services/capabilities/reach.ts): the owner's side
  *   reaches every capability of the owner; everyone else only an 'owner' or 'public' one that was
  *   published. An unknown visibility word or status is closed (secaudit2026oct22).
  * @usage cd aimeat && pnpm exec vitest run test/unit/capability-reach.test.ts
@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-10-26 — Initial (secaudit2026oct22).
  */
 import { describe, it, expect } from 'vitest';
-import { capabilityHiddenFrom, capabilityVisibilityRefusal, isCapabilityOwnersSide } from '../../src/services/capability-reach.js';
+import { capabilityHiddenFrom, capabilityVisibilityRefusal, isCapabilityOwnersSide } from '../../src/services/capabilities/reach.js';
 
 const NODE = 'node-a';
 const cap = (visibility: string, status: string, ownerGhii = `alice@${NODE}`) => ({ ownerGhii, visibility, status }) as never;

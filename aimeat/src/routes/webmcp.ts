@@ -86,7 +86,7 @@ import { callAuthority } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
-import { appToolBindingRefusal } from '../services/capability-invoke.js';
+import { appToolBindingRefusal } from '../services/capabilities/invoke.js';
 import { resolveIdentity, callerPrincipal, localAccountName } from '../utils/gaii.js';
 import { appToolsKey, isToolPriced, toolMoneyPrices, presentToolPacing, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import { loadPublicToolManifest } from '../services/app-tools/manifest-read.js';
@@ -293,7 +293,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       // A CONTRACT is pinned to the interface version it was signed at, so the provider can ship a
       // newer app without breaking a live integration. The owner's own call has nothing to pin —
       // they get their current binding, which is theirs to change. The manifest NAMES a capability;
-      // it does not confer one (services/capability-invoke.ts appToolBindingRefusal; secaudit 2026-10).
+      // it does not confer one (services/capabilities/invoke.ts appToolBindingRefusal; secaudit 2026-10).
       const bindingFor = async (ent: MeteredEntitlement | null): Promise<BoundTool | ProductRefusal> => {
         const pinnedVersion = ent?.surface && ent.surface.kind === 'app-tool' ? ent.surface.ifaceVersion : undefined;
         const providerGhii = ent?.providerGhii ?? `${ownerName}@${config.nodeId}`;
@@ -341,7 +341,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         const { cap, pinnedVersion, providerGhii } = bound;
         const jwt = (req.headers.authorization || '').replace('Bearer ', '');
         try {
-          const { invokeCapability } = await import('../services/capability-invoke.js');
+          const { invokeCapability } = await import('../services/capabilities/invoke.js');
           const startedAt = Date.now();
           // The capability runs over this node's own HTTP surface and meets the raw-invoke paywall,
           // which cannot know which product was bought. The pass says this call was already ruled on.
@@ -449,7 +449,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       }
       const { charge, pass: passKind } = paced;
       try {
-        const { invokeCapability } = await import('../services/capability-invoke.js');
+        const { invokeCapability } = await import('../services/capabilities/invoke.js');
         // This route just read the manifest and found no price on THIS tool. The backing action may
         // still be sold under a sibling tool, and the raw paywall — which sees only the action —
         // would then bill this free call at that neighbour's price. Say what was decided instead of

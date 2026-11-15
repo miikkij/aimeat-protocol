@@ -23,7 +23,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
     createCapability, updateCapability, deleteCapability, vouchCapability, recordCapabilityInvocation,
-} from '../../src/services/capability-record.js';
+} from '../../src/services/capabilities/record.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { CapabilityRecord } from '../../src/storage/interface.js';

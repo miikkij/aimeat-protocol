@@ -29,7 +29,7 @@ vi.mock('../../src/services/mcp-client/invoke.js', async (importActual) => ({
   callRemoteTool,
 }));
 
-const { invokeCapability } = await import('../../src/services/capability-invoke.js');
+const { invokeCapability } = await import('../../src/services/capabilities/invoke.js');
 
 const NODE = 'test-node-001';
 const config = { nodeId: NODE } as unknown as AimeatConfig;

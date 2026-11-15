@@ -59,7 +59,7 @@ import { reconcileAfterSourceWrite, exchangeOutcome } from '../../services/excha
 import { odpsWriteRefusal } from '../../services/exchange/odps-write.js';
 import { logger } from '../../utils/logger.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
-import { capabilityHiddenFrom } from '../../services/capability-reach.js';
+import { capabilityHiddenFrom } from '../../services/capabilities/reach.js';
 
 export function registerOffersRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── Agent OFFERS — the "what can I do with my agents" surface ──
@@ -216,7 +216,7 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
     const cap = await storage.getCapability(actionId);
     // An offer names a capability; it does not confer one. A capability the OFFER's owner cannot reach
     // by id (another owner's private one, or one never published) answers as a missing one, before
-    // any pacing (services/capability-reach.ts; secaudit2026oct26, offer-invoke:action-id-not-owned-by-offer-owner).
+    // any pacing (services/capabilities/reach.ts; secaudit2026oct26, offer-invoke:action-id-not-owned-by-offer-owner).
     if (!cap || capabilityHiddenFrom(cap, `${agent.owner}@${config.nodeId}`)) {
       res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${actionId}`)); return;
     }
@@ -247,7 +247,7 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
     const input = req.body?.input ?? {};
     let result: unknown;
     try {
-      const { invokeCapability } = await import('../../services/capability-invoke.js');
+      const { invokeCapability } = await import('../../services/capabilities/invoke.js');
       // This door has a session, so the session answers the scope question, as on the capability door.
       result = await invokeCapability(config, storage, cap, input, callerGhii, jwt, mode,
         undefined, callAuthority(req.auth!));

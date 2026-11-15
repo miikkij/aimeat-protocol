@@ -22,7 +22,7 @@ import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, CapabilityRecord, MemoryRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { capabilityLookup } from '../../src/services/capability-aggregator.js';
+import { capabilityLookup } from '../../src/services/capabilities/aggregator.js';
 import { listPublicAppTools } from '../../src/commerce/app-tool-catalog.js';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
 

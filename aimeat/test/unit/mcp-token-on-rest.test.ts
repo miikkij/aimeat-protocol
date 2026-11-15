@@ -50,7 +50,7 @@ import { requestIdMiddleware } from '../../src/middleware/request-id.js';
 import { mcpRouter } from '../../src/mcp/index.js';
 import { memoryRouter } from '../../src/routes/memory.js';
 import { extensionsRouter } from '../../src/routes/extensions.js';
-import { runCapabilityAggregation } from '../../src/services/capability-aggregator.js';
+import { runCapabilityAggregation } from '../../src/services/capabilities/aggregator.js';
 import { LOOPBACK_PASS_HEADER, mintLoopbackPass, revokeLoopbackPass } from '../../src/auth/loopback-pass.js';
 import { registerInProcessApp, noteListeningServer } from '../../src/services/request-injector.js';
 

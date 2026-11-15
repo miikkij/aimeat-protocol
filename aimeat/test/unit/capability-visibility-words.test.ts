@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The capabilities stored with a visibility word the node does not know are set to
  *   private once, and each owner gets one notice that names theirs; the operator is asked nothing
- *   (services/capability-visibility-words.ts; secaudit2026oct22, developer decision 2026-10-27).
+ *   (services/capabilities/visibility-words.ts; secaudit2026oct22, developer decision 2026-10-27).
  *
  *   With the real store (PostgreSQL too when DATABASE_URL is set): two capabilities with unknown words
  *   become private and the ones with private, owner and public keep their words; the run record keeps
@@ -30,8 +30,8 @@ vi.mock('../../src/utils/logger.js', async (importOriginal) => {
 import { createStorage } from '../../src/storage/storage-factory.js';
 import {
     settleUnknownCapabilityVisibilityOnce, CAPABILITY_VISIBILITY_WORDS_KEY,
-} from '../../src/services/capability-visibility-words.js';
-import { buildCapabilityRecord } from '../../src/services/capability-record.js';
+} from '../../src/services/capabilities/visibility-words.js';
+import { buildCapabilityRecord } from '../../src/services/capabilities/record.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 import { NOTIF_PREFIX } from '../../src/services/notify.js';
 import type { Storage } from '../../src/storage/interface.js';

@@ -306,7 +306,7 @@ describe('POST /v1/capabilities/{id}/invoke (profile Capabilities tab, the try p
     // views/profile/capabilities-tab.js sends { input: JSON.parse(textarea) }, so a person who types
     // null, an array, text or a number sends that value. routes/capabilities.ts reads
     // `req.body.input || {}` and refuses none of them: an empty value becomes {}, any other value goes
-    // on unchanged (services/capability-invoke.ts sends it as the webhook's or the action's body).
+    // on unchanged (services/capabilities/invoke.ts sends it as the webhook's or the action's body).
     it('takes an input of any JSON type', async () => {
         await taken('POST', '/v1/capabilities/cap-weather/invoke', [
             { input: null }, { input: ['Oulu', 'Turku'] }, { input: 'Oulu' }, { input: 3 }, { input: { city: 'Oulu' } }, {},

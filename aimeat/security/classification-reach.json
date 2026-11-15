@@ -1129,7 +1129,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Call-timing counters."
     },
-    "src/services/capability-aggregator.ts": {
+    "src/services/capabilities/aggregator.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 1

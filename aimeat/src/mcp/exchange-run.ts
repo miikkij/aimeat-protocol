@@ -124,7 +124,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { paceFreeToolUse } from '../commerce/app-tool-catalog.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { pacingReceipt } from '../services/metered-settlement.js';
-import { appToolBindingRefusal } from '../services/capability-invoke.js';
+import { appToolBindingRefusal } from '../services/capabilities/invoke.js';
 import { findBackingCapability } from '../services/component/address.js';
 
 /** An app tool's binding, resolved for one call: the capability it runs and the interface version it was pinned at. */
@@ -218,7 +218,7 @@ export function registerExchangeRunTools(
             // current binding. A CONTRACT is pinned to the interface version it was signed at, so a
             // provider can ship a newer app without breaking a live integration. The owner's own
             // call has nothing to pin — they get their current binding, which is theirs to change.
-            // The manifest NAMES a capability; it does not confer one (services/capability-invoke.ts
+            // The manifest NAMES a capability; it does not confer one (services/capabilities/invoke.ts
             // appToolBindingRefusal; secaudit 2026-10).
             const bindingFor = async (ent: MeteredEntitlement | null): Promise<BoundTool | ProductRefusal> => {
                 const pinnedVersion = ent?.surface && ent.surface.kind === 'app-tool' ? ent.surface.ifaceVersion : undefined;
@@ -277,7 +277,7 @@ export function registerExchangeRunTools(
 
             // Settled → invoke; refund on throw (never leave a phantom charge).
             try {
-                const { invokeCapability } = await import('../services/capability-invoke.js');
+                const { invokeCapability } = await import('../services/capabilities/invoke.js');
                 const { mintInternalPass } = await import('../services/extension-access/internal-pass.js');
                 // Settled above on this app-tool's coordinate. The capability then runs over the node's
                 // own HTTP surface and meets the raw paywall, which cannot know which product was bought —

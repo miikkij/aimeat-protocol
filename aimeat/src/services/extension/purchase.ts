@@ -65,7 +65,7 @@ import { logger } from '../../utils/logger.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../members-only.js';
 import { findBackingCapability } from '../component/address.js';
 import { resolveExtensionForCall } from '../component/versions.js';
-import { splitExtensionRef } from '../capability-extension-ref.js';
+import { splitExtensionRef } from '../capabilities/extension-ref.js';
 
 /**
  * The bare owner name behind any principal the capability registry stores. Extension-backed
@@ -108,7 +108,7 @@ async function runSellerExtensionForBuyer(args: {
   /** The extension the ref names in the seller's namespace (sellerExtensionTarget). */
   target: { extRef: string; actionId: string };
 }): Promise<{ result: unknown }> {
-  const { assertCapabilityRunnable } = await import('../capability-invoke.js');
+  const { assertCapabilityRunnable } = await import('../capabilities/invoke.js');
   assertCapabilityRunnable(args.cap);
   // The stored name the seller's namespace resolved, so the run reads that record and never the
   // buyer's own of the same short name. A ref that resolves to nothing is refused before the settle.
@@ -283,7 +283,7 @@ export async function buyForExtension(args: {
   }
 
   try {
-    const { invokeCapability } = await import('../capability-invoke.js');
+    const { invokeCapability } = await import('../capabilities/invoke.js');
     const { mintInternalPass } = await import('../extension-access/internal-pass.js');
     const lockedInput = applyLockedInput(toolDef, input);
     // Already settled on the product's own coordinate: the seller's paywall must not charge it again.

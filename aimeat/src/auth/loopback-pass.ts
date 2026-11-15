@@ -7,7 +7,7 @@
  *
  *   WHY IT EXISTS. Three MCP tools reach the node's REST routes over loopback with the session's
  *   bearer: `aimeat_invoke` (services/node/invoke.ts, through the connector's name-to-route table)
- *   and `aimeat_capabilities_invoke` and `aimeat_app_tool_invoke` (services/capability-invoke.ts, an
+ *   and `aimeat_capabilities_invoke` and `aimeat_app_tool_invoke` (services/capabilities/invoke.ts, an
  *   extension-backed capability over `POST /v1/ext/:name/:action`). When the session signed in over
  *   MCP OAuth, that bearer is bound to the MCP endpoint (RFC 8707, `aud`), and from 4.0.0 the REST
  *   layer refuses such a token (auth/mcp-token-on-rest.ts). The pass is what lets these three keep

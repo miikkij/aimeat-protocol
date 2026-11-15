@@ -1,7 +1,7 @@
 /**
  * @file test/unit/capability-extension-ref.test.ts
  * @description The extension capability ref grammar and the once-per-node step that switches off a
- *   stored capability whose ref names no extension action (src/services/capability-extension-ref.ts,
+ *   stored capability whose ref names no extension action (src/services/capabilities/extension-ref.ts,
  *   secaudit2026oct22).
  * @version-history
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22).
@@ -11,7 +11,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { CapabilityRecord } from '../../src/storage/interface.js';
 import {
     parseExtensionCapabilityRef, splitExtensionRef, disableMalformedExtensionRefsOnce, CAPABILITY_EXTENSION_REF_STEP_KEY,
-} from '../../src/services/capability-extension-ref.js';
+} from '../../src/services/capabilities/extension-ref.js';
 
 const NODE = 'unit-node';
 

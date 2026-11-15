@@ -1,5 +1,5 @@
 /**
- * @file capability-aggregator.ts
+ * @file src/services/capabilities/aggregator.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Background job that scans extensions, actions, and cortex modules
@@ -47,12 +47,12 @@
  *   v1.0.0 - 2026-05-02 - Initial aggregator
  */
 import { createHash } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityRecord, CortexLibComponent, CortexPromptComponent } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { cortexLibPath } from './component/address.js';
-import { AppToolsDocSchema, type AppToolsDoc } from '../models/app-tool-schemas.js';
-import { OffersDocSchema, normalizeOfferPacing, TOLL_MORSELS_MAX, type Offer, type OffersDoc } from '../models/offer-schemas.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, CapabilityRecord, CortexLibComponent, CortexPromptComponent } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { cortexLibPath } from '../component/address.js';
+import { AppToolsDocSchema, type AppToolsDoc } from '../../models/app-tool-schemas.js';
+import { OffersDocSchema, normalizeOfferPacing, TOLL_MORSELS_MAX, type Offer, type OffersDoc } from '../../models/offer-schemas.js';
 
 /**
  * An app tool's pacing amount per use: `tollMorsels`, plus a 3.26.x `price.morsels`, which is pacing
@@ -560,7 +560,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
       const existing = await storage.listCapabilitiesBySourceType(sourceType);
       for (const cap of existing) {
         // A row the operator switched off (operatorOverride.disabled, also set by the extension-ref
-        // boot step in services/capability-extension-ref.ts) is the operator's decision and is left
+        // boot step in services/capabilities/extension-ref.ts) is the operator's decision and is left
         // exactly as it is. The scan read it as "source gone", disabled it on one run and deleted it
         // with its note on the next (secaudit2026oct22).
         if (cap.operatorOverride?.disabled) continue;

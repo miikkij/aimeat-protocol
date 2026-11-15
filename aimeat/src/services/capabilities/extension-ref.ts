@@ -1,12 +1,12 @@
 /**
- * @file src/services/capability-extension-ref.ts
+ * @file src/services/capabilities/extension-ref.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The grammar of an extension-backed capability's source ref, and the once-per-node
  *   step that switches off a stored capability whose ref does not follow it.
  *
  *   WHY. An extension-backed capability is invoked as a POST the node sends to itself in process,
- *   to /v1/ext/<name>/<action> with the caller's bearer token (services/capability-invoke.ts,
+ *   to /v1/ext/<name>/<action> with the caller's bearer token (services/capabilities/invoke.ts,
  *   services/request-injector.ts). The ref `ext:<name>:<action>` was stored as the registrant
  *   wrote it and split on ':' into that path, so a ref whose segments were not an extension name and
  *   an action id made the request reach another REST route of the node, as the caller, with a body
@@ -37,14 +37,14 @@
  *     action is found through the address (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityRecord } from '../storage/interface.js';
-import { EXT_ADDRESS_PATTERN } from './extension/manifest.js';
-import { findExtension } from './component/address.js';
-import { splitPinnedName } from './component/versions.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
-import { recordSecurityIncident, securityOwner } from './security-incident.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, CapabilityRecord } from '../../storage/interface.js';
+import { EXT_ADDRESS_PATTERN } from '../extension/manifest.js';
+import { findExtension } from '../component/address.js';
+import { splitPinnedName } from '../component/versions.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
+import { recordSecurityIncident, securityOwner } from '../security-incident.js';
+import { logger } from '../../utils/logger.js';
 
 /** An extension action id: the pattern services/app/format-md.ts declares for an action it names. */
 export const EXT_ACTION_ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;

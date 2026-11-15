@@ -235,7 +235,7 @@
     "src/services/catalogue/catalogue-read.ts": {
       "listAgents": 1
     },
-    "src/services/capability-aggregator.ts": {
+    "src/services/capabilities/aggregator.ts": {
       "listOwners": 1,
       "listAgents": 1
     },

@@ -1,5 +1,5 @@
 /**
- * @file src/services/capability-reach.ts
+ * @file src/services/capabilities/reach.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who reaches one capability by its id, and which visibility words a capability may carry.
@@ -28,8 +28,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-26 — Initial (secaudit2026oct22; developer decision 2026-10-26).
  */
-import type { CapabilityRecord } from '../storage/interface.js';
-import { isSameOwner } from '../utils/gaii.js';
+import type { CapabilityRecord } from '../../storage/interface.js';
+import { isSameOwner } from '../../utils/gaii.js';
 
 /** Every visibility word the code knows for a capability (storage/types/capabilities.ts). */
 export const CAPABILITY_VISIBILITIES: readonly CapabilityRecord['visibility'][] = ['private', 'owner', 'public'];

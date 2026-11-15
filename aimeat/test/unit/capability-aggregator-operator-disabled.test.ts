@@ -2,7 +2,7 @@
  * @file test/unit/capability-aggregator-operator-disabled.test.ts
  * @description The capability scan's cleanup step leaves a row whose operatorOverride.disabled is set
  *   exactly as it is: the operator's switch, or the one the extension-ref boot step sets
- *   (services/capability-extension-ref.ts), is neither turned into the scan's own disable nor
+ *   (services/capabilities/extension-ref.ts), is neither turned into the scan's own disable nor
  *   followed by a delete. An ordinary stale extension row is still disabled on one run and deleted
  *   on the next (secaudit2026oct22).
  * @usage cd aimeat && pnpm exec vitest run test/unit/capability-aggregator-operator-disabled.test.ts
@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, CapabilityRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { runCapabilityAggregation } from '../../src/services/capability-aggregator.js';
+import { runCapabilityAggregation } from '../../src/services/capabilities/aggregator.js';
 
 const NODE = 'node-1';
 const config = { nodeId: NODE } as AimeatConfig;

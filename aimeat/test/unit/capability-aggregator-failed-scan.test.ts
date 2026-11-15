@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, CapabilityRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { runCapabilityAggregation } from '../../src/services/capability-aggregator.js';
+import { runCapabilityAggregation } from '../../src/services/capabilities/aggregator.js';
 
 const NODE = 'node-1';
 const config = { nodeId: NODE } as AimeatConfig;

@@ -94,7 +94,7 @@ import { maybeExtensionAi } from '../ai-jobs/index.js';
 import { nodeContext } from '../node/context.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../call-timing.js';
-import { countCapabilityCall } from '../capability-record.js';
+import { countCapabilityCall } from '../capabilities/record.js';
 import { getEncryptionKey } from '../encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './secrets.js';
 import { resolveExtensionForCall } from '../component/versions.js';

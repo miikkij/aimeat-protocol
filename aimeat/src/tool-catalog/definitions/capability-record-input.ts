@@ -5,7 +5,7 @@
  * @description The capability record fields that aimeat_capabilities_create and
  *   aimeat_capabilities_update both take, because POST /v1/capabilities and PUT /v1/capabilities/:id
  *   both take them on capability:write, the word both tools declare. The limits here only bound what
- *   the MCP schema accepts; createCapability and updateCapability (services/capability-record.ts)
+ *   the MCP schema accepts; createCapability and updateCapability (services/capabilities/record.ts)
  *   normalise each field and apply the source check and the webhook policy for every caller.
  * @structure CAPABILITY_RECORD_INPUT
  * @usage input: { ...ownFields, ...CAPABILITY_RECORD_INPUT }

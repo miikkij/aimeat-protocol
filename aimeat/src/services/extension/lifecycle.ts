@@ -76,7 +76,7 @@ import type { Scheduler } from '../scheduler.js';
 import { upsertExtensionInPlace } from './upsert.js';
 import { recordAccountEvent } from '../account-events.js';
 import { registerExtensionSchedules } from './schedules.js';
-import { aggregateExtensionNow } from '../capability-aggregator.js';
+import { aggregateExtensionNow } from '../capabilities/aggregator.js';
 import { reconcileAfterExtensionWrite } from '../exchange/projection.js';
 import { odpsWriteRefusal, extensionOdpsKey } from '../exchange/odps-write.js';
 import { extensionInstallRefusal } from '../install/quotas.js';

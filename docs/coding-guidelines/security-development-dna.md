@@ -275,7 +275,7 @@ record builder defaulted a MISSING type to `'manual'`. So omitting `source` enti
 `WEBHOOKS_DISABLED` and the domain allowlist, and the record was then built as exactly the manual
 capability the gate would have refused. The gate and the record disagreed about what the request was.
 The builder now normalises the source first and gates on the normalised value
-(`services/capability-record.ts`).
+(`services/capabilities/record.ts`).
 
 The same shape reached the isolation boundary: `middleware/subdomain.ts` set `req.appOrigin` from the
 `X-App-Origin` REQUEST header, so one header made the node believe a request had arrived on the

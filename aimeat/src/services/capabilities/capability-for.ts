@@ -5,7 +5,7 @@
  * @description Who may reach one capability by its id, and the read. GET /v1/capabilities/:id,
  *   POST /v1/capabilities/:id/invoke and the MCP tools aimeat_capabilities_get and
  *   aimeat_capabilities_invoke each read the record and asked capabilityHiddenFrom
- *   (services/capability-reach.ts), then admitted the operator. The routes asked operatorOverride,
+ *   (services/capabilities/reach.ts), then admitted the operator. The routes asked operatorOverride,
  *   which writes the operator trail, as the operator ruling of 2026-10-05 says every pass into another
  *   person's account does (services/operator/override.ts); the tools asked resolveOperatorAgentName,
  *   which admits the same callers and writes nothing, so an operator reading or running a private
@@ -24,7 +24,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, CapabilityRecord } from '../../storage/interface.js';
-import { capabilityHiddenFrom } from '../capability-reach.js';
+import { capabilityHiddenFrom } from './reach.js';
 import { operatorOverride, type OperatorAuth } from '../operator/override.js';
 
 export type CapabilityReach = { ok: true; capability: CapabilityRecord } | { ok: false };

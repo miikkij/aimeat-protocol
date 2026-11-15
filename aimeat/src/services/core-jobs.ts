@@ -268,11 +268,11 @@ export function registerCoreHandlers(
   });
 
   scheduler.registerCoreHandler('capability-aggregation', async () => {
-    const { runCapabilityAggregation } = await import('./capability-aggregator.js');
+    const { runCapabilityAggregation } = await import('./capabilities/aggregator.js');
     await runCapabilityAggregation(config, storage);
   });
   // Run once at startup (non-blocking)
-  import('./capability-aggregator.js')
+  import('./capabilities/aggregator.js')
     .then(m => m.runCapabilityAggregation(config, storage))
     .catch(err => logger.error('Startup capability aggregation failed', { error: String(err) }));
   // Every node: connection and MCP sign-in rounds, social and SSO sign-ins and the two-step sign-in

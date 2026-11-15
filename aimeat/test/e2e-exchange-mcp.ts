@@ -315,7 +315,7 @@ await test('Setup: provider installs a priced extension and sells it as an app-t
     assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body?.error)}`);
     // The aggregator that mints `ext:{name}:{action}` capability records runs on a schedule; drive it
     // now so the app-tool has something to bind to.
-    const { runCapabilityAggregation } = await import('../src/services/capability-aggregator.js');
+    const { runCapabilityAggregation } = await import('../src/services/capabilities/aggregator.js');
     await runCapabilityAggregation(config, storage);
     assert(!!(await storage.getCapability(`ext:${EXT}:echo`)), 'capability must be registered for the action');
 

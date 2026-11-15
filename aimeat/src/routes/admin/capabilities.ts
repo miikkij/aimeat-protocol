@@ -53,7 +53,7 @@ export function adminCapabilitiesRouter(config: AimeatConfig, storage: Storage):
   // Trigger aggregation manually (operator only). The answer names every scan that failed
   // (`failedScans`); the rows of a failed scan's source type are left unchanged.
   router.post('/v1/admin/capabilities/aggregate', ...auth, async (_req, res) => {
-    const { runCapabilityAggregation } = await import('../../services/capability-aggregator.js');
+    const { runCapabilityAggregation } = await import('../../services/capabilities/aggregator.js');
     const result = await runCapabilityAggregation(config, storage);
     res.json(success(config.nodeId, result));
   });

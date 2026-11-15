@@ -5,9 +5,9 @@
  * @description Capability Layer REST API: discovery, CRUD, invoke proxy, telemetry, vouch, test.
  * @structure
  *   - discovery: GET /v1/capabilities and /:id, with the private-row rules
- *   - CRUD: POST / PUT / DELETE, each rendering what services/capability-record.ts decided
+ *   - CRUD: POST / PUT / DELETE, each rendering what services/capabilities/record.ts decided
  *   - invoke, telemetry, vouch, test
- * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
+ * @usage Mounted by mountRoutes(); the shared write lives in services/capabilities/record.ts.
  * @version-history
  *   v1.7.1 — 2026-11-14 — GET /v1/capabilities/:id and POST /v1/capabilities/:id/invoke reach the
  *     capability through capabilityFor (services/capabilities/capability-for.ts), which the two MCP
@@ -66,7 +66,7 @@
 import { Router } from 'express';
 import {
   createCapability, updateCapability, deleteCapability, vouchCapability, unvouchCapability, recordCapabilityInvocation,
-} from '../services/capability-record.js';
+} from '../services/capabilities/record.js';
 import type { Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityFilter } from '../storage/interface.js';
@@ -130,7 +130,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   router.get('/v1/capabilities/:id', async (req, res) => {
     // A private capability, an unknown visibility word, and a capability never published (draft,
     // pending_review, rejected) are served to the owner's side and the operator only, and answer
-    // everyone else as a missing id does (services/capability-reach.ts; secaudit2026oct22). The same
+    // everyone else as a missing id does (services/capabilities/reach.ts; secaudit2026oct22). The same
     // function answers aimeat_capabilities_get.
     const found = await capabilityFor(storage, config, { identity: req.auth ? resolve(req) : null, auth: req.auth },
       req.params.id as string, 'read');
@@ -186,7 +186,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     const callerGhii = resolve(req);
     // Ownership (SECURITY): what the read route hides, invoke hides too, with the same 404: a private
     // capability, an unknown visibility word, and a capability never published reach the owner's side
-    // and the operator only (services/capability-reach.ts; secaudit2026oct22). The same function
+    // and the operator only (services/capabilities/reach.ts; secaudit2026oct22). The same function
     // answers aimeat_capabilities_invoke.
     const found = await capabilityFor(storage, config, { identity: callerGhii, auth: req.auth }, req.params.id as string, 'invoke');
     if (!found.ok) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
@@ -196,7 +196,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     const input = req.body.input || {};
 
     try {
-      const { invokeCapability } = await import('../services/capability-invoke.js');
+      const { invokeCapability } = await import('../services/capabilities/invoke.js');
       // This door proves work:request only. What else the session holds, and whether it is the
       // owner in person, goes with the call, so a capability over a remote MCP tool asks for
       // mcp:use there, as every MCP door does.
@@ -257,7 +257,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   // ── Vouching ──
   // WHO. The owner, or the owner's agent holding capability:write, the word the scope model gives a
   // vouch (public/views/profile/agents/scope-model.js) and aimeat_capabilities_vouch now declares. A vouch is keyed on the OWNER GHII whoever casts it (voucherGhiiOf in
-  // services/capability-record.ts), so an agent vouches in its owner's name and can never vouch for a
+  // services/capabilities/record.ts), so an agent vouches in its owner's name and can never vouch for a
   // capability of its own owner (QA audit D2-02).
 
   router.post('/v1/capabilities/:id/vouch', requireAuth(), requireRole('agent'), requireScope('capability:write'), async (req, res) => {
@@ -289,7 +289,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       return res.status(400).json(error(config.nodeId, 'NOT_TESTABLE', 'Only manual callable capabilities can be tested'));
     }
 
-    const { invokeCapability } = await import('../services/capability-invoke.js');
+    const { invokeCapability } = await import('../services/capabilities/invoke.js');
     const jwt = (req.headers.authorization || '').replace('Bearer ', '');
     try {
       const result = await invokeCapability(config, storage, cap, req.body.input || {}, resolve(req), jwt, 'normal');

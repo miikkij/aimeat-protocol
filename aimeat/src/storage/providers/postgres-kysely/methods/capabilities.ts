@@ -142,7 +142,7 @@ export const capabilityMethods = {
     if (filters.ownerGhii) base = base.where('ownerGhii', '=', filters.ownerGhii);
     if (filters.visibility) base = base.where('visibility', '=', filters.visibility);
     // Another owner's entry is listed only when it is public AND active, the same rule a single read and
-    // the MCP search apply (services/capability-reach.ts); the caller's own entries in any state.
+    // the MCP search apply (services/capabilities/reach.ts); the caller's own entries in any state.
     if (filters.publicOrOwner) base = base.where(eb => eb.or([
       eb.and([eb('visibility', '=', 'public'), eb('status', '=', 'active')]),
       eb('ownerGhii', '=', filters.publicOrOwner!),

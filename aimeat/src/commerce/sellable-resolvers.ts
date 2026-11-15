@@ -287,7 +287,7 @@ export function appToolSellableResolver(): SellableResolver {
       if (actionId) {
         const bound = await findBackingCapability(storage, actionId, sellerOwner);
         if (bound) {
-          const { appToolBindingRefusal } = await import('../services/capability-invoke.js');
+          const { appToolBindingRefusal } = await import('../services/capabilities/invoke.js');
           const misbound = appToolBindingRefusal(bound, sellerOwner, appRef, toolName);
           if (misbound) throw new CommerceError(misbound.code, misbound.statusCode, misbound.message);
         }
@@ -317,7 +317,7 @@ export function appToolSellableResolver(): SellableResolver {
             throw new CommerceError('CAPABILITY_NOT_FOUND', 404, `Backing capability not found: ${actionId}`);
           }
           const { invokeCapability, appToolBindingRefusal, authorityFromToken } =
-            await import('../services/capability-invoke.js');
+            await import('../services/capabilities/invoke.js');
           // The manifest NAMES a capability; it does not confer one. A throw here refunds the
           // collect, so the buyer pays nothing for a tool bound to a capability its seller does not
           // own (services/extension/purchase.ts has refused the same since the August 2026 audit

@@ -1,5 +1,5 @@
 /**
- * @file src/services/capability-record.ts
+ * @file src/services/capabilities/record.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Writing a capability, once, for whichever door is doing the writing.
@@ -65,12 +65,12 @@
  *     a string or null: '' is stored as null, any other type is 400 INVALID_INPUT.
  */
 import { randomUUID, createHash } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityRecord } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { normalizeCapabilityCost } from './toll-morsels-names.js';
-import { extensionRefRefusal } from './capability-extension-ref.js';
-import { capabilityVisibilityRefusal } from './capability-reach.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, CapabilityRecord } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { normalizeCapabilityCost } from '../toll-morsels-names.js';
+import { extensionRefRefusal } from './extension-ref.js';
+import { capabilityVisibilityRefusal } from './reach.js';
 
 /** The fields a caller may set. Everything absent takes the shape's own default. */
 export interface CapabilityInput {
@@ -224,8 +224,8 @@ function normaliseSource(raw: unknown): CapabilityResult<CapabilityRecord['sourc
     const ref = typeof obj.ref === 'string' && obj.ref ? obj.ref : (type === 'manual' ? 'manual' : '');
     if (!ref) return refuse(400, 'INVALID_INPUT', `source.ref is required for source.type '${type}'`);
     // An extension ref becomes the path of a loopback request made with the caller's token
-    // (services/capability-invoke.ts), so it must name an extension and an action and nothing else
-    // (secaudit2026oct22, services/capability-extension-ref.ts).
+    // (services/capabilities/invoke.ts), so it must name an extension and an action and nothing else
+    // (secaudit2026oct22, services/capabilities/extension-ref.ts).
     if (type === 'extension') {
         const refusal = extensionRefRefusal(ref);
         if (refusal) return refuse(400, 'INVALID_INPUT', refusal);
@@ -307,7 +307,7 @@ export async function createCapability(
     const { storage, config } = deps;
 
     // The visibility word first: a word the node does not know was stored as given, and the read
-    // and the list then read it two ways (services/capability-reach.ts; secaudit2026oct22). Absent
+    // and the list then read it two ways (services/capabilities/reach.ts; secaudit2026oct22). Absent
     // means the default, private.
     if (input.visibility !== undefined && input.visibility !== null) {
         const refusal = capabilityVisibilityRefusal(input.visibility);
@@ -411,7 +411,7 @@ export async function updateCapability(
     // A CHANGED visibility must be a word the node knows, as at create. The stored word sent back
     // unchanged passes, so a client that PUTs the whole record back keeps working on a record that
     // carries an older unknown word (set to private at start, and its owner told,
-    // services/capability-visibility-words.ts).
+    // services/capabilities/visibility-words.ts).
     if ('visibility' in updates && updates.visibility !== cap.visibility) {
         const refusal = capabilityVisibilityRefusal(updates.visibility);
         if (refusal) return refuse(400, 'INVALID_INPUT', refusal);

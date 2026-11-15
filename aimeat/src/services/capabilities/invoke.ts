@@ -1,5 +1,5 @@
 /**
- * @file capability-invoke.ts
+ * @file src/services/capabilities/invoke.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Invoke proxy: routes capability invocations to the correct underlying system: an
@@ -77,24 +77,24 @@
  *   v1.2.0 - 2026-07-25 - Name the caller-token failures (CALLER_TOKEN_MISSING / CALLER_TOKEN_INVALID)
  *     instead of reporting the route's AUTH_REQUIRED as an opaque EXTENSION_ERROR.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityRecord } from '../storage/interface.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { INTERNAL_PASS_HEADER } from './extension-access/internal-pass.js';
-import { withInProcessFetch } from './request-injector.js';
-import { nodeContext } from './node/context.js';
-import { buildGEAI, ownerGhiiOf, localAccountName, localAccountOf } from '../utils/gaii.js';
-import { requireUsableServer } from './mcp-client/registry.js';
-import { callRemoteTool, statusForRemoteRefusal } from './mcp-client/invoke.js';
-import { verifyJWT } from '../auth/jwt.js';
-import { callAuthority, withCurrentScopes } from '../auth/effective-scopes.js';
-import { resolvePat, PAT_PREFIX } from './access-token.js';
-import { ecosystemCallRefusal } from './eco-capability-approvals.js';
-import { personalSignInCapabilityRefusal } from './mcp-client/capability-consent.js';
-import { takesPersonalSignIn } from '../models/mcp-server-schemas.js';
-import { splitExtensionRef } from './capability-extension-ref.js';
-import { resolveExtensionForCall } from './component/versions.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, CapabilityRecord } from '../../storage/interface.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { INTERNAL_PASS_HEADER } from '../extension-access/internal-pass.js';
+import { withInProcessFetch } from '../request-injector.js';
+import { nodeContext } from '../node/context.js';
+import { buildGEAI, ownerGhiiOf, localAccountName, localAccountOf } from '../../utils/gaii.js';
+import { requireUsableServer } from '../mcp-client/registry.js';
+import { callRemoteTool, statusForRemoteRefusal } from '../mcp-client/invoke.js';
+import { verifyJWT } from '../../auth/jwt.js';
+import { callAuthority, withCurrentScopes } from '../../auth/effective-scopes.js';
+import { resolvePat, PAT_PREFIX } from '../access-token.js';
+import { ecosystemCallRefusal } from '../eco-capability-approvals.js';
+import { personalSignInCapabilityRefusal } from '../mcp-client/capability-consent.js';
+import { takesPersonalSignIn } from '../../models/mcp-server-schemas.js';
+import { splitExtensionRef } from './extension-ref.js';
+import { resolveExtensionForCall } from '../component/versions.js';
+import { logger } from '../../utils/logger.js';
 
 export interface InvokeResult {
   capability: string;
@@ -239,7 +239,7 @@ export async function invokeCapability(
       // action it names are resolved first, and the path is built from the resolved segments with
       // each one encoded. The ref was split on ':' into the path as written, so a ref the registrant
       // wrote reached any REST route of the node as the caller (secaudit2026oct22,
-      // services/capability-extension-ref.ts). The segments are read with a plain split rather than
+      // services/capabilities/extension-ref.ts). The segments are read with a plain split rather than
       // the registration grammar, so an aggregated row over an installed action whose id the grammar
       // would not admit still runs: what makes the request safe is that both segments name what is
       // installed and are encoded into the path.
