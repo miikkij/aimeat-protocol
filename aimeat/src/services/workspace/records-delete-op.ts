@@ -10,6 +10,9 @@
  * @usage
  *   const r = await deleteRecordsBatchOp(deps, caller, { organismId, ws, namespace, ids });
  * @version-history
+ *   2026-11-15 — The workspace write rule (checkOrganismNamespaceAccess, 'write') is asked once per
+ *     workspace the keys lie in, as aimeat_workspace_object_delete and DELETE /v1/memory/:key ask it:
+ *     a member without the contributor role is refused with CONSENT_REQUIRED (E2E audit M073).
  *   2026-11-15 — The team approval gate (services/team/action-gate.ts, T7): an AI's delete in a team waits for a lead.
  *   2026-11-04 — No value scan or per-key delete for a storage without listMemoryKeysByPrefix or
  *     bulkBinMemory: both are required on Storage (codebase analysis 2026-11-03, item D-e).
@@ -25,6 +28,7 @@ import { emitChange, emitWorkspaceChange, workspaceOfKey } from '../event-bus.js
 import { updateOrganismStructure } from '../structure-snapshot.js';
 import { logger } from '../../utils/logger.js';
 import { teamDeleteGate } from '../team/action-gate.js';
+import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
 import {
     refuse, denyReason, fencedOpRefusal,
     type WorkspaceOpsDeps, type WorkspaceOpsCaller, type WorkspaceOpResult,
@@ -84,6 +88,19 @@ export async function deleteRecordsBatchOp(
     for (const [fenceWs, keys] of byWs) {
         const fenced = await fencedOpRefusal(deps, caller, organismId, fenceWs, { keys });
         if (fenced) return fenced;
+    }
+    // Removing a workspace record is a write: the workspace's creator, an organism manager, or a
+    // member holding the creator's contributor role (services/organism-namespace-access.ts), the rule
+    // a draft write and DELETE /v1/memory/:key ask. Asked once per workspace, with a real key of it.
+    // Organism membership alone let a member whose role was revoked, or a viewer, delete here.
+    for (const keys of byWs.values()) {
+        const denied = await checkOrganismNamespaceAccess({ storage, config },
+            { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes, extension: caller.extension }, keys[0], 'write');
+        if (denied) {
+            return refuse(denied.status, denied.code, denied.code === 'CONSENT_REQUIRED'
+                ? 'You do not hold the contributor role in this workspace, so you cannot delete its records. Request it with aimeat_workspace_access(action:"request") and wait for the workspace\'s creator to approve.'
+                : denied.message, denied.details);
+        }
     }
 
     // Append-only guard ONCE (per-namespace policy): a create_only namespace refuses record deletion

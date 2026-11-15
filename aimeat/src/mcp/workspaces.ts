@@ -17,6 +17,9 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-15 — aimeat_workspace_object_delete asks the workspace write rule (checkOrganismNamespaceAccess,
+ *     'write', on the record key) as aimeat_workspace_write and DELETE /v1/memory/:key do: a member
+ *     without the contributor role is refused with CONSENT_REQUIRED (E2E audit M073).
  *   2026-11-15 — aimeat_workspace_object_delete asks the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-14 — roleOf asks organismMemberGate, the role the REST workspace routes ask; an attached
  *     agent's owner who left takes its agents with it, so no caller's answer changes (parity section
@@ -594,6 +597,18 @@ export function registerWorkspaceTools(
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);
             const base = `${root}.${namespace}.${id}`;
+            // Removing a record is a write: the workspace's creator, an organism manager, or a member
+            // holding the creator's contributor role (services/organism-namespace-access.ts), the rule
+            // aimeat_workspace_write and DELETE /v1/memory/:key ask. Organism membership alone let a
+            // member whose role was revoked, or a viewer, delete records over this tool.
+            const delCaller = opsCaller();
+            const delWrite = await checkOrganismNamespaceAccess({ storage, config },
+                { principal: delCaller.principal, owner: delCaller.ownerName, roles: delCaller.roles, scopes: delCaller.scopes }, base, 'write');
+            if (delWrite) {
+                return toolError(delWrite.code, delWrite.code === 'CONSENT_REQUIRED'
+                    ? 'You do not hold the contributor role in this workspace, so you cannot delete its records. Request it with aimeat_workspace_access(action:"request") and wait for the workspace\'s creator to approve.'
+                    : delWrite.message);
+            }
             // The delete below removes the owner's rows of the record as well as the agent's own
             // (deleteWorkspaceInstance, same-owner), so the fenced-space rule is asked first.
             const deleteFenced = await fencedToolError(organism_id, ws, namespace, id, true);

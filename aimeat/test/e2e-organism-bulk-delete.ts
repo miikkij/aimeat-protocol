@@ -6,6 +6,9 @@
  *   security invariant (Rule 10) — CROSS-OWNER protection: a member cannot bulk-delete another member's
  *   records (their rows are skipped, not deleted).
  * @version-history
+ *   v1.1.0 — 2026-11-15 — M073: contributor B deletes its own records over aimeat_workspace_object_delete
+ *     and this route; once the creator revokes the role, both refuse B with CONSENT_REQUIRED and the
+ *     records stay (both deleted them before the fix, E2E audit M073).
  *   v1.0.1 — 2026-10-20 — The cross-owner case grants B the contributor role before B writes: a
  *     workspace role is the member's own permission, so membership alone no longer carries a
  *     content write in person (Core 2026-11 COL-09; secaudit 2026-10, defect 1). The setup changed,
@@ -31,6 +34,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, mcpRpc, openSession, toolJson, type McpSession } from './helpers/mcp-session.js';
 async function setupOwner(label: string) {
     const name = `bd${label}${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'BD', password: 'BulkDel12' }) });
@@ -113,6 +117,50 @@ await test('CROSS-OWNER: a member cannot bulk-delete another member\'s record (R
     // B's record still exists.
     const still = await json(`/v1/memory/${encodeURIComponent(`${root()}.shared.notes.b1`)}?owner_scope=true`, { headers: authB() });
     assert(still.status === 200, 'B\'s record survives A\'s attempted delete');
+});
+
+// ── E2E audit M073: removing a record is a write ──
+// The batch route and aimeat_workspace_object_delete asked organism membership only, so a member
+// whose contributor role the creator revoked still deleted the records they had written. Both now
+// ask the rule a write asks (services/organism-namespace-access.ts), as DELETE /v1/memory/:key does.
+let mcpA!: McpSession;
+let mcpB!: McpSession;
+const bWrites = async (id: string) => {
+    const w = await json('/v1/memory', { method: 'POST', headers: authB(), body: JSON.stringify({ key: `${root()}.shared.notes.${id}`, value: { id, body: 'B owns this' }, visibility: 'members' }) });
+    assert(w.status === 201 || w.status === 200, `B write ${id}: ${w.status} ${JSON.stringify(w.body?.error)}`);
+};
+const objectDelete = (s: McpSession, id: string) => mcpRpc(s, 'tools/call', { name: 'aimeat_workspace_object_delete', arguments: { organism_id: orgId, ws: WS, namespace: 'shared.notes', id } });
+const aSees = async (id: string) => {
+    const r = await mcpRpc(mcpA, 'tools/call', { name: 'aimeat_workspace_read', arguments: { organism_id: orgId, ws: WS } });
+    return ((toolJson(r).index?.note) || []).some((o: any) => o.id === id);
+};
+
+await test('M073 use: contributor B deletes its own records over MCP and over the batch route', async () => {
+    // Each owner's agent: a workspace role is the owner's and covers the owner's agents.
+    const words = ['memory:read', 'memory:write', 'memory:delete', 'organism:read'];
+    mcpA = await openSession(BASE, (await makeAgent(BASE, A, words)).token, 'bulk-del-a');
+    mcpB = await openSession(BASE, (await makeAgent(BASE, B, words)).token, 'bulk-del-b');
+    for (const id of ['b2', 'b3', 'b4', 'b5']) await bWrites(id);
+    const del = await objectDelete(mcpB, 'b2');
+    assert(del.result?.isError !== true, `contributor B delete over MCP: ${JSON.stringify(del.result?.content?.[0]?.text ?? del).slice(0, 200)}`);
+    const batch = await json(delUrl(), { method: 'POST', headers: authB(), body: JSON.stringify({ ws: WS, namespace: 'shared.notes', ids: ['b3'] }) });
+    assert(batch.status === 200 && batch.body.data.rows_removed === 1, `contributor B batch delete ${batch.status}: ${JSON.stringify(batch.body)}`);
+    assert(!(await aSees('b2')) && !(await aSees('b3')), 'b2 and b3 are gone');
+});
+
+await test('M073 attack: B, whose contributor role was revoked, is refused the delete over MCP', async () => {
+    const rv = await json(`/v1/organisms/${orgId}/workspace-access/revoke`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, grantee: B.name }) });
+    assert(rv.status === 200, `revoke ${rv.status}: ${JSON.stringify(rv.body?.error)}`);
+    const del = await objectDelete(mcpB, 'b4');
+    assert(del.result?.isError === true, `revoked B deleted over MCP: ${JSON.stringify(del.result?.content?.[0]?.text ?? del).slice(0, 200)}`);
+    assert(String(del.result.content[0].text).startsWith('CONSENT_REQUIRED'), `the refusal names the missing role: ${del.result.content[0].text.slice(0, 200)}`);
+    assert(await aSees('b4'), 'A still reads b4');
+});
+
+await test('M073 attack: revoked B is refused the batch delete (403 CONSENT_REQUIRED)', async () => {
+    const r = await json(delUrl(), { method: 'POST', headers: authB(), body: JSON.stringify({ ws: WS, namespace: 'shared.notes', ids: ['b5'] }) });
+    assert(r.status === 403 && r.body.error?.code === 'CONSENT_REQUIRED', `revoked B batch delete must be 403 CONSENT_REQUIRED, got ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(await aSees('b5'), 'A still reads b5');
 });
 
 await test('Cleanup owners', async () => {
