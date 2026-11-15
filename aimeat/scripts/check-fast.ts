@@ -24,6 +24,8 @@
  *   cd aimeat && pnpm check:fast --jobs=8     # more, on a wider machine
  *   cd aimeat && pnpm check:fast --list       # the set, and nothing runs
  * @version-history
+ *   v1.2.0 — 2026-11-15 — A workstation skips the checks marked `slow` in the registry (they run in CI,
+ *     where CI is set, and on pnpm ready's branch); `--all` runs them here too.
  *   v1.1.0 — 2026-11-15 — One run at a time on a machine (scripts/lib/machine-lock.ts): a second
  *     session's run waits and says whom for. Three at once took 25-35 min each that afternoon.
  *     AIMEAT_CHECK_FAST_NO_LOCK=1 skips the lock (CI, where a runner holds one job).
@@ -42,9 +44,15 @@ interface Check {
     script: string;
     /** What the hook said while running it. */
     label: string;
+    /** Minutes on a workstation: run in CI and on `pnpm ready`'s branch, skipped locally unless --all. */
+    slow?: boolean;
 }
 
-const CHECKS: Check[] = FAST_CHECKS;
+// A workstation runs the quick set; CI (and `--all`) runs everything. The slow eight took 1527 of
+// 2158 s of check time on a quiet laptop on 2026-11-15, check:field-reach's CodeQL pass 793 s alone.
+const ALL = !!process.env.CI || process.argv.includes('--all');
+const SKIPPED: Check[] = ALL ? [] : FAST_CHECKS.filter(c => (c as Check).slow);
+const CHECKS: Check[] = ALL ? FAST_CHECKS : FAST_CHECKS.filter(c => !(c as Check).slow);
 
 interface Outcome { check: Check; code: number; out: string; ms: number }
 
@@ -110,6 +118,7 @@ async function main(): Promise<void> {
     const queue = [...CHECKS];
     const done: Outcome[] = [];
     console.log(`[check:fast] ${CHECKS.length} checks, ${jobs} at a time\n`);
+    if (SKIPPED.length) console.log(`[check:fast] ${SKIPPED.length} slow checks run in CI and on pnpm ready's branch, not here (--all runs them): ${SKIPPED.map(c => c.script).join(', ')}\n`);
 
     const worker = async (): Promise<void> => {
         for (let next = queue.shift(); next; next = queue.shift()) {

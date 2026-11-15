@@ -144,8 +144,8 @@
       "why": "Catalogue sync goes to peers sharing the catalogue, with validateOutboundUrl first."
     },
     "src/services/federation-book.ts": {
-      "count": 2,
-      "why": "Assembling the book reads node cards from active, non-private peers through safeFetch; verifying a book uses the issuer peer's pinned key, else the key cache, which is now written only under the node a key exchange asked."
+      "count": 3,
+      "why": "Assembling the book reads node cards from active, non-private peers through safeFetch; verifying a book uses the issuer peer's pinned key, else the key cache, which is now written only under the node a key exchange asked. readPeerOperators (2026-11-15, E2E audit M181, approved by the developer) reads the node card of an active peer whose broadcast already passed gatePeer('allowBroadcast') and the signature, through safeFetch with validateOutboundUrl, to learn whether the sender is that node's operator."
     },
     "src/services/federation-peer-gate.ts": {
       "count": 1,

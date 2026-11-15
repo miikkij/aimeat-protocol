@@ -54,8 +54,8 @@
       "sha": "25a722d8d67f3265"
     },
     "test/e2e-members.ts": {
-      "reason": "REVIEWED 2026-09-04 — GET /v1/portfolio/members is a public list with no authenticated door on it, so 'what does a second principal get' has one answer: the same list. Its only refusal is content-shaped and IS asserted — test 2 publishes nothing for one of the four owners and asserts that owner is absent, and test 5 resolves every listed member back to a published portfolio, so the list cannot name somebody who did not opt in. The four owners exist to cover the four gaii shapes a portfolio config can be stored under, not to compare principals. Sha re-stamped 2026-10-12 without a new denial case: the only edit was the owner sign-in moving from the owner key to the password (test/helpers/owner-login.ts; wish-e2e-testit-ja-sandbox-kirjautuvat-omistaja-avaimella-joka-po), which adds and removes no refusal.",
-      "sha": "f5dea8d35ac27f16"
+      "reason": "REVIEWED 2026-09-04 — GET /v1/portfolio/members is a public list with no authenticated door on it, so 'what does a second principal get' has one answer: the same list. Its only refusal is content-shaped and IS asserted — test 2 publishes nothing for one of the four owners and asserts that owner is absent, and test 5 resolves every listed member back to a published portfolio, so the list cannot name somebody who did not opt in. The four owners exist to cover the four gaii shapes a portfolio config can be stored under, not to compare principals. Sha re-stamped 2026-10-12 without a new denial case: the only edit was the owner sign-in moving from the owner key to the password (test/helpers/owner-login.ts; wish-e2e-testit-ja-sandbox-kirjautuvat-omistaja-avaimella-joka-po), which adds and removes no refusal. Re-stamped 2026-11-15 after audit part E (M143, L083): test 2b and test 5 now pin the opt-out and the listed members exactly; the surface is still public, so the reason holds.",
+      "sha": "d3c41c0aa578fc29"
     },
     "test/e2e-attachment-sweep.ts": {
       "reason": "REVIEWED 2026-09-08, unchanged in substance since 2026-09-04. There is no door here to refuse. This suite is IN-PROCESS: it imports createServer, loadConfig and sweepReferenceAttachments directly and calls the sweep function, and it makes zero fetch() calls (measured: 0 again on this edit). What it tests is a background job deciding whether an attachment reference is retried or expired, which has no caller and therefore no principal to refuse. It does carry the refusal that IS its own — case 5 asserts that a descriptor naming a third owner's file is refused and that none of the victim's bytes reach the recipient — but that is a data-shape refusal inside the job, not a principal being turned away at a door. The HTTP doors that create those attachments live in the DM suites and carry their refusals there. Re-seeded because the suite gained case 3b (a held attachment behind 205 finished ones), which adds no HTTP call. If this ever grows one, the sha pin expires with it. RE-STAMPED 2026-10-16: the in-process node follows the run's backend (test/helpers/own-node-db.ts, QA audit P1-02) and an unused read was removed; no assertion changed and still zero fetch() calls. RE-STAMPED 2026-10-27 (cc-jouni-ports): the only change was its fixed ports moving from 40000-41999 to 28000-29999 with every suite's, out of the range the claims board hands out; the reason above was re-read and still holds.",
@@ -78,8 +78,8 @@
       "sha": "55380193f3086751"
     },
     "test/e2e-scope-ceiling.ts": {
-      "reason": "ANSWERED 2026-10-16 (QA audit F03a-01). The refusal under test is the operator's scope ceiling, which every route answers with 400 INVALID_SCOPES by design (the request names a permission the node does not grant, it is not a second principal reaching for the first one's data). Each of the six routes and the ecosystem approval is asserted to refuse with that code and to leave nothing behind.",
-      "sha": "880451678816c4da"
+      "reason": "ANSWERED 2026-10-16 (QA audit F03a-01). The refusal under test is the operator's scope ceiling, which every route answers with 400 INVALID_SCOPES by design (the request names a permission the node does not grant, it is not a second principal reaching for the first one's data). Each of the six routes and the ecosystem approval is asserted to refuse with that code and to leave nothing behind. Re-stamped 2026-11-15 after audit part E (M055): the edit adds the scopes_within_ceiling validation check, no second principal; the reason holds.",
+      "sha": "e300cf5ac555ec27"
     },
     "test/e2e-package-update-widening.ts": {
       "reason": "ANSWERED 2026-10-16 (QA audit F08c-03). The refusal under test is the daily update holding back a version that can do more than the owner approved: it answers the outcome needs_owner, the install stays on its version and the owner is told once. No second principal is involved; the guard is between an automatic job and the owner's approval.",
@@ -208,16 +208,12 @@
       "sha": "7a3bb7d232431a2c"
     },
     "test/e2e-unfurl.ts": {
-      "reason": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10): GET /v1/unfurl and /v1/unfurl/image read a public web address the caller names and hold nothing of any account; routes/unfurl.ts caches the answer by the address alone, so every signed-in principal gets the same answer and there is no second principal to refuse. The refusals that matter are the sign-in (401) and the private-address guard (422), both asserted.",
-      "sha": "ab1a51c9649eec07"
+      "reason": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10): GET /v1/unfurl and /v1/unfurl/image read a public web address the caller names and hold nothing of any account; routes/unfurl.ts caches the answer by the address alone, so every signed-in principal gets the same answer and there is no second principal to refuse. The refusals that matter are the sign-in (401) and the private-address guard (422), both asserted. Re-stamped 2026-11-15 after audit part E (M124): the edit asserts the image route's sign-in refusal; the reason holds.",
+      "sha": "b4ee0eb6d6d5043b"
     },
     "test/e2e-agent-telemetry.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
       "sha": "a3424daee12e478b"
-    },
-    "test/e2e-ledger.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "50727d4e953eb79b"
     },
     "test/e2e-session-forgery.ts": {
       "reason": "ANSWERED 2026-10-16 (QA audit F20-01). The suite tests the session signature itself: a token signed with another key, with altered claims, expired, or with alg none is no principal at all, so 401 is the only right answer and there is no second signed-in principal to refuse. It runs with anonymous mode off (ANONYMOUS_OFF_SUITES), so a refused credential cannot fall back to the anonymous identity.",

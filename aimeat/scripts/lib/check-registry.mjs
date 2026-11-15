@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-15: `slow: true` on the eight checks that took 1527 of 2158 s of check time on a quiet laptop (check:field-reach alone 793 s, the CodeQL measurement). check:fast skips them on a workstation and runs them in CI and on `pnpm ready`'s branch, so the one local run before ready takes about three minutes, not eighteen.
  *  - 2026-11-15: check:picture-words, no new door, road, way in, machine room or showroom in the string literals of src/ and public/ or the visible text of the HTML pages (the locale files have check:locales).
  *  - 2026-11-15: check:design-language-publish, the node copy of skill aimeat-design-language is the repository copy as last published (decision P7 of the instruction audit).
  *  - 2026-11-14: check:find-fields, every find field is one the autofill guard sees (type="search" or data-find); Edge on Android wrote the sign-in name into the App Catalog search.
@@ -49,7 +50,7 @@
  *  - 1.0.0 (2026-09-08): A4: share the CI check registry with audit consumers.
  */
 export const FAST_CHECKS = [
-    { script: 'typecheck:audit-tests', label: 'Architecture regression tests use the current typed contracts' },
+    { script: 'typecheck:audit-tests', label: 'Architecture regression tests use the current typed contracts', slow: true },
     { script: 'check:docs', label: 'Documentation catalog, links, data syntax and help copies agree' },
     { script: 'check:importmap', label: 'Importmap ↔ imports in sync' },
     { script: 'check:find-fields', label: 'Every find field is one the autofill guard sees' },
@@ -80,16 +81,16 @@ export const FAST_CHECKS = [
     // Wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille (2026-10-18): the Python
     // package and the connector are written twice, and nothing compared them.
     { script: 'check:python-shapes', label: 'The Python offer and signal builders name every node schema field, or the difference is listed; the pytest fixture is fresh' },
-    { script: 'check:python-daemon', label: 'The Python daemon and aimeat connect agree on loopback routes, node REST routes and MCP tool names, or the difference is listed' },
+    { script: 'check:python-daemon', label: 'The Python daemon and aimeat connect agree on loopback routes, node REST routes and MCP tool names, or the difference is listed', slow: true },
     { script: 'check:browser-libs', label: 'The portal services and the app libraries call no new route with different parameters; the list only shrinks' },
     { script: 'check:plain-language', label: 'Plain language for the messages a person hears' },
     { script: 'check:poster-shapes', label: 'Design-language shapes live in poster.css, not in view sheets' },
-    { script: 'check:ui-library', label: 'Every interface part is in the component catalogue, and its facts are fresh' },
+    { script: 'check:ui-library', label: 'Every interface part is in the component catalogue, and its facts are fresh', slow: true },
     { script: 'check:theme-tokens', label: 'theme.css holds tokens only; every page that links it links the shell block' },
     { script: 'check:shape-tokens', label: 'A component sheet reads the theme\'s shape values, never a corner, frame, shadow or letter case of its own' },
     { script: 'check:dialogs', label: 'One dialog for the site: no hand-rolled overlay, backdrop or role="dialog" box' },
     { script: 'check:viewport', label: 'Cortex pack integrity: embed + VERSION constants + registry versions' },
-    { script: 'check:ai-disclosure', label: 'AI disclosure gates: one LLM path, one publish path, labels intact' },
+    { script: 'check:ai-disclosure', label: 'AI disclosure gates: one LLM path, one publish path, labels intact', slow: true },
     // Plan doc-mvcn6c7e4e5q, V6.4: each view printed its kind's stored word for who can read a thing.
     { script: 'check:audience-badge', label: 'Every view that shows the owner their content says who can read it with the AudienceBadge' },
     { script: 'check:locales', label: 'Language files agree with en.json' },
@@ -142,7 +143,7 @@ export const FAST_CHECKS = [
     { script: 'check:classification-reach', label: 'Every content read passes the classification reader or is listed with its reason' },
     // Wish wish-tarkistus-ei-atomiselle-kirjoitukselle-uudessa-koodissa (2026-10-18): the version
     // condition existed and new code wrote without it, sixteen times, most on money routes.
-    { script: 'check:atomic-writes', label: 'No code reads a record and writes the same key back without a version condition, beyond the listed ones; the list only shrinks' },
+    { script: 'check:atomic-writes', label: 'No code reads a record and writes the same key back without a version condition, beyond the listed ones; the list only shrinks', slow: true },
     { script: 'check:storage-parity', label: 'Owner-scoped tables are in both deletion cascades' },
     // Secaudit 2026-10, M8: claimScheduledFire lived in postgres-kysely/methods/schedules.ts and in
     // sqlite/methods/federation-oauth.ts, so a fix in one provider could not find its twin.
@@ -153,7 +154,7 @@ export const FAST_CHECKS = [
     { script: 'check:ext-entrypoints', label: 'Extension sandbox entry points use the shared context builder' },
     { script: 'check:shared-impl', label: 'MCP tools call what REST calls' },
     { script: 'check:surface-focus', label: 'The v2 surfaces are still projections' },
-    { script: 'check:deps', label: 'No new import cycle or layer inversion' },
+    { script: 'check:deps', label: 'No new import cycle or layer inversion', slow: true },
     // Codebase analysis 2026-11-03, D-g: an index over the classification family made 54 cycles in
     // October; check:deps sees such a cycle only after a module imports the index.
     { script: 'check:family-index', label: 'A family index exports no file that reaches a module importing the family back' },
@@ -179,12 +180,12 @@ export const FAST_CHECKS = [
     { script: 'check:doc-links', label: 'Served text links no repository file the node does not serve' },
     // Built on 2026-09-03 for exactly this axis and wired into nothing until 2026-09-14, when an
     // agent's company update dropped organism_id in silence: REST took the field and MCP did not.
-    { script: 'check:field-reach', label: 'A record field REST can set, an agent can set too' },
+    { script: 'check:field-reach', label: 'A record field REST can set, an agent can set too', slow: true },
     { script: 'check:liaison-surface', label: 'Published surfaces match, and neither needs a release' },
     // The whole-tree silent-exception pass, which until 2026-09-13 ran nowhere: the hook sees only
     // staged files and nothing else called it, so the three cleaned shapes were held at zero by
     // eslint alone and the fourth had no keeper at all.
-    { script: 'check:silent-catch -- --strict', label: 'A caught error leaves a trace: no file holds more silent handlers or exemptions than before, src/static included, and every exemption gives its reason' },
+    { script: 'check:silent-catch -- --strict', label: 'A caught error leaves a trace: no file holds more silent handlers or exemptions than before, src/static included, and every exemption gives its reason', slow: true },
 ];
 
 // The five compiler invariants share one program and run together, outside the fast pool.

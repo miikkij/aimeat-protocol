@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Finished work reaches main only after the full E2E run is green on it: this pushes the
  *   session's commits to its own branch `ready/<session>`, starts the full run there on GitHub (four
- *   shards per backend, the same workflow as the nightly), waits for it, and when it is green puts the
+ *   shards per backend, the same workflow as the nightly) beside CI, which the push starts and which
+ *   runs every check including the slow ones check:fast leaves to it, waits for both, and when it is green puts the
  *   commits on main and deletes the branch. When it is red it prints the red suites and stops; main is
  *   not touched.
  *
@@ -60,36 +61,45 @@ async function main(): Promise<void> {
 
     const started = Date.now();
     gh('workflow', 'run', WORKFLOW, '--ref', branch);
-    let runId = 0;
-    for (let i = 0; i < 30 && !runId; i++) {
-        await sleep(5000);
-        const runs = JSON.parse(gh('run', 'list', '--workflow', WORKFLOW, '--branch', branch, '--limit', '5', '--json', 'databaseId,headSha,createdAt')) as Array<{ databaseId: number; headSha: string; createdAt: string }>;
-        runId = runs.find(r => r.headSha === head && Date.parse(r.createdAt) >= started - 60_000)?.databaseId ?? 0;
-    }
-    if (!runId) refuse(`the run on ${branch} did not appear in 150 s; look at gh run list --workflow ${WORKFLOW} --branch ${branch}.`);
-    const url = gh('run', 'view', String(runId), '--json', 'url', '--jq', '.url');
-    console.log(`[ready] full E2E run: ${url}`);
+    // Two runs answer for the work: the full E2E sweep (dispatched above) and CI, which the push to a
+    // ready/ branch starts and which runs every check, the slow ones check:fast skips here included.
+    const findRun = async (workflow: string): Promise<number> => {
+        for (let i = 0; i < 30; i++) {
+            await sleep(5000);
+            const runs = JSON.parse(gh('run', 'list', '--workflow', workflow, '--branch', branch, '--limit', '5', '--json', 'databaseId,headSha,createdAt')) as Array<{ databaseId: number; headSha: string; createdAt: string }>;
+            const id = runs.find(r => r.headSha === head && Date.parse(r.createdAt) >= started - 120_000)?.databaseId;
+            if (id) return id;
+        }
+        return refuse(`the ${workflow} run on ${branch} did not appear in 150 s; look at gh run list --workflow ${workflow} --branch ${branch}.`);
+    };
+    const runs = [{ workflow: WORKFLOW, id: await findRun(WORKFLOW) }, { workflow: 'ci.yml', id: await findRun('ci.yml') }];
+    for (const r of runs) console.log(`[ready] ${r.workflow}: ${gh('run', 'view', String(r.id), '--json', 'url', '--jq', '.url')}`);
 
-    let state = { status: '', conclusion: '' };
-    while (state.status !== 'completed') {
+    const states = new Map<number, { status: string; conclusion: string }>();
+    while (runs.some(r => states.get(r.id)?.status !== 'completed')) {
         await sleep(60_000);
-        try { state = JSON.parse(gh('run', 'view', String(runId), '--json', 'status,conclusion')); }
-        catch (err) { console.warn(`[ready] could not read the run (asked again in a minute): ${String((err as Error).message).split('\n')[0]}`); }
+        for (const r of runs) {
+            try { states.set(r.id, JSON.parse(gh('run', 'view', String(r.id), '--json', 'status,conclusion'))); }
+            catch (err) { console.warn(`[ready] could not read ${r.workflow} (asked again in a minute): ${String((err as Error).message).split('\n')[0]}`); }
+        }
     }
     const minutes = Math.round((Date.now() - started) / 60_000);
-    if (state.conclusion !== 'success') {
-        console.error(`[ready] RED after ${minutes} min (${state.conclusion}). Main is not touched; ${branch} is kept.`);
-        const jobs = gh('run', 'view', String(runId), '--json', 'jobs', '--jq', '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name');
-        if (jobs) console.error(`  red jobs:\n${jobs.split('\n').map(j => `    ${j}`).join('\n')}`);
-        try {
-            const log = sh('gh', ['run', 'view', String(runId), '--log-failed']);
-            const lines = [...new Set(log.split('\n').filter(l => /❌|✗ e2e/.test(l)).map(l => l.replace(/^[^\t]*\t[^\t]*\t\S+ /, '').trim()))];
-            if (lines.length) console.error(`  red assertions:\n${lines.slice(0, 40).map(l => `    ${l}`).join('\n')}`);
-        } catch (err) { console.error(`  the failed log could not be read (${String((err as Error).message).split('\n')[0]}); it is on the run's page.`); }
+    const red = runs.filter(r => states.get(r.id)?.conclusion !== 'success');
+    if (red.length) {
+        console.error(`[ready] RED after ${minutes} min (${red.map(r => r.workflow).join(', ')}). Main is not touched; ${branch} is kept.`);
+        for (const r of red) {
+            const jobs = gh('run', 'view', String(r.id), '--json', 'jobs', '--jq', '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name');
+            if (jobs) console.error(`  ${r.workflow}, red jobs:\n${jobs.split('\n').map(j => `    ${j}`).join('\n')}`);
+            try {
+                const log = sh('gh', ['run', 'view', String(r.id), '--log-failed']);
+                const lines = [...new Set(log.split('\n').filter(l => /❌|✗ |✖/.test(l)).map(l => l.replace(/^[^\t]*\t[^\t]*\t\S+ /, '').trim()))];
+                if (lines.length) console.error(`  ${r.workflow}, red lines:\n${lines.slice(0, 60).map(l => `    ${l}`).join('\n')}`);
+            } catch (err) { console.error(`  the failed log could not be read (${String((err as Error).message).split('\n')[0]}); it is on the run's page.`); }
+        }
         console.error('  Fix every red line in one go, commit, and run pnpm ready again.');
         process.exit(1);
     }
-    console.log(`[ready] GREEN after ${minutes} min.`);
+    console.log(`[ready] GREEN after ${minutes} min (full E2E and CI).`);
     if (noMerge) { console.log(`[ready] --no-merge: ${branch} is kept, main is not touched.`); return; }
 
     git('fetch', '-q', 'origin', 'main');
