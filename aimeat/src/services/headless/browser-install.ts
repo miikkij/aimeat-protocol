@@ -1,5 +1,5 @@
 /**
- * @file headless-browser-install.ts
+ * @file src/services/headless/browser-install.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Installs the Chromium build the installed playwright-core is pinned to, and records
@@ -31,13 +31,13 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { emitChange } from './event-bus.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { emitChange } from '../event-bus.js';
 import {
   listSecurityIncidents, recordSecurityIncident, resolveSecurityIncident, securityOwner,
-} from './security-incident.js';
+} from '../security-incident.js';
 
 const require = createRequire(import.meta.url);
 

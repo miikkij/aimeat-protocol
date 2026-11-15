@@ -67,8 +67,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { systemGhiiFor } from '../compliance/register.js';
 import { withHeadlessContext, NO_HEADLESS_BROWSER } from '../screenshot-capture.js';
-import { takeHeadlessSlot, HEADLESS_BUSY_MESSAGE } from '../headless-slots.js';
-import { serveDocumentOnce, type HeadlessRoutable } from '../headless-network.js';
+import { takeHeadlessSlot, HEADLESS_BUSY_MESSAGE } from '../headless/slots.js';
+import { serveDocumentOnce, type HeadlessRoutable } from '../headless/network.js';
 import { DesignBookService, partKey, type DesignBookPart } from './service.js';
 import { DesignBookError } from './validate.js';
 import { renderableBodyFor, benchPageHtml } from './preview.js';
@@ -209,7 +209,7 @@ export async function runPartBench(
   const at = new Date().toISOString();
 
   // One node-wide headless slot for the six launches below, shared with the on-demand screenshots
-  // (services/headless-slots.ts; secaudit2026oct26). A busy node answers ran:false with words.
+  // (services/headless/slots.ts; secaudit2026oct26). A busy node answers ran:false with words.
   const slot = takeHeadlessSlot(config);
   if (!slot) return { ran: false, reason: HEADLESS_BUSY_MESSAGE, at };
   try {

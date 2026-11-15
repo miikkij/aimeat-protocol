@@ -686,7 +686,7 @@
         "count": 1,
         "why": "The headless browser loads the bench page from this origin, and the kit's relative assets resolve against it; a browser needs a real socket."
       },
-      "src/services/headless-network.ts": {
+      "src/services/headless/network.ts": {
         "count": 2,
         "why": "The headless browser's own-origin list, and the base from which the node fetches (through safeFetch) what that browser asks of the node's own pages. Part of the headless rendering the codebase analysis left on the socket."
       }

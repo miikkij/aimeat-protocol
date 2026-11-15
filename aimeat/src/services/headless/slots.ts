@@ -1,5 +1,5 @@
 /**
- * @file src/services/headless-slots.ts
+ * @file src/services/headless/slots.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node-wide count of headless browsers a request starts for an on-demand render: an
@@ -21,7 +21,7 @@
  *   v1.1.0 — 2026-10-27 — The count is the setting apps.renders_at_once (brief rule 6), default 4.
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
-import type { AimeatConfig } from '../config.js';
+import type { AimeatConfig } from '../../config.js';
 
 /** The default of apps.renders_at_once. */
 export const ON_DEMAND_HEADLESS_AT_ONCE = 4;

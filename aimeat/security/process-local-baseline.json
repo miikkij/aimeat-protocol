@@ -1037,7 +1037,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/headless-slots.ts :: let :: running": {
+    "src/services/headless/slots.ts :: let :: running": {
       "count": 1,
       "reason": "DEBT"
     },

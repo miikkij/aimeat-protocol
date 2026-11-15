@@ -1,5 +1,5 @@
 /**
- * @file src/services/headless-network.ts
+ * @file src/services/headless/network.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The network of the node's headless browser: what a page rendered on the server may
@@ -40,11 +40,11 @@
  *     node, which `aimeat screenshot-worker` now installs (secaudit 2026-10 follow-up, Part C).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, SSRF-1, plan S9).
  */
-import type { AimeatConfig } from '../config.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { readBodyCapped } from '../utils/read-capped.js';
-import { egressOriginsOf } from './ai/provider-common.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
+import { egressOriginsOf } from '../ai/provider-common.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Chromium arguments that leave the browser no network of its own. Port 9 is the discard port, and

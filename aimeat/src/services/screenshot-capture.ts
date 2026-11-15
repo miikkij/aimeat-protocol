@@ -76,11 +76,11 @@ import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
 import {
   HEADLESS_NO_NETWORK_ARGS, HEADLESS_CONTEXT_OPTIONS, guardHeadlessContext, serveDocumentOnce, type HeadlessRoutable,
-} from './headless-network.js';
+} from './headless/network.js';
 import {
   isBrowserBuildMissing, installPinnedBrowser, browserInstallHint, reportBrowserFault, clearBrowserFault, type InstallResult,
-} from './headless-browser-install.js';
-import { takeHeadlessSlot, HEADLESS_BUSY_MESSAGE } from './headless-slots.js';
+} from './headless/browser-install.js';
+import { takeHeadlessSlot, HEADLESS_BUSY_MESSAGE } from './headless/slots.js';
 
 const VIEWPORT = { width: 1200, height: 750 };
 const PAGE_TIMEOUT = 20_000;
@@ -482,7 +482,7 @@ export async function captureAppScreenshot(
   }
 
   // A node-wide slot first, so a busy node takes none of the owner's hourly allowance
-  // (services/headless-slots.ts; secaudit2026oct26, on-demand-render-no-node-slot-or-deadline).
+  // (services/headless/slots.ts; secaudit2026oct26, on-demand-render-no-node-slot-or-deadline).
   const slot = takeHeadlessSlot(config);
   if (!slot) return { ok: false, status: 503, code: 'HEADLESS_BUSY', message: HEADLESS_BUSY_MESSAGE };
 

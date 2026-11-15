@@ -98,7 +98,7 @@ export interface NodeLimitsConfig {
   realtimeMaxDocsPerRoom: number;
   /**
    * On-demand renders (an app screenshot asked for now, a Design Book bench) running at once on the
-   * node, each holding a headless browser (services/headless-slots.ts). AIMEAT_APP_RENDERS_AT_ONCE,
+   * node, each holding a headless browser (services/headless/slots.ts). AIMEAT_APP_RENDERS_AT_ONCE,
    * default 4; 0 is no limit.
    */
   appRendersAtOnce: number;

@@ -30,9 +30,9 @@
  *     300 MB browser download; keeps --watch daemon, anonymous render, operator-PAT auth.
  */
 import { chromium, type Browser } from 'playwright-core';
-import { HEADLESS_NO_NETWORK_ARGS, HEADLESS_CONTEXT_OPTIONS, headlessRequestHandlerFor } from '../services/headless-network.js';
+import { HEADLESS_NO_NETWORK_ARGS, HEADLESS_CONTEXT_OPTIONS, headlessRequestHandlerFor } from '../services/headless/network.js';
 import { egressOriginsOf } from '../services/ai/provider-common.js';
-import { browserInstallHint } from '../services/headless-browser-install.js';
+import { browserInstallHint } from '../services/headless/browser-install.js';
 
 function arg(name: string, def?: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -91,7 +91,7 @@ async function runOnce(base: string, token: string, opts: {
   let ok = 0; let fail = 0;
   try {
     const ctx = await browser.newContext({ viewport: { width: opts.width, height: opts.height }, deviceScaleFactor: 1, ...HEADLESS_CONTEXT_OPTIONS });
-    // The node's network rule (services/headless-network.ts): an app is code somebody else wrote,
+    // The node's network rule (services/headless/network.ts): an app is code somebody else wrote,
     // and this browser runs on the operator's machine, inside the operator's network. The node is
     // fetched at its own address with no credential; any other address goes through safeFetch, which
     // refuses private, loopback, link-local and metadata ranges; only GET and HEAD leave.

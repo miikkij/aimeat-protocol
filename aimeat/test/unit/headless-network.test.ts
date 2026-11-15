@@ -1,7 +1,7 @@
 /**
  * @file test/unit/headless-network.test.ts
  * @description What a page the node opens in its headless browser may reach
- *   (services/headless-network.ts): the node's own origin from its loopback with no credential,
+ *   (services/headless/network.ts): the node's own origin from its loopback with no credential,
  *   nothing private unless the operator listed it, no method but GET and HEAD, no scheme but http(s).
  *   Driven with recorded routes against two real loopback servers, one standing in for the node and
  *   one for a private service. Before 2026-10-05 every sub-request went to the browser's own network
@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import { createServer, type Server, type IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { AimeatConfig } from '../../src/config.js';
-import { headlessRequestHandler, headlessRequestHandlerFor, serveDocumentOnce, type HeadlessRoute } from '../../src/services/headless-network.js';
+import { headlessRequestHandler, headlessRequestHandlerFor, serveDocumentOnce, type HeadlessRoute } from '../../src/services/headless/network.js';
 
 interface Recorded { kind: 'fulfill' | 'abort' | 'fallback'; status?: number; body?: string; headers?: Record<string, string> }
 

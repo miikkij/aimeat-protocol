@@ -26,7 +26,7 @@ import { listSecurityIncidents } from '../../src/services/security-incident.js';
 import {
   isBrowserBuildMissing, installCommand, installPinnedBrowser, reportBrowserFault, clearBrowserFault,
   BROWSER_INCIDENT_TYPE, IPV4_ONLY_IMPORT, type InstallRun,
-} from '../../src/services/headless-browser-install.js';
+} from '../../src/services/headless/browser-install.js';
 import { ensureHeadlessBrowser, type LaunchOutcome } from '../../src/services/screenshot-capture.js';
 
 const config = { nodeId: 'node-test', baseUrl: 'http://node.test' } as never;

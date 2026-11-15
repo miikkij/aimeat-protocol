@@ -47,7 +47,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { withHeadlessContext, NO_HEADLESS_BROWSER } from '../screenshot-capture.js';
-import { serveDocumentOnce, type HeadlessRoutable } from '../headless-network.js';
+import { serveDocumentOnce, type HeadlessRoutable } from '../headless/network.js';
 import { lintAppArtifact, type AppArtifactLintResult } from './artifact-lint.js';
 import { logger } from '../../utils/logger.js';
 
