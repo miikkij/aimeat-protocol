@@ -10,6 +10,10 @@
  *   the result, return only the new key — no base64 in the arguments or the result.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-files.ts
  * @version-history
+ *   v1.4.0 — 2026-11-15 — ctx.files.write asks storage:write: an agent of the owner holding ext:invoke
+ *     only is refused 403 (reason SCOPE_DENIED, the one-press address in the message) and nothing is
+ *     stored; it answered 200 and stored the file before the fix (E2E audit M253). An agent holding
+ *     both words writes, as the owner does.
  *   v1.3.0 — 2026-11-15 — Audit M251 (the escape key is exact and nothing lands at the escaped address)
  *     and M252 (the written bytes are read back and compared, sameLength is asserted).
  *   v1.2.0 — 2026-10-30 — read() answers the file's visibility: private on the round trip, public once
@@ -41,6 +45,7 @@ async function json(path: string, opts: RequestInit = {}) {
   return { status: res.status, body };
 }
 import { ownerSignIn } from './helpers/owner-login.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 async function setupOwner(label: string) {
   const name = `xf${label}${Date.now()}`;
   let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Files', password: 'ExtFiles1234' }) });
@@ -177,6 +182,37 @@ await test('The same file, made public, IS readable by the other caller', async 
   assert(r.status === 200, `status ${r.status}`);
   assert(r.body.data.ok === true, `a public file is readable, got: ${r.body.data.message}`);
   assert(r.body.data.visibility === 'public', `and read says so, got ${r.body.data.visibility}`);
+});
+
+// ── A write asks storage:write, as POST /v1/storage does (E2E audit M253) ──
+// An agent holding ext:invoke and not storage:write stored files, and used its owner's quota, through
+// any extension it could invoke. The source file is public from the test above, so the read half
+// of `transform` passes for an agent and only the write decides.
+
+/** Device-auth (RFC 8628): an agent of the owner carrying exactly `scopes`; its token and GAII. */
+async function ownerAgent(label: string, scopes: string[]): Promise<{ token: string; gaii: string }> {
+  const { token } = await connectAgentByDevice(BASE, { owner: owner.name, ownerToken: owner.token, name: `${label}${Date.now() % 100000}`, scopes });
+  const gaii = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')).sub as string;
+  return { token, gaii };
+}
+const pubStatus = async (gaii: string, key: string) =>
+  (await fetch(`${BASE}/v1/pub/${encodeURIComponent(gaii)}/${key.split('/').map(encodeURIComponent).join('/')}`, { headers: auth(owner.token) })).status;
+
+await test('An agent with ext:invoke and NOT storage:write is refused the write with the one-press ask; nothing is stored', async () => {
+  const agent = await ownerAgent('xfnowrite', ['ext:invoke']);
+  const r = await invoke(agent.token, 'transform', { ref: `${owner.gaii}/${SOURCE_KEY}`, out: 'agent-denied.bin' });
+  assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+  assert(r.body?.error?.details?.reason === 'SCOPE_DENIED', `the reason names the missing permission: ${JSON.stringify(r.body?.error)}`);
+  assert(/\/v1\/allow\?agent=/.test(r.body?.error?.message ?? ''), `the refusal carries the one-press address: ${r.body?.error?.message}`);
+  assert(await pubStatus(agent.gaii, `ext/${EXT}/agent-denied.bin`) === 404, 'no file was stored for the agent');
+});
+
+await test('An agent with ext:invoke AND storage:write writes through the extension', async () => {
+  const agent = await ownerAgent('xfwrite', ['ext:invoke', 'storage:write']);
+  const r = await invoke(agent.token, 'transform', { ref: `${owner.gaii}/${SOURCE_KEY}`, out: 'agent-ok.bin' });
+  assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.wrote.key === `ext/${EXT}/agent-ok.bin`, `wrote under the reserved prefix, got ${r.body.data.wrote.key}`);
+  assert(await pubStatus(agent.gaii, `ext/${EXT}/agent-ok.bin`) === 200, 'the file is in the agent\'s storage, and its owner opens it');
 });
 
 await test('A missing reference answers null rather than throwing', async () => {

@@ -27,6 +27,8 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   2026-11-15 — ctx.files.write of an agent caller without storage:write is refused with the
+ *     permission ask (services/permission-ask.ts), as POST /v1/storage refuses it (E2E audit M253).
  *   2026-11-09 — ctx.changed for the caller's run (services/extension-live/changed.ts).
  *   2026-11-08 — One label trail per run, shared by ctx.workspace, ctx.files and ctx.datapackage, so a
  *     package the run publishes keeps the labels of what it read (secaudit2026nov08b round 15).
@@ -100,6 +102,8 @@ import { readAdult, NOT_VERIFIED } from '../adult-assurance.js';
 import { activeSubscriptions } from '../../commerce/subscriptions.js';
 import { takeExtensionRunSlot, createRunQueue, SELLER_RUNS_PER_RUN } from './run-slots.js';
 import { scriptRefusal, EXTENSION_REFUSED } from '../extension-access/script-refusal.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { permissionAskText } from '../permission-ask.js';
 
 /**
  * What kind of principal runs the action: the caller object's kind (services/caller-context.ts), or
@@ -371,7 +375,12 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
       // A public file or package asks the node's publish gate about the caller, as the upload and
       // data package routes do (services/publish-actors.ts; secaudit 2026-10, v68 and v69).
       files: makeExtensionFiles({ config, storage, callerGaii: caller.gaii, callerOwner: caller.owner, callerRoles: [...caller.roles], callerScopes: [...caller.scopes], extName: ext.name,
-        publishers: [invokingActor(storage, config.nodeId, account)], trail }),
+        publishers: [invokingActor(storage, config.nodeId, account)], trail,
+        // A file write asks storage:write, as POST /v1/storage does. An agent without it is refused
+        // with the permission ask that gives its person the one-press address (E2E audit M253).
+        ...(caller.kind === 'agent' && !scopeIsCovered(caller.scopes, 'storage:write') ? {
+          writeScopeAsk: permissionAskText({ baseUrl: config.baseUrl, agentGaii: caller.gaii, tool: `the extension action ${ext.name}/${action.id}`, words: ['storage:write'] }),
+        } : {}) }),
       // Data packages land in the OWNER's namespace whichever principal called, so one package has
       // one permanent address; `producedBy` still records the exact principal.
       datapackage: makeExtensionDataPackage({

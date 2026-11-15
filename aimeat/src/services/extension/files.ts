@@ -48,6 +48,9 @@
  *     readerGaii: installer.gaii, readerOwner: installer.owner,
  *     readerRoles: installer.roles, readerScopes: installer.scopes });
  * @version-history
+ *   v1.9.0 — 2026-11-15 — `writeScopeAsk`: write() is refused with SCOPE_DENIED and the permission ask
+ *     (services/permission-ask.ts) before any byte is stored when the caller does not hold
+ *     storage:write, the word POST /v1/storage asks (E2E audit M253).
  *   v1.8.0 — 2026-11-08 — read() of a data package version's file asks the labels the version keeps, as
  *     GET /v1/pub does, and `trail` records what read() returned, so a package the run publishes keeps
  *     those labels (secaudit2026nov08b round 15).
@@ -194,6 +197,12 @@ export function makeExtensionFiles(deps: {
     publishers?: readonly PublishActor[];
     /** The run's label trail: a file read() returns is recorded (services/datapackage/label-trail.ts). */
     trail?: LabelTrail;
+    /**
+     * Set when the caller does not hold storage:write, which POST /v1/storage asks: the permission
+     * ask (services/permission-ask.ts) a write() is refused with, as `SCOPE_DENIED: <text>`, before
+     * any byte is stored. Absent, a write goes on as before.
+     */
+    writeScopeAsk?: string;
 }): {
     read(ref: string): Promise<{
         base64: string; mime: string; size: number; key: string; visibility: string; workspaceRef?: string;
@@ -278,6 +287,11 @@ export function makeExtensionFiles(deps: {
         },
 
         async write(key, base64, opts) {
+            // A write stores a file in the caller's storage, as an upload does, so it asks the word
+            // the upload route asks. An agent with ext:invoke and no storage:write stored files and
+            // used the owner's quota through any extension (E2E audit M253). The refusal is the
+            // node's permission ask, which gives the person the one-press address to allow it.
+            if (deps.writeScopeAsk) throw new Error(`SCOPE_DENIED: ${deps.writeScopeAsk}`);
             const clean = String(key || '').replace(/^\/+/, '').trim();
             if (!clean) throw new Error('write() needs a key');
             // Reserved prefix: the result is attributable to the extension that made it, and no
