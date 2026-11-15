@@ -66,13 +66,16 @@ first-draft closing paragraphs lose nothing.
 
 `references/language-context.md` carries what the writer needs and the text itself cannot supply:
 what each thing in this product actually is, in one sentence, and the word this product has already
-settled on for it in English, Finnish and Spanish. Read it before composing, and add the row when
-you name something it does not cover, with its dated line in `references/language-context-changes.md`
-(the history of the table, which a writer does not need to read).
+settled on for it in English, Finnish and Spanish. It is an index: read `references/language-rules.md`
+whole (what the decided words bind you to, what is forbidden, the register), then the concept table
+of the area you write in, one `references/terms-<area>.md` file each. Read them before composing, and
+add the row when you name something none of them covers, with its dated line in
+`references/language-context-changes.md` (the history of the table, which a writer does not need to
+read).
 
 It exists because a word gets chosen twice for one concept otherwise, six weeks apart, by writers
 who cannot see each other. Measured on 2026-09-12, it prevented three terminology defects in one
-45-key screen and changed nothing else; the file's own last section says what it does and does not
+45-key screen and changed nothing else; the index's last section says what it does and does not
 reach, and that section is honest about the half it cannot help with.
 
 **Do not give it to a cold reader.** The reader simulation below works because the reader has no

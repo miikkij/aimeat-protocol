@@ -12,8 +12,8 @@
  *   Jouni, 2026-09-28: the eval runs only when a skill changes, and the gate marks that and asks.
  *
  *   HOW. security/skill-evals.json holds, per skill with a suite under .claude/evals/<skill>/, a
- *   digest of the skill's instructions (its SKILL.md, not its references/) and of its suite as they
- *   stood at the last decision, and what the
+ *   digest of the skill's instructions (its SKILL.md and any references/*-rules.md, not the data
+ *   files beside them) and of its suite as they stood at the last decision, and what the
  *   decision was: `ran` (with the scores) or `skipped` (with the reason). The gate fails when the
  *   digest differs, and the message names the command, a cost ceiling, and the two ways to record
  *   the decision. An AI session that meets this failure asks the developer before it runs the eval
@@ -30,6 +30,10 @@
  *   pnpm check:skill-evals --record aimeat-writing --ran "opus, 3 runs: +0.08 +0.08 +0.33"
  *   pnpm check:skill-evals --record aimeat-writing --skip "wording only; Jouni 2026-09-28"
  * @version-history
+ *   v1.2.0 -- 2026-11-15 -- A project skill's digest also covers its `references/*-rules.md`. With
+ *     SKILL.md alone, the instruction sections of aimeat-writing's language context (what is forbidden,
+ *     the register, how a term is added) could change with no eval decision, although the eval reads
+ *     them; those sections now live in references/language-rules.md, apart from the concept table.
  *   v1.1.0 — 2026-11-15 — A project skill's digest is its SKILL.md alone. The digest had covered
  *     every file of the folder, so each new row in aimeat-writing's language context failed the gate
  *     and asked the developer for a run-or-skip decision on a change no instruction carried.
@@ -78,16 +82,24 @@ function suites(): string[] {
     return readdirSync(EVALS).filter(n => statSync(join(EVALS, n)).isDirectory()).sort();
 }
 
+/** A reference file whose name ends in this holds instructions, not data, and is digested. */
+const RULES_FILE = /-rules\.md$/;
+
 /**
- * Where the skill's instructions live: SKILL.md of the project folder, or the built-in entry. Null
- * when neither. A project skill's `references/` and other files are not digested: they are data
- * the instructions point at (aimeat-writing's language context gains rows every week), and a new
- * row is not a change to what the skill tells a model to do.
+ * Where the skill's instructions live: SKILL.md of the project folder plus every
+ * `references/*-rules.md`, or the built-in entry. Null when neither. The other reference files are
+ * not digested: they are data the instructions point at (aimeat-writing's concept table gains rows
+ * every week, and its change log a line with each), and a new row is not a change to what the skill
+ * tells a model to do. A rules file is: the eval copies the whole folder and measures it, so the gate
+ * watches it too.
  */
 function skillSource(skill: string): { kind: 'project' | 'node'; texts: Array<[string, string]> } | null {
     const skillMd = join(PROJECT_SKILLS, skill, 'SKILL.md');
     if (existsSync(skillMd)) {
-        return { kind: 'project', texts: [[skillMd.slice(REPO.length + 1).replace(/\\/g, '/'), fold(readFileSync(skillMd, 'utf8'))]] };
+        const refs = join(PROJECT_SKILLS, skill, 'references');
+        const rules = existsSync(refs) ? readdirSync(refs).filter(n => RULES_FILE.test(n)).sort().map(n => join(refs, n)) : [];
+        const rel = (f: string): string => f.slice(REPO.length + 1).replace(/\\/g, '/');
+        return { kind: 'project', texts: [skillMd, ...rules].map(f => [rel(f), fold(readFileSync(f, 'utf8'))] as [string, string]) };
     }
     const builtin = BUILTIN_SKILLS.find(s => s.name === skill);
     return builtin ? { kind: 'node', texts: [[`node:${skill}`, fold(builtin.skillMd)]] } : null;

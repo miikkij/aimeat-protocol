@@ -39,6 +39,8 @@
  *     AGENTS.md must carry the public-repository rule and the release-tag rule; CLAUDE.md and
  *     AGENTS.md carry no live count that grows by design. Ceiling 44,000 -> 36,000 after content
  *     that holds only for some work moved into the rule files and guides.
+ *   v1.2.1 -- 2026-11-15 -- The em-dash ban also reads every skill's references/*.md, where the
+ *     skill splits of the same day had moved text that nothing checked.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -170,11 +172,16 @@ function main(): void {
     // 2. The root file bans em-dashes and used them on eight lines; skill aimeat-writing bans them
     //    and used them on five, with two more skills beside it. The project skills are held to it
     //    too, and since 2026-11-15 the agent files and AGENTS.md, which every subagent and every
-    //    other coding agent reads first. The rule files still carry some, moved verbatim from the old
-    //    root file, and are not read here until somebody rewrites them.
+    //    other coding agent reads first. A skill's `references/` files are held to it as well: a
+    //    skill loads them as part of itself, and the 2026-11-15 splits moved a change log with 35
+    //    em-dashes into one. The rule files still carry some, moved verbatim from the old root file,
+    //    and are not read here until somebody rewrites them.
     const agents = markdownFiles(join(REPO, '.claude', 'agents'), (n) => n.endsWith('.md'));
     const agentsMd = existsSync(AGENTS_MD) ? [AGENTS_MD] : [];
-    for (const file of [CLAUDE_MD, ...skills, ...agents, ...agentsMd]) {
+    const skillReferences = readdirSync(SKILLS_DIR, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .flatMap((d) => markdownFiles(join(SKILLS_DIR, d.name, 'references'), (n) => n.endsWith('.md')));
+    for (const file of [CLAUDE_MD, ...skills, ...skillReferences, ...agents, ...agentsMd]) {
         readFileSync(file, 'utf-8').split('\n').forEach((line, i) => {
             if (line.includes('—')) problems.push(`${rel(file)}:${i + 1} has an em-dash, which this project's writing rule bans. Use a comma, a colon or two sentences.`);
         });

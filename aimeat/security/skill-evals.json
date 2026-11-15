@@ -1,11 +1,11 @@
 {
-  "about": "For each skill with an eval suite under .claude/evals/<skill>/: the digest of the skill's instructions (SKILL.md, not references/; the skillMd for a node skill) and its suite at the last decision, and whether the eval ran (with scores) or was skipped (with the reason and who decided). pnpm check:skill-evals fails when the digest changes. The eval costs money, so the developer decides: run it, or record a skip. Reasoning: aimeat/scripts/check-skill-evals.ts.",
+  "about": "For each skill with an eval suite under .claude/evals/<skill>/: the digest of the skill's instructions (SKILL.md and any references/*-rules.md, not the data files beside them; the skillMd for a node skill) and its suite at the last decision, and whether the eval ran (with scores) or was skipped (with the reason and who decided). pnpm check:skill-evals fails when the digest changes. The eval costs money, so the developer decides: run it, or record a skip. Reasoning: aimeat/scripts/check-skill-evals.ts.",
   "skills": {
     "aimeat-writing": {
-      "digest": "sha256:92b3757fcbd84992fefd35a8",
+      "digest": "sha256:3f4e60d18cf00ec12f934c51",
       "decision": "ran",
-      "on": "2026-11-14",
-      "note": "opus, 3 runs per case per arm. Before (old SKILL.md, old suite): commit-message 1.00/1.00 (0.00), finnish-ui-copy 1.00/1.00 (0.00), operator-help-line 1.00/0.92 (+0.08), $2.03. After (STE, selkeä kieli, commit limits; new within-hook-limits grader): commit-message 1.00/1.00 (0.00), finnish-ui-copy 1.00/1.00 (0.00), operator-help-line 1.00/0.75 (+0.25), $1.74. The developer approved the run, 2026-11-15"
+      "on": "2026-11-15",
+      "note": "opus, 3 runs per case per arm, after the language-context split (rules in references/language-rules.md, now digested) and the exact-limit within-hook-limits grader: commit-message 1.00/1.00 (0.00), finnish-ui-copy 1.00/0.92 (+0.08), operator-help-line 0.92/0.75 (+0.17; one with-skill run failed does-and-costs), mean +0.08, $1.89. The developer approved the run, 2026-11-15"
     },
     "aimeat-ai-capabilities": {
       "digest": "sha256:2beca58b3805dc59376c99f4",

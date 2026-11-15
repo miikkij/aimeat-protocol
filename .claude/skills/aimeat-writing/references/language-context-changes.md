@@ -1,6 +1,6 @@
 # Language context: the change log
 
-The history of the concept table in `language-context.md`: which rows were added or changed, on
+The history of the concept table (the `terms-*.md` files that `language-context.md` lists): which rows were added or changed, on
 which day, and why a word was chosen. A writer does not need it to compose a text; read it when
 you want to know why a decided word is what it is. A change to the table adds its line here, the
 newest at the top.
@@ -65,12 +65,12 @@ newest at the top.
 - **2026-10-09**: Visibility (*Näkyvyys*, *Visibilidad*), a click that changed nothing, repeated clicks and the corrected draft, for the Visibility page and the weekly helper of AI visibility. *Klikkaus* is the word the Finnish pages already use. The first Finnish lines written for this work said *applikaatio*; they say *sovellus* now, as the app row above says.
 - **2026-10-05**: a page the server opens (*palvelimen avaama sivu*, *página que abre el servidor*), for the Config setting that lists which private servers such a page may reach (security.screenshot_egress). Screenshot stays *kuvakaappaus*, as the app pages already say.
 - **2026-10-03**: knowledge base, knowledge package, peer, profile and business card, the start block, prompt and "your AI", with the guidance pass for people new to the product. Every word was already on a screen: *tietopankki* and *tietopaketti* in the Knowledge explanation, *vertainen* and *par* on the federation page, *käyntikortti* in the home's first step, *Aloita tästä* / *Empieza aquí* on every page's start block. Spanish had two words for the business card; *tarjeta de presentación* is the Latin American one, and help.start1 now says it too. The Finnish sweep the same day rewrote every string that said *prompti* or *prompt* (64), an inflected *AI:* (61) or *appi* / *appsi* / *apit* (207) as whole sentences with *kehote*, *tekoäly* and *sovellus*; "AI-" compounds such as *AI-chat* and *AI-budjetti* (about 130 strings) were left for a later pass. The menu names Organisms, MCP and the other system words became what a person does there (Shared places, Connect your AI), and the explanation of an organism now says only that *organism* is its technical name.
-- **2026-10-02** — morsel in Finnish is *murunen*, everywhere. The table row said so and the
+- **2026-10-02**: morsel in Finnish is *murunen*, everywhere. The table row said so and the
   never-translated list said the opposite; the Finnish pages said *murunen* about 110 times and
   *morseli* in 29 strings (prices, wallet, boards, the app catalogue's pricing). Jouni ruled for
   *murunen*; the 29 strings were rewritten, and the never-translated line now covers English and
   Spanish only. Also: the burn rate is *polttoosuus* (the value is a 0–1 fraction, not a percent).
-- **2026-10-01** — viewer, contributor, creator and address book (IAM round 2 leftovers). The role
+- **2026-10-01**: viewer, contributor, creator and address book (IAM round 2 leftovers). The role
   words are what the organisms page and the kit's workspaceTeam already ship: *lukija*,
   *kirjoittaja*, *luoja*; *lector*, *colaborador*, *quien lo creó*. The data wallet page
   (`dwpage.role.*`) said *reader* / *writer* in English and *escritor* in Spanish for the same two
@@ -79,155 +79,155 @@ newest at the top.
   *libreta de direcciones* (the permission screen and the contacts cover), *agenda* (the contacts
   tab) and *libreta de contactos* (the kit's members block). The first was the most used, and the
   other two strings now say it.
-- **2026-09-29** — Content Classifier and classification policy, with the classification pages
+- **2026-09-29**: Content Classifier and classification policy, with the classification pages
   (TARGET-082 V5). *Sisällön luokittelija* says what it does to what; *luokittelukäytäntö* over the
   spec's *politiikka*, because *käytäntö* is the plain Finnish word for a set of rules one follows.
   Jouni approved both; no cold reader has read them yet. The same day, *päiväraja* for the
   classifier's daily cap, the ordinary word for a limit per day; approved the same way.
-- **2026-09-30** — exception and reason, with the classification exceptions list. *Poikkeus* and
+- **2026-09-30**: exception and reason, with the classification exceptions list. *Poikkeus* and
   *perustelu* are the ordinary words a Finnish audit uses; *excepción* and *motivo* the Spanish.
   Jouni approved them and the eval skip.
-- **2026-09-29** — classification, the act and the result, with the node's classification switch
+- **2026-09-29**: classification, the act and the result, with the node's classification switch
   (TARGET-082). The first spec said *tunniste* for the result, which the table already gives to the
   machine identifier, so Finnish takes the two ordinary words: *luokittelu* for the act and
   *luokitus* for what a piece of content carries, as *litterointi* and *transkriptio* above. English
   and Spanish use one word for both; a sentence that needs the act says *classify* / *clasificar*.
   Jouni approved the words; no cold reader has read them yet.
-- **2026-09-27** — spending limit, its second column: a step expected to cost more than the whole
+- **2026-09-27**: spending limit, its second column: a step expected to cost more than the whole
   limit starts once, alone, and its real cost is what counts. The words in the three languages stay.
-- **2026-09-26** — spending limit, its second column corrected: the judging of a run's worded
+- **2026-09-26**: spending limit, its second column corrected: the judging of a run's worded
   signals counts toward the limit as its AI steps do, and an AI step starts only while its expected
   cost still fits. The words in the three languages stay.
-- **2026-09-26** — reviewer and visible AI label, with the strict-policy wording of the label and
+- **2026-09-26**: reviewer and visible AI label, with the strict-policy wording of the label and
   the App Catalog's Marks section. The catalog already said *katselmoija* for the person and the
   label already said *tarkistanut* for the act; both stay as they ship, and the row says which is
   which so the next writer does not pick a third. *Merkintä* in *tekoälymerkintä* is the label and
   not the stored entry of the row above; the compound keeps the two apart.
-- **2026-09-25** — workflow and spending limit, with a workflow's per-run cap on AI spend.
+- **2026-09-25**: workflow and spending limit, with a workflow's per-run cap on AI spend.
   *Työnkulku* and *flujo* are what the Workflows page and its notifications already ship; the row
   records them. *Kulukatto* is the word Finnish already uses for a cost cap (Formula 1's budget cap,
   the cap on consumer credit costs), and *límite de gasto* is the plain Spanish. English says
   *spending limit* on a person's surface; *maxCostUsd* is the field. No cold reader has seen them yet.
-- **2026-09-25** — space, section, suggestion and member changes, with the doors through which a
+- **2026-09-25**: space, section, suggestion and member changes, with the doors through which a
   workspace member adds a space or files sections. *Tila* / *espacio* and *osio* / *sección* are what
   the workspace page already shipped; *ehdotus* is the word the decision rules' page already uses for
   what an agent proposes, and *sugerencia* matches the developer's own word, "members suggest". The
   decline button keeps the bell's *Kieltäydy* / *Rechazar*.
-- **2026-10-18** — reference image, verified adult and subscription, with the change log entry for the
+- **2026-10-18**: reference image, verified adult and subscription, with the change log entry for the
   Comicland v3 platform needs. *Mallikuva* is the ordinary Finnish word for a picture one copies a look
   from; *referenssikuva* is an anglicism. *Täysi-ikäiseksi vahvistettu* says what the app learns and
   nothing more. *Tilaus* is the everyday word for a subscription; in Finnish it also means an order,
   so a sentence about one says *kuukausitilaus* or names the period. No cold reader has read them yet.
-- **2026-09-25** — an app's own address and the isolated frame, with the admin Security page's line
+- **2026-09-25**: an app's own address and the isolated frame, with the admin Security page's line
   about how apps are kept apart (audit A7-1). *Eristetty* is the word Finnish IT text already uses
   for isolated (*eristetty ympäristö*); *kehys* is the ordinary word for a frame, and *marco* the
   Spanish one. No cold reader has read them yet.
-- **2026-09-18** — open, visitor, visitor measurement and not signed in, with the App Catalog's
+- **2026-09-18**: open, visitor, visitor measurement and not signed in, with the App Catalog's
   Visitors section (en and fi; the Spanish column is decided here and not yet on a screen).
   *Kävijämittaus* is the word Finnish web analytics already uses. *Kirjautumaton* was chosen over
   *anonyymi*, which promises more than the node knows: the person is not signed in, and nothing
   else is claimed about them. The app's own word stays *sovellus*, as the table already said; the
   catalog's older strings still say *appi* and were left alone.
-- **2026-09-16** — MCP server added, with the Access page's section of its own. *MCP-palvelin* and
+- **2026-09-16**: MCP server added, with the Access page's section of its own. *MCP-palvelin* and
   *servidor MCP* are what the panel already shipped on 2026-09-16 and what Finnish guides use; the
   row records them. Two cold readers, working separately, rejected the same two phrases on evidence:
   "puolestasi toimiva" / "nada de lo que actúa por ti" (a calque of "anything acting for you", with
   no hits in natural text) and "tässä AIMEATissa" / "este AIMEAT", which reads as if there were many.
   The decided *oma AIMEAT* / *tu propio AIMEAT* answers the second.
-- **2026-09-14** — row space added, with the workspace notice that first needed it in all three
+- **2026-09-14**: row space added, with the workspace notice that first needed it in all three
   languages. *Rivitila* is the word the developer and the reporting session were already using in
   Finnish before anything was written down, so the row records it rather than proposing it; *fila*
   is the ordinary Spanish word for a row of a table and needs no compound.
-- **2026-09-12** — written, after a pass over the Memory and Access screens in which cold readers
+- **2026-09-12**: written, after a pass over the Memory and Access screens in which cold readers
   in Finnish and Spanish, working separately, rejected the same two words on evidence. The table's
   decided column records what those screens already shipped rather than proposing anything new.
   Two questions were left open for the developer, and both are now answered below.
-- **2026-09-13** — both settled, and the answers went opposite ways. *Environment* and *server* are
+- **2026-09-13**: both settled, and the answers went opposite ways. *Environment* and *server* are
   BOTH right and both stay, each in its own sense: an environment is one you sign into and browse,
   a server is the machine when the sentence is about the machine. The readers who wanted one word
   for both were reading a distinction the product actually makes. *The house* goes entirely, from
   the twenty-five internal keys that carried it. Ruled by the developer, recorded on the board as
   decision-ymparisto-ja-palvelin-ovat-oikeat-sanat-toiselle-aimeatille-.
-- **2026-09-12, same day** — five concept rows, the heading rule and the placeholder rule added,
+- **2026-09-12, same day**: five concept rows, the heading rule and the placeholder rule added,
   each one named by the A/B test above rather than thought up.
-- **2026-09-13** — conversation, archive and rule, with the Messages list's sections and archive.
+- **2026-09-13**: conversation, archive and rule, with the Messages list's sections and archive.
   *Keskustelu* and *conversación* are what the Messages page already shipped; *arkistoitu* and
   *archivar* were already the words on other pages (organisms, packages, the calibrator), and
   *sääntö* is what the Libraries and Capabilities pages call a rule.
-- **2026-09-20** — decision rule, decision, gate and band, with decision rules on the server.
+- **2026-09-20**: decision rule, decision, gate and band, with decision rules on the server.
   *Päätössääntö* and *portti* were fixed by the developer in the build order; *kaista* is the word
   of his own wish text. *Compuerta* over *puerta* for the gate: it is the word Spanish already uses
   for a thing that lets through or holds back (a sluice, a logic gate), where *puerta* is a way in.
   A cold Spanish reader has not seen it yet.
-- **2026-09-23** — decision provider and local decision model, with providers on the server.
+- **2026-09-23**: decision provider and local decision model, with providers on the server.
   *Päätösmallin tarjoaja* and *paikallinen päätösmalli* are the developer's own words in the ruling
   (decision-the-decision-model-has-providers-jev-is-one-of-them-and-a-lo). *Proveedor* follows
   *proveedor de IA*, which the Spanish AI settings already use; no screen shows the two yet.
-- **2026-09-24** — theme, style, component CSS, theme CSS, built-in, Themes & Styles and look
+- **2026-09-24**: theme, style, component CSS, theme CSS, built-in, Themes & Styles and look
   picker, with the Themes & Styles admin view. The first six are the words of its spec
   (07-themes-and-styles.md) and of the developer's own sentences (*teema*, *tyyli*, *Teemat ja
   tyylit*); *Temas y estilos* is his ruling of 2026-09-24. *Look picker* names what the spec calls
   the pill, because *pill* says nothing to a reader who has not built one.
-- **2026-09-24, same day** — *part* / *osa* / *parte* became *component* / *komponentti* /
+- **2026-09-24, same day**: *part* / *osa* / *parte* became *component* / *komponentti* /
   *componente* for an entry of the interface library, in every row above and on every screen that
   names one (the design lab, Themes & Styles, the MCP tool texts). Ruled by the developer: "the word
   is "component" / "komponentti" everywhere, the lab and the language context too". *Part* stays
   the ordinary word for other things (a block of a page layout, the contents of a package).
-- **2026-09-24, same day** — *shapes* / *muodot* / *formas*, with the Shapes tab of Themes & Styles
+- **2026-09-24, same day**: *shapes* / *muodot* / *formas*, with the Shapes tab of Themes & Styles
   (07 "New components follow the theme"). The spec says "shape values"; on screen the tab and the
   group are *Shapes*, and one row is named by what it shapes ("Corner of a box"), never by its
   token. *Muoto* over *tyyli* or *ulkoasu*, which already name a style and the whole look. The main
   button (the design language's slab) is *pääpainike* / *el botón principal* on these screens.
-- **2026-09-28** — AI provider, capability, model policy, recommended models, transcription,
+- **2026-09-28**: AI provider, capability, model policy, recommended models, transcription,
   transcript, embedding and speech, with the System 2 AI layer (docs/internal/llmproviderintegrations/
   07, section 9). *Litterointi* for the act and *transkriptio* for the text follow Microsoft Teams in
   Finnish ("Tallenna ja litteroi", "Näytä transkriptio"), and the node's screens already said
   *Litteroi*; *upotus* and *upotusmalli* follow Microsoft Learn in Finnish. Ruled by the developer on
   2026-09-28. *Tarjoaja* alone is kept for sentences about AI, so it never collides with the decision
   model's *päätösmallin tarjoaja*.
-- **2026-09-28, same day** — routing, fallback, fixed provider type and local AI server, with the
+- **2026-09-28, same day**: routing, fallback, fixed provider type and local AI server, with the
   provider layer of System 2 (docs/internal/llmproviderintegrations/04 and 11). *Reititys* is the
   plan's own word ("kykyreititys"). *Varalle* follows the plan's "varalla oleva tarjoaja" and
   "siirtyä varalle", a common Finnish phrase, over the anglicism *fallback*. *Palvelin* for the node
   follows the Config tab's existing strings, so a local AI server is *paikallinen tekoälypalvelin*.
   The same day, *model catalogue*, *malliluettelo* (the plan's own word, file 06).
-- **2026-09-28, later** — AI role and binding (wish-tekoalyn-roolit). *Rooli* is the developer's own
+- **2026-09-28, later**: AI role and binding (wish-tekoalyn-roolit). *Rooli* is the developer's own
   word ("roolittaa ne"); *kytkeä* is the word the plan used with him ("kytkee sovelluksen roolin").
   Spanish *vincular* for bind, the usual word for linking an account or a device.
-- **2026-09-28, later** — package, install package, install set, package repository, managed install,
+- **2026-09-28, later**: package, install package, install set, package repository, managed install,
   fork and release channel (wish-asennuspaketit-uusille-nodeille-ja-keskitetty-pakettireposit).
   *Asennuspaketti*, *asennussetti*, *pakettirepository*, *fork* and *julkaisukanava* are the
   developer's own words. The code and the API say *install bundle* for the install package; a
   person reads *install package*. Spanish *copia propia* for fork, because *bifurcación* reads as
   a road splitting.
-- **2026-09-29** — sign-in link (the emailed link, and the dialog's "Email me a sign-in link").
+- **2026-09-29**: sign-in link (the emailed link, and the dialog's "Email me a sign-in link").
   *Kirjautumislinkki* and *enlace de acceso* were already the words of the node's own login-link
   email (email-templates.ts); the code and the API still say *magic link*.
-- **2026-09-28, evening** — which agents an organism admits (agentAccess, reported by omnituinen for a
+- **2026-09-28, evening**: which agents an organism admits (agentAccess, reported by omnituinen for a
   customer's area). *Päästää sisään* is the developer's own phrase from his reply ("mitkä jäsenen
   agentit pääsevät alueelle"), and the Agents section is *Agentit-kohta*, after the section's own
   heading *Agentit*. Spanish *admitir* is the usual word for letting someone into a group.
-- **2026-10-01** — seller and seller node (the Federation page's "how this peer arrived" line). *Myyjä* is
+- **2026-10-01**: seller and seller node (the Federation page's "how this peer arrived" line). *Myyjä* is
   the word of the package-sale design and the developer's marketplace brief; Spanish *vendedor*. The
   line says *lisättiin, kun ... myi sille paketin* and *asennussetti lisäsi*, from the rows above.
-- **2026-10-02** — claim code, automatic renewal and seller of record (package sale design, phase 3). The
+- **2026-10-02**: claim code, automatic renewal and seller of record (package sale design, phase 3). The
   notifications renew the *update service* (*päivityspalvelu*, *servicio de actualizaciones*), the word the
   package_updates_ended notice already used, and the verb is *uusia* / *renovar*. *Código de canje* is the
   usual Latin American word for a code redeemed once.
-- **2026-10-03** — face, base face, added face, licence unknown and fonts in owners' storage, with the
+- **2026-10-03**: face, base face, added face, licence unknown and fonts in owners' storage, with the
   font manager (Themes & Styles → Fonts). *Fontti* and *base setup* are the developer's own words in
   the wish ("omia fontteja", "ettei ne ole base setupista"); *perusasennus* renders base setup.
   Spanish *fuente* is the word the operating systems use. A font's upright or italic is *pysty vai
   kursiivi* / *normal o cursiva* on screen, never *tyyli* / *estilo*, which already name a style of a
   theme.
-- **2026-10-05** — input validation, format and the held button, with the aimeat-validate library and
+- **2026-10-05**: input validation, format and the held button, with the aimeat-validate library and
   the Atelier form (wish-sy-tteiden-validointi-sovelluksiin-yksi-json-schema-ui-lle-a). *Tarkistus* and
   *tarkista* follow the developer's own ask ("validoida", "tiedetään että input on OK") in the words
   the screens already use for a check. *Muoto* meets the Shapes tab's *muodot* only on that tab, and a
   sentence about a typed value names the value ("Y-tunnuksen muoto"). *Täydennä tai korjaa ensin*
   covers a field left empty and a field filled in wrong; *täytä ensin* covered only the first, and the
   browser check on 2026-10-05 showed the line naming a field that was filled in but did not match.
-- **2026-10-31** — generation rule and deep fake, with the AI page's rules section
+- **2026-10-31**: generation rule and deep fake, with the AI page's rules section
   (wish-image-and-video-generation-people-only-in-an-artistic-non-ph). *Kuvasääntö* is short and
   Finnish, and a video is a moving picture; on screen the section says what it covers ("Säännöt
   tekoälyn kuville ja videoille"). The exception and its reason take the classification words

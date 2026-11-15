@@ -589,10 +589,15 @@
       "digest": "sha256:fb6e147170d4550815e52875"
     },
     "project:aimeat-organism-records": {
-      "reviewedOn": "2026-11-14",
-      "watches": [],
-      "digest": "",
-      "note": "It describes records on the node, Lifecycle Central and ids in CLAUDE.md, not code in this tree, so the age limit is its only check; its frontmatter carries a review-by date."
+      "reviewedOn": "2026-11-15",
+      "watches": [
+        "aimeat/src/services/exchange-odps.ts",
+        "aimeat/src/static/sdk-libs/exchange/odps-completeness.js",
+        "docs/known_gaps.md",
+        ".claude/agents/note-writer.md"
+      ],
+      "digest": "sha256:5c6e4e0ccf316c4c7f920643",
+      "note": "Most of it is about records on the node and Lifecycle Central; the code it makes claims about is the ODPS descriptor and its completeness list (which fields a validator reports missing), the known-gaps rule, and the decision_record call it shares with agent note-writer. Its frontmatter also carries a review-by date."
     },
     "project:aimeat-pages-links": {
       "reviewedOn": "2026-11-14",
@@ -602,20 +607,23 @@
       "digest": "sha256:94f87e79d7393ecec8cc6023"
     },
     "project:aimeat-video": {
-      "reviewedOn": "2026-09-19",
-      "watches": [],
-      "digest": "",
-      "note": "Its tools are gitignored and live on the developer's main machine only."
+      "reviewedOn": "2026-11-15",
+      "watches": [
+        "assets/video/youtube-metadata.md"
+      ],
+      "digest": "sha256:dfc669f2ad9fb438b544b8ba",
+      "note": "Its tools (aimeat/scripts/demo-video/) and masters (genimages/) are gitignored and live on the developer's main machine only, so a watch cannot reach them; the tracked file it describes is the house-style metadata of the published clips."
     },
     "project:aimeat-writing": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/i18n.ts",
         "aimeat/scripts/locale-merge.ts",
-        ".githooks/commit-msg"
+        ".githooks/commit-msg",
+        "aimeat/scripts/check-commit-msg.ts"
       ],
-      "digest": "sha256:81c44f03b6a2f8afc5b496f9",
-      "note": "The locale loop it teaches, and the commit-msg hook whose limits it states."
+      "digest": "sha256:3af886aedfdc6e79b3238e27",
+      "note": "The locale loop it teaches, and the commit-msg hook whose limits it states (the limits themselves are in check-commit-msg.ts, which its eval grader within-hook-limits also mirrors)."
     },
     "project:security-audit": {
       "reviewedOn": "2026-11-14",
@@ -652,10 +660,13 @@
       "note": "Its verification runs against the shared stub harness; its contract is node:aimeat-subagent-brief, which the lead pastes into the brief."
     },
     "agent:note-writer": {
-      "reviewedOn": "2026-11-14",
-      "watches": [],
-      "digest": "",
-      "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names, not about code in this tree."
+      "reviewedOn": "2026-11-15",
+      "watches": [
+        "docs/pitfalls.md",
+        ".claude/skills/aimeat-organism-records/SKILL.md"
+      ],
+      "digest": "sha256:d48c77a254b92b53be8a3ba2",
+      "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
       "reviewedOn": "2026-11-15",
@@ -850,15 +861,23 @@
       ".githooks/pre-commit": "ba558088830eb13c",
       "aimeat/src/services/build-extension-prompt.ts": "84604622f15b4196"
     },
-    "project:aimeat-organism-records": {},
+    "project:aimeat-organism-records": {
+      "aimeat/src/services/exchange-odps.ts": "40876b1432ca4b0a",
+      "aimeat/src/static/sdk-libs/exchange/odps-completeness.js": "3ece888a8069ba12",
+      "docs/known_gaps.md": "9b4977634dac65c3",
+      ".claude/agents/note-writer.md": "14642ac19048c31a"
+    },
     "project:aimeat-pages-links": {
       "aimeat/src/routes/organisms/workspace-ops.ts": "35d1a080316443d1"
     },
-    "project:aimeat-video": {},
+    "project:aimeat-video": {
+      "assets/video/youtube-metadata.md": "2be6bc1f45851846"
+    },
     "project:aimeat-writing": {
       "aimeat/src/i18n.ts": "d2d70c782a9c5e45",
       "aimeat/scripts/locale-merge.ts": "e1c28235732aafa5",
-      ".githooks/commit-msg": "5847fa5992870104"
+      ".githooks/commit-msg": "5847fa5992870104",
+      "aimeat/scripts/check-commit-msg.ts": "2e459b8378b1085d"
     },
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "4d2c13ef4ace9e0e",
@@ -1039,7 +1058,10 @@
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
-    "agent:note-writer": {},
+    "agent:note-writer": {
+      "docs/pitfalls.md": "a4b76ae5fd91a72f",
+      ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
+    },
     "agent:ui-conformance": {
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
     },
