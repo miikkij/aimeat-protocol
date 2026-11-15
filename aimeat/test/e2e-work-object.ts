@@ -205,7 +205,9 @@ await test('8. KEPT: a row stored before the rule, with a string input and outpu
     const { tasks } = await withStorage(s => s.listAgentTasks(providerGaii));
     const task = tasks.find(t => t.workTrackingCode === tc);
     assert(task, `a task for ${tc} (owner ${providerOwnerName})`);
-    assert(JSON.stringify(task.scope) === JSON.stringify([{ name: 'input', value: '"an old text input"', type: 'text' }]),
+    // Field by field: PostgreSQL's jsonb does not keep the key order.
+    const only = task.scope.length === 1 ? task.scope[0] : undefined;
+    assert(only?.name === 'input' && only.value === '"an old text input"' && only.type === 'text',
         `one field input holding the old value as JSON: ${JSON.stringify(task.scope)}`);
 
     await withStorage(s => s.updateWork(tc, { output: 'an old text output' as unknown as Record<string, unknown>, updatedAt: new Date().toISOString() }));
