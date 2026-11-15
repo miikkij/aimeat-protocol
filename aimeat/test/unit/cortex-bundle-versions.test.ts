@@ -15,6 +15,8 @@
  *   version recorded here alongside a hash of the pack's bytes. Change the code and the hash moves,
  *   and this fails until the version is bumped with it.
  * @version-history
+ *   v1.1.3 -- 2026-11-15 -- aimeat-canvas 1.0.2 recorded, bumped with its save fix (create, then
+ *     update with the version).
  *   v1.1.2 -- 2026-11-05 -- aimeat-i18n 1.4.1 recorded, bumped with its useProfile and withZone fixes
  *     (codebase analysis 2026-11-03, decision 10b of 2026-11-05).
  *   v1.1.1 -- 2026-09-13 -- aimeat-charts 1.1.3, aimeat-surface 1.2.0 and aimeat-ui-motion 1.0.2
@@ -56,7 +58,7 @@ const dir = fileURLToPath(new URL('../../public/cortex-bundled/', import.meta.ur
  * a decision and not maintenance.
  */
 const KNOWN: Record<string, { version: string; sha256: string }> = {
-    'aimeat-canvas': { version: '1.0.1', sha256: '297f5f807074e0dd' },
+    'aimeat-canvas': { version: '1.0.2', sha256: '06570c624375c63c' },
     'aimeat-charts': { version: '1.1.3', sha256: 'cdc21136313d147f' },
     'aimeat-dag': { version: '1.1.4', sha256: '56fff8df06d77259' },
     'aimeat-flow': { version: '1.0.1', sha256: '1634ee00cbb0099d' },

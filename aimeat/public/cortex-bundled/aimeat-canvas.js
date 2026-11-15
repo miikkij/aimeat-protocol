@@ -16,6 +16,11 @@
  *       nodeUrl: 'http://localhost:40050'
  *     });
  *   </script>
+ *
+ * @version-history
+ *   1.0.2 — 2026-11-15 — Save creates the record with POST /v1/memory (expected_version 0) and
+ *     updates it with the version the node returned. The update route needs a version and answers
+ *     404 for a new key, so every save had failed with "Save failed".
  */
 (function (AIMEAT) {
   'use strict';
@@ -710,6 +715,7 @@
     var currentStroke = null; // Stroke being drawn right now.
     var isDrawing = false;
     var createdAt = '';     // Timestamp of first save (preserved across undo/clear).
+    var recordVersion = null; // Version of the stored record, null while none is known to exist.
 
     var activeTool = enabledTools[0] || 'pen';
     var activeColor = '#000000';
@@ -1207,7 +1213,6 @@
         createdAt = drawingData.metadata.createdAt;
       }
 
-      var url = nodeUrl + '/v1/memory/' + encodeURIComponent(storageKey);
       var headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
@@ -1218,17 +1223,63 @@
 
       setStatus('Saving...');
 
-      return fetch(url, {
-        method: 'PUT',
-        headers: headers,
-        body: JSON.stringify({ value: drawingData })
-      })
-        .then(function (res) {
-          if (!res.ok) {
-            throw new Error('HTTP ' + res.status + ' saving drawing');
-          }
+      // The node's update route (PUT /v1/memory/{key}) needs the version the caller read and answers
+      // 404 for a key that does not exist yet, so a first save creates the record with
+      // POST /v1/memory and expected_version 0 (create only if absent), and every later save updates
+      // with the version the node last returned. A 404 on update (the record was deleted) or a 409
+      // (another window saved) reads the current version once and writes again, which keeps the
+      // last-write-wins behaviour this canvas has always had.
+      function writeOnce() {
+        if (recordVersion === null) {
+          return fetch(nodeUrl + '/v1/memory', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ key: storageKey, value: drawingData, expected_version: 0 })
+          });
+        }
+        return fetch(nodeUrl + '/v1/memory/' + encodeURIComponent(storageKey), {
+          method: 'PUT',
+          headers: headers,
+          body: JSON.stringify({ value: drawingData, version: recordVersion })
+        });
+      }
+
+      function readVersion() {
+        var readHeaders = { 'Accept': 'application/json' };
+        if (token) readHeaders['Authorization'] = 'Bearer ' + token;
+        return fetch(nodeUrl + '/v1/memory/' + encodeURIComponent(storageKey) + '?soft=1', { headers: readHeaders })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status + ' reading the drawing version');
+            return res.json();
+          })
+          .then(function (body) {
+            var d = body && body.data;
+            recordVersion = d && d.exists && typeof d.version === 'number' ? d.version : null;
+          });
+      }
+
+      function settle(res) {
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status + ' saving drawing');
+        }
+        return res.json().then(function (body) {
+          var v = body && body.data && body.data.version;
+          if (typeof v === 'number') recordVersion = v;
           setStatus('Saved');
-          return res.json();
+          return body;
+        });
+      }
+
+      return writeOnce()
+        .then(function (res) {
+          if (res.status === 404 && recordVersion !== null) {
+            recordVersion = null;
+            return writeOnce().then(settle);
+          }
+          if (res.status === 409) {
+            return readVersion().then(writeOnce).then(settle);
+          }
+          return settle(res);
         })
         .catch(function (err) {
           setStatus('Save failed');
@@ -1263,7 +1314,8 @@
       return fetch(url, { headers: headers })
         .then(function (res) {
           if (res.status === 404) {
-            // No saved drawing — start fresh.
+            // No saved drawing — start fresh; the first save creates the record.
+            recordVersion = null;
             setStatus('New drawing');
             return null;
           }
@@ -1274,6 +1326,11 @@
         })
         .then(function (response) {
           if (!response) return;
+
+          // The version the next save sends to the update route.
+          if (response.data && typeof response.data.version === 'number') {
+            recordVersion = response.data.version;
+          }
 
           // Extract from AIMEAT response envelope.
           var data = response && response.data && response.data.value;
