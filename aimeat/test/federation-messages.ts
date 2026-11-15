@@ -9,6 +9,10 @@
  *   Node B: port 28271, aimeat-node-001-msgb
  *
  * @version-history
+ *   2026-11-15 -- 7c: an agent of a blocked person is refused on the recipient's node; 10b: the
+ *     operator's agent with operator:admin broadcasts federation-wide, lands in a peer owner's inbox
+ *     (the receiving node reads the sender's operators from its node card) and not with a person who
+ *     blocked the operator (E2E audit M075, M181).
  *   2026-10-23 -- setupOwner uses setupOperator and mintOwnerToken the password sign-in; POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 --The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -425,6 +429,22 @@ await test('7b. The blocked message never reaches the recipient\'s mailbox on th
         `the pre-block message must still be in Bob's inbox: ${JSON.stringify(msgs.map(m => m.body))}`);
 });
 
+// E2E audit M075 across nodes: node B read the block for the exact sender identity, so a blocked
+// person reached the recipient through any agent of theirs.
+await test('7c. REFUSED — an agent of the blocked Alice is refused on the other node too, and nothing reaches Bob', async () => {
+    const bot = await createAgentOn(A!, A!.ownerName, A!.ownerToken, `ablocked${ts}`, ['messages:send']);
+    const send = await A!.json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${bot.token}` },
+        body: JSON.stringify({ to: B!.ownerGhii, body: 'through my agent, past the block' }),
+    });
+    assert(send.status === 201, `send status ${send.status}: ${JSON.stringify(send.body)}`);
+    assert(send.body.data.message.status === 'undeliverable', `expected undeliverable, got ${send.body.data.message.status}`);
+    const reqs = await B!.json('/v1/messages/requests', { headers: { Authorization: `Bearer ${B!.ownerToken}` } });
+    assert(!(reqs.body.data.requests ?? []).some((x: any) => x.contactId === bot.gaii), 'no request from the blocked person\'s agent');
+    const inbox = await B!.json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${B!.ownerToken}` } });
+    assert(!(inbox.body.data.messages ?? []).some((m: any) => m.body === 'through my agent, past the block'), 'nothing in Bob\'s inbox');
+});
+
 await test('8. Cross-node DM to an AGENT: the agent reads it AND its owner sees it', async () => {
     // Fresh owner on B (independent of the operator Bob, who blocked Alice above) + an agent with read.
     const owner = await registerOwnerOn(B!, `bagent${ts}`);
@@ -528,6 +548,32 @@ await test('10. Operator broadcasts to the whole federation; a peer owner receiv
     assert(msg !== undefined, 'B owner received the federation announcement in their inbox');
     assert(msg.senderGhii === A!.ownerGhii, `from A operator, got ${msg.senderGhii}`);
     assert(msg.respondable === false, 'an announcement is non-respondable');
+});
+
+// The receiving node now asks the sending node's card who its operators are (E2E audit M181), and an
+// operator's agent holding operator:admin may announce as the operator does. Bob blocked Alice in
+// test 7, so the same broadcast must not reach him through her agent (M075).
+await test('10b. The operator\'s AGENT broadcasts federation-wide: a peer owner gets it in the inbox; Bob, who blocked the operator, does not', async () => {
+    const bUser = await registerOwnerOn(B!, `bcagent${ts}`);
+    const bot = await createAgentOn(A!, A!.ownerName, A!.ownerToken, `aop${ts}`, ['messages:send', 'operator:admin']);
+    const bc = await A!.json('/v1/messages/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${bot.token}` },
+        body: JSON.stringify({ audience: 'federation-users', mode: 'announcement', body: 'Notice from the operator agent.' }),
+    });
+    assert(bc.status === 201, `broadcast ${bc.status}: ${JSON.stringify(bc.body)}`);
+    let msg: any;
+    for (let i = 0; i < 25; i++) {
+        const inbox = await B!.json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bUser.token}` } });
+        msg = (inbox.body?.data?.messages ?? []).find((m: any) => m.body === 'Notice from the operator agent.');
+        if (msg) break;
+        await sleep(150);
+    }
+    assert(msg !== undefined, 'the peer owner received the agent\'s announcement in their inbox');
+    assert(msg.senderGhii === bot.gaii, `from the operator's agent, got ${msg.senderGhii}`);
+    const bobInbox = await B!.json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${B!.ownerToken}` } });
+    assert(!(bobInbox.body.data.messages ?? []).some((m: any) => m.body === 'Notice from the operator agent.'), 'Bob blocked Alice: her agent\'s announcement must not reach him');
+    const bobReqs = await B!.json('/v1/messages/requests', { headers: { Authorization: `Bearer ${B!.ownerToken}` } });
+    assert(!(bobReqs.body.data.requests ?? []).some((x: any) => x.contactId === bot.gaii), 'nor his requests');
 });
 
 await test('11. A non-operator cannot broadcast to the federation (403)', async () => {

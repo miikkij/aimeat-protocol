@@ -20,6 +20,10 @@
  *   summary and resolve · 5 package repository doors
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-limits
  * @version-history
+ *   2026-11-15 — M's node card answers at M's address (startMCard), naming M's operators. B3: a
+ *     broadcast from a person of M who is not its operator lands as a request; B4: one from an agent
+ *     of M's operator lands in the inbox; B5: a block on a person of M holds back that person's agent
+ *     (E2E audit M181, M075). B2 is unchanged and passes because its sender is on the card.
  *   2026-10-22 — R2 gives the person's sign-in consent for M before the push-home replicate, and R2a
  *     shows the same replicate without it is 403 CONSENT_REQUIRED with nothing stored (secaudit
  *     2026-10 wave 3, v71; test change approved by the developer on 2026-10-22).
@@ -50,6 +54,29 @@ const FAKE_NODE = 'aimeat-peer-001-peerlimf';
 let V: NodeState;
 let mKeys: { publicKey: string; privateKey: string };
 let fake: { server: import('node:http').Server; url: string };
+
+/** M's operators as its node card names them. `op2` is the one V's person blocks in B5. */
+const M_OPERATORS = [`op@${M_NODE}`, `op2@${M_NODE}`];
+
+/**
+ * M's node card at M's own address (localhost:49981), the one thing V reads from M: a broadcast
+ * auto-accepts a new contact only for a sender M names as its operator there (E2E audit M181). Every
+ * other path is dropped without an answer, as when nothing listened on the port.
+ */
+async function startMCard(): Promise<import('node:http').Server> {
+    const http = await import('node:http');
+    const server = http.createServer((req, res) => {
+        if ((req.url ?? '').split('?')[0] !== '/v1/federation/node-card') { req.socket.destroy(); return; }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, data: {
+            node_id: M_NODE, url: 'http://localhost:49981', listed: true,
+            operators: M_OPERATORS.map(ghii => ({ ghii, display_name: ghii, avatar: null })),
+        } }));
+    });
+    await new Promise<void>(resolve => server.listen(49981, resolve));
+    return server;
+}
+let mCard: import('node:http').Server;
 
 /** The paths whose message signs no send time of its own, so they carry the delivery proof. */
 const DELIVERY_PATHS = new Set(['/v1/federation/replicate', '/v1/federation/message/receipt', '/v1/federation/catalogue-sync']);
@@ -101,6 +128,7 @@ await test('Boot V (package repository on), an operator with an agent, member pe
     });
     assert(agent.status === 201, `create agent: ${agent.status} ${JSON.stringify(agent.body)}`);
     mKeys = await generateKeyPair();
+    mCard = await startMCard();
     await addPeer(V, M_NODE, 'http://localhost:49981', mKeys.publicKey);
     const pKeys = await generateKeyPair();
     await addPeer(V, P_NODE, 'http://localhost:49982', pKeys.publicKey, { tier: 'contact' });
@@ -191,6 +219,48 @@ await test('B2. A broadcast from a person of M is delivered (the positive contro
     });
     assert(r.status === 200 && r.body.data?.delivered >= 1, `broadcast: ${r.status} ${JSON.stringify(r.body)}`);
     assert((await inboxBodies()).includes(honest), 'the announcement lands in the inbox');
+});
+
+const requestsOf = async (): Promise<any[]> =>
+    (await V.json('/v1/messages/requests', { headers: auth(V.ownerToken) })).body.data?.requests ?? [];
+
+// E2E audit M181. A broadcast opened a new contact as accepted for whatever person of M it named, so
+// any person of a linked peer could reach every inbox here. Only a sender M's own node card names as
+// its operator is auto-accepted; anyone else lands as an ordinary first message.
+await test('B3. REFUSED auto-accept — a broadcast from a person of M who is not M\'s operator lands as a request, not in the inbox', async () => {
+    const sender = `someone${ts}@${M_NODE}`;
+    const body = `not an operator ${ts}`;
+    const r = await asM('/v1/federation/broadcast', {
+        source_node: M_NODE, broadcast: { senderGhii: sender, body, broadcastId: randomUUID() }, timestamp: new Date().toISOString(),
+    });
+    assert(r.status === 200 && r.body.data?.delivered >= 1, `broadcast: ${r.status} ${JSON.stringify(r.body)}`);
+    assert(!(await inboxBodies()).includes(body), 'a broadcast from a non-operator must not land in the inbox');
+    assert((await requestsOf()).some(x => x.contactId === sender), 'it waits in the requests, like any first message');
+    const contact = await V.storage.getContact(V.ownerGhii, sender);
+    assert(contact?.state === 'pending', `the contact is pending, got ${contact?.state}`);
+});
+
+await test('B4. A broadcast from an AGENT of M\'s operator lands in the inbox (the operator\'s agent may announce)', async () => {
+    const body = `from the operator's agent ${ts}`;
+    const r = await asM('/v1/federation/broadcast', {
+        source_node: M_NODE, broadcast: { senderGhii: `bot#op@${M_NODE}`, body, broadcastId: randomUUID() }, timestamp: new Date().toISOString(),
+    });
+    assert(r.status === 200 && r.body.data?.delivered >= 1, `broadcast: ${r.status} ${JSON.stringify(r.body)}`);
+    assert((await inboxBodies()).includes(body), 'the announcement lands in the inbox');
+});
+
+// E2E audit M075 on the broadcast path: a block on a person held back that exact identity only.
+await test('B5. REFUSED — a person who blocked M\'s operator op2 gets nothing from op2\'s agent either', async () => {
+    const block = await V.json(`/v1/messages/contacts/${encodeURIComponent(`op2@${M_NODE}`)}/block`, { method: 'POST', headers: auth(V.ownerToken) });
+    assert(block.status === 200, `block op2: ${block.status} ${JSON.stringify(block.body)}`);
+    const body = `from op2's agent ${ts}`;
+    const r = await asM('/v1/federation/broadcast', {
+        source_node: M_NODE, broadcast: { senderGhii: `bot#op2@${M_NODE}`, body, broadcastId: randomUUID() }, timestamp: new Date().toISOString(),
+    });
+    assert(r.status === 200, `broadcast: ${r.status} ${JSON.stringify(r.body)}`);
+    assert(!(await inboxBodies()).includes(body), 'the blocked person\'s agent must not reach the inbox');
+    assert(!(await requestsOf()).some(x => x.contactId === `bot#op2@${M_NODE}`), 'nor the requests');
+    assert(!(await V.storage.getContact(V.ownerGhii, `bot#op2@${M_NODE}`)), 'no contact row is written for the agent');
 });
 
 // ── 3. Key exchange roster (S6-04) ──
@@ -301,6 +371,8 @@ await test('P4. A claim signed with the key it names is heard once, and refused 
 
 await new Promise<void>(resolve => V.server.close(() => resolve()));
 await new Promise<void>(resolve => fake.server.close(() => resolve()));
+mCard?.closeAllConnections();
+await new Promise<void>(resolve => (mCard ? mCard.close(() => resolve()) : resolve()));
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 process.exit(failed > 0 ? 1 : 0);

@@ -5,6 +5,11 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — The broadcast opens a new contact as accepted only for a sender the peer names as
+ *     its operator on its node card (federation-book.ts readPeerOperators), or an agent of one; any
+ *     other sender of the peer lands as a contact request with the request bell (E2E audit M181).
+ *     The message and the broadcast also refuse a sender whose person the recipient blocked
+ *     (contact-same-account.ts blockedSenderAccount; E2E audit M075).
  *   2026-11-14 — notify() passes i18n so the notification is written in its recipient's language
  *     (notiftext.direct_message, direct_message_request, direct_message_announcement).
  *   2026-11-05 — The replicate, message, broadcast, receipt and storage grant doors declare the
@@ -111,8 +116,9 @@ import {
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../services/resource-events.js';
 import { notify } from '../../services/notify.js';
-import { parseGaiiLoose, isSameOwner, localAccountName, localAccountOf } from '../../utils/gaii.js';
-import { acceptedSameAccount } from '../../services/contact-same-account.js';
+import { parseGaiiLoose, isSameOwner, localAccountName, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
+import { acceptedSameAccount, blockedSenderAccount } from '../../services/contact-same-account.js';
+import { readPeerOperators } from '../../services/federation-book.js';
 import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
 import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message-alias.js';
 import { listOperatorGhiis } from '../../services/operators.js';
@@ -431,8 +437,10 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         }
 
         // First-contact gate is the OWNER's (they decide who may reach them and their agents).
+        // A block on the sender's person holds back their agents and apps too; the sender is on the
+        // signing node (SENDER_NOT_OF_PEER above), so its owner GHII names a person of that node.
         const contact = await storage.getContact(deliveryGhii, message.senderGhii);
-        if (contact?.state === 'blocked') {
+        if (contact?.state === 'blocked' || await blockedSenderAccount(storage, deliveryGhii, String(message.senderGhii))) {
             res.status(403).json(error(config.nodeId, 'BLOCKED', 'Recipient is not accepting messages from this sender'));
             return;
         }
@@ -604,15 +612,25 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         // the other side of a trust boundary, and it lands in a row every human on this node sees.
         const rawSubject = typeof broadcast.subject === 'string' ? broadcast.subject.trim() : '';
         const peerSubject = rawSubject ? rawSubject.slice(0, 200) : undefined;
+        // An operator announcement opens a new contact as accepted, so it lands in the inbox. That is
+        // granted only to a sender the peer names as its operator on its own node card, read from the
+        // address this node pinned for the peer; an agent of such an operator counts, as on the sending
+        // side (an operator's agent with operator:admin may broadcast). Any other sender of the peer
+        // lands like an ordinary first message: a contact request (E2E audit M181).
+        const card = await readPeerOperators(peer, config.federationTimeoutMs ?? 5_000);
+        if (!card.ok) logger.info('POST /v1/federation/broadcast: the peer operator could not be read; new contacts land as requests', { peer: source_node, detail: card.detail });
+        const fromPeerOperator = card.ok && card.operators.includes(ownerGhiiOf(senderGhii));
         const now = new Date().toISOString();
         const ghiis = await storage.listGHIIs();
         let delivered = 0;
         for (const g of ghiis) {
             try {
                 if (g.ghii === senderGhii) continue; // don't deliver back to the sender if they're local
-                // Respect a block: a recipient who blocked the sender does NOT get the announcement.
+                // Respect a block: a recipient who blocked the sender, or the sender's person, does NOT
+                // get the announcement (contact-same-account.ts blockedSenderAccount).
                 const existing = await storage.getContact(g.ghii, senderGhii).catch(err => { logger.warn('POST /v1/federation/broadcast: continuing after a suppressed failure', { error: String(err) }); return null; });
                 if (existing?.state === 'blocked') continue;
+                if (await blockedSenderAccount(storage, g.ghii, senderGhii)) continue;
                 // A TITLED announcement opens a thread of its own, the same rule sendDirectMessage
                 // applies locally. Dropping it into the deterministic pair thread instead would bury
                 // it under whatever that thread was already called: the list takes the EARLIEST
@@ -622,7 +640,14 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 const conversationId = peerSubject ? randomUUID() : conversationIdFor(senderGhii, g.ghii);
                 const id = randomUUID();
                 // Operator announcement: auto-accept a NEW contact so it lands in the inbox, not requests.
-                if (!existing) await storage.setContactState(g.ghii, senderGhii, 'accepted', id).catch(err => { logger.warn('POST /v1/federation/broadcast: best-effort', { error: String(err) }); });
+                // Another sender of the peer is accepted only where the recipient already accepted an
+                // agent of the sender's account, the rule an ordinary first message follows.
+                let state = existing?.state;
+                if (!existing) {
+                    state = fromPeerOperator || await acceptedSameAccount(storage, g.ghii, senderGhii) ? 'accepted' : 'pending';
+                    await storage.setContactState(g.ghii, senderGhii, state, id).catch(err => { logger.warn('POST /v1/federation/broadcast: best-effort', { error: String(err) }); });
+                }
+                const isRequest = state === 'pending';
                 await storage.createDirectMessage({
                     id, ownerGhii: g.ghii, conversationId, senderGhii, recipientGhii: g.ghii,
                     subject: peerSubject,
@@ -631,7 +656,14 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                     status: 'delivered', direction: 'inbound', origin: 'federation', originNodeId: source_node,
                     createdAt: broadcast.createdAt ?? now, deliveredAt: now,
                 });
-                await notify(storage, g.ghii, {
+                await notify(storage, g.ghii, isRequest ? {
+                    // A held first contact: the same bell an ordinary first message rings.
+                    type: 'direct_message_request',
+                    title: `${senderGhii} wants to message you`,
+                    body: messagePreview(broadcast.body ?? ''),
+                    link: `/v1/profile#inbox/req:${conversationId}`,
+                    i18n: { key: 'direct_message_request', vars: { who: senderGhii, preview: messagePreview(broadcast.body ?? '') } },
+                } : {
                     type: 'direct_message',
                     title: `Announcement from ${senderGhii}`,
                     body: messagePreview(broadcast.body ?? ''),

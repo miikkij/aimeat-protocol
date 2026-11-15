@@ -10,6 +10,8 @@
 //   and each agent to its names; without it both are whole.
 // v1.4.0 -- 2026-11-08 -- 2b: a request carries `body`, its whole first message with line breaks (cut at
 //   4000), equal in /requests and the overview; another owner and the recipient's agent do not read it.
+// v1.5.0 -- 2026-11-15 -- 12b-12d: a block on a person refuses that person's agent too; the agent still
+//   reaches someone else; a block on one agent refuses that agent and not its owner (E2E audit M075).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -286,6 +288,36 @@ await test('12. Bob blocks Mallory proactively; Mallory send is rejected', async
     // Nothing landed in Bob's inbox or requests from Mallory.
     const reqs = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${bob.token}` } });
     assert(reqs.body.data.requests.find((x: any) => x.contactId === mal.ghii) === undefined, 'no request from blocked Mallory');
+});
+
+// E2E audit M075: a block was read for the exact sender, so Mallory reached Bob through her agent.
+const dm = (token: string, to: string, body: string) => json('/v1/messages', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ to, body }) });
+const requestIds = async (token: string): Promise<string[]> =>
+    ((await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${token}` } })).body.data.requests ?? []).map((x: any) => x.contactId);
+await test('12b. REFUSED — after Bob blocks Mallory, Mallory\'s AGENT is refused too, and nothing reaches Bob', async () => {
+    const malBot = await createAgent(malName, mal.token, `malbot${stamp}`, ['messages:send']);
+    const send = await dm(malBot.token, bob.ghii, 'spam through my agent');
+    assert(send.status === 403 && send.body.error?.code === 'BLOCKED', `a blocked person's agent: expected 403 BLOCKED, got ${send.status}: ${JSON.stringify(send.body)}`);
+    assert(!(await requestIds(bob.token)).includes(malBot.gaii), 'no request from the blocked person\'s agent');
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(!(inbox.body.data.messages ?? []).some((m: any) => m.body === 'spam through my agent'), 'nothing from the agent in Bob\'s inbox');
+});
+await test('12c. The same agent still reaches someone who has not blocked Mallory (the block is Bob\'s alone)', async () => {
+    const malBot2 = await createAgent(malName, mal.token, `malbot2${stamp}`, ['messages:send']);
+    const send = await dm(malBot2.token, alice.ghii, 'hello Alice from Mallory\'s agent');
+    assert(send.status === 201, `send to a person who did not block: ${send.status} ${JSON.stringify(send.body)}`);
+    assert((await requestIds(alice.token)).includes(malBot2.gaii), 'Alice holds it as an ordinary first-contact request');
+});
+await test('12d. A block on ONE agent keeps working as before, and its owner still reaches the recipient', async () => {
+    const carol = await registerOwner(`dmcarol${stamp}`);
+    const carolBot = await createAgent(`dmcarol${stamp}`, carol.token, `carolbot${stamp}`, ['messages:send']);
+    const block = await json(`/v1/messages/contacts/${encodeURIComponent(carolBot.gaii)}/block`, { method: 'POST', headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(block.status === 200, `block the agent: ${block.status} ${JSON.stringify(block.body)}`);
+    const byAgent = await dm(carolBot.token, bob.ghii, 'from the blocked agent');
+    assert(byAgent.status === 403 && byAgent.body.error?.code === 'BLOCKED', `the blocked agent: ${byAgent.status} ${JSON.stringify(byAgent.body)}`);
+    const byPerson = await dm(carol.token, bob.ghii, 'from Carol herself');
+    assert(byPerson.status === 201, `the agent's owner is not blocked: ${byPerson.status} ${JSON.stringify(byPerson.body)}`);
+    assert((await requestIds(bob.token)).includes(carol.ghii), 'Carol lands as an ordinary request');
 });
 
 console.log('\nPhase 6 -- Validation');

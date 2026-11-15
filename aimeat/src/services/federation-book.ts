@@ -16,6 +16,7 @@
  *   - buildNodeCard(config, storage) — this node's card (or { listed:false } when opted out)
  *   - bookSignString() · legacyBookSignString() · verifyBookSignature() · getActiveBook() · storeActiveBook()
  *   - assembleBook(config, storage, peers) — primary: fetch peer cards + own → sign → store
+ *   - readPeerOperators(peer, timeoutMs) — the operator GHIIs a peer's own node card names
  * @usage import { buildNodeCard, assembleBook, getActiveBook } from './federation-book.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial federation book (node-card + primary assembly + signed doc).
@@ -32,6 +33,9 @@
  *   v1.1.1 — 2026-11-01 — assembleBook reads each peer's node card under NODE_CARD_MAX_BYTES and
  *     skips a card over it with a warning; pullBook reads the book under BOOK_MAX_BYTES and answers
  *     FETCH_FAILED over it. Both used resp.json() with no ceiling (secaudit2026oct31w2 round 11).
+ *   v1.2.0 — 2026-11-15 — readPeerOperators(): the operator GHIIs a peer's node card names, read
+ *     from the peer record's url under NODE_CARD_MAX_BYTES, for POST /v1/federation/broadcast, which
+ *     auto-accepts a new contact only for a sender the peer names as its operator (E2E audit M181).
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -170,6 +174,38 @@ export async function buildNodeCard(config: AimeatConfig, storage: Storage): Pro
   const stable = Object.fromEntries(Object.entries(card).filter(([k]) => k !== 'node_card_hash' && k !== 'computed_at'));
   card.node_card_hash = sha256(JSON.stringify(stable));
   return card;
+}
+
+/**
+ * The operator GHIIs a peer publishes on its node card (GET /v1/federation/node-card), read from the
+ * url in this node's peer record. A card for another node id, an unlisted card (the node opted out of
+ * the book), an unreachable peer or a card over NODE_CARD_MAX_BYTES answers ok:false. Never throws.
+ *
+ * What it proves: the peer at the address this node pinned names these people as its operators,
+ * publicly, now. It is the peer's own word, the same peer that signs its broadcasts, so it binds a
+ * broadcast's sender to a public statement rather than to a field of the broadcast itself.
+ */
+export async function readPeerOperators(
+  peer: Pick<PeerInfo, 'nodeId' | 'url'>, timeoutMs: number,
+): Promise<{ ok: true; operators: string[] } | { ok: false; detail: string }> {
+  try {
+    const base = peer.url.replace(/\/+$/, '');
+    const check = await validateOutboundUrl(base);
+    if (!check.valid) return { ok: false, detail: check.reason ?? 'The peer address is not allowed.' };
+    // safeFetch re-validates each redirect hop; the address is remote-supplied (CodeQL request-forgery).
+    const resp = await safeFetch(`${base}/v1/federation/node-card`, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!resp.ok) {
+      // The status is the answer; the body is only released.
+      await resp.body?.cancel().catch(err => logger.warn('readPeerOperators: releasing the body failed', { error: String(err) }));
+      return { ok: false, detail: `HTTP ${resp.status}` };
+    }
+    const card = (await readJson(resp, NODE_CARD_MAX_BYTES) as { data?: NodeCard })?.data;
+    if (!card || card.node_id !== peer.nodeId) return { ok: false, detail: 'The card names another node.' };
+    if (!card.listed || !Array.isArray(card.operators)) return { ok: false, detail: 'The card lists no operators.' };
+    return { ok: true, operators: card.operators.map(o => o?.ghii).filter((g): g is string => typeof g === 'string' && !!g) };
+  } catch (err) {
+    return { ok: false, detail: String(err).slice(0, 200) };
+  }
 }
 
 /**

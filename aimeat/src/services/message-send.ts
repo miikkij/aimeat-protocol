@@ -11,6 +11,10 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.15.0 — 2026-11-15 — The block check for a local recipient also reads a block on the sender's
+ *     owner GHII (contact-same-account.ts blockedSenderAccount), so a blocked person's agent or
+ *     ecosystem app is refused BLOCKED like the person. It read the exact sender identity only
+ *     (E2E audit M075).
  *   v1.14.0 — 2026-11-14 — `kind` takes the help kinds, and a reply into a question's thread is the
  *     helper's answer (services/help/thread-reply.ts noteThreadReply); `helpHandled` skips that check.
  *   v1.13.0 — 2026-11-03 — An address whose node part is not a node id is refused RECIPIENT_NOT_FOUND
@@ -72,7 +76,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage, DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
 import type { MessageAttachmentInput } from '../models/message-schemas.js';
-import { acceptedSameAccount } from './contact-same-account.js';
+import { acceptedSameAccount, blockedSenderAccount } from './contact-same-account.js';
 import { areColleagues } from './colleagues.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, messagePreviewWithAttachments, deliveryTargetFor } from '../utils/messaging.js';
@@ -315,8 +319,8 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     if (await localIdentityExists(storage, config, recipientGhii) === false) {
       return { ok: false, code: 'RECIPIENT_NOT_FOUND', reason: missingIdentityReason(recipientGhii) };
     }
-    const contact = await storage.getContact(deliveryGhii, senderGhii);
-    if (contact?.state === 'blocked') {
+    // A block on the sender's person blocks their agents and apps too (contact-same-account.ts).
+    if (await blockedSenderAccount(storage, deliveryGhii, senderGhii)) {
       // Record the sender's own copy as undeliverable; do not deliver to the recipient.
       await storage.createDirectMessage({
         id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
