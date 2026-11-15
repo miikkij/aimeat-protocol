@@ -199,7 +199,7 @@ function main(): void {
         console.error('  Put the decision in ONE function that takes the caller (identity, roles, scopes)');
         console.error('  and returns a refusal or a result, then call it from both doors. Each door still');
         console.error('  renders its own answer — that part is meant to differ. Worked examples:');
-        console.error('  services/memory/write.ts, services/board-post.ts, services/install/quotas.ts,');
+        console.error('  services/memory/write.ts, services/boards/post.ts, services/install/quotas.ts,');
         console.error('  services/agent/task-rules.ts, services/memory/ceilings.ts.');
         if (strict) process.exit(1);
         return;

@@ -1,5 +1,5 @@
 /**
- * @file src/services/board-write.ts
+ * @file src/services/boards/write.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Every board write except the post, once, for every surface that performs it.
@@ -85,20 +85,20 @@
  *     the MCP tools were performing against storage directly.
  */
 import { randomBytes } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, BoardRecord, BoardRules, BoardSubscriptionRecord } from '../storage/interface.js';
-import { isSameOwner, ownerGhiiOf } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { emitChange } from './event-bus.js';
-import { parseAudience, audienceAllows, formatAudience, type AudienceAuth } from './audience.js';
-import { boardOrganismAudience, organismBoardAdmits } from './board-read-access.js';
-import { isRaiseToPublic } from './publish-gate.js';
-import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
-import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
-import { boardVisibilityDefault } from './content-defaults.js';
-import { classifyContainerAfterWrite } from './classify-on-write.js';
-import { boardTarget } from './classification/containers.js';
-import { audienceCapOf, audienceOfVisibility, capByOf, capRefusalOf } from './classification/audience-cap.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, BoardRecord, BoardRules, BoardSubscriptionRecord } from '../../storage/interface.js';
+import { isSameOwner, ownerGhiiOf } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { emitChange } from '../event-bus.js';
+import { parseAudience, audienceAllows, formatAudience, type AudienceAuth } from '../audience.js';
+import { boardOrganismAudience, organismBoardAdmits } from './read-access.js';
+import { isRaiseToPublic } from '../publish-gate.js';
+import { publishAskOf, type PublishAsk } from '../publish-requests/ask.js';
+import { fileAskForDoor, type DoorAsk, type PublishGateInput } from '../publish-requests/door.js';
+import { boardVisibilityDefault } from '../content-defaults.js';
+import { classifyContainerAfterWrite } from '../classify-on-write.js';
+import { boardTarget } from '../classification/containers.js';
+import { audienceCapOf, audienceOfVisibility, capByOf, capRefusalOf } from '../classification/audience-cap.js';
 
 /** The bounds BoardRulesSchema applies on the HTTP door. */
 export const BOARD_RULE_LIMITS = {
@@ -600,7 +600,7 @@ export async function setBoardMembers(
 
     // A standing subscription is not standing access: an identity taken off the roster that the
     // board no longer serves loses its subscription with it. Delivery asks the read rule again
-    // anyway (services/board-subscribers.ts), so this keeps the stored rows honest rather than
+    // anyway (services/boards/subscribers.ts), so this keeps the stored rows honest rather than
     // being the only check.
     if (Array.isArray(changes.remove)) {
         for (const g of changes.remove) {

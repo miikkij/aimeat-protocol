@@ -185,7 +185,7 @@ const DELEGATES: Record<string, string> = {
         + 'rather than only for the caller. The REST twin (PATCH /v1/apps/:filename) reaches the '
         + 'same function, so the two doors emit the same domain by construction rather than by '
         + 'agreement.',
-    'src/mcp/boards.ts': "services/board-write.ts and services/board-post.ts, both emitting 'boards'",
+    'src/mcp/boards.ts': "services/boards/write.ts and services/boards/post.ts, both emitting 'boards'",
     'src/mcp/chat-instances.ts': "services/chat/instance-write.ts, which emits 'chat'",
     'src/mcp/compliance.ts': "services/compliance/register.ts, whose one write helper emits "
         + "'compliance' — so the HTTP route, this tool surface and the scheduled monthly job all "
@@ -214,7 +214,7 @@ const DELEGATES: Record<string, string> = {
         + "services/agent/task-fanout.ts (completion and failure), both emitting 'agent-tasks' scoped to the owner",
     'src/mcp/agent-telemetry.ts': "services/telemetry-buffer.ts ('agents') and usage-metering.ts ('agent-usage')",
     'src/mcp/core.ts': "services/work-lifecycle.ts ('work' on accept and deliver), routes/work.ts "
-        + "createWorkItem ('work'), services/memory/write.ts ('memory') and services/board-post.ts ('boards')",
+        + "createWorkItem ('work'), services/memory/write.ts ('memory') and services/boards/post.ts ('boards')",
     'src/mcp/core-admin.ts': "services/morsel.ts mintMorsels, which emits 'config' and 'wallet'",
     'src/mcp/core-storage.ts': "services/storage-file-write.ts, which emits 'files' and 'memory'",
     'src/mcp/classification.ts': "services/classification/labels.ts, whose setLabel and reviewLabel "

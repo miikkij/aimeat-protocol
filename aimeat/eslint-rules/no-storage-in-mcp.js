@@ -29,7 +29,7 @@
  *   HOW TO SATISFY IT. Put the decision in a service that takes the CALLER — identity, roles,
  *   scopes — and returns a refusal or a result. Both doors call it and each renders the answer its
  *   own way. Worked examples: services/memory/write.ts, services/consent-write.ts,
- *   services/board-post.ts, services/schedule/gate.ts.
+ *   services/boards/post.ts, services/schedule/gate.ts.
  *
  *   THE SEED. 44 files did this on 2026-08-11 and are listed below. The list only shrinks: a new
  *   MCP file that reaches for storage fails the build, and every conversion deletes a line here.
@@ -115,7 +115,7 @@ export const noStorageInMcp = {
       direct:
         'An MCP tool must not call storage directly. Put the decision in a service that takes the '
         + 'CALLER (identity, roles, scopes) and returns a refusal or a result, then call it from both '
-        + 'doors — services/memory/write.ts, services/consent-write.ts and services/board-post.ts are '
+        + 'doors — services/memory/write.ts, services/consent-write.ts and services/boards/post.ts are '
         + 'worked examples. Writing the capability twice is what produced 315 measured differences '
         + 'between this surface and REST, including agents deleting another owner\'s extension and '
         + 'memory writes with no size limit. See docs/internal/secauditaug2026/08-mcp-rest-drift-map.md.',

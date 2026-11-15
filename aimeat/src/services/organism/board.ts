@@ -25,7 +25,7 @@
  */
 import type { Storage, OrganismRecord, BoardRecord } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
-import { boardOrganismAudience } from '../board-read-access.js';
+import { boardOrganismAudience } from '../boards/read-access.js';
 
 /** The board visibility an organism at `visibility` gives its discussion board. */
 export function organismBoardVisibility(organismId: string, visibility: string): BoardRecord['visibility'] {
@@ -54,7 +54,7 @@ export async function followOrganismVisibility(
   if (from === to) return null;
   const board = await storage.getBoard(organism.boardId);
   if (!board || board.visibility !== from) return null;
-  // A board at the organism level is never federated (services/board-visibility.ts applies the same
+  // A board at the organism level is never federated (services/boards/visibility.ts applies the same
   // rule to a keeper's change); a move to public keeps the flag the board has.
   const updated = await storage.updateBoardVisibility(board.id, to, boardOrganismAudience(to) ? false : undefined);
   if (updated) emitChange('boards');

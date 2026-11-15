@@ -732,7 +732,7 @@ await test('24. aimeat_board_read', async () => {
     // The board_id is an ID, not a name. This test used to pass the NAME and assert only that an
     // array came back — and it did, empty, because the tool listed posts for a board id that never
     // existed and never loaded the board to find out. Once the tool started ruling on visibility
-    // (services/board-read-access.ts) the same call answered "Board not found", which is the honest
+    // (services/boards/read-access.ts) the same call answered "Board not found", which is the honest
     // answer to the question the test was actually asking.
     //
     // SHARED rather than private, and that distinction is the rule rather than a test convenience:

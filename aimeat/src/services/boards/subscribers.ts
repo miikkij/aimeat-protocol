@@ -1,5 +1,5 @@
 /**
- * @file src/services/board-subscribers.ts
+ * @file src/services/boards/subscribers.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Telling a board's subscribers that a post landed.
@@ -29,11 +29,11 @@
  *   v1.0.0 — 2026-08-11 — Extracted from routes/boards.ts so both doors notify (August 2026 audit,
  *     the side-effect sweep).
  */
-import type { BoardRecord, Storage } from '../storage/interface.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { logger } from '../utils/logger.js';
-import { localAccountOf } from '../utils/gaii.js';
-import { boardVisibleToCaller } from './board-write.js';
+import type { BoardRecord, Storage } from '../../storage/interface.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountOf } from '../../utils/gaii.js';
+import { boardVisibleToCaller } from './write.js';
 
 /** How long a subscriber's callback has to answer before the delivery is abandoned. */
 const CALLBACK_TIMEOUT_MS = 10_000;

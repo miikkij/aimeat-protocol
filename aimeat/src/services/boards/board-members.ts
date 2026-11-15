@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Changing a board's reader list as a caller: the board read, who may change it, and
- *   the roster write (setBoardMembers, services/board-write.ts). PATCH /v1/boards/:boardId/members
+ *   the roster write (setBoardMembers, services/boards/write.ts). PATCH /v1/boards/:boardId/members
  *   and aimeat_board_members both call it (developer approval 2026-11-14, parity section
  *   BOARD-MEMBERS).
  *
@@ -25,7 +25,7 @@
 import type { CallerContext } from '../caller-context.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { operatorOverride } from '../operator/override.js';
-import { setBoardMembers, type BoardMembersResult, type BoardWriteDeps } from '../board-write.js';
+import { setBoardMembers, type BoardMembersResult, type BoardWriteDeps } from './write.js';
 
 /** Change the reader list when this caller may, or say why not. */
 export async function setBoardMembersAs(
@@ -58,6 +58,6 @@ export async function setBoardMembersAs(
     } else {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the board owner, an agent of the owner, or the operator can manage members' };
     }
-    // The roster arithmetic, the write and the change event are services/board-write.ts.
+    // The roster arithmetic, the write and the change event are services/boards/write.ts.
     return setBoardMembers(deps, board, change);
 }

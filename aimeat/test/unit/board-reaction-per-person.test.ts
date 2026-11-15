@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-09-13 — Initial. The two same-person cases failed on the unchanged service.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { reactToBoardPost, unreactToBoardPost } from '../../src/services/board-write.js';
+import { reactToBoardPost, unreactToBoardPost } from '../../src/services/boards/write.js';
 
 const OWNER = 'alice@n1';
 const AGENT = 'bot#alice@n1';

@@ -36,7 +36,7 @@ import { descriptionFor, shapeResponse, jsonContent } from '../tool-catalog/shap
 import { annotationsFor } from './annotations.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../services/ai/provenance-result.js';
-import { createBoardPost } from '../services/board-post.js';
+import { createBoardPost } from '../services/boards/post.js';
 import { boardPostsPage } from '../services/boards/posts-page.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -99,7 +99,7 @@ mcp.registerTool(
         annotations: annotationsFor('aimeat_board_post'),
     },
     async ({ board_id, title, body, category, ai_provenance, ai_provenance_id, ttl_hours }) => {
-        // ONE implementation (services/board-post.ts). This tool never loaded the board, so it
+        // ONE implementation (services/boards/post.ts). This tool never loaded the board, so it
         // had no access check, no price on a public board, no pre_board_post hook and no bound
         // on title or body. Any agent holding social:write posted into any board on the node,
         // including another owner's private one, for free.

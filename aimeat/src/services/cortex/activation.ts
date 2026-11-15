@@ -54,7 +54,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { idStemOf } from '../component/address.js';
-import { publicBoardCeiling, type BoardWriteRefusal } from '../board-write.js';
+import { publicBoardCeiling, type BoardWriteRefusal } from '../boards/write.js';
 import { cortexOntologyToSkos } from './ontology-skos.js';
 import { accountPrincipals } from '../db/owner-identity.js';
 import { schemaLockRefusal } from '../schema-lock-rule.js';

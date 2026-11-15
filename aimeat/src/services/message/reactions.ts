@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Acknowledgement marks on a single direct message: a symbol (an emoji or a short word)
- *   given instead of a reply, modelled on board reactions (services/board-write.ts). The one
+ *   given instead of a reply, modelled on board reactions (services/boards/write.ts). The one
  *   implementation behind POST/DELETE /v1/messages/:id/reactions, the MCP tool aimeat_dm_react on
  *   all three surfaces, and the federation endpoint POST /v1/federation/message/reaction.
  *

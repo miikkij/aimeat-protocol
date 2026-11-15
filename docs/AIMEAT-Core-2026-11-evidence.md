@@ -130,7 +130,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | AUTHZ-13 | met | `aimeat/src/routes/consent.ts:132-177`; `aimeat/src/services/consent.ts:158-160`; retention 365 days `aimeat/src/config/data-access.ts:48` | |
 | AUTHZ-14 | met | `aimeat/src/routes/consent.ts:69,126,138,171,233,268`; `aimeat/src/services/consent-write.ts:204-219` | `consent:manage` is inside the wildcard. |
 | AUTHZ-18 | met (4.0.0) | `aimeat/src/utils/consent-reach.ts` (`CONSENT_REACH_LOCAL_DEFAULT_IN`, `consentReachOf`); `grantConsent` in `aimeat/src/services/consent-write.ts` takes `local`, `federation`, `auth`, stores `private` and `dmz` as `local` (with the Deprecation headers) and gives an absent reach `local` from 4.0.0; both providers read a stored `private` or `dmz` as `local`; test `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts` | Before 4.0.0 an absent reach is still `federation`. The compliance roll-up (`consentFacets`) groups by the stored value. |
-| AUTHZ-15 | met | `aimeat/src/services/access-guard.ts:134-238`; `aimeat/src/services/consent.ts:76-181` | Boards and the organism key gate run their own consent checks (`aimeat/src/services/board-read-access.ts:115`, `aimeat/src/services/organism/namespace-access.ts:235-264`); both are stricter, not looser. |
+| AUTHZ-15 | met | `aimeat/src/services/access-guard.ts:134-238`; `aimeat/src/services/consent.ts:76-181` | Boards and the organism key gate run their own consent checks (`aimeat/src/services/boards/read-access.ts:115`, `aimeat/src/services/organism/namespace-access.ts:235-264`); both are stricter, not looser. |
 | AUTHZ-16 | partial | Provenance answers one 404 (`aimeat/src/routes/ai-provenance.ts:250-307`); memory read 404 | Not verified on every route. |
 | AUTHZ-17 | partial (SHOULD) | `aimeat/src/middleware/refusal-recorder.ts`; `aimeat/src/auth/deny.ts`; `aimeat/src/services/auth-audit.ts` | Every HTTP 401 and 403 reaches the refusal log since 2026-10-16, including the 403s written directly in route handlers. A refusal inside an MCP tool is a tool result, not an HTTP status: it is noted on the agent's card, not in this log. |
 | CLS-01 | met | `aimeat/src/services/classification/reader.ts` (show, useForAi, leave); gate `aimeat/security/classification-reach.json` | |
@@ -194,11 +194,11 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | COL-10 | partial | `aimeat/src/routes/organisms/workspace-read.ts:552-692` | Read-gate inheritance not verified. |
 | COL-11 | met | `aimeat/src/routes/organisms/gates.ts` (schema failure 422) | |
 | COL-12 | met | `aimeat/src/routes/boards.ts:362,418-434,478` | |
-| COL-13 | met | `aimeat/src/services/board-post.ts:101,263,408-418`; sweep `aimeat/src/services/job-seeding.ts:66` | |
-| COL-14 | met | `aimeat/src/services/board-write.ts:509-519` | |
-| COL-15 | met | `aimeat/src/services/board-moderation.ts:28-43`; threshold `aimeat/src/config.ts:626` | |
-| COL-16 | met | `aimeat/src/services/board-subscribers.ts:64-98` | The SHOULD is not met: the push carries no signature. |
-| COL-17 | met | `aimeat/src/services/board-post.ts:160-165,229,279` | The code calls it a post cost and an anti-flood price; see PACE-11. |
+| COL-13 | met | `aimeat/src/services/boards/post.ts:101,263,408-418`; sweep `aimeat/src/services/job-seeding.ts:66` | |
+| COL-14 | met | `aimeat/src/services/boards/write.ts:509-519` | |
+| COL-15 | met | `aimeat/src/services/boards/moderation.ts:28-43`; threshold `aimeat/src/config.ts:626` | |
+| COL-16 | met | `aimeat/src/services/boards/subscribers.ts:64-98` | The SHOULD is not met: the push carries no signature. |
+| COL-17 | met | `aimeat/src/services/boards/post.ts:160-165,229,279` | The code calls it a post cost and an anti-flood price; see PACE-11. |
 | COL-18 | met | `aimeat/src/services/message/send.ts:319-327,385-399`; `aimeat/src/routes/messages.ts:755,763,789` | |
 | COL-19 | met | `aimeat/src/services/message/delivery.ts:102-130,201-229`; `aimeat/src/routes/federation-sync/messaging.ts:335` | |
 | COL-20 | met | `aimeat/src/services/conversation-group.ts`; `aimeat/src/storage/types/direct-messages.ts:240-275` | Group threads are node-local, with one remote party allowed. |
@@ -217,7 +217,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | PACE-08 | met | `aimeat/src/services/metered-settlement.ts:85-91` (`resolvePacingToll`: the provider's amount, the node default when none, clamped to the ceiling); ceiling `aimeat/src/config.ts:668`; `aimeat/src/models/offer-schemas.ts:228` | Node default 0 (`aimeat/src/config.ts:678`). |
 | PACE-09 | met | `aimeat/src/services/metered-settlement.ts:122-185` (`chargePacing`: one transaction; debit, burn at `burnRate`, an existing operator share `:133-136`, the rest to the provider, every ledger row; `reverse` gives it all back); burn rate 10 % by default `aimeat/src/config.ts:323`; chokepoint `aimeat/src/services/metered-access.ts:334-346`; own use free `aimeat/src/services/extension-access/pacing.ts:75` | The operator share applies only to flows that had a marketplace fee before the pacing ruling; with no operator account it burns. |
 | PACE-10 | met | `aimeat/src/commerce/pacing-pack.ts:43-49` (`insufficientMorselsMessage`: the daily allowance and, when the operator sells one, the pacing pack); used by checkout `aimeat/src/commerce/session-service.ts:594` and by the metered refusal `aimeat/src/services/extension-access/metered-response.ts`; `aimeat/src/services/extension-access/pacing.ts:81-86` | |
-| PACE-11 | **gap** | | Capabilities exposed the pacing amount as `cost.morsels`; since 4.0.0 it is `cost.toll_morsels`, and the old name is deprecated until 5.0.0 (`aimeat/src/services/toll-morsels-names.ts`). Listing rows call it `basePrice` (PACE-05); board code calls it a price (`aimeat/src/services/board-post.ts`). |
+| PACE-11 | **gap** | | Capabilities exposed the pacing amount as `cost.morsels`; since 4.0.0 it is `cost.toll_morsels`, and the old name is deprecated until 5.0.0 (`aimeat/src/services/toll-morsels-names.ts`). Listing rows call it `basePrice` (PACE-05); board code calls it a price (`aimeat/src/services/boards/post.ts`). |
 | PACE-12 | met | `aimeat/src/services/usage-metering.ts:79,226-250`; `aimeat/src/services/ai/usage-record.ts:191-218`; `aimeat/src/routes/ledger.ts:170-345` | |
 | PACE-13 | met | No conversion path found | |
 | PACE-14 | met | `requireScope('ai:use')` in 14 places | |

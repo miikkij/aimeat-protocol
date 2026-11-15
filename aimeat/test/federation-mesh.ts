@@ -405,7 +405,7 @@ console.log('\nBoard Federate Flag');
 
 let federatedBoardId = '';
 
-// A PUBLIC board is the operator's to create (services/board-write.ts). This test used agentToken,
+// A PUBLIC board is the operator's to create (services/boards/write.ts). This test used agentToken,
 // which worked because POST /v1/auth/token copied the owner's 'owner' and 'operator' roles onto the
 // agent JWT. Audit finding H-2 closed that: an agent session is exactly ['agent'] now, matching what
 // device-auth, the MCP OAuth path and the refresh path always issued. So the operator credential is
@@ -432,7 +432,7 @@ await test('POST /v1/boards -- create board with federate=true', async () => {
     // The probe is `system`, not `public`, since 2026-08-30. A public board stopped being the
     // operator's that day — boards came back as Core (RFC §27) and a notice board a person keeps for
     // their street is the shape it exists for, so any account may open one up to
-    // config.boardPublicPerOwnerMax (services/board-write.ts says so in a comment and in its version
+    // config.boardPublicPerOwnerMax (services/boards/write.ts says so in a comment and in its version
     // history). A `system` board — one the node itself speaks through — is still operator-only, which
     // is what this test was always asking: an agent session is not an operator.
     //

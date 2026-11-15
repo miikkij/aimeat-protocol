@@ -516,7 +516,7 @@ await test('17b. owner2 (plain owner, not the board owner) gets 403 on PATCH mem
 
 // ─── Phase 4b: posting rule 'anyone' admits only a caller that may read the board ───
 //
-// boardPostAccessRefusal (services/board-post.ts) asked nothing when a shared board's posting rule
+// boardPostAccessRefusal (services/boards/post.ts) asked nothing when a shared board's posting rule
 // was 'anyone', so a caller of another owner that knew the board's id posted and replied to a board
 // it could not read. Both halves are asserted: the non-reader is refused on the post and the reply
 // route, and a reader (the roster) and anyone on a public board still post.

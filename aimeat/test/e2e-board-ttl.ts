@@ -290,7 +290,7 @@ await test('8. Add reaction to post', async () => {
 // A30 (E2E test-quality audit) was raised against this test and does NOT hold: agent-B is a second
 // agent of the SAME owner (see "Register agent-B"), so reacting on its owner's private board is
 // exactly right and nothing here is cross-owner. What this test does not cover — and should not be
-// read as covering — is a reaction from a DIFFERENT owner. services/board-write.ts:193 records that
+// read as covering — is a reaction from a DIFFERENT owner. services/boards/write.ts:193 records that
 // deliberately: "Neither door loads the board here, so a reaction lands on any post whose ids the
 // caller knows … left as it is." That is a written decision, not an oversight, and changing it is a
 // permission decision rather than a repair.
@@ -325,7 +325,7 @@ await test('8d. Verify reactions on post', async () => {
 await test('9. A stranger cannot reply on a PRIVATE board', async () => {
     // agent2 does not own this board. Posting to it has always been refused; REPLYING was not,
     // because neither door applied the board's access rule to a reply — both checked only that the
-    // parent post existed. The rule is one function now (services/board-post.ts), so a reply asks
+    // parent post existed. The rule is one function now (services/boards/post.ts), so a reply asks
     // the same question a post does.
     const { status, body } = await json(`/v1/boards/${privateBoardId}/posts/${reactionPostId}/replies`, {
         method: 'POST',

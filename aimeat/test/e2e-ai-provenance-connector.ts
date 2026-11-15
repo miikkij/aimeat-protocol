@@ -427,7 +427,7 @@ await test('SHELL: /local/call/aimeat_memory_read returns the record too', async
 console.log('\nPhase 5 — A board post carries its declaration through the connector');
 
 await test('aimeat_board_post through the connector records the declaration the crew made', async () => {
-  // SHARED rather than public. A PUBLIC board is operator-gated (services/board-write.ts), and this
+  // SHARED rather than public. A PUBLIC board is operator-gated (services/boards/write.ts), and this
   // probe has to be made by the DECLARER agent itself, because what it measures is what that agent's
   // own tool reports back. Swapping in an owner session to clear the gate would change the subject of
   // the test. The visibility is incidental here: the board exists so there is somewhere to post.

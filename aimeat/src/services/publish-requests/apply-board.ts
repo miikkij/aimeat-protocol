@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for a board: it becomes public, as its keeper, through
- *   setBoardVisibility (services/board-visibility.ts), the change PATCH /v1/boards/:id/visibility runs
+ *   setBoardVisibility (services/boards/visibility.ts), the change PATCH /v1/boards/:id/visibility runs
  *   (plan doc-mvcn6c7e4e5q, V4). The public-board ceiling applies as it does to the keeper's own change.
  *
  *   A board has no version. The request carries its name, which is what the owner read: a board
@@ -14,7 +14,7 @@
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
-import { setBoardVisibility } from '../board-visibility.js';
+import { setBoardVisibility } from '../boards/visibility.js';
 import { namespaceOfOwner } from './apply-memory.js';
 
 export async function applyBoardPublish(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

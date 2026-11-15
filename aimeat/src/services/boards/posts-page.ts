@@ -29,8 +29,8 @@ import type { Storage, BoardRecord, BoardPostRecord } from '../../storage/interf
 import type { AudienceAuth } from '../audience.js';
 import type { ReaderAuth } from '../classification/reader.js';
 import { readerFor } from '../classification/reader.js';
-import { boardReadRefusal, classifiedBoardPosts, type BoardReadRefusal } from '../board-read-access.js';
-import { withoutHiddenPosts } from '../board-moderation.js';
+import { boardReadRefusal, classifiedBoardPosts, type BoardReadRefusal } from './read-access.js';
+import { withoutHiddenPosts } from './moderation.js';
 
 export interface BoardPostsCaller {
     /** The identity the read gate asks about; undefined for an unauthenticated or anonymous caller. */

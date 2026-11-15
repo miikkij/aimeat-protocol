@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The boards a caller may see: every board, filtered by who may see each one
- *   (boardVisibleToCaller, services/board-write.ts; an organism board by membership). GET /v1/boards,
+ *   (boardVisibleToCaller, services/boards/write.ts; an organism board by membership). GET /v1/boards,
  *   aimeat_board_list and the aimeat://boards resource list call it, so the surfaces ask the same
  *   rule around the same read (structure programme 2026-11, unit 2b).
  *
@@ -18,7 +18,7 @@
  */
 import type { Storage, BoardRecord } from '../../storage/interface.js';
 import type { AudienceAuth } from '../audience.js';
-import { boardVisibleToCaller } from '../board-write.js';
+import { boardVisibleToCaller } from './write.js';
 
 /** Every board this caller may see, in the store's order. */
 export async function boardsVisibleTo(

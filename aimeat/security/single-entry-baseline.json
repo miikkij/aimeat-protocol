@@ -173,11 +173,11 @@
         "count": 1,
         "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
       },
-      "src/services/board-post.ts": {
+      "src/services/boards/post.ts": {
         "count": 2,
         "why": "Reads the caller's role list, which both surfaces build from askOperator (rolesWithOperator on REST, boardCaller on MCP)."
       },
-      "src/services/board-write.ts": {
+      "src/services/boards/write.ts": {
         "count": 3,
         "why": "Reads the caller's role list, which both surfaces build from askOperator (rolesWithOperator on REST, boardCaller on MCP)."
       },

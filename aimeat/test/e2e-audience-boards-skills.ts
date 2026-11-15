@@ -123,7 +123,7 @@ await test('B3. C (not a member) and C\'s agent are refused on every read and wr
         const post = await json(`/v1/boards/${boardId}/posts`, { method: 'POST', headers: auth(tok), body: JSON.stringify({ title: 'Outsider', body: 'Should not land.' }) });
         assert(post.status === 403 && post.body.error?.code === 'ACCESS_DENIED', `${who} posting: ${post.status} ${JSON.stringify(post.body.error)}`);
         const react = await json(`/v1/boards/${boardId}/posts/${postId}/react`, { method: 'POST', headers: auth(tok), body: JSON.stringify({ reaction: 'thanks' }) });
-        // A board the caller cannot see answers a reaction as a missing post does (services/board-write.ts).
+        // A board the caller cannot see answers a reaction as a missing post does (services/boards/write.ts).
         assert(react.status === 404 && react.body.error?.code === 'NOT_FOUND', `${who} reacting: ${react.status}`);
         const sub = await json(`/v1/boards/${boardId}/subscribe`, { method: 'POST', headers: auth(tok), body: JSON.stringify({}) });
         assert(sub.status === 403 && sub.body.error?.code === 'ACCESS_DENIED', `${who} subscribing: ${sub.status} ${JSON.stringify(sub.body.error)}`);

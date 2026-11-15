@@ -1,5 +1,5 @@
 /**
- * @file src/services/board-read-access.ts
+ * @file src/services/boards/read-access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may READ a board's posts, once, for every surface that serves them.
@@ -42,13 +42,13 @@
  *   v1.0.0 — 2026-08-11 — Extracted from routes/boards.ts (August 2026 audit, the side-effect sweep's
  *     read-path half) after aimeat_board_read was found reading private boards.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, BoardRecord, BoardPostRecord } from '../storage/interface.js';
-import type { ContentReader } from './classification/reader.js';
-import { boardPostTarget } from './classification/containers.js';
-import { isSameOwner } from '../utils/gaii.js';
-import { checkConsentForRead, auditDataAccess } from './consent.js';
-import { parseAudience, audienceAllows, type Audience, type AudienceAuth } from './audience.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, BoardRecord, BoardPostRecord } from '../../storage/interface.js';
+import type { ContentReader } from '../classification/reader.js';
+import { boardPostTarget } from '../classification/containers.js';
+import { isSameOwner } from '../../utils/gaii.js';
+import { checkConsentForRead, auditDataAccess } from '../consent.js';
+import { parseAudience, audienceAllows, type Audience, type AudienceAuth } from '../audience.js';
 
 /** The organism audience a board's visibility names (`organism:<id>`), or null for every other level. */
 export function boardOrganismAudience(visibility: string): Audience | null {

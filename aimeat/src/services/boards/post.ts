@@ -1,5 +1,5 @@
 /**
- * @file src/services/board-post.ts
+ * @file src/services/boards/post.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Posting to a board, once, for every surface that can post.
@@ -50,15 +50,15 @@
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 3, option B: shared service, gate inside).
  */
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, BoardPostRecord, BoardRecord } from '../storage/interface.js';
-import { executeHooks } from './hooks.js';
-import { provenanceForWrite, provenanceDeclarationRefusal } from './ai/provenance.js';
-import { isSameOwner } from '../utils/gaii.js';
-import { emitChange } from './event-bus.js';
-import { notifyBoardSubscribers } from './board-subscribers.js';
-import { boardOrganismAudience, organismBoardAdmits, boardReadRefusal } from './board-read-access.js';
-import type { AudienceAuth } from './audience.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, BoardPostRecord, BoardRecord } from '../../storage/interface.js';
+import { executeHooks } from '../hooks.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from '../ai/provenance.js';
+import { isSameOwner } from '../../utils/gaii.js';
+import { emitChange } from '../event-bus.js';
+import { notifyBoardSubscribers } from './subscribers.js';
+import { boardOrganismAudience, organismBoardAdmits, boardReadRefusal } from './read-access.js';
+import type { AudienceAuth } from '../audience.js';
 
 /** The bounds BoardPostSchema applies on the HTTP door, named here so both doors share them. */
 export const BOARD_POST_LIMITS = {
@@ -110,7 +110,7 @@ const DEFAULT_TTL_HOURS = 168;
  * keeper may narrow either to 'owner' (an announcements board) or a public one to 'members'.
  * An organism board takes posts from whoever may read it; 'owner' narrows it to the keeper.
  *
- * 'anyone' means anyone who may READ the board (services/board-read-access.ts boardReadRefusal).
+ * 'anyone' means anyone who may READ the board (services/boards/read-access.ts boardReadRefusal).
  * On a public board that is every signed-in caller; on a shared board it is the keeper, the
  * keeper's other principals, the roster and a caller the consent layer admits. Until 2026-11-08
  * the 'anyone' rule asked nothing, so a caller that knew a shared board's id posted to a board it

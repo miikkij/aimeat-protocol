@@ -76,12 +76,12 @@ import type { Storage, BoardRecord } from '../storage/interface.js';
 import { resolveOperatorAgentName } from '../services/operator/principal.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { createBoardReply, boardPostPrice } from '../services/board-post.js';
+import { createBoardReply, boardPostPrice } from '../services/boards/post.js';
 import { boardPostsPage } from '../services/boards/posts-page.js';
 import {
     createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost,
     deleteBoardById, boardRulesBlock, type BoardWriteCaller,
-} from '../services/board-write.js';
+} from '../services/boards/write.js';
 import { setBoardMembersAs } from '../services/boards/board-members.js';
 import { boardsVisibleTo } from '../services/boards/board-list.js';
 import { setBoardRulesAs } from '../services/boards/board-rules.js';
@@ -95,7 +95,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 /**
  * How long a post lives when neither the post nor the board names a lifetime.
  *
- * A COPY of DEFAULT_TTL_HOURS in services/board-post.ts, which that file does not export. It is
+ * A COPY of DEFAULT_TTL_HOURS in services/boards/post.ts, which that file does not export. It is
  * here so the create answer can say the number out loud: a board used as a catalogue emptied itself
  * a week after launch, and nothing an agent read at creation mentioned the week. Replace this with
  * the import once board-post.ts exports its constant.
@@ -258,7 +258,7 @@ export function registerBoardsTools(
             annotations: annotationsFor('aimeat_board_create'),
         },
         async ({ name, visibility, description, allowed_gaiis, rules, federate }) => {
-            // services/board-write.ts — the same create POST /v1/boards performs. The operator rule
+            // services/boards/write.ts — the same create POST /v1/boards performs. The operator rule
             // lived here as "public requires operator" while the route reserves system boards too,
             // the name and description had no bound at all, and federate was never set.
             // `rules` goes to the same normalizer the HTTP body does. This tool did not take it, so a
@@ -334,7 +334,7 @@ export function registerBoardsTools(
             annotations: annotationsFor('aimeat_board_subscribe'),
         },
         async ({ board_id, callback_url, filters }) => {
-            // services/board-write.ts — the same subscription POST /v1/boards/:id/subscribe writes,
+            // services/boards/write.ts — the same subscription POST /v1/boards/:id/subscribe writes,
             // with the same visibility rule, the same duplicate refusal and the same change event.
             const out = await subscribeToBoard({ storage, config }, await boardCaller(), {
                 boardId: board_id, callbackUrl: callback_url, filters,
@@ -363,7 +363,7 @@ export function registerBoardsTools(
             annotations: annotationsFor('aimeat_board_react'),
         },
         async ({ board_id, post_id, emoji, remove }) => {
-            // services/board-write.ts — the same reaction POST /v1/boards/:b/posts/:p/react writes,
+            // services/boards/write.ts — the same reaction POST /v1/boards/:b/posts/:p/react writes,
             // and with remove the same withdrawal its DELETE makes. The route runs
             // BoardReactionSchema over it first; this tool declared z.string(), so an empty
             // reaction and a ten-thousand-character one both stored.
@@ -393,7 +393,7 @@ export function registerBoardsTools(
             annotations: annotationsFor('aimeat_board_reply'),
         },
         async ({ board_id, post_id, body, ai_provenance, ai_provenance_id }) => {
-            // The whole reply is services/board-post.ts: the board's ACCESS rule (which neither door
+            // The whole reply is services/boards/post.ts: the board's ACCESS rule (which neither door
             // applied to a reply — both checked only that the parent post existed), the body bound,
             // the provenance stamp with the board's REAL visibility (this tool stamped every reply
             // 'public', so one on a private board carried a public-surface label), the record, the
@@ -465,7 +465,7 @@ export function registerBoardsTools(
             annotations: annotationsFor('aimeat_board_delete'),
         },
         async ({ board_id }) => {
-            // services/board-write.ts — the same delete DELETE /v1/boards/:id performs, with the
+            // services/boards/write.ts — the same delete DELETE /v1/boards/:id performs, with the
             // same owner-or-operator rule and the same change event.
             const out = await deleteBoardById({ storage, config }, await boardCaller(), board_id);
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };

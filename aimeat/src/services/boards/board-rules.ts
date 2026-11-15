@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Setting a board's own rules as a caller: the board read, the keeper rule (the exact
  *   identity that created the board, or an operator through operatorOverride, which writes the
- *   operator trail) and the write (setBoardRules, services/board-write.ts). PATCH
+ *   operator trail) and the write (setBoardRules, services/boards/write.ts). PATCH
  *   /v1/boards/:boardId/rules and aimeat_board_rules_set both call it, so the keeper rule is written
  *   once (structure programme 2026-11, unit 2b).
  *
@@ -17,7 +17,7 @@
  *     keeper rule (structure programme 2026-11, unit 2b).
  */
 import { operatorOverride, type OperatorAuth } from '../operator/override.js';
-import { setBoardRules, type BoardRulesResult, type BoardWriteDeps } from '../board-write.js';
+import { setBoardRules, type BoardRulesResult, type BoardWriteDeps } from './write.js';
 
 /** Replace the board's rules when this caller keeps the board, or say why not. */
 export async function setBoardRulesAs(
@@ -33,6 +33,6 @@ export async function setBoardRulesAs(
         { ownerOf: board.ownerGaii, area: 'board', action: 'rules', subject: board.name }))) {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the keeper of this board sets its rules. Ask them, or open a board of your own.' };
     }
-    // The shape check, the write and the change event are services/board-write.ts.
+    // The shape check, the write and the change event are services/boards/write.ts.
     return setBoardRules(deps, board, rules);
 }

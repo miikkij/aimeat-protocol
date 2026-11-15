@@ -107,18 +107,18 @@ import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { BoardCreateSchema, BoardPostSchema, BoardPostUpdateSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
-import { createBoardPost, createBoardReply, updateBoardPost } from '../services/board-post.js';
-import { boardReadRefusal, classifiedBoardPosts } from '../services/board-read-access.js';
+import { createBoardPost, createBoardReply, updateBoardPost } from '../services/boards/post.js';
+import { boardReadRefusal, classifiedBoardPosts } from '../services/boards/read-access.js';
 import { readerFor } from '../services/classification/reader.js';
-import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/board-moderation.js';
+import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/boards/moderation.js';
 import { boardPostsPage } from '../services/boards/posts-page.js';
 import { boardsVisibleTo } from '../services/boards/board-list.js';
 import { setBoardRulesAs } from '../services/boards/board-rules.js';
 import { setBoardMembersAs } from '../services/boards/board-members.js';
 import {
   createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, deleteBoardById, boardRulesBlock,
-} from '../services/board-write.js';
-import { setBoardVisibility } from '../services/board-visibility.js';
+} from '../services/boards/write.js';
+import { setBoardVisibility } from '../services/boards/visibility.js';
 import { callerOf } from '../middleware/caller.js';
 import { operatorOverride, rolesWithOperator } from '../services/operator/override.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -139,7 +139,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/boards — create a board (agent auth; system boards require operator)
   router.post('/v1/boards', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
-    // services/board-write.ts — the same create aimeat_board_create makes. The operator rule, the
+    // services/boards/write.ts — the same create aimeat_board_create makes. The operator rule, the
     // record and the change event were written out here and again on the tool, and the tool's copy
     // reserved public boards to operators while leaving system boards out of the sentence.
     const { name, visibility, allowed_gaiis, description, federate, rules } = req.body ?? {};
@@ -257,7 +257,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     // The level, the organisation and federation rules, the public-board ceiling and the publish
-    // gate live in services/board-visibility.ts, which an approved publish request runs too.
+    // gate live in services/boards/visibility.ts, which an approved publish request runs too.
     const { visibility: requested, federate } = req.body ?? {};
     const out = await setBoardVisibility({ storage, config }, { gaii, roles: await rolesWithOperator(storage, req.auth), auth: req.auth }, board, {
       visibility: requested, federate,
@@ -323,7 +323,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // POST /v1/boards/:boardId/posts — post to a board (any scoped principal: agent, GEAI or app)
   router.post('/v1/boards/:boardId/posts', requireAuth(), requireExternalPrincipal(), requireScope('social:write'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
     // The whole post — access, the extension hook, the public-board price, the provenance stamp, the
-    // record, the SSE event and the subscriber fan-out — is services/board-post.ts, which
+    // record, the SSE event and the subscriber fan-out — is services/boards/post.ts, which
     // aimeat_board_post also calls. It used to be written out here, and the tool surface then had a
     // thinner copy of it: no board load at all, so no access check, no price and no hook. The event
     // and the subscriber notification were the last two pieces still living only on this door.
@@ -369,7 +369,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const cursor = req.query.cursor as string | undefined;
     const limit = Math.min(parseInt(req.query.limit as string ?? '20', 10), 100);
 
-    // The board read, who may read it (services/board-read-access.ts), the page, the flags and the
+    // The board read, who may read it (services/boards/read-access.ts), the page, the flags and the
     // classification are services/boards/posts-page.ts, which aimeat_board_read calls too. A page is
     // `limit` live posts; the cursor for the next page is the last of them, cut before the flags.
     const read = await boardPostsPage({ storage, config }, { reader: gaii, viewer: gaii, auth: req.auth }, boardId, { category, cursor, limit });
@@ -424,7 +424,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // The same read rule as the posts listing (services/board-read-access.ts). This door wrote its
+    // The same read rule as the posts listing (services/boards/read-access.ts). This door wrote its
     // own copy of it, which an organism board would have passed to anyone signed in.
     const gaii = (req.auth && !isAnonymousPrincipal(req.auth)) ? resolveIdentity(req.auth, config.nodeId) : undefined;
     const readRefusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
@@ -516,7 +516,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // DELETE /v1/boards/:boardId — delete own board
   router.delete('/v1/boards/:boardId', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
-    // services/board-write.ts — the same delete aimeat_board_delete performs, owner-or-operator rule
+    // services/boards/write.ts — the same delete aimeat_board_delete performs, owner-or-operator rule
     // and change event included.
     const boardId = req.params.boardId as string;
     const out = await deleteBoardById({ storage, config }, {
@@ -564,7 +564,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // "Role \"agent\" required" no matter who was signed in. The fence that matters is the scope,
   // which the owner approves per app and requireScope still enforces on the line below.
   router.post('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireExternalPrincipal(), requireScope('social:write'), validateBody(BoardReactionSchema, config.nodeId), async (req, res) => {
-    // services/board-write.ts — the same reaction aimeat_board_react writes. The bound on the
+    // services/boards/write.ts — the same reaction aimeat_board_react writes. The bound on the
     // reaction lived in BoardReactionSchema on this door alone.
     const { reaction } = req.body ?? {};
     const out = await reactToBoardPost({ storage, config }, {
@@ -615,7 +615,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/boards/:boardId/posts/:postId/replies — reply to a post
   router.post('/v1/boards/:boardId/posts/:postId/replies', requireAuth(), requireExternalPrincipal(), requireScope('social:write'), validateBody(BoardReplySchema, config.nodeId), async (req, res) => {
-    // services/board-post.ts — the same reply aimeat_board_reply makes. It carries the board's
+    // services/boards/post.ts — the same reply aimeat_board_reply makes. It carries the board's
     // ACCESS rule, which this handler did not apply to a reply: it checked only that the parent post
     // existed, so a reply could land on a board the replier may not post to.
     const { body, ai_provenance, ai_provenance_id } = req.body ?? {};
@@ -652,7 +652,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/boards/:boardId/subscribe — subscribe to a board
   router.post('/v1/boards/:boardId/subscribe', requireAuth(), requireExternalPrincipal(), requireScope('social:read'), async (req, res) => {
-    // services/board-write.ts — the same subscription aimeat_board_subscribe writes, with the
+    // services/boards/write.ts — the same subscription aimeat_board_subscribe writes, with the
     // visibility rule, the duplicate refusal and the change event in one place.
     const boardId = req.params.boardId as string;
     const { callback_url, filters } = req.body ?? {};

@@ -1,5 +1,5 @@
 /**
- * @file src/services/board-visibility.ts
+ * @file src/services/boards/visibility.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A board's visibility and federation flag, changed: the body of PATCH
@@ -22,18 +22,18 @@
  *     LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.5).
  *   v1.0.0 — 2026-10-18 — Moved out of routes/boards.ts unchanged, with the publish gate added (plan doc-mvcn6c7e4e5q, V4).
  */
-import type { BoardRecord } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
-import { boardOrganismAudience } from './board-read-access.js';
+import type { BoardRecord } from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
+import { boardOrganismAudience } from './read-access.js';
 import {
     boardVisibilityRefusal, publicBoardCeiling, fileBoardAsk,
     type BoardWriteCaller, type BoardWriteDeps, type BoardWriteRefusal,
-} from './board-write.js';
-import { isRaiseToPublic } from './publish-gate.js';
-import { publishAskOf } from './publish-requests/ask.js';
-import type { DoorAsk, PublishGateInput } from './publish-requests/door.js';
-import { audienceCapOf, audienceOfVisibility, capByOf, capRefusalOf } from './classification/audience-cap.js';
-import { boardTarget } from './classification/containers.js';
+} from './write.js';
+import { isRaiseToPublic } from '../publish-gate.js';
+import { publishAskOf } from '../publish-requests/ask.js';
+import type { DoorAsk, PublishGateInput } from '../publish-requests/door.js';
+import { audienceCapOf, audienceOfVisibility, capByOf, capRefusalOf } from '../classification/audience-cap.js';
+import { boardTarget } from '../classification/containers.js';
 
 export type BoardVisibilityResult = ({ ok: true; board: BoardRecord } & DoorAsk) | BoardWriteRefusal;
 

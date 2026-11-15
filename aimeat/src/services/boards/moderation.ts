@@ -1,5 +1,5 @@
 /**
- * @file src/services/board-moderation.ts
+ * @file src/services/boards/moderation.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which board posts are hidden by flags, and who may still see them. RFC v4.0 §27 and
@@ -13,10 +13,10 @@
  *     are one reporter (secaudit2026oct31w2 round 10, W2-8).
  *   v1.0.0 — 2026-08-30 — Initial.
  */
-import type { Storage } from '../storage/interface.js';
-import type { BoardPostRecord, BoardRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config-types.js';
-import { activeReporterCount } from './moderation-flags.js';
+import type { Storage } from '../../storage/interface.js';
+import type { BoardPostRecord, BoardRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config-types.js';
+import { activeReporterCount } from '../moderation-flags.js';
 
 export type BoardModerationDeps = { storage: Storage; config: AimeatConfig };
 

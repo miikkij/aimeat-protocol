@@ -281,7 +281,7 @@ await test('6. Create a public board for testing', async () => {
     // A7 (E2E test-quality audit). This used to read "First owner is operator, so can create public
     // boards", which states an escalation as if it were the feature. It is neither: the first owner
     // registered on an empty node is promoted to operator on purpose (routes/ghii/register-login.ts),
-    // and creating a public board is operator-only (services/board-write.ts:130). This suite's owner
+    // and creating a public board is operator-only (services/boards/write.ts:130). This suite's owner
     // happens to be that first owner, which is why the call below succeeds — it is a property of the
     // fixture, not a permission any agent has. Test 6b pins the gate the comment used to hide.
     const { body } = await mcpRpc('tools/call', {
@@ -295,7 +295,7 @@ await test('6. Create a public board for testing', async () => {
 });
 
 // A7 (E2E test-quality audit). The gate test 6 passes only by being the bootstrap owner. Asserted
-// here through the HTTP door, which calls the SAME createBoard in services/board-write.ts that the
+// here through the HTTP door, which calls the SAME createBoard in services/boards/write.ts that the
 // MCP tool calls — one implementation, so proving it on either door proves the rule. A second owner
 // registered on a node that already has one is an ordinary account with no operator role.
 await test('6b. A later owner\'s agent cannot create a public board (the operator gate)', async () => {
