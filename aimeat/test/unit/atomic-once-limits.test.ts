@@ -38,10 +38,10 @@ import { pulseInstanceServer } from '../../src/services/living/pulse.js';
 requirePostgresWhenAsked('atomic-once-limits');
 
 // The modules that order their own calls in-process, twice: one copy per simulated node process.
-const intakeA = await import('../../src/services/intake-daily-count.js');
+const intakeA = await import('../../src/services/intake/daily-count.js');
 const notifA = await import('../../src/services/notifications/settings.js');
 vi.resetModules();
-const intakeB = await import('../../src/services/intake-daily-count.js');
+const intakeB = await import('../../src/services/intake/daily-count.js');
 const notifB = await import('../../src/services/notifications/settings.js');
 
 type TestStorage = Storage & { close(): void | Promise<void> };

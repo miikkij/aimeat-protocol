@@ -1,5 +1,5 @@
 /**
- * @file src/services/intake-thread.ts
+ * @file src/services/intake/thread.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A conversation through a public intake form: what a visitor who is not signed in

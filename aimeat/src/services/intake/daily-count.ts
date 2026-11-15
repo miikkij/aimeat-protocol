@@ -1,5 +1,5 @@
 /**
- * @file src/services/intake-daily-count.ts
+ * @file src/services/intake/daily-count.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The daily cap of a public intake form: how many submissions one form has taken
@@ -26,8 +26,8 @@
  *     (feature-list audit #63).
  *   v1.0.0 — 2026-10-13 — Initial.
  */
-import type { Storage } from '../storage/interface.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
+import type { Storage } from '../../storage/interface.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 export interface IntakeFormRef { org: string; ws: string; formId: string }
 

@@ -1045,11 +1045,11 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/intake-daily-count.ts :: map :: chains": {
+    "src/services/intake/daily-count.ts :: map :: chains": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/intake-thread-retention.ts :: map :: chains": {
+    "src/services/intake/thread-retention.ts :: map :: chains": {
       "count": 1,
       "reason": "DEBT"
     },

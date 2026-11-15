@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';
 import { registerOrganismIntakeRoutes } from '../../src/routes/organisms/intake.js';
-import { releaseDailySlot, takeDailySlot } from '../../src/services/intake-daily-count.js';
+import { releaseDailySlot, takeDailySlot } from '../../src/services/intake/daily-count.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { OrganismRecord, OrganismMembershipRecord, GHIIRecord } from '../../src/storage/interface.js';
 

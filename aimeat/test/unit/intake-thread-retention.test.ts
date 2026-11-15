@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { runIntakeThreadRetention, registerThreadForm, entryOfFormConfig } from '../../src/services/intake-thread-retention.js';
+import { runIntakeThreadRetention, registerThreadForm, entryOfFormConfig } from '../../src/services/intake/thread-retention.js';
 import { seedCoreScheduledJobs } from '../../src/services/job-seeding.js';
 import { registerCoreHandlers } from '../../src/services/core-jobs.js';
 import type { AimeatConfig } from '../../src/config.js';

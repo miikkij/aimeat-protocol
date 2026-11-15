@@ -1,5 +1,5 @@
 /**
- * @file src/services/intake-thread-retention.ts
+ * @file src/services/intake/thread-retention.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The retention of a conversation through a public intake form: the node deletes the
@@ -29,10 +29,10 @@
  *   2026-10-15 — Initial: deletion by date on a scheduled job, and the registry that outlives the
  *     form (feature-list audit #64).
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { readWorkspaceMetaRecord, workspaceRegistrations } from './workspace/meta-read.js';
-import { threadIsExpired, type IntakeThreadConfig } from './intake-thread.js';
-import { logger } from '../utils/logger.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { readWorkspaceMetaRecord, workspaceRegistrations } from '../workspace/meta-read.js';
+import { threadIsExpired, type IntakeThreadConfig } from './thread.js';
+import { logger } from '../../utils/logger.js';
 
 /** Where one conversation form keeps its records, and for how long. */
 export interface ThreadFormEntry {

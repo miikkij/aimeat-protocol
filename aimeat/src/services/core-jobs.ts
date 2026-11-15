@@ -130,7 +130,7 @@ export function registerCoreHandlers(
   // Visitor conversations of public intake forms past the retention date the form promised: the
   // thread and its messages are deleted, whatever state the form is in (feature-list audit #64).
   scheduler.registerCoreHandler('intake-thread-retention', async () => {
-    const { runIntakeThreadRetention } = await import('./intake-thread-retention.js');
+    const { runIntakeThreadRetention } = await import('./intake/thread-retention.js');
     const removed = await runIntakeThreadRetention(storage, config.nodeId);
     if (removed > 0) logger.info(`Intake thread retention: ${removed} visitor conversation(s) deleted`);
   });

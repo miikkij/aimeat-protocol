@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
     THREAD_DEFAULTS, THREAD_CEILINGS, parseThreadConfig, newThreadToken, threadIdOf, cleanTurnText, turnsOfThread, replyState,
     composeTurns, threadIsExpired,
-} from '../../src/services/intake-thread.js';
+} from '../../src/services/intake/thread.js';
 
 describe('the conversation settings of a form', () => {
     const base = { reply_namespace: 'chat.replies', signal_namespace: 'chat.signals' };

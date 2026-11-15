@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The storage side of a conversation through a public intake form: the form that takes
  *   a conversation, the live copy of one of its records, and the conversation a visitor's token opens.
- *   The pure part (the token, the record shapes, the settings) is services/intake-thread.ts.
+ *   The pure part (the token, the record shapes, the settings) is services/intake/thread.ts.
  *
  *   These were local functions of routes/organisms/intake-thread.ts until 2026-11-05. The visitor's
  *   token is now verified in the auth layer ('intake-visitor', src/auth/credential-strategies.ts), and
@@ -24,7 +24,7 @@
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { readWorkspaceMetaRecord } from '../workspace/meta-read.js';
-import { threadIdOf, type IntakeThreadConfig } from '../intake-thread.js';
+import { threadIdOf, type IntakeThreadConfig } from './thread.js';
 import { formConfigOfRecord } from './form-owner.js';
 
 /** The part of a form's stored config the conversation routes read (routes/organisms/intake.ts writes it). */

@@ -80,9 +80,9 @@ import { readPublishSpace, undeclaredSpaceRefusal } from '../../services/workspa
 import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace/meta.js';
 import { fencedFormRefusal, FENCED_FORM_PUBLIC_MESSAGE } from '../../services/fenced-space.js';
 import { callerOf } from '../../middleware/caller.js';
-import { takeDailySlot, releaseDailySlot, forgetDailyCount } from '../../services/intake-daily-count.js';
-import { parseThreadConfig, THREAD_RECORD_FIELDS, SIGNAL_RECORD_FIELDS, type IntakeThreadConfig } from '../../services/intake-thread.js';
-import { entryOfFormConfig, registerThreadForm } from '../../services/intake-thread-retention.js';
+import { takeDailySlot, releaseDailySlot, forgetDailyCount } from '../../services/intake/daily-count.js';
+import { parseThreadConfig, THREAD_RECORD_FIELDS, SIGNAL_RECORD_FIELDS, type IntakeThreadConfig } from '../../services/intake/thread.js';
+import { entryOfFormConfig, registerThreadForm } from '../../services/intake/thread-retention.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';

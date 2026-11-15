@@ -6,7 +6,7 @@
  *   signed in writes, reads the answers and can have the conversation deleted. The form owner's
  *   side (an agent, or a person in an app) answers by writing an ordinary workspace record, so
  *   these routes are the visitor's only. The records, the secret and the settings are in
- *   services/intake-thread.ts.
+ *   services/intake/thread.ts.
  *
  *   WHAT THE NODE DECIDES, so that no agent has to: how many conversations a form starts in a day
  *   (the form's `max_per_day`), how many turns one conversation takes, how long one turn is, how
@@ -48,13 +48,13 @@ import { readPublishSpace } from '../../services/workspace/write-items.js';
 import { readThreadForm as readThreadFormOf, latestThreadRecord, type ThreadForm } from '../../services/intake/visitor-thread.js';
 import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
 import { fencedFormRefusal, FENCED_FORM_PUBLIC_MESSAGE } from '../../services/fenced-space.js';
-import { takeDailySlot } from '../../services/intake-daily-count.js';
+import { takeDailySlot } from '../../services/intake/daily-count.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import {
   THREAD_DEFAULTS, MIN_TURN_INTERVAL_MS, newThreadToken, threadIdOf, cleanTurnText, turnsOfThread, replyState, composeTurns,
-} from '../../services/intake-thread.js';
-import { forgetThreadRecords } from '../../services/intake-thread-retention.js';
+} from '../../services/intake/thread.js';
+import { forgetThreadRecords } from '../../services/intake/thread-retention.js';
 import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismIntakeThreadRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
@@ -65,7 +65,7 @@ export function registerOrganismIntakeThreadRoutes(router: Router, config: Aimea
   const latestOf = (org: string, ws: string, namespace: string, id: string): Promise<MemoryRecord | null> => latestThreadRecord(storage, org, ws, namespace, id);
 
   /** Delete a conversation: the thread, the reply and the signal, with every version of each
-   *  (services/intake-thread-retention.ts, which the scheduled retention job uses too). */
+   *  (services/intake/thread-retention.ts, which the scheduled retention job uses too). */
   function forgetThread(org: string, ws: string, cfg: ThreadForm, id: string): Promise<number> {
     return forgetThreadRecords(storage, { org, ws, namespace: cfg.namespace, replyNamespace: cfg.thread.replyNamespace, signalNamespace: cfg.thread.signalNamespace }, id);
   }
@@ -83,7 +83,7 @@ export function registerOrganismIntakeThreadRoutes(router: Router, config: Aimea
   }
 
   // Conversations past the form's keeping time are deleted by the scheduled job
-  // core:intake-thread-retention (services/intake-thread-retention.ts), whatever state the form is
+  // core:intake-thread-retention (services/intake/thread-retention.ts), whatever state the form is
   // in. Until 2026-10-15 the deletion ran here, when a new conversation started, so a form nobody
   // wrote to, or one switched off or deleted, kept everything (feature-list audit #64).
 
