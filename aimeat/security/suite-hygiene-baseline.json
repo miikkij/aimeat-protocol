@@ -1361,6 +1361,10 @@
   "test/e2e-invite-grants.ts": {
    "ownHarness": 1
   },
+  "test/e2e-invoke-routes.ts": {
+   "ownHarness": 1,
+   "looseRefusal": 1
+  },
   "test/e2e-key-reencrypt.ts": {
    "ownHarness": 1
   },
