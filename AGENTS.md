@@ -141,9 +141,11 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
 - Edit files with your editing tool, never with `sed`, a heredoc or an inline script.
 - Reuse what exists. A new MCP tool, route, table or page type needs a reason that a memory record
   and a prompt could not cover.
-- Finished work is merged to `main` and pushed. A green `pnpm gate` is what "done" needs; do not
-  wait for GitHub CI or poll `gh`. Push `main` only: the origin is public, and a work branch pushed
-  there shows half-done work to everyone.
+- Finished work reaches `main` in three steps (2026-11-15): while developing, only the suites of the
+  area the change reaches; when it looks done, `pnpm check:fast` once (fix every red line in one go);
+  then `pnpm ready` from `aimeat/`, which runs the full E2E sweep and the builds on GitHub on a
+  `ready/<session>` branch and puts the work on `main` only when green. The origin is public: push no
+  other branch.
 - Answer in Finnish when Jouni writes Finnish, composed in Finnish, plain and short. The answer
   first, the evidence after it: a status question is answered in the first sentence as "done",
   "done, except X, which needs your decision" or "not done, it is at X". No em-dashes.

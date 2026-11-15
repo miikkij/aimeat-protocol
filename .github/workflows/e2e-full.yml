@@ -523,9 +523,11 @@ jobs:
   # and does what the sweep's own last two steps did: a red leg opens or updates its issue, a green
   # one closes it. Each leg has its own issue title, and no title contains another, because the
   # lookup is a phrase search on the title.
+  # ONLY FOR MAIN. A run on a ready/<session> branch (`pnpm ready`, 2026-11-15) tests work before it
+  # reaches main; its red belongs to that session, not to main, so it opens and closes nothing.
   issue:
     needs: [sweep, pack-smoke, stripe-testmode, upgrade-from-release, docker-image]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

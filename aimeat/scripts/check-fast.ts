@@ -24,6 +24,9 @@
  *   cd aimeat && pnpm check:fast --jobs=8     # more, on a wider machine
  *   cd aimeat && pnpm check:fast --list       # the set, and nothing runs
  * @version-history
+ *   v1.1.0 — 2026-11-15 — One run at a time on a machine (scripts/lib/machine-lock.ts): a second
+ *     session's run waits and says whom for. Three at once took 25-35 min each that afternoon.
+ *     AIMEAT_CHECK_FAST_NO_LOCK=1 skips the lock (CI, where a runner holds one job).
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 — 2026-09-05 — Initial. Written from the pipeline-cost analysis of the same day.
  */
@@ -32,6 +35,7 @@ import { readFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { FAST_CHECKS } from './lib/check-registry.mjs';
+import { acquireMachineLock, releaseMachineLock } from './lib/machine-lock.js';
 
 interface Check {
     /** The pnpm script, with its arguments as the hook passed them. */
@@ -91,6 +95,16 @@ async function main(): Promise<void> {
     }
     const jobsArg = args.find(a => a.startsWith('--jobs='));
     const jobs = jobsArg ? Math.max(1, Number(jobsArg.slice('--jobs='.length)) || 1) : Math.max(2, Math.min(4, cpus().length - 1));
+
+    // One run at a time on this machine: two runs compete for the same cores and both take many
+    // times longer than running one after the other.
+    const useLock = !process.env.CI && process.env.AIMEAT_CHECK_FAST_NO_LOCK !== '1';
+    const lock = useLock
+        ? await acquireMachineLock('check-fast', { session: process.env.AIMEAT_SESSION || '(no session)', worktree: process.cwd() }, {
+            onWait: h => console.log(`[check:fast] waiting: ${h ? `${h.session} runs it in ${h.worktree} (since ${h.at})` : 'another run holds it'}; one run at a time on this machine`),
+        })
+        : null;
+    process.on('exit', () => { if (lock) releaseMachineLock(lock); });
 
     const t0 = Date.now();
     const queue = [...CHECKS];

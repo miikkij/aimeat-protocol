@@ -100,13 +100,12 @@ one of them is wrong even when it closes the hole.
 2. **Behaviour-change list.** One row per observable change: before, now, the record that requires
    it, who could notice. Rows tied to no record go back to the old behaviour. The developer approves
    the list.
-3. **Tests in this order.** The suites the change reaches, on both backends; then `pnpm gate`, once,
-   as the last step. The purpose suites (wish
-   `wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni`) run in the gate on every
-   change that reaches `src/`, together with the suites the nightly's coverage map says executed a
-   changed line. The full E2E sweep on both backends runs only when the developer has looked at the
-   round and says so, or asks for it, and then on GitHub (`pnpm nightly:preflight --dispatch`). Never
-   start it on your own; report the targeted results and the gate, and ask.
+3. **Tests in this order** (CLAUDE.md, Git). The suites the change reaches, on both backends, while
+   the work is in progress; `pnpm check:fast` once when it looks done, every red line fixed in one
+   go; then `pnpm ready`, which runs the full E2E sweep (the purpose suites of wish
+   `wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni` included) and the builds on
+   GitHub and puts the round on `main` only when green. A round that changes a behaviour waits for
+   the developer's approval of the list above before `pnpm ready`.
 
 **The purpose tier** is the automated form of the list above: `PURPOSE_SUITES` in
 `aimeat/test/run-e2e-ci.ts` (`pnpm test:e2e:purpose:sqlite`, `:postgres-kysely`), which `pnpm gate`

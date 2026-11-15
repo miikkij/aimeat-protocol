@@ -106,6 +106,7 @@
     "typecheck:frontend": "tsc --noEmit -p tsconfig.frontend.json --incremental --tsBuildInfoFile node_modules/.cache/tsc/frontend.tsbuildinfo",
     "typecheck:sdk": "tsc --noEmit -p tsconfig.sdk.json --incremental --tsBuildInfoFile node_modules/.cache/tsc/sdk.tsbuildinfo",
     "check:fast": "tsx scripts/check-fast.ts",
+    "ready": "tsx scripts/ready.ts",
     "check:invariants": "tsx scripts/check-invariants.ts",
     "test:changed": "vitest run --changed --passWithNoTests",
     "gate": "tsx scripts/gate.ts",

@@ -1,0 +1,101 @@
+/**
+ * @file scripts/lib/machine-lock.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One holder at a time, machine-wide, for a run that every session on this machine may
+ *   start and that only slows the others down when two run together.
+ *
+ *   WHY. On 2026-11-15 three sessions ran `pnpm check:fast` at the same moment on one laptop, and its
+ *   check-field-reach step took 25 to 35 minutes in each instead of a few: the three runs competed
+ *   for the same cores, every node boot in every other session's E2E run missed its 60 s limit, and
+ *   no work moved for an afternoon. One run at a time finishes all three sooner than three at once.
+ *
+ *   HOW. A lock is a directory under the user's home (shared by every worktree and session), made with
+ *   a non-recursive mkdir, so EEXIST is the answer "somebody holds it". The holder writes who it is.
+ *   A lock whose holder process is gone, or that is older than `staleMs`, is passed over. A waiting
+ *   run says once whom it waits for, and keeps waiting until `timeoutMs`.
+ * @structure machineLockRoot() · acquireMachineLock(name, owner, opts) · releaseMachineLock(held)
+ * @usage
+ *   const held = await acquireMachineLock('check-fast', { session, worktree }, { onWait: h => console.log(...) });
+ *   try { ... } finally { releaseMachineLock(held); }
+ * @version-history
+ *   v1.0.0 — 2026-11-15 — Initial: check:fast runs one at a time on a machine.
+ */
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
+export interface MachineLockOwner { session: string; worktree: string }
+export interface MachineLockRecord extends MachineLockOwner { name: string; pid: number; at: string }
+export interface MachineLockOptions {
+    /** Give up after this long, naming the holder. */
+    timeoutMs?: number;
+    pollMs?: number;
+    /** A lock older than this is passed over whatever its holder says. */
+    staleMs?: number;
+    /** Called once, when the lock is held by someone else. */
+    onWait?: (holder: MachineLockRecord | null) => void;
+    /** The lock directory, for tests. */
+    root?: string;
+    pid?: number;
+}
+
+export function machineLockRoot(): string {
+    return process.env.AIMEAT_MACHINE_LOCK_DIR || join(homedir(), '.aimeat-machine-locks');
+}
+
+function holderOf(dir: string): MachineLockRecord | null {
+    try { return JSON.parse(readFileSync(join(dir, 'owner.json'), 'utf-8')) as MachineLockRecord; }
+    catch { return null; } // made a moment ago and not written yet: the age decides
+}
+
+function alive(pid: number): boolean {
+    try { process.kill(pid, 0); return true; }
+    catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM'; }
+}
+
+function abandoned(dir: string, staleMs: number): boolean {
+    let ageMs: number;
+    try { ageMs = Date.now() - statSync(dir).mtimeMs; }
+    catch { return false; } // removed between the failed mkdir and this look: the next try takes it
+    if (ageMs > staleMs) return true;
+    const holder = holderOf(dir);
+    if (!holder) return ageMs > 2000;
+    return !alive(holder.pid);
+}
+
+/** Take the lock `name`, waiting while another run holds it. */
+export async function acquireMachineLock(name: string, owner: MachineLockOwner, opts: MachineLockOptions = {}): Promise<{ dir: string }> {
+    const root = opts.root ?? machineLockRoot();
+    const pid = opts.pid ?? process.pid;
+    const timeoutMs = opts.timeoutMs ?? 90 * 60_000;
+    const pollMs = opts.pollMs ?? 2000;
+    const staleMs = opts.staleMs ?? 90 * 60_000;
+    const dir = join(root, name);
+    mkdirSync(root, { recursive: true });
+    const deadline = Date.now() + timeoutMs;
+    let told = false;
+    for (;;) {
+        try {
+            mkdirSync(dir);
+            const record: MachineLockRecord = { ...owner, name, pid, at: new Date().toISOString() };
+            writeFileSync(join(dir, 'owner.json'), JSON.stringify(record), 'utf-8');
+            return { dir };
+        } catch (e) {
+            if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+            if (abandoned(dir, staleMs)) { rmSync(dir, { recursive: true, force: true }); continue; }
+        }
+        const holder = holderOf(dir);
+        if (!told) { told = true; opts.onWait?.(holder); }
+        if (Date.now() >= deadline) {
+            throw new Error(`${name} is held by ${holder ? `${holder.session} (${holder.worktree}, pid ${holder.pid}, since ${holder.at})` : 'another run'} `
+                + `and did not come free in ${Math.round(timeoutMs / 60_000)} min. If that run is gone, remove ${dir}.`);
+        }
+        await new Promise(r => setTimeout(r, pollMs));
+    }
+}
+
+/** Give the lock back. Safe to call twice. */
+export function releaseMachineLock(held: { dir: string }): void {
+    rmSync(held.dir, { recursive: true, force: true });
+}
