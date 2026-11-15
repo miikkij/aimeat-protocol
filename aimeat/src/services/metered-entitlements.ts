@@ -355,7 +355,7 @@ export async function listAllEntitlements(storage: Storage): Promise<MeteredEnti
  * The records under `prefix` in the service namespace `ns`, and nowhere else. The service writes its
  * rows only there (persistEntitlement, archiveEntitlement), while the key prefixes are open to any
  * memory writer, so a record of the same key shape in another namespace is not the service's
- * (the a2apeer rule, services/a2a-foreign.ts). ownerPrefix narrows the scan in the database; the exact
+ * (the a2apeer rule, services/a2a/foreign.ts). ownerPrefix narrows the scan in the database; the exact
  * test keeps out a namespace that only starts with the same letters, such as the history namespace,
  * which starts with the contract namespace's name.
  */

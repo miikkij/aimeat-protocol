@@ -152,7 +152,7 @@ export function registerAgentCardRoutes(router: Router, config: AimeatConfig, st
    * who it IS.
    *
    * `issuedAt` moves, deliberately. Nothing pins the card — the A2A trust-on-first-use pin holds
-   * `keyX` and `kid`, and `cardUri` is re-read on every sighting (services/a2a-foreign.ts) — so a
+   * `keyX` and `kid`, and `cardUri` is re-read on every sighting (services/a2a/foreign.ts) — so a
    * re-issue under the same key is invisible to a peer that has met this agent before. Checked
    * against that code rather than assumed.
    */

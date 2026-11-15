@@ -31,7 +31,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { apexOnly } from './agent-docs.js';
 import { agentSkillsIndex } from './agent-skills-discovery.js';
-import { publishedAgentOfferings } from '../services/a2a-offering.js';
+import { publishedAgentOfferings } from '../services/a2a/offering.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { logger } from '../utils/logger.js';
 

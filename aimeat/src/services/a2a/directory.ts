@@ -1,5 +1,5 @@
 /**
- * @file src/services/a2a-directory.ts
+ * @file src/services/a2a/directory.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's A2A directory: the card at /.well-known/agent-card.json and the JSON-RPC
@@ -15,7 +15,7 @@
  *   stored, and the caller's message is not read beyond being well formed.
  *
  *   PUBLIC, like the card. The list is the agents whose owners published an offering, which is the
- *   consent this node already uses for strangers (services/a2a-offering.ts), and the interface
+ *   consent this node already uses for strangers (services/a2a/offering.ts), and the interface
  *   answers exactly what the public card says.
  * @structure directoryInterfaceUrl(config) · directoryAgents(config, storage) ·
  *   directoryCard(config, agents) · DirectoryA2AHandler
@@ -40,10 +40,10 @@ import {
   JsonRpcTaskNotFoundError, JsonRpcRequestMalformedError, JsonRpcUnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { publishedAgentOfferings } from './a2a-offering.js';
-import { directoryDescriptionFor } from './a2a-card.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { publishedAgentOfferings } from './offering.js';
+import { directoryDescriptionFor } from './card.js';
 
 /** The A2A version nearly every client speaks today; the SDK's compat layer answers it (a2a-card.ts). */
 const A2A_LEGACY_VERSION = '0.3';

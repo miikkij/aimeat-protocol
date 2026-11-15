@@ -1,5 +1,5 @@
 /**
- * @file src/services/a2a-foreign-handler.ts
+ * @file src/services/a2a/foreign-handler.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The A2A surface a FOREIGN agent gets: hire this agent against something it has
@@ -66,26 +66,26 @@ import {
   JsonRpcTaskNotFoundError, JsonRpcRequestMalformedError, JsonRpcUnsupportedOperationError,
   JsonRpcTaskNotCancelableError, JsonRpcTransportError,
 } from '@a2a-js/sdk/errors';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { fromA2APart } from './a2a-projection.js';
-import { findSellableOffering, priceForForeignCaller, A2A_X402_EXTENSION } from './a2a-offering.js';
-import type { ForeignPeer } from './a2a-foreign.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { fromA2APart } from './projection.js';
+import { findSellableOffering, priceForForeignCaller, A2A_X402_EXTENSION } from './offering.js';
+import type { ForeignPeer } from './foreign.js';
 import {
   newWorkId, putWork, getWork, isOpenForPayment, claimWorkForPayment, settleWorkPayment, releaseWorkPayment,
   cancelOpenWork, type AgentWork,
-} from './exchange/work.js';
-import { refundCollected, refundSentence, recordUndeliveredPayment } from '../commerce/undelivered-payment.js';
-import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
-import { getPaymentHandler } from '../commerce/payment-handlers.js';
-import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
-import { PossiblePaymentError, recordPossiblePayment } from '../commerce/possible-payment.js';
-import { decodeXPayment } from '../commerce/x402-facilitator.js';
-import { settleSessionlessSale } from '../commerce/session-service.js';
-import { commerceFeePercent } from './marketplace-fee.js';
-import { percentFee } from '../commerce/money.js';
-import { notify } from './notify.js';
-import { logger } from '../utils/logger.js';
+} from '../exchange/work.js';
+import { refundCollected, refundSentence, recordUndeliveredPayment } from '../../commerce/undelivered-payment.js';
+import type { CheckoutSessionRecord, PaymentHandler } from '../../commerce/types.js';
+import { getPaymentHandler } from '../../commerce/payment-handlers.js';
+import { X402_HANDLER_ID } from '../../commerce/x402-handler.js';
+import { PossiblePaymentError, recordPossiblePayment } from '../../commerce/possible-payment.js';
+import { decodeXPayment } from '../../commerce/x402-facilitator.js';
+import { settleSessionlessSale } from '../../commerce/session-service.js';
+import { commerceFeePercent } from '../marketplace-fee.js';
+import { percentFee } from '../../commerce/money.js';
+import { notify } from '../notify.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * The refusals this door has that A2A does not name, in the -32000..-32099 range JSON-RPC leaves to

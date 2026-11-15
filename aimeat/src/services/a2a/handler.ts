@@ -1,5 +1,5 @@
 /**
- * @file src/services/a2a-handler.ts
+ * @file src/services/a2a/handler.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description This node's agents, answering A2A. One `A2ARequestHandler` per (agent, caller),
@@ -43,17 +43,17 @@ import {
   JsonRpcTaskNotFoundError, JsonRpcTaskNotCancelableError, JsonRpcRequestMalformedError,
   JsonRpcPushNotificationNotSupportedError,
 } from '@a2a-js/sdk/errors';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord, AgentV2TaskRecord, MessagePart } from '../storage/interface.js';
-import { toA2ATask, toA2APushConfig, fromA2APart } from './a2a-projection.js';
-import { statusesForA2AState, matchesA2AState } from './a2a-task-state.js';
-import { a2aExtendedCardFrom } from './a2a-card.js';
-import { streamTask } from './a2a-stream.js';
-import { createTask, getTask, cancelTask, listTasks } from './agent/v2-tasks-ops.js';
-import { sendTurn, setPushTarget, listPushTargets, deletePushTarget, type Principal, type OpResult } from './agent/v2-messaging-ops.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { isOwnerInPerson } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord, AgentV2TaskRecord, MessagePart } from '../../storage/interface.js';
+import { toA2ATask, toA2APushConfig, fromA2APart } from './projection.js';
+import { statusesForA2AState, matchesA2AState } from './task-state.js';
+import { a2aExtendedCardFrom } from './card.js';
+import { streamTask } from './stream.js';
+import { createTask, getTask, cancelTask, listTasks } from '../agent/v2-tasks-ops.js';
+import { sendTurn, setPushTarget, listPushTargets, deletePushTarget, type Principal, type OpResult } from '../agent/v2-messaging-ops.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * A caller at this door: the principal, plus the scopes it holds.
@@ -87,7 +87,7 @@ function asRpcError(out: Extract<OpResult<unknown>, { ok: false }>): Error {
   return new Error(out.message);
 }
 
-// The state relation lives in services/a2a-task-state.ts. `statusesForA2AState` narrows the QUERY;
+// The state relation lives in services/a2a/task-state.ts. `statusesForA2AState` narrows the QUERY;
 // `matchesA2AState` decides. This file used to hold its own BACKWARDS copy of the table, and it
 // disagreed with the two forward ones: REJECTED narrowed to `failed` and stopped there, so a client
 // asking for what was refused was handed everything that broke. → pitfalls §43

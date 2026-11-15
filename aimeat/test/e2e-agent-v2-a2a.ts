@@ -117,7 +117,7 @@ interface Stranger {
     assertion(lifetimeSeconds?: number): Promise<string>;
 }
 
-/** The A2A refusals this node names that the protocol does not. Mirrors src/services/a2a-foreign-handler.ts. */
+/** The A2A refusals this node names that the protocol does not. Mirrors src/services/a2a/foreign-handler.ts. */
 const FOREIGN_CODE = {
     NOTHING_FOR_SALE: -32040,
     OFFERING_NOT_NAMED: -32041,
@@ -493,7 +493,7 @@ async function run(): Promise<void> {
     //
     // The list filter knew only the status. Asking for REJECTED narrowed the query to `failed` and
     // stopped there, so a client asking what had been REFUSED was handed everything that had
-    // BROKEN. The relation lives in services/a2a-task-state.ts now, and the filter is the forward
+    // BROKEN. The relation lives in services/a2a/task-state.ts now, and the filter is the forward
     // mapping read as a question, so the two cannot drift apart again. → pitfalls §43
     await test('ListTasks(REJECTED) returns what was refused and not what broke', async () => {
         const made: Record<string, string> = {};

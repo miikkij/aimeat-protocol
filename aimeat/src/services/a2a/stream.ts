@@ -1,5 +1,5 @@
 /**
- * @file a2a-stream.ts
+ * @file src/services/a2a/stream.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A2A streaming: one task, watched until it settles.
@@ -31,14 +31,14 @@
  * @version-history
  *   v1.0.0 — 2026-09-04 — Initial: message/stream and SubscribeToTask stop refusing.
  */
-import type { Storage, AgentV2TaskRecord, AgentV2MessageRecord } from '../storage/interface.js';
+import type { Storage, AgentV2TaskRecord, AgentV2MessageRecord } from '../../storage/interface.js';
 import type { Task } from '@a2a-js/sdk';
-import { onTaskMoved, offTaskMoved, type TaskMovedEvent } from './event-bus.js';
-import { getTask } from './agent/v2-tasks-ops.js';
-import type { Principal } from './agent/v2-messaging-ops.js';
-import { toA2ATask } from './a2a-projection.js';
-import { isTerminal } from '../models/agent-v2-task.js';
-import { logger } from '../utils/logger.js';
+import { onTaskMoved, offTaskMoved, type TaskMovedEvent } from '../event-bus.js';
+import { getTask } from '../agent/v2-tasks-ops.js';
+import type { Principal } from '../agent/v2-messaging-ops.js';
+import { toA2ATask } from './projection.js';
+import { isTerminal } from '../../models/agent-v2-task.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * How long one stream may hold a connection. Half an hour: long enough that a real piece of work

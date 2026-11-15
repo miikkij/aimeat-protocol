@@ -1,5 +1,5 @@
 /**
- * @file a2a-task-state.ts
+ * @file src/services/a2a/task-state.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description ONE table for the relation between a task's state here and its state in A2A.
@@ -27,12 +27,12 @@
  *   - statusesForA2AState(state) — the coarse status prefilter for a query
  *   - matchesA2AState(task, state) — the exact predicate, derived from the forward answer
  * @usage
- *   import { a2aStateOf, matchesA2AState, A2A_TASK_ERROR_CODE } from './a2a-task-state.js';
+ *   import { a2aStateOf, matchesA2AState, A2A_TASK_ERROR_CODE } from './task-state.js';
  * @version-history
  *   v1.0.0 — 2026-09-04 — Extracted from three call sites; REJECTED stops filtering as FAILED.
  */
 import { TaskState } from '@a2a-js/sdk';
-import type { AgentV2TaskRecord, AgentV2TaskStatus } from '../storage/types/agent-v2-tasks.js';
+import type { AgentV2TaskRecord, AgentV2TaskStatus } from '../../storage/types/agent-v2-tasks.js';
 
 /**
  * The two error codes that mean a STATE rather than a fault.

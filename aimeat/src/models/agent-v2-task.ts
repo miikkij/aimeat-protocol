@@ -24,7 +24,7 @@
  */
 import type { AgentV2TaskRecord, AgentV2TaskStatus, MessagePart } from '../storage/interface.js';
 import { V2_TASK_STATUSES } from '../storage/types/agent-v2-tasks.js';
-import { a2aStateOf } from '../services/a2a-task-state.js';
+import { a2aStateOf } from '../services/a2a/task-state.js';
 import { validatePartsArray, type MessageDefect } from './agent-v2-message.js';
 
 /** What a stored task says it is, for a reader that meets one on its own. */
@@ -64,7 +64,7 @@ export function allowedFrom(): AgentV2TaskStatus[] {
  * `unknown` is never produced: a task this node holds is in a state it knows.
  */
 export function a2aState(task: Pick<AgentV2TaskRecord, 'status' | 'startedAt' | 'error'>): string {
-  // ONE LINE, because the relation lives in services/a2a-task-state.ts. It was written out here and
+  // ONE LINE, because the relation lives in services/a2a/task-state.ts. It was written out here and
   // again as a protobuf enum in a2a-projection.ts, on the reasoning that a string a person reads and
   // a wire enum are different things. A THIRD copy then went backwards in a2a-handler.ts, disagreed
   // with both, and filtered A2A's `rejected` as every failure. Two copies do not agree by being

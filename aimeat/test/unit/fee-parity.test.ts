@@ -83,12 +83,12 @@ describe('both call sites read the same configuration value', () => {
     });
 
     it('the A2A foreign handler calls commerceFeePercent', () => {
-        expect(read('services/a2a-foreign-handler.ts'))
+        expect(read('services/a2a/foreign-handler.ts'))
             .toContain('percentFee(priced.price.amount, commerceFeePercent(this.config))');
     });
 
     it('and neither has grown a second percentage of its own', () => {
-        for (const file of ['commerce/session-service.ts', 'services/a2a-foreign-handler.ts']) {
+        for (const file of ['commerce/session-service.ts', 'services/a2a/foreign-handler.ts']) {
             const src = read(file);
             // A literal percentage next to the word fee is the shape this test exists to refuse.
             expect(src).not.toMatch(/fee\s*=\s*[^;\n]*\*\s*0?\.\d/);

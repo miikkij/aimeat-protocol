@@ -28,7 +28,7 @@
       "spec": "https://a2a-protocol.org/latest/specification/",
       "weDeclare": "0.3",
       "declaredIn": [
-        { "file": "src/services/a2a-card.ts", "template": "const A2A_LEGACY_VERSION = '{version}'" }
+        { "file": "src/services/a2a/card.ts", "template": "const A2A_LEGACY_VERSION = '{version}'" }
       ],
       "current": "1.0.0",
       "verifiedOn": "2026-09-04",

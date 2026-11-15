@@ -25,7 +25,7 @@
  *   v1.0.0 — 2026-09-04 — Initial, with the fix it exists to hold.
  */
 import { describe, it, expect } from 'vitest';
-import { a2aCardFor, directoryDescriptionFor } from '../../src/services/a2a-card.js';
+import { a2aCardFor, directoryDescriptionFor } from '../../src/services/a2a/card.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { AgentRecord } from '../../src/storage/interface.js';
 

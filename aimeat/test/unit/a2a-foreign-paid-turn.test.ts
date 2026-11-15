@@ -27,7 +27,7 @@ import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { registerPaymentHandler } from '../../src/commerce/payment-handlers.js';
 import { X402_HANDLER_ID } from '../../src/commerce/x402-handler.js';
-import type { ForeignPeer } from '../../src/services/a2a-foreign.js';
+import type { ForeignPeer } from '../../src/services/a2a/foreign.js';
 
 const RUN = randomUUID().slice(0, 8);
 const NODE_ID = `a2a-paid-${RUN}`;
@@ -35,8 +35,8 @@ const SELLER = `alice${RUN}`;
 const SELLER_GHII = `${SELLER}@${NODE_ID}`;
 const PRICE = 2_500_000;
 
-vi.mock('../../src/services/a2a-offering.js', async (importOriginal) => {
-  const real = await importOriginal<typeof import('../../src/services/a2a-offering.js')>();
+vi.mock('../../src/services/a2a/offering.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../src/services/a2a/offering.js')>();
   const offering = () => ({
     offeringId: 'off-1', providerGhii: SELLER_GHII, providerOwner: SELLER, ext: `agentwork:${SELLER}/worker`,
     action: 'summarize', unit: 'money', title: 'Summarise', kind: 'agent-work', state: 'listed',
@@ -52,7 +52,7 @@ vi.mock('../../src/services/a2a-offering.js', async (importOriginal) => {
   };
 });
 
-const { ForeignA2AHandler } = await import('../../src/services/a2a-foreign-handler.js');
+const { ForeignA2AHandler } = await import('../../src/services/a2a/foreign-handler.js');
 
 type TestStorage = Storage & { close(): void | Promise<void> };
 

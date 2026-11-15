@@ -252,7 +252,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | FED-16 | **gap** | `aimeat/src/routes/federation-auth.ts:83-222` | The home node checks the tier ceiling for federated sign-in, not the peer's own permission word (`federation-auth.ts:101`). |
 | FED-17 | met | `aimeat/src/auth/account-security.ts:95-101`; `aimeat/src/auth/jwt.ts:250-254` | |
 | FED-18 | met | Same read decision path (`aimeat/src/services/access-guard.ts:134-238`) | |
-| FED-19 | met | `aimeat/src/services/a2a-foreign.ts:5-35` | |
+| FED-19 | met | `aimeat/src/services/a2a/foreign.ts:5-35` | |
 | FED-20 | met | `aimeat/src/services/memory/replication.ts:103-126,203,212`; `aimeat/src/services/classification-exits.ts:68-79` | |
 | FED-21 | met | `aimeat/src/utils/visibility-words.ts:52-63`; `aimeat/src/services/memory/replication.ts:413-414` | |
 | FED-22 | met | `aimeat/src/services/memory/replication.ts:230` | The SHOULD is not met: the reference is outside the signed payload (`:166-174`) and the receiver does not check it (`aimeat/src/routes/federation-sync/messaging.ts:215-331`). |

@@ -1,5 +1,5 @@
 /**
- * @file src/services/a2a-offering.ts
+ * @file src/services/a2a/offering.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a foreign A2A caller is allowed to ask for, and what it costs.
@@ -28,17 +28,17 @@
  *     a2a-foreign-handler/deactivated-provider-offering-quoted-and-charged).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a foreign path).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord } from '../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
 import {
   filterOfferings, resolveOfferingPricing, agentWorkCoordinate, type Offering,
-} from './exchange/market.js';
-import { isMoneyCurrency } from '../commerce/money.js';
-import { buildGAII } from '../utils/gaii.js';
-import { deactivatedSince } from './account-deactivated.js';
+} from '../exchange/market.js';
+import { isMoneyCurrency } from '../../commerce/money.js';
+import { buildGAII } from '../../utils/gaii.js';
+import { deactivatedSince } from '../account-deactivated.js';
 import {
   getX402Network, getX402Asset, buildExactRequirements, extractPayTo,
-} from '../commerce/x402-facilitator.js';
+} from '../../commerce/x402-facilitator.js';
 
 /**
  * The A2A extension this node declares when an agent has something for sale.

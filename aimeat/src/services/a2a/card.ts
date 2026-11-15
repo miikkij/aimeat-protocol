@@ -1,5 +1,5 @@
 /**
- * @file src/services/a2a-card.ts
+ * @file src/services/a2a/card.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One of this node's agents, described as an A2A AgentCard.
@@ -31,9 +31,9 @@
  */
 import type { AgentCard } from '@a2a-js/sdk';
 import { A2A_PROTOCOL_VERSION } from '@a2a-js/sdk';
-import type { Offering } from './exchange/market.js';
-import { A2A_X402_EXTENSION } from './a2a-offering.js';
-import { FOREIGN_HEADERS } from './a2a-foreign.js';
+import type { Offering } from '../exchange/market.js';
+import { A2A_X402_EXTENSION } from './offering.js';
+import { FOREIGN_HEADERS } from './foreign.js';
 
 /**
  * The A2A version almost every client in the world speaks today. The SDK ships a compatibility
@@ -42,13 +42,13 @@ import { FOREIGN_HEADERS } from './a2a-foreign.js';
  * A card that declared 1.0 alone would be correct and unreachable.
  */
 const A2A_LEGACY_VERSION = '0.3';
-import type { AimeatConfig } from '../config.js';
-import type { AgentRecord } from '../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { AgentRecord } from '../../storage/interface.js';
 
 /** What this door does and does not do. Read by the card and by the handler's refusals. */
 export const A2A_SURFACE = {
   // On since 2026-09-04. `message/stream` and `SubscribeToTask` yield the whole task on every move
-  // until it settles; services/a2a-stream.ts says why whole tasks rather than deltas, and what
+  // until it settles; services/a2a/stream.ts says why whole tasks rather than deltas, and what
   // makes the stream end.
   streaming: true,
   pushNotifications: true,

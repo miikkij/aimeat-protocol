@@ -1,5 +1,5 @@
 /**
- * @file src/services/a2a-projection.ts
+ * @file src/services/a2a/projection.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What this node already stores, said in A2A's words. Pure functions: no I/O, no
@@ -28,8 +28,8 @@
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a).
  */
 import { TaskState, Role, type Part, type Message, type Task, type TaskPushNotificationConfig } from '@a2a-js/sdk';
-import type { AgentV2MessageRecord, AgentV2TaskRecord, AgentV2PushConfigRecord, MessagePart } from '../storage/interface.js';
-import { a2aTaskStateOf } from './a2a-task-state.js';
+import type { AgentV2MessageRecord, AgentV2TaskRecord, AgentV2PushConfigRecord, MessagePart } from '../../storage/interface.js';
+import { a2aTaskStateOf } from './task-state.js';
 
 /** One of our parts, as an A2A part. */
 export function toA2APart(part: MessagePart): Part {
@@ -97,7 +97,7 @@ export function toA2AMessage(m: AgentV2MessageRecord): Message {
  * A2A answer "share a bug rather than merely agreeing". The opposite is what happened: a THIRD
  * copy, the backwards one in a2a-handler.ts, disagreed with both and filtered `rejected` as every
  * failure. Two copies do not agree by being separate; they agree until one of them is edited.
- * → services/a2a-task-state.ts, which is the one table now, and pitfalls §43.
+ * → services/a2a/task-state.ts, which is the one table now, and pitfalls §43.
  */
 export function toA2ATaskState(task: Pick<AgentV2TaskRecord, 'status' | 'startedAt' | 'error'>): TaskState {
   return a2aTaskStateOf(task);

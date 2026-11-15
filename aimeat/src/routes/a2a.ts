@@ -75,14 +75,14 @@ import { requireAuth } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { buildGAII } from '../utils/gaii.js';
-import { a2aCardFor } from '../services/a2a-card.js';
-import { agentInterfaceUrl, directoryAgents, directoryCard, DirectoryA2AHandler } from '../services/a2a-directory.js';
+import { a2aCardFor } from '../services/a2a/card.js';
+import { agentInterfaceUrl, directoryAgents, directoryCard, DirectoryA2AHandler } from '../services/a2a/directory.js';
 import { oasfRecordFor } from '../services/oasf-projection.js';
-import { AimeatA2ARequestHandler } from '../services/a2a-handler.js';
-import type { A2ACaller } from '../services/a2a-handler.js';
-import { ForeignA2AHandler } from '../services/a2a-foreign-handler.js';
-import { identifyForeignCaller, FOREIGN_HEADERS } from '../services/a2a-foreign.js';
-import { offeringsForAgent } from '../services/a2a-offering.js';
+import { AimeatA2ARequestHandler } from '../services/a2a/handler.js';
+import type { A2ACaller } from '../services/a2a/handler.js';
+import { ForeignA2AHandler } from '../services/a2a/foreign-handler.js';
+import { identifyForeignCaller, FOREIGN_HEADERS } from '../services/a2a/foreign.js';
+import { offeringsForAgent } from '../services/a2a/offering.js';
 import { readAvatarsOrEmpty } from '../services/agent/avatar.js';
 import { logger } from '../utils/logger.js';
 
@@ -134,7 +134,7 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
     // A DIRECTORY THAT IS A CARD, because this path is A2A's and A2A says a card lives here. Every
     // required field is true of a directory, and since 2026-10-27 it names an interface that
     // answers: /v1/a2a/directory, where any message gets the same `agents` list back
-    // (services/a2a-directory.ts says why the empty interface list went).
+    // (services/a2a/directory.ts says why the empty interface list went).
     res.setHeader('Cache-Control', 'public, max-age=60');
     res.json(directoryCard(config, await directoryAgents(config, storage)));
   });

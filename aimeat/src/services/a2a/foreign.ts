@@ -1,5 +1,5 @@
 /**
- * @file src/services/a2a-foreign.ts
+ * @file src/services/a2a/foreign.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who is this A2A caller, when it holds no account here?
@@ -38,7 +38,7 @@
  *
  *   NOTHING HERE GRANTS ANYTHING. A verified foreign caller is a name we are willing to write down.
  *   What it may then do is decided entirely by whether a published offering says so, which is
- *   services/a2a-offering.ts and not this file.
+ *   services/a2a/offering.ts and not this file.
  *
  * @structure ForeignPeer · identifyForeignCaller() · FOREIGN_HEADERS
  * @usage const who = await identifyForeignCaller(config, storage, req.headers);
@@ -59,13 +59,13 @@
  */
 import { createHash } from 'node:crypto';
 import { compactVerify, importJWK, decodeProtectedHeader } from 'jose';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { readCardJws, verifyCardJws } from './agent/card.js';
-import { spendAssertion } from './assertion-spend.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { readJson } from '../utils/read-capped.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { readCardJws, verifyCardJws } from '../agent/card.js';
+import { spendAssertion } from '../assertion-spend.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { readJson } from '../../utils/read-capped.js';
+import { logger } from '../../utils/logger.js';
 
 /** The most of a JWKS answer this node reads. A JWKS of a few dozen keys is a few kilobytes. */
 const JWKS_MAX_BYTES = 256 * 1024;

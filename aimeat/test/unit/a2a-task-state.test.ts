@@ -21,7 +21,7 @@ import { TaskState } from '@a2a-js/sdk';
 import {
   a2aStateOf, a2aTaskStateOf, statusesForA2AState, matchesA2AState,
   A2A_TASK_ERROR_CODE, type A2AStateName, type TaskStateInput,
-} from '../../src/services/a2a-task-state.js';
+} from '../../src/services/a2a/task-state.js';
 
 /** A task shape carrying only what the relation reads. */
 const task = (over: Partial<TaskStateInput>): TaskStateInput =>

@@ -1,7 +1,7 @@
 /**
  * @file e2e-service-namespace-lists.ts
  * @description A service that lists a key prefix across the node takes only the rows in its own
- *   namespace (secaudit2026oct26, round 8, group memory-a; the a2apeer rule in services/a2a-foreign.ts).
+ *   namespace (secaudit2026oct26, round 8, group memory-a; the a2apeer rule in services/a2a/foreign.ts).
  *   Each case writes a record of the service's key shape into an account's own memory and asks the
  *   list that used to show it, and each has the legitimate use beside it:
  *     4. Beneficiary splits: GET /v1/commerce/beneficiary-splits lists the provider's declared splits
