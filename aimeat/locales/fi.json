@@ -24192,6 +24192,9 @@
         "testFailed": "Webhook-toimitus epäonnistui",
         "register": "Rekisteröi webhook",
         "remove": "Poista webhook",
+        "removeConfirm": "Osoite on tyhjä, joten tallennus poistaa webhookin. Agentti ei sen jälkeen saa tapahtumia suoraan, vaan hakee työnsä itse. Poistetaanko?",
+        "removed": "Webhook poistettu",
+        "removeFailed": "Webhookia ei poistettu. Yritä uudelleen.",
         "deliveryLog": "Toimitushistoria",
         "noDeliveries": "Ei toimituksia vielä"
       },

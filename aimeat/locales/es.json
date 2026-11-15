@@ -22244,6 +22244,9 @@
         "testFailed": "La entrega del webhook falló",
         "register": "Registrar el webhook",
         "remove": "Quitar el webhook",
+        "removeConfirm": "La dirección está vacía, así que guardar quita el webhook. Después el agente no recibe eventos y busca su trabajo por su cuenta. ¿Quitarlo?",
+        "removed": "Webhook quitado",
+        "removeFailed": "El webhook no se quitó. Inténtalo de nuevo.",
         "deliveryLog": "Registro de entregas",
         "noDeliveries": "Todavía no ha habido entregas"
       },

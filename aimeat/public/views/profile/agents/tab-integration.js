@@ -6,6 +6,8 @@
  *   during onboarding or production status (readiness, connection, platform, identity,
  *   what came after onboarding, and how to attach the agent elsewhere) after completion.
  * @version-history
+ *   v1.24.1 -- 2026-11-15 -- Saving an emptied webhook address removes the webhook (DELETE, after a
+ *     confirmation) instead of sending url "" to PUT, which refuses it.
  *   v1.24.0 -- 2026-09-26 -- onto the components: the sections are the section Card in a CardGrid (their
  *     head the section title with its date beside it, as the other agent tabs have it), the rows the
  *     Facts, the steps Marks in their Status tones, the hints and empty lines the Note, every way on an
@@ -95,12 +97,13 @@ import { Note } from '/components/Note.js';
 import { List, Row, Name, Who, When, Cell, More } from '/components/List.js';
 import { TextField } from '/components/TextField.js';
 import { Space } from '/components/Layout.js';
+import { useConfirm } from '/components/Modal.js';
 import { agentState } from './state-detector.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
 import {
   getOnboarding, startOnboarding, getIntegrationOverview,
-  getWebhookConfig, testWebhook, updateWebhook,
+  getWebhookConfig, testWebhook, updateWebhook, deleteWebhook,
   getSkillBundleVersion, getSkillBundleUrl, updateSkillBundle,
   getDeliveryLog
 } from '/js/services/agent-integration.js';
@@ -128,6 +131,7 @@ export default function TabIntegration({ agent, onboarding, showToast, agentName
   const [webhookDraft, setWebhookDraft] = useState('');
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [updatingBundle, setUpdatingBundle] = useState(false);
+  const { confirm, ConfirmUI } = useConfirm();
 
   const loadData = useCallback(async ({ showSpinner = true } = {}) => {
     if (showSpinner) setLoading(true);
@@ -237,8 +241,30 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
     setEditingWebhook(true);
   }
 
+  async function removeWebhook() {
+    setSavingWebhook(true);
+    try {
+      await deleteWebhook(agentName);
+      showToast(t('profile.agents.webhook.removed'));
+      setEditingWebhook(false);
+      loadData();
+    } catch (err) {
+      swallowed('tab-integration: removeWebhook', err);
+      showToast(t('profile.agents.webhook.removeFailed'), true);
+    }
+    setSavingWebhook(false);
+  }
+
   async function handleSaveWebhook(e) {
     e.stopPropagation();
+    // PUT /v1/agents/:name/webhook refuses an empty address (it must be a URL); an emptied address
+    // means "no webhook", which is DELETE on the same path. Nothing set and nothing typed: nothing to do.
+    if (!webhookDraft.trim()) {
+      if (!(webhook && webhook.url)) { setEditingWebhook(false); return; }
+      confirm(t('profile.agents.webhook.removeConfirm'), removeWebhook,
+        { danger: true, title: t('profile.agents.webhook.remove'), confirmLabel: t('profile.agents.webhook.remove') });
+      return;
+    }
     setSavingWebhook(true);
     try {
       await updateWebhook(agentName, { url: webhookDraft });
@@ -295,13 +321,13 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
 
   const displayDeliveries = showAllDeliveries && allDeliveries ? allDeliveries : deliveries;
 
-  return renderProductionView({
+  return html`<${ConfirmUI} />${renderProductionView({
     agent, onboarding, webhook, bundleVersion, displayDeliveries, postChecklist,
     handleTestWebhook, testing, handleRerun, rerunning, handleShowAll, showAllDeliveries,
     editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook,
     handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle,
     curlText, installCmdText, agentPromptText,
-  });
+  })}`;
 }
 
 /* ── The pieces every section is built from ────────────────────────────────────────────────── */

@@ -5,6 +5,8 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.32.1 -- 2026-11-15 -- The problem panel's address field: saving it emptied removes the webhook
+ *     (DELETE, after a confirmation) instead of sending url "" to PUT, which refuses it.
  *   v2.32.0 -- 2026-10-19 -- The closed row (Jouni, 2026-10-19): the mode, platform and federation tags stand in their own column before how it runs; what the agent works on now stands in brackets after its name (`doing`, the title of its active task), nothing while it is idle; something unseen is a short line under the picture (Name `flag`) in place of the dot before it.
  *   v2.31.0 -- 2026-10-19 -- The agent's own picture (components/AgentAvatar.js) stands before its name on the closed row and the open card's title, when the agent has set one; without one both look as before.
  *   v2.30.0 -- 2026-10-18 -- InvitesLine: the open card says when the agent may invite people (organism:invite).
@@ -158,7 +160,8 @@ import { ClearanceLine } from './agent-card-clearance.js';
 import { templateLabel } from './scope-config.js';
 import { detectTemplate } from './scope-model.js';
 import { agentGaii } from './tab-helpers.js';
-import { testWebhook, updateWebhook } from '/js/services/agent-integration.js';
+import { testWebhook, updateWebhook, deleteWebhook } from '/js/services/agent-integration.js';
+import { useConfirm } from '/components/Modal.js';
 import TabReadme from './tab-readme.js';
 import TabIntegration from './tab-integration.js';
 import TabTasks from './tab-tasks.js';
@@ -663,6 +666,7 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
   const [editingUrl, setEditingUrl] = useState(false);
   const [urlValue, setUrlValue] = useState(agent.webhook_url || agent.webhookUrl || '');
   const [testing, setTesting] = useState(false);
+  const { confirm, ConfirmUI } = useConfirm();
 
   async function handleTestWebhook(e) {
     e.stopPropagation();
@@ -681,8 +685,27 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
     setTesting(false);
   }
 
+  async function removeWebhook() {
+    try {
+      await deleteWebhook(agent.name);
+      showToast(t('profile.agents.webhook.removed'));
+      setEditingUrl(false);
+    } catch (err) {
+      swallowed('agent-card: removeWebhook', err);
+      showToast(t('profile.agents.webhook.removeFailed'), true);
+    }
+  }
+
   async function handleSaveUrl(e) {
     e.stopPropagation();
+    // PUT /v1/agents/:name/webhook refuses an empty address; an emptied address means "no webhook",
+    // which is DELETE on the same path. Nothing set and nothing typed: nothing to do.
+    if (!urlValue.trim()) {
+      if (!(agent.webhook_url || agent.webhookUrl || agent?.health?.delivery?.webhook_configured)) { setEditingUrl(false); return; }
+      confirm(t('profile.agents.webhook.removeConfirm'), removeWebhook,
+        { danger: true, title: t('profile.agents.webhook.remove'), confirmLabel: t('profile.agents.webhook.remove') });
+      return;
+    }
     try {
       const resp = await updateWebhook(agent.name, { url: urlValue });
       if (resp?.ok !== false) {
@@ -715,6 +738,7 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
   };
 
   return html`
+    <${ConfirmUI} />
     <${Note} kind="aside" size="small">
       ${zoneTitle(t('profile.agents.detail.zone2.problemTitle'))}
       <div>

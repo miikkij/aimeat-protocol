@@ -23425,6 +23425,9 @@
         "testFailed": "Webhook delivery failed",
         "register": "Register webhook",
         "remove": "Remove webhook",
+        "removeConfirm": "The address is empty, so saving removes the webhook. The agent then gets no events sent to it and fetches its work itself. Remove it?",
+        "removed": "Webhook removed",
+        "removeFailed": "The webhook was not removed. Try again.",
         "deliveryLog": "Delivery Log",
         "noDeliveries": "No deliveries yet"
       },
