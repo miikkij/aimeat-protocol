@@ -38,6 +38,9 @@
  *   - The account's own tools: secrets, access, usage report, agent statistics
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-admin-tools
  * @version-history
+ *   v1.2.1 — 2026-11-15 — aimeat_admin_hooks: the overview is held to the node's own moment list
+ *     (HOOK_NAMES) and to the five gates by name, not to a count of eleven, which two notify moments
+ *     added on 2026-11-14 had made false (nightly 43656769268).
  *   v1.2.0 — 2026-10-21 — aimeat_secret_host_set and aimeat_secret_approval_withdraw: the address
  *     without the value, another owner refused, and neither offered to '*'.
  *   v1.1.0 — 2026-10-17 —aimeat_usage_report misses only wallet:read for a memory:read agent, a
@@ -49,6 +52,7 @@ import { registerOwner, ownerSignIn, type RegisteredOwner } from './helpers/owne
 import { makeAgent, openSession, callTool, toolNames, type McpSession, type McpAgent } from './helpers/mcp-session.js';
 import { buildIdpMetadataXml, FAKE_IDP } from './helpers/fake-saml-idp.js';
 import { CONNECT_CLI_TOOLS } from '../src/tool-dispatch/index.js';
+import { HOOK_NAMES } from '../src/services/hooks.js';
 import { AimeatClient } from '../src/tool-dispatch/api-client.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -245,10 +249,17 @@ console.log('\nHooks');
 
 let actionRef = '';
 
-await test("aimeat_admin_hooks: refused to the ordinary owner's agent; the operator's agent reads the eleven moments", async () => {
+// The gates that decide whether a thing happens. A notify moment may be added (two came with Ask
+// someone who knows on 2026-11-14) without touching this suite; a gate disappearing must not.
+const GATE_MOMENTS = ['pre_owner_registration', 'pre_agent_registration', 'pre_work_request', 'pre_board_post', 'pre_federation_peer'];
+
+await test("aimeat_admin_hooks: refused to the ordinary owner's agent; the operator's agent reads every moment the node fires", async () => {
     assertHandlerRefusal(await callTool(memAdmin, 'aimeat_admin_hooks', {}), 'member hooks');
     const r = await callTool(opAdmin, 'aimeat_admin_hooks', {});
-    assert(!r.isError && Array.isArray(r.data.hooks) && r.data.hooks.length === 11, `operator hooks: ${r.text.slice(0, 300)}`);
+    assert(!r.isError && Array.isArray(r.data.hooks), `operator hooks: ${r.text.slice(0, 300)}`);
+    const listed = r.data.hooks.map((h: any) => h.name);
+    assert(JSON.stringify([...listed].sort()) === JSON.stringify([...HOOK_NAMES].sort()), `the overview lists exactly the node's moments: ${JSON.stringify(listed)}`);
+    for (const g of GATE_MOMENTS) assert(listed.includes(g), `the gate ${g} is listed`);
 });
 
 await test("aimeat_admin_hook_set: refused to the ordinary owner's agent, nothing bound; the operator's agent binds a published action", async () => {

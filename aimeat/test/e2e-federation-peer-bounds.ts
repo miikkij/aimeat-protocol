@@ -38,6 +38,9 @@
  *   6 own node id · 7 replicas
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-bounds
  * @version-history
+ *   2026-11-15 — V2: the operator's notice is read for the node id, its address and the key, not for
+ *     the words "different key", which the plain-words rewrite of 2026-11-14 removed (nightly
+ *     43656769268).
  *   2026-10-31 — C1-C4: a peer's settlement past the node's daily ceiling is refused (429), recorded on
  *     the Security page and told to the operators; the operator gives a peer no limit or a ceiling of
  *     its own through the settlement-ceiling door or the peer policy door (secaudit2026oct31w2 round 10,
@@ -510,7 +513,10 @@ try {
         assert(asks.length === 1, `the operator gets one notice: ${JSON.stringify(asks.map(a => a.title))}`);
         const ids = (asks[0].actions ?? []).map((a: any) => a.id).sort();
         assert(JSON.stringify(ids) === JSON.stringify(['allow', 'deny']), `with Allow and Don't allow: ${JSON.stringify(asks[0].actions)}`);
-        assert(String(asks[0].body).includes('different key'), `in plain words: ${asks[0].body}`);
+        // The notice names the node, the address it came from and that the key differs; the exact
+        // wording is the locale's (it was rewritten on 2026-11-14), so it is not pinned here.
+        const body = String(asks[0].body);
+        assert(body.includes(X_ID) && body.includes(X_URL) && /\bkey\b/i.test(body), `in plain words, naming the node, its address and the key: ${body}`);
         const again = await introduce(X_ID, X_URL, k2, { invite_token: plainInvite.token });
         assert(again.status === 202 && again.body.data?.request_id === replaceRequest, `the same invite again answers with its waiting request: ${JSON.stringify(again.body.data)}`);
     });
