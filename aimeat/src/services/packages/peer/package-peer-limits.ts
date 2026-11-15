@@ -27,7 +27,7 @@
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage } from '../../../storage/interface.js';
 import type { PeerInfo } from '../../federation.js';
-import { listPeerOrigins, listPendingPeers, NS_PEER_ORIGIN, type PeerOriginSource } from '../../peer-origin.js';
+import { listPeerOrigins, listPendingPeers, NS_PEER_ORIGIN, type PeerOriginSource } from '../../peer/origin.js';
 import { recordSecurityIncident } from '../../security-incident.js';
 import { removePeer } from '../../federation/peer-remove.js';
 import { logger } from '../../../utils/logger.js';

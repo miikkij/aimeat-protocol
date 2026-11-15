@@ -1,5 +1,5 @@
 /**
- * @file src/services/peer-replace-ask.ts
+ * @file src/services/peer/replace-ask.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operator's one-press decision when a node presents an invite that names no node
@@ -27,16 +27,16 @@
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { randomBytes } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PeerInfo } from './federation.js';
-import { notify } from './notify.js';
-import { approverGhiis, closeQuestion } from './approval-standard.js';
-import { LINK_INVITE_GAII, consumeLinkInviteAtKey, type LinkInviteRecord } from './link-invites.js';
-import { deriveTierFlags, coerceTier } from './federation/tiers.js';
-import { performKeyExchange } from './federation/helpers.js';
-import { emitChange } from './event-bus.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { notify } from '../notify.js';
+import { approverGhiis, closeQuestion } from '../approval-standard.js';
+import { LINK_INVITE_GAII, consumeLinkInviteAtKey, type LinkInviteRecord } from '../link-invites.js';
+import { deriveTierFlags, coerceTier } from '../federation/tiers.js';
+import { performKeyExchange } from '../federation/helpers.js';
+import { emitChange } from '../event-bus.js';
+import { logger } from '../../utils/logger.js';
 
 /** The bell notice type of the question, and its locale key under `notiftext.`. */
 export const PEER_REPLACE_ASK_TYPE = 'peer_replace_ask';

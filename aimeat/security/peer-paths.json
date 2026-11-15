@@ -41,7 +41,7 @@
       "count": 1,
       "why": "claimPackageHere, behind requireOperatorPrincipal with operator:admin on POST /v1/package-claims and resolveOperatorAgentName on MCP: after the repository accepted this node's signed claim, the repository's existing peer record is saved with shareCatalogue true, so pulls reach it. Only that flag changes; the url and key are the ones linkPackagePeer pinned after the repository's own card answered with them (2026-10-02)."
     },
-    "src/services/peer-replace-ask.ts": {
+    "src/services/peer/replace-ask.ts": {
       "count": 1,
       "why": "decidePeerReplacement, from the operator's decision on a peering request (requireOperator on PUT /v1/admin/peering/requests/:id and POST …/:id/decision): replaces a peer held under another key only after an operator allowed it, with the key and url the presenting node signed its introduction with and an invite this operator minted, used at that moment at its own tier (secaudit2026oct26)."
     },

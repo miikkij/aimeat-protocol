@@ -137,12 +137,12 @@
       "digest": "sha256:7cf9129d85ecc3fb105e9a0a"
     },
     "12-updates-releases.md": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         ".github/SECURITY.md",
         "docs/operations/upgrading.md"
       ],
-      "digest": "sha256:0a728d40e3e78d9f9e16fa6a"
+      "digest": "sha256:f295b5e86ff61802b1cde501"
     },
     "13-apps-agents-endpoints.md": {
       "reviewedOn": "2026-11-15",
@@ -367,7 +367,7 @@
     },
     "12-updates-releases.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
-      "docs/operations/upgrading.md": "cb1d2e2ce541d4fa"
+      "docs/operations/upgrading.md": "75fbc8dc0c7c645d"
     },
     "13-apps-agents-endpoints.md": {
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce",

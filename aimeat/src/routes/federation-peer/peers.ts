@@ -67,7 +67,7 @@
 
 import type { Router, RequestHandler } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import { decidePeerReplacement } from '../../services/peer-replace-ask.js';
+import { decidePeerReplacement } from '../../services/peer/replace-ask.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -87,9 +87,9 @@ import {
     parseSettlementCeiling, peerSettlementCeiling, setPeerSettlementCeiling, writePeerSettlementCeiling, type SettlementCeilingSetting,
 } from '../../services/settlement-ceiling.js';
 import { promotionMetrics } from './promotion.js';
-import { describePeerOrigins } from '../../services/peer-origin-view.js';
-import { pendingRegistrationView } from '../../services/peer-origin.js';
-import { peerUrlRefusal } from '../../services/peer-url-policy.js';
+import { describePeerOrigins } from '../../services/peer/origin-view.js';
+import { pendingRegistrationView } from '../../services/peer/origin.js';
+import { peerUrlRefusal } from '../../services/peer/url-policy.js';
 import { sweepExpiredPeeringRequests, peeringRequestExpired, expiredRequestMessage } from '../../services/peering-request-expiry.js';
 
 export function registerPeersRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
@@ -147,7 +147,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         }
 
         // A node presenting an invite for a node id held under another key: the operator's answer
-        // replaces the held peer or leaves it (services/peer-replace-ask.ts; secaudit2026oct26).
+        // replaces the held peer or leaves it (services/peer/replace-ask.ts; secaudit2026oct26).
         if (request.status === 'pending') {
             const replaced = await decidePeerReplacement({ storage, config, peers }, id, decision, req.auth?.owner ?? null);
             if (replaced) {

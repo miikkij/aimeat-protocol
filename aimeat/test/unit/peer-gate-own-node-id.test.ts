@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { gatePeer } from '../../src/services/federation/peer-gate.js';
-import { peerRegistry, ownNodeIdOf } from '../../src/services/peer-registry.js';
+import { peerRegistry, ownNodeIdOf } from '../../src/services/peer/registry.js';
 import { deriveTierFlags } from '../../src/services/federation/tiers.js';
 import type { PeerInfo } from '../../src/services/federation.js';
 

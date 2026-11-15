@@ -9,7 +9,7 @@
  *   auto-approved peering request and no peer row. Until 2026-10-23 removing a peer (an emergency
  *   removal, the end of its de-peering grace, a ban) deleted the peer row and left the request standing,
  *   so the removed node came back with one key exchange (Core FED-15; secaudit2026oct22). Removal now
- *   revokes the request (services/peer-origin.ts revokePeerApprovals). The requests a removal left
+ *   revokes the request (services/peer/origin.ts revokePeerApprovals). The requests a removal left
  *   standing before that day cannot be told apart from an approval still waiting for its node's first
  *   key exchange (this node's own join writes one), so this step revokes nothing: it names each one,
  *   and the operator deletes the ones whose node they removed (DELETE /v1/admin/peering/requests/:id)

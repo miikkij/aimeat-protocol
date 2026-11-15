@@ -1,5 +1,5 @@
 /**
- * @file services/peer-incidents.ts
+ * @file src/services/peer/incidents.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Two federation events the operator learns about on the Security page, because nobody
@@ -33,10 +33,10 @@
  *   v1.0.0 — 2026-10-01 — Initial (follow-up to the peer-registration incident, items 5 and 6).
  */
 import { createHash } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import { recordSecurityIncident } from './security-incident.js';
-import { NS_PEER_ORIGIN } from './peer-origin.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import { recordSecurityIncident } from '../security-incident.js';
+import { NS_PEER_ORIGIN } from './origin.js';
+import { logger } from '../../utils/logger.js';
 
 export type PeerIncidentKind = 'proof-failed' | 'id-held';
 

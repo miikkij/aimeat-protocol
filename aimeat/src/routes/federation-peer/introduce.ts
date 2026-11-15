@@ -74,10 +74,10 @@ import { deriveTierFlags, type PeerTier } from '../../services/federation/tiers.
 import { consumeLinkInvite } from '../../services/link-invites.js';
 import { getActivePolicy, evaluateAutoAdmit } from '../../services/network-policy.js';
 import { logger } from '../../utils/logger.js';
-import { reportPeerIncident } from '../../services/peer-incidents.js';
-import { peerUrlRefusal } from '../../services/peer-url-policy.js';
+import { reportPeerIncident } from '../../services/peer/incidents.js';
+import { peerUrlRefusal } from '../../services/peer/url-policy.js';
 import { selfNodeIdMessage } from '../../services/federation/peer-gate.js';
-import { askPeerReplacement } from '../../services/peer-replace-ask.js';
+import { askPeerReplacement } from '../../services/peer/replace-ask.js';
 import { sweepExpiredPeeringRequests, peeringRequestExpired, expiredRequestMessage } from '../../services/peering-request-expiry.js';
 import { unsignedServiceSummaryAccepted, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../../config/federation.js';
 
@@ -374,7 +374,7 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         const invited = await consumeLinkInvite(storage, invite_token, node_id, { heldUnderAnotherKey });
         // An invite that names no node does not replace a peer held under another key on its own: the
         // replacement waits as a pending request the operators allow with one press, and the invite is
-        // used only then (services/peer-replace-ask.ts; secaudit2026oct26). An invite that names this
+        // used only then (services/peer/replace-ask.ts; secaudit2026oct26). An invite that names this
         // node goes straight through below.
         if (!invited.ok && invited.reason === 'held') {
             const asked = await askPeerReplacement({ storage, config }, {

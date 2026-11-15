@@ -53,7 +53,7 @@
  *     settlement, presence, memory-list and templates each name a word now.
  */
 import type { PeerInfo } from '../federation.js';
-import { ownNodeIdOf } from '../peer-registry.js';
+import { ownNodeIdOf } from '../peer/registry.js';
 
 /**
  * The permission words an inbound door may require. Deliberately a subset of the peer's flags: the

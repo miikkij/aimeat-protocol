@@ -40,7 +40,7 @@ import { emitChange } from '../event-bus.js';
 import { sendTrustNotice } from './trust-notice.js';
 import { deleteRemoteTemplates } from './remote-templates.js';
 import { peerKeyCache } from './helpers.js';
-import { forgetPeer, readPendingPeer, deletePendingPeer } from '../peer-origin.js';
+import { forgetPeer, readPendingPeer, deletePendingPeer } from '../peer/origin.js';
 import { parseGaiiLoose } from '../../utils/gaii.js';
 
 /** Replicas read per listing call while de-peering converts them, and the paging loop's stop. */

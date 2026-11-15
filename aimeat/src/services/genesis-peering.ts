@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GenesisPeerRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { peerUrlRefusal } from './peer-url-policy.js';
+import { peerUrlRefusal } from './peer/url-policy.js';
 
 export interface GenesisPeeringService {
   requestPeering(genesisNodeId: string, genesisUrl: string, publicKey: string): Promise<GenesisPeerRecord>;

@@ -66,8 +66,8 @@ import type { NodeCard } from './book.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
 import { logger } from '../../utils/logger.js';
 import { peerRelayClaimView, relayClaimSummary, type PeerRelayClaimView, type RelayClaimSummary } from '../relay-claim-policy.js';
-import { describePeerOrigins, type PeerOriginView } from '../peer-origin-view.js';
-import { pendingRegistrationView } from '../peer-origin.js';
+import { describePeerOrigins, type PeerOriginView } from '../peer/origin-view.js';
+import { pendingRegistrationView } from '../peer/origin.js';
 import { sweepExpiredPeeringRequests } from '../peering-request-expiry.js';
 
 export type FederationStanding = 'alone' | 'waiting' | 'degraded' | 'linked';

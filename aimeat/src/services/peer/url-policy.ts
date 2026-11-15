@@ -1,5 +1,5 @@
 /**
- * @file src/services/peer-url-policy.ts
+ * @file src/services/peer/url-policy.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which peer addresses a node takes: on a public node only HTTPS, on a local node HTTP
@@ -24,8 +24,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-12 — Initial (wish-core-luonnoksen-pienemm-t-aukot-tilin-poisto-peerit-http-ll-, FED-13).
  */
-import type { AimeatConfig } from '../config.js';
-import { noteDeprecatedUse, removedFrom } from './deprecation.js';
+import type { AimeatConfig } from '../../config.js';
+import { noteDeprecatedUse, removedFrom } from '../deprecation.js';
 
 /** The release from which a public node takes only an `https:` peer address. */
 export const PEER_HTTPS_REQUIRED_IN = '4.0.0';

@@ -61,7 +61,7 @@ export interface PeeringRequestRecord {
   targetUrl?: string;
   publicKey?: string;
   message?: string;
-  /** `revoked`: the approval of a peer an operator removed (services/peer-origin.ts revokePeerApprovals);
+  /** `revoked`: the approval of a peer an operator removed (services/peer/origin.ts revokePeerApprovals);
    *  a key exchange no longer admits on it. */
   status: 'pending' | 'approved' | 'rejected' | 'auto_approved' | 'revoked';
   /** The tier this request was APPROVED at. Absent → 'member', which is what every request meant

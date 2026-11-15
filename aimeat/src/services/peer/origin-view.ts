@@ -1,5 +1,5 @@
 /**
- * @file services/peer-origin-view.ts
+ * @file src/services/peer/origin-view.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What the operator's peer listings say about how each peer arrived.
@@ -20,10 +20,10 @@
  * @version-history
  *   v1.0.0 — 2026-10-01 — Initial (the peer-registration incident, finding F).
  */
-import type { Storage } from '../storage/interface.js';
-import type { PeerInfo } from './federation.js';
-import { listPeerOrigins, listPendingPeers, type PendingPeer } from './peer-origin.js';
-import { NS_PACKAGE_ENTITLEMENTS } from './packages/sale/package-entitlements.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { listPeerOrigins, listPendingPeers, type PendingPeer } from './origin.js';
+import { NS_PACKAGE_ENTITLEMENTS } from '../packages/sale/package-entitlements.js';
 
 export type PeerOriginView =
     | { kind: 'recorded'; source: string; by: string; group_id?: string; proof: string; requested_at: string; proven_at: string }

@@ -138,7 +138,7 @@ export type ConsumeResult =
   // 'other-node': the invite names another node. Not used.
   | { ok: false; reason: 'unknown' | 'expired' | 'consumed' | 'other-node' }
   // 'held': the invite names no node, and this node id is held by a peer under another key. Not used
-  // here: the operator decides the replacement (services/peer-replace-ask.ts), which then uses it by `key`.
+  // here: the operator decides the replacement (services/peer/replace-ask.ts), which then uses it by `key`.
   | { ok: false; reason: 'held'; key: string; invite: LinkInviteRecord };
 
 /**
@@ -162,7 +162,7 @@ export async function consumeLinkInvite(
 
 /**
  * Use the invite stored at `key` for `nodeId`, after the operator approved the replacement of a peer
- * held under another key that it was presented for (services/peer-replace-ask.ts). Expired, revoked or
+ * held under another key that it was presented for (services/peer/replace-ask.ts). Expired, revoked or
  * used meanwhile answers as consumeLinkInvite does.
  */
 export async function consumeLinkInviteAtKey(storage: Storage, key: string, nodeId: string): Promise<ConsumeResult> {

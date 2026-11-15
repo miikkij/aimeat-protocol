@@ -194,7 +194,7 @@ describe('peer addresses on a public node (FED-13)', () => {
         v.version = NEW;
         const r = await addPeer('https://peer-c.example', 'peer-c');
         expect(r.body.error?.code).not.toBe('PEER_HTTPS_REQUIRED');
-        const { peerUrlRefusal } = await import('../../src/services/peer-url-policy.js');
+        const { peerUrlRefusal } = await import('../../src/services/peer/url-policy.js');
         expect(peerUrlRefusal({ securityProfile: 'local' }, 'http://localhost:40050', NEW)).toBeNull();
         expect(peerUrlRefusal({ securityProfile: 'public' }, 'http://peer.example', NEW)?.code).toBe('PEER_HTTPS_REQUIRED');
     });

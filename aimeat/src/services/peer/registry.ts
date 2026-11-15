@@ -1,5 +1,5 @@
 /**
- * @file src/services/peer-registry.ts
+ * @file src/services/peer/registry.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The live federation peer map of one node, made knowing that node's own id, so the gate

@@ -47,7 +47,7 @@ vi.mock('../../src/services/packages/compose/package-read.js', () => ({
     }) as unknown as PackageRecord),
 }));
 vi.mock('../../src/services/packages/peer/package-peer-register.js', () => ({ proveNodeCard: vi.fn(async () => ({ kind: 'proven' })) }));
-vi.mock('../../src/services/peer-origin.js', () => ({ recordPeerOrigin: vi.fn(async () => undefined) }));
+vi.mock('../../src/services/peer/origin.js', () => ({ recordPeerOrigin: vi.fn(async () => undefined) }));
 vi.mock('../../src/services/install/set-grants.js', () => ({
     grantInstalledApps: vi.fn(async () => undefined),
     landingPath: vi.fn(async () => null),

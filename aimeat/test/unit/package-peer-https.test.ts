@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A packages-only peer link (a seller, a grant's customer node, a claim's repository)
- *   asks the same address rule as every other peer admission (Core FED-13, services/peer-url-policy.ts):
+ *   asks the same address rule as every other peer admission (Core FED-13, services/peer/url-policy.ts):
  *   a public node takes only an https:// address, and a local node still links over plain http, which
  *   is how two sandbox nodes link. The card read is stubbed, so nothing leaves the process.
  * @usage cd aimeat && pnpm exec vitest run test/unit/package-peer-https.test.ts

@@ -1,5 +1,5 @@
 /**
- * @file services/peer-origin.ts
+ * @file src/services/peer/origin.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How a federation peer arrived when no operator added it, and the registrations still
@@ -31,8 +31,8 @@
  *   v1.1.0 — 2026-10-01 — forgetPeer also removes the markers of the peer's Security page events.
  *   v1.0.0 — 2026-10-01 — Initial (the peer-registration incident, finding F).
  */
-import type { Storage } from '../storage/interface.js';
-import { forgetPeerSettlementCeiling } from './settlement-ceiling.js';
+import type { Storage } from '../../storage/interface.js';
+import { forgetPeerSettlementCeiling } from '../settlement-ceiling.js';
 
 export const NS_PEER_ORIGIN = 'federation-peer-origin';
 

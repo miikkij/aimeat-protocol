@@ -108,7 +108,7 @@ import { readProposal, settleProposal } from '../agent/proposals.js';
 import { deriveTierFlags } from '../federation/tiers.js';
 import { selfNodeIdMessage } from '../federation/peer-gate.js';
 import { proveNodeCard } from '../packages/peer/package-peer-register.js';
-import { recordPeerOrigin } from '../peer-origin.js';
+import { recordPeerOrigin } from '../peer/origin.js';
 import { ed25519PublicKeyProblem } from '../../auth/keypair.js';
 import { NS_INSTALL_SETS } from './set-trust.js';
 import { claimRun, finishRun, releaseRun, type RunClaim } from './set-run.js';

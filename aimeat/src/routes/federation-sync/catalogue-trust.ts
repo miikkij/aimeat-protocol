@@ -51,7 +51,7 @@ import { deriveTierFlags, tierRank, coerceTier } from '../../services/federation
 import { emitChange } from '../../services/event-bus.js';
 import { actionPricingFromPeer } from '../../services/action-pacing.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
-import { revokePeerApprovals } from '../../services/peer-origin.js';
+import { revokePeerApprovals } from '../../services/peer/origin.js';
 import { parseGaiiLoose } from '../../utils/gaii.js';
 
 export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {

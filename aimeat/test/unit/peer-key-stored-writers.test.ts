@@ -33,7 +33,7 @@ import { generateKeyPair } from '../../src/auth/keypair.js';
 import { initNodeKeys, issueJWT, generateSessionId } from '../../src/auth/jwt.js';
 import { initSessionAuth } from '../../src/auth/middleware.js';
 import { adoptPendingPeer } from '../../src/services/packages/peer/package-peer-register.js';
-import { writePendingPeer, readPendingPeer } from '../../src/services/peer-origin.js';
+import { writePendingPeer, readPendingPeer } from '../../src/services/peer/origin.js';
 
 const NODE_ID = 'aimeat-local-001-dev';
 const OWNER = 'keyop';
