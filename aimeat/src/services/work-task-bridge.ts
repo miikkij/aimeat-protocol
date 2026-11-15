@@ -5,6 +5,8 @@
  * @description Auto-creates an AgentTask when a work item is accepted by an agent
  *   that has the task system enabled. Links via workTrackingCode.
  * @version-history
+ *   v1.2.0 -- 2026-11-15 -- taskFieldsFromInput(): a nested object or array value becomes its JSON, not
+ *     "[object Object]", and an old row whose input is not an object becomes one field `input`.
  *   v1.1.0 -- 2026-09-08 -- The accepted job wakes the provider's agent: createTaskFromWork built
  *     the task and emitted no task_assigned, so the only signal on the path was the caller's
  *     emitChange('work'), a UI refresh. Same miss as the workflow engine's. -> pitfalls 58
@@ -13,6 +15,21 @@
 import type { Storage, WorkRecord, AgentTaskRecord } from '../storage/interface.js';
 import { randomUUID } from 'node:crypto';
 import { emitDelivery } from './event-bus.js';
+import { isWorkPayload } from './work/work-payload.js';
+
+/** A field value as text: text stays as it is, anything else (a number, an object, an array) is its JSON. */
+const asText = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value) ?? String(value));
+
+/**
+ * The task's fields from a work item's input. New input is a JSON object (decision 2026-11-15), one
+ * field per key. A row stored between 2026-02-26 and 2026-11-15 may hold text, a number, an array or
+ * null: that becomes one field `input` holding its JSON, so the agent still sees what was asked.
+ */
+function taskFieldsFromInput(input: unknown): AgentTaskRecord['scope'] {
+  if (input === undefined) return [];
+  if (!isWorkPayload(input)) return [{ name: 'input', value: JSON.stringify(input), type: 'text' as const }];
+  return Object.entries(input).map(([name, value]) => ({ name, value: asText(value), type: 'text' as const }));
+}
 
 export async function createTaskFromWork(
   storage: Storage, work: WorkRecord, providerGaii: string
@@ -30,11 +47,7 @@ export async function createTaskFromWork(
     ownerGaii: providerGaii.split('#')[1] ?? providerGaii,
     title: `Work: ${action?.displayName ?? work.actionId}`,
     description: `Auto-created from work request ${work.trackingCode}. Requester: ${work.requesterGaii}.`,
-    scope: Object.entries(work.input || {}).map(([name, value]) => ({
-      name,
-      value: String(value),
-      type: 'text' as const,
-    })),
+    scope: taskFieldsFromInput(work.input),
     rules: [],
     verification: {
       userExpects: `Deliver result for work request ${work.trackingCode}`,
