@@ -212,6 +212,16 @@ const PICTURE_WORDS: PictureWord[] = [
     baseline: new URL('../security/locale-room-baseline.json', import.meta.url),
     fix: 'name the page or the thing: the admin pages, a demo, a card, its documents and records',
   },
+  {
+    word: 'wall',
+    byLocale: {
+      en: /\bwalls?\b/i,
+      fi: /(?<![\p{L}])(?:korttiseinä\p{L}*|aloitusseinä\p{L}*|seinä\p{L}*|seinil\p{L}*)/iu,
+      es: /\bmuros?\b/i,
+    },
+    baseline: new URL('../security/locale-wall-baseline.json', import.meta.url),
+    fix: 'name the list: the public app list, the front page\'s app list, a grid of cards; a blocked sign-in is "blocked"',
+  },
 ];
 
 function jargonOffenders(

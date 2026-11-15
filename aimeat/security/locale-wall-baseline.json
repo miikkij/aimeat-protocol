@@ -1,0 +1,10 @@
+{
+  "en:story.b2Alt": "A real picture: the alt text describes a chat bubble painted on the wall of a building.",
+  "fi:story.b2Alt": "A real picture: the alt text describes a chat bubble painted on the wall of a building.",
+  "en:story.b4Alt": "A real picture: the alt text describes a gallery wall of framed app pictures.",
+  "en:connectStory.b2Alt": "A real picture: the alt text describes a wall socket.",
+  "es:organisms.sharePublicDesc": "The established Spanish social-media word: \"muro\" is the public activity feed, which is what the string names.",
+  "es:organisms.feedPublishBtn": "The established Spanish social-media word: \"muro\" is the public activity feed, which is what the string names.",
+  "es:organisms.feedPublishedAll": "The established Spanish social-media word: \"muro\" is the public activity feed, which is what the string names.",
+  "es:organisms.feedPublishConfirm": "The established Spanish social-media word: \"muro\" is the public activity feed, which is what the string names."
+}

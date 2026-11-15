@@ -1532,8 +1532,8 @@
         "promptCopied": "Copiado"
       },
       "open": "Abrir",
-      "takeDown": "Quitarla del muro",
-      "putBack": "Devolverla al muro",
+      "takeDown": "Retirarla",
+      "putBack": "Devolverla a la lista",
       "col": {
         "app": "Aplicación",
         "owner": "Propietario",
@@ -1545,7 +1545,7 @@
       "chip": {
         "internet": "Abierta a internet"
       },
-      "hideTitle": "Quitarla del muro",
+      "hideTitle": "Quitarla de la lista pública",
       "reasonLabel": "Por qué (quien la publicó lo lee)",
       "deleteTitle": "Eliminar para siempre",
       "deleteTypeLabel": "Escribe {filename} para confirmar",
@@ -1962,7 +1962,7 @@
         },
         "filter24": "24 h",
         "filterAll": "todas {n}",
-        "walled": "muro",
+        "walled": "bloqueado",
         "search": "un endpoint, una dirección IP, una huella o un nombre",
         "time": "Hora",
         "answer": "Respuesta",
@@ -3109,7 +3109,7 @@
       },
       "shape": {
         "title": "Qué hay aquí",
-        "lead": "La forma de la colección, que un muro de tarjetas no puede mostrar. La primera pregunta no es cuál abrir sino qué es esto, y cada respuesta de abajo es una cuenta que el sitio ya tenía.",
+        "lead": "La forma de la colección, que una cuadrícula de tarjetas no puede mostrar. La primera pregunta no es cuál abrir sino qué es esto, y cada respuesta de abajo es una cuenta que el sitio ya tenía.",
         "byAuthor": "Por autor",
         "byAuthorWhy": "El nombre del archivo, no la cuenta que escribió. Pulsa uno para ver solo los suyos.",
         "byKind": "Por tipo",
@@ -27748,7 +27748,7 @@
     "publish.filenameHint": "Letras, números, puntos, guiones y guiones bajos. Tiene que terminar en .html",
     "publish.description": "Descripción",
     "publish.descriptionPh": "¿Qué hace esta aplicación? 1 o 2 frases (tu IA puede escribirlas)",
-    "publish.descriptionHint": "Se muestra en el catálogo y en el muro de inicio. Obligatoria para una aplicación nueva.",
+    "publish.descriptionHint": "Se muestra en el catálogo y en la lista de aplicaciones de la portada. Obligatoria para una aplicación nueva.",
     "publish.accessCode": "Código de acceso (opcional)",
     "publish.accessCodePh": "Déjalo vacío para que sea pública",
     "publish.accessCodeHint": "De 4 a 64 caracteres. Si lo pones, la aplicación solo se abre o se descarga con el código. Tú, como propietario, nunca lo necesitas.",
@@ -28718,7 +28718,7 @@
     "actions.shotNeedPublish": "Publica primero la aplicación. Después puedes poner una captura de pantalla.",
     "actions.shotNeedLogin": "Inicia sesión para poner una captura de pantalla.",
     "actions.shotTooLarge": "La imagen es demasiado grande (máximo 2 MB).",
-    "actions.shotSet": "Captura de pantalla guardada. Se verá en el catálogo y en el muro de la página de inicio.",
+    "actions.shotSet": "Captura de pantalla guardada. Se verá en el catálogo y en la lista de aplicaciones de la portada.",
     "actions.shotRefreshNeedPublish": "Publica primero la aplicación. Después puedes renovar su captura de pantalla.",
     "actions.shotRefreshNeedLogin": "Inicia sesión para renovar la captura de pantalla.",
     "actions.shotCleared": "Captura de pantalla borrada. Se tomará una nueva en la próxima ejecución programada.",
