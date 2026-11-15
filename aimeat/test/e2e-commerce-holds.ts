@@ -5,6 +5,10 @@
  *   release it (either party), and lazy expiry. Runs on the test.money handler
  *   (AIMEAT_TEST_MONEY_HANDLER=true) — no real PSP.
  * @version-history
+ *   2026-11-15 — Audit M139: tests 1, 5 and 7 read the test money provider's books
+ *     (GET /v1/admin/test-money/ledger): a hold charges nothing and holds the amount, a partial capture
+ *     charges exactly the captured amount and ends the hold, a release ends the hold and charges
+ *     nothing. Test 15: only the operator reads the books.
  *   2026-11-15 — Audit M140: test 14 ages a real hold in storage and proves lazy expiry (read
  *     'expired', capture 409).
  *   v1.0.0 — 2026-08-06 — Initial: hold lifecycle happy paths + authz failures (TINKI phase 1)
@@ -43,7 +47,7 @@ async function json(path: string, opts: RequestInit = {}) {
   return { status: res.status, body };
 }
 
-import { ownerSignIn } from './helpers/owner-login.js';
+import { ownerSignIn, setupOperator, tokenRoles } from './helpers/owner-login.js';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 
@@ -65,27 +69,42 @@ console.log('\n=== AIMEAT Commerce Holds E2E Test ===\n');
 const buyerName = `holdbuyer${Date.now()}`;
 const sellerName = `holdseller${Date.now()}`;
 const otherName = `holdother${Date.now()}`;
+// The buyer's card for the holds whose money the books are read for; no other suite names it.
+const CARD = `pm_hold_books_${Date.now()}`;
+const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? '';
 let buyer!: { token: string; ghii: string };
 let seller!: { token: string; ghii: string };
 let other!: { token: string; ghii: string };
+let operatorToken = '';
+
+/** What the test money provider's books say for CARD in EUR (zeros before the first movement). */
+async function books(): Promise<{ charged: number; held: number; refunded: number }> {
+  const r = await json(`/v1/admin/test-money/ledger?instrument=${encodeURIComponent(CARD)}`, { headers: authed(operatorToken) });
+  assert(r.status === 200, `books: ${r.status} ${JSON.stringify(r.body.error ?? r.body).slice(0, 200)}`);
+  const row = (r.body.data.instruments as any[]).find(x => x.instrument === CARD && x.currency === 'EUR');
+  return { charged: row?.charged ?? 0, held: row?.held ?? 0, refunded: row?.refunded ?? 0 };
+}
 
 console.log('Setup');
-await test('Register buyer, seller and bystander', async () => {
+await test('Register buyer, seller and bystander, and an operator who reads the books', async () => {
   buyer = await makeOwner(buyerName);
   seller = await makeOwner(sellerName);
   other = await makeOwner(otherName);
+  operatorToken = (await setupOperator(BASE, ADMIN_PW, `holdops${Date.now()}`)).token;
 });
 
 // ─── Happy path: authorize → capture ───
 console.log('\nPhase 1 — authorize + capture');
 
 let holdId = '';
+let booksBefore = { charged: 0, held: 0, refunded: 0 };
 await test('1. Buyer places a hold (authorize, no money moves)', async () => {
+  booksBefore = await books();
   const { status, body } = await json('/v1/commerce/holds', {
     method: 'POST', headers: authed(buyer.token),
     body: JSON.stringify({
       seller: sellerName, amount: 80_000000, currency: 'EUR', purpose: 'bid',
-      reference: 'tinki-listing-1', payment: { handler: 'test.money', instrument: 'pm_test_hold' },
+      reference: 'tinki-listing-1', payment: { handler: 'test.money', instrument: CARD },
     }),
   });
   assert(status === 201, `status ${status}: ${JSON.stringify(body).slice(0, 300)}`);
@@ -95,6 +114,10 @@ await test('1. Buyer places a hold (authorize, no money moves)', async () => {
   assert(hold.sellerGhii === seller.ghii, `sellerGhii: ${hold.sellerGhii}`);
   assert(typeof hold.trackingCode === 'string' && hold.trackingCode.length > 0, 'has trackingCode');
   holdId = hold.id;
+  // The provider's books: the card is charged nothing, and the amount is held on it.
+  const after = await books();
+  assert(after.charged === booksBefore.charged, `a hold charged the card: ${booksBefore.charged} -> ${after.charged}`);
+  assert(after.held === booksBefore.held + 80_000000, `held: ${booksBefore.held} -> ${after.held}, expected +80000000`);
 });
 
 await test('2. Buyer and seller can both read the hold; bystander cannot', async () => {
@@ -130,6 +153,10 @@ await test('5. Seller captures a partial amount (the second price)', async () =>
   const hold = body.data.hold;
   assert(hold.status === 'captured', `status: ${hold.status}`);
   assert(hold.capturedAmount === 62_000000, `capturedAmount: ${hold.capturedAmount}`);
+  // The card is charged exactly the captured amount, and the rest of the hold is released.
+  const after = await books();
+  assert(after.charged === booksBefore.charged + 62_000000, `charged: ${booksBefore.charged} -> ${after.charged}, expected +62000000`);
+  assert(after.held === booksBefore.held, `held after the capture: ${after.held}, expected ${booksBefore.held}`);
 });
 
 await test('6. A captured hold cannot be captured again or released', async () => {
@@ -148,20 +175,27 @@ console.log('\nPhase 2 — release (losing bid)');
 
 let hold2 = '';
 await test('7. Second hold releases cleanly by the buyer', async () => {
+  const before = await books();
   const create = await json('/v1/commerce/holds', {
     method: 'POST', headers: authed(buyer.token),
     body: JSON.stringify({
       seller: sellerName, amount: 25_000000, currency: 'EUR', purpose: 'bid',
-      reference: 'tinki-listing-2', payment: { handler: 'test.money', instrument: 'pm_test_hold' },
+      reference: 'tinki-listing-2', payment: { handler: 'test.money', instrument: CARD },
     }),
   });
   assert(create.status === 201, `create: ${create.status}`);
   hold2 = create.body.data.hold.id;
+  const held = await books();
+  assert(held.held === before.held + 25_000000, `held: ${before.held} -> ${held.held}, expected +25000000`);
   const rel = await json(`/v1/commerce/holds/${hold2}/release`, {
     method: 'POST', headers: authed(buyer.token), body: JSON.stringify({}),
   });
   assert(rel.status === 200, `release: ${rel.status}: ${JSON.stringify(rel.body).slice(0, 200)}`);
   assert(rel.body.data.hold.status === 'released', `status: ${rel.body.data.hold.status}`);
+  // The release gives the hold back, and the card was never charged for it.
+  const after = await books();
+  assert(after.held === before.held, `held after the release: ${after.held}, expected ${before.held}`);
+  assert(after.charged === before.charged, `a released hold charged the card: ${before.charged} -> ${after.charged}`);
 });
 
 await test('8. A released hold cannot be captured', async () => {
@@ -262,6 +296,22 @@ await test('14. A hold past its expiry reads as expired and cannot be captured',
     `capture of an expired hold: expected 409 HOLD_NOT_CAPTURABLE, got ${cap.status} ${JSON.stringify(cap.body.error ?? cap.body.data?.hold?.status)}`);
   const read = await json(`/v1/commerce/holds/${id}`, { headers: authed(buyer.token) });
   assert(read.status === 200 && read.body.data.hold.status === 'expired', `buyer read: ${read.status} ${read.body.data?.hold?.status}`);
+});
+
+// ─── The provider's books ───
+console.log('\nPhase 5 — who reads the books');
+
+await test('15. Only the operator reads the test money books; a filter that is too long is refused', async () => {
+  // The first owner on a fresh node is its operator, so the refusal is asked of the bystander.
+  assert(!tokenRoles(other.token).includes('operator'), 'the bystander must not be an operator');
+  const asOwner = await json(`/v1/admin/test-money/ledger?instrument=${encodeURIComponent(CARD)}`, { headers: authed(other.token) });
+  assert(asOwner.status === 403, `an owner who is not the operator reads the books: expected 403, got ${asOwner.status}`);
+  const anon = await json('/v1/admin/test-money/ledger');
+  assert(anon.status === 401, `no token: expected 401, got ${anon.status}`);
+  const long = await json(`/v1/admin/test-money/ledger?seller=${'x'.repeat(300)}`, { headers: authed(operatorToken) });
+  assert(long.status === 400 && long.body.error?.code === 'INVALID_INPUT', `a 300-character filter: ${long.status} ${JSON.stringify(long.body.error)}`);
+  const sellerOnly = await json(`/v1/admin/test-money/ledger?seller=${encodeURIComponent(seller.ghii)}`, { headers: authed(operatorToken) });
+  assert(sellerOnly.status === 200 && sellerOnly.body.data.instruments.length === 0, `a seller filter answers sellers only: ${JSON.stringify(sellerOnly.body.data).slice(0, 200)}`);
 });
 
 // ─── Summary ───

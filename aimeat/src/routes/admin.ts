@@ -12,6 +12,7 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-11-15 -- adminTestMoneyRouter mounted: GET /v1/admin/test-money/ledger, the test money books (audit M139).
  *   2026-11-13 -- GET /v1/admin/dashboard reads the agents, actions, boards, work items and the 24-hour count
  *     through services/node-admin/activity.ts, which aimeat_admin_stats reads too (structure programme 2026-11, unit 2b).
  *   2026-11-05 -- adminKeyReencryptRouter mounted: the data key's re-encrypt job (codebase analysis
@@ -104,6 +105,7 @@ import { adminAgentsRouter } from './admin/agents.js';
 import { adminMaintenanceRouter } from './admin/maintenance.js';
 import { adminEconomyRouter } from './admin/economy.js';
 import { adminMemoryRouter } from './admin/memory.js';
+import { adminTestMoneyRouter } from './admin/test-money.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { ADMIN_LOGIN_HTML, ADMIN_SETUP_HTML } from './admin/setup-html.js';
 import { registerSetupRegisterRoute } from './admin/setup-register.js';
@@ -690,6 +692,7 @@ export function adminRouter(
     router.use(adminMaintenanceRouter(config, storage, maintenanceCache));
     router.use(adminEconomyRouter(config, storage));
     router.use(adminMemoryRouter(config, storage));
+    router.use(adminTestMoneyRouter(config, storage));
 
     return router;
 }

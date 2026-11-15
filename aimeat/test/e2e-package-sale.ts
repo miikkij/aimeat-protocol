@@ -28,6 +28,9 @@
  *   - Phase 10: an unused packages-only peer is removed after 30 days; a seller is kept (finding F)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-sale
  * @version-history
+ *   2026-11-15 — The test money provider's books (GET /v1/admin/test-money/ledger on S): phase 3's sale
+ *     charges the card the total and pays the seller its net; phase 7's refunded sale returns the whole
+ *     charge, and the sale whose refund fails returns nothing (audit M139).
  *   2026-10-25 — Phase 7: a payment refunded after a refused sale is not taken again when the buyer
  *     retries with the same payment (402 PAYMENT_REFUNDED); paying again completes (secaudit2026oct22).
  *   2026-10-23 — setupOwner uses setupOperator (a password and the password sign-in); POST
@@ -174,6 +177,15 @@ async function buy(line: { app: string; offer_id?: string; input?: Record<string
     return { create, done };
 }
 const resultOf = (done: any) => done.body.data.session.fulfillment.results[0].result;
+/** What S's test money books say in EUR for one buyer card (charged, refunded) or one payee (paid out). */
+async function booksOnS(q: { instrument: string } | { seller: string }): Promise<{ charged: number; refunded: number; paid_out: number }> {
+    const [name, value] = 'instrument' in q ? ['instrument', q.instrument] : ['seller', q.seller];
+    const r = await S.json(`/v1/admin/test-money/ledger?${name}=${encodeURIComponent(value)}`, { headers: auth(opsToken) });
+    assert(r.status === 200, `S's books: ${r.status} ${JSON.stringify(r.body.error ?? r.body).slice(0, 200)}`);
+    const card = (r.body.data.instruments as any[]).find(x => x.instrument === value && x.currency === 'EUR');
+    const payee = (r.body.data.sellers as any[]).find(x => x.seller === value && x.currency === 'EUR');
+    return { charged: card?.charged ?? 0, refunded: card?.refunded ?? 0, paid_out: payee?.paid_out ?? 0 };
+}
 const grantsOn = async (group: string) =>
     (await R.json(`/v1/packages/${encodeURIComponent(group)}/entitlements`, { headers: auth(vendorToken) })).body.data.entitlements as any[];
 const subscriptions = async () => (await S.json('/v1/package-sales/subscriptions', { headers: auth(buyerToken) })).body.data;
@@ -300,13 +312,22 @@ let claimCode = '';
 await test('A checkout in another currency is refused; one without a node pays and gives a claim code', async () => {
     const usd = await buy({ app: kit }, 'card-ok', 'USD');
     assert(usd.create.status === 422 && usd.create.body.error?.code === 'CURRENCY_NOT_SUPPORTED', `USD: ${usd.create.status} ${JSON.stringify(usd.create.body)}`);
-    const { create, done } = await buy({ app: kit });
+    const card = `card-claim-${ts}`;
+    const sellerAccount = `${ops}@${S.nodeId}`;
+    const [cardBefore, sellerBefore] = [await booksOnS({ instrument: card }), await booksOnS({ seller: sellerAccount })];
+    const { create, done } = await buy({ app: kit }, card);
     assert(create.body.data.session.total === 25_000_000, `the price is S's: ${JSON.stringify(create.body.data.session)}`);
     assert(done.status === 200, `complete: ${done.status} ${JSON.stringify(done.body)}`);
     const r = resultOf(done);
     claimCode = r.claim_code;
     assert(/^pkgc_/.test(claimCode) && r.seller_of_record.account === ops && r.supplier.author === vendor && r.supplier.terms_id === 't1'
         && r.supplier_cost.amount === 20_000_000 && r.paid.amount === 25_000_000, `result: ${JSON.stringify(r)}`);
+    // The test money provider's books: the card is charged the total, and the seller is paid its net.
+    const receipt = done.body.data.session.receipt;
+    const [cardAfter, sellerAfter] = [await booksOnS({ instrument: card }), await booksOnS({ seller: sellerAccount })];
+    assert(cardAfter.charged - cardBefore.charged === 25_000_000, `the card was charged ${cardAfter.charged - cardBefore.charged}, expected 25000000`);
+    assert(receipt.earned > 0 && sellerAfter.paid_out - sellerBefore.paid_out === receipt.earned,
+        `the seller was paid out ${sellerAfter.paid_out - sellerBefore.paid_out}, the receipt says it earned ${receipt.earned}`);
 });
 
 await test('B\'s operator redeems the code once; R grants B, sold by S, on the terms paid for', async () => {
@@ -466,9 +487,16 @@ console.log('\nPhase 7 — A refusal on the repository refunds');
 await test('A sale the repository refuses (a known node under another key) answers FULFILLMENT_FAILED and grants nothing', async () => {
     const before = (await grantsOn(kit)).find(x => x.nodeId === B.nodeId);
     const wrongKey = { node_id: B.nodeId, url: B.baseUrl, public_key: (await generateKeyPair()).publicKey };
-    const { create, done } = await buy({ app: kit, input: { node: wrongKey } });
+    const card = `card-refunded-${ts}`;
+    const booksBefore = await booksOnS({ instrument: card });
+    const { create, done } = await buy({ app: kit, input: { node: wrongKey } }, card);
     // The refund the test rail confirmed is the only case that may say "refunded" (QA audit F5-01).
     assert(done.status === 502 && done.body.error?.code === 'FULFILLMENT_FAILED' && /The payment was refunded\./.test(done.body.error?.message), `refused: ${done.status} ${JSON.stringify(done.body)}`);
+    // The provider's books: the card was charged the total and the whole of it returned.
+    const total = create.body.data.session.total as number;
+    const booksAfter = await booksOnS({ instrument: card });
+    assert(total > 0 && booksAfter.charged - booksBefore.charged === total && booksAfter.refunded - booksBefore.refunded === total,
+        `the card's books: charged ${booksAfter.charged - booksBefore.charged}, refunded ${booksAfter.refunded - booksBefore.refunded}, expected ${total} each`);
     const after = (await grantsOn(kit)).find(x => x.nodeId === B.nodeId);
     assert(JSON.stringify(after) === JSON.stringify(before), `B's grant is unchanged: ${JSON.stringify(after)}`);
     const rec = await S.json(`/v1/memory/${encodeURIComponent(`commerce.undelivered.${create.body.data.session.id}`)}`, { headers: auth(opsToken) });
@@ -479,10 +507,15 @@ await test('A sale the repository refuses (a known node under another key) answe
 // the rail refuses must say the money was NOT returned and leave a record the seller can read.
 await test('A refused sale whose refund fails says the payment was not returned, and the seller and the operator get the record', async () => {
     const wrongKey = { node_id: B.nodeId, url: B.baseUrl, public_key: (await generateKeyPair()).publicKey };
+    const booksBefore = await booksOnS({ instrument: 'refund-fails' });
     const { create, done } = await buy({ app: kit, input: { node: wrongKey } }, 'refund-fails');
     const id = create.body.data.session.id as string;
     const msg = String(done.body.error?.message ?? '');
     assert(done.status === 502 && done.body.error?.code === 'FULFILLMENT_FAILED', `refused: ${done.status} ${JSON.stringify(done.body)}`);
+    // The provider's books: charged, and nothing returned, because the card refused the refund.
+    const booksAfter = await booksOnS({ instrument: 'refund-fails' });
+    assert(booksAfter.charged - booksBefore.charged === create.body.data.session.total && booksAfter.refunded === booksBefore.refunded,
+        `the card's books: charged ${booksAfter.charged - booksBefore.charged}, refunded ${booksAfter.refunded - booksBefore.refunded}`);
     assert(!/was refunded/i.test(msg) && /NOT returned/.test(msg) && msg.includes(id) && /Contact the seller/.test(msg), `the message says the money was not returned: ${msg}`);
     const rec = await S.json(`/v1/memory/${encodeURIComponent(`commerce.undelivered.${id}`)}`, { headers: auth(opsToken) });
     const v = rec.body.data?.value ?? rec.body.data?.memory?.value;

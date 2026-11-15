@@ -12,6 +12,7 @@
  *   URL, the way the E2E runner and `pnpm sandbox` start a node: test.money works and nothing warns.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=test-money-guard
  * @version-history
+ *   2026-11-15 — With the flag off, GET /v1/admin/test-money/ledger answers the operator 404 NOT_FOUND.
  *   v2.0.2 — 2026-11-03 — The first operator of each public node sends the one-time setup code from
  *     the node's start log: from 2026-11-02 the admin setup route asks for it (4fc091e8d), and the
  *     suite stopped at its first registration with 403 SETUP_CODE_REQUIRED.
@@ -191,6 +192,10 @@ try {
   await test('with the flag off the Security page has no test money finding', async () => {
     const t = (await overview(off, operator)).body.data?.now?.test_money_handler;
     assert(t?.requested === false && t.active === false && t.zone === 'healthy' && t.message === null, `test_money_handler: ${JSON.stringify(t)}`);
+  });
+  await test('with the flag off the test money books do not exist, not even for the operator (404)', async () => {
+    const r = await json(off, '/v1/admin/test-money/ledger', { headers: { Authorization: `Bearer ${operator}` } });
+    assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND', `ledger with the flag off: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
   });
 } finally {
   stopNode(off);

@@ -76540,6 +76540,69 @@ paths:
         '403':
           description: Operator only
 
+  /v1/admin/test-money/ledger:
+    get:
+      operationId: adminTestMoneyLedger
+      summary: The test money provider's books (operator, only while test money is on)
+      description: |
+        What the test money handler (`test.money`) charged, held and refunded per buyer instrument, and
+        paid out per seller, per currency, the way a card provider keeps these books for a real payment.
+        A buyer's account is the `payment.instrument` string, or the buyer's GHII when a collect named
+        none. Amounts are in the units the rail was given (6-decimal micro-units for a money checkout).
+        Entries expire after 30 days. Answers 404 NOT_FOUND to everyone when test money is off.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: instrument
+          schema: { type: string, minLength: 1, maxLength: 256 }
+          description: Only this buyer account (an instrument string or a buyer GHII)
+        - in: query
+          name: seller
+          schema: { type: string, minLength: 1, maxLength: 256 }
+          description: Only this payee GHII
+      responses:
+        '200':
+          description: The books
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          instruments:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                instrument: { type: string }
+                                currency: { type: string }
+                                charged: { type: number, description: Charged in total, captures included }
+                                held: { type: number, description: Authorized and not yet captured or released }
+                                refunded: { type: number }
+                          sellers:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                seller: { type: string }
+                                currency: { type: string }
+                                paid_out: { type: number }
+                          complete:
+                            type: boolean
+                            description: False when the node holds more entries than one read sums
+        '400':
+          description: A filter is empty or too long (INVALID_INPUT)
+        '403':
+          description: Operator only
+        '404':
+          description: Test money is off on this node (NOT_FOUND)
+
   /v1/admin/agent-tasks:
     get:
       operationId: adminListAgentTasks

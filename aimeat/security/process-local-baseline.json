@@ -137,10 +137,6 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/commerce/test-money-handler.ts :: map :: holds": {
-      "count": 1,
-      "reason": "DEBT"
-    },
     "src/data/atelier-ambients.ts :: map :: byId": {
       "count": 1,
       "reason": "DEBT"
