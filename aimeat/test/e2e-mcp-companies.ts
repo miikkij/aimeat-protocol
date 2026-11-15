@@ -12,6 +12,8 @@
  *   Also covers the scope fence (an agent without company:write is refused) and the ownership
  *   fence (the tools resolve the agent's OWNER, never a client-supplied id).
  * @version-history
+ *   2026-11-15 — Audit L071: test 4 reads the stored company back through aimeat_company_list and
+ *     checks iban, vatId and email, not only the update answers.
  *   2026-10-10 — 15: a create refused SLUG_TAKEN leaves no provenance record for its description
  *     (secaudit 2026-10-10 I11).
  *   2026-10-05 — Phase 4: the description carries AI provenance (the developer's decision). A declared
@@ -243,6 +245,11 @@ await test('4. a second update keeps what the first one wrote', async () => {
     assert(second.company.vatId === 'FI12345678', 'the second update blanked the vat id from the first');
     assert(second.company.businessId === '1234567-8', 'the second update blanked the business id from creation');
     assert(second.company.city === 'Espoo', 'the second update blanked the city from creation');
+    // The update answers echo a merged view; the stored record is read back through the list tool.
+    const stored = toolJson(await mcpRpc(full.session, 'tools/call', { name: 'aimeat_company_list', arguments: {} }, nextId()))
+        .companies.find((c: any) => c.id === companyId);
+    assert(stored?.iban === 'FI2112345600000785' && stored.vatId === 'FI12345678' && stored.email === 'lasku@example.com',
+        `the stored record lost a merged field: iban ${stored?.iban}, vatId ${stored?.vatId}, email ${stored?.email}`);
 });
 
 await test('4b. the organism a company keeps its knowledge in is reachable from the tool', async () => {

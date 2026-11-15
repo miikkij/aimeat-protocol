@@ -14,6 +14,8 @@
  *     - standalone_url is advertised on /v1/portfolio/config and data/:username.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-portfolio-origin.ts
  * @version-history
+ *   2026-11-15 — Audit L106: x-portfolio-origin and x-subdomain sent with the apex Host must not be
+ *     served as the portfolio origin.
  *   2026-10-29 — The first visit after an erased name's portfolio origin passed to its next holder
  *     clears the old storage once; an unchanged holder's visits clear nothing (secaudit2026oct26
  *     round 8c, origin-handed-to-next-name-holder).
@@ -157,6 +159,17 @@ async function main() {
             assert(r.body.includes('/v1/libs/aimeat-auth.js'), 'aimeat-auth.js injected');
             assert(r.body.includes('/v1/libs/portfolio-standalone.js'), 'portfolio-standalone.js injected');
             assert(r.body.includes('name="aimeat-scopes"'), 'aimeat-scopes meta injected');
+        });
+
+        // The marker counts only on a Host in the portfolio family (subdomain.ts marked()). The same
+        // marker and label sent with the apex Host must get the apex page, not the portfolio.
+        await test('x-portfolio-origin with the apex Host is dropped: no portfolio HTML is served', async () => {
+            const r = await hostRequest(BASE, '/', `localhost:${PORT}`, { headers: { 'x-portfolio-origin': '1', 'x-subdomain': owner } });
+            const plain = await hostRequest(BASE, '/', `localhost:${PORT}`);
+            // A trusted marker would make this the bare portfolio host, which redirects to the showcase.
+            assert(r.status === plain.status && !r.header('location'), `marked ${r.status} (location ${r.header('location')}) vs unmarked apex ${plain.status}`);
+            assert(!r.body.includes('PORTFOLIO ORIGIN DEMO'), `the apex Host served the portfolio (status ${r.status})`);
+            assert(!r.body.includes('/v1/libs/portfolio-standalone.js'), 'the apex Host got the portfolio bridge');
         });
 
         await test('aimeat badge present by default (showBadge unset)', async () => {

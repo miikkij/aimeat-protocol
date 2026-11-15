@@ -8,6 +8,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=profile-tabs
  * @version-history
+ *   2026-11-15 — Audit M200: the allow_clone=false case imports its own catalogue-listed package and
+ *     a second owner's clone must answer exactly 403 CLONE_DISABLED (no silent skip, no 404 accepted).
  *   v1.2.2 — 2026-10-16 — Deleting a board post: the author deletes and the post is gone on read,
  *     another owner's agent and a sibling are refused with 403 and the post stays, the board owner
  *     may delete another agent's post. The old test accepted 200, 403 or 500 (QA audit F7c-05).
@@ -624,25 +626,22 @@ await test('POST /v1/knowledge/:id/clone — clone package (allow_clone=true)', 
 });
 
 await test('POST /v1/knowledge/:id/clone — clone with allow_clone=false should 403', async () => {
-    // The first imported package (e2e-test-pkg) has allow_clone=false by default
-    const { body: listBody } = await authJson('/v1/memory?prefix=packages/&tags=knowledge-package', agentToken);
-    const entries = listBody.data?.entries || listBody.data?.items || [];
-    // Find a non-clonable package (any without allow_clone=true)
-    let nonClonableId = '';
-    for (const e of entries) {
-        const manifest = e.value;
-        if (manifest && manifest.sharing && manifest.sharing.allow_clone === false) {
-            nonClonableId = manifest.id || e.key.split('/')[1] || '';
-            break;
-        }
-    }
-    if (!nonClonableId) { return; } // Skip if we can't find one
-    const { status, body } = await authJson(`/v1/knowledge/${encodeURIComponent(nonClonableId)}/clone`, agentToken, {
+    // A catalogue-listed package whose author turned cloning off, cloned by ANOTHER owner (audit M200):
+    // its manifest is public, so the refusal can only come from the allow_clone check, not from a 404.
+    const imp = await authJson('/v1/knowledge/import', agentToken, {
+        method: 'POST',
+        body: JSON.stringify({ package: { type: 'knowledge-package', name: 'E2E No Clone', version: '1.0.0', author: ownerName,
+            content_type: 'research', language: 'en', tags: ['e2e', 'no-clone'], synthesis: { level: 'original', description: 'No clone' },
+            sharing: { catalog_listed: true, allow_clone: false, morsel_price: 0 },
+            entries: [{ key: 'noclone-entry', title: 'Keep', value: 'Not cloneable', visibility: 'public' }] }, overrides: {} }),
+    });
+    const nonClonableId = imp.body.data?.package_id || '';
+    assert(imp.body.ok === true && nonClonableId.length > 0, `import non-clonable: ${JSON.stringify(imp.body.error)}`);
+    const { status, body } = await authJson(`/v1/knowledge/${encodeURIComponent(nonClonableId)}/clone`, owner2Token, {
         method: 'POST',
         body: JSON.stringify({ target_prefix: 'should-fail' }),
     });
-    // 403 if found but cloning disabled, or 404 if package is private (not visible)
-    assert(status === 403 || status === 404 || body.error?.code === 'CLONE_DISABLED', `expected 403/404, got ${status}: ${JSON.stringify(body)}`);
+    assert(status === 403 && body.error?.code === 'CLONE_DISABLED', `expected 403 CLONE_DISABLED, got ${status}: ${JSON.stringify(body)}`);
 });
 
 // Test default allow_clone behavior — catalog_listed should imply allow_clone

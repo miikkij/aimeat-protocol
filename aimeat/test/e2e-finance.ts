@@ -9,6 +9,8 @@
  *   per-seller Stripe webhook (signature check, idempotent redelivery, invoice
  *   matching via metadata.aimeat_reference, payout as a transfer voucher).
  * @version-history
+ *   2026-11-15 — Audit M227, L057: an agent holding finance:write is refused the accountant and
+ *     fiscal-year-lock routes by the owner-role gate; a correctly signed stale webhook is refused.
  *   2026-10-16 — Case 22 also finds the refused delivery in the refusal log (QA audit E2-08).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
@@ -84,11 +86,11 @@ async function makeOwner(name: string): Promise<{ token: string; ghii: string; o
   }
 }
 
-async function makeNarrowAgent(ownerCtx: { token: string; owner: string }): Promise<string> {
+async function makeNarrowAgent(ownerCtx: { token: string; owner: string }, scopes: string[] = ['memory:read']): Promise<string> {
   const name = `narrow${Date.now().toString(36).slice(-5)}`;
   const reg = await json('/v1/agents', {
     method: 'POST', headers: authed(ownerCtx.token),
-    body: JSON.stringify({ name, owner: ownerCtx.owner, scopes: ['memory:read'] }),
+    body: JSON.stringify({ name, owner: ownerCtx.owner, scopes }),
   });
   assert(reg.status === 201, `agent registration failed: ${reg.status} ${JSON.stringify(reg.body)}`);
   const gaii = reg.body.data.agent.gaii as string;
@@ -378,6 +380,17 @@ await test('22. a bad signature is rejected 401', async () => {
   assert(!JSON.stringify(line).includes('deadbeef'), 'the signature is never written');
 });
 
+// Every other delivery here is signed with t = now. A correct HMAC over a timestamp an hour old is
+// a replayed capture, and the freshness window must refuse it.
+await test('22b. a correctly signed delivery with a stale timestamp is rejected 401', async () => {
+  const event = { id: 'evt_stale_1', type: 'payment_intent.succeeded', created: Math.floor(Date.now() / 1000) - 3600,
+    data: { object: { id: 'pi_e2e_stale', amount_received: 700, currency: 'eur' } } };
+  const r = await postWebhook(A.owner, event, stripeSig(JSON.stringify(event), WEBHOOK_SECRET, Math.floor(Date.now() / 1000) - 3600));
+  assert(r.status === 401 && r.body.error?.code === 'INVALID_SIGNATURE', `stale delivery: ${r.status} ${JSON.stringify(r.body)}`);
+  const vouchers = await json('/v1/finance/vouchers?source=stripe', { headers: authed(A.token) });
+  assert(!vouchers.body.data.vouchers.some((v: any) => v.externalRef === 'evt_stale_1'), 'the stale delivery booked nothing');
+});
+
 await test('23. payment_intent.succeeded books an income voucher; redelivery is idempotent', async () => {
   const event = {
     id: 'evt_charge_1', type: 'payment_intent.succeeded', created: Math.floor(Date.now() / 1000),
@@ -567,6 +580,20 @@ await test('34b. the P&L summary sums income, expenses and the result, transfers
 await test('34. only the owner role manages accountants (agent → 403)', async () => {
   const r = await json('/v1/finance/accountants', { method: 'POST', headers: authed(narrowAgentToken), body: JSON.stringify({ accountant: C.owner }) });
   assert(r.status === 403, `agent grant should be 403, got ${r.status}`);
+  // The memory:read agent above is stopped by requireScope before requireRole('owner') is read. An
+  // agent that HOLDS finance:read + finance:write isolates the owner-role gate.
+  const full = await makeNarrowAgent(A, ['finance:read', 'finance:write']);
+  const probe = await json('/v1/finance/invoices', { headers: authed(full) });
+  assert(probe.status === 200, `the finance agent's scope works (invoices ${probe.status})`);
+  const grant = await json('/v1/finance/accountants', { method: 'POST', headers: authed(full), body: JSON.stringify({ accountant: C.owner }) });
+  assert(grant.status === 403 && grant.body.error?.code === 'ACCESS_DENIED', `a finance:write agent may not grant an accountant: ${grant.status} ${JSON.stringify(grant.body.error)}`);
+  const revoke = await json(`/v1/finance/accountants/${C.owner}`, { method: 'DELETE', headers: authed(full) });
+  assert(revoke.status === 403 && revoke.body.error?.code === 'ACCESS_DENIED', `a finance:write agent may not revoke an accountant: ${revoke.status} ${JSON.stringify(revoke.body.error)}`);
+  const years = await json('/v1/finance/fiscal-years', { headers: authed(A.token) });
+  const lock = await json(`/v1/finance/fiscal-years/${years.body.data.fiscal_years[0].id}/lock`, { method: 'POST', headers: authed(full), body: JSON.stringify({ locked: true }) });
+  assert(lock.status === 403 && lock.body.error?.code === 'ACCESS_DENIED', `a finance:write agent may not lock a fiscal year: ${lock.status} ${JSON.stringify(lock.body.error)}`);
+  const list = await json('/v1/finance/accountants', { headers: authed(A.token) });
+  assert(!JSON.stringify(list.body.data.accountants).includes(C.owner), `no accountant grant was written: ${JSON.stringify(list.body.data)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

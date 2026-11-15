@@ -10,6 +10,8 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=library-packs).
  * @version-history
+ *   2026-11-15 - Audit M160, L067: each frontier pack's caveat is looked for in its own prompt
+ *     entry, pixi must be listed, and the demoTemplateId check has a floor.
  *   v1.4.0 - 2026-10-05 - aimeat-validate: served, discoverable, a wrong check digit refused in Finnish.
  *   v1.3.0 - 2026-09-18 - Execute calendar and print APIs, including a malformed ICS refusal.
  *   v1.0.0 — 2026-07-16 — initial (Library Acceleration Program, Phase 1).
@@ -157,6 +159,9 @@ await test('every include URL resolves 200 on this node', async () => {
 await test('every demoTemplateId exists in /v1/app-templates', async () => {
   const { body } = await json('/v1/app-templates');
   const templateIds = new Set((body.data?.templates ?? []).map((t: any) => t.id));
+  // A floor first: with the field dropped from the index the check below runs over an empty set.
+  const withDemo = packs.filter(p => p.demoTemplateId);
+  assert(withDemo.length >= 10, `expected >= 10 packs with a demoTemplateId, got ${withDemo.length}`);
   const misses = packs.filter(p => p.demoTemplateId && !templateIds.has(p.demoTemplateId));
   assert(misses.length === 0, `Missing demo templates: ${misses.map(p => `${p.id}→${p.demoTemplateId}`).join(', ')}`);
 });
@@ -246,12 +251,21 @@ await test('build-app prompt inlines the apiCaveat for frontier packs', async ()
   const res = await fetch(`${BASE}/v1/prompts/build-app?format=txt`);
   const prompt = await res.text();
   const frontier = packs.filter(p => p.modelTier === 'frontier' && p.apiCaveat);
-  // The prompt only lists vendored/cortex capability packs — check the ones that appear there.
-  const misses = frontier.filter(p => prompt.includes(p.id) && !prompt.includes('⚠'));
-  assert(misses.length === 0, `frontier caveat not inlined in prompt for: ${misses.map(p => p.id).join(', ')}`);
-  // pixi specifically: its v8 caveat fragment must be present next to the pack.
-  const pixi = frontier.find(p => p.id === 'pixi');
-  if (pixi && prompt.includes('pixi')) assert(/beginFill|\.rect\(.*\)\.fill\(|v8/i.test(prompt), 'pixi v8 caveat fragment absent from prompt');
+  // The prompt lists each capability pack as a line '- <id> [tier] — ...', followed by its '⚠ <caveat>'
+  // line. The caveat is looked for inside that pack's own entry (up to the next '- ' line), so one
+  // warning sign elsewhere in the prompt no longer satisfies every pack.
+  const entryOf = (id: string): string | null => {
+    const lines = prompt.split('\n');
+    const at = lines.findIndex(l => l.startsWith(`- ${id} `));
+    if (at < 0) return null;
+    const rest = lines.slice(at + 1);
+    const end = rest.findIndex(l => l.startsWith('- ') || l.trim() === '');
+    return [lines[at], ...(end < 0 ? rest : rest.slice(0, end))].join('\n');
+  };
+  const listed = frontier.filter(p => entryOf(p.id) !== null);
+  assert(listed.some(p => p.id === 'pixi'), `pixi (frontier) is not listed as a capability pack in the prompt; listed: ${listed.map(p => p.id).join(', ')}`);
+  const misses = listed.filter(p => !entryOf(p.id)!.includes('⚠ ' + String(p.apiCaveat).slice(0, 40)));
+  assert(misses.length === 0, `frontier caveat not inlined in its own prompt entry for: ${misses.map(p => p.id).join(', ')}`);
   // The reliability tier is surfaced to the building AI (not left as API-only metadata).
   assert(/\[frontier\]|\[any\]|\[needs-doc\]/.test(prompt), 'no modelTier tag surfaced in the build prompt');
   assert(/reliability tag from AEB testing/i.test(prompt), 'prompt does not explain the tier tags');

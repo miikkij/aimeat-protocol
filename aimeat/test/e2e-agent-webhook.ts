@@ -4,6 +4,8 @@
  *   handling of the webhook secret.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-webhook
  * @version-history
+ *   2026-11-15 — Audit M264: 4a2 PUTs a link-local metadata URL, which only the SSRF check refuses
+ *     (400 INVALID_URL), and reads the stored webhook back unchanged.
  *   v1.2.0 — 2026-10-16 — A real receiver (QA audit F07a-01). The suite starts a loopback HTTP listener
  *     and registers it, so the delivery is RECEIVED: the X-AIMEAT-Signature is recomputed over the body
  *     that arrived with the webhook secret, the event header and the envelope are read, a 2xx answer
@@ -236,6 +238,19 @@ await test('4a. PUT with invalid URL returns 400', async () => {
         body: JSON.stringify({ url: 'not-a-valid-url' }),
     });
     assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+});
+
+// 4a's URL is refused by the schema before the SSRF check runs. A well-formed cloud-metadata URL
+// (link-local, blocked even on a node that allows loopback egress) reaches validateOutboundUrl.
+await test('4a2. PUT with a link-local metadata URL returns 400 INVALID_URL and stores nothing', async () => {
+    const before = await json(`/v1/agents/${agentName}/webhook`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const { status, body } = await json(`/v1/agents/${agentName}/webhook`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ url: 'http://169.254.169.254/latest/meta-data' }),
+    });
+    assert(status === 400 && body.error?.code === 'INVALID_URL', `expected 400 INVALID_URL, got ${status} ${JSON.stringify(body.error)}`);
+    const after = await json(`/v1/agents/${agentName}/webhook`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(JSON.stringify(after.body.data) === JSON.stringify(before.body.data), `the stored webhook changed: ${JSON.stringify(after.body.data)}`);
 });
 
 await test('4b. PUT with too-short secret returns 400', async () => {

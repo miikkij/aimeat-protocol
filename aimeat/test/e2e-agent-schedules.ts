@@ -6,6 +6,8 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-11-15 — Audit L037: test 20 names the other owner in the body, expects exactly 404
+ *     AGENT_NOT_FOUND and reads the schedule list back for a stray row.
  *   2026-11-06 — 48: editing and deleting a schedule take the same words, workflow:write or memory:write
  *     (decision 13a of 2026-11-05, verb parity).
  *   2026-11-02 — 8d2: a `deliver` scope entry in a task no delivering schedule made does not make the
@@ -616,12 +618,12 @@ await test('19. target_agent body alias targets the sibling on the /v1/schedules
     assert(body.data.schedule.agentName === o1.agentName, `alias target should be ${o1.agentName}, got ${body.data.schedule.agentName}`);
 });
 
-await test('20. Cross-owner target is rejected (sibling cannot schedule another owner\'s agent)', async () => {
-    const { status } = await json(`/v1/agents/${o2.agentName}/schedules`, {
-        method: 'POST', headers: { Authorization: `Bearer ${sibling.token}` },
-        body: JSON.stringify({ kind: 'agent_task', cron: '0 3 * * *', display_name: 'x', task_template: { title: 'x' } }),
-    });
-    assert(status === 404 || status === 403, `expected 404/403 cross-owner, got ${status}`);
+await test('20. Cross-owner target is rejected (sibling cannot schedule another owner\'s agent)', async () => { // an owner in the body must not move the target (audit L037)
+    const r = await json(`/v1/agents/${o2.agentName}/schedules`, { method: 'POST', headers: { Authorization: `Bearer ${sibling.token}` },
+        body: JSON.stringify({ kind: 'agent_task', cron: '0 3 * * *', display_name: 'x-cross', owner: o2.ownerName, task_template: { title: 'x' } }) });
+    assert(r.status === 404 && r.body.error?.code === 'AGENT_NOT_FOUND', `expected 404 AGENT_NOT_FOUND cross-owner, got ${r.status} ${r.body.error?.code}`);
+    const listed = await json('/v1/schedules?detail=true', { headers: auth1 });
+    assert(!JSON.stringify(listed.body.data).includes('x-cross'), 'no schedule was written for the cross-owner target');
 });
 
 // QA audit F08a-02: a sibling manages an agent-made schedule (decision 2026-10-12, Q4), and editing or

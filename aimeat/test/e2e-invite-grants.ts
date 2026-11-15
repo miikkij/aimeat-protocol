@@ -6,6 +6,8 @@
  *   roster. Covers the guardrails: non-admin edits → 403, unknown workspace → 404, direct add of
  *   an existing member → 409, and the plain no-fields invite regression.
  * @version-history
+ *   2026-11-15 — Audit M148: test 6b has a plain member (B) try PATCH and DELETE on a pending
+ *     invitation, which only the admin gate refuses (test 5's outsider is refused earlier).
  *   v1.0.0 — 2026-07-16 — Initial: invite-with-grants / direct-add / edit / cancel / all=1.
  *   v1.1.0 — 2026-08-11 — Tests 15-21 (H-28): a provisioned-code key hands out only what the person
  *     minting it holds. Plain membership opens that door and used to decide nothing else, so a member
@@ -150,6 +152,23 @@ await test('6. B accepts → member role + WS1 viewer grant applied', async () =
     assert(wsRow && wsRow.role === 'viewer' && wsRow.source === 'invite', `WS1 roster has B as viewer via invite: ${JSON.stringify(wsRow)}`);
     const acc2 = await json(`/v1/organisms/${orgId}/workspace-access?ws=${WS2}`, { headers: auth(A.token) });
     assert(!(acc2.body.data.members || []).some((x: any) => x.owner === B.name), 'WS2 grant was removed by the PATCH — must NOT be applied');
+});
+
+// Test 5 used C, an outsider at that point, so its 403 came from the membership gate. B is now a
+// plain member: the PATCH and DELETE must still refuse B, which only the admin gate does.
+await test('6b. A plain member (B) cannot edit or cancel a pending invite (403 ACCESS_DENIED)', async () => {
+    const inv = await json(`/v1/organisms/${orgId}/invitations`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ invitee: D.name, role: 'member' }) });
+    assert(inv.status === 201, `invite D ${inv.status}: ${JSON.stringify(inv.body.error)}`);
+    const path = `/v1/organisms/${orgId}/invitations/${encodeURIComponent(D.name)}`;
+    const p = await json(path, { method: 'PATCH', headers: auth(B.token), body: JSON.stringify({ role: 'admin', workspaces: [{ ws: WS1, role: 'contributor' }] }) });
+    assert(p.status === 403 && p.body.error?.code === 'ACCESS_DENIED', `member PATCH: ${p.status} ${p.body.error?.code}`);
+    const d = await json(path, { method: 'DELETE', headers: auth(B.token) });
+    assert(d.status === 403 && d.body.error?.code === 'ACCESS_DENIED', `member DELETE: ${d.status} ${d.body.error?.code}`);
+    const list = await json(`/v1/organisms/${orgId}/invitations`, { headers: auth(A.token) });
+    const row = (list.body.data.invitations || []).find((m: any) => m.ghii === D.name);
+    assert(row && row.role === 'member' && (row.invitedWorkspaces || []).length === 0, `D's invite is unchanged: ${JSON.stringify(row)}`);
+    const cancel = await json(path, { method: 'DELETE', headers: auth(A.token) });
+    assert(cancel.status === 200, `A cancels D's invite: ${cancel.status}`);
 });
 
 // ── Cancel a pending invitation ──

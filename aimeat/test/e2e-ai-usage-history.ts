@@ -7,6 +7,8 @@
  *   asserts the owner history windows (d1/d7/d30) and per-app series, the operator per-app +
  *   per-user aggregation across both owners, and the auth guards (401 no-auth, 403 non-operator).
  * @version-history
+ *   2026-11-15 — Audit M210: the operator view's per_user rows are tied to each owner by name and
+ *     carry that owner's own app spend (0.10 and 0.08), not only a length and a sort order.
  *   v1.0.0 — 2026-07-05 — Initial.
  */
 // Run: cd aimeat && pnpm exec tsx test/e2e-ai-usage-history.ts
@@ -156,6 +158,10 @@ await test('GET /v1/admin/ai-usage (operator) aggregates across both owners', as
   assert(!d.per_app._unknown, 'an unattributed call is not an app, so there is no _unknown bucket');
   assert(Array.isArray(d.per_user) && d.per_user.length >= 2, `>=2 users, got ${d.per_user?.length}`);
   assert(d.per_user[0].cost_usd >= d.per_user[1].cost_usd, 'per_user sorted by spend desc');
+  // Each row is tied to its owner by name: op spent 0.06 + 0.04 on apps, the other owner 0.08.
+  const spendOf = (name: string) => d.per_user.find((u: any) => String(u.owner_gaii).startsWith(`${name}@`))?.cost_usd ?? -1;
+  approx(spendOf(opName), 0.10, `per_user row of ${opName}`);
+  approx(spendOf(userName), 0.08, `per_user row of ${userName}`);
   assert(Array.isArray(d.days) && d.days.length >= 1, 'days series present');
 });
 

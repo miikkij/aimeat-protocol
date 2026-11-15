@@ -13,6 +13,9 @@
  *   - Phase 7: Auth & Validation
  *   - Phase 8: Template Moderation Lifecycle
  * @version-history
+ *   2026-11-15 — Audit M214: the exported ZIP is imported by the second owner and must keep the
+ *     second version's 3 components and changelog (import mints a new version string by design,
+ *     package-import.ts); the ZIP helpers moved unchanged to helpers/package-zip.ts.
  *   v1.6.0 — 2026-08-23 — Bundled crew-defs across the package door (TARGET-070): a valid declaration
  *     arrives on the installed app's manifest, and a malformed one fails the install out loud instead
  *     of installing an app whose agents are quietly absent. Both cases were seen failing against the
@@ -41,6 +44,7 @@ import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import YAML from 'yaml';
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { buildTestZip, uploadZipTo } from './helpers/package-zip.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
@@ -79,42 +83,8 @@ function authed(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
 
-/** Helper: build a valid ZIP buffer from a manifest and component files */
-async function buildTestZip(manifest: Record<string, unknown>, components: { name: string; content: string }[]): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const archive = new ZipArchive({ zlib: { level: 6 } });
-    const chunks: Buffer[] = [];
-    archive.on('data', (chunk: Buffer) => chunks.push(chunk));
-    archive.on('end', () => resolve(Buffer.concat(chunks)));
-    archive.on('error', reject);
-    archive.append(YAML.stringify(manifest), { name: 'manifest.yaml' });
-    for (const c of components) {
-      archive.append(c.content, { name: c.name });
-    }
-    archive.finalize();
-  });
-}
-
-/** Helper: upload a ZIP buffer via multipart/form-data */
-async function uploadZip(path: string, zipBuf: Buffer, token: string): Promise<{ status: number; body: any }> {
-  const boundary = '----FormBoundary' + Date.now();
-  const parts: Buffer[] = [];
-  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="package.zip"\r\nContent-Type: application/zip\r\n\r\n`));
-  parts.push(zipBuf);
-  parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
-  const body = Buffer.concat(parts);
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      'Authorization': `Bearer ${token}`,
-    },
-    body,
-  });
-  const ct = res.headers.get('content-type') ?? '';
-  const parsed = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
-  return { status: res.status, body: parsed };
-}
+/** buildTestZip and the multipart upload live in helpers/package-zip.ts. */
+const uploadZip = (path: string, zipBuf: Buffer, token: string) => uploadZipTo(BASE, path, zipBuf, token);
 
 // ─── State ───────────────────────────────────────────────────────────
 
@@ -565,7 +535,7 @@ await test('Export package as ZIP (GET /v1/packages/:groupId/export)', async () 
   assert(buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04,
     `Expected ZIP magic bytes, got ${buf.subarray(0, 4).toString('hex')}`);
   assert(buf.length > 100, `ZIP should have content, got ${buf.length} bytes`);
-  // Store for import test
+  // Imported by the second owner in Phase 7 (round trip: components and version survive)
   exportedZipBuffer = buf;
 });
 
@@ -1284,6 +1254,16 @@ await test('Second owner auth', async () => {
   const { body } = await ownerSignIn(BASE, owner2Name);
   assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
   owner2Token = body.data?.token;
+});
+
+await test('The Phase 3 export imports on another account with the second version\'s 3 components', async () => {
+  const imp = await uploadZip('/v1/packages/import', exportedZipBuffer!, owner2Token);
+  assert(imp.status === 201, `import ${imp.status}: ${JSON.stringify(imp.body).slice(0, 300)}`);
+  const copy = encodeURIComponent(`${pkgName}::${owner2Name}`);
+  const { body } = await json(`/v1/packages/${copy}`, { headers: authed(owner2Token) }); // import mints its own version string
+  const ids = (body.data?.components ?? []).map((c: any) => c.id).sort().join(',');
+  assert(ids === 'app-ui,csm-main,ext-helper' && body.data?.changelog === 'Added new component', `imported copy: [${ids}] changelog ${body.data?.changelog}`);
+  await json(`/v1/packages/${copy}`, { method: 'DELETE', headers: authed(owner2Token) });
 });
 
 await test('Second owner cannot publish version to first owner package', async () => {

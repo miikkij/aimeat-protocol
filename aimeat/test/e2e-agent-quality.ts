@@ -6,6 +6,8 @@
  * @structure Setup, then Phases 1-4 + the overview phase, each a numbered `test()` against a live node.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-quality
  * @version-history
+ *   2026-11-15 — Audit M013: test 10 reads the cached reviews rollup's numbers (factual average,
+ *     source-grounded count, overall n), not only that the key holds an object.
  *   v1.1.0 — 2026-08-01 — Test 4b's oversized-metadata payload tracks the 200 000-byte cap (raised
  *     from 4 KB on 2026-07-30); under it the rating landed and skewed test 9's factual average.
  *   v1.0.0 — earlier — Agent Quality suite.
@@ -268,8 +270,11 @@ await test('10. Statistics written to public cache key (agents.<name>.statistics
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    const value = body.data?.value ?? body.data?.entry?.value ?? body.data;
-    assert(value && typeof value === 'object', 'cache value present');
+    const value = body.data?.value;
+    // The cached rollup carries the same numbers test 9 read from the route, not just an object.
+    assert(value?.byContext?.factual?.avgStars === 1, `cached factual avg: ${JSON.stringify(value?.byContext?.factual)}`);
+    assert(value.byContext.factual.sourceGroundedN === 1, `cached groundedN: ${value.byContext.factual.sourceGroundedN}`);
+    assert(value.overall?.n >= 2, `cached overall n: ${value.overall?.n}`);
 });
 
 await test('11. Custom metric under agents.<name>.statistics.custom.* surfaces in /statistics', async () => {

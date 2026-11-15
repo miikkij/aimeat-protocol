@@ -39,6 +39,8 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   2026-11-15 -- Audit M095: 7d's plan also names the catalogued delegate (agent 'other', offer 'x'),
+ *     which must be kept while the ungrounded 'ghost' is dropped.
  *   2026-11-15 -- 1b also refuses the model list, and 1b2 refuses a chat call with no messages: the two
  *     cases e2e-llm-proxy held that no other suite did, moved here when it was deleted (E2E report of
  *     2026-11-15, 3.2).
@@ -1031,13 +1033,13 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
 
     await test('7d. The planner sees the same structure, and a delegate step the catalogue does not know is dropped', async () => {
         provider.queue('chat', chatJson(JSON.stringify({
-            summary: 'Two steps',
-            confidence: 0.6,
+            summary: 'Three steps', confidence: 0.6,
             steps: [
                 { id: 's1', kind: 'llm_reason', query: 'what changed', title: 'Think' },
                 { id: 's2', kind: 'librarian_assess', query: 'what do I already have' },
                 { id: 's3', kind: 'delegate', query: 'ask someone', agent: 'ghost', offerId: 'nope' },
                 { id: 's4', kind: 'not-a-kind', query: 'x' },
+                { id: 's5', kind: 'delegate', query: 'ask the catalogued one', agent: 'other', offerId: 'x' }, // grounded by the body's catalogue (audit M095)
             ],
         })), carries('MARK-PLAN-OK'));
         const r = await json('/v1/librarian/plan', {
@@ -1046,7 +1048,7 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         });
         assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
         const kinds = r.body.data.plan.steps.map((s: any) => s.kind);
-        assert(kinds.join(',') === 'llm_reason,librarian_assess', `ungrounded and unknown steps are dropped, got ${kinds.join(',')}`);
+        assert(kinds.join(',') === 'llm_reason,librarian_assess,delegate', `the catalogued delegate is kept, ungrounded and unknown steps dropped, got ${kinds.join(',')}`);
         assert(r.body.data.context.organisms.some((o: any) => o.id === ORG), 'the placement context reached the planner');
     });
 

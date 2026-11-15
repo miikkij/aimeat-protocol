@@ -1,5 +1,13 @@
-// E2E Tests for Agent Activity
-// Run: cd aimeat && pnpm exec tsx test/e2e-agent-activity.ts
+/**
+ * @file e2e-agent-activity.ts
+ * @description E2E tests for agent activity: activityStats, GET /activity and its days window,
+ *   the event log, the overview composite and GET /v1/agents?include=stats.
+ *   Run: cd aimeat && pnpm exec tsx test/e2e-agent-activity.ts
+ * @version-history
+ *   2026-11-15 — Audit M033, M034, L004: a backdated history row proves the days window, the
+ *     per-agent stats are cross-checked against a sibling with no tasks, and the activity_stats
+ *     tautology became a real check.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -44,6 +52,9 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import type { Storage } from '../src/storage/interface.js';
+import { serverSqlitePath, serverDbUrl } from './helpers/server-db.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -249,11 +260,13 @@ await test('4. GET /activity?days=7 filters to last 7 days', async () => {
     assert(body.ok === true, 'response ok');
 
     // activity_stats should still be present (stats are cumulative, not filtered by days)
-    assert(body.data.activity_stats !== null || body.data.activity_stats === null,
-        'activity_stats field exists');
+    const st = body.data.activity_stats;
+    assert(typeof st?.tasksCompleted === 'number' && st.tasksCompleted >= 1,
+        `activity_stats.tasksCompleted should be a number >= 1, got ${JSON.stringify(st)}`);
 
     // history should be filtered -- all records within last 7 days
     assert(Array.isArray(body.data.history), 'history is array');
+    assert(body.data.history.length > 0, 'history holds today\'s task rows');
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const cutoff = sevenDaysAgo.toISOString().split('T')[0];
@@ -261,6 +274,25 @@ await test('4. GET /activity?days=7 filters to last 7 days', async () => {
         assert(record.date >= cutoff,
             `history record date ${record.date} should be >= ${cutoff}`);
     }
+});
+
+// Every row the HTTP routes write is dated today, so no window could exclude one. A row dated ten
+// days back is planted straight into storage: ?days=7 must leave it out and ?days=30 must return it.
+await test('4a. GET /activity?days=7 omits a 10-day-old history row that ?days=30 returns', async () => {
+    const provider = (process.env.AIMEAT_DB ?? 'sqlite') as StorageProvider;
+    if (provider !== 'sqlite' && provider !== 'postgres-kysely') { console.log(`     (skipped: the ${provider} backend lives inside the server)`); return; }
+    const old = new Date(Date.now() - 10 * 86_400_000).toISOString().split('T')[0];
+    const storage: Storage = await createStorage({ provider, sqlitePath: serverSqlitePath(), dbUrl: serverDbUrl() });
+    try {
+        await storage.recordActivity({ agentGaii, date: old, hour: 3, metric: 'tasks_completed', value: 1 });
+    } finally { await (storage as unknown as { close?: () => unknown }).close?.(); }
+    const read = async (days: number) => (await json(`/v1/agents/${agentName}/activity?days=${days}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    })).body.data.history as Array<{ date: string }>;
+    const week = await read(7);
+    const month = await read(30);
+    assert(week.length > 0 && !week.some(r => r.date === old), `?days=7 should omit ${old}, got ${JSON.stringify(week.map(r => r.date))}`);
+    assert(month.some(r => r.date === old), `?days=30 should include ${old}, got ${JSON.stringify(month.map(r => r.date))}`);
 });
 
 await test('4b. GET /activity?granularity=hourly returns hourly breakdown', async () => {
@@ -405,9 +437,15 @@ await test('7. counts match the per-agent countTasksByAgent sums (cross-check)',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     const agent = (body.data.agents || []).find((a: any) => a.name === agentName);
-    // The embedded activityStats.tasksCompleted (lifetime) should be >= the overview's done count
-    // is not a strict equality (different windows), so just assert both report >=1 completion.
-    assert(agent.stats.tasks.done >= 1 && cap.tasksCompleted >= 1, 'both report completed tasks');
+    const sibling = (body.data.agents || []).find((a: any) => a.name === 'actbot2');
+    // Every task of this run was completed inside the run, so the lifetime counter on the agent
+    // record and the per-agent task count agree exactly. actbot2 (test 5c) completed none: a count
+    // taken from the owner's whole fleet would show its sibling's completion on it.
+    assert(cap.tasksCompleted >= 1 && agent.stats.tasks.done === cap.tasksCompleted,
+        `actbot done ${agent.stats.tasks.done} should equal capabilities tasksCompleted ${cap.tasksCompleted}`);
+    assert(sibling, 'actbot2 present in list');
+    assert(sibling.stats.tasks.done === 0 && sibling.stats.tasks.failed === 0,
+        `actbot2 completed and failed nothing, got ${JSON.stringify(sibling.stats.tasks)}`);
 });
 
 await test('8. without include=stats, no stats field is attached (default projection)', async () => {

@@ -16,6 +16,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-funnel
  * @version-history
+ *   2026-11-15 — Audit M118: a remake account initializes its home (agent proof + home state) and
+ *     the funnel's home_initialized column must move from 0 to 1, not only read zero.
  *   v2.0.0 — 2026-08-27 — Phase 3 is the start page, not the switch: every account defaults to the
  *     home, choosing a start page never touches `track`, and the `switched` column is asserted
  *     ABSENT from the funnel. The old assertions counted flips between two paths that are now two
@@ -27,6 +29,7 @@
 
 import { registerOwner as registerWithPassword, ownerSignIn } from './helpers/owner-login.js';
 import { seedPassword } from './helpers/seed-password.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now() % 100000;
@@ -227,6 +230,23 @@ await test('The remake columns exist and read zero before anyone walks the path'
     assert(remake.branch && typeof remake.branch.A === 'number' && typeof remake.branch.B === 'number'
         && typeof remake.branch.agent === 'number', 'the branch split (A/B/agent) is missing');
     assert(remake.home_initialized_rate_pct === 0, 'nothing is initialized yet');
+});
+
+// The zero state alone passes a funnel that never counts anything. One remake account walks the
+// path the home uses (a connected agent writes the Hello MCP proof, the home state is read, the
+// onboarding.home_initialized marker is stamped) and the column must move.
+await test('home_initialized moves from 0 to 1 once a remake account initializes its home', async () => {
+    const agent = await connectAgentByDevice(BASE, { owner: ownerHuman, ownerToken: tokenHuman, name: 'rmkagent', scopes: ['memory:read', 'memory:write'] });
+    const w = await json('/v1/memory', auth(agent.token, { method: 'POST', body: JSON.stringify({ key: 'onboarding.hello_mcp', value: { ok: true }, visibility: 'private' }) }));
+    assert(w.status === 201, `hello_mcp write ${w.status}: ${JSON.stringify(w.body.error)}`);
+    const st = await json('/v1/home/state', auth(tokenHuman));
+    assert(st.body.data?.state?.initialized === true, `setup: the home must be initialized, got ${JSON.stringify(st.body.data ?? st.body).slice(0, 300)}`);
+    const { body } = await json('/v1/admin/onboarding-funnel?limit=1000', auth(tokenOp));
+    const row = (body.data?.rows ?? []).find((r: any) => r.owner === ownerHuman);
+    assert(typeof row?.homeInitializedAt === 'string', `the row carries the marker: ${JSON.stringify(row)}`);
+    const remake = (body.data?.cohorts ?? []).find((c: any) => c.track === 'remake');
+    assert(remake?.home_initialized === 1, `home_initialized should be 1, got ${remake?.home_initialized}`);
+    assert(remake.home_initialized_rate_pct > 0, `home_initialized_rate_pct should be > 0, got ${remake.home_initialized_rate_pct}`);
 });
 
 console.log('\nPhase 3: the start page, and the cohort it never touches');

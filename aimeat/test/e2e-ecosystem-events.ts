@@ -8,6 +8,9 @@
  *   not. Plus scope enforcement (events:emit) on the inbound route.
  *   Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-events
  * @version-history
+ *   2026-11-15 — Audit M234, M235: a second app of the same owner (freshdesk) emits the event a
+ *     zendesk-pinned trigger names and must not fire it; every negative is read after a barrier
+ *     (a later event or write whose own run or frame is awaited) instead of after a fixed sleep.
  *   v1.2.0 — 2026-11-01 — Phase 5 (secaudit2026oct31w2 round 12, ecosystem-subscriptions:
  *     node-wide-registry-unbounded-size): a match with more fields than any event carries is refused
  *     with its reason; the app's own token is refused on GET and POST /v1/ecosystem/subscriptions; a
@@ -88,6 +91,27 @@ async function runCount(wfId: string): Promise<number> {
   const r = await json(`/v1/workflows/${wfId}/runs`, { headers: auth });
   return r.body.data?.count ?? 0;
 }
+/** Poll a workflow's run list until it holds `atLeast` runs or the time is up; returns the last count. */
+async function waitForRuns(wfId: string, atLeast: number, timeoutMs = 5000): Promise<number> {
+  const until = Date.now() + timeoutMs;
+  for (;;) {
+    const n = await runCount(wfId);
+    if (n >= atLeast || Date.now() > until) return n;
+    await sleep(100);
+  }
+}
+// A negative is proved after a barrier, not after a fixed sleep: the barrier event is emitted AFTER
+// the event that must not fire, and its own workflow run is awaited, so the trigger matcher has
+// handled the earlier event by the time the negative is read.
+let barrierToken = '';
+let barrierRuns = 0;
+async function barrier(): Promise<void> {
+  barrierRuns++;
+  const r = await emitEvent(barrierToken, 'barrier.tick', 1, { n: barrierRuns });
+  assert(r.status === 200 && r.body.data?.accepted === true, `barrier emit: ${r.status} ${JSON.stringify(r.body)}`);
+  const n = await waitForRuns('eco-wf-barrier', barrierRuns);
+  assert(n >= barrierRuns, `barrier run ${barrierRuns} did not land (count ${n})`);
+}
 
 async function run() {
   console.log('\n=== AIMEAT Ecosystem Events & Triggers E2E ===\n');
@@ -112,6 +136,19 @@ async function run() {
     const g = await connectGeai('zendesk', ['memory:read', 'memory:write', 'events:emit', 'events:subscribe']);
     geai = g.geai; geaiToken = g.token;
     assert(geai === `eco:zendesk#${ownerName}@${NODE_ID}`, `geai: ${geai}`);
+    barrierToken = geaiToken;
+  });
+
+  await test('Barrier workflow (fires on every zendesk barrier.tick)', async () => {
+    const wf = {
+      title: { en_US: 'Barrier' }, description: { en_US: 'orders the negative checks' },
+      trigger: { kind: 'ecosystem.event', app: 'zendesk', on: 'barrier.tick', version: 1 },
+      // parallel: every tick starts a run of its own; the one-live-run guard would skip the second.
+      parallel: true, vars: [], on_step_fail: 'inspect', steps: [stepFetch],
+    };
+    const put = await json('/v1/workflows/eco-wf-barrier', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
+    assert(put.status === 200, `put eco-wf-barrier ${put.status}: ${JSON.stringify(put.body)}`);
+    await barrier();
   });
 
   // ── Phase 1: inbound event → ecosystem.event trigger fires ──
@@ -128,8 +165,29 @@ async function run() {
 
     const r = await emitEvent(geaiToken, 'ticket.resolved', 1, { ticket_id: 't1', status: 'closed' });
     assert(r.status === 200 && r.body.data?.accepted === true, `emit: ${r.status} ${JSON.stringify(r.body)}`);
-    await sleep(900);
-    assert((await runCount('eco-wf')) >= 1, 'expected a run after the matching event');
+    assert((await waitForRuns('eco-wf', 1)) >= 1, 'expected a run after the matching event');
+  });
+
+  // The trigger is pinned to app 'zendesk'. A second connector of the SAME owner, holding
+  // events:emit, emits the identical event name, version and payload: the pinned trigger must not run.
+  await test('An event from another app of the same owner does NOT fire a trigger pinned to zendesk', async () => {
+    // parallel, so a live run of this workflow cannot hide a wrong start behind the one-live-run guard.
+    const wf = {
+      title: { en_US: 'Pinned to zendesk' }, description: { en_US: 'fires on zendesk ticket.pinned only' },
+      trigger: { kind: 'ecosystem.event', app: 'zendesk', on: 'ticket.pinned', version: 1, match: { status: 'closed' } },
+      parallel: true, vars: [], on_step_fail: 'inspect', steps: [stepFetch],
+    };
+    const put = await json('/v1/workflows/eco-wf-pin', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
+    assert(put.status === 200, `put eco-wf-pin ${put.status}: ${JSON.stringify(put.body)}`);
+    const fd = await connectGeai('freshdesk', ['memory:read', 'events:emit']);
+    const r = await emitEvent(fd.token, 'ticket.pinned', 1, { ticket_id: 't-fd', status: 'closed' });
+    assert(r.status === 200 && r.body.data?.accepted === true, `freshdesk emit: ${r.status} ${JSON.stringify(r.body)}`);
+    await barrier();
+    const after = await runCount('eco-wf-pin');
+    assert(after === 0, `a freshdesk event must not fire the zendesk-pinned trigger (runs ${after})`);
+    // Positive control: the same event from zendesk does fire it.
+    await emitEvent(geaiToken, 'ticket.pinned', 1, { ticket_id: 't-zd', status: 'closed' });
+    assert((await waitForRuns('eco-wf-pin', 1)) === 1, 'the same event from zendesk must fire the pinned trigger');
   });
 
   // The trigger filter matches on app + event + version, and the OWNER is the fourth term. With one
@@ -197,12 +255,11 @@ async function run() {
     assert((await json('/v1/workflows/eco-wf-v', { method: 'PUT', headers: auth, body: JSON.stringify(wf) })).status === 200, 'put eco-wf-v');
 
     await emitEvent(geaiToken, 'feedback.received', 2, { feedback_id: 'f1' });   // wrong MAJOR
-    await sleep(700);
+    await barrier();
     assert((await runCount('eco-wf-v')) === 0, 'a major-version mismatch must not fire the trigger');
 
     await emitEvent(geaiToken, 'feedback.received', 1, { feedback_id: 'f2' });   // correct MAJOR
-    await sleep(900);
-    assert((await runCount('eco-wf-v')) >= 1, 'the correct major version must fire the trigger');
+    assert((await waitForRuns('eco-wf-v', 1)) >= 1, 'the correct major version must fire the trigger');
   });
 
   await test('Non-matching payload does NOT fire; matching payload does', async () => {
@@ -214,12 +271,11 @@ async function run() {
     assert((await json('/v1/workflows/eco-wf-m', { method: 'PUT', headers: auth, body: JSON.stringify(wf) })).status === 200, 'put eco-wf-m');
 
     await emitEvent(geaiToken, 'csat.dropped', 1, { status: 'open' });           // match fails
-    await sleep(700);
+    await barrier();
     assert((await runCount('eco-wf-m')) === 0, 'a non-matching payload must not fire');
 
     await emitEvent(geaiToken, 'csat.dropped', 1, { status: 'closed' });         // match passes
-    await sleep(900);
-    assert((await runCount('eco-wf-m')) >= 1, 'a matching payload must fire');
+    assert((await waitForRuns('eco-wf-m', 1)) >= 1, 'a matching payload must fire');
   });
 
   // ── Phase 3: outbound subscription → tunnel delivery ──
@@ -241,10 +297,12 @@ async function run() {
       const payload = frame!.payload as any;
       assert(payload?.event === 'memory.write' && payload?.geai === geai && payload?.data?.key === 'service.zendesk.ticketX', `payload: ${JSON.stringify(payload)}`);
 
-      // A non-matching write must NOT deliver.
+      // A non-matching write must NOT deliver. A matching write follows it as the barrier: frames
+      // arrive in order, so the next frame must be the barrier's and not the unrelated key's.
       await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'unrelated.key', value: { y: 2 }, visibility: 'private' }) });
-      const none = await tunnel.waitForDeliver(800);
-      assert(none === null, `a non-matching write must not deliver (got ${JSON.stringify(none)})`);
+      await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'service.zendesk.barrier1', value: { y: 3 }, visibility: 'private' }) });
+      const next = await tunnel.waitForDeliver(3000);
+      assert((next?.payload as any)?.data?.key === 'service.zendesk.barrier1', `a non-matching write must not deliver (next frame ${JSON.stringify(next)})`);
     } finally {
       await tunnel.close();
     }
@@ -323,14 +381,14 @@ async function run() {
       await json('/v1/memory', { method: 'POST', headers: otherAuth, body: JSON.stringify({ key: 'service.zendesk.fromB', value: { b: 1 }, visibility: 'private' }) });
       const toB = await tunnelB.waitForDeliver(2000);
       assert(!!toB && (toB.payload as any)?.geai === otherGeai && (toB.payload as any)?.data?.key === 'service.zendesk.fromB', `B's app hears B's write: ${JSON.stringify(toB)}`);
-      const toA = await tunnelA.waitForDeliver(800);
-      assert(toA === null, `A's app must not hear B's write (got ${JSON.stringify(toA)})`);
-
+      // A's write is A's barrier: A's next frame must be fromA, not B's earlier fromB.
       await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'service.zendesk.fromA', value: { a: 1 }, visibility: 'private' }) });
-      const toA2 = await tunnelA.waitForDeliver(2000);
-      assert(!!toA2 && (toA2.payload as any)?.data?.key === 'service.zendesk.fromA', `A's app hears A's write: ${JSON.stringify(toA2)}`);
-      const toB2 = await tunnelB.waitForDeliver(800);
-      assert(toB2 === null, `B's app must not hear A's write (got ${JSON.stringify(toB2)})`);
+      const toA2 = await tunnelA.waitForDeliver(3000);
+      assert(!!toA2 && (toA2.payload as any)?.data?.key === 'service.zendesk.fromA', `A's app must hear A's write and not B's first: ${JSON.stringify(toA2)}`);
+      // B's second write is B's barrier: B's next frame must be fromB2, not A's fromA.
+      await json('/v1/memory', { method: 'POST', headers: otherAuth, body: JSON.stringify({ key: 'service.zendesk.fromB2', value: { b: 2 }, visibility: 'private' }) });
+      const toB2 = await tunnelB.waitForDeliver(3000);
+      assert(!!toB2 && (toB2.payload as any)?.data?.key === 'service.zendesk.fromB2', `B's app must hear B's write and not A's first: ${JSON.stringify(toB2)}`);
     } finally {
       await tunnelA.close();
       await tunnelB.close();
