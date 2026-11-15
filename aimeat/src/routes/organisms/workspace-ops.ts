@@ -685,7 +685,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const prefix = ws ? `organism.${id}.w.${ws}.` : `organism.${id}.`;
     // An AI's delete of a team's workspace waits for a lead (services/team/action-gate.ts, T7).
-    const held = await teamDeleteGate({ storage, config }, { principal: req.auth!.sub, roles: req.auth!.roles }, [`${prefix}*`],
+    const held = await teamDeleteGate({ storage, config }, callerOf(req, config.nodeId, storage), [`${prefix}*`],
       ws ? `delete the whole workspace ${ws}` : 'delete every workspace of the team');
     if (held) { res.status(held.status).json(error(config.nodeId, held.code, held.message, held.status, held.details)); return; }
     // Data-access redesign (Phase 2): wipe the container in ONE statement (all rows under the prefix,

@@ -757,7 +757,7 @@ export async function acceptBid(
     const capUnits = input.capUnits ?? n.budgetCap;
     // A paying contract made by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
     // The principal decides: a person's GHII is never held.
-    const teamHeld = await teamAgentGate(deps, { principal: input.consumerGaii, roles: [] }, 'pay',
+    const teamHeld = await teamAgentGate(deps, input.consumerGaii, 'pay',
         { need: input.needId, bid: input.bidId, cap: capUnits }, `accept the bid ${input.bidId} for ${bid.ext}/${bid.action}`);
     if (teamHeld) return { ok: false, status: teamHeld.status, code: teamHeld.code, message: teamHeld.message };
     const existing = await readContractForCall(storage, input.consumerGaii, bid.ext, bid.action);

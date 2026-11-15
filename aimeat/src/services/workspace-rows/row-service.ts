@@ -659,7 +659,7 @@ export async function readRow(
  * ask is named as the rows' address in the workspace, `organism.<id>.w.<ws>.<namespace>.<what>`.
  */
 async function teamRowGate(deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string, namespace: string, what: string): Promise<void> {
-  const held = await teamDeleteGate(deps, { principal: caller.principal, roles: caller.roles },
+  const held = await teamDeleteGate(deps, caller,
     [`organism.${organismId}.w.${wsId}.${namespace}.${what.replace(/\s+/g, '-')}`], `delete ${what} in ${namespace}`);
   if (held) throw new WorkspaceRowError(held.code, held.status, held.message, held.details);
 }

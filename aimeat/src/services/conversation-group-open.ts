@@ -81,7 +81,7 @@ export async function openGroupAs(ctx: DeliveryCtx, req: OpenGroupRequest): Prom
   if (refusal) return { ok: false, status: 403, code: refusal.code, message: refusal.message };
 
   // A group opened by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
-  const teamHeld = await teamAgentGate(ctx, { principal: req.principal, roles: [] }, 'send',
+  const teamHeld = await teamAgentGate(ctx, req.principal, 'send',
     { group: req.members, subject: req.subject, body: req.body }, 'open a group conversation');
   if (teamHeld) return { ok: false, status: teamHeld.status, code: teamHeld.code, message: teamHeld.message };
 

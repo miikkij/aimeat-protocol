@@ -1,5 +1,5 @@
 /**
- * @file src/services/siem-export.ts
+ * @file src/services/node-admin/siem-export.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's security events, pushed to the organisation's own monitoring (team setup
@@ -36,20 +36,23 @@
 import { createSocket, type Socket as UdpSocket } from 'node:dgram';
 import { connect as tcpConnect, type Socket as TcpSocket } from 'node:net';
 import { hostname } from 'node:os';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import { safeFetch } from '../utils/url-validator.js';
-import { onUsageRecorded } from './usage/usage-buffer.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import { onUsageRecorded } from '../usage/usage-buffer.js';
 
 export type SiemKind = 'refusal' | 'operator' | 'incident' | 'team' | 'trail';
 export interface SiemEvent { kind: SiemKind; at: string; node: string; fields: Record<string, unknown> }
 
 type SiemConfig = Pick<AimeatConfig, 'nodeId' | 'siemSyslog' | 'siemOtlpUrl' | 'siemEvents'>;
 
+// process-local: nothing; every process binds the same config at boot and sends its own events.
 let bound: SiemConfig | null = null;
+// process-local: nothing; each process warns once in its own log.
 const warned = new Set<string>();
 const sent = { syslog: 0, otlp: 0, dropped: 0 };
 
+// process-local: nothing; each process listens to its own usage stream, which holds its own calls.
 let offTrail: (() => void) | null = null;
 
 /**
@@ -111,7 +114,9 @@ export function otlpBody(events: SiemEvent[], node: string): unknown {
 }
 
 // ── syslog ──
+// process-local: nothing; each process opens its own socket to the collector.
 let udp: UdpSocket | null = null;
+// process-local: nothing; each process keeps its own connection to the collector.
 let tcp: { target: string; socket: TcpSocket | null; connecting: boolean } | null = null;
 
 function parseTarget(raw: string): { proto: 'udp' | 'tcp'; host: string; port: number } | null {
@@ -154,7 +159,9 @@ function sendSyslog(target: string, line: string): void {
 }
 
 // ── OTLP ──
+// process-local: a process that stops loses its last second of OTLP events; each process posts its own.
 let batch: SiemEvent[] = [];
+// process-local: nothing; each process flushes its own batch.
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const OTLP_BATCH_MAX = 500;
 

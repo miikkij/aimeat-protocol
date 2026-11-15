@@ -84,7 +84,7 @@ export async function sendAsOwner(ctx: DeliveryCtx, input: SendAsOwnerInput): Pr
 
   // The agent wrote it: a send by an agent that works for a team waits for a lead
   // (services/team/action-gate.ts, T7), before the send turn.
-  const teamHeld = await teamAgentGate(ctx, { principal: input.agentGaii, roles: ['agent'] }, 'send',
+  const teamHeld = await teamAgentGate(ctx, input.agentGaii, 'send',
     { to, conversation: input.conversationId ?? '', subject: input.subject ?? '', body: input.body ?? '' }, `send a message to ${to} in the owner's name`);
   if (teamHeld) return { ok: false, status: teamHeld.status, code: teamHeld.code, message: teamHeld.message };
 

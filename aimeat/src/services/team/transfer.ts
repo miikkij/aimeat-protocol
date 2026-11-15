@@ -34,6 +34,7 @@
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { organismOwners } from '../organism-ownership.js';
+import { localAccountOf } from '../../utils/gaii.js';
 import { createNameInvitation, InvitationError } from '../invitations.js';
 import { teamLang, type TeamLang } from '../../data/team-kit.js';
 import { readTeamRecord, readTeamRecordWithVersion, writeTeamRecord, TEAM_RECORD_TYPE, teamGateOn, type TeamRecord, type PendingLead } from './record.js';
@@ -189,12 +190,11 @@ export async function restoreTeamAndPeople(deps: Deps, caller: { owner: string; 
     const organism = await storage.getOrganism(args.orgId);
     for (const p of people) {
         const base = { identity: p.identity, role: p.role, lead: p.lead };
-        const at = p.identity.lastIndexOf('@');
-        const account = p.identity.slice(0, at);
-        const local = p.identity.slice(at + 1) === config.nodeId;
-        if (local && account === caller.owner) { results.push({ ...base, result: 'you' }); continue; }
+        // The account on THIS node, or null for a person of another node (utils/gaii.ts).
+        const account = localAccountOf(p.identity);
+        if (account !== null && account === caller.owner) { results.push({ ...base, result: 'you' }); continue; }
         if (args.options.people !== 'invite') { results.push({ ...base, result: 'not_invited' }); continue; }
-        if (!local) { results.push({ ...base, result: 'by_address', reason: 'another node: invite by email address' }); continue; }
+        if (account === null) { results.push({ ...base, result: 'by_address', reason: 'another node: invite by email address' }); continue; }
         if (!organism) { results.push({ ...base, result: 'refused', reason: 'the organism is gone' }); continue; }
         try {
             const role = p.lead || p.role !== 'member' ? 'admin' : 'member';

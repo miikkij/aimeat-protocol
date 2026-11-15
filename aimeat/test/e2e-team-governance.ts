@@ -226,6 +226,9 @@ await test('t13 the person in person is not held; a lead turns the gate off and 
 await test('t14 a send by an agent that works for the team waits; an agent with no workplace is not held', async () => {
     const plain = await json('/v1/messages', { method: 'POST', headers: auth(leadAgent.token), body: JSON.stringify({ to: member.ghii, body: `hei ${stamp}` }) });
     assert(plain.status === 201, `no workplace: ${plain.status} ${JSON.stringify(plain.body.error ?? '')}`);
+    // Another person cannot point the lead's agent at a team: the workplace decides what the gate holds.
+    const foreign = await json(`/v1/agents/${leadAgent.name}/workplace`, { method: 'PUT', headers: auth(member.token), body: JSON.stringify({ organism_id: teamId, workspace_id: sharedWs }) });
+    assert(foreign.status === 403 || foreign.status === 404, `another person sets the workplace: ${foreign.status}`);
     const wp = await json(`/v1/agents/${leadAgent.name}/workplace`, { method: 'PUT', headers: auth(lead.token), body: JSON.stringify({ organism_id: teamId, workspace_id: sharedWs }) });
     assert(wp.status === 200, `workplace ${wp.status} ${JSON.stringify(wp.body.error ?? '')}`);
     const msg = JSON.stringify({ to: member.ghii, body: `tarjous lähtee ${stamp}` });

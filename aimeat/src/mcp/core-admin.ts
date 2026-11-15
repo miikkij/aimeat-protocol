@@ -68,7 +68,6 @@ import { nodeActivity } from '../services/node-admin/activity.js';
 import { addOrganismOwner } from '../services/organism-ownership.js';
 import { organismOwnershipView } from '../services/node-admin/organism-ownership-view.js';
 import { nodeTeamsView } from '../services/node-admin/teams-view.js';
-import { parseGAII } from '../utils/gaii.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
@@ -250,11 +249,11 @@ export function registerCoreAdminTools(
             annotations: annotationsFor('aimeat_admin_teams'),
         },
         async () => {
-            if (!(await isOperator())) return notOperator;
-            // The team names in the operator's own language, as the REST door gives them.
-            const owner = parseGAII(agentGaii)?.owner ?? null;
-            const locale = owner ? (await storage.getGHIIByOwner(owner))?.locale ?? null : null;
-            const view = await nodeTeamsView(storage, { now: Date.now(), locale });
+            // The operator's account, which the operator question names; the team names come in its
+            // language, as the REST door gives them.
+            const owner = await resolveOperatorAgentName(storage, agentGaii, scopes);
+            if (!owner) return notOperator;
+            const view = await nodeTeamsView(storage, { now: Date.now(), reader: owner });
             return { content: [{ type: 'text' as const, text: JSON.stringify(view, null, 2) }] };
         },
     );

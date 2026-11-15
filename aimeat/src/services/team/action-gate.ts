@@ -38,13 +38,14 @@ import type { AimeatConfig } from '../../config.js';
 import { isOwnerInPerson, parseGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { readWorkplace } from '../agent/ties.js';
 import { emitChange } from '../event-bus.js';
-import { siemEmit } from '../siem-export.js';
+import { siemEmit } from '../node-admin/siem-export.js';
 import { readTeamRecord, teamGateOn, teamDisplayName } from './record.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 export type TeamGateKind = 'delete' | 'send' | 'pay';
 
 export const TEAM_GATE_ACTIONS: Record<TeamGateKind, string> = { delete: 'team:delete', send: 'team:send', pay: 'team:pay' };
+// process-local: nothing; a constant set of three action names, the same in every process.
 const ACTIONS = new Set(Object.values(TEAM_GATE_ACTIONS));
 /** An approval this gate filed: it is approved or declined as asked, never edited. */
 export function isTeamGateAction(action: string): boolean { return ACTIONS.has(action); }
@@ -70,7 +71,7 @@ function fingerprintOf(kind: TeamGateKind, parts: unknown): string {
     return createHash('sha256').update(JSON.stringify([kind, parts])).digest('hex').slice(0, 40);
 }
 
-async function gateIn(deps: Deps, caller: TeamGateCaller, orgId: string, kind: TeamGateKind, parts: unknown, summary: string): Promise<TeamGateRefusal | null> {
+async function gateIn(deps: Deps, principal: string, orgId: string, kind: TeamGateKind, parts: unknown, summary: string): Promise<TeamGateRefusal | null> {
     const { storage } = deps;
     const team = await readTeamRecord(storage, orgId);
     if (!team || !teamGateOn(team)) return null;
@@ -80,7 +81,7 @@ async function gateIn(deps: Deps, caller: TeamGateCaller, orgId: string, kind: T
     const fingerprint = fingerprintOf(kind, parts);
     const now = Date.now();
     const mine = (await storage.listPendingApprovals(orgId))
-        .filter(a => a.action === action && a.actor === caller.principal && a.arguments?.fingerprint === fingerprint)
+        .filter(a => a.action === action && a.actor === principal && a.arguments?.fingerprint === fingerprint)
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     const usedAt = (a: PendingApprovalRecord) => (typeof a.arguments?.used_at === 'string' ? Date.parse(a.arguments.used_at) : null);
     const usable = mine.find(a => a.status === 'approved'
@@ -111,14 +112,14 @@ async function gateIn(deps: Deps, caller: TeamGateCaller, orgId: string, kind: T
         id = uuidv4();
         const at = new Date(now).toISOString();
         const record: PendingApprovalRecord = {
-            id, organismId: orgId, actor: caller.principal, action,
+            id, organismId: orgId, actor: principal, action,
             arguments: { kind, fingerprint, summary: summary.slice(0, 500) },
             risk: 'high', approverRole: 'owner', prompt: summary.slice(0, 500),
             status: 'pending', createdAt: at, updatedAt: at,
         };
         await storage.createPendingApproval(record);
         emitChange('organisms');
-        siemEmit('team', { approval_id: id, organism_id: orgId, action, actor: caller.principal, status: 'pending', summary: summary.slice(0, 200) });
+        siemEmit('team', { approval_id: id, organism_id: orgId, action, actor: principal, status: 'pending', summary: summary.slice(0, 200) });
     }
     return {
         status: 403, code: 'TEAM_APPROVAL_REQUIRED',
@@ -141,22 +142,22 @@ export async function teamDeleteGate(deps: Deps, caller: TeamGateCaller, keys: r
     for (const [orgId, own] of byOrg) {
         const sorted = [...new Set(own)].sort();
         const what = summary ?? (sorted.length === 1 ? `delete ${sorted[0]}` : `delete ${sorted.length} keys, first ${sorted[0]}`);
-        const held = await gateIn(deps, caller, orgId, 'delete', sorted, what);
+        const held = await gateIn(deps, caller.principal, orgId, 'delete', sorted, what);
         if (held) return held;
     }
     return null;
 }
 
 /**
- * A send or a payment. Held when the caller is an agent whose workplace is a workspace of a team
- * with the gate on. `parts` is what the ask is (recipient and content, or the checkout), so only the
- * same ask passes on the approval.
+ * A send or a payment by `principal`. Held when the principal is an agent (its GAII; a person's GHII,
+ * an app's or an ecosystem app's identity never is) whose workplace is a workspace of a team with the
+ * gate on. `parts` is what the ask is (recipient and content, or the checkout), so only the same ask
+ * passes on the approval.
  */
-export async function teamAgentGate(deps: Deps, caller: TeamGateCaller, kind: 'send' | 'pay', parts: unknown, summary: string): Promise<TeamGateRefusal | null> {
-    if (isOwnerInPerson({ roles: [...caller.roles] })) return null;
-    const agent = parseGAII(caller.principal);
+export async function teamAgentGate(deps: Deps, principal: string, kind: 'send' | 'pay', parts: unknown, summary: string): Promise<TeamGateRefusal | null> {
+    const agent = parseGAII(principal);
     if (!agent) return null;
-    const workplace = await readWorkplace(deps.storage, ownerGhiiOf(caller.principal), agent.agent);
+    const workplace = await readWorkplace(deps.storage, ownerGhiiOf(principal), agent.agent);
     if (!workplace?.organismId) return null;
-    return gateIn(deps, caller, workplace.organismId, kind, parts, summary);
+    return gateIn(deps, principal, workplace.organismId, kind, parts, summary);
 }

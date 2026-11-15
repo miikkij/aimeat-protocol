@@ -186,7 +186,7 @@ export function registerDmMessageTools(
             }
             // A send by an agent that works for a team waits for a lead (services/team/action-gate.ts,
             // T7), asked as POST /v1/messages asks it: before the send turn, with the same input.
-            const teamHeld = await teamAgentGate({ storage, config }, { principal: senderGhii, roles: [...caller().roles] }, 'send',
+            const teamHeld = await teamAgentGate({ storage, config }, senderGhii, 'send',
                 { to: recipientGhii, conversation: conversation_id ?? '', subject: subject ?? '', body: body ?? '' },
                 `send a message to ${recipientGhii || `conversation ${conversation_id ?? ''}`}`);
             if (teamHeld) return toolError(teamHeld.code, teamHeld.message);
@@ -558,7 +558,7 @@ export function registerDmMessageTools(
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot send a message to yourself.' }) }] };
             }
             // A send by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
-            const teamHeld = await teamAgentGate({ storage, config }, { principal: senderGhii, roles: [...caller().roles] }, 'send',
+            const teamHeld = await teamAgentGate({ storage, config }, senderGhii, 'send',
                 { to: recipientGhii, conversation: conversation_id ?? '', subject: subject ?? '', body: body ?? '', questions }, `ask ${recipientGhii} a question`);
             if (teamHeld) return toolError(teamHeld.code, teamHeld.message);
             // A question is a message: counted before the provenance record below is written.

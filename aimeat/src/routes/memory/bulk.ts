@@ -615,7 +615,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     // An AI's delete in a team's workspaces waits for a lead (services/team/action-gate.ts, T7):
     // one team key in the request holds the whole request, before the first delete.
-    const held = await teamDeleteGate({ storage, config }, { principal: session.principal, roles: session.roles },
+    const held = await teamDeleteGate({ storage, config }, session,
       records.filter(r => (!keys || keys.has(r.key)) && !keep.has(`${r.ownerGaii}\u0000${r.key}`)).map(r => r.key));
     if (held) {
       res.status(held.status).json(error(config.nodeId, held.code, held.message, held.status, held.details));

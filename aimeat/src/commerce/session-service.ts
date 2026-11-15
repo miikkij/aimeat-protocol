@@ -513,7 +513,7 @@ async function completeSessionInner(
   // An agent that works for a team pays only after a lead approved this checkout
   // (services/team/action-gate.ts, T7). The ask is the session: one approval pays this one checkout.
   if (caller?.sub) {
-    const teamHeld = await teamAgentGate({ storage, config }, { principal: caller.sub, roles: caller.roles }, 'pay',
+    const teamHeld = await teamAgentGate({ storage, config }, caller.sub, 'pay',
       { session: session.id }, `pay checkout ${session.id} to ${session.sellerOwner}`);
     if (teamHeld) throw new CommerceError(teamHeld.code, teamHeld.status, teamHeld.message);
   }

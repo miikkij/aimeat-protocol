@@ -12,6 +12,7 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-11-15 -- node-operations: aimeat_admin_teams, every team as counts only (team setup T16).
  *   2026-11-15 -- manage-my-agents: a new agent has two ways in. aimeat_agent_propose for an agent this
  *     node makes and runs, device authorization for an AI the owner already runs elsewhere; the
  *     closing line had named device authorization alone, against the skill's own first section.
@@ -129,6 +130,8 @@ show the owner what you found before acting.
 2. \`aimeat_admin_agents\` (or \`aimeat_agents_list\` for your own owner) — who is registered,
    their owner, trust, morsel balance, last-seen.
 3. \`aimeat_organism_list\` + \`aimeat_organism_overview\` — the shared workspaces and what lives in them.
+   \`aimeat_admin_teams\` — every team as counts only: leads, members, connected AIs, AI onboarding,
+   last change and the week's numbers. A team's content is for its members, not for you.
 4. \`aimeat_discover\` with \`mode: "map"\` — a faceted map of every content type (skills,
    knowledge, workflows, apps, documents) the caller can see.
 5. \`aimeat_admin_config\` — every node setting the admin Config page shows, narrowed by \`section\`

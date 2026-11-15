@@ -93,7 +93,7 @@ export async function deleteRecordsBatchOp(
         return refuse(409, 'WRITE_CONFLICT', guard.errors?.[0]?.message ?? 'namespace is append-only', { violations: guard.errors });
     }
     // An AI's delete in a team's workspaces waits for a lead (services/team/action-gate.ts, T7).
-    const held = await teamDeleteGate(deps, { principal: caller.principal, roles: caller.roles }, ids.map(x => `${root}.${namespace}.${x}`));
+    const held = await teamDeleteGate(deps, caller, ids.map(x => `${root}.${namespace}.${x}`));
     if (held) return refuse(held.status, held.code, held.message, held.details);
 
     // A key's role suffix must be the RECORD itself (bare), its .draft/.latest, or a .version.N, never

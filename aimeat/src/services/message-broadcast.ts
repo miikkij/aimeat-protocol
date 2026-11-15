@@ -261,7 +261,7 @@ export async function broadcastFromPrincipal(
 > {
   // A broadcast by an agent that works for a team waits for a lead (services/team/action-gate.ts,
   // T7). The principal decides: an agent's GAII is held, a person's GHII is not.
-  const teamHeld = await teamAgentGate(ctx, { principal: input.senderGhii, roles: [] }, 'send',
+  const teamHeld = await teamAgentGate(ctx, input.senderGhii, 'send',
     { to: input.to ?? [], group: input.groupId ?? '', audience: input.audience ?? '', subject: input.subject ?? '', body: input.body ?? '' }, 'send a broadcast');
   if (teamHeld) return { ok: false, status: teamHeld.status, code: teamHeld.code, message: teamHeld.message };
   // The account's send limit comes first: one broadcast is one send, however many it reaches, and

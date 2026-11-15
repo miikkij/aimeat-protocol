@@ -516,7 +516,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // A mail sent by an agent that works for a team waits for a lead first (services/team/action-gate.ts,
   // T7): the principal decides, so a person's own send is never held, and a held one takes no turn.
   if (input.principal) {
-    const teamHeld = await teamAgentGate({ storage, config }, { principal: input.principal, roles: [] }, 'send',
+    const teamHeld = await teamAgentGate({ storage, config }, input.principal, 'send',
       { contact: input.contactId, kind: input.kind, subject: input.subject ?? '', body: input.body ?? '', template: input.templateId ?? '', invoice: input.invoiceId ?? '' },
       `send an email to contact ${input.contactId}`);
     if (teamHeld) throw new OutboundError(teamHeld.code, teamHeld.status, teamHeld.message);

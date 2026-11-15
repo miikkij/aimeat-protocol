@@ -182,7 +182,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
           budgetFloorText(capUnits, minCharge, priced.unit, priced.currency)));
       }
       // A paying contract made by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
-      const teamHeld = await teamAgentGate({ storage, config }, { principal: consumerGaii, roles: req.auth!.roles }, 'pay',
+      const teamHeld = await teamAgentGate({ storage, config }, consumerGaii, 'pay',
         { contract: priced.ext, action: priced.action, plan: planId ?? '', cap: capUnits }, `accept a paid contract for ${priced.ext}/${priced.action}`);
       if (teamHeld) return res.status(teamHeld.status).json(error(config.nodeId, teamHeld.code, teamHeld.message, teamHeld.status, teamHeld.details));
       const existing = await readContractForCall(storage, consumerGaii, priced.ext, priced.action);
@@ -224,7 +224,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const providerGhii = `${extRec.installedBy}@${config.nodeId}`;
 
     // A paying contract made by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
-    const teamHeld = await teamAgentGate({ storage, config }, { principal: consumerGaii, roles: req.auth!.roles }, 'pay',
+    const teamHeld = await teamAgentGate({ storage, config }, consumerGaii, 'pay',
       { contract: ext, action, plan: planId ?? '', cap: capUnits }, `accept a paid contract for ${ext}/${action}`);
     if (teamHeld) return res.status(teamHeld.status).json(error(config.nodeId, teamHeld.code, teamHeld.message, teamHeld.status, teamHeld.details));
     // Carry spend forward on re-acceptance (renegotiation) so a new contract does not reset the meter.

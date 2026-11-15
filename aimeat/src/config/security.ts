@@ -74,7 +74,7 @@ export interface SecurityDoorConfig {
   /** Byte ceiling before the refusal log rotates (one generation kept). AIMEAT_AUTH_LOG_MAX_BYTES. */
   authLogMaxBytes: number;
 
-  // ── Export to the organisation's monitoring (services/siem-export.ts) ──
+  // ── Export to the organisation's monitoring (services/node-admin/siem-export.ts) ──
   /** Syslog target for security events, `udp://host:port` or `tcp://host:port`; empty sends nothing. AIMEAT_SIEM_SYSLOG. */
   siemSyslog: string;
   /** OTLP/HTTP logs endpoint (e.g. https://collector:4318/v1/logs); empty sends nothing. AIMEAT_SIEM_OTLP_URL. */

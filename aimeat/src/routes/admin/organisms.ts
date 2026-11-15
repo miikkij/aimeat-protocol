@@ -91,8 +91,7 @@ export function adminOrganismsRouter(config: AimeatConfig, storage: Storage): Ro
     // operator:admin, the word of the operator's read-only node views, not the repair word: this
     // reads counts and changes nothing.
     router.get('/v1/admin/teams', requireAuth(), requireOperator(storage), async (req, res) => {
-        const locale = (await storage.getGHIIByOwner(req.auth!.owner))?.locale ?? null;
-        res.json(success(config.nodeId, await nodeTeamsView(storage, { now: Date.now(), locale })));
+        res.json(success(config.nodeId, await nodeTeamsView(storage, { now: Date.now(), reader: req.auth!.owner })));
     });
 
     /* ── GET /v1/admin/organisms/:id/ownership ──

@@ -55,7 +55,7 @@ import { dropCachesForChange } from '../services/cache-invalidation.js';
 import { runAsNode } from '../utils/gaii.js';
 import { initStats } from '../services/stats.js';
 import { configureAuthAudit } from '../services/auth-audit.js';
-import { configureSiem } from '../services/siem-export.js';
+import { configureSiem } from '../services/node-admin/siem-export.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { bindUsageSettings } from '../services/usage/usage-settings.js';
@@ -84,7 +84,7 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // address is refuse somebody, and the point of this file is that those refusals are not lost.
   configureAuthAudit(config);
   // The same refusals, and the other security events, to the organisation's monitoring when the
-  // operator named a syslog or OTLP target (services/siem-export.ts).
+  // operator named a syslog or OTLP target (services/node-admin/siem-export.ts).
   configureSiem(config);
 
   // In-memory accumulator for high-frequency agent signals (telemetry + heartbeat),

@@ -27,7 +27,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
-import { siemEmit } from '../siem-export.js';
+import { siemEmit } from '../node-admin/siem-export.js';
 import { resolveSkillRef } from '../skills.js';
 import { logger } from '../../utils/logger.js';
 import { readTeamRecordWithVersion, teamDisplayName } from './record.js';

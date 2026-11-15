@@ -11,7 +11,7 @@
  *   GET /v1/admin/teams and aimeat_admin_teams both read it here. Both ask the operator question
  *   (services/operator-principal.ts) before they call this.
  * @structure AdminTeamRow · nodeTeamsView(storage, opts) → { teams, count, complete }
- * @usage const view = await nodeTeamsView(storage, { now: Date.now() });
+ * @usage const view = await nodeTeamsView(storage, { now: Date.now(), reader: operatorName });
  * @version-history
  *   v1.1.0 — 2026-11-15 — `ai_onboarding`: how many members went through the team's AI onboarding (T11).
  *   v1.0.0 — 2026-11-15 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T16).
@@ -47,7 +47,9 @@ export interface AdminTeamRow {
 }
 
 /** Every team on this node, newest first. */
-export async function nodeTeamsView(storage: Storage, opts: { now: number; locale?: string | null }): Promise<{ teams: AdminTeamRow[]; count: number; complete: boolean }> {
+export async function nodeTeamsView(storage: Storage, opts: { now: number; reader?: string | null }): Promise<{ teams: AdminTeamRow[]; count: number; complete: boolean }> {
+    // The team names in the reading operator's own language.
+    const locale = opts.reader ? (await storage.getGHIIByOwner(opts.reader))?.locale ?? null : null;
     const organisms = await storage.listOrganisms({ perPage: ADMIN_TEAMS_SCAN, archived: 'exclude' });
     const teams: AdminTeamRow[] = [];
     for (const organism of organisms) {
@@ -64,7 +66,7 @@ export async function nodeTeamsView(storage: Storage, opts: { now: number; local
         const literacy = literacySummary(await readTeamLiteracy(storage, organism.id), accounts, null);
         teams.push({
             organism_id: organism.id,
-            name: teamDisplayName(team, opts.locale ?? null, organism.name),
+            name: teamDisplayName(team, locale, organism.name),
             kind: team.kind, team_type: team.teamType ?? 'general',
             leads: organismOwners(organism),
             members: accounts.length,

@@ -231,7 +231,7 @@ export function registerExchangeTools(
                     return fail(`BUDGET_TOO_LOW: ${budgetFloorText(capUnits, minCharge, priced.unit, priced.currency)}`);
                 }
                 // A paying contract made by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
-                const teamHeld = await teamAgentGate({ storage, config }, { principal: consumerGaii, roles: ['agent'] }, 'pay',
+                const teamHeld = await teamAgentGate({ storage, config }, consumerGaii, 'pay',
                     { contract: priced.ext, action: priced.action, plan: plan_id ?? '', cap: capUnits }, `accept a paid contract for ${priced.ext}/${priced.action}`);
                 if (teamHeld) return fail(`${teamHeld.code}: ${teamHeld.message}`);
                 const existing = await readContractForCall(storage, consumerGaii, priced.ext, priced.action);
@@ -265,7 +265,7 @@ export function registerExchangeTools(
 
             // Carry spend forward on re-acceptance (renegotiation) so a new contract does not reset the meter.
             // Keyed by the stored name, which is the name a settled call carries.
-            const teamHeld = await teamAgentGate({ storage, config }, { principal: consumerGaii, roles: ['agent'] }, 'pay',
+            const teamHeld = await teamAgentGate({ storage, config }, consumerGaii, 'pay',
                 { contract: extRec.name, action, plan: plan_id ?? '', cap: capUnits }, `accept a paid contract for ${extRec.name}/${action}`);
             if (teamHeld) return fail(`${teamHeld.code}: ${teamHeld.message}`);
             const existing = await readContractForCall(storage, consumerGaii, extRec.name, action);

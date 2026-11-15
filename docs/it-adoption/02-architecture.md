@@ -1,6 +1,6 @@
 # 02 Architecture
 
-> Checked against AIMEAT node 4.3.1 (commit 41f69d7e4) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 776f8fa94) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request. How many nodes and processes to run, and what runs beside a node, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 
@@ -121,7 +121,7 @@ Every outbound call whose address is not a constant in the code goes through `sa
 | Data space participants (`did:web` documents, callback addresses) | Eclipse Dataspace Protocol provider side | `AIMEAT_DATASPACE_ENABLED` | `aimeat/src/services/dataspace/did-resolve.ts` |
 | Browser push services (the endpoint each browser's subscription names) | Web push notifications | `AIMEAT_VAPID_PUBLIC_KEY` and `AIMEAT_VAPID_PRIVATE_KEY` (with `AIMEAT_PUSH_ENABLED`) | `aimeat/src/services/mailbox-notification.ts` |
 | `cdn.playwright.dev` | Download of the Chromium build at start when no Edge or Chrome is installed | `AIMEAT_SCREENSHOT_AUTO` | `aimeat/src/services/headless-browser-install.ts`, `aimeat/.env.example` |
-| Your SIEM: a syslog collector (UDP or TCP) and an OTLP/HTTP logs endpoint | Security events as they happen: refusals, operator acts, security incidents, a team's approval decisions, and the trail of every call when named. Names, codes, routes and ids only | `AIMEAT_SIEM_SYSLOG`, `AIMEAT_SIEM_OTLP_URL`, `AIMEAT_SIEM_EVENTS` | `aimeat/src/services/siem-export.ts`, [SIEM and Wazuh](../operations/siem-wazuh.md) |
+| Your SIEM: a syslog collector (UDP or TCP) and an OTLP/HTTP logs endpoint | Security events as they happen: refusals, operator acts, security incidents, a team's approval decisions, and the trail of every call when named. Names, codes, routes and ids only | `AIMEAT_SIEM_SYSLOG`, `AIMEAT_SIEM_OTLP_URL`, `AIMEAT_SIEM_EVENTS` | `aimeat/src/services/node-admin/siem-export.ts`, [SIEM and Wazuh](../operations/siem-wazuh.md) |
 | Your Consul server | Central configuration | `AIMEAT_CONSUL_ENABLED`, `AIMEAT_CONSUL_URL` | `aimeat/src/services/consul-config.ts` |
 | An origin node | Mirror of another node's portal | `AIMEAT_SITE_LB_ENABLED`, `AIMEAT_SITE_LB_ORIGIN_URL` | `aimeat/.env.example` |
 | The operator's store and build queue addresses | Public price list and "build it with you" requests | `AIMEAT_SITE_STORE_URL`, `AIMEAT_SITE_BUILD_QUEUE_URL` | `aimeat/src/services/build-with-you.ts` |

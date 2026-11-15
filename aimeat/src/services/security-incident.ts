@@ -24,7 +24,7 @@
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
  *   v1.11.0 -- 2026-11-15 -- recordSecurityIncident sends an `incident` event to the organisation's
- *     monitoring (services/siem-export.ts, team setup T10).
+ *     monitoring (services/node-admin/siem-export.ts, team setup T10).
  *   v1.10.0 -- 2026-11-08 -- An entry's action can be 'pseudonymise': a schema lock older than the account
  *     that holds its name takes the erasure pseudonym (services/csm/erased-lock-holders.ts; secaudit2026nov08
  *     round 14b).
@@ -64,7 +64,7 @@ import type { AimeatConfig } from '../config.js';
 import type { HeldAccountName, HeldNameOutcome, HeldNameResolution, UntiedLedgerValue } from '../storage/types/held-names.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
-import { siemEmit } from './siem-export.js';
+import { siemEmit } from './node-admin/siem-export.js';
 
 export const SECURITY_INCIDENT_PREFIX = 'security.incident.';
 export const SECURITY_QUARANTINE_PREFIX = 'security.quarantine.';
@@ -260,7 +260,7 @@ export async function recordSecurityIncident(
     });
     recorded = true;
   } catch (err) { logger.warn('recordSecurityIncident: incident logging is best-effort — must not fail the request', { error: String(err) }); }
-  // To the organisation's monitoring as it opens (services/siem-export.ts, T10): the category, the
+  // To the organisation's monitoring as it opens (services/node-admin/siem-export.ts, T10): the category, the
   // code, who and where, and whether evidence was kept. The detail stays on the Security page.
   siemEmit('incident', { id, type: input.type, code: input.code, actor: input.actorGhii, source: input.source ?? '', quarantined: quarantineKey !== null });
 

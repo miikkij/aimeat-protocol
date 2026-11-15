@@ -507,7 +507,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // turns out to be the thing being squeezed.
   { key: 'authLogPath', dotPath: 'security.auth_log_path', envVar: 'AIMEAT_AUTH_LOG_PATH', type: 'string', validate: () => true, immutable: false, description: 'Refusal log file (every 401/403, one JSON line each). Empty disables it.' },
   { key: 'authLogMaxBytes', dotPath: 'security.auth_log_max_bytes', envVar: 'AIMEAT_AUTH_LOG_MAX_BYTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1_073_741_824, immutable: false, description: 'Refusal log rotates past this size, keeping one older generation', range: '0-1073741824' },
-  // Export to the organisation's monitoring (services/siem-export.ts). Mutable: the exporter reads them
+  // Export to the organisation's monitoring (services/node-admin/siem-export.ts). Mutable: the exporter reads them
   // on every event, so a SOC repoints it without a restart. Never a value or a credential goes out.
   { key: 'siemSyslog', dotPath: 'security.siem_syslog', envVar: 'AIMEAT_SIEM_SYSLOG', type: 'string', validate: v => typeof v === 'string' && (v === '' || /^(udp|tcp):\/\/(\[[^\]]+\]|[^:/\s]+):\d{1,5}\/?$/i.test(v)), immutable: false, description: 'Syslog target for security events (RFC 5424), udp://host:port or tcp://host:port. Empty sends nothing.' },
   { key: 'siemOtlpUrl', dotPath: 'security.siem_otlp_url', envVar: 'AIMEAT_SIEM_OTLP_URL', type: 'string', validate: v => typeof v === 'string' && (v === '' || /^https?:\/\/\S+$/i.test(v)), immutable: false, description: 'OTLP/HTTP logs endpoint for security events, such as https://collector:4318/v1/logs. Empty sends nothing.' },

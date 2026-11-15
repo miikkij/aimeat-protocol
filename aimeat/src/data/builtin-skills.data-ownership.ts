@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-15 — Section 4: an AI's delete in a team waits for a lead while the team's approval gate
+ *     is on (services/team/action-gate.ts, team setup T7).
  *   2026-11-15 — Section 6: erasure also removes the people registered to the person's apps without an
  *     account and what they kept (services/owner-erasure.ts step app_parties).
  *   2026-11-14 — Section 6: erasure also removes the person's questions in Ask someone who knows and
@@ -294,6 +296,13 @@ action to call. The person in person can always do it themselves, and so can an 
 owner gave it the permission \`organism:direct\` (full access covers it). The record that holds
 such a workspace's structure is protected the same way: only the person in person, or an agent
 with that permission, changes or deletes it when the change touches the list of a closed space.
+
+A delete in a team's workspaces (a record, rows, a whole workspace or the team itself) that you ask
+for waits for one of the team's leads while the team's approval gate is on, which it is by default.
+You get \`TEAM_APPROVAL_REQUIRED\` with the approval's id and where a lead decides it, and nothing is
+deleted. Tell the person; after a lead approves, make the same call again with the same input, and
+it runs. \`TEAM_APPROVAL_DECLINED\` means a lead said no. The person deleting with their own hands is
+never held.
 
 ## 5. How knowledge goes stale here
 

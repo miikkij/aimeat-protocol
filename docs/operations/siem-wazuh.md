@@ -2,7 +2,7 @@
 
 This page is for the operator and the SOC that watch an AIMEAT node. It says how to send the node's security events to your SIEM, what one event looks like, and how to read them in Wazuh with a decoder and a few rules.
 
-The exporter is `aimeat/src/services/siem-export.ts`. What it sends and the settings are also listed on [10 Logging and monitoring](../it-adoption/10-logging-monitoring.md#export-to-a-siem).
+The exporter is `aimeat/src/services/node-admin/siem-export.ts`. What it sends and the settings are also listed on [10 Logging and monitoring](../it-adoption/10-logging-monitoring.md#export-to-a-siem).
 
 ## Turn it on
 

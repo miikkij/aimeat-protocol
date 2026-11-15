@@ -38,6 +38,9 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-11-15 -- ROUTE_CEILING lowered by 2: POST /v1/organisms/import (an agent without
+ *     organism:write) and PUT /v1/agents/{name}/workplace (another person's agent) are refused in
+ *     test/e2e-team-governance.ts.
  *   2026-11-15 -- denialKinds also reads the shared harness's `expectRefusal(res, 403|401, …)`
  *     (test/helpers/harness.ts), so a suite moved onto the harness keeps its refusal cases.
  *   2026-11-14 -- ROUTE_CEILING 440: GET /v1/ledger/usage/runs is refused to an agent without

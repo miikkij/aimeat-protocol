@@ -3094,6 +3094,18 @@
       },
       "why": "Reviewed 2026-11-02, checked: a scheduled task's deliverable, read under its agent for the owner who commissioned it; it goes to that owner's own bell, and to their e-mail only after passing leave (external, e-mail), as ecosystem-automation-notify.ts does. A record that stays behind is logged by key and goes to the bell only."
     },
+    "src/services/node-admin/teams-view.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-15 (team setup T16): reads the team's structure snapshot (organism.{id}.meta.structure) for its updatedAt only, the date the operator's team list shows. No value of it is answered."
+    },
+    "src/services/team/onboarding.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-15 (team setup T11): reads the team's AI onboarding record (organism.{id}.meta.ai-literacy), the node's own record of who confirmed the onboarding and when. It holds account names and dates, no content a person wrote, and is shown to the team's members and leads and as a count to the operator."
+    },
     "src/services/team/record.ts": {
       "reads": {
         "listAllMemory": 1

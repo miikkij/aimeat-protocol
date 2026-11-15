@@ -1,6 +1,6 @@
 # 10 Logging and monitoring
 
-> Checked against AIMEAT node 4.3.1 (commit 41f69d7e4) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 776f8fa94) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the sysadmin and the SOC that must watch a node. It lists what the node records, where each record lives and how long it is kept, what the process log looks like and what it masks, how to get the records into a SIEM, which health and metrics endpoints exist, what to alert on, and which compliance reports the node keeps. The operator's own monitoring guide is [aimeat/docs/observability-guide.md](../../aimeat/docs/observability-guide.md); health checks are in [Production deployment](../operations/production-deployment.md#health-checks).
 
@@ -53,7 +53,7 @@ Records in the database are in every database backup, so the backup retention in
 
 ## Export to a SIEM
 
-The node pushes its security events to your SIEM as they happen, as syslog lines (RFC 5424 over UDP or TCP, facility 13 log audit) to `AIMEAT_SIEM_SYSLOG` and as OTLP log records (JSON over HTTP) to `AIMEAT_SIEM_OTLP_URL`. Both are off while empty, and both can be changed on the admin Config page without a restart (`aimeat/src/services/siem-export.ts`). An event carries names, codes, routes and ids, never a record's content and never a credential (a refusal carries the same truncated digest as the refusal log). A collector that is down never slows or refuses a request: the events are dropped and the process log warns once. A Wazuh decoder and rules for the syslog stream are in [SIEM and Wazuh](../operations/siem-wazuh.md).
+The node pushes its security events to your SIEM as they happen, as syslog lines (RFC 5424 over UDP or TCP, facility 13 log audit) to `AIMEAT_SIEM_SYSLOG` and as OTLP log records (JSON over HTTP) to `AIMEAT_SIEM_OTLP_URL`. Both are off while empty, and both can be changed on the admin Config page without a restart (`aimeat/src/services/node-admin/siem-export.ts`). An event carries names, codes, routes and ids, never a record's content and never a credential (a refusal carries the same truncated digest as the refusal log). A collector that is down never slows or refuses a request: the events are dropped and the process log warns once. A Wazuh decoder and rules for the syslog stream are in [SIEM and Wazuh](../operations/siem-wazuh.md).
 
 | Kind (`AIMEAT_SIEM_EVENTS`) | One event per | Default |
 |---|---|---|

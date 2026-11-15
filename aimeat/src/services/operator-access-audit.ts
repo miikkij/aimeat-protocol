@@ -32,7 +32,7 @@
  *   });
  * @version-history
  *   2026-11-15 — Each of the three acts also goes to the organisation's monitoring as an `operator`
- *     event (services/siem-export.ts, team setup T10).
+ *     event (services/node-admin/siem-export.ts, team setup T10).
  *   2026-10-25 — secaudit2026oct22: action 'export', written by GET /v1/admin/backup once per person
  *     whose entries the backup holds, with their count.
  *   2026-10-16 — recordOperatorAction also writes an info log line; recordOperatorNodeAct(): the usage row
@@ -49,7 +49,7 @@ import { ownerGhiiOf, isValidGHII } from '../utils/gaii.js';
 import { recordUsageCall } from './usage/usage-buffer.js';
 import { recordAccountEvent } from './account-events.js';
 import { logger } from '../utils/logger.js';
-import { siemEmit } from './siem-export.js';
+import { siemEmit } from './node-admin/siem-export.js';
 
 /** What the operator did, as the person's feed names it. */
 export type OperatorAccessAction = 'read' | 'search' | 'delete' | 'restore' | 'export';

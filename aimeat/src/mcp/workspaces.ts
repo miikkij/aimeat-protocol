@@ -603,8 +603,7 @@ export function registerWorkspaceTools(
             const delGuard = await checkDeleteGuard(`${base}.latest`, storage);
             if (!delGuard.valid) return fail('Delete refused: ' + (delGuard.errors?.[0]?.message ?? 'append-only namespace'));
             // An AI's delete in a team's workspaces waits for a lead (services/team/action-gate.ts, T7).
-            const c = caller();
-            const held = await teamDeleteGate({ storage, config }, { principal: c.principal, roles: [...c.roles] }, [base]);
+            const held = await teamDeleteGate({ storage, config }, caller(), [base]);
             if (held) return toolError(held.code, held.message);
             // The whole instance — the bare key plus `.draft` / `.latest` / every `.version.N`, own
             // and same-owner only — through services/workspace/write.ts, which is the predicate the

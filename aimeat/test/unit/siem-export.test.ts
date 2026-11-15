@@ -2,7 +2,7 @@
  * @file test/unit/siem-export.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The node's security events to the organisation's monitoring (services/siem-export.ts):
+ * @description The node's security events to the organisation's monitoring (services/node-admin/siem-export.ts):
  *   a refusal arrives at a syslog listener over UDP and over TCP as one RFC 5424 line with the
  *   refusal's facts and never the credential; nothing is sent with no target or for a kind the
  *   operator left out; the trail is out unless named; the OTLP body is the logs signal's shape; a
@@ -14,7 +14,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { createSocket } from 'node:dgram';
 import { createServer, type Server } from 'node:net';
 import type { AddressInfo } from 'node:net';
-import { configureSiem, siemEmit, syslogLine, otlpBody, enabledKinds, siemStatus } from '../../src/services/siem-export.js';
+import { configureSiem, siemEmit, syslogLine, otlpBody, enabledKinds, siemStatus } from '../../src/services/node-admin/siem-export.js';
 import { recordAuthFailure } from '../../src/services/auth-audit.js';
 
 const cfg = { nodeId: 'test-node', siemSyslog: '', siemOtlpUrl: '', siemEvents: '' };

@@ -22,7 +22,7 @@
  * @usage router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), validateBody(OrganismCreateBody, config.nodeId), …)
  * @version-history
  *   v1.4.0 — 2026-11-15 — TeamDecisionShareBody: share a team decision with other teams (T19).
- *     TeamSetupTeams: `approval_gate` (T7).
+ *     TeamSetupTeams: `approval_gate` (T7). TeamOnboardingBody (T11).
  *   v1.3.0 — 2026-11-14 — TeamSetupTeams: `type`, the team type (TEAM_TYPE_IDS).
  *   v1.2.0 — 2026-11-14 — TeamSetupBody and TeamSetupTeams: POST /v1/teams/setup and aimeat_team_setup.
  *   v1.1.0 — 2026-11-12 — AccessRequestBody: the optional message of an access request.
@@ -97,6 +97,9 @@ export const TeamPasteBody = z.looseObject({
     text: documentText(),
     dry_run: z.boolean().optional(),
 });
+
+/** POST /v1/teams/:id/onboarding (services/team/onboarding.ts): the caller confirms for themselves; nothing else is read. */
+export const TeamOnboardingBody = z.strictObject({});
 
 /** POST /v1/teams/:id/decisions/:decision/share (services/team/share-decision.ts). */
 export const TeamDecisionShareBody = z.looseObject({

@@ -201,7 +201,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     }
     // A send by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7);
     // asked before the send turn, so a held message takes none of the account's allowance.
-    const teamHeld = await teamAgentGate({ storage, config }, { principal: senderGhii, roles: req.auth!.roles }, 'send',
+    const teamHeld = await teamAgentGate({ storage, config }, senderGhii, 'send',
       { to: input.to.trim(), conversation: input.conversation_id ?? '', subject: input.subject ?? '', body: input.body },
       `send a message to ${input.to.trim() || `conversation ${input.conversation_id ?? ''}`}`);
     if (teamHeld) {

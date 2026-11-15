@@ -311,11 +311,11 @@
       "digest": "sha256:5c7fea7dd0017128af1a94f9"
     },
     "node:aimeat-node-operations": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
-      "digest": "sha256:63100708afc6ed5285a9669b"
+      "digest": "sha256:5ac3fe4b7a6f3c761e33e2d8"
     },
     "node:manage-my-agents": {
       "reviewedOn": "2026-11-15",
@@ -393,7 +393,7 @@
       "digest": "sha256:ccb5ae7a323cd1e5f0dde1ed"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -402,7 +402,7 @@
         "aimeat/src/services/agent/profile-write.ts",
         "aimeat/src/services/agent/task-rules.ts"
       ],
-      "digest": "sha256:0eb02aa78c5ac91b717f4f6b"
+      "digest": "sha256:e058e4d832549d3576a7a2c7"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-13",
@@ -427,7 +427,7 @@
       "digest": "sha256:9db5b30b9b19e5f5cf51eff7"
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -437,7 +437,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:d87e7e898e6e0a18a017f3cf"
+      "digest": "sha256:8aeb1d3cb5c3ce3d28fceb18"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-15",
@@ -451,7 +451,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:7ec30a6dca630cd0207678d4",
+      "digest": "sha256:2222c18ee56df3543081dfff",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -600,11 +600,11 @@
       "note": "Most of it is about records on the node and Lifecycle Central; the code it makes claims about is the ODPS descriptor and its completeness list (which fields a validator reports missing), the known-gaps rule, and the decision_record call it shares with agent note-writer. Its frontmatter also carries a review-by date."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:94f87e79d7393ecec8cc6023"
+      "digest": "sha256:e9bac899d79bbfc6f78a4f67"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-11-15",
@@ -786,7 +786,7 @@
       "aimeat/src/services/ai/provenance.ts": "68296bdb24b7667c"
     },
     "node:aimeat-node-operations": {
-      "aimeat/src/mcp/core-admin.ts": "0c3d4f33a5fb029e"
+      "aimeat/src/mcp/core-admin.ts": "211c227005dfb863"
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "5d8abd2588be4862",
@@ -868,7 +868,7 @@
       ".claude/agents/note-writer.md": "14642ac19048c31a"
     },
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "35d1a080316443d1"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "ef8573072fce8bef"
     },
     "project:aimeat-video": {
       "assets/video/youtube-metadata.md": "2be6bc1f45851846"
@@ -923,7 +923,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "7988907b4567d61b",
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "35d1a080316443d1",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "ef8573072fce8bef",
       "aimeat/src/routes/organisms/workspace-access.ts": "fe023bacaef89f2b",
       "aimeat/src/services/agent/profile-write.ts": "a643a8315ca182f4",
       "aimeat/src/services/agent/task-rules.ts": "3d0abc3361b12a54"
@@ -938,14 +938,14 @@
       "aimeat/src/services/extension/schedules.ts": "ae3a0c93f2e7baf7"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "abad3a6bc645e733",
-      "aimeat/src/routes/memory/key.ts": "1954090b6085c062",
-      "aimeat/src/services/memory-bin.ts": "af03c3dad61b242b",
+      "aimeat/src/routes/memory/bulk.ts": "45ab1d34f4a87e7e",
+      "aimeat/src/routes/memory/key.ts": "9781dc2da8dd0fb6",
+      "aimeat/src/services/memory-bin.ts": "b493211eadb13053",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "6f50fd45cba97f84",
       "aimeat/src/services/owner-erasure.ts": "b3d237837e053b2a",
       "aimeat/src/services/archive.ts": "8a08d72e2732e5ed",
-      "aimeat/src/mcp/organisms.ts": "78311ac4ded02b9a"
+      "aimeat/src/mcp/organisms.ts": "000de4a3189c78ee"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "d52a31eafc176cab",
@@ -972,7 +972,7 @@
       "aimeat/src/commerce/app-tool-catalog.ts": "c2ddc40235643464",
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
       "aimeat/src/services/connect-tunnel-push.ts": "7988907b4567d61b",
-      "aimeat/src/services/workspace-rows/row-service.ts": "cb91e39b05884101",
+      "aimeat/src/services/workspace-rows/row-service.ts": "1da0b65a5a7b7354",
       "aimeat/src/services/refinery/pipeline.ts": "fc234b1ffcf6442b",
       "aimeat/src/routes/outbound.ts": "d5e03c7e8dcc48ef"
     },

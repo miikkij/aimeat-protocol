@@ -398,7 +398,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     }
 
     // An AI's delete of a whole team waits for a lead (services/team/action-gate.ts, T7).
-    const held = await teamDeleteGate({ storage, config }, { principal: req.auth!.sub, roles: req.auth!.roles }, [`organism.${id}.*`], 'delete the whole team');
+    const held = await teamDeleteGate({ storage, config }, callerOf(req, config.nodeId, storage), [`organism.${id}.*`], 'delete the whole team');
     if (held) { res.status(held.status).json(error(config.nodeId, held.code, held.message, held.status, held.details)); return; }
 
     // The organism and every record that belongs to it (services/organism-lifecycle.ts).
