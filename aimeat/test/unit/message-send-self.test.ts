@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { sendDirectMessage } from '../../src/services/message-send.js';
+import { sendDirectMessage } from '../../src/services/message/send.js';
 
 const NODE_ID = 'unit-node';
 const OP = `op@${NODE_ID}`;

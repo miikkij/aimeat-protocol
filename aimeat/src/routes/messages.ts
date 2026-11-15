@@ -122,10 +122,10 @@ import { emitChange } from '../services/event-bus.js';
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
 import { dismissConversationNotifications } from '../services/notify.js';
 import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schemas.js';
-import { propagateReadReceipt } from '../services/message-delivery.js';
-import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
-import { takeSendTurn } from '../services/message-send-limit.js';
-import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
+import { propagateReadReceipt } from '../services/message/delivery.js';
+import { sendDirectMessage, mapMessageAttachments } from '../services/message/send.js';
+import { takeSendTurn } from '../services/message/send-limit.js';
+import { resolveGroupTarget, soleParticipantNote } from '../services/message/alias.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { registerSendAsOwnerRoute } from './messages-as-owner.js';
 import { registerGroupRoutes } from './message-groups.js';
@@ -133,9 +133,9 @@ import { registerMessageReactionRoutes } from './message-reactions.js';
 import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from '../services/agent/dm-reads.js';
 import { provenanceDeclarationRefusal } from '../services/ai/provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai/provenance-marks.js';
-import { mintMessageProvenance, withMessageProvenance } from '../services/message-provenance.js';
+import { mintMessageProvenance, withMessageProvenance } from '../services/message/provenance.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
-import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
+import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message/broadcast.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner/mailbox-reads.js';
@@ -165,7 +165,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
-  // The account's message limit lives in the send services (services/message-send-limit.ts), which
+  // The account's message limit lives in the send services (services/message/send-limit.ts), which
   // the aimeat_dm_* tools call too: one allowance per account, whichever door and whichever of the
   // owner's agents sends. This is the answer both doors here give when it is used up.
   const refuseSendLimit = (res: Response, wait: { retryAfterSec?: number; message?: string }): void => {

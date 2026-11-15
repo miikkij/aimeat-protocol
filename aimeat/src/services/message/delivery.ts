@@ -1,5 +1,5 @@
 /**
- * @file message-delivery.ts
+ * @file src/services/message/delivery.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Cross-node delivery for human↔human direct messages. Signs an outbound message with
@@ -10,7 +10,7 @@
  *   - deliverDirectMessage(ctx, record) → 'delivered' | 'queued' | 'undeliverable'
  *   - propagateReadReceipt(ctx, message) — local update or signed receipt to the origin node
  *   - startMessageRetryJob(config, storage, peers) — periodic sweep (DECISION #6)
- * @usage import { deliverDirectMessage, startMessageRetryJob } from '../services/message-delivery.js';
+ * @usage import { deliverDirectMessage, startMessageRetryJob } from './delivery.js';
  * @version-history
  *   v1.7.0 -- 2026-11-04 -- The retry sweep runs in one node process per round (process-lease.ts claimedSweep; codebase analysis 2026-11-03, item HA 2.7).
  *   v1.6.0 -- 2026-10-17 -- The payload carries sentByAgent / sentByAgentName, the agent that sent the message in the sender's name.
@@ -32,18 +32,18 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, DirectMessageRecord, MessageDeliveryLog } from '../storage/interface.js';
-import type { PeerInfo } from './federation.js';
-import { sign } from '../auth/keypair.js';
-import { audienceProof, deliveryProof } from './signed-node-request.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
-import { deliveryTargetFor } from '../utils/messaging.js';
-import { logger } from '../utils/logger.js';
-import { sweepReferenceAttachments } from './attachment-duplication.js';
-import { peerTakesMessages } from './federation/peer-gate.js';
-import { peerFetch } from '../utils/peer-fetch.js';
-import { claimedSweep } from './process-lease.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, DirectMessageRecord, MessageDeliveryLog } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { sign } from '../../auth/keypair.js';
+import { audienceProof, deliveryProof } from '../signed-node-request.js';
+import { parseGaiiLoose } from '../../utils/gaii.js';
+import { deliveryTargetFor } from '../../utils/messaging.js';
+import { logger } from '../../utils/logger.js';
+import { sweepReferenceAttachments } from '../attachment-duplication.js';
+import { peerTakesMessages } from '../federation/peer-gate.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
+import { claimedSweep } from '../process-lease.js';
 
 export interface DeliveryCtx {
   config: AimeatConfig;

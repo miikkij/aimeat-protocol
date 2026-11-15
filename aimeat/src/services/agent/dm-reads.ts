@@ -38,7 +38,7 @@
 import type { Storage, DirectMessageRecord } from '../../storage/interface.js';
 import { isParticipant } from '../conversation-group.js';
 import { deliveryTargetFor } from '../../utils/messaging.js';
-import { withReactions } from '../message-reactions.js';
+import { withReactions } from '../message/reactions.js';
 import { permissionAskText } from '../permission-ask.js';
 
 /** The owner's mailbox permission (services/owner/mailbox-reads.ts), spelled here: that module imports this one. */

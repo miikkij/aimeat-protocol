@@ -46,7 +46,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { redactCredentialText } from '../utils/redact-credentials.js';
 import { findOperatorGhii } from './operators.js';
-import { sendDirectMessage } from './message-send.js';
+import { sendDirectMessage } from './message/send.js';
 
 /**
  * The codes that mean the node failed, as opposed to a caller getting the call wrong.

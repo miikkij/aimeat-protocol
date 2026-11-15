@@ -345,7 +345,7 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
         //
         // The AGENT keys were a roster: every agent's GAII and public key on this node, which names
         // every person here and how many AIs each of them runs. Cross-node delivery signs with the
-        // NODE key alone (services/message-delivery.ts), nothing on the receiving side reads agent
+        // NODE key alone (services/message/delivery.ts), nothing on the receiving side reads agent
         // keys, and this branch answers a caller that signed nothing when the key is unchanged. So no
         // tier gets the roster; agent_keys stays in the answer as an empty list for older peers that
         // read the field (QA audit S6-04).

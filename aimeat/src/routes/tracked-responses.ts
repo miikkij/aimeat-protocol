@@ -32,7 +32,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
 import { messagePreview } from '../utils/messaging.js';
-import type { DeliveryCtx } from '../services/message-delivery.js';
+import type { DeliveryCtx } from '../services/message/delivery.js';
 import {
   createTrackedResponse, getTrackedResponse, listTrackedResponses, cancelTrackedResponse,
   markReplied, evaluateOwnerTrackedResponses, evaluateTrackedKey, TRACKED_RESPONSE_SPEC,

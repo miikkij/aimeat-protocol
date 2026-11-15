@@ -2,7 +2,7 @@
  * @file test/e2e-message-reactions.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Acknowledgement marks on a single direct message (services/message-reactions.ts), on two
+ * @description Acknowledgement marks on a single direct message (services/message/reactions.ts), on two
  *   whole nodes A and B booted in this process and peered with messaging on.
  *
  *   WHAT IT ASSERTS
@@ -28,7 +28,7 @@ import * as ed from '@noble/ed25519';
 import { audienceProof } from '../src/services/signed-node-request.js';
 import { sign } from '../src/auth/keypair.js';
 import { onDeliveryEvent, offDeliveryEvent, type DeliveryEvent } from '../src/services/event-bus.js';
-import { reactionPayload } from '../src/services/message-reactions.js';
+import { reactionPayload } from '../src/services/message/reactions.js';
 import { bootNode, setupOperator, addPeer, auth, sleep, type NodeState } from './helpers/federation-two-node.js';
 import { suitePort } from './helpers/free-port.js';
 import { registerOwner } from './helpers/owner-login.js';

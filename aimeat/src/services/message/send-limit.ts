@@ -1,5 +1,5 @@
 /**
- * @file src/services/message-send-limit.ts
+ * @file src/services/message/send-limit.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How many messages one account may send in a minute, on every door that sends one.
@@ -35,8 +35,8 @@
  *     POST /v1/messages/broadcast only, keyed by the principal, and the aimeat_dm_* tools, which
  *     never pass those routes, sent without one.
  */
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { rateBuckets } from './rate-buckets.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { rateBuckets } from '../rate-buckets.js';
 
 /** Sends one account may make in one window, every send door together. The number the outbound send
  *  door has always used (routes/outbound.ts). */

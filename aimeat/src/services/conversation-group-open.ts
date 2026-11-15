@@ -9,7 +9,7 @@
  *   WHO OPENS IT. A person opens a group as themselves. An agent opens it as itself, or, with
  *   `asOwner`, in its owner's name: the owner is then the manager and the sender of the first message,
  *   and that message names the agent that wrote it (sentByAgent), the rule a 1:1 sent in the owner's
- *   name follows (services/message-send-as-owner.ts). The endpoint decides whether `asOwner` is allowed
+ *   name follows (services/message/send-as-owner.ts). The endpoint decides whether `asOwner` is allowed
  *   (`messages:send-as-owner`); this function takes the answer.
  * @structure groupActor() · openGroupAs()
  * @usage const r = await openGroupAs(ctx, { principal, scopes, members, subject, body, pipeline: 'rest.messages_group_create' });
@@ -18,11 +18,11 @@
  *   v1.0.0 — 2026-10-21 — Initial: user-created group chat (wish-ryhm-keskustelu-viestit-puolelle).
  */
 import type { ConversationRecord } from '../storage/interface.js';
-import type { DeliveryCtx } from './message-delivery.js';
+import type { DeliveryCtx } from './message/delivery.js';
 import type { DeclaredProvenance } from './ai/provenance.js';
 import { provenanceDeclarationRefusal } from './ai/provenance.js';
-import { mintMessageProvenance } from './message-provenance.js';
-import { takeSendTurn } from './message-send-limit.js';
+import { mintMessageProvenance } from './message/provenance.js';
+import { takeSendTurn } from './message/send-limit.js';
 import { startGroupConversation, type GroupManageError, type MemberOutcome } from './conversation-group-manage.js';
 import { ownerGhiiOf, parseGaiiLoose } from '../utils/gaii.js';
 import { teamAgentGate } from './team/action-gate.js';

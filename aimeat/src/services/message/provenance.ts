@@ -1,5 +1,5 @@
 /**
- * @file message-provenance.ts
+ * @file src/services/message/provenance.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The provenance of direct messages: which model wrote a message, resolved for a page
@@ -40,11 +40,11 @@
  *     answers 404 at /v1/provenance/:id for everyone but its owner, so the recipient reads it here.
  *   v1.0.0 — 2026-08-11 — Initial: surface the writing model on messaging reads.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, DirectMessageRecord, AiProvenanceRecordRow } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { provenanceForWrite, storeHeldProvenance, type DeclaredProvenance } from './ai/provenance.js';
-import { servedProvenanceOf, provenanceItemBlock, type AiProvenanceItemBlock } from './ai/provenance-marks.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, DirectMessageRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { provenanceForWrite, storeHeldProvenance, type DeclaredProvenance } from '../ai/provenance.js';
+import { servedProvenanceOf, provenanceItemBlock, type AiProvenanceItemBlock } from '../ai/provenance-marks.js';
 
 /**
  * What a reader is told about how a message was written.

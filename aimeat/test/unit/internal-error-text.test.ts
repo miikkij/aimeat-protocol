@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const sent: Array<{ body: string }> = [];
-vi.mock('../../src/services/message-send.js', () => ({
+vi.mock('../../src/services/message/send.js', () => ({
   sendDirectMessage: vi.fn(async (_deps: unknown, msg: { body: string }) => { sent.push(msg); return {}; }),
 }));
 vi.mock('../../src/services/operators.js', () => ({

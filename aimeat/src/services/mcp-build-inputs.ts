@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The values an MCP server reads from storage when it is built: the owner's
  *   proactive guidance (services/proactive-mode.ts), the node that answers support here
- *   (resolveSupportRoute in services/message-alias.ts, over the stored peer rows) and the owner's
+ *   (resolveSupportRoute in services/message/alias.ts, over the stored peer rows) and the owner's
  *   context index (services/context/index-line.ts). All go into the instructions.
  *
  *   CACHED FOR THE 2026-07-28 CODE PATH ONLY. A 2025 session builds its server once, at `initialize`,
@@ -28,7 +28,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { proactiveGuidance } from './proactive-mode.js';
-import { resolveSupportRoute } from './message-alias.js';
+import { resolveSupportRoute } from './message/alias.js';
 import { contextIndexLine } from './context/index-line.js';
 import { teamIndexLine } from './team/index-line.js';
 import type { ContentReader } from './classification/reader.js';

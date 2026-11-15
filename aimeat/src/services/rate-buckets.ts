@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Fixed-window counting per key, the arithmetic every limiter on this node shares. The
  *   request middleware (middleware/rate-limit.ts) keys it by the caller or the address; a service
- *   that limits something no single route owns keys it by what it limits (services/message-send-limit.ts
+ *   that limits something no single route owns keys it by what it limits (services/message/send-limit.ts
  *   keys it by the sending account). A refusal counts in the same metrics either way, so the security
  *   overview sees both.
  *

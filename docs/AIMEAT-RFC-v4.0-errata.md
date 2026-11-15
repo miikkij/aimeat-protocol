@@ -34,7 +34,7 @@ The RFC was wrong, or the code changed after it, with no new capability involved
 |---|---|---|---|---|
 | B5 | "Anti-abuse: wash-trading detection over a reciprocal window with economic penalty" | Core §21 | Not implemented. | No such code in `aimeat/src`; feature list §23 lists it as not in the code |
 | B6 | "`broadcastTrustAdvisory` is defined but not yet invoked" | Core §36 | The function does not exist. | No `broadcastTrustAdvisory` in `aimeat/src` |
-| B7 | Direct messages are "Human↔human"; "cross-node delivery is deferred" | Core §28 | Messages are delivered between nodes (since 2026-06-16), between people and agents, in threads with several participants. | `aimeat/src/services/message-delivery.ts` |
+| B7 | Direct messages are "Human↔human"; "cross-node delivery is deferred" | Core §28 | Messages are delivered between nodes (since 2026-06-16), between people and agents, in threads with several participants. | `aimeat/src/services/message/delivery.ts` |
 | B8 | Single upload default 50 MB | Core §11 | 10 MB (`AIMEAT_STORAGE_MAX_FILE_SIZE_MB`). | `aimeat/src/config.ts` (`storageMaxFileSizeMb`) |
 | B9 | `AIMEAT_JWT_TTL_SECONDS` | Core §6.4 | The variable is `AIMEAT_JWT_TTL`, as Core Appendix B already says. | `aimeat/src/config.ts` (`jwtTtlSeconds`) |
 | B10 | Envelope `{ok, node, data\|error, hints, meta:{timestamp, request_id, pagination?}}` | Core §37 | `protocol`, `version` (`'v1'`), `timestamp` and `request_id` are top-level fields. `meta` holds `page`, `per_page`, `total` and `provenance`. | `aimeat/src/middleware/envelope.ts` (`AimeatResponse`, `EnvelopeMeta`) |

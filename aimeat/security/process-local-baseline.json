@@ -1093,7 +1093,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/message-delivery.ts :: interval :: startMessageRetryJob": {
+    "src/services/message/delivery.ts :: interval :: startMessageRetryJob": {
       "count": 1,
       "reason": "DEBT"
     },

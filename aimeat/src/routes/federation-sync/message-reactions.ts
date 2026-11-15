@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description POST /v1/federation/message/reaction: an acknowledgement mark on a direct message, given
  *   by a person or agent of another node, arrives here signed. The sending node signs the seven fields
- *   of reactionPayload (services/message-reactions.ts) and adds the audience proof a message carries;
+ *   of reactionPayload (services/message/reactions.ts) and adds the audience proof a message carries;
  *   this node refuses a peer without the messaging right, a bad signature, a stale or replayed send,
  *   a reactor that is not the signing node's own, and a message this node holds no copy of with the
  *   reactor as a party. The mark is then stored and announced here, and never sent on.
@@ -23,7 +23,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
 import { badInput, bodyOf } from '../../auth/credential-strategies-node.js';
 import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
-import { applyRemoteReaction, reactionPayload } from '../../services/message-reactions.js';
+import { applyRemoteReaction, reactionPayload } from '../../services/message/reactions.js';
 
 export function registerMessageReactionFederationRoute(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // A mark is part of the message conversation, so it rides the same word as a message. The peer and

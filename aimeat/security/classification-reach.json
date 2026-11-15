@@ -2398,7 +2398,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update, shadow-copy existence and version-conflict reads."
     },
-    "src/services/message-send.ts": {
+    "src/services/message/send.ts": {
       "reads": {
         "getStorageFileMeta": 1
       },

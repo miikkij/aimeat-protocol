@@ -1,5 +1,5 @@
 /**
- * @file src/services/message-send-as-owner.ts
+ * @file src/services/message/send-as-owner.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An agent sends a direct message in its owner's name, and the message says which agent
@@ -29,18 +29,18 @@
  *   v1.0.0 — 2026-10-17 — Initial, from the body of aimeat_dm_send_as_owner
  *     (wish-agentin-omistajan-nimiss-l-hett-m-viesti-n-ytt-mik-agentti-s).
  */
-import type { DeliveryCtx } from './message-delivery.js';
-import type { MessageAttachmentInput } from '../models/message-schemas.js';
-import type { DeclaredProvenance } from './ai/provenance.js';
-import { sendDirectMessage, mapMessageAttachments } from './message-send.js';
-import { sendGroupMessage } from './conversation-group.js';
-import { resolveGroupTarget } from './message-alias.js';
-import { takeSendTurn } from './message-send-limit.js';
-import { mintMessageProvenance } from './message-provenance.js';
-import { provenanceDeclarationRefusal } from './ai/provenance.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { teamAgentGate } from './team/action-gate.js';
+import type { DeliveryCtx } from './delivery.js';
+import type { MessageAttachmentInput } from '../../models/message-schemas.js';
+import type { DeclaredProvenance } from '../ai/provenance.js';
+import { sendDirectMessage, mapMessageAttachments } from './send.js';
+import { sendGroupMessage } from '../conversation-group.js';
+import { resolveGroupTarget } from './alias.js';
+import { takeSendTurn } from './send-limit.js';
+import { mintMessageProvenance } from './provenance.js';
+import { provenanceDeclarationRefusal } from '../ai/provenance.js';
+import { parseGaiiLoose } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { teamAgentGate } from '../team/action-gate.js';
 
 export interface SendAsOwnerInput {
   /** The acting agent's own identity, from its credential. */

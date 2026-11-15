@@ -79,7 +79,7 @@ import type { OutboundContactRecord, OutboundContactLink, OutboundKind, Outbound
 import type { EmailAttachment } from '../email.js';
 import { nodeContext } from '../node/context.js';
 import { inviteEmailHash } from '../invitations.js';
-import { sendDirectMessage } from '../message-send.js';
+import { sendDirectMessage } from '../message/send.js';
 import { emitChange } from '../../services/event-bus.js';
 import { renderInvoicePdf } from '../finance/invoice-pdf.js';
 import { buildFinvoiceXml } from '../finance/finvoice.js';

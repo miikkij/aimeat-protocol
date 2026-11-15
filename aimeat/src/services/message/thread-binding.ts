@@ -1,5 +1,5 @@
 /**
- * @file src/services/message-thread-binding.ts
+ * @file src/services/message/thread-binding.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which thread a 1:1 message that names a conversation id lands in (secaudit2026oct26,
@@ -23,8 +23,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
-import type { Storage } from '../storage/interface.js';
-import { conversationIdFor, deliveryTargetFor } from '../utils/messaging.js';
+import type { Storage } from '../../storage/interface.js';
+import { conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
 
 type ThreadStorage = Pick<Storage, 'listConversation' | 'listAgentDmThread'>;
 

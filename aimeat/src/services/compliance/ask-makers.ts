@@ -41,7 +41,7 @@ import { appReach } from './app-reach.js';
 import { askedQuestions, effectiveQuestionnaire, readUseCases, systemGhiiFor } from './register.js';
 import { readAppDataMap } from '../data-map/data-map-store.js';
 import { findOperatorGhii } from '../operators.js';
-import { sendDirectMessage } from '../message-send.js';
+import { sendDirectMessage } from '../message/send.js';
 import { updateRecord } from '../record-cas.js';
 import { createT, toLocale } from '../../i18n.js';
 import { localAccountName } from '../../utils/gaii.js';

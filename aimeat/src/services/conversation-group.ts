@@ -64,14 +64,14 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { ConversationRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
-import { deliverDirectMessage, type DeliveryCtx } from './message-delivery.js';
+import { deliverDirectMessage, type DeliveryCtx } from './message/delivery.js';
 import { duplicateMessageAttachments } from './attachment-duplication.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { deliveryTargetFor, messagePreviewWithAttachments } from '../utils/messaging.js';
 import { notify } from './notify.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { messagePreview } from '../utils/messaging.js';
-import { checkSendLimit, type SendLimitMark } from './message-send-limit.js';
+import { checkSendLimit, type SendLimitMark } from './message/send-limit.js';
 
 /** The maximum number of identities in one group thread. High enough for a team plus its AIs, low
  *  enough that a single send stays one bounded write rather than an unbounded fan-out. */
@@ -208,7 +208,7 @@ export interface GroupSendInput {
   /** The agent that sends this in the sender's name, and its name (DirectMessageRecord.sentByAgent). */
   sentByAgent?: string;
   sentByAgentName?: string;
-  /** The account's send limit (services/message-send-limit.ts). Omitted, this send is counted here;
+  /** The account's send limit (services/message/send-limit.ts). Omitted, this send is counted here;
    *  a turn means the door counted it before writing anything of its own. */
   sendLimit?: SendLimitMark;
 }

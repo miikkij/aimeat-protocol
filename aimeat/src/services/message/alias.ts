@@ -1,5 +1,5 @@
 /**
- * @file message-alias.ts
+ * @file src/services/message/alias.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Named message addresses that stand for a GROUP of people rather than one person.
@@ -39,13 +39,13 @@
  *     node since 2026-09-24, instead of taking both apart here (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { ConversationRecord, DirectMessageAttachment } from '../storage/interface.js';
-import type { DeliveryCtx } from './message-delivery.js';
-import { listOperatorGhiis } from './operators.js';
-import { createGroupConversation, setParticipants, fanOutToParticipants } from './conversation-group.js';
-import { isSameOwner } from '../utils/gaii.js';
-import { deliveryTargetFor } from '../utils/messaging.js';
+import type { AimeatConfig } from '../../config.js';
+import type { ConversationRecord, DirectMessageAttachment } from '../../storage/interface.js';
+import type { DeliveryCtx } from './delivery.js';
+import { listOperatorGhiis } from '../operators.js';
+import { createGroupConversation, setParticipants, fanOutToParticipants } from '../conversation-group.js';
+import { isSameOwner } from '../../utils/gaii.js';
+import { deliveryTargetFor } from '../../utils/messaging.js';
 
 /** The local part. Reserved in utils/gaii.ts so nobody registers an owner by this name. */
 export const SUPPORT_LOCAL_PART = 'support';

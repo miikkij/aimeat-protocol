@@ -48,7 +48,7 @@ import { runAsNode } from '../utils/gaii.js';
 import { createGenesisSyncService } from '../services/genesis-sync.js';
 import { startCacheCleanupJob } from '../services/cache-cleanup.js';
 import { startSyncScheduler } from '../services/sync-scheduler.js';
-import { startMessageRetryJob } from '../services/message-delivery.js';
+import { startMessageRetryJob } from '../services/message/delivery.js';
 import { startTrackedResponseReconciler, evaluateTrackedKey } from '../services/tracked-response.js';
 import { rebuildTrackRegistry, isTracked } from '../services/track-registry.js';
 import { onMemoryWrittenEvent, isRemoteEvent } from '../services/event-bus.js';

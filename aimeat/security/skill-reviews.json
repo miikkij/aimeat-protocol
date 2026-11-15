@@ -76,7 +76,7 @@
         "aimeat/src/services/context/check.ts",
         "aimeat/src/services/memory-versions/history.ts"
       ],
-      "digest": "sha256:9e360085cfee187094688e8d"
+      "digest": "sha256:e6ae67f8f4075985a4c4a54a"
     },
     "node:aimeat-find-my-app": {
       "reviewedOn": "2026-11-15",
@@ -114,7 +114,7 @@
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-ask-someone-who-knows": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/help/questions.ts",
         "aimeat/src/services/help/respond.ts",
@@ -122,7 +122,7 @@
         "aimeat/src/services/help/participants.ts",
         "aimeat/src/services/help/report.ts"
       ],
-      "digest": "sha256:b4aeaa5d413b038375e685f1",
+      "digest": "sha256:57e1542929dda8bce515f6c7",
       "note": "The order an AI follows (find, show, ask), the AI level the node enforces on an answer, the close with thanks and keep, the owner's choices an AI may only lower, and the operator's report tools are decided in these five files."
     },
     "node:aimeat-guided-journey": {
@@ -1011,7 +1011,7 @@
     },
     "node:aimeat-context": {
       "aimeat/src/services/context/index-line.ts": "635f3d9f01f7cc1d",
-      "aimeat/src/services/mcp-build-inputs.ts": "b072fc92778f9ae0",
+      "aimeat/src/services/mcp-build-inputs.ts": "01efe179d7911e0d",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
       "aimeat/src/services/context/check.ts": "f0768afe110e859c",
       "aimeat/src/services/memory-versions/history.ts": "fd78285b47179edd"
@@ -1039,7 +1039,7 @@
     },
     "node:aimeat-ask-someone-who-knows": {
       "aimeat/src/services/help/questions.ts": "b50cbe9a38572b55",
-      "aimeat/src/services/help/respond.ts": "a54811359113e017",
+      "aimeat/src/services/help/respond.ts": "90866c616b0d5349",
       "aimeat/src/services/help/close.ts": "eceaefeba42cea8c",
       "aimeat/src/services/help/participants.ts": "99fe63c994a9813a",
       "aimeat/src/services/help/report.ts": "6f23f8121715ce27"

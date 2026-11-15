@@ -1,6 +1,6 @@
 /**
  * @file test/unit/message-send-limit.test.ts
- * @description The account's message limit (services/message-send-limit.ts): 30 sends a minute per
+ * @description The account's message limit (services/message/send-limit.ts): 30 sends a minute per
  *   ACCOUNT, the owner and every agent and app acting for them together, and a send that carries a
  *   turn or is marked 'exempt' is not counted a second time.
  *
@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-09-24 — Initial (security audit A5-3).
  */
 import { describe, it, expect } from 'vitest';
-import { MESSAGE_SEND_LIMIT, takeSendTurn, checkSendLimit } from '../../src/services/message-send-limit.js';
+import { MESSAGE_SEND_LIMIT, takeSendTurn, checkSendLimit } from '../../src/services/message/send-limit.js';
 
 const NODE = 'aimeat-local-001-dev';
 let n = 0;

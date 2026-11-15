@@ -184,7 +184,7 @@ export class MessagingDbService {
       // a member this person never accepted one to one.
       const own = withEmptyGroupRows((byOwner[ownerGhii] ?? []).filter(c => !hidden.has(c.peerGhii) || groups.has(c.conversationId)), groups)
         // The owner's last message here was sent in their name by one of their agents: the row says
-        // which, where it read "You: ..." (services/message-send-as-owner.ts).
+        // which, where it read "You: ..." (services/message/send-as-owner.ts).
         .map(c => (c.lastDirection === 'outbound' && c.lastSentByAgent
           ? { ...c, sentByAgent: c.lastSentByAgent, sentByAgentName: c.lastSentByAgentName }
           : c));

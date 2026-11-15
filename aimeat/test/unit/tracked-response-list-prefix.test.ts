@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { Storage } from '../../src/storage/interface.js';
-import type { DeliveryCtx } from '../../src/services/message-delivery.js';
+import type { DeliveryCtx } from '../../src/services/message/delivery.js';
 import { listTrackedResponses, evaluateOwnerTrackedResponses } from '../../src/services/tracked-response.js';
 
 const OWNER = 'alice@aimeat-test-001';

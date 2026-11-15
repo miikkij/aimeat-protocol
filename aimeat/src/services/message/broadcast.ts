@@ -1,5 +1,5 @@
 /**
- * @file message-broadcast.ts
+ * @file src/services/message/broadcast.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Send-to-many (broadcast / mass posting). Resolves an audience — an explicit recipient list
@@ -11,7 +11,7 @@
  *   message each recipient can reply to (a 1:1 thread). Polls (an `interactive` question spec) ride the
  *   same fan-out — see Phase 2.
  * @structure resolveAudience(ctx, senderGhii, sel) → string[] · sendBroadcast(ctx, input) → BroadcastResult
- * @usage import { resolveAudience, sendBroadcast } from '../services/message-broadcast.js';
+ * @usage import { resolveAudience, sendBroadcast } from './broadcast.js';
  * @version-history
  *   v1.8.0 — 2026-11-15 — broadcastFromPrincipal asks the team approval gate first (services/team/action-gate.ts, T7).
  *   v1.7.0 — 2026-10-08 — broadcastProvenanceStamp() hashes with messageProvenanceContent(), the one
@@ -38,20 +38,20 @@
  *   v1.0.0 — 2026-06-23 — Initial: explicit-list + Share-Group audiences, announcement/broadcast modes.
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { DirectMessageAttachment, InteractivePayload, SharingGroupRecord, Storage } from '../storage/interface.js';
-import { provenanceForWrite, type DeclaredProvenance } from './ai/provenance.js';
-import { messageProvenanceContent } from './message-provenance.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { isAddressableRecipient } from '../utils/messaging.js';
-import type { DeliveryCtx } from './message-delivery.js';
-import { sendDirectMessage } from './message-send.js';
-import { takeSendTurn, type SendLimitMark } from './message-send-limit.js';
-import { sign } from '../auth/keypair.js';
-import { audienceProof } from './signed-node-request.js';
-import { logger } from '../utils/logger.js';
-import { peerFetch } from '../utils/peer-fetch.js';
-import { teamAgentGate } from './team/action-gate.js';
+import type { AimeatConfig } from '../../config.js';
+import type { DirectMessageAttachment, InteractivePayload, SharingGroupRecord, Storage } from '../../storage/interface.js';
+import { provenanceForWrite, type DeclaredProvenance } from '../ai/provenance.js';
+import { messageProvenanceContent } from './provenance.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { isAddressableRecipient } from '../../utils/messaging.js';
+import type { DeliveryCtx } from './delivery.js';
+import { sendDirectMessage } from './send.js';
+import { takeSendTurn, type SendLimitMark } from './send-limit.js';
+import { sign } from '../../auth/keypair.js';
+import { audienceProof } from '../signed-node-request.js';
+import { logger } from '../../utils/logger.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
+import { teamAgentGate } from '../team/action-gate.js';
 
 export interface AudienceSelector {
   /** Explicit recipient identities (owner@node, agent#owner@node, eco:app#owner@node). */
@@ -79,7 +79,7 @@ export interface BroadcastInput {
   /** TARGET-058: the provenance record describing the body. Every copy carries the SAME id, because
    *  the statement is about the bytes and one broadcast is one set of bytes. */
   aiProvenanceId?: string;
-  /** The turn the whole broadcast was counted with (services/message-send-limit.ts). Every copy
+  /** The turn the whole broadcast was counted with (services/message/send-limit.ts). Every copy
    *  carries it, so the copies are not counted again one by one. */
   sendLimit: SendLimitMark;
 }
@@ -206,7 +206,7 @@ export function broadcastProvenanceStamp(
     principal: input.principal,
     scopes: input.scopes,
     // The questions are content a person reads, so they are hashed with the body: the one rule
-    // every message send uses (services/message-provenance.ts).
+    // every message send uses (services/message/provenance.ts).
     content: messageProvenanceContent(input.body, input.interactive),
     declaredId: input.declaredId,
     declared: input.declared,

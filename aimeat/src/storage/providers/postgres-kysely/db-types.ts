@@ -1453,7 +1453,7 @@ export interface Conversation {
   updatedAt: Generated<Timestamp>;
 }
 
-/** Migration 0118: one person's acknowledgement mark on one message (services/message-reactions.ts). */
+/** Migration 0118: one person's acknowledgement mark on one message (services/message/reactions.ts). */
 export interface DirectMessageReaction {
   byAgent: string | null;
   createdAt: Generated<Timestamp>;

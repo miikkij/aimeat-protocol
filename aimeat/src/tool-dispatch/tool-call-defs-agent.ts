@@ -716,7 +716,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         // Send a federated DM AS THE OWNER (consented delegation) through POST /v1/messages/as-owner, the
-        // route the node MCP tool's service answers too (services/message-send-as-owner.ts). Until
+        // route the node MCP tool's service answers too (services/message/send-as-owner.ts). Until
         // 2026-10-17 this posted to POST /v1/messages and so sent as the agent, not the owner.
         name: 'aimeat_dm_send_as_owner',
         description: 'Send a federated direct message in the owner\'s name (Reply-with-AI). The message says which agent sent it.',

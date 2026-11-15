@@ -101,7 +101,7 @@
     },
     "src/routes/federation-sync/message-reactions.ts": {
       "count": 1,
-      "why": "An inbound mark on a message: gatePeer with allowMessaging first, then the signature against the pinned key, then the audience proof verified against the same key; the reactor and by_agent must be the signing node's own, and the reactor a party of a copy held here (services/message-reactions.ts applyRemoteReaction; 2026-10-26)."
+      "why": "An inbound mark on a message: gatePeer with allowMessaging first, then the signature against the pinned key, then the audience proof verified against the same key; the reactor and by_agent must be the signing node's own, and the reactor a party of a copy held here (services/message/reactions.ts applyRemoteReaction; 2026-10-26)."
     },
     "src/routes/federation-sync/messaging.ts": {
       "count": 2,
@@ -171,15 +171,15 @@
       "count": 4,
       "why": "Replication goes to active peers with replicateMemory, validateOutboundUrl first. The retraction send (retractMemoryFromPeer) reads the same two: it refuses a peer whose replicateMemory is off and runs validateOutboundUrl on the url before the post, and it signs the message with this node's key plus an audience proof naming the target peer, so a captured retraction cannot be replayed at a third node (secaudit 2026-10, replica retention)."
     },
-    "src/services/message-broadcast.ts": {
+    "src/services/message/broadcast.ts": {
       "count": 1,
       "why": "A federation broadcast goes to active, non-private peers; a packages-only or contact peer is private (peerMode), so it receives none."
     },
-    "src/services/message-delivery.ts": {
+    "src/services/message/delivery.ts": {
       "count": 3,
       "why": "Messages and read receipts go only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on); the plain fetch is the federation carve-out of security/outbound-fetch-exemptions.json (2026-10-01)."
     },
-    "src/services/message-reactions.ts": {
+    "src/services/message/reactions.ts": {
       "count": 2,
       "why": "A mark on a message goes only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on), through peerFetch, signed with this node's key and the audience proof naming that peer (2026-10-26)."
     },

@@ -21,14 +21,14 @@ import { resolve } from 'node:path';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig } from '../../src/config.js';
 import { createTrackedResponse, reconcileTrackedResponses, getTrackedResponse } from '../../src/services/tracked-response.js';
-import { sendDirectMessage, type SendMessageResult } from '../../src/services/message-send.js';
+import { sendDirectMessage, type SendMessageResult } from '../../src/services/message/send.js';
 import type { DirectMessageRecord } from '../../src/storage/interface.js';
 import { WorkflowEngine } from '../../src/services/workflow/engine.js';
 import type { WorkflowRun } from '../../src/models/workflow-schemas.js';
 import { runKey } from '../../src/services/workflow/store.js';
 import { reconcileActiveRun } from '../../src/services/workflow/lifecycle.js';
 
-vi.mock('../../src/services/message-send.js', () => ({ sendDirectMessage: vi.fn() }));
+vi.mock('../../src/services/message/send.js', () => ({ sendDirectMessage: vi.fn() }));
 const config = { ...loadConfig().config, aiProvenance: false };
 afterEach(() => vi.restoreAllMocks());
 

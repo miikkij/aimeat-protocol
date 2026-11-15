@@ -34,7 +34,7 @@ import { PaymentError } from './payment-handlers.js';
 import { putRecord } from './platform-fee.js';
 import { logger } from '../utils/logger.js';
 import { findOperatorGhii } from '../services/operators.js';
-import { sendDirectMessage } from '../services/message-send.js';
+import { sendDirectMessage } from '../services/message/send.js';
 import { notify } from '../services/notify.js';
 
 /** Key prefix of the possible-payment record under the seller's GHII. */

@@ -267,7 +267,7 @@ vi.mock('../../src/services/job-seeding.js', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()),
     seedCoreScheduledJobs: (config: { nodeId: string }) => h.later(config.nodeId, 'the core job seeding'),
 }));
-vi.mock('../../src/services/message-delivery.js', async (importOriginal) => ({
+vi.mock('../../src/services/message/delivery.js', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()),
     startMessageRetryJob: (config: { nodeId: string }) => h.every(config.nodeId, 'the message retry'),
 }));

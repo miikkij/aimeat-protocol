@@ -2,7 +2,7 @@
  * @file src/routes/message-reactions.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Acknowledgement marks on a single direct message (services/message-reactions.ts, which
+ * @description Acknowledgement marks on a single direct message (services/message/reactions.ts, which
  *   also backs aimeat_dm_react):
  *     POST   /v1/messages/:id/reactions   { reaction, as_owner? }        give a mark
  *     DELETE /v1/messages/:id/reactions?reaction=…[&as_owner=true]      take your own back
@@ -23,7 +23,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireLocalSession, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
-import { reactToMessage, reactionActor } from '../services/message-reactions.js';
+import { reactToMessage, reactionActor } from '../services/message/reactions.js';
 
 export function registerMessageReactionRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
   const ctx = { config, storage, peers };

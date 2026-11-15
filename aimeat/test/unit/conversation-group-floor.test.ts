@@ -20,7 +20,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createGroupConversation } from '../../src/services/conversation-group.js';
-import type { DeliveryCtx } from '../../src/services/message-delivery.js';
+import type { DeliveryCtx } from '../../src/services/message/delivery.js';
 
 const NODE_ID = 'aimeat-local-001-dev';
 

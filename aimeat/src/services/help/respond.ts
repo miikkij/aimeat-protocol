@@ -14,7 +14,7 @@
  *
  *   A REPLY IN THE THREAD COUNTS. A helper who simply answers in the message thread has answered:
  *   thread-reply.ts noteThreadReply is called by the message path after it delivers a message in a
- *   thread that belongs to a question (services/message-send.ts).
+ *   thread that belongs to a question (services/message/send.ts).
  * @structure routeOnward · respondToQuestion
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial (wish-pyyd-apua-nodessa-yhteinen-avunpyynt-v-yl-ihmisille-ja-heid-).

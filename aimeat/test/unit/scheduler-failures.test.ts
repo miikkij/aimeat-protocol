@@ -30,7 +30,7 @@ vi.mock('../../src/utils/logger.js', async (importOriginal) => {
 });
 
 const sent: Array<{ subject: string; kind?: string; body: string }> = [];
-vi.mock('../../src/services/message-send.js', () => ({
+vi.mock('../../src/services/message/send.js', () => ({
     sendDirectMessage: vi.fn(async (_deps: unknown, msg: { subject: string; kind?: string; body: string }) => { sent.push(msg); return {}; }),
 }));
 vi.mock('../../src/services/operators.js', () => ({

@@ -7,7 +7,7 @@
  *   A Tracked Response is one self-describing owner-memory record binding an inbound message ↔ a
  *   watched memory key ↔ a completion condition ↔ a reply policy ↔ delivery state. When the watched
  *   key satisfies the condition, the system sends (auto) or drafts-for-approval (approve) a reply back
- *   to the original message — across federation if needed — reusing services/message-send.ts.
+ *   to the original message — across federation if needed — reusing services/message/send.ts.
  *   Firing is reactive (the memory-write hook calls evaluateTrackedKey); the reconciler is the safety
  *   net that retriggers errored / missed / stale-in-flight contracts so nothing fails silently.
  * @structure
@@ -52,9 +52,9 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { logger } from '../utils/logger.js';
 import { notify } from './notify.js';
-import { sendDirectMessage } from './message-send.js';
+import { sendDirectMessage } from './message/send.js';
 import { trackKey, untrackKey } from './track-registry.js';
-import type { DeliveryCtx } from './message-delivery.js';
+import type { DeliveryCtx } from './message/delivery.js';
 import { stampAutonomousOutput } from './ai/provenance.js';
 import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';

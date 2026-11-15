@@ -206,7 +206,7 @@ export interface DirectMessageRecord {
   /**
    * The acknowledgement marks on this message, grouped by symbol in the order each was first given
    * ({@link MessageReactionRecord}). Never stored on the row: the reads that hand a thread to a reader
-   * attach it (services/message-reactions.ts withReactions). Absent means nobody has reacted, or the
+   * attach it (services/message/reactions.ts withReactions). Absent means nobody has reacted, or the
    * read did not ask.
    */
   reactions?: MessageReactionSummary[];
@@ -217,7 +217,7 @@ export interface DirectMessageRecord {
  * characters) instead of a reply. One row per message, symbol and reactor, so the same person gives
  * the same symbol once. Every mailbox copy of a message carries the same id, so the rows of one node
  * serve all of its copies; a reactor on another node sends the mark there signed, as a read receipt
- * travels (services/message-reactions.ts).
+ * travels (services/message/reactions.ts).
  */
 export interface MessageReactionRecord {
   messageId: string;

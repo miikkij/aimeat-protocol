@@ -31,7 +31,7 @@ import type { CheckoutSessionRecord, PaymentContext, PaymentHandler, RefundOutco
 import { putRecord } from './platform-fee.js';
 import { logger } from '../utils/logger.js';
 import { findOperatorGhii } from '../services/operators.js';
-import { sendDirectMessage } from '../services/message-send.js';
+import { sendDirectMessage } from '../services/message/send.js';
 import { notify } from '../services/notify.js';
 
 export type { RefundOutcome };

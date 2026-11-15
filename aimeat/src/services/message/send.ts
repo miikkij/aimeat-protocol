@@ -1,5 +1,5 @@
 /**
- * @file message-send.ts
+ * @file src/services/message/send.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The core "create + deliver a direct message" path, extracted from the POST /v1/messages
@@ -9,7 +9,7 @@
  *   copy + notify + attachment duplication) or hands off to cross-node federation delivery. Behaviour
  *   is identical to the inline logic the route used previously; the route is now a thin caller.
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
- * @usage import { sendDirectMessage } from '../services/message-send.js';
+ * @usage import { sendDirectMessage } from './send.js';
  * @version-history
  *   v1.15.0 — 2026-11-15 — The block check for a local recipient also reads a block on the sender's
  *     owner GHII (contact-same-account.ts blockedSenderAccount), so a blocked person's agent or
@@ -74,20 +74,20 @@
  *     the tick. Dynamic import avoids the responder↔message-send cycle; the responder no-ops for non-system.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
-import type { MessageAttachmentInput } from '../models/message-schemas.js';
-import { acceptedSameAccount, blockedSenderAccount } from './contact-same-account.js';
-import { areColleagues } from './colleagues.js';
-import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
-import { conversationIdFor, messagePreview, messagePreviewWithAttachments, deliveryTargetFor } from '../utils/messaging.js';
-import { notify } from './notify.js';
-import { emitChange, emitDelivery } from './event-bus.js';
-import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './message-delivery.js';
-import { duplicateMessageAttachments } from './attachment-duplication.js';
-import { localIdentityExists, missingIdentityReason, nodePartRefusal } from './local-identity.js';
-import { checkSendLimit, type SendLimitMark } from './message-send-limit.js';
-import { boundConversationId } from './message-thread-binding.js';
-import { logger } from '../utils/logger.js';
+import type { Storage, DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../../storage/interface.js';
+import type { MessageAttachmentInput } from '../../models/message-schemas.js';
+import { acceptedSameAccount, blockedSenderAccount } from '../contact-same-account.js';
+import { areColleagues } from '../colleagues.js';
+import { isSameOwner, parseGaiiLoose } from '../../utils/gaii.js';
+import { conversationIdFor, messagePreview, messagePreviewWithAttachments, deliveryTargetFor } from '../../utils/messaging.js';
+import { notify } from '../notify.js';
+import { emitChange, emitDelivery } from '../event-bus.js';
+import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './delivery.js';
+import { duplicateMessageAttachments } from '../attachment-duplication.js';
+import { localIdentityExists, missingIdentityReason, nodePartRefusal } from '../local-identity.js';
+import { checkSendLimit, type SendLimitMark } from './send-limit.js';
+import { boundConversationId } from './thread-binding.js';
+import { logger } from '../../utils/logger.js';
 
 export interface SendMessageInput {
   senderGhii: string;
@@ -139,13 +139,13 @@ export interface SendMessageInput {
   senderReadsOwnerMailbox?: boolean;
   /**
    * The agent that sends this in the sender's name, and its name as the owner sees it
-   * (DirectMessageRecord.sentByAgent). Set by services/message-send-as-owner.ts only; written on both
+   * (DirectMessageRecord.sentByAgent). Set by services/message/send-as-owner.ts only; written on both
    * copies and carried to the recipient's node.
    */
   sentByAgent?: string;
   sentByAgentName?: string;
   /**
-   * The account's send limit (services/message-send-limit.ts). Omitted, this send is counted here.
+   * The account's send limit (services/message/send-limit.ts). Omitted, this send is counted here.
    * A turn: the door counted it before writing anything of its own. 'exempt': the node's own message,
    * one copy of a broadcast counted as a whole, or a door with a limit of its own.
    */
@@ -302,7 +302,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
   // Default: the deterministic per-pair thread. An explicit conversationId continues a specific thread;
   // a `subject` with no id opens a NEW thread (fresh minted id). Both nodes share the id via the payload.
   // A named id lands in that thread only when the sender holds it or nobody else's thread is under it;
-  // otherwise the message goes to the pair's own thread (services/message-thread-binding.ts, secaudit2026oct26).
+  // otherwise the message goes to the pair's own thread (services/message/thread-binding.ts, secaudit2026oct26).
   const conversationId = input.conversationId
     ? await boundConversationId(storage, {
       requested: input.conversationId, senderGhii, recipientGhii,
@@ -450,7 +450,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     // it. Only a reply into a named thread can be one, and the help service's own sends say so and
     // are skipped. Loaded on use: services/help/ sends through this file.
     if (!kind && !input.helpHandled && input.conversationId) {
-      const { noteThreadReply } = await import('./help/thread-reply.js');
+      const { noteThreadReply } = await import('../help/thread-reply.js');
       await noteThreadReply({ storage, config }, conversationId, senderGhii, body, input.sentByAgent)
         .catch((err: unknown) => logger.warn('help: a reply in a question thread was not recorded', { conversationId, error: String(err) }));
     }

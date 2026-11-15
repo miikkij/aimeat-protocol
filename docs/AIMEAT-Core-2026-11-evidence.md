@@ -199,8 +199,8 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | COL-15 | met | `aimeat/src/services/board-moderation.ts:28-43`; threshold `aimeat/src/config.ts:626` | |
 | COL-16 | met | `aimeat/src/services/board-subscribers.ts:64-98` | The SHOULD is not met: the push carries no signature. |
 | COL-17 | met | `aimeat/src/services/board-post.ts:160-165,229,279` | The code calls it a post cost and an anti-flood price; see PACE-11. |
-| COL-18 | met | `aimeat/src/services/message-send.ts:319-327,385-399`; `aimeat/src/routes/messages.ts:755,763,789` | |
-| COL-19 | met | `aimeat/src/services/message-delivery.ts:102-130,201-229`; `aimeat/src/routes/federation-sync/messaging.ts:335` | |
+| COL-18 | met | `aimeat/src/services/message/send.ts:319-327,385-399`; `aimeat/src/routes/messages.ts:755,763,789` | |
+| COL-19 | met | `aimeat/src/services/message/delivery.ts:102-130,201-229`; `aimeat/src/routes/federation-sync/messaging.ts:335` | |
 | COL-20 | met | `aimeat/src/services/conversation-group.ts`; `aimeat/src/storage/types/direct-messages.ts:240-275` | Group threads are node-local, with one remote party allowed. |
 
 ## 8. Pacing and metering

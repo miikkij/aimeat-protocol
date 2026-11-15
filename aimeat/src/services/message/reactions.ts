@@ -1,5 +1,5 @@
 /**
- * @file src/services/message-reactions.ts
+ * @file src/services/message/reactions.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Acknowledgement marks on a single direct message: a symbol (an emoji or a short word)
@@ -35,18 +35,18 @@
  * @version-history
  *   v1.0.0 — 2026-10-26 — Initial (wish-kuittausreaktiot-yksitt-isiin-viesteihin-viestit-ketjuissa).
  */
-import type { DirectMessageRecord, MessageReactionRecord, MessageReactionSummary, ConversationRecord } from '../storage/interface.js';
-import type { DeliveryCtx } from './message-delivery.js';
-import type { CallerContext } from './caller-context.js';
-import { emitChange, emitDelivery } from './event-bus.js';
-import { isParticipant } from './conversation-group.js';
-import { deliveryTargetFor } from '../utils/messaging.js';
-import { parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
-import { sign } from '../auth/keypair.js';
-import { audienceProof } from './signed-node-request.js';
-import { peerTakesMessages } from './federation/peer-gate.js';
-import { peerFetch } from '../utils/peer-fetch.js';
-import { logger } from '../utils/logger.js';
+import type { DirectMessageRecord, MessageReactionRecord, MessageReactionSummary, ConversationRecord } from '../../storage/interface.js';
+import type { DeliveryCtx } from './delivery.js';
+import type { CallerContext } from '../caller-context.js';
+import { emitChange, emitDelivery } from '../event-bus.js';
+import { isParticipant } from '../conversation-group.js';
+import { deliveryTargetFor } from '../../utils/messaging.js';
+import { parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
+import { sign } from '../../auth/keypair.js';
+import { audienceProof } from '../signed-node-request.js';
+import { peerTakesMessages } from '../federation/peer-gate.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
+import { logger } from '../../utils/logger.js';
 
 /** The longest symbol, as board reactions (BOARD_LIMITS.reactionMax). */
 export const REACTION_MAX = 32;

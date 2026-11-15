@@ -17,7 +17,7 @@ import { splitSubjectAndBody } from '../../src/services/welcome-message.js';
 const sendDirectMessage = vi.hoisted(() => vi.fn(async () => ({ ok: true as const, message: {} as never })));
 const resolveOperatorFeeGhii = vi.hoisted(() => vi.fn(async () => 'boss@node-1' as string | null));
 
-vi.mock('../../src/services/message-send.js', () => ({ sendDirectMessage }));
+vi.mock('../../src/services/message/send.js', () => ({ sendDirectMessage }));
 vi.mock('../../src/services/marketplace-fee.js', () => ({ resolveOperatorFeeGhii }));
 
 const { sendOperatorWelcome } = await import('../../src/services/welcome-message.js');

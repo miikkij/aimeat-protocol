@@ -113,7 +113,7 @@ import { applyLockedInput, isToolPriced } from '../models/app-tool-schemas.js';
 import { appToolManifestIds, loadPublicToolManifest } from '../services/app-tools/manifest-read.js';
 import { checkAppToolInput } from '../services/app/tool-input.js';
 import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
-import { sendDirectMessage } from '../services/message-send.js';
+import { sendDirectMessage } from '../services/message/send.js';
 import type { PeerInfo } from '../services/federation.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';

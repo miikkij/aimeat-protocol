@@ -100,7 +100,7 @@ describe('POST /v1/federation/catalogue-sync', () => {
 
 describe('POST /v1/federation/message', () => {
     const v = validatorFor('POST', '/v1/federation/message');
-    // buildMessagePayload (services/message-delivery.ts) sends every optional field the record lacks
+    // buildMessagePayload (services/message/delivery.ts) sends every optional field the record lacks
     // as null: a message without attachments carries `attachments: null`.
     const wire = {
         id: '5f1d3a52-7c1e-4bb3-9d0a-6a3d2b1c0e9f', conversationId: 'c1', subject: null,

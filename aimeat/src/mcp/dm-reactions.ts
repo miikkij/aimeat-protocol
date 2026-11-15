@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description aimeat_dm_react on the node's MCP endpoint. It decides nothing itself: reactionActor and
- *   reactToMessage (services/message-reactions.ts) are what POST/DELETE /v1/messages/:id/reactions
+ *   reactToMessage (services/message/reactions.ts) are what POST/DELETE /v1/messages/:id/reactions
  *   call, so the chat and the page follow one set of rules. messages:send is applied where every tool
  *   is registered (TOOL_SCOPES, from the catalog entry); `as_owner` asks messages:send-as-owner in
  *   reactionActor, as the route does.
@@ -21,7 +21,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
-import { reactToMessage, reactionActor } from '../services/message-reactions.js';
+import { reactToMessage, reactionActor } from '../services/message/reactions.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 

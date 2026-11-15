@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description What class of identity an id names, and whether that identity actually exists on THIS
  *   node. Two questions, one answer each, asked by every surface that takes an id from a caller: the
- *   address book (services/contacts.ts) and direct-message send (services/message-send.ts).
+ *   address book (services/contacts.ts) and direct-message send (services/message/send.ts).
  *
  *   IT LIVES IN ITS OWN MODULE because those two cannot import each other — contacts reaches the
  *   outbound service, and the outbound service sends messages — and because the check had already

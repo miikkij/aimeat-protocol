@@ -5,7 +5,7 @@
  * @description Recording an answer to a question of Ask someone who knows, and the check the message
  *   path runs after every local delivery: a helper who simply replies in the thread a question opened
  *   has answered it. Its own file, importing nothing that sends a message, because
- *   services/message-send.ts loads it and services/help/delivery.ts sends through message-send.ts:
+ *   services/message/send.ts loads it and services/help/delivery.ts sends through message-send.ts:
  *   the two in one file made an import cycle.
  * @structure updateQuestion · recordAnswer · noteThreadReply
  * @version-history
@@ -42,7 +42,7 @@ export async function recordAnswer(deps: HelpDeps, q: HelpQuestionRecord, route:
 
 /**
  * A message was delivered in a thread. When the thread belongs to a question and the sender is the
- * helper it was sent to, that message is the helper's answer. Called by services/message-send.ts for
+ * helper it was sent to, that message is the helper's answer. Called by services/message/send.ts for
  * every local delivery into a named thread that is not the help service's own; cheap when the thread
  * is not a question's (one indexed read).
  */

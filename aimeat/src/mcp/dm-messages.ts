@@ -84,18 +84,18 @@ import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
-import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
-import { takeSendTurn } from '../services/message-send-limit.js';
-import { sendAsOwner } from '../services/message-send-as-owner.js';
+import { sendDirectMessage, mapMessageAttachments } from '../services/message/send.js';
+import { takeSendTurn } from '../services/message/send-limit.js';
+import { sendAsOwner } from '../services/message/send-as-owner.js';
 import { toolError } from './tool-error.js';
-import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
+import { resolveGroupTarget, soleParticipantNote } from '../services/message/alias.js';
 import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from '../services/agent/dm-reads.js';
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
 import { delegateReaderFor, readOwnerOverview, readOwnerThread, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner/mailbox-reads.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
-import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
-import type { DeliveryCtx } from '../services/message-delivery.js';
+import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message/broadcast.js';
+import type { DeliveryCtx } from '../services/message/delivery.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
@@ -103,7 +103,7 @@ import { fileRefFor } from '../services/file-refs.js';
 import type { DirectMessageAttachment } from '../storage/interface.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../services/ai/provenance-result.js';
-import { mintMessageProvenance } from '../services/message-provenance.js';
+import { mintMessageProvenance } from '../services/message/provenance.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -159,7 +159,7 @@ export function registerDmMessageTools(
 ): void {
     const ctx: DeliveryCtx = { config, storage, peers };
 
-    /** The account has sent as many messages as it may this minute (services/message-send-limit.ts).
+    /** The account has sent as many messages as it may this minute (services/message/send-limit.ts).
      *  The same limit, and the same code, as POST /v1/messages. */
     const sendLimitRefused = (wait: { message?: string }) => ({
         ...toolError('RATE_LIMITED', wait.message ?? 'This account has sent as many messages as it may this minute.'),
@@ -200,7 +200,7 @@ export function registerDmMessageTools(
             // it is stamped like any other write: declared if the agent said something, Mint-3 if it
             // said nothing. The record describes the BODY; an attached file is stored by its own
             // upload, which records its own provenance where its route takes one. The record is
-            // HELD and stored once the send lands (services/message-provenance.ts, aiprov D11).
+            // HELD and stored once the send lands (services/message/provenance.ts, aiprov D11).
             const prov = await mintMessageProvenance({ storage, config }, {
                 principal: senderGhii, scopes: caller().scopes, body,
                 declaredId: ai_provenance_id, declared: toDeclaredProvenance(ai_provenance),
@@ -381,7 +381,7 @@ export function registerDmMessageTools(
             annotations: annotationsFor('aimeat_dm_send_as_owner'),
         },
         async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
-            // One implementation with POST /v1/messages/as-owner (services/message-send-as-owner.ts): the
+            // One implementation with POST /v1/messages/as-owner (services/message/send-as-owner.ts): the
             // owner derived from this session's agent, the address resolved as POST /v1/messages does
             // (a group thread included), the provenance naming the agent, and the agent on the message.
             const result = await sendAsOwner(ctx, {
@@ -525,7 +525,7 @@ export function registerDmMessageTools(
                             id: m.id,
                             direction: m.direction,
                             from: m.senderGhii,
-                            // The agent that sent it in the sender's name (services/message-send-as-owner.ts).
+                            // The agent that sent it in the sender's name (services/message/send-as-owner.ts).
                             ...(m.sentByAgent ? { sent_by_agent: m.sentByAgent, sent_by_agent_name: m.sentByAgentName ?? null } : {}),
                             to: m.recipientGhii,
                             subject: m.subject ?? null,
@@ -633,7 +633,7 @@ export function registerDmMessageTools(
                             conversation_id: m.conversationId,
                             subject: m.subject ?? null,
                             from: m.senderGhii,
-                            // The agent that sent it in the sender's name (services/message-send-as-owner.ts).
+                            // The agent that sent it in the sender's name (services/message/send-as-owner.ts).
                             ...(m.sentByAgent ? { sent_by_agent: m.sentByAgent, sent_by_agent_name: m.sentByAgentName ?? null } : {}),
                             body: m.body,
                             attachments: m.attachments?.map(a => attachmentView(a, mailboxOwnerGhii)) ?? [],
@@ -675,7 +675,7 @@ export function registerDmMessageTools(
                             id: m.id,
                             direction: m.direction,
                             from: m.senderGhii,
-                            // The agent that sent it in the sender's name (services/message-send-as-owner.ts).
+                            // The agent that sent it in the sender's name (services/message/send-as-owner.ts).
                             ...(m.sentByAgent ? { sent_by_agent: m.sentByAgent, sent_by_agent_name: m.sentByAgentName ?? null } : {}),
                             to: m.recipientGhii,
                             subject: m.subject ?? null,

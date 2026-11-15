@@ -120,7 +120,7 @@ import { parseGaiiLoose, isSameOwner, localAccountName, localAccountOf, ownerGhi
 import { acceptedSameAccount, blockedSenderAccount } from '../../services/contact-same-account.js';
 import { readPeerOperators } from '../../services/federation/book.js';
 import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
-import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message-alias.js';
+import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message/alias.js';
 import { listOperatorGhiis } from '../../services/operators.js';
 import { generateDownloadToken } from '../../services/download-token.js';
 import { duplicateMessageAttachments, sameAccount, isSentVersion, FILE_CHANGED_REASON } from '../../services/attachment-duplication.js';
@@ -129,7 +129,7 @@ import { fileTarget } from '../../services/classification/labels.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
 import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation/auth-consent.js';
 import { NONCE_WINDOW_MS } from '../../services/request-nonce.js';
-import { boundInboundConversationId } from '../../services/message-thread-binding.js';
+import { boundInboundConversationId } from '../../services/message/thread-binding.js';
 import { normalizeInboundAttachments } from './inbound-attachments.js';
 
 export function registerMessagingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
@@ -510,7 +510,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 // landed in had the peer sent one. Measured against a second local node 2026-09-02.
                 // A named id lands in that thread only when the recipient holds no thread under it or the
                 // sender is already in it; a peer naming the id of a thread between other parties gets
-                // the pair's own thread (services/message-thread-binding.ts, secaudit2026oct26).
+                // the pair's own thread (services/message/thread-binding.ts, secaudit2026oct26).
                 conversationId: message.conversationId
                     ? await boundInboundConversationId(storage, { requested: message.conversationId, senderGhii: message.senderGhii, recipientGhii, recipientMailbox: deliveryGhii })
                     : conversationIdFor(message.senderGhii, recipientGhii),

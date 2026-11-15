@@ -97,7 +97,7 @@ export const ECO_PREFIX = 'eco:';
 const GEAI_RE = /^eco:([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}[a-z0-9])@(?=[a-z0-9-]{3,64}$)([a-z0-9]+(?:-[a-z0-9]+)+)$/;
 
 // 'support' and 'operators' are the two halves of `support@operators`, the named address that
-// reaches whoever runs this node (services/message-alias.ts). An owner or agent registered under
+// reaches whoever runs this node (services/message/alias.ts). An owner or agent registered under
 // either name would make the address ambiguous, so neither is available.
 // 'security-system' and 'scheduler' are owners the node writes under itself: every security
 // incident and quarantined upload (services/security-incident.ts), and the caller of an unattended

@@ -60,9 +60,9 @@ import { isForeignPrincipal, isSameOwner, localAccountName } from '../../utils/g
 import { createMessagingDbService, type OwnerConversation } from '../db/messaging-db-service.js';
 import { createMessagesInboxService, type InboxOverview } from '../db/messages-inbox-db-service.js';
 import type { AgentRecordView } from '../agent/record-view.js';
-import { withMessageProvenance } from '../message-provenance.js';
+import { withMessageProvenance } from '../message/provenance.js';
 import { readAgentDmThread } from '../agent/dm-reads.js';
-import { withReactions } from '../message-reactions.js';
+import { withReactions } from '../message/reactions.js';
 import { isParticipant } from '../conversation-group.js';
 import { logger } from '../../utils/logger.js';
 

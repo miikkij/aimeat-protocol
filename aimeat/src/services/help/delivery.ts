@@ -20,7 +20,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { HelpQuestionRecord, HelpRouteRecord } from '../../storage/types/help.js';
-import { sendDirectMessage, mapMessageAttachments } from '../message-send.js';
+import { sendDirectMessage, mapMessageAttachments } from '../message/send.js';
 import { createT, toLocale } from '../../i18n.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { newRouteId, type HelpDeps, type HelpResult, refuse } from './rules.js';

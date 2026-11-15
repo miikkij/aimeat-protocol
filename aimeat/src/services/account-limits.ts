@@ -9,7 +9,7 @@
  *   send, an emailed invitation and an AI call each had a path limiter, and the MCP tools that do the
  *   same work never pass the path, so an agent sent without one. The path limiter also counts per
  *   principal, so an owner with N agents had N allowances. Counted here, per owner GHII, an owner and
- *   every agent and app acting for them share one allowance. The pattern is services/message-send-limit.ts.
+ *   every agent and app acting for them share one allowance. The pattern is services/message/send-limit.ts.
  *
  *   WHAT IS NOT COUNTED. Work the node does itself (an install set inviting the people it names)
  *   passes `exempt`; the caller says why.

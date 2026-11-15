@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description POST /v1/messages/as-owner: an agent sends a direct message in its owner's name, and
  *   the message says which agent sent it. The REST twin of aimeat_dm_send_as_owner; both call
- *   services/message-send-as-owner.ts. The connector's copy of the tool calls this route, where it
+ *   services/message/send-as-owner.ts. The connector's copy of the tool calls this route, where it
  *   posted to POST /v1/messages with the agent's own token and so sent as the agent until 2026-10-17.
  *
  *   WHO. An agent holding `messages:send-as-owner`. The sender is the agent's own owner, derived from
@@ -22,7 +22,7 @@ import { requireAuth, requireLocalSession, requireScope } from '../auth/middlewa
 import { success, error } from '../middleware/envelope.js';
 import { MessageSendAsOwnerSchema } from '../models/message-schemas.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
-import { sendAsOwner } from '../services/message-send-as-owner.js';
+import { sendAsOwner } from '../services/message/send-as-owner.js';
 import { resolveIdentity } from '../utils/gaii.js';
 
 export function registerSendAsOwnerRoute(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {

@@ -86,7 +86,7 @@ import {
   type ContractProposal, newProposalId, putProposal, getProposal, listProposalsForOwner,
   supersedeWithProposal, ownerOfGaii, CONTRACT_ENDED_TEXT,
 } from '../services/exchange/proposals.js';
-import { sendDirectMessage } from '../services/message-send.js';
+import { sendDirectMessage } from '../services/message/send.js';
 import type { PeerInfo } from '../services/federation.js';
 import { logger } from '../utils/logger.js';
 import { notifyGrantIssued, notifyGrantsRevoked } from '../services/membership-notify.js';
