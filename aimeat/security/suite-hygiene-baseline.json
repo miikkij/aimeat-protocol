@@ -515,7 +515,7 @@
   "test/e2e-app-origin.ts": {
    "ownHarness": 1,
    "looseRefusal": 2,
-   "lines": 1420
+   "lines": 1421
   },
   "test/e2e-app-parties.ts": {
    "ownHarness": 1

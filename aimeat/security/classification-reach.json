@@ -64,6 +64,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The hold ledger and its state machine, plus the seller's payment settings."
     },
+    "src/commerce/test-money-ledger.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listAllMemoryPages": 1
+      },
+      "why": "Reviewed 2026-11-15, the node's own read: the test money provider's books (commerce.test-money.* under system@<node>), written and read only by the test money handler and the operator's ledger route while test money is on; no person's content."
+    },
     "src/commerce/pacing-pack.ts": {
       "reads": {
         "getMemory": 1
