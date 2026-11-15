@@ -140,7 +140,7 @@ import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
 import { ConnectTunnelManager } from '../services/connect-tunnel.js';
 import { startPendingEnrolment } from '../services/agent/pending-enrolment.js';
-import { startConnectorRegistry } from '../services/connector-registry.js';
+import { startConnectorRegistry } from '../services/connector/registry.js';
 import { seedProfileSchemas } from '../services/profile-schemas.js';
 import { seedCsmTemplates } from '../services/csm/seed.js';
 import { seedManifestSchema } from '../services/manifest-schema.js';
@@ -695,7 +695,7 @@ export async function initializeServices(
     provideNodeService('tunnel', connectTunnelManager);
     // An agent approved while the owner's connector was down gets its key when the connector connects.
     startPendingEnrolment({ config, storage });
-    // Each connector is recorded for its owner as it connects and disconnects (services/connector-registry.ts).
+    // Each connector is recorded for its owner as it connects and disconnects (services/connector/registry.ts).
     startConnectorRegistry({ config, storage });
     logger.info('Connector forward tunnel enabled');
   }

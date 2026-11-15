@@ -77,8 +77,8 @@ import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anony
 import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent/profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent/proposals.js';
-import { connectorListAnswer, renameConnector } from '../services/connector-registry.js';
-import { setProgramDecision } from '../services/connector-programs.js';
+import { connectorListAnswer, renameConnector } from '../services/connector/registry.js';
+import { setProgramDecision } from '../services/connector/programs.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';

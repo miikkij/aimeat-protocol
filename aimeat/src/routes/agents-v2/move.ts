@@ -38,7 +38,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
-import { findConnector, setWanted } from '../../services/connector-registry.js';
+import { findConnector, setWanted } from '../../services/connector/registry.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 

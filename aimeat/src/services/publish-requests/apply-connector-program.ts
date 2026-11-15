@@ -3,9 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner answered the question about a program a computer holds for an agent
- *   (services/connector-programs.ts filed it). Allow records the programs under the request's hash as
+ *   (services/connector/programs.ts filed it). Allow records the programs under the request's hash as
  *   allowed on that computer; Don't allow records them as declined. Either way the computer is told
- *   over its tunnel and acts on the hash it holds itself (services/connector-program-decision.ts).
+ *   over its tunnel and acts on the hash it holds itself (services/connector/program-decision.ts).
  *   A computer that no longer reports that hash ends the request `outdated`.
  * @structure applyConnectorProgram · declineConnectorProgram
  * @usage registered in appliers.ts under the kind 'connector-program'
@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-10-31 — Initial (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  */
 import { localAccountName } from '../../utils/gaii.js';
-import { recordProgramDecision } from '../connector-program-decision.js';
+import { recordProgramDecision } from '../connector/program-decision.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 function targetOf(ownerGhii: string, request: PublishRequest): { owner: string; connector: string; hash: string } | null {

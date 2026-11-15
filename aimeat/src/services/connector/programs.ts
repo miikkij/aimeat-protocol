@@ -1,5 +1,5 @@
 /**
- * @file src/services/connector-programs.ts
+ * @file src/services/connector/programs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The programs a connector may start for its agents, on the node: what the machine
@@ -28,18 +28,18 @@
  * @version-history
  *   v1.0.0 — 2026-10-31 — Initial (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { CallerContext } from './caller-context.js';
-import { findConnector, listConnectors, liveConnectorOf, mutateConnector } from './connector-registry.js';
-import { programStatusOf, type ProgramAsk, type ProgramSource, type StoredAgentPrograms, type ProgramView } from './connector-programs-view.js';
-import { recordProgramDecision } from './connector-program-decision.js';
-import { fileAsk, requesterOf } from './publish-requests/ask.js';
-import { approveUrl, effectiveState, readPublishRequest } from './publish-requests/store.js';
-import { decidePublishRequest, type PublishViewer } from './publish-requests/decide.js';
-import { emitChange } from './event-bus.js';
-import { parseGAII } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { CallerContext } from '../caller-context.js';
+import { findConnector, listConnectors, liveConnectorOf, mutateConnector } from './registry.js';
+import { programStatusOf, type ProgramAsk, type ProgramSource, type StoredAgentPrograms, type ProgramView } from './programs-view.js';
+import { recordProgramDecision } from './program-decision.js';
+import { fileAsk, requesterOf } from '../publish-requests/ask.js';
+import { approveUrl, effectiveState, readPublishRequest } from '../publish-requests/store.js';
+import { decidePublishRequest, type PublishViewer } from '../publish-requests/decide.js';
+import { emitChange } from '../event-bus.js';
+import { parseGAII } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
 
 type Ctx = { config: AimeatConfig; storage: Storage };
 type Fail = { ok: false; status: number; code: string; message: string };

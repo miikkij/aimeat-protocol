@@ -207,7 +207,7 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // prefix; the owner reads and settles through the agent-proposals routes.
   'agents.proposals.',
   // 2026-10-10: `agents.connectors.registry` is the owner's connectors and the orders that wait for one
-  // (services/connector-registry.ts). The node ACTS on it: a proposal's `connector` is resolved to
+  // (services/connector/registry.ts). The node ACTS on it: a proposal's `connector` is resolved to
   // an install id by the names in this record, and an agent that is waiting is offered only to the
   // connector the record names for it. A granted app that could write the key could rename a
   // machine, or point an approved agent's order at another machine, so the agent's key would be

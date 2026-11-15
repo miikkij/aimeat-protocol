@@ -1,5 +1,5 @@
 /**
- * @file src/services/connector-registry.ts
+ * @file src/services/connector/registry.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner's connectors as named, remembered machines.
@@ -50,17 +50,17 @@
  *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { connectedDaemons } from './basic-agents.js';
-import { nodeContext } from './node/context.js';
-import { onTunnelSocketOpened, onTunnelSocketClosed, type TunnelSocketOpened } from './connect-tunnel/hooks.js';
-import { INSTALL_NAME_MAX } from './connect-tunnel/roster.js';
-import { emitChange } from './event-bus.js';
-import { parseGAII, runAsNode } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { loadOwnerAgents } from './db/owner-identity.js';
-import { programViewsOf, type StoredAgentPrograms, type ProgramAsk, type ProgramView } from './connector-programs-view.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { connectedDaemons } from '../basic-agents.js';
+import { nodeContext } from '../node/context.js';
+import { onTunnelSocketOpened, onTunnelSocketClosed, type TunnelSocketOpened } from '../connect-tunnel/hooks.js';
+import { INSTALL_NAME_MAX } from '../connect-tunnel/roster.js';
+import { emitChange } from '../event-bus.js';
+import { parseGAII, runAsNode } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { loadOwnerAgents } from '../db/owner-identity.js';
+import { programViewsOf, type StoredAgentPrograms, type ProgramAsk, type ProgramView } from './programs-view.js';
 
 /** Where an owner's connectors live, in the owner's own namespace. */
 export const CONNECTORS_KEY = 'agents.connectors.registry';

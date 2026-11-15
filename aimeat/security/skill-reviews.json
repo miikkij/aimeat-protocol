@@ -103,7 +103,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule/write.ts"
       ],
-      "digest": "sha256:24edd8f05b0605953fd6c7d0"
+      "digest": "sha256:ad1de4687f6df3e8a8e78a72"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-11-08",
@@ -341,7 +341,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:e75f47a2c61c4dadcf11fab8"
+      "digest": "sha256:6b953f5a5e58ed16ad55ceb9"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-11-15",
@@ -799,7 +799,7 @@
       "aimeat/src/routes/agents/device-auth.ts": "254d513415b91da4",
       "aimeat/src/tool-catalog/scopes.ts": "f499b8c05ac25a9e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "36d516deca3f34a6",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "bb4b3aa945ca8601",
       "aimeat/src/data/basic-agents.ts": "dbb35e8f8ad3c093"
     },
     "node:set-up-content-pipeline": {
@@ -882,7 +882,7 @@
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule/gate.ts": "4071f6e834a03cff",
       "aimeat/src/mcp/agent-schedules.ts": "7ab9f9ab149a0628",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "36d516deca3f34a6",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "bb4b3aa945ca8601",
       "aimeat/src/services/schedule/write.ts": "e964d8ddc942e30d"
     },
     "node:aimeat-decide": {

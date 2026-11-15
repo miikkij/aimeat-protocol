@@ -75,7 +75,7 @@ import { withCrewRuntimeScopes } from '../../data/crew-runtime-scopes.js';
 import { addItem, listItems, closeItem } from '../open-items.js';
 import { basicAgentsApprovalUrl, residentRunnable } from '../basic-agents.js';
 import { ownerDefaultIsNode } from '../crews/menu.js';
-import { findConnector, listConnectors } from '../connector-registry.js';
+import { findConnector, listConnectors } from '../connector/registry.js';
 import { logger } from '../../utils/logger.js';
 import { crewDefWarnings, type CrewDefWarning } from '../crews/def-warnings.js';
 import { TASK_START_FLOOR } from './task-rules.js';

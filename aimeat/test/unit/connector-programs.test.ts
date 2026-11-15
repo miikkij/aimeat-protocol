@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { programStatusOf, programViewsOf, type StoredAgentPrograms } from '../../src/services/connector-programs-view.js';
+import { programStatusOf, programViewsOf, type StoredAgentPrograms } from '../../src/services/connector/programs-view.js';
 import { reportPrograms, programsBodyOf } from '../../src/cli/connect/program-report.js';
 import { commandHash, isTrustedCommand, trustEntryOf, trustWrittenCommands, adoptExistingCommands } from '../../src/cli/connect/command-trust.js';
 import type { RegisteredAgent } from '../../src/cli/connect/agent-registry.js';

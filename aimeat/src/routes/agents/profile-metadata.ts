@@ -110,7 +110,7 @@ import { nodeContext } from '../../services/node/context.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
 import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent/credential-health.js';
 import { portRedirectFor } from '../../services/agent/port-redirect.js';
-import { agentInstalls } from '../../services/connector-registry.js';
+import { agentInstalls } from '../../services/connector/registry.js';
 import { stoppedView } from '../../services/agent/stop-rules.js';
 import { invitesPeople } from '../../services/agent/invites.js';
 import { avatarView, readAvatarsOrEmpty } from '../../services/agent/avatar.js';
@@ -366,7 +366,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         identity_version: a.identityVersion ?? 1,
         // Which of the owner's connectors holds it, or the one it waits for (card_enrolled says
         // which); null when the node cannot place it. A runtime reads its roster and its own share
-        // of it in this one call (services/connector-registry.ts agentInstalls).
+        // of it in this one call (services/connector/registry.ts agentInstalls).
         install_id: installOf[a.name] ?? null,
         // Credential health at a glance: a v2 agent with no card is created and unconnected.
         card_enrolled: !!a.enrolledAt,

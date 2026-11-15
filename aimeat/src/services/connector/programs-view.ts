@@ -1,5 +1,5 @@
 /**
- * @file src/services/connector-programs-view.ts
+ * @file src/services/connector/programs-view.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The programs a connector may start for its agents, as stored on the connector's row

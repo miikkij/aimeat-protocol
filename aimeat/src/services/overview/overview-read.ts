@@ -8,7 +8,7 @@
  *   and an AI cannot tell two stories.
  *
  *   WHERE EACH PART COMES FROM, all through the service functions the other pages call:
- *   - machines and which agents live on each: services/connector-registry.ts (the Computers page);
+ *   - machines and which agents live on each: services/connector/registry.ts (the Computers page);
  *   - an agent that no machine runs but an AI chat client brings in: its `mcpClient`;
  *   - calls per agent: the usage cut `call.actor`; done tasks: storage.countTasksByOwner;
  *   - the apps that show an agent's work, and the workspace its work goes to: services/agent/ties.ts;
@@ -35,7 +35,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { AgentRecord } from '../../storage/types/identity.js';
-import { listConnectors, wantedInstalls } from '../connector-registry.js';
+import { listConnectors, wantedInstalls } from '../connector/registry.js';
 import { readAgentTies, readTieChoices } from '../agent/ties.js';
 import { resolveAppUrls } from '../app/urls.js';
 import { logger } from '../../utils/logger.js';

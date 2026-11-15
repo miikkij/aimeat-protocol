@@ -669,11 +669,11 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/connector-registry.ts :: map :: chains": {
+    "src/services/connector/registry.ts :: map :: chains": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/connector-registry.ts :: map :: scheduled": {
+    "src/services/connector/registry.ts :: map :: scheduled": {
       "count": 1,
       "reason": "DEBT"
     },

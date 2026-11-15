@@ -18,7 +18,7 @@
  *   WHY ALLOWING A PROGRAM IS agent:write AND NOT THE OWNER IN PERSON. The design the developer
  *   approved on 2026-10-31 lets an agent the owner gave that permission allow a program, as it may
  *   already set a sibling's run mode; the machine still runs only a program it holds itself
- *   (services/connector-programs.ts).
+ *   (services/connector/programs.ts).
  *
  *   WHY THE LIST IS OPEN TO THE OWNER'S AGENTS. A person asks their own AI "make me an agent on the
  *   home machine", and the AI has to be able to say which machines there are. Everything in the
@@ -34,7 +34,7 @@
  *   verb (codebase analysis 2026-11-03, decision 13a). Both verbs take the union
  *   (auth/owner-principal-or-scope.ts) and then refuse an app and an ecosystem app by kind.
  *
- *   The routes store nothing themselves: services/connector-registry.ts holds the record and the
+ *   The routes store nothing themselves: services/connector/registry.ts holds the record and the
  *   rules, and the MCP tools call the same functions.
  * @structure registerConnectorRoutes(router, config, storage)
  * @usage registerConnectorRoutes(router, config, storage);
@@ -57,8 +57,8 @@ import { requireOwnerPrincipalOrScope } from '../../auth/owner-principal-or-scop
 import type { CallerContext } from '../../services/caller-context.js';
 import { success, error } from '../../middleware/envelope.js';
 import { callerOf } from '../../middleware/caller.js';
-import { connectorListAnswer, renameConnector, forgetConnector } from '../../services/connector-registry.js';
-import { reportAgentPrograms, setProgramDecision } from '../../services/connector-programs.js';
+import { connectorListAnswer, renameConnector, forgetConnector } from '../../services/connector/registry.js';
+import { reportAgentPrograms, setProgramDecision } from '../../services/connector/programs.js';
 import { emitChange } from '../../services/event-bus.js';
 import { refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { requireScopeUnlessSelf } from '../../auth/self-or-scope.js';
@@ -67,7 +67,7 @@ import { z } from 'zod';
 import { validateBody } from '../../models/schemas.js';
 import { boundedText } from '../../models/input-limits.js';
 
-/** What a connector reports for one agent (services/connector-programs.ts reads it the same way). */
+/** What a connector reports for one agent (services/connector/programs.ts reads it the same way). */
 const ProgramsReportSchema = z.object({
   hash: z.string().max(64).regex(/^[0-9a-f]{64}$/).nullable().optional(),
   status: z.enum(['allowed', 'waiting']).optional(),

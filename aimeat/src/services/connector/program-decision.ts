@@ -1,5 +1,5 @@
 /**
- * @file src/services/connector-program-decision.ts
+ * @file src/services/connector/program-decision.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner's decision on one program of one connector: recorded on the connector's row,
@@ -17,11 +17,11 @@
  * @version-history
  *   v1.0.0 — 2026-10-31 — Initial (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { mutateConnector, principalsOnConnector } from './connector-registry.js';
-import { emitChange, emitDelivery } from './event-bus.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { mutateConnector, principalsOnConnector } from './registry.js';
+import { emitChange, emitDelivery } from '../event-bus.js';
+import { logger } from '../../utils/logger.js';
 
 /** The delivery kind a connector hears when the owner decided on one of its programs. */
 export const PROGRAMS_DECIDED = 'connector.programs_decided';

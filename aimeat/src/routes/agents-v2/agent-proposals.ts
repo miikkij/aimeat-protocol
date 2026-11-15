@@ -74,7 +74,7 @@ import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/mid
 import { buildGAII, resolveIdentity } from '../../utils/gaii.js';
 import { crewSeedAuthored, type CrewCaller } from '../../services/crews/ops.js';
 import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
-import { findConnector, setWanted, clearWanted, type ConnectorView } from '../../services/connector-registry.js';
+import { findConnector, setWanted, clearWanted, type ConnectorView } from '../../services/connector/registry.js';
 import { emitChange } from '../../services/event-bus.js';
 import { executeHooks } from '../../services/hooks.js';
 import { fireHook } from '../../utils/fire-hook.js';

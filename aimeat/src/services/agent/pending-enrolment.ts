@@ -48,7 +48,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AgentRecord } from '../../storage/interface.js';
 import { offerEnrolment, isBeingOffered, type EnrolCandidate } from './enrolment-offer.js';
 import { onTunnelSocketOpened, type TunnelSocketOpened } from '../connect-tunnel/hooks.js';
-import { wantedInstalls } from '../connector-registry.js';
+import { wantedInstalls } from '../connector/registry.js';
 import { emitChange } from '../event-bus.js';
 import { runAsNode } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';

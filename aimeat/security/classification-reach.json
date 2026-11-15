@@ -1322,7 +1322,7 @@
       },
       "why": "Reviewed 2026-11-02 (wish-sharepoint-liitin-tiedostot-luettaviksi-ja-kirjoitettaviksi-), checked: loadStoredBytes reads the caller's own stored file and passes it through reader.leave (external, to the connection) before a byte is sent, the order publish-run.ts keeps; a refused file answers CLASSIFIED and nothing is written."
     },
-    "src/services/connector-registry.ts": {
+    "src/services/connector/registry.ts": {
       "reads": {
         "getMemory": 2
       },
