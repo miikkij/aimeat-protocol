@@ -94,7 +94,7 @@ describe('POST /v1/work/request, /v1/work and /v1/work/batch (aimeat-work.js req
     });
 
     it('refuses a request without input, or with a ttl_hours of 0 or over 720, as the route does', async () => {
-        const { input: _drop, ...noInput } = req('x');
+        const noInput = { action_id: 'translate-text', provider_gaii: 'bot#alice@node-a' };
         await refused('POST', '/v1/work/request', [noInput, req('x', { ttl_hours: 0 }), req('x', { ttl_hours: 721 })]);
         await refused('POST', '/v1/work/batch', [{ requests: [noInput] }]);
     });
