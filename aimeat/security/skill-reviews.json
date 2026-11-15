@@ -580,13 +580,13 @@
       "note": "The script for repo and marketing pictures, and the node tool an app's pictures come from instead."
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:fb6e147170d4550815e52875"
+      "digest": "sha256:2327ca676e10bb6b4fdd8a90"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-11-15",
@@ -665,7 +665,7 @@
         "docs/pitfalls.md",
         ".claude/skills/aimeat-organism-records/SKILL.md"
       ],
-      "digest": "sha256:d48c77a254b92b53be8a3ba2",
+      "digest": "sha256:b9ff3d5b6ba94d33b898bcb6",
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
@@ -858,7 +858,7 @@
     },
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "bbefdfada0757d7f",
-      ".githooks/pre-commit": "ba558088830eb13c",
+      ".githooks/pre-commit": "3ba3106c803ba291",
       "aimeat/src/services/build-extension-prompt.ts": "84604622f15b4196"
     },
     "project:aimeat-organism-records": {
@@ -1059,7 +1059,7 @@
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
     "agent:note-writer": {
-      "docs/pitfalls.md": "a4b76ae5fd91a72f",
+      "docs/pitfalls.md": "18106f71237fb661",
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {
