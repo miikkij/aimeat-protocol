@@ -31,6 +31,7 @@
  *   nextPdfToSign · deleteRequest · readRequestRecord
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-11-16 — Without a signing app address, a party's notice opens the notifications page and its text gives a sentence to say to the AI (notiftext.docsign_request_ai).
  *   2026-11-08 — A party's read of a request's stored file asks the labels a data package version keeps, so a party outside one of them gets no PDF from the node, as GET /v1/pub answers it 404 (secaudit2026nov08b round 15b).
  *   2026-10-27 — A request made before the caller's account existed is not the caller's: getRequest answers 404 and listRequests leaves it out, so the next holder of an erased account name (or an agent of the same name under it) neither reads nor signs what named the earlier holder (secaudit2026oct26, party-identity-bound-by-reusable-account-name).
  *   2026-10-25 -- A wallet signature's statement carries the certificate's subject and issuer, and the checks and the public lookup show them (secaudit2026oct22, lead 3924).
@@ -311,13 +312,23 @@ async function tellParties(ctx: DocsignCtx, rec: DocSignRecord, from: string): P
   for (const p of rec.parties) {
     if (p.identity === from || p.identity.includes('#')) continue;
     try {
-      await notify(ctx.storage, p.identity, {
-        type: 'docsign_request',
-        title: `${fromName} asks you to sign: ${rec.title}`,
-        body: `Document ${rec.document.name}. Open the signing request, or ask your AI to show it to you. (${rec.id})`,
-        ...(ctx.config.docsignAppUrl ? { link: `${ctx.config.docsignAppUrl}/?request=${encodeURIComponent(rec.id)}` } : {}),
-        i18n: { key: 'docsign_request', vars: { from: fromName, title: rec.title, document: rec.document.name } },
-      });
+      const vars = { from: fromName, title: rec.title, document: rec.document.name };
+      // Without a signing app the notice opens the notifications page and gives a sentence to copy to the AI.
+      await notify(ctx.storage, p.identity, ctx.config.docsignAppUrl
+        ? {
+          type: 'docsign_request',
+          title: `${fromName} asks you to sign: ${rec.title}`,
+          body: `Document ${rec.document.name}. Open the signing request, or ask your AI to show it to you. (${rec.id})`,
+          link: `${ctx.config.docsignAppUrl}/?request=${encodeURIComponent(rec.id)}`,
+          i18n: { key: 'docsign_request', vars },
+        }
+        : {
+          type: 'docsign_request',
+          title: `${fromName} asks you to sign: ${rec.title}`,
+          body: `Document ${rec.document.name}. To see it, say this to your AI: "Show me the signing request ${rec.id}."`,
+          link: '/v1/profile?tab=notifications',
+          i18n: { key: 'docsign_request_ai', vars: { ...vars, id: rec.id } },
+        });
     } catch (err) {
       logger.warn('docsign: a party could not be notified', { request: rec.id, error: String(err) });
     }

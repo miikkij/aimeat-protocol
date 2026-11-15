@@ -21,6 +21,7 @@
  *       approval points it; an agent with publish:public points it at once;
  *     - gate off again: each of those is direct.
  * @version-history
+ *   v1.2.0 — 2026-11-16 — The owner's notice of a waiting app opens the app in the App Catalog.
  *   2026-10-31 — PUT /v1/portfolio/config with enabled 1 or "yes" asks as true does (secaudit 2026-10-31 inv-10).
  *   v1.1.0 — 2026-10-20 — A presigned app publish by an agent that lost publish:public after the mint
  *     lands unlisted with a request (202); an agent that still holds it is listed at once (secaudit
@@ -224,6 +225,11 @@ await test('An agent that lost publish:public after the mint: the presigned app 
     const put = await up.put();
     assert(put.status === 202 && put.body.publish_request?.kind === 'app', `upload: ${put.status} ${JSON.stringify(put.body.publish_request ?? put.body.error)}`);
     assert(!(await anonFinds(f)), 'anonymous does not find the waiting app');
+    // The owner's notice opens the app in the App Catalog, not the notifications page (request-link.ts).
+    const id = put.body.publish_request.request_id;
+    const notes = (await call('/v1/notifications?limit=200', { token: A.token })).body.data.notifications as Array<{ link?: string; actions?: Array<{ endpoint?: string }> }>;
+    const note = notes.find(n => (n.actions ?? []).some(a => String(a.endpoint ?? '').includes(`/v1/publish-requests/${id}/decision`)));
+    assert(note?.link === `/v1/appcat?app=${encodeURIComponent(`${A.name}/${f}`)}`, `notice link: ${note?.link}`);
 });
 
 await test('MCP: aimeat_app_manage settings and aimeat_app_publish answer with publish_request', async () => {

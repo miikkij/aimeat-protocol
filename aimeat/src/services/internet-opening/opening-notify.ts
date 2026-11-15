@@ -10,6 +10,7 @@
  * @structure notifyOperators · tellOperators · tellOwner · formsText
  * @usage await tellOperators(ctx, 'internet_opening_requested', opening, { reason });
  * @version-history
+ *   v1.0.1 — 2026-11-16 — The owner's notice opens the app's details in the App Catalog, or the App Catalog when it names no app.
  *   v1.0.0 — 2026-10-25 — Initial (wish-corp-moodissa-julkaistu-app-ulosp-in-vahdittuna-ja-listattun).
  */
 import { notify, type NotifAction, type NotifyInput } from '../notify.js';
@@ -98,6 +99,7 @@ export async function tellOwner(ctx: OpeningCtx, owner: string, type: OwnerNotic
     internet_opening_untrusted: { title: 'Opening an app to the internet now needs an operator\'s approval', body: `${v('by')} took the right away. What you opened stays open.` },
   };
   const t = texts[type];
-  const link = vars.app ? `/v1/apps/${String(vars.app)}` : '/v1/profile';
+  // The app's details in the App Catalog (appcat.js reads ?app=<owner>/<filename>); a trust notice names no app.
+  const link = vars.app ? `/v1/appcat?app=${encodeURIComponent(String(vars.app))}` : '/v1/appcat';
   await notify(ctx.storage, `${owner}@${ctx.config.nodeId}`, { type, title: t.title, body: t.body, link, i18n: { key: type, vars } });
 }

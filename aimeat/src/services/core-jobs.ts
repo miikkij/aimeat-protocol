@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-16 — The notice of a timed-out dispute that waits for a ruling opens that dispute on the admin Work page.
  *   2026-11-14 — team-weekly: the team's week to its leads (services/team/weekly-report.ts).
  *   2026-11-14 — help-sweep and help-report: the hourly round and the report job of Ask someone who knows.
  *   2026-11-08 — tidyStoredFiles, once a minute after start and before the daily file store sweep: the
@@ -471,8 +472,9 @@ async function tellOperatorsTimeoutWaits(config: AimeatConfig, storage: Storage,
     await notify(storage, ghii, {
       type: 'dispute_timeout_waiting',
       title: `Dispute ${disputeId} needs your ruling`,
-      body: `The dispute timed out after 30 days, but the provider's balance does not cover the refund of ${amount} morsels. Rule it with POST /v1/admin/disputes/${disputeId}/rule.`,
-      link: '/v1/admin',
+      body: `The dispute timed out after 30 days, but the provider's balance does not cover the refund of ${amount} morsels. Rule it on the Work page, or ask your AI to rule it.`,
+      // The Work page opens this dispute's ruling dialog (work-tab.disputes.js reads ?dispute=).
+      link: `/v1/admin?tab=work&dispute=${encodeURIComponent(disputeId)}`,
     });
   }
 }

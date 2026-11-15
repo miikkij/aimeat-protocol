@@ -32,6 +32,8 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-11-16 — The publish request notice and the notice of an agent's decision lead to the thing
+ *     the request is about (request-link.ts), not to the notifications page.
  *   2026-11-02 — The kind `mcp-capability-use`: another account's capability over a remote MCP server where
  *     each person signs in with their own account runs with the caller's sign-in once the caller's
  *     account allows it (services/mcp-client/capability-consent.ts; secaudit2026nov02d round 13).
@@ -121,6 +123,7 @@ import { serialByKey } from '../../utils/serial-by-key.js';
 import { logger } from '../../utils/logger.js';
 import { PUBLISH_REQUEST_DAYS, publishRequestExpired } from './policy.js';
 import { announcePart } from './parts.js';
+import { publishRequestLink } from './request-link.js';
 
 /** Where one request lives. The prefix is listable, so the owner's list finds them all. */
 export const PUBLISH_REQUEST_PREFIX = 'publish.requests.';
@@ -508,7 +511,7 @@ async function announcePublish(ctx: PublishStoreCtx, ownerGhii: string, request:
     type: 'publish_request',
     title: `${who} asks to make ${request.title} public`,
     body: `Public means anyone can read it, also people who are not signed in. If you approve, it is public at once. If you decline, it stays as it is.`,
-    link: '/v1/profile?tab=notifications',
+    link: publishRequestLink(request),
     i18n: { key: 'publish_request', vars: { who, what: request.name } },
     ref: questionRef(request.id),
     actions: [
@@ -657,7 +660,7 @@ export async function settlePublishRequest(
       body: state === 'approved'
         ? `${asker} asked for it, and ${agentName} approved it in your name.`
         : `${asker} asked for it, and ${agentName} declined it in your name.`,
-      link: '/v1/profile?tab=notifications',
+      link: publishRequestLink(request),
       i18n: {
         key: state === 'approved' ? 'publish_request_approved_by_agent' : 'publish_request_declined_by_agent',
         vars: { by: agentName, who: asker, what: request.name },

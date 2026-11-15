@@ -12499,6 +12499,8 @@
   "explain.help.routing_extension.what": "Recibe identificadores, temas coincidentes y carga semanal, nunca el texto de una pregunta, y devuelve un orden. Si falla, se usa el orden incluido: primero la mejor coincidencia de temas, luego la semana más ligera.",
   "notiftext.docsign_request.title": "{from} te pide que firmes: {title}",
   "notiftext.docsign_request.body": "Documento {document}. Abre la solicitud de firma o pide a tu IA que te la muestre.",
+  "notiftext.docsign_request_ai.title": "{from} te pide que firmes: {title}",
+  "notiftext.docsign_request_ai.body": "Documento {document}. Para verlo, di a tu IA: \"Muéstrame la solicitud de firma {id}.\"",
   "notiftext.app_published_by_app.title": "{publisher} hizo una nueva versión de tu aplicación {app}",
   "notiftext.app_published_by_app.body": "Le diste permiso a {publisher} para publicar aplicaciones por ti, y publicó la versión {version}. La próxima vez que abras {app}, verás qué quiere hacer la nueva versión, y tú eliges si lo permites.",
   "notiftext.csm_removed.title": "Se eliminó la descripción de datos {csm}",

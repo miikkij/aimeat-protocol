@@ -27,6 +27,7 @@
  *   v1.0.1 — 2026-09-26 — ownerOfPrincipal takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.0.2 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
  *     language (notiftext.app_member_approved*, app_member_revoked*).
+ *   v1.0.3 — 2026-11-16 — A notice without an app leads to the Wallet page; the Exchange tab it named is gone.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -51,13 +52,13 @@ export function coalesceKey(appId: string | null | undefined): string {
   return appId && appId.trim() ? appId.trim() : '(direct)';
 }
 
-/** A deep link to the app when the grant names one, else the consumer's own entitlements page. */
+/** A deep link to the app when the grant names one, else the consumer's Wallet page, which lists what they hold. */
 function targetLink(appId: string | null): string {
   if (appId && appId.includes('/')) {
     const [owner, filename] = appId.split('/');
     return `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}?mode=inline`;
   }
-  return '/v1/profile?tab=exchange';
+  return '/v1/profile?tab=wallet';
 }
 
 /**

@@ -13037,6 +13037,8 @@
   "explain.help.routing_extension.what": "It receives ids, matched topics and weekly load, never a question's text, and answers an order. If it fails, the built-in order is used: the best topic match first, then the lightest week.",
   "notiftext.docsign_request.title": "{from} asks you to sign: {title}",
   "notiftext.docsign_request.body": "Document {document}. Open the signing request, or ask your AI to show it to you.",
+  "notiftext.docsign_request_ai.title": "{from} asks you to sign: {title}",
+  "notiftext.docsign_request_ai.body": "Document {document}. To see it, say this to your AI: \"Show me the signing request {id}.\"",
   "notiftext.app_published_by_app.title": "{publisher} made a new version of your app {app}",
   "notiftext.app_published_by_app.body": "You gave {publisher} permission to publish apps for you, and it published version {version}. The next time you open {app}, you see what the new version wants to do, and you choose whether to allow it.",
   "notiftext.csm_removed.title": "The data description {csm} was removed",
