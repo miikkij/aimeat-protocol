@@ -133,3 +133,20 @@ describe('POST /v1/ai/decisions/{id}/review (aimeat-decide.js review, aimeat-ref
         await refused('POST', path, [{ override: 'x' }, { outcome: 'maybe' }, { outcome: 'confirmed', note: 'x'.repeat(2001) }]);
     });
 });
+
+describe('PUT /v1/classification/label, POST /v1/classification/label/review and /exceptions (aimeat-labels.js set, review, except)', () => {
+    // labels/index.js targetParams sends `owner: o.owner`, and an item from list() carries owner null for
+    // the person's own content. services/classification/labels.ts holderOf reads undefined, null and ''
+    // as the caller's own.
+    const target = { kind: 'memory', key: 'notes.plan', owner: null };
+
+    it('takes owner null for the caller\'s own content', async () => {
+        await taken('PUT', '/v1/classification/label', [{ ...target, label: 'internal' }]);
+        await taken('POST', '/v1/classification/label/review', [{ ...target, decision: 'accept' }]);
+        await taken('POST', '/v1/classification/exceptions', [{ ...target, action: 'ai-send', reason: 'the board asked for it' }]);
+    });
+
+    it('still refuses an owner that is not text or null', async () => {
+        await refused('PUT', '/v1/classification/label', [{ ...target, owner: 5, label: 'internal' }]);
+    });
+});

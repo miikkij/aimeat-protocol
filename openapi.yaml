@@ -19992,7 +19992,7 @@ paths:
                 row_id: { type: string }
                 board_id: { type: string, description: 'kind board: the board id.' }
                 app: { type: string, description: 'kind app: the filename of your hosted app or the name of your ecosystem app.' }
-                owner: { type: string, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
+                owner: { type: [string, 'null'], description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent, null or empty: the owner's own." }
                 action: { type: string, enum: [leave, ai-send, audience] }
                 reason: { type: string, maxLength: 1000 }
                 until: { type: string, format: date-time, description: When the exception ends. Absent, until it is withdrawn. }
@@ -20135,7 +20135,7 @@ paths:
                 ws: { type: string }
                 space: { type: string }
                 row_id: { type: string }
-                owner: { type: string, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
+                owner: { type: [string, 'null'], description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent, null or empty: the owner's own." }
                 board_id: { type: string, description: 'kind board: the board id.' }
                 app: { type: string, description: "kind app: the filename of the caller's hosted app or the name of their ecosystem app." }
                 label: { type: string }
@@ -20173,7 +20173,7 @@ paths:
                 ws: { type: string }
                 space: { type: string }
                 row_id: { type: string }
-                owner: { type: string, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
+                owner: { type: [string, 'null'], description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent, null or empty: the owner's own." }
                 board_id: { type: string, description: 'kind board: the board id.' }
                 app: { type: string, description: "kind app: the filename of the caller's hosted app or the name of their ecosystem app." }
                 decision: { type: string, enum: [accept, reject] }
