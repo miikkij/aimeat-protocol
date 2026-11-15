@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.36.4 -- 2026-11-15 -- consent.app_party_max: the most people one app holds (10 000), in place of the fixed 1000.
  *   v1.36.3 -- 2026-11-14 -- aimeat_admin_usage reads a node usage report with report (tool, day, model and the rest).
  *   v1.36.2 -- 2026-11-14 -- aimeat_consent_list lists the agent's own consents, and the account's with
  *     consent:read-as-owner.
@@ -229,8 +230,11 @@ without an account here. \`aimeat_admin_app_party_registrations\` lists the apps
 requested, open or refused) and, with \`action: "decide"\`, approves or refuses one (\`owner\`, \`app\`,
 \`decision\`, \`reason\`). Decide only as the operator says; the Config page's group Data out shows the
 same list. One network address may sign up to the apps \`consent.app_party_signups_per_hour\` times an
-hour (30; 0 is no limit), and a signup nobody confirms keeps its place in the app's 1000 people for
-\`consent.app_party_pending_hours\` after its last link (24; 0 keeps it until the owner removes it).
+hour (30; 0 is no limit). One app holds at most \`consent.app_party_max\` people (10 000; 1 to
+1 000 000; a lower value removes nobody, it stops new signups until the app holds fewer), and a signup
+nobody confirms keeps its place among them for \`consent.app_party_pending_hours\` after its last link
+(24; 0 keeps it until the owner removes it). The owner sees the count against the limit on the app's
+page in the App Catalog and in the list of the app's registered people their own AI reads.
 
 **Replacing the data key (operator).** Every stored secret is sealed with the node's data key. The
 keys are set in the environment only, never through a tool: AIMEAT_ENCRYPTION_KEY_1 adds a second key

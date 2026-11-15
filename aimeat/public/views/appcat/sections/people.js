@@ -13,10 +13,15 @@
  *   Owner only, as the routes are: GET .../parties, PUT .../parties/registration, POST .../members
  *   with `party`, POST .../parties/{name}/stop and /resume, DELETE .../parties/{name}. The list reads
  *   again on the live event `app-parties` (the node sends it to the owner's streams), never on a timer.
+ *   THE CAP. The list answers `limit` (max, used, left): the line under the setting says how many
+ *   places are taken of the server's limit per app, and from 80 % on it says what to do before the app
+ *   is full. The list comes a page of 200 at a time, with "Show more".
  *   Made of the component kit: the section passes data and never a class.
- * @structure meta · PeopleSection({ d })
+ * @structure meta · PAGE · PeopleSection({ d })
  * @usage const mod = await import('./sections/people.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.1.0 — 2026-11-15 — The places taken against the server's limit per app, a warning near it, and
+ *     the list a page at a time (the people are rows of their own now).
  *   v1.0.0 — 2026-11-01 — Initial (WP9d).
  */
 import { h } from 'preact';
@@ -31,12 +36,19 @@ import { Space } from '/components/Layout.js';
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { x } from '/views/appcat/i18n.js';
+import { num as fmtNum } from '/js/format.js';
 import { dateText } from '/views/appcat/sections/app-write.js';
 import { buildCtx } from '/views/appcat/sections/build-ctx.js';
 
 const html = htm.bind(h);
 
 export const meta = { id: 'people', title: 'detail.people', show: (d) => !!(d && d.isOwnPublished) };
+
+/** People read per page of the list. */
+const PAGE = 200;
+
+/** A count in the person's own number format (10 000, 10,000). */
+const num = (n) => fmtNum(Number(n || 0));
 
 /**
  * The roles a registered person may get: the plan's roles and every role in use on the roster, less
@@ -60,17 +72,19 @@ function registrationLine(reg) {
 
 export default function PeopleSection({ d }) {
   const b = buildCtx(d);
-  const [read, setRead] = useState({ state: 'loading', parties: [], registration: null, plan: null, inUse: [] });
+  const [read, setRead] = useState({ state: 'loading', parties: [], registration: null, plan: null, inUse: [], total: 0, limit: null });
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState({ name: '', what: '' });
   const [role, setRole] = useState('');
   const [newRole, setNewRole] = useState('');
   const [tick, setTick] = useState(0);
+  // How many people the list shows: one page more per "Show more"; a live event reads as many again.
+  const [shown, setShown] = useState(PAGE);
 
   useEffect(() => {
     let active = true;
     Promise.all([
-      apiGet(`${b.path}/parties`),
+      apiGet(`${b.path}/parties?limit=${Math.min(shown, 1000)}`),
       apiGet(`${b.path}/members/plan`).catch((err) => { swallowed('appcat: people plan', err); return null; }),
       apiGet(`${b.path}/members`).catch((err) => { swallowed('appcat: people roster roles', err); return null; }),
     ])
@@ -78,11 +92,14 @@ export default function PeopleSection({ d }) {
         if (!active) return;
         const data = res?.data || {};
         const inUse = ((roster?.data?.members) || []).map((m) => m.role).filter(Boolean);
-        setRead({ state: 'ready', parties: data.parties || [], registration: data.registration || null, plan: plan?.data?.plan || null, inUse });
+        setRead({
+          state: 'ready', parties: data.parties || [], registration: data.registration || null, plan: plan?.data?.plan || null, inUse,
+          total: Number(data.total || 0), limit: data.limit || null,
+        });
       })
       .catch((err) => { swallowed('appcat: people', err); if (active) setRead((r) => ({ ...r, state: 'failed' })); });
     return () => { active = false; };
-  }, [b.path, tick]);
+  }, [b.path, tick, shown]);
 
   // The node tells the owner's page when somebody registers, is stopped or removed.
   useEffect(() => {
@@ -114,11 +131,17 @@ export default function PeopleSection({ d }) {
   const roleOptions = roles.map((r) => [r, r]);
   const pick = newRole || (reg && reg.role) || roles[0] || 'member';
   const nameOf = (p) => p.display_name || p.name;
+  const lim = read.limit;
+  const near = lim && lim.max > 0 && lim.used >= lim.max * 0.8;
 
   return html`
     <${Note} kind="lead">${x('people.lead')}<//>
     <${Space} above="section">
       <${Note} kind="quiet">${registrationLine(reg)}<//>
+      ${lim ? html`<${Note} kind="quiet">${x('people.capacity', { used: num(lim.used), max: num(lim.max) })}<//>` : null}
+      ${near ? html`<${Note} role=${lim.left > 0 ? 'status' : 'alert'}>${lim.left > 0
+        ? x('people.capacityNear', { left: num(lim.left) })
+        : x('people.capacityFull', { max: num(lim.max) })}<//>` : null}
       ${off ? null : html`
         <${Space} above="medium">
           <${Actions}>
@@ -172,6 +195,13 @@ export default function PeopleSection({ d }) {
           <//>`;
         })}
       <//>
+      ${read.total > read.parties.length ? html`
+        <${Space} above="medium">
+          <${Note} kind="quiet">${x('people.showing', { n: num(read.parties.length), total: num(read.total) })}<//>
+          <${Actions}>
+            <${Action} small disabled=${busy || shown >= 1000} onClick=${() => setShown((n) => Math.min(1000, n + PAGE))}>${x('people.more')}<//>
+          <//>
+        <//>` : null}
     <//>
     <${Note}>${x('people.personal')}<//>`;
 }

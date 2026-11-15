@@ -8,6 +8,8 @@
  * @structure PARTIES_PACKS
  * @usage Spread into SDK_PACKS by library-packs/sdk.ts.
  * @version-history
+ *   v1.1.1 - 2026-11-15 - aiDoc point 6: the people one app holds (consent.app_party_max, 10 000), the 429
+ *     a full app answers, and where the limit is read before building for a large audience.
  *   v1.1.0 - 2026-11-01 - aimeat-parties 1.1.0: AIMEAT.iam for every member, this library for the signup
  *     and the sign-in only; fetch() and the session event (WP9d).
  *   v1.0.0 - 2026-11-01 - Initial (plan doc-mvwxcas3dom3, D4.2).
@@ -57,6 +59,12 @@ export const PARTIES_PACKS: LibraryPack[] = [
       '4. The session is a token for THIS app only: no other app and no node route takes it.',
       '5. The people are personal data the owner holds. The data map says so: "registers-parties" in',
       '   machinery, or "registers": { "who": "...", "keeps": ["e-mail address", ...] }.',
+      '6. ONE APP HOLDS A LIMITED NUMBER OF PEOPLE: the node\'s consent.app_party_max, 10 000 unless its',
+      '   operator set another (1 to 1 000 000). A signup waiting for its link counts until its place runs',
+      '   out. A full app answers signUp() with 429 TOO_MANY_PARTIES: tell the person the app is full now.',
+      '   Before you build for a large audience, read the limit: GET /v1/apps/{owner}/{app}/parties with',
+      '   the owner\'s session answers limit { max, used, left } (aimeat_app_manage action parties). Say it',
+      '   to the owner when the audience can be bigger, so they ask the operator to raise it in time.',
       '',
       'ROLES AND WHAT A PERSON MAY DO: AIMEAT.iam, never this library. Use AIMEAT.iam for EVERY member,',
       'the account holders and the registered people alike, and this library for the signup and the sign-in',

@@ -174,6 +174,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI settings record, read to update it."
     },
+    "src/routes/admin.ts": {
+      "reads": {
+        "listAllMemoryPages": 2
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Commerce ledger records aggregated into dashboard counts. 2026-10-16 (QA audit S8-10): read to the end with listAllMemoryPages instead of a 2000-record window."
+    },
     "src/routes/admin/features.ts": {
       "reads": {
         "getMemory": 2
@@ -201,12 +207,6 @@
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Operator-only incident evidence: a quarantined payload downloaded by the operator."
-    },
-    "src/routes/admin.ts": {
-      "reads": {
-        "listAllMemoryPages": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Commerce ledger records aggregated into dashboard counts. 2026-10-16 (QA audit S8-10): read to the end with listAllMemoryPages instead of a 2000-record window."
     },
     "src/routes/agent-activity.ts": {
       "reads": {
@@ -675,6 +675,12 @@
       },
       "why": "Reviewed 2026-10-18 (Comicland v3 A-3), the node's own read: the service-owned verified-adult record (identity.adult.status) of one account, read to update it and to answer yes or no. It holds no content and no personal data beyond the method and the time."
     },
+    "src/services/agent-tasks/live-trace.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Moved unchanged from src/routes/agent-tasks/helpers.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them."
+    },
     "src/services/agent/ai-keys.ts": {
       "reads": {
         "getMemory": 8
@@ -724,12 +730,6 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads the deliverable only to check whether it is public before logging activity."
-    },
-    "src/services/agent-tasks/live-trace.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Moved unchanged from src/routes/agent-tasks/helpers.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them."
     },
     "src/services/agent/ties.ts": {
       "reads": {
@@ -889,18 +889,37 @@
       },
       "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the once-only start step lists the shared anonymous account's skill manifests and data-package files to name them in one Security page incident for the operator, and clearAnonymousRecord lists the same account's files to delete the ones under datapkg/<name>/ when the operator chooses Delete on the incident. No value or file content is read or shown."
     },
-    "src/services/app-tools/manifest-read.ts": {
-      "reads": {
-        "listMemory": 1,
-        "getMemory": 1
-      },
-      "why": "Moved 2026-11-13 from src/mcp/commerce.ts and src/mcp/exchange-run.ts with appToolManifestIds (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: app-id key names for a hint, private ones only for the owner. Moved 2026-11-14 from src/mcp/exchange-run.ts with loadPublicToolManifest (structure programme 2026-11, unit 2b, B14), the node's own read: a public tool manifest read to route an invocation, which POST .../webmcp/tools/:tool and aimeat_app_tool_invoke both ask."
-    },
-    "src/services/organism-read/workspace-access-requests.ts": {
+    "src/services/app-parties/move-to-tables.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Moved 2026-11-13 from src/mcp/workspace-members.ts and two reads of src/routes/organisms/workspace-access.ts with listWorkspaceAccessRequests (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: workspace access-request state records."
+      "why": "Reviewed 2026-11-15, the node's own read: the once-per-node boot step reads the service-owned `app-parties.` and `app-party-data.` records to move them into the AppParty and AppPartyData tables, writes them back on their version or deletes them once their row reads back. Nothing is answered to anyone; what it cannot move is named on the Security page."
+    },
+    "src/services/app-parties/owner.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4.1, D4.3), the node's own read: the apps' service-owned `app-parties.` records for the operator's list of signup requests. No record content is answered. Since 2026-11-15 a removed party's collections are rows deleted with it, not memory keys read here."
+    },
+    "src/services/app-parties/store.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4), the node's own read: an app's service-owned `app-parties.` record (its signup setting; since 2026-11-15 the people who registered are AppParty rows), which only the app party service writes."
+    },
+    "src/services/app-tools/manifest-read.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Moved 2026-11-13 from src/mcp/commerce.ts and src/mcp/exchange-run.ts with appToolManifestIds (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: app-id key names for a hint, private ones only for the owner. Moved 2026-11-14 from src/mcp/exchange-run.ts with loadPublicToolManifest (structure programme 2026-11, unit 2b, B14), the node's own read: a public tool manifest read to route an invocation, which POST .../webmcp/tools/:tool and aimeat_app_tool_invoke both ask."
+    },
+    "src/services/app-ui/service.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemoryHistory": 2
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the app layout configuration record and its earlier versions."
     },
     "src/services/app/agent-deploy.ts": {
       "reads": {
@@ -972,26 +991,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App membership and seen-visit records in system namespaces."
     },
-    "src/services/app-parties/data.ts": {
-      "reads": {
-        "getMemory": 3,
-        "listMemoryMeta": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4.2), the node's own read: the service-owned `app-party-data.` records under the app owner, read back only to the party whose uid the node put in the key (or the app's shared collection), and counted for the per-party limit. The party wrote the content itself; no owner content is read. Since 2026-11-04 the count reads meta rows, no values, at most up to the limit (codebase analysis 2026-11-03, item C1)."
-    },
-    "src/services/app-parties/owner.ts": {
-      "reads": {
-        "listMemory": 1,
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4.1, D4.3), the node's own read: the keys of one removed party's service-owned data records, to delete them, and the apps' service-owned `app-parties.` records for the operator's list of signup requests. No record content is answered."
-    },
-    "src/services/app-parties/store.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4), the node's own read: an app's service-owned `app-parties.` record (its signup setting and the people who registered), which only the app party service writes."
-    },
     "src/services/app/record-keys.ts": {
       "reads": {
         "getMemory": 5,
@@ -1043,13 +1042,6 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A one-time migration of manifest keys."
-    },
-    "src/services/app-ui/service.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listMemoryHistory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the app layout configuration record and its earlier versions."
     },
     "src/services/app/workspaces.ts": {
       "reads": {
@@ -1286,13 +1278,6 @@
         "listAllMemoryMeta": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's system compliance records."
-    },
-    "src/services/help/report.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listAllMemoryMeta": 1
-      },
-      "why": "Reviewed 2026-11-14 (Ask someone who knows), the node's own read: the reports and the unmatched-topic counts under system@<node> (help.report.*, help.unmatched.*), which the node itself wrote; no person's content is read here."
     },
     "src/services/component-content.ts": {
       "reads": {
@@ -2120,6 +2105,13 @@
       },
       "why": "Reviewed 2026-10-25 (agent goals), the node's own read: the minute sweep lists the goal records (agent-goals.*, reserved, written only by services/goals) to return stuck work, end expired goals and start clock rounds. Shown to nobody here."
     },
+    "src/services/help/report.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listAllMemoryMeta": 1
+      },
+      "why": "Reviewed 2026-11-14 (Ask someone who knows), the node's own read: the reports and the unmatched-topic counts under system@<node> (help.report.*, help.unmatched.*), which the node itself wrote; no person's content is read here."
+    },
     "src/services/home-feed.ts": {
       "reads": {
         "listMemoryForOwners": 1
@@ -2524,23 +2516,11 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The manifest for gate policy, decision-log pruning, the publish state machine, and registry and manifest indexes."
     },
-    "src/services/team/record.ts": {
+    "src/services/organism-read/workspace-access-requests.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Reviewed 2026-11-14 (team setup): the read is the team record at organism.{id}.meta.team, the node's own record of what the team setup made (names, workspace ids, skill ref, pending lead invitations). It is no content a person wrote; the team's content is read through status.ts with the caller's reader."
-    },
-    "src/services/team/status.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-11-14 (team setup): the team context record reaches the caller only through reader.show (contextOf), the caller's classification reader, as showOrganismReadme does."
-    },
-    "src/services/team/weekly-report.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-11-14 (team setup T8): the weekly report counts a team's decisions, open matters and waiting records; a decision's title reaches a lead only through that lead's classification reader (reader.show in runTeamWeeklyReports). Counts carry no content."
+      "why": "Moved 2026-11-13 from src/mcp/workspace-members.ts and two reads of src/routes/organisms/workspace-access.ts with listWorkspaceAccessRequests (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: workspace access-request state records."
     },
     "src/services/organism-readme.ts": {
       "reads": {
@@ -3114,6 +3094,24 @@
       },
       "why": "Reviewed 2026-11-02, checked: a scheduled task's deliverable, read under its agent for the owner who commissioned it; it goes to that owner's own bell, and to their e-mail only after passing leave (external, e-mail), as ecosystem-automation-notify.ts does. A record that stays behind is logged by key and goes to the bell only."
     },
+    "src/services/team/record.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-14 (team setup): the read is the team record at organism.{id}.meta.team, the node's own record of what the team setup made (names, workspace ids, skill ref, pending lead invitations). It is no content a person wrote; the team's content is read through status.ts with the caller's reader."
+    },
+    "src/services/team/status.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-14 (team setup): the team context record reaches the caller only through reader.show (contextOf), the caller's classification reader, as showOrganismReadme does."
+    },
+    "src/services/team/weekly-report.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-14 (team setup T8): the weekly report counts a team's decisions, open matters and waiting records; a decision's title reaches a lead only through that lead's classification reader (reader.show in runTeamWeeklyReports). Counts carry no content."
+    },
     "src/services/themes/fonts.ts": {
       "reads": {
         "listAllMemoryMeta": 1,
@@ -3278,6 +3276,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The system open-refusals index and refused-run state."
     },
+    "src/services/workspace-rows/row-service.ts": {
+      "reads": {
+        "listWorkspaceRows": 1,
+        "getWorkspaceRow": 1
+      },
+      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one."
+    },
     "src/services/workspace/access-decision.ts": {
       "reads": {
         "listAllMemory": 1
@@ -3348,13 +3353,6 @@
         "listMemoryKeysByPrefix": 1
       },
       "why": "The batch delete's key-only scan and its value-scan fallback, moved unchanged from services/workspace/tool-ops.ts on 2026-10-16 (max-file-lines): they find the addresses a delete removes, and no value reaches the caller."
-    },
-    "src/services/workspace-rows/row-service.ts": {
-      "reads": {
-        "listWorkspaceRows": 1,
-        "getWorkspaceRow": 1
-      },
-      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one."
     },
     "src/services/workspace/share-gate.ts": {
       "reads": {

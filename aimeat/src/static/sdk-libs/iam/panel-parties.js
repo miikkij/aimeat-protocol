@@ -11,6 +11,7 @@
  * @structure partiesSection(iam, h) → Promise<HTMLElement|null> · isAppPartyRow(id)
  * @usage const sec = await partiesSection(iam, { S, cls, act, roles }); if (sec) wrap.appendChild(sec);
  * @version-history
+ *   v1.0.1 — 2026-11-15 — The heading counts every registered person (`total`), not the first page.
  *   v1.0.0 — 2026-11-01 — Initial (WP9d).
  */
 import { el, fmtDate } from './dom.js';
@@ -43,7 +44,8 @@ export async function partiesSection(iam, h) {
   const reg = st.registration || {};
   // The roles a registered person may hold: the app's own, never "owner".
   const roles = h.roles.filter((r) => r && r !== 'owner');
-  const body = [el('h3', { cls: cls('aim-iam-h'), text: S('partiesTitle', { n: st.parties.length }) }),
+  // `total` is how many the app holds; the list is its first page (200 people) since 2026-11-15.
+  const body = [el('h3', { cls: cls('aim-iam-h'), text: S('partiesTitle', { n: typeof st.total === 'number' ? st.total : st.parties.length }) }),
     el('p', { cls: cls('aim-iam-lead'), text: S('partiesLead') })];
 
   // ── the signup: the node's setting first, then the app's own ──

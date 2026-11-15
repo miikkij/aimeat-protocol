@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   2026-11-15 — AppPartyRepository: an app's own users and what they keep in it, in their own tables
+ *     (types/app-parties.ts).
  *   2026-11-14 — HelpRepository: Ask someone who knows, its participants, questions and routes
  *     (types/help.ts).
  *   2026-11-14 — SecretShareRepository: secret shares and requests, their events, named people and
@@ -78,6 +80,7 @@ export * from './types/agents-messaging.js';
 export * from './types/agent-v2-messaging.js';
 export * from './types/agent-v2-tasks.js';
 export * from './types/ai-provenance.js';
+export * from './types/app-parties.js';
 export * from './types/ai-decisions.js';
 export * from './types/content-labels.js';
 export * from './types/classification-audit.js';
@@ -169,6 +172,7 @@ import type { EphemeralClaimRepository } from './repositories/ephemeral-claim.re
 import type { SealedColumnRepository } from './repositories/sealed-column.repository.js';
 import type { SecretShareRepository } from './repositories/secret-share.repository.js';
 import type { HelpRepository } from './repositories/help.repository.js';
+import type { AppPartyRepository } from './repositories/app-party.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository, MemoryShapeRepository,
@@ -218,6 +222,7 @@ export interface Storage extends
   SealedColumnRepository,
   SecretShareRepository,
   HelpRepository,
+  AppPartyRepository,
   StatsRepository {
   /**
    * Run `fn` inside ONE database transaction: every storage call made underneath it commits together

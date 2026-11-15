@@ -15,6 +15,7 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   2026-11-15 — appPartyMethods bound (AppParty, AppPartyData; migration 0132).
  *   2026-11-14 — helpMethods bound (HelpParticipant, HelpQuestion, HelpRoute; migration 0131).
  *   2026-11-14 — secretShareMethods bound (SecretShare, SecretShareEvent, SecretShareMember,
  *     VaultDeviceKey; migration 0130).
@@ -138,6 +139,7 @@ import { ephemeralClaimMethods } from './methods/ephemeral-claims.js';
 import { sealedColumnMethods } from './methods/sealed-columns.js';
 import { secretShareMethods } from './methods/secret-shares.js';
 import { helpMethods } from './methods/help.js';
+import { appPartyMethods } from './methods/app-parties.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
@@ -299,6 +301,7 @@ Object.assign(
   sealedColumnMethods,
   secretShareMethods,
   helpMethods,
+  appPartyMethods,
   identityMethods,
   walletMethods,
   sessionMethods,

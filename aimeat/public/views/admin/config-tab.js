@@ -33,6 +33,7 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-11-15 -- consent.app_party_max in Data out, after the signup hours: the most people one app holds.
  *   2026-11-14 -- The `help` section (Ask someone who knows) stands in Money and pacing, beside the morsel policy.
  *   2026-11-14 -- The `compliance` section (compliance.balancing_test) stands in Identity and access, beside classification.
  *   2026-11-07 -- The `csm` section (csm.default_visibility, who reads a new data description) stands
@@ -175,7 +176,7 @@ const DOMAINS = [
  * this map, so a page group needs its dashboard.cfgGroup_<group> name like a section does.
  */
 const PAGE_GROUPS = {
-  data_out: ['consent.data_intermediation', 'consent.party_self_registration', 'consent.app_party_signups_per_hour', 'consent.app_party_pending_hours', 'dataspace.*', 'consent.share_max_days'],
+  data_out: ['consent.data_intermediation', 'consent.party_self_registration', 'consent.app_party_signups_per_hour', 'consent.app_party_pending_hours', 'consent.app_party_max', 'dataspace.*', 'consent.share_max_days'],
 };
 
 /** The place of `path` in a page group's list, or -1 when no entry names it. */

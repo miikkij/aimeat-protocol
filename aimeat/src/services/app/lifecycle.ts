@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.13.0 — 2026-11-15 — deleteOwnedApp removes the app's own users with the whole app: their rows,
+ *     what they kept, their roster rows and the signup setting (they stayed behind until now).
  *   v1.12.0 — 2026-11-13 — resolveAppTargetScope also answers `delegated`, so aimeat_app_publish
  *     refuses the pacing amount and the licence to a delegated builder as POST /v1/apps does.
  *   v1.11.0 — 2026-11-11 — A staged draft reads its agents from the page's own aimeat-crews block
@@ -140,6 +142,7 @@ import { removeComplianceDocs } from '../compliance/docs.js';
 import { holdAppLabels } from '../held-app-labels.js';
 import { deleteAppPlan } from './plan.js';
 import { managedIntakeForms } from './intake-forms.js';
+import { removeAppPartiesOfApp } from '../app-parties/app-removal.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './owner-scope.js';
 
 /**
@@ -728,6 +731,11 @@ export async function deleteOwnedApp(
     // Its plan goes too, or the structure page would list a deleted app as one being built.
     await deleteAppPlan(storage, `${ownerName}/${filename}`)
       .catch(err => logger.warn('deleteOwnedApp: app plan not removed', { filename, error: String(err) }));
+    // The people who registered to it go with it: their rows and addresses, what they kept, their roster
+    // rows and the app's signup setting (services/app-parties/app-removal.ts). Their e-mail addresses are the
+    // owner's personal data about them, and a later app of the same name must not inherit them.
+    await removeAppPartiesOfApp(storage, ownerGhii.slice(ownerGhii.indexOf('@') + 1), ownerName, ownerGhii, filename)
+      .catch(err => logger.warn('deleteOwnedApp: the people registered to the app were not removed', { filename, error: String(err) }));
   } else {
     // Single-version case: try the buckets in order, delete from the one that has it.
     let app = await storage.getApp(ownerGhii, filename, version);

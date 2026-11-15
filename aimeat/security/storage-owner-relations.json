@@ -106,6 +106,33 @@
       "verification": "behavior-tested",
       "decision": "existing-contract"
     },
+    "AppParty.ownerGhii": {
+      "role": "ownership",
+      "current": "eraseOwner calls deleteAppPartiesByOwner (step app_parties): every person registered to the owner's apps goes with what they kept; deleteOwnedApp removes one app's people when the whole app is deleted.",
+      "reason": "The rows are people who registered to this owner's apps, personal data the owner holds as controller; they cannot pass to a new registrant of the same name.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/services/app-parties/owner.ts",
+        "src/storage/providers/postgres-kysely/methods/app-parties.ts",
+        "src/storage/providers/sqlite/methods/app-parties.ts"
+      ],
+      "test": "test/unit/app-parties-storage.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
+    "AppPartyData.ownerGhii": {
+      "role": "ownership",
+      "current": "eraseOwner calls deleteAppPartiesByOwner (step app_parties); a removed person's collections go with their row, and a deleted app's with the app.",
+      "reason": "What a person kept in one of this owner's apps; it cannot pass to a new registrant of the same name.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/app-parties.ts",
+        "src/storage/providers/sqlite/methods/app-parties.ts"
+      ],
+      "test": "test/unit/app-parties-storage.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
     "HelpQuestion.ownerGhii": {
       "role": "ownership",
       "current": "eraseOwner calls deleteHelpDataByOwner (step help_questions): every question the person asked goes with its routes.",

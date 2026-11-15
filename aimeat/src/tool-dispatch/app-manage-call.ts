@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-11-15 -- parties forwards limit and offset to GET .../parties, a page of the registered people.
  *   2026-11-01 -- party_stop and party_resume reach POST .../parties/{name}/stop and /resume (WP9d).
  *   2026-11-01 -- member_set forwards `party`; parties, party_remove and party_registration_set reach
  *     /v1/apps/{owner}/{app}/parties (plan doc-mvwxcas3dom3, D4).
@@ -176,7 +177,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
             return client.post(`/v1/apps/${enc(ownerName)}/${file}/members`, body);
         }
         case 'parties':
-            return client.get(`/v1/apps/${enc(ownerName)}/${file}/parties`);
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/parties${query(input, ['limit', 'offset'])}`);
         case 'party_remove':
             return client.delete(`/v1/apps/${enc(ownerName)}/${file}/parties/${enc(String(input.party_name))}`);
         case 'party_stop':

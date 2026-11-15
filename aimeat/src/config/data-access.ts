@@ -17,6 +17,8 @@
  * @version-history
  *   v1.9.0 — 2026-11-14 — balancingTest (AIMEAT_COMPLIANCE_BALANCING_TEST: required | optional, the
  *     default | off): whether the node asks for the balancing test of an app on legitimate interests.
+ *   v1.9.0 — 2026-11-15 — appPartyMax (AIMEAT_APP_PARTY_MAX, 10 000): the most people one app holds,
+ *     now that the parties are rows and not one memory value.
  *   v1.8.0 — 2026-11-02 — secaudit2026nov02d round 13: appPartySignupsPerHour
  *     (AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR, 30) and appPartyPendingHours (AIMEAT_APP_PARTY_PENDING_HOURS,
  *     24); 0 is no limit for each.
@@ -103,6 +105,8 @@ export function dataAccessDefaults() {
     appPartySignupsPerHour: wholeNumber(process.env.AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR, 30, 100_000),
     // Hours an unconfirmed app signup keeps its place after its last link (services/app-parties/); 0 = always.
     appPartyPendingHours: wholeNumber(process.env.AIMEAT_APP_PARTY_PENDING_HOURS, 24, 8760),
+    // The most people one app holds (services/app-parties/); at least 1.
+    appPartyMax: Math.max(1, wholeNumber(process.env.AIMEAT_APP_PARTY_MAX, 10_000, 1_000_000)),
     // The Eclipse Dataspace Protocol provider (services/dataspace/): off, and every list empty, by default.
     ...dataspaceDefaults(),
   };

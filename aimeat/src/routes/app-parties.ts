@@ -102,7 +102,7 @@ export function appPartiesRouter(config: AimeatConfig, storage: Storage): Router
     router.put('/v1/apps/:owner/:filename/parties/registration', requireAuth(), requireScopeOrOwnApp('app:manage'), validateBody(AppPartyRegistrationSchema, config.nodeId), async (req, res) =>
         sendAppOp(res, config.nodeId, await setRegistration(deps, req.auth!, refOf(req), (req.body ?? {}) as Record<string, unknown>)));
     router.get('/v1/apps/:owner/:filename/parties', requireAuth(), requireScopeOrOwnApp('app:write'), async (req, res) =>
-        sendAppOp(res, config.nodeId, await listAppParties(deps, req.auth!, refOf(req))));
+        sendAppOp(res, config.nodeId, await listAppParties(deps, req.auth!, refOf(req), { limit: req.query.limit, offset: req.query.offset })));
     router.delete('/v1/apps/:owner/:filename/parties/:name', requireAuth(), requireScopeOrOwnApp('app:manage'), async (req, res) =>
         sendAppOp(res, config.nodeId, await removeAppParty(deps, req.auth!, refOf(req), String(req.params.name ?? ''))));
     router.post('/v1/apps/:owner/:filename/parties/:name/stop', requireAuth(), requireScopeOrOwnApp('app:manage'), validateBody(EmptyBodySchema, config.nodeId), async (req, res) =>

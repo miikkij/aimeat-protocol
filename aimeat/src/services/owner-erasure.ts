@@ -76,6 +76,8 @@
  *     it does not act on the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-04 — The service_records step erases the person's service namespace (services/service-records.ts),
  *     and the log names it only when it held records (codebase analysis 2026-11-03, item B6).
+ *   2026-11-15 — The app_parties step: the people registered to the person's apps without an account,
+ *     and what they kept in them (storage AppParty, AppPartyData).
  *   2026-11-14 — The help_questions step: the person's questions, the routes that sent questions to
  *     them and their participant row (Ask someone who knows).
  *   2026-11-14 — The secret_shares and vault_device_keys steps: the person's secret shares and requests,
@@ -464,6 +466,14 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const { apps } = await storage.listApps({ ownerGaii: ghii });
       for (const a of apps) await storage.deleteApp(ghii, a.filename);
       return apps.length ? `apps:${apps.length}` : null;
+    }, deletionLog, storage);
+
+    // The people who registered to this person's apps without an account, and what they kept in
+    // them: rows keyed by the app owner's GHII (storage AppParty, AppPartyData). Their signup
+    // settings were memory records under the GHII and went with ghii_memory.
+    await step('app_parties', async () => {
+      const n = await storage.deleteAppPartiesByOwner(ghii);
+      return n ? `app_parties:${n}` : null;
     }, deletionLog, storage);
 
     // The compliance documents of this person's apps (registers, requests, breaches, impact

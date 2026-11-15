@@ -14,6 +14,7 @@
  * @structure APP_SCAN · registerDrafts() · appPartiesRegister()
  * @usage const drafts = await registerDrafts({ storage, config }, await listDocs(storage, nodeId, 'registers'));
  * @version-history
+ *   v1.1.2 — 2026-11-15 — appPartiesRegister counts the app's people in their table (storage AppParty).
  *   v1.1.1 — 2026-11-05 — Moved unchanged from src/services/compliance-register-drafts.ts to src/services/compliance/register-drafts.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.1.0 — 2026-11-01 — An app with people registered to it as outside parties, or with its signup
  *     open, drafts a register of them (appPartiesRegister; plan doc-mvwxcas3dom3, D4.4).
@@ -68,7 +69,7 @@ export async function registerDrafts(
  */
 export async function appPartiesRegister(deps: { storage: Storage; config: AimeatConfig }, owner: string, filename: string): Promise<ComplianceRegister | null> {
     const rec = await readAppParties(deps.storage, `${owner}@${deps.config.nodeId}`, `${owner}/${filename}`);
-    if (!rec.parties.length && !signupOpen(deps.config, rec.registration)) return null;
+    if (!(await deps.storage.countAppParties(`${owner}/${filename}`)) && !signupOpen(deps.config, rec.registration)) return null;
     const stem = filename.replace(/\.html?$/i, '').replace(/[^A-Za-z0-9_-]+/g, '-');
     return {
         id: `app-${stem}-parties`, title: `People who registered to ${filename}`.slice(0, 300), type: 'personal', purpose: 'member', role: 'controller',

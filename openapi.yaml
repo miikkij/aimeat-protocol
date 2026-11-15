@@ -41614,14 +41614,16 @@ paths:
     get:
       operationId: appPartiesList
       summary: The people without an account who registered to the app
-      description: The app's owner (app:write). Each person's e-mail address, state, role and dates, and the signup setting. MCP aimeat_app_manage action parties.
+      description: The app's owner (app:write). A page of the people, oldest first, each with their e-mail address, state, role and dates; the signup setting; `total`, how many the app holds; and `limit` { max, used, left }, the server's cap per app (consent.app_party_max), how many places are taken (a signup waiting for its link counts until its place runs out) and how many more people the app takes before a signup is refused with 429 TOO_MANY_PARTIES. MCP aimeat_app_manage action parties.
       tags: [Apps]
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }, description: People on one page. }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 }, description: People to skip, for the next page. }
       responses:
-        '200': { description: '`{ registration, parties, total, personal_data }`' }
+        '200': { description: '`{ registration, parties, total, limit: { max, used, left }, offset, page_size, personal_data }`' }
         '403': { description: 'FORBIDDEN or SCOPE_DENIED' }
   /v1/apps/{owner}/{filename}/parties/{name}:
     delete:

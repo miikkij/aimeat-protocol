@@ -15,12 +15,17 @@
  *   read, app:manage to change), checked by rosterContext as the member roster checks it, and the
  *   app's own token for its own app. A member who manages the roster does not manage its parties.
  *
- *   REMOVING A PARTY ends everything it held at once: it leaves the record (its token answers 401 on the
- *   next request), the roster, and every collection of party data it kept in the app.
+ *   REMOVING A PARTY ends everything it held at once: its row goes (its token answers 401 on the next
+ *   request) with every collection of party data it kept in the app, and its roster row.
+ *
+ *   THE CAP. The list answers `limit` (max, used, left: ./store.ts partyLimit), so the owner and an AI
+ *   building the app see how many more people the app takes before a signup is refused.
  * @structure registrationView · getRegistration · setRegistration · listAppParties · removeAppParty ·
  *   setAppPartyStatus · setPartyMember · listRegistrationRequests · decideRegistration
  * @usage const out = await setRegistration(deps, caller, { owner, filename }, { open: true });
  * @version-history
+ *   v1.3.0 — 2026-11-15 — The parties are rows: the list is paged (limit, offset, total) and answers the
+ *     cap; the roster reads follow the page size. A deleted app's parties go with it (./app-removal.ts).
  *   v1.2.0 — 2026-11-01 — setAppPartyStatus: the owner stops a registered person and lets it in again
  *     (POST .../parties/{name}/stop and /resume, aimeat_app_manage party_stop and party_resume; WP9d).
  *   v1.1.0 — 2026-11-01 — Each request in the operator's list names its app's `filename`, which the
@@ -35,10 +40,10 @@ import { done, refuse, type AppOpOutcome } from '../app/op-outcome.js';
 import { getMember, putMember, removeMember } from '../app/members.js';
 import { isManagerRole, roleShapeError } from '../app/member-rules.js';
 import { parsePartyRef, partyRefOf } from '../parties/contract.js';
-import { findParty } from '../parties/store.js';
-import { APP_PARTIES_PREFIX, PARTY_DATA_PREFIX, appPartyView, parseAppPartiesValue, type AppPartyRegistration } from './contract.js';
-import { appKeySegment } from '../app/record-keys.js';
-import { appIdOf, changeAppParties, readAppParties, registrationMode, signupOpen } from './store.js';
+import { findParty as findOwnerParty } from '../parties/store.js';
+import { emitChange } from '../event-bus.js';
+import { APP_PARTIES_PREFIX, appPartyView, fromPartyRow, parseAppPartiesValue, type AppPartyRegistration } from './contract.js';
+import { appIdOf, changeAppParties, changeAppParty, findParty, partyLimit, readAppParties, registrationMode, signupOpen } from './store.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 type AppRef = { owner: string; filename: string };
@@ -99,44 +104,50 @@ export async function setRegistration(deps: Deps, caller: RosterCaller, ref: App
     });
 }
 
-/** The people who registered to the app, with the setting. */
-export async function listAppParties(deps: Deps, caller: RosterCaller, ref: AppRef): Promise<AppOpOutcome> {
+/** A page of the list: 200 people by default, at most 1000. */
+function pageOf(opts: { limit?: unknown; offset?: unknown }): { limit: number; offset: number } {
+    const limit = Number(opts.limit ?? 200);
+    const offset = Number(opts.offset ?? 0);
+    return {
+        limit: Number.isFinite(limit) ? Math.min(1000, Math.max(1, Math.floor(limit))) : 200,
+        offset: Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0,
+    };
+}
+
+/** The people who registered to the app, a page at a time, with the setting and the app's cap. */
+export async function listAppParties(
+    deps: Deps, caller: RosterCaller, ref: AppRef, opts: { limit?: unknown; offset?: unknown } = {},
+): Promise<AppOpOutcome> {
     const c = await ownerCtx(deps, caller, ref);
     if (!c.ok) return c;
     const rec = await readAppParties(deps.storage, await rosterBucketOf(deps.storage, deps.config, c.owner), c.appId);
-    const parties = [];
-    for (const p of rec.parties) {
+    const page = pageOf(opts);
+    const rows = await deps.storage.listAppParties(c.appId, page);
+    // One roster read per person on the page, so the cost follows the page size, never the app's size.
+    const parties = await Promise.all(rows.map(fromPartyRow).map(async p => {
         const ref2 = partyRefOf(c.owner, p.name, deps.config.nodeId);
-        parties.push({ ...appPartyView(p, ref2), role: (await getMember(deps.storage, c.appId, ref2))?.role ?? null });
-    }
+        return { ...appPartyView(p, ref2), role: (await getMember(deps.storage, c.appId, ref2))?.role ?? null };
+    }));
+    const total = await deps.storage.countAppParties(c.appId);
     return done({
-        registration: registrationView(deps.config, rec.registration), parties, total: parties.length,
+        registration: registrationView(deps.config, rec.registration), parties, total,
+        limit: await partyLimit(deps.storage, deps.config, c.appId), offset: page.offset, page_size: page.limit,
         personal_data: 'The e-mail address of each person is personal data you hold as the app\'s owner. Remove a person who no longer uses the app.',
     });
 }
 
-/** Remove one registered person: the record, the roster row and every collection it kept. */
+/** Remove one registered person: the row, every collection it kept and the roster row. */
 export async function removeAppParty(deps: Deps, caller: RosterCaller, ref: AppRef, name: string): Promise<AppOpOutcome> {
     const c = await ownerCtx(deps, caller, ref);
     if (!c.ok) return c;
     const ownerGhii = await rosterBucketOf(deps.storage, deps.config, c.owner);
-    let removed: { uid: string; name: string } | null = null;
-    await changeAppParties(deps.storage, ownerGhii, c.appId, cur => {
-        const p = cur.parties.find(x => x.name === name);
-        if (!p) return UNCHANGED;
-        removed = { uid: p.uid, name: p.name };
-        return { ...cur, parties: cur.parties.filter(x => x.uid !== p.uid) };
-    });
-    const gone = removed as { uid: string; name: string } | null;
-    if (!gone) return refuse(404, 'NOT_FOUND', `No registered person "${name}" in this app.`);
+    const gone = await findParty(deps.storage, c.appId, { name });
+    const out = gone ? await deps.storage.deleteAppParty(c.appId, gone.uid) : null;
+    if (!gone || !out?.removed) return refuse(404, 'NOT_FOUND', `No registered person "${name}" in this app.`);
+    emitChange('app-parties', ownerGhii);
     await removeMember(deps.storage, c.appId, partyRefOf(c.owner, gone.name, deps.config.nodeId));
-    const prefix = `${PARTY_DATA_PREFIX}${appKeySegment(c.appId)}.${gone.uid}.`;
-    let dataDeleted = 0;
-    for (const r of await deps.storage.listMemory(ownerGhii, { prefix })) {
-        if (await deps.storage.deleteMemory(ownerGhii, r.key, ownerGhii)) dataDeleted++;
-    }
     await rosterAudit(deps.storage, deps.config, c, 'member.removed', { account: partyRefOf(c.owner, gone.name, deps.config.nodeId), from: 'party', to: null });
-    return done({ removed: true, name: gone.name, uid: gone.uid, data_deleted: dataDeleted });
+    return done({ removed: true, name: gone.name, uid: gone.uid, data_deleted: out.data });
 }
 
 /**
@@ -149,23 +160,17 @@ export async function setAppPartyStatus(deps: Deps, caller: RosterCaller, ref: A
     const c = await ownerCtx(deps, caller, ref);
     if (!c.ok) return c;
     const ownerGhii = await rosterBucketOf(deps.storage, deps.config, c.owner);
-    let found: { uid: string; name: string; status: string } | null = null;
     const now = new Date().toISOString();
-    await changeAppParties(deps.storage, ownerGhii, c.appId, cur => {
-        const i = cur.parties.findIndex(x => x.name === name);
-        if (i < 0) return UNCHANGED;
-        const p = cur.parties[i]!;
+    const target = await findParty(deps.storage, c.appId, { name });
+    const after = target && await changeAppParty(deps.storage, ownerGhii, c.appId, target.uid, p => {
         const status = to === 'stopped' ? 'stopped' : (p.verifiedAt ? 'active' : 'pending');
-        found = { uid: p.uid, name: p.name, status };
         if (p.status === status) return UNCHANGED;
-        const parties = [...cur.parties];
-        parties[i] = to === 'stopped'
+        return to === 'stopped'
             ? { ...p, status, stoppedBy: 'owner', stoppedAt: now, link: null }
             : { ...p, status, stoppedBy: undefined, stoppedAt: undefined };
-        return { ...cur, parties };
     });
-    const hit = found as { uid: string; name: string; status: string } | null;
-    if (!hit) return refuse(404, 'NOT_FOUND', `No registered person "${name}" in this app.`);
+    if (!after) return refuse(404, 'NOT_FOUND', `No registered person "${name}" in this app.`);
+    const hit = { uid: after.uid, name: after.name, status: after.status };
     await rosterAudit(deps.storage, deps.config, c, to === 'stopped' ? 'party.stopped' : 'party.resumed', { account: partyRefOf(c.owner, hit.name, deps.config.nodeId), state: hit.status });
     return done({ name: hit.name, uid: hit.uid, status: hit.status });
 }
@@ -186,8 +191,8 @@ export async function setPartyMember(
     const shape = roleShapeError(role);
     if (shape) return refuse(400, 'INVALID_INPUT', shape);
     const ownerGhii = await rosterBucketOf(deps.storage, deps.config, c.owner);
-    const inApp = (await readAppParties(deps.storage, ownerGhii, c.appId)).parties.some(p => p.name === ref.name);
-    if (!inApp && !(await findParty(deps.storage, ownerGhii, ref.name))) return refuse(404, 'PARTY_NOT_FOUND', `The owner has no party called "${ref.name}".`);
+    const inApp = !!(await findParty(deps.storage, c.appId, { name: ref.name }));
+    if (!inApp && !(await findOwnerParty(deps.storage, ownerGhii, ref.name))) return refuse(404, 'PARTY_NOT_FOUND', `The owner has no party called "${ref.name}".`);
     const before = await getMember(deps.storage, c.appId, party);
     const member = await putMember(deps.storage, { appId: c.appId, account: party, role, approvedBy: c.callerAccount, offerings: [], ...(note ? { note } : {}) });
     return done({ member, created: !before, party: true, note: 'An outside party has no account here, so the role carries no free access to what the owner sells.' }, before ? 200 : 201);
@@ -203,7 +208,10 @@ export async function listRegistrationRequests(deps: Deps): Promise<AppOpOutcome
         if (v.registration.state === 'closed') continue;
         // `filename`: the app the decision names (POST .../app-party-registrations/{owner}/{filename}).
         const filename = v.appId && v.appId.includes('/') ? v.appId.slice(v.appId.indexOf('/') + 1) : null;
-        out.push({ owner: r.ownerGaii.slice(0, -(deps.config.nodeId.length + 1)), key: r.key, filename, ...registrationView(deps.config, v.registration), parties: v.parties.length });
+        out.push({
+            owner: r.ownerGaii.slice(0, -(deps.config.nodeId.length + 1)), key: r.key, filename, ...registrationView(deps.config, v.registration),
+            parties: v.appId ? await deps.storage.countAppParties(v.appId) : 0,
+        });
     }
     return done({ setting: deps.config.partySelfRegistration ?? 'off', effective: registrationMode(deps.config), apps: out, total: out.length });
 }

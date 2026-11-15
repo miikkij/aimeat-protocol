@@ -19,6 +19,7 @@
  *   (src/server.ts keeps the raw body for /ucp/). The global auth middleware is not mounted: it is not
  *   what changed, and the E2E suites of each surface run the whole chain.
  * @version-history
+ *   v1.0.1 — 2026-11-15 — The app parties are seeded as AppParty rows, where the service reads them now.
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item B8).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -43,7 +44,7 @@ import { insertParty } from '../../src/services/parties/store.js';
 import { hashPartyKey } from '../../src/services/parties/keys.js';
 import { changeAppParties } from '../../src/services/app-parties/store.js';
 import type { PartyRecord } from '../../src/services/parties/contract.js';
-import type { AppPartyRecord } from '../../src/services/app-parties/contract.js';
+import { toPartyRow, type AppPartyRecord } from '../../src/services/app-parties/contract.js';
 import { clearDidCache } from '../../src/services/dataspace/did-resolve.js';
 
 const RECORD = process.env.CREDENTIAL_TABLE_RECORD === '1';
@@ -305,8 +306,10 @@ beforeAll(async () => {
     }
     await changeAppParties(storage, OWNER_GHII, `${OWNER}/${APP}`, () => ({
         registration: { state: 'open', role: 'member', updatedAt: now() },
-        parties: [appParty('liisa', 'ap-liisa', 'active', 0), appParty('ville', 'ap-ville', 'stopped', 0)],
     }));
+    for (const p of [appParty('liisa', 'ap-liisa', 'active', 0), appParty('ville', 'ap-ville', 'stopped', 0)]) {
+        expect(await storage.importAppParty(toPartyRow(p, OWNER_GHII))).toBe('inserted');
+    }
 
     const app = express();
     app.set('trust proxy', false);

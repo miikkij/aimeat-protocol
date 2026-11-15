@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.21.0 — 2026-11-15 — Ends with applyAppPartySchema: app_parties and app_party_data (an app's own
+ *     users and what they keep). Mirrors Postgres 0132.
  *   v1.20.0 — 2026-11-14 — Ends with applyHelpSchema: help_participants, help_questions and
  *     help_routes (Ask someone who knows). Mirrors Postgres 0131.
  *   v1.19.0 — 2026-11-14 — Ends with applySecretShareSchema: secret_shares, secret_share_events,
@@ -49,6 +51,7 @@ import { applyMcpUserCredentialSchema } from './schema-mcp-user-credentials.js';
 import { applyEphemeralClaimSchema } from './schema-ephemeral-claim.js';
 import { applyCsmVersionSchema } from './schema-csm-versions.js';
 import { applySecretShareSchema } from './schema-secret-shares.js';
+import { applyAppPartySchema } from './schema-app-parties.js';
 import { applyHelpSchema } from './schema-help.js';
 
 export function applySchemaTables4(db: Database.Database): void {
@@ -802,4 +805,6 @@ export function applySchemaTables4(db: Database.Database): void {
   applySecretShareSchema(db);
   // Ask someone who knows: participants, questions and routes (Postgres 0131).
   applyHelpSchema(db);
+  // An app's own users and what they keep in it (Postgres 0132).
+  applyAppPartySchema(db);
 }

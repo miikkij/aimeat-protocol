@@ -451,7 +451,7 @@
     const reg = st.registration || {};
     const roles = h.roles.filter((r) => r && r !== "owner");
     const body = [
-      el("h3", { cls: cls("aim-iam-h"), text: S("partiesTitle", { n: st.parties.length }) }),
+      el("h3", { cls: cls("aim-iam-h"), text: S("partiesTitle", { n: typeof st.total === "number" ? st.total : st.parties.length }) }),
       el("p", { cls: cls("aim-iam-lead"), text: S("partiesLead") })
     ];
     if (reg.node_setting === "off" || reg.effective === "off") {

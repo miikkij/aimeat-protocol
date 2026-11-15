@@ -17,6 +17,9 @@
  *     whose signup is open and that sells.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-parties
  * @version-history
+ *   v1.2.0 — 2026-11-15 — The people are rows: the list answers the server's limit per app and pages;
+ *     a full app answers 429 naming the limit (consent.app_party_max) and takes the signup once the
+ *     operator raises it; deleting the app removes its people and what they kept (they stayed before).
  *   v1.1.1 — 2026-11-03 — The signup 429 names the limit and the Config setting (secaudit2026nov02d round 13b).
  *   v1.1.0 — 2026-11-01 — D4.3 over MCP: aimeat_admin_app_party_registrations lists and decides for the
  *     operator and refuses an owner's agent (WP9b; the tool did not exist, so the test fails on the old code).
@@ -293,6 +296,10 @@ async function run(): Promise<void> {
     await test('D4.1 the owner sees the parties and removes one: its sign-in and its data end at once; C sees none of it', async () => {
         const list = await call(P('/parties'), { token: A.token });
         assert(list.status === 200 && list.body.data.total === 2 && (list.body.data.parties as Body[]).some(p => p.email === emailX), `list: ${show(list)}`);
+        const lim = list.body.data.limit as Body;
+        assert(lim && lim.max === 10_000 && lim.used === 2 && lim.left === 9_998, `the list says the server's limit per app and what is left: ${show(list)}`);
+        const page = await call(P('/parties?limit=1&offset=1'), { token: A.token });
+        assert(page.status === 200 && (page.body.data.parties as Body[]).length === 1 && page.body.data.total === 2, `a page of one: ${show(page)}`);
         const byC = await call(P('/parties'), { token: C.token });
         assert(byC.status === 403, `C lists A's parties: ${show(byC)}`);
         await call(P('/party-data/notes'), { token: Y.token, method: 'PUT', body: { value: { n: 1 } } });
@@ -377,6 +384,21 @@ async function run(): Promise<void> {
         assert((await call(P('/parties/me'), { token: back.body.data.token })).body.data.role === 'member', 'Z has the role again');
     });
 
+    await test('A full app refuses a new signup with 429 naming the limit; the operator raises it and the signup goes through', async () => {
+        const before = await call(P('/parties'), { token: A.token });
+        const used = Number((before.body.data.limit as Body).used);
+        assert(used > 0, `the app holds people: ${show(before)}`);
+        assert((await setConfig('consent.app_party_max', used)).status === 200, 'the limit set to what the app holds');
+        const full = await call(P('/parties/signup'), { body: { email: `full-${stamp}@example.test` } });
+        assert(full.status === 429 && codeOf(full) === 'TOO_MANY_PARTIES' && full.text.includes(`(${used})`), `a full app: ${show(full)}`);
+        const seen = await call(P('/parties'), { token: A.token });
+        assert((seen.body.data.limit as Body).left === 0 && seen.body.data.total === used, `the owner sees it full, nobody added: ${show(seen)}`);
+        assert((await setConfig('consent.app_party_max', used + 1)).status === 200, 'the limit raised by one');
+        const fits = await call(P('/parties/signup'), { body: { email: `full-${stamp}@example.test` } });
+        assert(fits.status === 202, `the signup fits now: ${show(fits)}`);
+        assert((await setConfig('consent.app_party_max', 10_000)).status === 200, 'the default again');
+    });
+
     await test('The signup takes a limited number of signups an hour from one address; the refusal names the setting, and 0 is no limit', async () => {
         assert((await setConfig('consent.app_party_signups_per_hour', 2)).status === 200, 'the limit set to 2');
         let refused: Answer | null = null;
@@ -392,6 +414,26 @@ async function run(): Promise<void> {
         const free = await call(P('/parties/signup'), { body: { email: `rlfree-${stamp}@example.test` } });
         assert(free.status === 202, `with no limit: ${show(free)}`);
         assert((await setConfig('consent.app_party_signups_per_hour', 30)).status === 200, 'the default again');
+    });
+
+    await test('Deleting the app removes the people registered to it and what they kept; the same name published again starts empty', async () => {
+        assert((await call(P('/party-data/cart'), { token: X.token, method: 'PUT', body: { value: { items: ['pears'] } } })).status === 200, 'X keeps a collection');
+        const before = await call(P('/parties'), { token: A.token });
+        assert(before.status === 200 && Number(before.body.data.total) > 0, `people before: ${show(before)}`);
+        const anon = await call(`/v1/apps/${APP}`, { method: 'DELETE' });
+        assert(anon.status === 401, `a delete with no credential is refused: ${show(anon)}`);
+        // The path names the caller's own app: C deleting "market.html" deletes C's, never A's.
+        const del = await call(`/v1/apps/${APP}`, { token: A.token, method: 'DELETE' });
+        assert(del.status === 200, `delete the app: ${show(del)}`);
+        assert([200, 201].includes((await publish(A.token, APP)).status), 'the same name published again');
+        const after = await call(P('/parties'), { token: A.token });
+        assert(after.status === 200 && after.body.data.total === 0 && (after.body.data.limit as Body).used === 0, `nobody is left: ${show(after)}`);
+        assert(after.body.data.registration?.state === 'closed', `the signup setting went with the app: ${show(after)}`);
+        const me = await call(P('/parties/me'), { token: X.token });
+        assert(me.status === 401, `X's sign-in to the deleted app ended: ${show(me)}`);
+        // C's app of the same name kept its own setting and people untouched.
+        const cReg = await call(P('/parties/registration', APP, C.name));
+        assert(cReg.status === 200, `C's app answers: ${show(cReg)}`);
     });
 
     console.log(`\n${passed} passed, ${failed} failed\n`);

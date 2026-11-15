@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-15 — parties carries limit and offset (a page of the registered people).
  *   2026-11-06 — settings carries `about` and `about_lang` (TARGET-093).
  *   2026-11-01 — party_stop and party_resume (WP9d).
  *   2026-11-01 — parties, party_remove and party_registration_set, and member_set's party field (plan D4).
@@ -137,7 +138,7 @@ const EXPECT: Record<string, [string, string]> = {
     structure_set: ['PUT', '/v1/apps/alice/shop.html/structure'],
     plans: ['GET', '/v1/app-plans'],
     // The people registered to the app without an account, and its signup setting: the owner's own app only.
-    parties: ['GET', '/v1/apps/me-owner/shop.html/parties'],
+    parties: ['GET', '/v1/apps/me-owner/shop.html/parties?limit=7&offset=11'],
     party_remove: ['DELETE', '/v1/apps/me-owner/shop.html/parties/ap-zqxname'],
     party_registration_set: ['PUT', '/v1/apps/me-owner/shop.html/parties/registration'],
     party_stop: ['POST', '/v1/apps/me-owner/shop.html/parties/ap-zqxname/stop'],

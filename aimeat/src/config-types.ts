@@ -16,6 +16,7 @@
  *   v1.31.0 — 2026-11-04 — The SMTP fields moved to config-types-smtp.ts (SmtpConfig, mixed in) unchanged
  *     (max-file-lines), with smtpConnectTimeoutMs and smtpSocketTimeoutMs (codebase analysis 2026-11-03, HA stage 1).
  *   v1.30.0 — 2026-11-02 — emailReportsPerSenderDay (secaudit2026nov02d round 13).
+ *   2026-11-15 — appPartyMax: the most people one app holds (consent.app_party_max).
  *   v1.29.0 — 2026-11-02 — appPartySignupsPerHour and appPartyPendingHours (secaudit2026nov02d round 13).
  *   v1.28.0 — 2026-11-02 — partyPurchasesPerHour (AIMEAT_PARTY_PURCHASES_PER_HOUR; secaudit2026nov02d round 13).
  *   v1.27.0 — 2026-11-01 — DataspaceConfig mixed in (config-dataspace.ts; plan doc-mvwxcas3dom3, D8).
@@ -517,6 +518,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   appPartySignupsPerHour: number;
   /** Hours an unconfirmed app signup keeps its place after its last link; 0 = it keeps it. */
   appPartyPendingHours: number;
+  /** The most people one app holds (services/app-parties/); 10 000 by default. */
+  appPartyMax: number;
   /**
    * How many events stay in an account's "what has happened" window before the oldest move to the
    * archive. A COUNT rather than a number of days: recency is relative to how much happens to

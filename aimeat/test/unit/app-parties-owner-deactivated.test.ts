@@ -9,6 +9,7 @@
  *   - After reactivation the same token is admitted again: nothing was deleted.
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-parties-owner-deactivated.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-15 — The party is seeded as an AppParty row, where the service reads it now.
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14, older item O3).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -21,7 +22,7 @@ import { setThisNodeId } from '../../src/utils/gaii.js';
 import { initPartyTokenKeys, mintPartyToken } from '../../src/services/parties/token.js';
 import { appPartyFromRequest } from '../../src/services/app-parties/service.js';
 import { changeAppParties } from '../../src/services/app-parties/store.js';
-import type { AppPartyRecord } from '../../src/services/app-parties/contract.js';
+import { toPartyRow, type AppPartyRecord } from '../../src/services/app-parties/contract.js';
 
 const NODE_ID = 'aimeat-app-parties-deactivated';
 const OWNER = 'apdowner';
@@ -53,7 +54,8 @@ beforeAll(async () => {
         status: 'active', createdAt: at, createdBy: `app:${APP_ID}`, keys: [], failedAttempts: 0, lastSeenAt: null,
         app: APP_ID, emailHash: 'hash-liisa', verifiedAt: at, link: null, epoch: 0,
     } as AppPartyRecord;
-    await changeAppParties(storage, GHII, APP_ID, () => ({ registration: { state: 'open', role: 'member', updatedAt: at }, parties: [party] }));
+    await changeAppParties(storage, GHII, APP_ID, () => ({ registration: { state: 'open', role: 'member', updatedAt: at } }));
+    expect(await storage.importAppParty(toPartyRow(party, GHII))).toBe('inserted');
     token = await mintPartyToken({ owner: OWNER, uid: party.uid, kid: 'app', app: APP_ID, ep: 0 }, 600);
 }, 60_000);
 

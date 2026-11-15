@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-15 — parties takes limit and offset (a page of the people, 200 by default) and answers the
+ *     app's cap: how many people it holds against the server's limit, and how many more it takes.
  *   2026-11-11 — The four agent_* actions say what they do since the approval path: a proposal, the
  *     agent the caller already has, the states of agent_status (services/app-agent-deploy.ts).
  *   2026-11-06 — settings takes `about` and `about_lang`: the owner's longer text about the app, shown on
@@ -114,7 +116,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     content: { type: 'string', description: 'For legal: the page text, the HTML document, or the absolute https URL.' },
     remove: { type: 'boolean', description: 'For legal: true removes the named page.' },
     // audit
-    limit: { type: 'number', description: 'For audit and member_audit: how many of the newest entries. Default 50, at most 500. For members: how many people per list on one page. Default 100, at most 500.', zod: z.number().int().min(1).max(500) },
+    limit: { type: 'number', description: 'For audit and member_audit: how many of the newest entries. Default 50, at most 500. For members: how many people per list on one page. Default 100, at most 500. For parties: how many registered people on one page. Default 200, at most 500.', zod: z.number().int().min(1).max(500) },
     playtest: { type: 'boolean', description: 'For audit: also open the app in a headless browser, signed out, and report what it did (about a minute).' },
     // visitors
     days: { type: 'number', description: 'For visitors: the trailing window in days, 0 to 360. 0 is today only. Default 30. For member_set: how many days the membership lasts, counted from now; omit it to use the role\'s term from the plan.', zod: z.number().int().min(0).max(36500) },
@@ -168,7 +170,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     email: { type: 'string', description: 'For member_set, instead of account: an email address. When it belongs to a verified account on this server, that person is approved; any other address gets an invitation by email, valid 7 days, with a sign-up link: opening it makes the account with that address and a member at once. When no email could leave, the answer carries acceptUrl, the link to pass on yourself. Open invitations are listed by members and cancelled with member_invite_cancel, which also stops the link.' },
     locale: { type: 'string', enum: ['en', 'fi', 'es'], description: 'For member_set with email: the language of the invitation email. Omit it to use your own language.' },
     q: { type: 'string', description: 'For members: show only people whose account name, display name, email or note contains this text.', zod: z.string().max(100) },
-    offset: { type: 'number', description: 'For members: how many people to skip on each list, for the next page. Default 0.', zod: z.number().int().min(0) },
+    offset: { type: 'number', description: 'For members and parties: how many people to skip, for the next page. Default 0.', zod: z.number().int().min(0) },
     before: { type: 'string', description: 'For member_audit: the time of the oldest entry you already have, to read the page before it. For audit_archive: a date or ISO time; the entries older than it move into the archive.' },
     year: { type: 'string', description: 'For audit: read that year\'s archived entries (four digits, e.g. "2026") instead of the active log. The audit answer lists the archived years.', zod: z.string().regex(/^\d{4}$/).max(INPUT_LIMITS.id) },
     keep: { type: 'string', description: 'For audit_keep: "all" keeps every entry of every app\'s audit log (nothing deleted), a whole number such as "1000" keeps that many newest entries per app and deletes the rest, "default" returns to the node default. Omit it to read the setting. A number deletes, so it takes the account:security permission: without it the number is refused, and the account holder sets it on the app page, signed in.', zod: z.string().max(20) },
@@ -235,8 +237,8 @@ const MEMBER_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'your own standing in an app, yours or somebody else\'s: your role, whether you are the owner, and your request to join and its state' },
     member_request: { fields: F(['filename', 'owner'], ['note']), scope: 'social:write',
         summary: 'ask the owner of somebody else\'s app to let you in. The owner is notified with your note; asking again replaces the note. A member is told they already are one' },
-    parties: { fields: F(['filename'], []), scope: 'app:write',
-        summary: 'the people without an account who registered to the app (outside parties of yours), each with their e-mail address, state and role, and whether the signup is open. Owner only' },
+    parties: { fields: F(['filename'], ['limit', 'offset']), scope: 'app:write',
+        summary: 'the people without an account who registered to the app (outside parties of yours), a page at a time, each with their e-mail address, state and role; whether the signup is open; and `limit`: how many people the app holds against the server\'s limit per app, and how many more it takes before a signup is refused. Owner only' },
     party_remove: { fields: F(['filename', 'party_name'], []), scope: 'app:manage',
         summary: 'remove one registered person: their sign-in ends at once, they leave the roster, and everything they kept in the app is deleted. Owner only' },
     party_stop: { fields: F(['filename', 'party_name'], []), scope: 'app:manage',

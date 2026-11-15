@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-11-15 -- moveAppPartiesToTablesOnce, after moveCsmLockHoldersOnce: the people registered to apps
+ *     and their collections move from memory records to the AppParty and AppPartyData tables.
  *   2026-11-08 -- moveCsmLockHoldersOnce, after moveErasedLockHoldersOnce: a lock under csm. another account
  *     holds goes to the CSM's registering account or an erasure pseudonym, its content unchanged
  *     (secaudit2026nov08b round 15, D1).
@@ -114,6 +116,7 @@ import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-princ
 import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover-schedules.js';
 import { moveErasedLockHoldersOnce } from '../services/csm/erased-lock-holders.js';
 import { moveCsmLockHoldersOnce } from '../services/csm/csm-lock-holders.js';
+import { moveAppPartiesToTablesOnce } from '../services/app-parties/move-to-tables.js';
 import { settleUnknownCapabilityVisibilityOnce } from '../services/capability-visibility-words.js';
 import { markPlatformFeeWritersOnce } from '../commerce/platform-fee-writers.js';
 import { askUncertainAccountantGrantsOnce } from '../services/finance/accountant-grant-ask.js';
@@ -246,6 +249,11 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // (services/csm/csm-lock-holders.ts). After the step above, whose pseudonyms it leaves as they are.
   await moveCsmLockHoldersOnce(storage, config)
     .catch(err => logger.error('Failed to move the older schema locks under csm. to the CSMs\' registering accounts; the next boot tries again', { error: String(err) }));
+  // The people registered to apps and what they keep move from memory records to their own tables
+  // (services/app-parties/move-to-tables.ts). Awaited: the service reads only the tables, so a request
+  // before the move would find nobody registered.
+  await moveAppPartiesToTablesOnce(storage, config)
+    .catch(err => logger.error('Failed to move the people registered to apps to their tables; the next boot tries again', { error: String(err) }));
   // The capabilities stored with a visibility word the node does not know are set to private, which
   // changes no reach, and each owner is told (services/capability-visibility-words.ts).
   await settleUnknownCapabilityVisibilityOnce(storage, config)

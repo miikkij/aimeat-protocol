@@ -75,7 +75,7 @@ export async function appManageMemberAction(
     }
     // The app's users without an account (services/app-parties/owner.ts), as their routes do.
     case 'parties':
-      return opAnswer(await listAppParties({ storage, config }, caller, ownRef));
+      return opAnswer(await listAppParties({ storage, config }, caller, ownRef, pick(args, ['limit', 'offset'])));
     case 'party_remove':
       return opAnswer(await removeAppParty({ storage, config }, caller, ownRef, String(args.party_name ?? '')));
     case 'party_stop':

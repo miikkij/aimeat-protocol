@@ -494,6 +494,37 @@ export interface HelpParticipant {
   updatedAt: string;
 }
 
+/** One person registered to one app (migration 0132). `record` is the whole party record as JSON text. */
+export interface AppParty {
+  uid: string;
+  ownerGhii: string;
+  appId: string;
+  name: string;
+  emailHash: string;
+  status: string;
+  linkHash: string | null;
+  linkExpiresAt: string | null;
+  verifiedAt: string | null;
+  pendingSince: string;
+  epoch: Generated<number>;
+  record: string;
+  createdAt: string;
+  updatedAt: string;
+  version: Generated<number>;
+}
+
+/** One collection a person keeps in an app, or the app shares (migration 0132). `value` is JSON text. */
+export interface AppPartyData {
+  appId: string;
+  partyUid: string;
+  key: string;
+  ownerGhii: string;
+  value: string;
+  bytes: Generated<number>;
+  version: Generated<number>;
+  updatedAt: string;
+}
+
 /** One question in Ask someone who knows (migration 0131). JSON columns are TEXT; times are ISO strings. */
 export interface HelpQuestion {
   id: string;
@@ -2649,6 +2680,8 @@ export interface DB {
   GenesisPeer: GenesisPeer;
   Ghii: Ghii;
   GroupShare: GroupShare;
+  AppParty: AppParty;
+  AppPartyData: AppPartyData;
   HelpParticipant: HelpParticipant;
   HelpQuestion: HelpQuestion;
   HelpRoute: HelpRoute;
