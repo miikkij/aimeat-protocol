@@ -34,6 +34,8 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   2026-11-15 - The llms.txt index cuts a page's first sentence at 110 characters, not 140: the team
+ *     pages took it to 8195 bytes, over the 8192 api-full and e2e-agent-readiness hold it to.
  *   2026-11-15 - The getting-started page calls AGENTS.md the shorter guide, not the shorter road.
  *   2026-11-15 - /v1/how-an-app-builds says the front page's list of apps, not "the wall".
  *   2026-11-12 -`language` on PublicPage: the language of a page served in one known language.
@@ -534,7 +536,8 @@ function llmsLine(page: PublicPage, baseUrl: string): string {
 }
 
 /**
- * The first sentence, and never past 140 characters.
+ * The first sentence, and never past 110 characters (140 until 2026-11-15, when the team pages took
+ * the index to 8195 bytes, 3 over the ceiling, on both backends).
  *
  * The TITLE is what tells one entry from another here, and it has to be, because two of these
  * descriptions open with the same line ("You own your data and what you build.") — taking more
@@ -542,12 +545,14 @@ function llmsLine(page: PublicPage, baseUrl: string): string {
  * leaves the index about 470 bytes under the ceiling two suites hold it to, which is room for two
  * more pages before this has to be looked at again.
  */
+const SHORT_DESCRIPTION_MAX = 110;
+
 function shortDescription(text: string): string {
   const stop = text.indexOf('. ');
   const one = stop === -1 ? text : text.slice(0, stop + 1);
-  if (one.length <= 140) return one;
-  const cut = one.lastIndexOf(' ', 140);
-  return `${one.slice(0, cut === -1 ? 140 : cut)}…`;
+  if (one.length <= SHORT_DESCRIPTION_MAX) return one;
+  const cut = one.lastIndexOf(' ', SHORT_DESCRIPTION_MAX);
+  return `${one.slice(0, cut === -1 ? SHORT_DESCRIPTION_MAX : cut)}…`;
 }
 
 /**
