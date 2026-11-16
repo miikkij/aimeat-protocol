@@ -8,6 +8,9 @@
  *   Ports: G 28278, P1 28279, P2 28280. Each node has a database of its own on the run's backend
  *   (test/helpers/own-node-db.ts), one per port.
  * @version-history
+ *   v1.0.4 — 2026-11-16 — Test 7 takes the genuine book from P1's mirror, not from G: G's book
+ *     timer re-assembled the book between tests 6 and 7 on a slow nightly, and the control then
+ *     applied a newer version instead of meeting the version gate.
  *   v1.0.3 — 2026-11-15 — Audit M071 (a plain owner is refused /book/pull and /book/rebuild) and
  *     L053 (node_card_hash is recomputed from the returned card).
  *   v1.0.2 — 2026-10-23 — setupOwner uses setupOperator (a password and the password sign-in); POST
@@ -166,8 +169,13 @@ await test('6b. a plain owner on P1 is refused /book/pull and /book/rebuild (403
 // is the node directory: who exists in this federation and at which address. A document accepted
 // without verification rewrites that list on every node that mirrors it.
 await test('7. a book that is unsigned or tampered is refused, and the mirrored directory does not move', async () => {
-  const genuine = (await G.json('/v1/federation/book')).body.data.book;
-  assert(typeof genuine?.book_version === 'number', `G must serve a book: ${JSON.stringify(genuine)}`);
+  // The genuine book is the one P1 already mirrors: G's own copy can be newer, because G's book
+  // timer (service-init.ts, 15 s after boot) re-assembles it with fresh node cards, and on a slow
+  // run that lands after test 6 while P1's own timer has already pulled. P1's version only grows,
+  // so its own copy always meets the version gate. Seen red with a G rebuild forced right here.
+  const genuine = (await P1.json('/v1/federation/book')).body.data.book;
+  assert(typeof genuine?.book_version === 'number' && genuine.issued_by === G.nodeId && !!genuine.signature,
+    `P1 must mirror G's signed book: ${JSON.stringify(genuine)}`);
 
   let served: unknown = genuine;
   const stub = http.createServer((req, res) => {
