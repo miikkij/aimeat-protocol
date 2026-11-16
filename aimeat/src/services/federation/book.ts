@@ -36,6 +36,8 @@
  *   v1.2.0 — 2026-11-15 — readPeerOperators(): the operator GHIIs a peer's node card names, read
  *     from the peer record's url under NODE_CARD_MAX_BYTES, for POST /v1/federation/broadcast, which
  *     auto-accepts a new contact only for a sender the peer names as its operator (E2E audit M181).
+ *   v1.2.1 — 2026-11-16 — pullBook trims the source URL's trailing slashes with stripTrailingSlashes,
+ *     a linear loop, in place of /\/+$/, which CodeQL reads as polynomial on a remote-supplied URL.
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -44,7 +46,7 @@ import type { PeerInfo } from '../federation.js';
 import { buildNodeDescriptor } from '../../utils/node-descriptor.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
-import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch, stripTrailingSlashes } from '../../utils/url-validator.js';
 import { readJson, ResponseTooLargeError } from '../../utils/read-capped.js';
 import { sign, verify } from '../../auth/keypair.js';
 import { peerKeyCache } from './helpers.js';
@@ -316,7 +318,7 @@ export async function pullBook(config: AimeatConfig, storage: Storage, peers: Ma
   let book: FederationBook;
   try {
     // safeFetch re-validates each redirect hop; source is remote-supplied (CodeQL request-forgery).
-    const resp = await safeFetch(`${source.replace(/\/+$/, '')}/v1/federation/book`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
+    const resp = await safeFetch(`${stripTrailingSlashes(source)}/v1/federation/book`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
     if (!resp.ok) return { ok: false, status: 502, code: 'FETCH_FAILED', message: `Source returned ${resp.status}` };
     // A ResponseTooLargeError lands in the catch below as FETCH_FAILED, with its own message.
     const body = await readJson(resp, BOOK_MAX_BYTES) as { data?: { book?: FederationBook } };

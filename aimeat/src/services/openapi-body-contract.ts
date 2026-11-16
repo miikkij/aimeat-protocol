@@ -30,6 +30,9 @@
  *   const op = contract?.match('POST', '/v1/memory/notes');
  *   const check = op?.validator();  // null when the schema could not be compiled
  * @version-history
+ *   v1.0.1 — 2026-11-16 — normalisePathTemplate's `{name}` pattern excludes `{` from the name, so a
+ *     run of `{` is read once rather than once per brace (CodeQL polynomial regex); a real template
+ *     has no nested brace, so every key is unchanged.
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item B5).
  */
 import { readFileSync } from 'node:fs';
@@ -68,7 +71,7 @@ export interface BodyContract {
 
 /** `/v1/agents/{name}/scopes` and `/v1/agents/:agentName/scopes` both become `/v1/agents/{}/scopes`. */
 export function normalisePathTemplate(path: string): string {
-    return path.replace(/\{[^}/]*\}/g, '{}').replace(/:[A-Za-z_][\w]*/g, '{}');
+    return path.replace(/\{[^{}/]*\}/g, '{}').replace(/:[A-Za-z_][\w]*/g, '{}');
 }
 
 /** The key a route is known by in the mode table and the check: `POST /v1/memory/{}`. */

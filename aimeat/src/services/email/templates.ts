@@ -9,6 +9,8 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './templates.js';
  * @version-history
+ *   2026-11-16 — emailLang reads the locale only when it is a string: a query value can arrive as an
+ *     array, and an array's slice is not a language tag (CodeQL type confusion).
  *   2026-11-15 — The login-details email opens with "Your access code worked", in en, fi and es, not an opened door.
  *   2026-11-15 — The key template's footer says who sent it ("Sent by AIMEAT"), in place of "the AIMEAT
  *     machine room", in en, fi and es.
@@ -260,7 +262,7 @@ export { esc };
 
 /** The language this email is written in: the requested one when we have it, else English. */
 function emailLang(locale: string | undefined): string {
-  const tag = (locale ?? '').slice(0, 2).toLowerCase();
+  const tag = (typeof locale === 'string' ? locale : '').slice(0, 2).toLowerCase();
   return Object.prototype.hasOwnProperty.call(i18n, tag) ? tag : 'en';
 }
 /** The language a template renders for `locale`, so a caller can say which one went out. */

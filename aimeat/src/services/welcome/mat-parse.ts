@@ -21,6 +21,8 @@
  *   import { parseWelcomeMat } from './mat-parse.js';
  *   const parsed = parseWelcomeMat(req.body.paste);
  * @version-history
+ *   2026-11-16 — hasVisibleContent's script and style patterns end at `</script ...>` with any
+ *     attributes or spaces before `>`, as a browser ends them (CodeQL bad tag filter).
  *   2026-10-31 — readWelcomeMatMeta reads the `<meta>` tags and the `<title>` in one linear pass
  *     (utils/html-tag-scan.ts), in place of two patterns per field that cost the square of the paste's
  *     size on a page full of `<meta` openers (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-1).
@@ -177,8 +179,8 @@ function wrapFragment(fragment: string, meta: WelcomeMatMeta): string {
 function hasVisibleContent(html: string): boolean {
     const stripped = html
         .replace(/<!--[\s\S]*?-->/g, ' ')
-        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<script\b[\s\S]*?<\/script\b[^>]*>/gi, ' ')
+        .replace(/<style\b[\s\S]*?<\/style\b[^>]*>/gi, ' ')
         .replace(/<[^>]*>/g, ' ')
         .replace(/&[a-z#0-9]+;/gi, ' ')
         .trim();

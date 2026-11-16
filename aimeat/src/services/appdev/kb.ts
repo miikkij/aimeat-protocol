@@ -14,6 +14,8 @@
  *   PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './kb.js';
  * @version-history
+ *   2026-11-16 -- slugifyKb trims the edge dashes with a linear loop in place of /^-+|-+$/g, which
+ *     CodeQL reads as polynomial on a user-supplied category; the slug it returns is unchanged.
  *   2026-11-08 -- Every index row carries `open`, the exact call that opens it: a real build read an
  *     own entry with the shared-entry tool, because the hint named both and the row did not say which.
  *   2026-11-04 -- A pitfall delete is announced with emitRecordChangePriorUnknown: the same streams hear
@@ -115,7 +117,11 @@ export function verificationStamp(version: string, at: Date = new Date()): { ver
 }
 
 export function slugifyKb(s: string): string {
-    return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'entry';
+    const dashed = s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    let start = 0, end = dashed.length;
+    while (start < end && dashed[start] === '-') start++;
+    while (end > start && dashed[end - 1] === '-') end--;
+    return dashed.slice(start, end).slice(0, 64) || 'entry';
 }
 
 /** The address of one learned entry. Category is slugified, slug is taken as given (lowercased). */
