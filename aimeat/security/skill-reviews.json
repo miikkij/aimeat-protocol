@@ -427,7 +427,7 @@
       "digest": "sha256:23485dcd6f01e1da985ab862"
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-18",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -437,7 +437,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:cab3877599000fbc06908a6a"
+      "digest": "sha256:6737809fb5a17180a03ad88c"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-15",
@@ -589,14 +589,14 @@
       "digest": "sha256:5624a1910e4515b568615abe"
     },
     "project:aimeat-organism-records": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-18",
       "watches": [
         "aimeat/src/services/exchange/odps.ts",
         "aimeat/src/static/sdk-libs/exchange/odps-completeness.js",
         "docs/known_gaps.md",
         ".claude/agents/note-writer.md"
       ],
-      "digest": "sha256:c619b2e588b1614882ad3d32",
+      "digest": "sha256:4d6d589c47dfcd2d276c9779",
       "note": "Most of it is about records on the node and Lifecycle Central; the code it makes claims about is the ODPS descriptor and its completeness list (which fields a validator reports missing), the known-gaps rule, and the decision_record call it shares with agent note-writer. Its frontmatter also carries a review-by date."
     },
     "project:aimeat-pages-links": {
@@ -862,8 +862,8 @@
       "aimeat/src/services/builder/extension-prompt.ts": "91ab68a199b0d408"
     },
     "project:aimeat-organism-records": {
-      "aimeat/src/services/exchange/odps.ts": "29f3def5e2722db1",
-      "aimeat/src/static/sdk-libs/exchange/odps-completeness.js": "3ece888a8069ba12",
+      "aimeat/src/services/exchange/odps.ts": "e6bddb3b685823fe",
+      "aimeat/src/static/sdk-libs/exchange/odps-completeness.js": "c6242c9fcfdbc5fc",
       "docs/known_gaps.md": "9b4977634dac65c3",
       ".claude/agents/note-writer.md": "14642ac19048c31a"
     },
@@ -968,7 +968,7 @@
       "aimeat/src/routes/odata.ts": "adb0ec05fc647d8f"
     },
     "node:aimeat-agent-capability": {
-      "aimeat/src/models/app-tool-schemas.ts": "b9f5168703e0e8fc",
+      "aimeat/src/models/app-tool-schemas.ts": "59d81633ae8ac6b5",
       "aimeat/src/commerce/app-tool-catalog.ts": "997e99370b2cfc6c",
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
       "aimeat/src/services/connect-tunnel/push.ts": "b828b403c0ce83a5",

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The ODPS description of one tool, inside the Monetize tool editor (question 3, "On
  *   the marketplace"): what a buyer reads before contracting. A listed tool is projected into an Open
- *   Data Product Specification v4.1 document (GET /v1/exchange/offerings/{id}/odps.yaml); the node
+ *   Data Product Specification v4.2 document (GET /v1/exchange/offerings/{id}/odps.yaml); the node
  *   derives price, plans, access, licence rights and observed use, and what it cannot derive is
  *   written here into the tool's own `odps` and `provenance` in the manifest.
  *
@@ -17,6 +17,7 @@
  * @structure OdpsToolBlock({ d, m, tool, form, set }) · odpsFormOf(tool) · readOdpsTool(base, form, open)
  * @usage html`<${OdpsToolBlock} d=${d} m=${m} tool=${base} form=${form} set=${set} />`
  * @version-history
+ *   v1.2.2 — 2026-11-18 — ODPS v4.2: the SLA unit `hours`, and the drafting prompt names v4.2.
  *   v1.2.1 — 2026-10-12 — A money price shows two decimals ("0.50 EUR").
  *   v1.2.0 — 2026-10-11 — The drafting prompt says the money price (or "free") and the pacing amount
  *     per call, not "N morsels" as a price (ruling "morseli on tahdistus, ei hinta").
@@ -51,7 +52,7 @@ const PRODUCT_TYPES = ['', 'raw data', 'derived data', 'dataset', 'reports', 'an
   'data-enabled performance', 'bi-directional'];
 const SLA_DIMENSIONS = ['latency', 'uptime', 'responseTime', 'errorRate', 'endOfSupport', 'endOfLife',
   'updateFrequency', 'timeToDetect', 'timeToNotify', 'timeToRepair', 'emailResponseTime'];
-const SLA_UNITS = ['percent', 'milliseconds', 'seconds', 'minutes', 'days', 'weeks', 'months', 'years', 'never', 'date'];
+const SLA_UNITS = ['percent', 'milliseconds', 'seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'years', 'never', 'date'];
 const QUALITY_DIMENSIONS = ['accuracy', 'completeness', 'conformity', 'consistency', 'coverage', 'timeliness', 'validity', 'uniqueness'];
 const QUALITY_UNITS = ['percentage', 'number'];
 
@@ -148,7 +149,7 @@ function promptPrice(tool) {
   return (money || 'free') + (toll ? ' · pacing ' + toll + ' morsels per call (not a price)' : '');
 }
 
-const DRAFT_SYSTEM = 'You write the descriptive half of an Open Data Product Specification (ODPS v4.1) entry for '
+const DRAFT_SYSTEM = 'You write the descriptive half of an Open Data Product Specification (ODPS v4.2) entry for '
   + 'a capability sold on a marketplace. Return ONLY a JSON object with these keys: '
   + '"productType" (one of: raw data, derived data, dataset, reports, analytic view, algorithm, decision support, '
   + 'automated decision-making, data-enhanced product, data-driven service, data-enabled performance, bi-directional), '

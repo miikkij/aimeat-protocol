@@ -22,6 +22,7 @@
  *     PERSONAL_DATA_PUBLIC, nothing written) until the request confirms; the confirmation stays on the
  *     package; a map row naming the package's own family decides alone.
  * @version-history
+ *   v1.2.1 — 2026-11-18 — ODPS v4.2: the data holder is read under its language key (dataHolder.en).
  *   v1.2.0 — 2026-11-02 — The suite follows WP10e (fbf5ec149), whose source change these three
  *     assertions still described the old way, so they were red on main since then: D1.3a dct:license
  *     is the EU licence vocabulary IRI for CC BY 4.0, D1.4c the schema.org license is the deed's
@@ -239,7 +240,8 @@ await test('D1.2 Without a company the sheet has no dataHolder; with A\'s one co
     const co = await call('/v1/companies', { token: A.token, body: { name: `Dsc Oy ${stamp}`, business_id: '1234567-8', city: 'Oulu', country: 'FI', phone: '+358401234567' } });
     assert(co.status === 201, `company: ${show(co)}`);
     const after = await call(`/v1/datapackages/${A.name}/${P.pub}/odps?format=json`);
-    const holder = after.body.data.odps.product.dataHolder;
+    // ODPS keys the data holder by the sheet's language, as it keys `details`.
+    const holder = after.body.data.odps.product.dataHolder?.en;
     assert(holder?.legalName === `Dsc Oy ${stamp}` && holder.businessID === '1234567-8' && holder.addressLocality === 'Oulu' && holder.addressCountry === 'FI', `holder ${JSON.stringify(holder)}`);
     assert(!holder.telephone && !('phone' in holder), `the phone reached the sheet: ${JSON.stringify(holder)}`);
 });

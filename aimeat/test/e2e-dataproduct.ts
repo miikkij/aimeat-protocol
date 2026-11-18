@@ -20,6 +20,7 @@
  *   file, and cannot read, run or delete A's definition; an agent without memory:write is refused; an
  *   agent with the words defines and previews over MCP.
  * @version-history
+ *   v1.4.1 — 2026-11-18 — The preview's sheet is ODPS v4.2.
  *   v1.4.0 — 2026-11-09 — W7/W8 (TARGET-094): a public package built unchanged from another names the
  *     original's page as canonical and leaves the dataset sitemap; one that is not a copy keeps its own
  *     address, and its page names the publisher in the title and says the rows in a crawler body.
@@ -322,7 +323,7 @@ await test('D9.4 a preview publishes nothing and answers rows, schema, validatio
     const d = pv.body.data;
     assert(d.published === false && d.publish_check.ok === true && d.validation.ok === true, `checks ${JSON.stringify({ c: d.publish_check, v: d.validation })}`);
     assert(d.resources[0].row_count === 2 && d.resources[0].rows.length === 2 && d.resources[0].schema.fields.length === 2, `resources ${JSON.stringify(d.resources)}`);
-    assert(typeof d.odps_yaml === 'string' && d.odps_yaml.includes('version: "4.1"') && d.odps?.product?.details?.en?.productID === `pkg:${A.name}/${N('draft')}` && typeof d.content_hash === 'string', `odps ${String(d.odps_yaml).slice(0, 200)}`);
+    assert(typeof d.odps_yaml === 'string' && d.odps_yaml.includes('version: "4.2"') && d.odps?.product?.details?.en?.productID === `pkg:${A.name}/${N('draft')}` && typeof d.content_hash === 'string', `odps ${String(d.odps_yaml).slice(0, 200)}`);
     assert((await call(`/v1/datapackages/${A.name}/${N('draft')}`, { token: A.token })).status === 404, 'the preview published a package');
     assert((await call(`/v1/dataproducts/${N('draft')}`, { token: A.token })).status === 404, 'the preview stored a definition');
 });

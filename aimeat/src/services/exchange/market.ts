@@ -8,7 +8,7 @@
  *   is the generic store + a simple capability match, per "node holds refined data, not orchestration"):
  *     - OFFERING — a provider's public supply listing: a capability (ext/action) + pricing (base + plans) +
  *       provenance + an optional ODPS authoring block. Discoverable by any consumer, and projectable into
- *       a full ODPS v4.1 document (services/exchange/odps.ts).
+ *       a full ODPS v4.2 document (services/exchange/odps.ts).
  *     - NEED — a consumer/app's open demand: a wanted capability + budget + autonomy. Providers browse open
  *       needs and BID.
  *     - BID — a provider's offer against a NEED (links an OFFERING + proposed terms). The requester accepts
@@ -88,7 +88,7 @@ export type { ActionCommercial, OfferingPlan } from './action-pricing.js';
  * Provenance attestation + the ODPS authoring block. Both are defined (and validated) in
  * `models/odps-schemas.ts` and re-exported here so the offering record stays the single import site.
  * A PROMISE by the provider, not a platform guarantee — but structured, attributed and projectable
- * into the ODPS v4.1 document served at `/v1/exchange/offerings/{id}/odps.yaml`.
+ * into the ODPS v4.2 document served at `/v1/exchange/offerings/{id}/odps.yaml`.
  */
 export type { Provenance, OdpsExtras };
 
@@ -189,7 +189,7 @@ export interface Offering {
    * The provider's ODPS authoring block — the Open Data Product Specification fields the node cannot derive
    * (value proposition, categories, standards, use cases, sample, SLA + data-quality COMMITMENTS, the legal
    * data holder, jurisdiction/exit terms). Optional: without it the listing still projects a valid, thinner
-   * ODPS v4.1 document at `/v1/exchange/offerings/{id}/odps.yaml`.
+   * ODPS v4.2 document at `/v1/exchange/offerings/{id}/odps.yaml`.
    */
   odps?: OdpsExtras | null;
   tags: string[];

@@ -101,6 +101,19 @@
     { "id": "rfc8628", "name": "OAuth Device Authorization Grant (RFC 8628)", "spec": "https://datatracker.ietf.org/doc/html/rfc8628", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "How every agent gets an identity here. Stable RFC, but nobody has checked our flow against it since it was written." },
     { "id": "agents-txt", "name": "agents.txt", "spec": "https://agentstxt.org", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Served at /agents.txt. A young convention with no settled owner; nobody has checked whose version we follow." },
     {
+      "id": "odps",
+      "name": "Open Data Product Specification",
+      "spec": "https://opendataproducts.org/",
+      "weDeclare": "4.2",
+      "declaredIn": [
+        { "file": "src/services/exchange/odps.ts", "template": "export const ODPS_VERSION = '{version}';" }
+      ],
+      "current": "4.2",
+      "verifiedOn": "2026-11-18",
+      "verdict": "current",
+      "note": "Every EXCHANGE offering (GET /v1/exchange/offerings/{id}/odps.yaml) and every published data package (GET /v1/datapackages/{owner}/{name}/odps) is projected as an ODPS document; both read ODPS_VERSION and the schema URLs beside it. 4.2 was released 2026-10-26 (github.com/Open-Data-Product-Initiative/v4.2, its ODPS-4.1-to-4.2-SDK-MIGRATION.md). Moved from 4.1 on 2026-11-18: SLA and data-quality `declarative` as named mappings with `default`, `displaytitle` (4.2 refuses `displayTitle`), `dataHolder` keyed by language, no `{resource}` template in an accessURL, no `OData v4` in `specification`. test/fixtures/odps-v4.2.schema.json is the published schema byte for byte, and the unit and E2E tests validate whole generated documents against it. Not used: contract profiles (the node emits no `contract`), compression, external `$ref` packages. Not the same standard as Bitol's Open Data Product Standard (also abbreviated ODPS, v1.x). The ODPS app on aimeat.io (odps.html, aimeat-apps repository) and its `odps` extension carry their own copy of the schema and move with this entry."
+    },
+    {
       "id": "aimeat-core",
       "name": "AIMEAT Core",
       "spec": "docs/AIMEAT-Core-2026-11.md",

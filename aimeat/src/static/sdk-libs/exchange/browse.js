@@ -2,12 +2,13 @@
  * @file exchange/browse.js
  * @description The BROWSE half of AIMEAT.exchange — reading the market. Every call here maps to a
  *   route the node publishes without authentication, so an app can render the catalogue, one
- *   listing's full decision context, and its ODPS v4.1 descriptor to a signed-out visitor. The
+ *   listing's full decision context, and its ODPS v4.2 descriptor to a signed-out visitor. The
  *   session is sent when there is one (see client.js `maybe`) purely so a seller's own projections
  *   are fresh; it changes what is CURRENT, never what is VISIBLE.
  * @structure info() · list(filter) · search(q, filter) · get(id) · odps(id) · odpsYaml(id)
  * @usage const { offerings } = await AIMEAT.exchange.list({ q: 'company', stats: true });
  * @version-history
+ *   v1.0.1 — 2026-11-18 — The node projects ODPS v4.2; comments only.
  *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 02 — the EXCHANGE browser library, gap G19).
  */
 import { pub, pubText, maybe, qs } from './client.js';
@@ -60,7 +61,7 @@ export function get(id) {
 }
 
 /**
- * The offering as an Open Data Product Specification v4.1 document (JSON) — the interoperable
+ * The offering as an Open Data Product Specification v4.2 document (JSON) — the interoperable
  * descriptor an outside catalogue or a negotiating agent reads without knowing anything about
  * AIMEAT. Derived on read, so it cannot drift from the listing it describes.
  * @param {string} id
@@ -71,7 +72,7 @@ export function odps(id) {
 }
 
 /**
- * The same ODPS v4.1 document in the spec's native YAML, as raw text — what you hand to a catalogue
+ * The same ODPS v4.2 document in the spec's native YAML, as raw text — what you hand to a catalogue
  * that expects the file, or show in a "copy this descriptor" box.
  * @param {string} id
  * @returns {Promise<string>}

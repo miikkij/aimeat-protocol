@@ -2,14 +2,17 @@
  * @file tools/odps-coverage.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Coverage report for the EXCHANGE → ODPS v4.1 projection: walks every field the published
- *   ODPS v4.1 JSON Schema defines and reports which ones a MAXIMALLY-filled AIMEAT offering can populate,
+ * @description Coverage report for the EXCHANGE → ODPS v4.2 projection: walks every field the published
+ *   ODPS v4.2 JSON Schema defines and reports which ones a MAXIMALLY-filled AIMEAT offering can populate,
  *   which the provider must author (and can, via the `odps` block), and which AIMEAT has no source for at
  *   all. Run it after changing services/exchange/odps.ts or models/odps-schemas.ts to see the honest gap.
- *   v4.1 keys `details` and `pricingPlans.declarative` by language, so the walker follows patternProperties
- *   and the probe treats a language key like an array member.
+ *   ODPS keys `details`, `dataHolder` and `pricingPlans.declarative` by language and keeps `dataAccess`,
+ *   `paymentGateways`, `SLA.declarative` and `dataQuality.declarative` as named mappings, so the walker
+ *   follows patternProperties, schema-valued additionalProperties and every oneOf branch, and the probe
+ *   treats a language key or a mapping name like an array member.
  * @usage cd aimeat && pnpm exec tsx tools/odps-coverage.ts
  * @version-history
+ *   v1.2.0 — 2026-11-18 — ODPS v4.2: walks named mappings (additionalProperties) and oneOf branches.
  *   v1.1.0 — 2026-07-25 — Follows ODPS v4.1 (language-keyed details/pricing via patternProperties).
  *   v1.0.0 — 2026-07-25 — Initial coverage report (TARGET-045 §4 ODPS adoption).
  */
@@ -17,7 +20,7 @@ import { readFileSync } from 'node:fs';
 import { offeringToOdps, ODPS_VERSION } from '../src/services/exchange/odps.js';
 import type { Offering } from '../src/services/exchange/market.js';
 
-const schema = JSON.parse(readFileSync(new URL('../test/fixtures/odps-v4.1.schema.json', import.meta.url), 'utf8'));
+const schema = JSON.parse(readFileSync(new URL('../test/fixtures/odps-v4.2.schema.json', import.meta.url), 'utf8'));
 
 /** A listing with EVERY authorable field filled — the ceiling of what the projection can currently emit. */
 const offering = {
@@ -32,7 +35,7 @@ const offering = {
   provenance: {
     source: 'PRH', legalBasis: 'public register', consentStatus: 'n/a', retention: '30 days',
     transformations: 'normalised', snapshotHash: 'a'.repeat(64),
-    lineage: [{ source: 'avoindata.prh.fi', transform: 'fetch' }], odpsVersion: '4.1',
+    lineage: [{ source: 'avoindata.prh.fi', transform: 'fetch' }], odpsVersion: '4.2',
   },
   usageTerms: { derivatives: true, resale: true, attribution: true, note: 'Attribute PRH.' },
   odps: {
@@ -75,24 +78,31 @@ const doc = offeringToOdps({
 /** Every leaf path the schema defines, following $ref. */
 function paths(node: any, prefix: string, out: string[], depth = 0): void {
   if (!node || depth > 6) return;
-  const resolved = node.$ref ? { ...schema.$defs[String(node.$ref).split('/').pop()!], ...node } : node;
-  // v4.1 language keys (`^[a-z]{2}$`) are a transparent level: walk through them, do not name them.
+  const resolved = node.$ref?.startsWith?.('#/$defs/') ? { ...schema.$defs[String(node.$ref).split('/').pop()!], ...node } : node;
+  // Language keys (`^[a-z]{2}$`) and mapping names (`default`, `mcp`, …) are a transparent level: walk
+  // through them, do not name them. A oneOf is walked branch by branch.
   if (resolved.patternProperties) {
     for (const v of Object.values<any>(resolved.patternProperties)) paths(v, prefix, out, depth + 1);
   }
+  if (resolved.additionalProperties && typeof resolved.additionalProperties === 'object') paths(resolved.additionalProperties, prefix, out, depth + 1);
+  if (Array.isArray(resolved.oneOf)) for (const branch of resolved.oneOf) paths(branch, prefix, out, depth + 1);
   if (resolved.properties) {
     for (const [k, v] of Object.entries<any>(resolved.properties)) {
+      // `$ref` as a property name is a reference-only form (an external package), not a field to fill.
+      if (k === '$ref') continue;
       const p = prefix ? `${prefix}.${k}` : k;
-      const child = v.$ref ? { ...schema.$defs[String(v.$ref).split('/').pop()!], ...v } : v;
-      if (child.properties || child.patternProperties || child.items?.properties || child.items?.$ref) { out.push(p); paths(child, p, out, depth + 1); }
+      const child = v.$ref?.startsWith?.('#/$defs/') ? { ...schema.$defs[String(v.$ref).split('/').pop()!], ...v } : v;
+      if (child.properties || child.patternProperties || child.oneOf || (child.additionalProperties && typeof child.additionalProperties === 'object')
+        || child.items?.properties || child.items?.$ref) { out.push(p); paths(child, p, out, depth + 1); }
       else out.push(p);
     }
   }
   if (resolved.items) paths(resolved.items, `${prefix}[]`, out, depth + 1);
 }
 
-const all: string[] = [];
-paths(schema, '', all);
+const raw: string[] = [];
+paths(schema, '', raw);
+const all = [...new Set(raw)];
 
 /** Resolve a schema path against the document. Arrays and named mappings are searched for ANY member that
  *  carries the field — a bundle-only field like `maxTransactionQuantity` counts as emitted. */
@@ -103,8 +113,8 @@ function get(obj: any, path: string): unknown {
       if (n === undefined || n === null) continue;
       if (Array.isArray(n)) { for (const item of n) if (item?.[key] !== undefined) out.push(item[key]); continue; }
       if (n[key] !== undefined) { out.push(n[key]); continue; }
-      // Named mappings — dataAccess/paymentGateways entries (default, mcp, …) and v4.1 language keys
-      // (details.en, pricingPlans.declarative.fi) — are transparent: look inside every entry.
+      // Named mappings — dataAccess/paymentGateways/SLA entries (default, mcp, …) and language keys
+      // (details.en, dataHolder.en, pricingPlans.declarative.fi) — are transparent: look inside every entry.
       if (typeof n === 'object') {
         for (const v of Object.values<any>(n)) {
           if (Array.isArray(v)) { for (const item of v) if (item?.[key] !== undefined) out.push(item[key]); continue; }

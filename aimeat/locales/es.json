@@ -6607,7 +6607,7 @@
       },
       "langBase": "Los textos de base, que también recibe quien lee en otro idioma",
       "langOther": "Textos en {lang}. Quien lee en {lang} recibe estos; un campo vacío muestra el texto de base.",
-      "odpsTitle": "La descripción que leen las máquinas (ODPS 4.1, extracto)",
+      "odpsTitle": "La descripción que leen las máquinas (ODPS 4.2, extracto)",
       "noOdps": "La ficha aparece cuando la vista previa pasa sus revisiones."
     },
     "sched": {
@@ -28107,7 +28107,7 @@
     "monetize.currency2": "Moneda",
     "monetize.money2Hint": "Opcional: vende la misma llamada en una segunda moneda. El comprador elige una al abrir un contrato.",
     "odps.title": "EXCHANGE y ODPS",
-    "odps.hint": "Si esta aplicación vende algo en el mercado, y la descripción de producto que lleva cada anuncio. Una herramienta listada se publica como un documento Open Data Product Specification v4.1 que pueden leer los catálogos externos y los agentes compradores.",
+    "odps.hint": "Si esta aplicación vende algo en el mercado, y la descripción de producto que lleva cada anuncio. Una herramienta listada se publica como un documento Open Data Product Specification v4.2 que pueden leer los catálogos externos y los agentes compradores.",
     "odps.statusOn": "En el mercado: {live} de {total} herramientas",
     "odps.statusOff": "Fuera del mercado ({total} herramientas declaradas)",
     "odps.statusBlocked": "{n} herramienta(s) están marcadas para EXCHANGE pero todavía no se pueden listar; el motivo aparece en cada herramienta.",

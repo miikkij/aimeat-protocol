@@ -507,7 +507,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   });
 
   /**
-   * The offering as an **Open Data Product Specification v4.1** document (opendataproducts.org, Linux
+   * The offering as an **Open Data Product Specification v4.2** document (opendataproducts.org, Linux
    * Foundation) — the interoperable descriptor an outside catalogue or a negotiating agent can read without
    * knowing anything about AIMEAT. Public, like the listing itself. Derived on read (never stored in ODPS
    * form), so it cannot drift from the offering it describes. `.yaml` serves the spec's native format;

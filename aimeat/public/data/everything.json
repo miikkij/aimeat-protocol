@@ -3371,13 +3371,13 @@
      "plain": "EXCHANGE A marketplace where providers list offerings, buyers post needs, others bid, and an accepted bid becomes a contract. The price comes from the provider, each call is metered against the buyer's budget, and the operator's cut is taken on the way. /v1/exchange/*, aimeat_exchange_*"
     },
     {
-     "slug": "g-14-odps-4-1-product-descriptions",
+     "slug": "g-14-odps-product-descriptions",
      "cells": [
-      "<strong>ODPS 4.1 product descriptions</strong>",
-      "An outside catalog or buying agent can read what a product provides, its delivery, price, permitted use, provider and provenance through the Open Data Product Specification. The node generates the document from the offering and provider declarations. Unstated service commitments stay absent.",
+      "<strong>ODPS product descriptions</strong>",
+      "An outside catalog or buying agent can read what a product provides, its delivery, price, permitted use, provider and provenance through the Open Data Product Specification (ODPS 4.2). The node generates the document from the offering and provider declarations. Unstated service commitments stay absent.",
       "<code>/v1/exchange/offerings/:id/odps</code> (JSON), <code>/v1/exchange/offerings/:id/odps.yaml</code> (YAML)"
      ],
-     "plain": "ODPS 4.1 product descriptions An outside catalog or buying agent can read what a product provides, its delivery, price, permitted use, provider and provenance through the Open Data Product Specification. The node generates the document from the offering and provider declarations. Unstated service commitments stay absent. /v1/exchange/offerings/:id/odps (JSON), /v1/exchange/offerings/:id/odps.yaml (YAML)"
+     "plain": "ODPS product descriptions An outside catalog or buying agent can read what a product provides, its delivery, price, permitted use, provider and provenance through the Open Data Product Specification (ODPS 4.2). The node generates the document from the offering and provider declarations. Unstated service commitments stay absent. /v1/exchange/offerings/:id/odps (JSON), /v1/exchange/offerings/:id/odps.yaml (YAML)"
     },
     {
      "slug": "g-14-contracted-interfaces-and-usage-terms",
@@ -3604,10 +3604,10 @@
      "slug": "g-15-data-package-odps-sheets",
      "cells": [
       "<strong>Data-package ODPS sheets</strong>",
-      "Each published version has an ODPS 4.1 product sheet generated from its descriptor and resource schema when it is read, so a consumer can inspect the data without maintaining a second description. The sheet says who may read the package and whether a sign-in is needed, as the package's audience is at that moment: open to anyone with no sign-in, or for this node's accounts, one organism or the owner with a token. The descriptor read gives the sheet's address. When you have registered exactly one company (or one company bound to the organism the package is for), the sheet names it as the data holder with its business and VAT ids and its registered address; its e-mail, telephone and bank details never go in. Without a company there is no holder on the sheet.",
+      "Each published version has an ODPS 4.2 product sheet generated from its descriptor and resource schema when it is read, so a consumer can inspect the data without maintaining a second description. The sheet says who may read the package and whether a sign-in is needed, as the package's audience is at that moment: open to anyone with no sign-in, or for this node's accounts, one organism or the owner with a token. The descriptor read gives the sheet's address. When you have registered exactly one company (or one company bound to the organism the package is for), the sheet names it as the data holder with its business and VAT ids and its registered address; its e-mail, telephone and bank details never go in. Without a company there is no holder on the sheet.",
       "<code>GET /v1/datapackages/:owner/:name/odps</code> (YAML, <code>?format=json</code>), <code>odps_url</code> on <code>GET /v1/datapackages/:owner/:name</code>; an older version's <code>odps.yaml</code> address redirects there"
      ],
-     "plain": "Data-package ODPS sheets Each published version has an ODPS 4.1 product sheet generated from its descriptor and resource schema when it is read, so a consumer can inspect the data without maintaining a second description. The sheet says who may read the package and whether a sign-in is needed, as the package's audience is at that moment: open to anyone with no sign-in, or for this node's accounts, one organism or the owner with a token. The descriptor read gives the sheet's address. When you have registered exactly one company (or one company bound to the organism the package is for), the sheet names it as the data holder with its business and VAT ids and its registered address; its e-mail, telephone and bank details never go in. Without a company there is no holder on the sheet. GET /v1/datapackages/:owner/:name/odps (YAML, ?format=json), odps_url on GET /v1/datapackages/:owner/:name; an older version's odps.yaml address redirects there"
+     "plain": "Data-package ODPS sheets Each published version has an ODPS 4.2 product sheet generated from its descriptor and resource schema when it is read, so a consumer can inspect the data without maintaining a second description. The sheet says who may read the package and whether a sign-in is needed, as the package's audience is at that moment: open to anyone with no sign-in, or for this node's accounts, one organism or the owner with a token. The descriptor read gives the sheet's address. When you have registered exactly one company (or one company bound to the organism the package is for), the sheet names it as the data holder with its business and VAT ids and its registered address; its e-mail, telephone and bank details never go in. Without a company there is no holder on the sheet. GET /v1/datapackages/:owner/:name/odps (YAML, ?format=json), odps_url on GET /v1/datapackages/:owner/:name; an older version's odps.yaml address redirects there"
     },
     {
      "slug": "g-15-your-ai-finds-the-tables",
@@ -4652,13 +4652,13 @@
      "plain": "Finvoice, OData v4 Finnish e-invoices and spreadsheet/BI connections to published data packages. section 15"
     },
     {
-     "slug": "g-21-odps-4-1-open-data-product-specification",
+     "slug": "g-21-odps-open-data-product-specification",
      "cells": [
-      "<strong>ODPS 4.1 (Open Data Product Specification)</strong>",
-      "Machine-readable product descriptions for EXCHANGE offerings and published data packages.",
+      "<strong>ODPS (Open Data Product Specification)</strong>",
+      "Machine-readable product descriptions for EXCHANGE offerings and published data packages, in ODPS 4.2.",
       "<code>/v1/exchange/offerings/:id/odps.yaml</code>, <code>/v1/datapackages/:owner/:name/odps</code>"
      ],
-     "plain": "ODPS 4.1 (Open Data Product Specification) Machine-readable product descriptions for EXCHANGE offerings and published data packages. /v1/exchange/offerings/:id/odps.yaml, /v1/datapackages/:owner/:name/odps"
+     "plain": "ODPS (Open Data Product Specification) Machine-readable product descriptions for EXCHANGE offerings and published data packages, in ODPS 4.2. /v1/exchange/offerings/:id/odps.yaml, /v1/datapackages/:owner/:name/odps"
     },
     {
      "slug": "g-21-frictionless-data-package-and-table-schema",

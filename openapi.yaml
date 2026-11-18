@@ -8739,7 +8739,7 @@ components:
 
     OdpsFieldTooLong:
       description: >
-        ODPS_FIELD_TOO_LONG. The write would publish an EXCHANGE listing whose ODPS v4.1 document breaks a
+        ODPS_FIELD_TOO_LONG. The write would publish an EXCHANGE listing whose ODPS v4.2 document breaks a
         schema maxLength, in text the stored record did not already carry. Nothing was written and nothing is
         truncated. `error.details` is `{ key, fields[] }`, one row per field the owner wrote: `entry` (the
         listing, e.g. `shop.html/find`), `source_field` (where it was written, e.g. `tools[find].usageTerms.note`),
@@ -27527,7 +27527,7 @@ paths:
           provenance: { type: object, description: "Provider attestation, validated (400 INVALID_PROVENANCE): { source, legalBasis, consentStatus, retention, transformations, snapshotHash (SHA-256), lineage[{source,transform,at}] }. The node stamps odpsVersion.", properties: {
             source: { type: string }, legalBasis: { type: string }, consentStatus: { type: string }, retention: { type: string },
             transformations: { type: string }, snapshotHash: { type: string }, lineage: { type: array, items: { type: object } } } },
-          odps: { type: object, description: "ODPS v4.1 fields the node cannot derive, validated (400 INVALID_ODPS): productType, valueProposition, categories, standards, useCases, contentSample, logoURL, sla[{dimension,objective,unit}], dataQuality[{dimension,objective,unit}], dataHolder{legalName,…}, license{geographicalArea,applicableLaws,exclusive,…}. Surfaced at GET /v1/exchange/offerings/{id}/odps.yaml." },
+          odps: { type: object, description: "ODPS v4.2 fields the node cannot derive, validated (400 INVALID_ODPS): productType, valueProposition, categories, standards, useCases, contentSample, logoURL, sla[{dimension,objective,unit}], dataQuality[{dimension,objective,unit}], dataHolder{legalName,…}, license{geographicalArea,applicableLaws,exclusive,…}. Surfaced at GET /v1/exchange/offerings/{id}/odps.yaml." },
           tags: { type: array, items: { type: string } },
           usage_terms: { type: object, properties: {
             derivatives: { type: boolean }, resale: { type: boolean }, attribution: { type: boolean }, note: { type: string } } } } } } }
@@ -27680,7 +27680,7 @@ paths:
         `pacing.source` is `capability` when the
         provider declared it (`tollMorsels` on the tool/action/offer) and `node` when the node default
         applies. `odps` points at the same listing
-        rendered as an Open Data Product Specification v4.1 document. A `datapackage` offering carries
+        rendered as an Open Data Product Specification v4.2 document. A `datapackage` offering carries
         `offering.freshness` (`state` fresh, late, stale or unscheduled, `reason`, `reason_code`,
         `due_at`, `stale_at`, `last_success_at`), as the browse answer states it.
       tags: [Commerce]
@@ -27711,9 +27711,9 @@ paths:
   /v1/exchange/offerings/{id}/odps:
     get:
       operationId: exchangeOfferingOdps
-      summary: One EXCHANGE offering as an Open Data Product Specification v4.1 document (public) (TARGET-045)
+      summary: One EXCHANGE offering as an Open Data Product Specification v4.2 document (public) (TARGET-045)
       description: >
-        The listing rendered in the Linux Foundation's **Open Data Product Specification** (ODPS) v4.1 —
+        The listing rendered in the Linux Foundation's **Open Data Product Specification** (ODPS) v4.2 —
         the interoperable descriptor an outside catalogue or a negotiating agent can read without knowing
         anything about AIMEAT. Derived on read from the offering (never stored in ODPS form), so it cannot
         drift from the listing it describes. Carries `product.details`, `dataAccess` (the metered REST call
@@ -27735,7 +27735,7 @@ paths:
   /v1/exchange/offerings/{id}/odps.yaml:
     get:
       operationId: exchangeOfferingOdpsYaml
-      summary: One EXCHANGE offering as an ODPS v4.1 YAML document (public) (TARGET-045)
+      summary: One EXCHANGE offering as an ODPS v4.2 YAML document (public) (TARGET-045)
       description: >
         Same document as `GET /v1/exchange/offerings/{id}/odps`, served raw as `text/yaml` — the format the
         Open Data Product Specification leads with, so the URL can be handed straight to an ODPS-aware tool.
@@ -27743,7 +27743,7 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses:
         '200':
-          description: The ODPS v4.1 document.
+          description: The ODPS v4.2 document.
           content:
             text/yaml:
               schema: { type: string }
@@ -29868,7 +29868,7 @@ paths:
       operationId: getDataPackageOdps
       summary: The ODPS product sheet of one version
       description: |
-        The ODPS v4.1 product sheet of one version, projected when it is read from the descriptor and
+        The ODPS v4.2 product sheet of one version, projected when it is read from the descriptor and
         the version's audience, so it states who reads the package now. `details.visibility` is
         public, dataspace (every account of this node), organisation (the members of one organism) or
         private, and `x-aimeat.audience` names the AIMEAT audience (public, members, organism:<id> or

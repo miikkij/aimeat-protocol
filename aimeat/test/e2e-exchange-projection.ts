@@ -10,6 +10,7 @@
  *   projection-aware delist guard.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange-projection.ts
  * @version-history
+ *   v1.6.1 — 2026-11-18 — The node stamps ODPS 4.2 on a listing's provenance.
  *   v1.6.0 — 2026-10-18 — BYPASS: the raw route's 402 to a stranger names only the money-priced
  *     product (`paid`), not the pacing-only `brief`. The test was stale, not the paywall: da1fc12cc
  *     (2026-10-17) made a pacing-only tool a free product on the raw route, and the assertion kept the
@@ -39,7 +40,7 @@
  *     restriction past 255 characters, published whole). Both listings of a duplicate stay listed.
  *     Another owner's PUT onto the agent's offers is refused 403 and delists nothing.
  *   v1.1.0 — 2026-07-25 — ODPS: app-level defaults on the manifest root inherit into every tool, a tool
- *     overrides field by field, and both reach the listing's ODPS v4.1 document.
+ *     overrides field by field, and both reach the listing's ODPS document.
  *   v1.0.0 — 2026-07-25 — Initial projection proof (TARGET-050 slices 1 + 3).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -618,7 +619,7 @@ await test('App-level ODPS defaults are inherited by every tool of that app', as
   const listing = forTool(await myOfferings(provider.token), 'brief')[0];
   assert(listing, 'the tool is listed');
   assert(listing.odps?.dataHolder?.legalName === 'Overscale Solutions Oy', `app defaults inherited: ${JSON.stringify(listing.odps)}`);
-  assert(listing.provenance?.legalBasis === 'Public register' && listing.provenance?.odpsVersion === '4.1',
+  assert(listing.provenance?.legalBasis === 'Public register' && listing.provenance?.odpsVersion === '4.2',
     `provenance inherited + stamped: ${JSON.stringify(listing.provenance)}`);
   const res = await fetch(`${BASE}/v1/exchange/offerings/${listing.offeringId}/odps.yaml`);
   const doc = await res.text();
@@ -684,7 +685,7 @@ await test('An EXTENSION ACTION carries its own ODPS descriptor from the manifes
   await json(`/v1/extensions/${EXT2}/activate`, { method: 'POST', headers: auth(provider.token) });
   const listing = (await myOfferings(provider.token)).find((o: any) => o.ext === EXT2 && o.action === 'search');
   assert(listing, 'the flagged action is listed');
-  assert(listing.provenance?.legalBasis === 'CC BY 4.0 open data' && listing.provenance?.odpsVersion === '4.1',
+  assert(listing.provenance?.legalBasis === 'CC BY 4.0 open data' && listing.provenance?.odpsVersion === '4.2',
     `manifest provenance reached the listing: ${JSON.stringify(listing.provenance)}`);
   assert(listing.odps?.dataHolder?.legalName === 'Overscale Solutions Oy', `manifest odps reached the listing: ${JSON.stringify(listing.odps)}`);
   const doc = await (await fetch(`${BASE}/v1/exchange/offerings/${listing.offeringId}/odps.yaml`)).text();

@@ -9,6 +9,8 @@
  *   door (odpsWriteRefusal), so these tests call it for all three kinds of source.
  * @usage cd aimeat && pnpm exec vitest run test/unit/exchange-odps-write.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-18 — ODPS v4.2 keys the data holder by language, so the refused field is
+ *     product.dataHolder.en.description.
  *   v1.0.0 — 2026-09-13 — Initial (appdev pitfall usageterms-note-caps-at-156-not-255, turned into a refusal).
  */
 import { describe, it, expect } from 'vitest';
@@ -83,7 +85,7 @@ describe('an app-tool manifest', () => {
   it('names the manifest root when a tool inherits the text, and the tool when it overrides it', () => {
     const root = { odps: { dataHolder: { legalName: 'Oy', description: 'd'.repeat(600) } } };
     const inherited = odpsWriteRefusal(KEY, manifest([tool()], root), undefined)!.details.fields;
-    expect(inherited).toEqual([expect.objectContaining({ entry: 'shop.html/find', source_field: 'odps.dataHolder.description', odps_field: 'product.dataHolder.description', length: 600, max_length: 512, room: 512 })]);
+    expect(inherited).toEqual([expect.objectContaining({ entry: 'shop.html/find', source_field: 'odps.dataHolder.description', odps_field: 'product.dataHolder.en.description', length: 600, max_length: 512, room: 512 })]);
     const own = odpsWriteRefusal(KEY, manifest([tool({ odps: { valueProposition: 'v'.repeat(513) } })]), undefined)!.details.fields;
     expect(own).toEqual([expect.objectContaining({ source_field: 'tools[find].odps.valueProposition', odps_field: 'product.details.en.valueProposition', room: 512 })]);
   });

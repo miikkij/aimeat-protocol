@@ -28,7 +28,7 @@ import type { CompanyRecord } from '../../models/company-schemas.js';
 import { companyAddress } from '../company/company-service.js';
 import { logger } from '../../utils/logger.js';
 
-/** The ODPS v4.1 dataHolder fields a company record fills. */
+/** The ODPS v4.2 dataHolder fields a company record fills. */
 export type DataHolder = Record<string, string>;
 
 /** The company that holds a package of `ownerGhii` at `audience`, or null when none is stated unambiguously. */

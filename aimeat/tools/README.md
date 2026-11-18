@@ -15,7 +15,7 @@ that `pnpm gate` or the build depends on.
 | `build-living-nodes.ts` | The same for the living-document node vocabulary | `pnpm build:living-nodes`, `pnpm check:living-nodes` |
 | `atelier-check.ts` | Checks every Atelier look preset arithmetically | `pnpm check:atelier` |
 | `theme-contrast.ts` | Checks the theme tokens against WCAG 2.1 contrast | `pnpm check:theme` |
-| `odps-coverage.ts` | Reports which ODPS v4.1 fields the EXCHANGE projection fills | `pnpm exec tsx tools/odps-coverage.ts` |
+| `odps-coverage.ts` | Reports which ODPS v4.2 fields the EXCHANGE projection fills | `pnpm exec tsx tools/odps-coverage.ts` |
 
 The rest of this page describes SynthTraces.
 

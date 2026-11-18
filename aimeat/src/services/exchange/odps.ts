@@ -2,7 +2,7 @@
  * @file src/services/exchange/odps.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Projects an EXCHANGE offering into an **Open Data Product Specification v4.1** document
+ * @description Projects an EXCHANGE offering into an **Open Data Product Specification v4.2** document
  *   (opendataproducts.org, Linux Foundation, Apache-2.0) — the interoperable, machine-parsable descriptor a
  *   negotiating agent or an outside catalogue can read without knowing AIMEAT. This is a PROJECTION, exactly
  *   like the listing itself is a projection of its source (TARGET-050): nothing is stored in ODPS form, the
@@ -12,8 +12,9 @@
  *   Two rules keep it honest:
  *   1. **Nothing is invented.** A field the node cannot know is omitted, never filled with a plausible value.
  *      An unstated SLA is an absent SLA block, not a promise of 99.9 %.
- *   v4.1 keeps text multilingual: `product.details` and `product.pricingPlans.declarative` are keyed by
- *   ISO 639-1 language code, and several name/description fields are language maps. AIMEAT listings carry
+ *   ODPS keeps text multilingual: `product.details`, `product.dataHolder` and
+ *   `product.pricingPlans.declarative` are keyed by ISO 639-1 language code, and several name/description
+ *   fields are language maps. AIMEAT listings carry
  *   ONE free-text title/description in whatever language the provider wrote, so everything is emitted under
  *   a single key — `odps.language` when the provider declares it, `en` otherwise. We never duplicate the
  *   same string under a second language: a claimed translation that does not exist is worse than none.
@@ -31,6 +32,13 @@
  *   res.type('text/yaml').send(odpsToYaml(doc));
  *   const tooLong = odpsLengthOverruns(doc);   // listing warnings; the write refusal is exchange-odps-write.ts
  * @version-history
+ *   v1.6.0 — 2026-11-18 — ODPS v4.2 (released 2026-10-26). The SLA and data-quality `declarative` blocks
+ *     are named mappings with a `default` entry, the quality block's title is `displaytitle` (v4.2 refuses
+ *     `displayTitle`), and `dataHolder` is keyed by language, as v4.1 already was after its own schema
+ *     fix. A data package's OData port names OData in its description, because `specification` takes
+ *     only OAS, RAML, Slate and MCP, and its CSV port points at the package sheet, which has one address
+ *     per resource, instead of a `{resource}` template that is not a URI. The two length caps on the
+ *     data holder moved with it (`product.dataHolder.*`).
  *   v1.5.0 — 2026-11-01 — A datapackage offering projects as a dataset: its plans (a month, or per read),
  *     its OData and CSV ports, the purchase address of an outside buyer as a second payment gateway, and
  *     x-aimeat.package with the package's own read-time sheet. x-aimeat.delivers_data on every offering.
@@ -62,24 +70,24 @@ import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension, Provenance } f
 import { AiProvenanceSchema } from '../../models/ai-provenance-schemas.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config/pacing.js';
 
-/** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x, v4.1 current). */
-export const ODPS_VERSION = '4.1';
-export const ODPS_SCHEMA_URL = 'https://opendataproducts.org/v4.1/schema/odps.json';
+/** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x, the current one). */
+export const ODPS_VERSION = '4.2';
+export const ODPS_SCHEMA_URL = 'https://opendataproducts.org/v4.2/schema/odps.json';
 /** The same schema in YAML. A YAML document points at the YAML schema, as the spec's own examples do. */
-export const ODPS_SCHEMA_URL_YAML = 'https://opendataproducts.org/v4.1/schema/odps.yaml';
+export const ODPS_SCHEMA_URL_YAML = 'https://opendataproducts.org/v4.2/schema/odps.yaml';
 
 /** ISO 639-1 code used when a provider has not declared what language its listing text is in. */
 const DEFAULT_LANGUAGE = 'en';
 
-/** v4.1 wraps several free-text fields in a language-keyed object (`$defs.Languages`). */
+/** ODPS wraps several free-text fields in a language-keyed object (`$defs.Languages`). */
 function localized(lang: string, text: string): Json {
   return { [lang]: text };
 }
 
 type Json = Record<string, unknown>;
 
-/** An ODPS v4.1 document. Loosely typed on purpose — the authority is the published JSON Schema, which the
- *  E2E suite validates the generated document against (test/fixtures/odps-v4.1.schema.json). */
+/** An ODPS v4.2 document. Loosely typed on purpose — the authority is the published JSON Schema, which the
+ *  tests validate the generated document against (test/fixtures/odps-v4.2.schema.json). */
 export interface OdpsDocument {
   schema: string;
   version: string;
@@ -238,7 +246,7 @@ export function pricingPlans(o: Offering, extras: OdpsExtras | null, lang: strin
       });
     }
   }
-  return { declarative: { [lang]: declarative } };   // v4.1: declarative is keyed by language
+  return { declarative: { [lang]: declarative } };   // ODPS keys pricing declarative by language
 }
 
 /** AIMEAT's three usage flags expressed as ODPS licence rights (what the buyer MAY do with the output). */
@@ -297,10 +305,9 @@ function licence(o: Offering, extras: OdpsExtras | null): Json {
 
 /**
  * How the product is actually delivered: the metered REST call, and the MCP surface when the node exposes
- * one. ODPS models `dataAccess` as a MAPPING of named access blocks (`default`, then whatever else the
- * product offers) — see the v4.1 examples. The published JSON Schema is self-contradictory here (the
- * `product.dataAccess` property is `type: object` while it `$ref`s an array-typed definition), so the
- * documented shape is the one to follow; the E2E suite validates around that known schema bug.
+ * one. ODPS models `dataAccess` as a MAPPING of named access blocks: v4.2 requires `default`, then whatever
+ * else the product offers, and `outputPortType` on every block. (v4.1's first published schema declared an
+ * array here while its examples showed this mapping; v4.2 settled it.)
  */
 function dataAccess(input: OdpsProjectionInput, lang: string): Json {
   const { offering: o, callRecipe, baseUrl } = input;
@@ -308,17 +315,22 @@ function dataAccess(input: OdpsProjectionInput, lang: string): Json {
   if (o.surface?.kind === 'datapackage') {
     // A data package is read, not called: the OData feed and the CSV of each resource (plan D5.1).
     const path = `${encodeURIComponent(o.surface.ownerName)}/${encodeURIComponent(o.surface.packageName)}`;
+    // `specification` takes only OAS, RAML, Slate and MCP, so the protocol is named in the description and
+    // its CSDL document is the specsURL.
     ports.default = {
       name: localized(lang, 'OData feed'),
-      description: localized(lang, 'The contract is the access: an account reads with its own AIMEAT token, an outside party with the key its purchase gave (HTTP Basic). Each entity set read is metered.'),
-      outputPortType: 'API', format: 'JSON', authenticationMethod: 'Token', specification: 'OData v4',
+      description: localized(lang, 'An OData v4 feed. The contract is the access: an account reads with its own AIMEAT token, an outside party with the key its purchase gave (HTTP Basic). Each entity set read is metered.'),
+      outputPortType: 'API', format: 'JSON', authenticationMethod: 'Token',
+      specsURL: `${baseUrl}/v1/odata/${path}/$metadata`,
       accessURL: `${baseUrl}/v1/odata/${path}`, documentationURL: `${baseUrl}/v1/exchange/offerings/${o.offeringId}`,
     };
+    // The listing does not know the package's resources; the package sheet names one address per resource.
+    // `accessURL` is a URI, so it never carries a `{resource}` placeholder.
     ports.csv = {
       name: localized(lang, 'CSV'),
-      description: localized(lang, 'The whole resource as CSV, one metered read per request.'),
+      description: localized(lang, `Each resource as CSV at ${baseUrl}/v1/datapackages/${path}/rows/<resource>?format=csv, one metered read per request. The package sheet lists the resources.`),
       outputPortType: 'file', format: 'CSV', authenticationMethod: 'Token',
-      accessURL: `${baseUrl}/v1/datapackages/${path}/rows/{resource}?format=csv`, documentationURL: `${baseUrl}/v1/datapackages/${path}/odps`,
+      documentationURL: `${baseUrl}/v1/datapackages/${path}/odps`,
     };
     return ports;
   }
@@ -388,16 +400,19 @@ function slaBlock(extras: OdpsExtras | null, lang: string): Json | null {
     ...(extras?.supportHours ? { emailServiceHours: extras.supportHours } : {}),
     ...(extras?.documentationURL ? { documentationURL: extras.documentationURL } : {}),
   };
+  // v4.2: `declarative` is a mapping of named definitions, `default` first.
   return {
-    declarative: [{
-      name: localized(lang, 'Provider commitment'),
-      description: localized(lang, 'Service levels the provider commits to for this offering.'),
-      ...(Object.keys(support).length ? { support } : {}),
-      dimensions: dims.map((d: OdpsSlaDimension) => ({
-        dimension: d.dimension, objective: String(d.objective), unit: d.unit,
-        ...(d.description ? { description: d.description } : {}),
-      })),
-    }],
+    declarative: {
+      default: {
+        name: localized(lang, 'Provider commitment'),
+        description: localized(lang, 'Service levels the provider commits to for this offering.'),
+        ...(Object.keys(support).length ? { support } : {}),
+        dimensions: dims.map((d: OdpsSlaDimension) => ({
+          dimension: d.dimension, objective: String(d.objective), unit: d.unit,
+          ...(d.description ? { description: d.description } : {}),
+        })),
+      },
+    },
   };
 }
 
@@ -405,29 +420,38 @@ function slaBlock(extras: OdpsExtras | null, lang: string): Json | null {
 function qualityBlock(extras: OdpsExtras | null, lang: string): Json | null {
   const dims = extras?.dataQuality ?? [];
   if (!dims.length) return null;
+  // v4.2: a mapping of named definitions; the title is `displaytitle`, one language map (v4.2 refuses
+  // `displayTitle`).
   return {
-    declarative: [{
-      displayTitle: [localized(lang, 'Provider commitment')],   // v4.1: an ARRAY of language maps here
-      description: 'Data-quality levels the provider commits to for this offering.',
-      dimensions: dims.map((d: OdpsQualityDimension) => ({
-        dimension: d.dimension, objective: Math.round(d.objective), unit: d.unit,
-        ...(d.description ? { description: d.description } : {}),
-      })),
-    }],
+    declarative: {
+      default: {
+        displaytitle: localized(lang, 'Provider commitment'),
+        description: localized(lang, 'Data-quality levels the provider commits to for this offering.'),
+        dimensions: dims.map((d: OdpsQualityDimension) => ({
+          dimension: d.dimension, objective: Math.round(d.objective), unit: d.unit,
+          ...(d.description ? { description: d.description } : {}),
+        })),
+      },
+    },
   };
 }
 
-/** The legal entity behind the offering: the provider's declaration when given, the AIMEAT account otherwise. */
-function dataHolder(o: Offering, extras: OdpsExtras | null, baseUrl: string): Json {
-  if (extras?.dataHolder) return { ...extras.dataHolder } as Json;
+/**
+ * The legal entity behind the offering: the provider's declaration when given, the AIMEAT account
+ * otherwise. ODPS keys the block by language (`dataHolder.en.legalName`), as it keys `details`.
+ */
+function dataHolder(o: Offering, extras: OdpsExtras | null, baseUrl: string, lang: string): Json {
+  if (extras?.dataHolder) return { [lang]: { ...extras.dataHolder } };
   return {
-    legalName: o.providerOwner,
-    description: 'AIMEAT account identity of the provider. No verified legal entity has been declared for this offering — treat the account, not a company, as the counterparty.',
-    URL: baseUrl,
+    [lang]: {
+      legalName: o.providerOwner,
+      description: 'AIMEAT account identity of the provider. No verified legal entity has been declared for this offering — treat the account, not a company, as the counterparty.',
+      URL: baseUrl,
+    },
   };
 }
 
-/** The AIMEAT extension block: everything true about this offering that ODPS v4.1 has no slot for. */
+/** The AIMEAT extension block: everything true about this offering that ODPS has no slot for. */
 function aimeatExtension(input: OdpsProjectionInput): Json {
   const { offering: o, iface, callRecipe, stats, rakePercent, nodeId } = input;
   return {
@@ -492,7 +516,7 @@ function aimeatExtension(input: OdpsProjectionInput): Json {
 }
 
 /**
- * Project one offering into an ODPS v4.1 document. Pure: no storage, no clock — everything comes from the
+ * Project one offering into an ODPS v4.2 document. Pure: no storage, no clock — everything comes from the
  * inputs, so the same offering always yields the same document.
  */
 export function offeringToOdps(input: OdpsProjectionInput): OdpsDocument {
@@ -544,11 +568,11 @@ export function offeringToOdps(input: OdpsProjectionInput): OdpsDocument {
     schema: ODPS_SCHEMA_URL,
     version: ODPS_VERSION,
     product: {
-      details: { [lang]: details },   // v4.1: details is keyed by ISO 639-1 language
+      details: { [lang]: details },   // details is keyed by ISO 639-1 language
       dataAccess: dataAccess(input, lang),
       pricingPlans: pricingPlans(o, extras, lang),
       license: licence(o, extras),
-      dataHolder: dataHolder(o, extras, input.baseUrl),
+      dataHolder: dataHolder(o, extras, input.baseUrl, lang),
       paymentGateways: paymentGateways(o, input.rakePercent, input.baseUrl, lang),
       ...(sla ? { SLA: sla } : {}),
       ...(quality ? { dataQuality: quality } : {}),
@@ -572,7 +596,7 @@ export function odpsToYaml(doc: OdpsDocument): string {
 export interface OdpsTextLimit {
   /** Path into the generated document; `*` stands for the ISO 639-1 language key. */
   path: string;
-  /** The `maxLength` the vendored ODPS v4.1 JSON Schema gives the field. */
+  /** The `maxLength` the vendored ODPS v4.2 JSON Schema gives the field. */
   maxLength: number;
   /** What fills it: the authoring field a provider writes, or the node itself. */
   source: string;
@@ -585,7 +609,7 @@ export interface OdpsTextLimit {
 }
 
 /**
- * Every `maxLength` in the ODPS v4.1 JSON Schema this repo vendors (test/fixtures/odps-v4.1.schema.json),
+ * Every `maxLength` in the ODPS v4.2 JSON Schema this repo vendors (test/fixtures/odps-v4.2.schema.json),
  * as a path into the document offeringToOdps() writes. test/unit/exchange-odps-length.test.ts walks the
  * vendored schema and fails when the two disagree, so a schema update cannot add a cap this list misses.
  */
@@ -602,9 +626,9 @@ export const ODPS_TEXT_LIMITS: readonly OdpsTextLimit[] = [
   { path: 'product.license.governance.confidentiality', maxLength: 512, source: 'odps.license.confidentiality', fields: ['odps.license.confidentiality'] },
   { path: 'product.license.governance.applicableLaws', maxLength: 512, source: 'odps.license.applicableLaws', fields: ['odps.license.applicableLaws'] },
   { path: 'product.license.governance.forceMajeure', maxLength: 512, source: 'odps.license.forceMajeure', fields: ['odps.license.forceMajeure'] },
-  { path: 'product.dataHolder.legalName', maxLength: 256, source: 'odps.dataHolder.legalName (the account name when none is declared)', fields: ['odps.dataHolder.legalName'] },
-  { path: 'product.dataHolder.description', maxLength: 512, source: 'odps.dataHolder.description', fields: ['odps.dataHolder.description'] },
-  { path: 'product.dataHolder.slogan', maxLength: 256, source: 'odps.dataHolder.slogan', fields: ['odps.dataHolder.slogan'] },
+  { path: 'product.dataHolder.*.legalName', maxLength: 256, source: 'odps.dataHolder.legalName (the account name when none is declared)', fields: ['odps.dataHolder.legalName'] },
+  { path: 'product.dataHolder.*.description', maxLength: 512, source: 'odps.dataHolder.description', fields: ['odps.dataHolder.description'] },
+  { path: 'product.dataHolder.*.slogan', maxLength: 256, source: 'odps.dataHolder.slogan', fields: ['odps.dataHolder.slogan'] },
 ];
 
 /** A field of a generated document that is longer than the ODPS schema allows. */

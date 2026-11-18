@@ -7140,7 +7140,7 @@
       "langLabel": "The language of these words", "lang": { "fi": "Suomi", "en": "English", "es": "Español" },
       "langBase": "The base words, which a reader of any other language gets too",
       "langOther": "Words in {lang}. A reader whose language is {lang} gets these; a field left empty shows the base words.",
-      "odpsTitle": "The description machines read (ODPS 4.1, excerpt)", "noOdps": "The sheet shows once the preview passes its checks."
+      "odpsTitle": "The description machines read (ODPS 4.2, excerpt)", "noOdps": "The sheet shows once the preview passes its checks."
     },
     "sched": {
       "change": "When the source changes",
@@ -29737,7 +29737,7 @@
     "monetize.currency2": "Currency",
     "monetize.money2Hint": "Optional: sell the same call in a second currency. Buyers pick one when they open a contract.",
     "odps.title": "EXCHANGE & ODPS",
-    "odps.hint": "Whether this app sells anything on the marketplace, and the product description every listing carries. A listed tool is published as an Open Data Product Specification v4.1 document that outside catalogues and buying agents can read.",
+    "odps.hint": "Whether this app sells anything on the marketplace, and the product description every listing carries. A listed tool is published as an Open Data Product Specification v4.2 document that outside catalogues and buying agents can read.",
     "odps.statusOn": "On the marketplace: {live} of {total} tools",
     "odps.statusOff": "Not on the marketplace ({total} tools declared)",
     "odps.statusBlocked": "{n} tool(s) are flagged for EXCHANGE but cannot be listed yet — see the reason on the tool.",

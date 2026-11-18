@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The ODPS length rule at the WRITE. Decided by the developer on 2026-09-13: a write that would
- *   make an EXCHANGE listing's generated ODPS v4.1 document break a schema maxLength is refused before
+ *   make an EXCHANGE listing's generated ODPS v4.2 document break a schema maxLength is refused before
  *   anything is stored, with 422 ODPS_FIELD_TOO_LONG naming the field the owner wrote, the ODPS field it
  *   fills, that field's length, the cap and the room left. The text is never truncated: a shortened
  *   licence term states something the provider did not write.

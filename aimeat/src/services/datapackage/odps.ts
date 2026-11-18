@@ -16,9 +16,9 @@
  *
  *   THREE PLACES THE SPEC'S CLOSED ENUMS DO NOT FIT, handled the same way each time: state it under
  *   `x-aimeat` rather than bend a field to nearly mean it.
- *   - `dataAccess[].format` is `TOON|JSON|XML|CSV|Excel|zip|plain text|GraphQL|MCP`. CSV is on it, so
- *     today's canonical form declares itself honestly. Parquet is not, and when Parquet arrives it
- *     goes in the extension block rather than being called `zip`.
+ *   - `dataAccess.<name>.format` is `TOON|JSON|JSONL|XML|CSV|Excel|Parquet|zip|plain text|GraphQL|MCP`
+ *     in v4.2. CSV is on it, so today's canonical form declares itself honestly, and Parquet is on it
+ *     since v4.2, so a Parquet resource can say so.
  *   - `specification` is `OAS|RAML|Slate|MCP`. A plain file has no API specification, so the field is
  *     simply absent rather than filled with the closest wrong answer.
  *   - `updateFrequency` IS in the SLA dimension enum, and it is filled from the producer's cron —
@@ -26,7 +26,7 @@
  *     service level is an absent one, never a promise of daily.
  *
  *   WHO READS IT is the version's audience (./audience.ts), passed in by the caller at read time. ODPS
- *   v4.1 `details.visibility` takes private|invitation|organisation|dataspace|public; public maps to
+ *   `details.visibility` takes private|invitation|organisation|dataspace|public (v4.2 adds internal); public maps to
  *   public, members (every account of this node) to dataspace, organism:<id> to organisation and
  *   private to private, and the AIMEAT audience itself is stated under `x-aimeat.audience`.
  *   `authenticationMethod` is 'none' only for a public package and 'Token' (an AIMEAT bearer token)
@@ -34,6 +34,8 @@
  * @structure descriptorToOdps · odpsVisibilityOf
  * @usage const doc = descriptorToOdps({ descriptor, ownerGhii, baseUrl, resourceUrls, audience });
  * @version-history
+ *   v1.5.0 -- 2026-11-18 -- ODPS v4.2: the SLA `declarative` block is a named mapping with `default`, and
+ *     `dataHolder` is keyed by the sheet's language (`dataHolder.en.legalName`).
  *   v1.4.0 -- 2026-11-01 -- `details` carries one block per language the package states its title and
  *     description in; the licence's definition names the licence, its deed and the attribution, and
  *     x-aimeat.license states them as fields (WP10e A2, A3).
@@ -85,7 +87,7 @@ export interface OdpsProjectionInput {
     /** The permanent, session-free URL of each resource's CSV, keyed by resource name. */
     resourceUrls: Record<string, string>;
     descriptorUrl: string;
-    /** ISO 639-1 language the `details` block is keyed by. v4.1 requires the map. */
+    /** ISO 639-1 language the `details` and `dataHolder` blocks are keyed by. ODPS requires the map. */
     lang?: string;
     /** Who reads this version (./audience.ts): public, members, organism:<id> or private. Default public. */
     audience?: string;
@@ -103,7 +105,7 @@ export interface OdpsProjectionInput {
     freshness?: Freshness | null;
 }
 
-/** ODPS v4.1 `details.visibility` for an AIMEAT audience. */
+/** ODPS `details.visibility` for an AIMEAT audience. */
 export function odpsVisibilityOf(audience: string): 'public' | 'dataspace' | 'organisation' | 'private' {
     if (audience === 'public') return 'public';
     if (audience === 'members') return 'dataspace';
@@ -118,7 +120,7 @@ function readersOf(audience: string): string {
 }
 
 /**
- * Project one published version into an ODPS v4.1 document.
+ * Project one published version into an ODPS v4.2 document.
  *
  * Everything traces to the descriptor. `status` is 'production' because a published version at a
  * permanent immutable address is exactly that — a draft is a thing that has not been published, and
@@ -139,7 +141,7 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
     const details: Record<string, unknown> = {
         name: d.title ?? d.name,
         productID: a.packageId,
-        // v4.1 `type`: this is a dataset delivered as files, which is what 'dataset' means here.
+        // ODPS `type`: this is a dataset delivered as files, which is what 'dataset' means here.
         type: 'dataset',
         status: 'production',
         visibility: odpsVisibilityOf(audience),
@@ -197,21 +199,24 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
     const promised = input.freshness?.promise?.cron ?? a.producer.schedule;
     const promisedBy = input.freshness?.promise?.source === 'dataproduct' ? 'dataproduct' : a.producer.kind;
     const freq = updateFrequencyFrom(promised);
+    // v4.2: `declarative` is a mapping of named definitions, `default` first.
     const sla = freq
         ? {
-            declarative: [{
-                name: { [lang]: 'Producer cadence' },
-                description: {
-                    [lang]: `Refreshed by a ${promisedBy} producer on the schedule "${promised}". `
-                        + 'A run that fails writes no version: the package stays on its previous one and the '
-                        + 'failure is recorded on the package pointer.',
+            declarative: {
+                default: {
+                    name: { [lang]: 'Producer cadence' },
+                    description: {
+                        [lang]: `Refreshed by a ${promisedBy} producer on the schedule "${promised}". `
+                            + 'A run that fails writes no version: the package stays on its previous one and the '
+                            + 'failure is recorded on the package pointer.',
+                    },
+                    dimensions: [{
+                        dimension: 'updateFrequency',
+                        objective: String(freq.objective),
+                        unit: freq.unit,
+                    }],
                 },
-                dimensions: [{
-                    dimension: 'updateFrequency',
-                    objective: String(freq.objective),
-                    unit: freq.unit,
-                }],
-            }],
+            },
         }
         : null;
 
@@ -238,7 +243,8 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
                 licenceUrl && licenceUrl !== a.license ? `(${licenceUrl})` : '',
                 a.attribution ? `Attribution: ${a.attribution}` : '',
             ].filter(Boolean).join(' ') } } } : {}),
-            ...(input.dataHolder ? { dataHolder: input.dataHolder } : {}),
+            // ODPS keys the data holder by language, as it keys `details`.
+            ...(input.dataHolder ? { dataHolder: { [lang]: input.dataHolder } } : {}),
             ...(sla ? { SLA: sla } : {}),
             // Everything the closed enums cannot hold, stated rather than bent into a near-fit.
             'x-aimeat': {

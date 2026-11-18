@@ -7,7 +7,7 @@
     "offer.field.node-only:exchange": "DEBT: no named keyword in build_offer. Listing an offer on EXCHANGE (TARGET-050) reaches the node only through **extra, unchecked.",
     "offer.field.node-only:inputSchema": "DEBT: no named keyword in build_offer. The buyer's input schema, required to list on EXCHANGE, reaches the node only through **extra, unchecked.",
     "offer.field.node-only:inputs": "DEBT: no named keyword in build_offer. The named inputs list reaches the node only through **extra, unchecked.",
-    "offer.field.node-only:odps": "DEBT: no named keyword in build_offer. The ODPS v4.1 extras reach the node only through **extra, unchecked.",
+    "offer.field.node-only:odps": "DEBT: no named keyword in build_offer. The ODPS v4.2 extras reach the node only through **extra, unchecked.",
     "offer.field.node-only:outputSchema": "DEBT: no named keyword in build_offer. The deliverable's output schema, required to list on EXCHANGE, reaches the node only through **extra, unchecked.",
     "offer.field.node-only:price": "ANSWER: deliberate. `price` is the deprecated morsel price (offer-schemas.ts: accepted until 4.0.0 and read as pacing). build_offer takes price= for old callers, warns, adds it to tollMorsels and never puts `price` on the offer. Read 2026-10-18.",
     "offer.field.node-only:pricesMoney": "DEBT: no named keyword in build_offer. The additional money prices, one per currency (EXCHANGE lists from them), reach the node only through **extra, unchecked.",

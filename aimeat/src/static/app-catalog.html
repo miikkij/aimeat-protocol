@@ -4632,7 +4632,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "monetize.currency2": "Currency",
       "monetize.money2Hint": "Optional: sell the same call in a second currency. Buyers pick one when they open a contract.",
       "odps.title": "EXCHANGE & ODPS",
-      "odps.hint": "Whether this app sells anything on the marketplace, and the product description every listing carries. A listed tool is published as an Open Data Product Specification v4.1 document that outside catalogues and buying agents can read.",
+      "odps.hint": "Whether this app sells anything on the marketplace, and the product description every listing carries. A listed tool is published as an Open Data Product Specification v4.2 document that outside catalogues and buying agents can read.",
       "odps.statusOn": "On the marketplace: {live} of {total} tools",
       "odps.statusOff": "Not on the marketplace ({total} tools declared)",
       "odps.statusBlocked": "{n} tool(s) are flagged for EXCHANGE but cannot be listed yet — see the reason on the tool.",
@@ -5741,7 +5741,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "monetize.currency2": "Valuutta",
       "monetize.money2Hint": "Valinnainen: myy sama kutsu toisessa valuutassa. Ostaja valitsee valuutan sopimusta avatessaan.",
       "odps.title": "EXCHANGE ja ODPS",
-      "odps.hint": "Myykö tämä sovellus jotain markkinalla, ja mikä tuotekuvaus jokaisen listauksen mukana kulkee. Listattu työkalu julkaistaan Open Data Product Specification v4.1 -dokumenttina, jota ulkoiset katalogit ja ostavat agentit osaavat lukea.",
+      "odps.hint": "Myykö tämä sovellus jotain markkinalla, ja mikä tuotekuvaus jokaisen listauksen mukana kulkee. Listattu työkalu julkaistaan Open Data Product Specification v4.2 -dokumenttina, jota ulkoiset katalogit ja ostavat agentit osaavat lukea.",
       "odps.statusOn": "Markkinalla: {live} / {total} työkalua",
       "odps.statusOff": "Ei markkinalla ({total} työkalua määritelty)",
       "odps.statusBlocked": "{n} työkalua on merkitty EXCHANGEen mutta ei vielä listaudu — syy näkyy työkalun kohdalla.",
@@ -7935,7 +7935,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     "timeToRepair",
     "emailResponseTime"
   ];
-  var SLA_UNITS = ["percent", "milliseconds", "seconds", "minutes", "days", "weeks", "months", "years", "never", "date"];
+  var SLA_UNITS = ["percent", "milliseconds", "seconds", "minutes", "hours", "days", "weeks", "months", "years", "never", "date"];
   var QUALITY_DIMENSIONS = ["accuracy", "completeness", "conformity", "consistency", "coverage", "timeliness", "validity", "uniqueness"];
   var QUALITY_UNITS = ["percentage", "number"];
   var odDefaultsOpen = false;
@@ -8241,7 +8241,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       statusEl.className = "dtl-ai-status";
       statusEl.textContent = t("odps.suggesting");
     }
-    var system = `You write the descriptive half of an Open Data Product Specification (ODPS v4.1) entry for a capability sold on a marketplace. Return ONLY a JSON object with these keys: "productType" (one of: raw data, derived data, dataset, reports, analytic view, algorithm, decision support, automated decision-making, data-enhanced product, data-driven service, data-enabled performance, bi-directional), "valueProposition" (one sentence, max 400 characters, what a buyer gets), "categories" (2-4 short strings), "standards" (0-3 recognised standards that genuinely apply, else []), "useCases" (1-3 objects with "title" and "description"). Base every word on the material given. Do NOT state where the data comes from, its legal basis, consent, retention, service levels, uptime, accuracy or the selling company — those are the owner's own attestations and inventing them would be a false claim. No markdown, no commentary, JSON only.`;
+    var system = `You write the descriptive half of an Open Data Product Specification (ODPS v4.2) entry for a capability sold on a marketplace. Return ONLY a JSON object with these keys: "productType" (one of: raw data, derived data, dataset, reports, analytic view, algorithm, decision support, automated decision-making, data-enhanced product, data-driven service, data-enabled performance, bi-directional), "valueProposition" (one sentence, max 400 characters, what a buyer gets), "categories" (2-4 short strings), "standards" (0-3 recognised standards that genuinely apply, else []), "useCases" (1-3 objects with "title" and "description"). Base every word on the material given. Do NOT state where the data comes from, its legal basis, consent, retention, service levels, uptime, accuracy or the selling company — those are the owner's own attestations and inventing them would be a false claim. No markdown, no commentary, JSON only.`;
     var prompt2 = "App: " + (ctx.appName || ctx.appId) + "\n" + (ctx.appDescription ? "App description: " + ctx.appDescription + "\n" : "") + "Capability (tool) name: " + (ctx.toolName || "") + "\n" + (ctx.toolDescription ? "Capability description: " + ctx.toolDescription + "\n" : "") + (ctx.inputSchema ? "Input schema: " + JSON.stringify(ctx.inputSchema).slice(0, 1500) + "\n" : "") + (ctx.outputSchema ? "Output schema: " + JSON.stringify(ctx.outputSchema).slice(0, 1500) + "\n" : "") + (ctx.price ? "Price: " + ctx.price + "\n" : "") + "Write the ODPS descriptive fields for this capability.";
     fetch(base4 + "/v1/ai/complete", {
       method: "POST",

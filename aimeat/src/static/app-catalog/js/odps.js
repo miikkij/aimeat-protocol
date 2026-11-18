@@ -2,7 +2,7 @@
  * @file odps.js
  * @description The ODPS surface of the App Detail view: the app-level EXCHANGE status + ODPS defaults,
  *   and the per-tool ODPS descriptor block inside the Monetize editor. A listed tool is projected into an
- *   Open Data Product Specification v4.1 document (GET /v1/exchange/offerings/{id}/odps.yaml) — the
+ *   Open Data Product Specification v4.2 document (GET /v1/exchange/offerings/{id}/odps.yaml) — the
  *   interoperable descriptor outside catalogues and negotiating agents read. Most of that document the
  *   node derives (price, plans, access, licence rights, observed use); what it CANNOT derive is authored
  *   here and stored in the app's own tool manifest (`apps.{appId}.tools`), so the app owns its ODPS data.
@@ -19,6 +19,7 @@
  *   readOdpsToolFields · readOdpsAppDefaults · odpsSuggestForTool · odpsToggleDefaults · odpsToggleTool
  * @usage import { odpsStatusInner, odpsToolFieldsHtml, readOdpsToolFields } from './odps.js'
  * @version-history
+ *   v1.0.3 — 2026-11-18 — ODPS v4.2: the SLA unit `hours`, and the drafting prompt names v4.2.
  *   v1.0.2 — 2026-10-11 — A tool with a pacing amount (tollMorsels) and no money price is not blocked as unpriced.
  *   v1.0.1 — 2026-08-31 — The odps.yaml link escapes the node address before it goes in the href.
  *     It comes from the Settings field, so it was DOM text reinterpreted as markup, and it reached
@@ -39,7 +40,7 @@ var GOVERNANCE = ['', 'structured', 'enforced', 'automated', 'audit_ready'];
 var PRIORITIES = ['', 'critical', 'high', 'medium', 'low'];
 var SLA_DIMENSIONS = ['latency', 'uptime', 'responseTime', 'errorRate', 'endOfSupport', 'endOfLife',
   'updateFrequency', 'timeToDetect', 'timeToNotify', 'timeToRepair', 'emailResponseTime'];
-var SLA_UNITS = ['percent', 'milliseconds', 'seconds', 'minutes', 'days', 'weeks', 'months', 'years', 'never', 'date'];
+var SLA_UNITS = ['percent', 'milliseconds', 'seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'years', 'never', 'date'];
 var QUALITY_DIMENSIONS = ['accuracy', 'completeness', 'conformity', 'consistency', 'coverage', 'timeliness', 'validity', 'uniqueness'];
 var QUALITY_UNITS = ['percentage', 'number'];
 
@@ -439,7 +440,7 @@ export function odpsSuggestForTool(ctx, rerender) {
   if (!base) { if (statusEl) statusEl.textContent = t('odps.aiUnavailable'); return; }
   odBusy = true;
   if (statusEl) { statusEl.className = 'dtl-ai-status'; statusEl.textContent = t('odps.suggesting'); }
-  var system = 'You write the descriptive half of an Open Data Product Specification (ODPS v4.1) entry for '
+  var system = 'You write the descriptive half of an Open Data Product Specification (ODPS v4.2) entry for '
     + 'a capability sold on a marketplace. Return ONLY a JSON object with these keys: '
     + '"productType" (one of: raw data, derived data, dataset, reports, analytic view, algorithm, decision support, '
     + 'automated decision-making, data-enhanced product, data-driven service, data-enabled performance, bi-directional), '

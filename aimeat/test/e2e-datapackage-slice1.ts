@@ -29,6 +29,7 @@
  *   shape locally so the suite proves the machinery rather than the availability of a third party.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=datapackage-slice1
  * @version-history
+ *   v1.0.1 -- 2026-11-18 -- The sheet is ODPS v4.2: its schema pointer and its quoted version.
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, C). The out-of-band engine read:
  *     python -c "import duckdb; print(duckdb.sql(\"SELECT count(*), min(vnr) FROM read_csv('<csvUrl>')\"))"
  */
@@ -376,15 +377,15 @@ await test('10a2. The history is readable as a chain, not as a list of hashes', 
 await test('10b. ACCEPTANCE: the package is sellable — odps.yaml rides with every version', async () => {
   // The product sheet is generated from the descriptor and stored beside it, so a pinned version
   // carries the sheet that describes THAT version. Schema conformance is asserted against the
-  // vendored ODPS v4.1 schema in test/unit/datapackage-odps.test.ts; what matters here is that the
+  // vendored ODPS v4.2 schema in test/unit/datapackage-odps.test.ts; what matters here is that the
   // file exists at a permanent address and says the true things about this package.
   const yamlUrl = descriptorUrl.replace(/datapackage\.json$/, 'odps.yaml');
   const res = await fetch(yamlUrl);
   assert(res.status === 200, `anonymous odps.yaml read ${res.status}`);
   const text = await res.text();
-  assert(/^schema: https:\/\/opendataproducts\.org\/v4\.1\/schema\/odps\.yaml/m.test(text), `schema pointer: ${text.slice(0, 80)}`);
-  // The YAML writer quotes it, because a bare 4.1 would parse as a number and the field is a string.
-  assert(/^version: ["']?4\.1["']?$/m.test(text), `ODPS v4.1, got: ${/^version:.*$/m.exec(text)?.[0]}`);
+  assert(/^schema: https:\/\/opendataproducts\.org\/v4\.2\/schema\/odps\.yaml/m.test(text), `schema pointer: ${text.slice(0, 80)}`);
+  // The YAML writer quotes it, because a bare 4.2 would parse as a number and the field is a string.
+  assert(/^version: ["']4\.2["']$/m.test(text), `ODPS v4.2, quoted, got: ${/^version:.*$/m.exec(text)?.[0]}`);
   // The cadence is the producer's cron, recorded rather than described. The schedule is weekly.
   assert(/dimension: updateFrequency/.test(text), 'the SLA carries the update frequency');
   assert(/unit: weeks/.test(text), `and it came from the cron, got: ${/unit: \w+/.exec(text)?.[0]}`);

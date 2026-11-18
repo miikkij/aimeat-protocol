@@ -414,7 +414,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     /**
-     * The ODPS v4.1 product sheet of one version, projected now from the descriptor and the version's
+     * The ODPS v4.2 product sheet of one version, projected now from the descriptor and the version's
      * audience (services/datapackage/odps-read.ts): YAML, or the envelope with `?format=json`. Readable
      * by whoever may read the package, refused as the descriptor read refuses.
      */

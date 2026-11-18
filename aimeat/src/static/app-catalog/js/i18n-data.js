@@ -5,6 +5,7 @@
  *   stay in main.js and import this table. Keep en + fi keys in lockstep (Rule 4).
  * @usage import { I18N } from './i18n-data.js'
  * @version-history
+ *   v1.7.4 — 2026-11-18 — odps.hint names ODPS v4.2 (en, fi).
  *   v1.7.3 — 2026-11-15 — list.foot says a row's buttons (fi: painikkeet), not its doors (en, fi).
  *   v1.7.2 — 2026-11-11 — agents.deployDesc says what a deploy with no runner does, and
  *     agents.saidProposed is the notice for an agent that waits for approval (en, fi).
@@ -665,7 +666,7 @@ export const I18N = {
       'monetize.currency2': 'Currency',
       'monetize.money2Hint': 'Optional: sell the same call in a second currency. Buyers pick one when they open a contract.',
       'odps.title': 'EXCHANGE & ODPS',
-      'odps.hint': 'Whether this app sells anything on the marketplace, and the product description every listing carries. A listed tool is published as an Open Data Product Specification v4.1 document that outside catalogues and buying agents can read.',
+      'odps.hint': 'Whether this app sells anything on the marketplace, and the product description every listing carries. A listed tool is published as an Open Data Product Specification v4.2 document that outside catalogues and buying agents can read.',
       'odps.statusOn': 'On the marketplace: {live} of {total} tools',
       'odps.statusOff': 'Not on the marketplace ({total} tools declared)',
       'odps.statusBlocked': '{n} tool(s) are flagged for EXCHANGE but cannot be listed yet — see the reason on the tool.',
@@ -1774,7 +1775,7 @@ export const I18N = {
       'monetize.currency2': 'Valuutta',
       'monetize.money2Hint': 'Valinnainen: myy sama kutsu toisessa valuutassa. Ostaja valitsee valuutan sopimusta avatessaan.',
       'odps.title': 'EXCHANGE ja ODPS',
-      'odps.hint': 'Myykö tämä sovellus jotain markkinalla, ja mikä tuotekuvaus jokaisen listauksen mukana kulkee. Listattu työkalu julkaistaan Open Data Product Specification v4.1 -dokumenttina, jota ulkoiset katalogit ja ostavat agentit osaavat lukea.',
+      'odps.hint': 'Myykö tämä sovellus jotain markkinalla, ja mikä tuotekuvaus jokaisen listauksen mukana kulkee. Listattu työkalu julkaistaan Open Data Product Specification v4.2 -dokumenttina, jota ulkoiset katalogit ja ostavat agentit osaavat lukea.',
       'odps.statusOn': 'Markkinalla: {live} / {total} työkalua',
       'odps.statusOff': 'Ei markkinalla ({total} työkalua määritelty)',
       'odps.statusBlocked': '{n} työkalua on merkitty EXCHANGEen mutta ei vielä listaudu — syy näkyy työkalun kohdalla.',

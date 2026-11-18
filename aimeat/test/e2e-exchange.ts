@@ -10,6 +10,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=exchange
  *   (the .env.test.* file turns on the extensions and the EUR test money handler the money tests need)
  * @version-history
+ *   2026-11-18 — ODPS v4.2: the document validates whole against the v4.2 schema (the dataAccess and
+ *     paymentGateways exclusion and its tripwire are gone), the data holder sits under its language key,
+ *     SLA and data quality are named mappings with `default`, and the node stamps 4.2.
  *   2026-11-15 — Audit L047, L048: a missing EUR money handler fails a precondition test instead of
  *     skipping the money and earnings tests; the consumer withdrawing the provider's proposal is 403
  *     FORBIDDEN.
@@ -70,7 +73,7 @@ import { parse as parseYaml } from 'yaml';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { readFileSync } from 'node:fs';
-const odpsSchema = JSON.parse(readFileSync(new URL('./fixtures/odps-v4.1.schema.json', import.meta.url), 'utf8'));
+const odpsSchema = JSON.parse(readFileSync(new URL('./fixtures/odps-v4.2.schema.json', import.meta.url), 'utf8'));
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
@@ -984,10 +987,10 @@ await test('The provider cannot start agent work for their own agent, even holdi
   assert(mine.status === 200 && mine.body.data.work.length === 0, `no work was stored for the provider as its consumer: ${JSON.stringify(mine.body.data?.work)}`);
 });
 
-// ── ODPS v4.1 (TARGET-045 §4): the listing as an Open Data Product Specification document ──
-// Validated against the OFFICIAL published schema (test/fixtures/odps-v4.1.schema.json, ODPS v4.1,
-// Apache-2.0) — a conformance claim only counts if a real validator agrees with it. v4.1 keys `details`
-// and `pricingPlans.declarative` by ISO 639-1 language and wraps several labels in language maps.
+// ── ODPS v4.2 (TARGET-045 §4): the listing as an Open Data Product Specification document ──
+// Validated against the OFFICIAL published schema (test/fixtures/odps-v4.2.schema.json, ODPS v4.2,
+// Apache-2.0) — a conformance claim only counts if a real validator agrees with it. ODPS keys `details`,
+// `dataHolder` and `pricingPlans.declarative` by ISO 639-1 language and wraps several labels in language maps.
 const ODPS_PROVENANCE = {
   source: 'PRH open company register (YTJ v3)',
   legalBasis: 'Public register — open data, no personal data reused',
@@ -1022,7 +1025,7 @@ await test('Listing accepts a validated PROVENANCE + ODPS authoring block (odpsV
   assert(r.status === 201, `list with odps ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const o = r.body.data.offering;
   odpsOfferingId = o.offeringId;
-  assert(o.provenance?.odpsVersion === '4.1', `node stamps odpsVersion, got ${JSON.stringify(o.provenance)}`);
+  assert(o.provenance?.odpsVersion === '4.2', `node stamps odpsVersion, got ${JSON.stringify(o.provenance)}`);
   assert(o.provenance?.lineage?.length === 1 && o.odps?.dataHolder?.legalName === 'Overscale Solutions Oy', `provenance + odps stored: ${JSON.stringify(o.odps)}`);
 });
 
@@ -1039,43 +1042,32 @@ await test('Malformed ODPS block (SLA dimension outside the spec enum) → 400 I
   assert(r.status === 400 && r.body?.error?.code === 'INVALID_ODPS', `expected INVALID_ODPS, got ${r.status}/${JSON.stringify(r.body?.error)}`);
 });
 
-await test('GET /odps.yaml serves YAML that VALIDATES against the official ODPS v4.1 schema', async () => {
+await test('GET /odps.yaml serves YAML that VALIDATES against the official ODPS v4.2 schema', async () => {
   const res = await fetch(`${BASE}/v1/exchange/offerings/${odpsOfferingId}/odps.yaml`);
   assert(res.status === 200, `odps.yaml ${res.status}`);
   assert((res.headers.get('content-type') ?? '').includes('yaml'), `content-type should be YAML, got ${res.headers.get('content-type')}`);
   const doc = parseYaml(await res.text()) as any;
-  // KNOWN SPEC BUG (still present in the v4.1 published JSON Schema): `product.dataAccess` and `product.paymentGateways` are
-  // declared `type: object` while $ref-ing an ARRAY-typed definition — a contradiction no document can
-  // satisfy. The specification's own examples show a MAPPING of named access blocks, which is what we emit.
-  // We therefore validate every other element strictly and assert those two by hand (below). If ODPS repairs
-  // the schema, the tripwire assertion at the end of this test fails and full validation can be turned on.
+  // The whole document: v4.2 declares `dataAccess` and `paymentGateways` as the named mappings the node
+  // writes, so nothing is set aside any more (v4.1's first schema declared arrays there).
   const validator = new Ajv2020({ strict: false, allErrors: true });
   addFormats(validator);
-  const validatable = { ...doc, product: { ...doc.product } };
-  delete validatable.product.dataAccess;
-  delete validatable.product.paymentGateways;
-  const ok = validator.validate(odpsSchema, validatable);
+  const ok = validator.validate(odpsSchema, doc);
   assert(ok === true, `ODPS schema validation failed: ${JSON.stringify(validator.errors?.slice(0, 4))}`);
   // A YAML document points at the YAML schema (as the spec's own examples do); the JSON route keeps odps.json.
-  assert(doc.version === '4.1' && String(doc.schema) === 'https://opendataproducts.org/v4.1/schema/odps.yaml', `root: ${JSON.stringify({ v: doc.version, s: doc.schema })}`);
-  // Tripwire: the contradiction is still present in the pinned schema fixture.
-  const daProp = odpsSchema.properties.product.properties.dataAccess;
-  const daDef = odpsSchema.$defs.DataAccess;
-  assert(daProp.type === 'object' && daDef.type === 'array',
-    'ODPS fixed the dataAccess schema contradiction — validate the whole document again and drop this workaround');
+  assert(doc.version === '4.2' && String(doc.schema) === 'https://opendataproducts.org/v4.2/schema/odps.yaml', `root: ${JSON.stringify({ v: doc.version, s: doc.schema })}`);
 });
 
 await test('The ODPS document carries the AIMEAT truth: pricing, licence rights, provenance, observed usage', async () => {
   const res = await fetch(`${BASE}/v1/exchange/offerings/${odpsOfferingId}/odps.yaml`);
   const doc = parseYaml(await res.text()) as any;
   const p = doc.product;
-  // v4.1: details is keyed by ISO 639-1 language — one key only, the language the provider declared.
+  // details is keyed by ISO 639-1 language — one key only, the language the provider declared.
   assert(Object.keys(p.details).length === 1 && p.details.en, `details should be language-keyed: ${JSON.stringify(Object.keys(p.details))}`);
   const det = p.details.en;
   assert(det.productID === odpsOfferingId && det.status === 'production' && det.type === 'derived data',
     `details: ${JSON.stringify(det)}`);
-  assert(det.standards.includes('ODPS v4.1') && det.useCases[0].useCase.useCaseTitle === 'KYB onboarding', `details standards/useCases: ${JSON.stringify(det.standards)}`);
-  assert(det.governanceProfile === 'audit_ready' && det.portfolioPriority === 'high', `v4.1 governance fields: ${JSON.stringify({ g: det.governanceProfile, p: det.portfolioPriority })}`);
+  assert(det.standards.includes('ODPS v4.2') && det.useCases[0].useCase.useCaseTitle === 'KYB onboarding', `details standards/useCases: ${JSON.stringify(det.standards)}`);
+  assert(det.governanceProfile === 'audit_ready' && det.portfolioPriority === 'high', `governance fields: ${JSON.stringify({ g: det.governanceProfile, p: det.portfolioPriority })}`);
   const plan = p.pricingPlans.declarative.en[0];
   // A morsel figure is pacing, never a price: the plan is free ("0") and its note names the 10 morsels
   // of pacing. It asserted price "10", the old morsel-price model.
@@ -1085,18 +1077,20 @@ await test('The ODPS document carries the AIMEAT truth: pricing, licence rights,
   assert(p.license.scope.rights.includes('Adaptation') && !p.license.scope.rights.includes('Reselling'),
     `licence rights from usage terms: ${JSON.stringify(p.license.scope.rights)}`);
   assert(String(p.license.scope.restrictions).includes('Attribution'), `attribution restriction: ${p.license.scope.restrictions}`);
-  assert(p.dataHolder.legalName === 'Overscale Solutions Oy', `provider-declared data holder wins: ${JSON.stringify(p.dataHolder)}`);
-  assert(p.SLA.declarative[0].dimensions.length === 2 && p.dataQuality.declarative[0].dimensions[0].dimension === 'accuracy',
-    'SLA + data-quality commitments projected');
+  // v4.2: the data holder is keyed by language, and SLA and data quality are named mappings with `default`.
+  assert(p.dataHolder.en?.legalName === 'Overscale Solutions Oy', `provider-declared data holder wins: ${JSON.stringify(p.dataHolder)}`);
+  assert(p.SLA.declarative.default.dimensions.length === 2 && p.dataQuality.declarative.default.dimensions[0].dimension === 'accuracy'
+    && p.dataQuality.declarative.default.displaytitle?.en === 'Provider commitment',
+    `SLA + data-quality commitments projected: ${JSON.stringify({ sla: p.SLA, dq: p.dataQuality })}`);
   assert(String(p.dataAccess.default.accessURL).endsWith(`/v1/ext/${EXT}/validate`) && p.dataAccess.mcp.format === 'MCP',
     `data access ports: ${JSON.stringify(Object.keys(p.dataAccess))}`);
-  // v4.1: access-port and gateway labels are language maps, not bare strings.
+  // Access-port and gateway labels are language maps, not bare strings.
   assert(p.dataAccess.default.name.en === 'Metered AIMEAT call', `access name should be a language map: ${JSON.stringify(p.dataAccess.default.name)}`);
   // No money moves on a morsel-rail offering; its gateway names pacing (was "Morsel meter", a price model).
   assert(p.paymentGateways.default.type === 'Custom' && String(p.paymentGateways.default.description.en).includes('pacing'),
     `a free, paced offering moves no money and names its pacing: ${JSON.stringify(p.paymentGateways)}`);
   const x = p['x-aimeat'];
-  assert(String(x.provenance.legalBasis).startsWith('Public register') && x.provenance.odpsVersion === '4.1', `x-aimeat provenance: ${JSON.stringify(x.provenance)}`);
+  assert(String(x.provenance.legalBasis).startsWith('Public register') && x.provenance.odpsVersion === '4.2', `x-aimeat provenance: ${JSON.stringify(x.provenance)}`);
   assert(x.capability.ext === EXT && typeof x.interface.output_schema === 'object', `x-aimeat capability + interface: ${JSON.stringify(x.capability)}`);
   assert(typeof x.observed.total_calls === 'number' && x.economics.rake_percent >= 0 && x.economics.toll_morsels === 10,
     `x-aimeat observed + economics with the pacing: ${JSON.stringify(x.economics)}`);
@@ -1104,7 +1098,7 @@ await test('The ODPS document carries the AIMEAT truth: pricing, licence rights,
 
 await test('GET /odps returns the same document as JSON in the envelope; unknown offering → 404', async () => {
   const r = await json(`/v1/exchange/offerings/${odpsOfferingId}/odps`);
-  assert(r.status === 200 && r.body.data.odps_version === '4.1', `odps json ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.status === 200 && r.body.data.odps_version === '4.2', `odps json ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.odps.product.details.en.productID === odpsOfferingId, 'same document as JSON');
   assert(String(r.body.data.odps.schema).endsWith('odps.json'), `the JSON rendering points at the JSON schema: ${r.body.data.odps.schema}`);
   const missing = await json('/v1/exchange/offerings/off-does-not-exist/odps.yaml');
@@ -1113,7 +1107,7 @@ await test('GET /odps returns the same document as JSON in the envelope; unknown
 
 await test('Offering DETAIL points at the ODPS projection (discoverable without reading docs)', async () => {
   const r = await json(`/v1/exchange/offerings/${odpsOfferingId}`);
-  assert(r.status === 200 && r.body.data.odps?.version === '4.1', `detail odps pointer: ${JSON.stringify(r.body.data.odps)}`);
+  assert(r.status === 200 && r.body.data.odps?.version === '4.2', `detail odps pointer: ${JSON.stringify(r.body.data.odps)}`);
   assert(r.body.data.odps.url === `/v1/exchange/offerings/${odpsOfferingId}/odps.yaml`, 'detail carries the odps url');
 });
 
@@ -1156,12 +1150,9 @@ await test('A usage note past the ODPS restrictions cap is refused on write, and
 
   // A real validator agrees with the warning, and on that field only: the rest of the document is in schema.
   const doc = parseYaml(await (await fetch(`${BASE}/v1/exchange/offerings/${listing.offeringId}/odps.yaml`)).text()) as any;
-  const validatable = { ...doc, product: { ...doc.product } };
-  delete validatable.product.dataAccess;           // the published schema's known contradiction, see above
-  delete validatable.product.paymentGateways;
   const validator = new Ajv2020({ strict: false, allErrors: true });
   addFormats(validator);
-  validator.validate(odpsSchema, validatable);
+  validator.validate(odpsSchema, doc);
   const tooLong = (validator.errors ?? []).filter(e => e.keyword === 'maxLength').map(e => e.instancePath);
   assert(JSON.stringify(tooLong) === JSON.stringify(['/product/license/scope/restrictions']), `validator refuses exactly the warned field: ${JSON.stringify(tooLong)}`);
   assert(String(doc.product.license.scope.restrictions).endsWith(note), 'and the restriction is published as written, never cut');

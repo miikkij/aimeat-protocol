@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "ODPS schema",
-    "description": "This is the schema for ODPS v4.1.",
+    "title": "ODPS v4.2 schema",
+    "description": "The final ODPS v4.2 schema for interoperable, machine-readable data product metadata.",
     "type": "object",
     "properties": {
         "schema": {
@@ -11,9 +11,9 @@
         },
         "version": {
             "type": "string",
-            "description": "Current ODPS version.",
+            "description": "Current ODPS version identifier. Quote numeric-looking values in YAML so they remain strings.",
             "examples": [
-                "v4.1",
+                "4.2",
                 "dev"
             ]
         },
@@ -64,7 +64,8 @@
                                         "invitation",
                                         "organisation",
                                         "dataspace",
-                                        "public"
+                                        "public",
+                                        "internal"
                                     ]
                                 },
                                 "status": {
@@ -214,7 +215,7 @@
                 },
                 "contract": {
                     "type": "object",
-                    "$ref": "#/$defs/Contract"
+                    "$ref": "#/$defs/ContractProfiles"
                 },
                 "SLA": {
                     "type": "object",
@@ -234,7 +235,7 @@
                 },
                 "dataAccess": {
                     "type": "object",
-                    "$ref": "#/$defs/DataAccess"
+                    "$ref": "#/$defs/DataAccessConfiguration"
                 },
                 "dataHolder": {
                     "type": "object",
@@ -260,12 +261,12 @@
     "$defs": {
         "Contract": {
             "type": "object",
-            "description": "Binds together data contract details.",
+            "description": "Defines one data contract, either by external reference, metadata and URL, or inline specification.",
             "properties": {
                 "$ref": {
                     "type": "string",
-                    "format": "uri",
-                    "description": "Points to the contract content, local file or online. You can use this or then the other described approaches to define elements of the contract."
+                    "format": "uri-reference",
+                    "description": "Points to the content of this individual contract profile in a local or external file."
                 },
                 "id": {
                     "type": "string",
@@ -286,21 +287,77 @@
                 "contractURL": {
                     "type": "string",
                     "format": "uri",
-                    "description": "URL pointing to data contract in data ontract management service or alike."
+                    "description": "URL pointing to a data contract in a contract management service or similar system."
                 },
                 "spec": {
                     "type": "object",
                     "description": "Inline YAML element to add data contract details instead of using URL."
                 }
+            },
+            "minProperties": 1,
+            "additionalProperties": false
+        },
+        "ContractProfilePackageReference": {
+            "type": "object",
+            "description": "References an external package containing named data contract profiles. The referenced package must contain a default profile.",
+            "properties": {
+                "$ref": {
+                    "type": "string",
+                    "format": "uri-reference"
+                }
+            },
+            "required": [
+                "$ref"
+            ],
+            "additionalProperties": false
+        },
+        "ContractProfileCollection": {
+            "type": "object",
+            "description": "Inline collection of one or more named data contract profiles. The default profile is required.",
+            "properties": {
+                "default": {
+                    "$ref": "#/$defs/Contract"
+                }
+            },
+            "required": [
+                "default"
+            ],
+            "additionalProperties": {
+                "$ref": "#/$defs/Contract"
             }
+        },
+        "ContractProfiles": {
+            "description": "Named data contract profiles defined inline or supplied as an external package.",
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/ContractProfileCollection"
+                },
+                {
+                    "$ref": "#/$defs/ContractProfilePackageReference"
+                }
+            ]
+        },
+        "ContractReference": {
+            "type": "object",
+            "description": "Reference from a Data Access profile to a named data contract profile.",
+            "properties": {
+                "$ref": {
+                    "type": "string",
+                    "format": "uri-reference"
+                }
+            },
+            "required": [
+                "$ref"
+            ],
+            "additionalProperties": false
         },
         "Sla": {
             "type": "object",
             "properties": {
                 "declarative": {
-                    "type": "array",
+                    "type": "object",
                     "description": "defines the dimensions and aimed/intended SLA levels in defined unit.",
-                    "items": {
+                    "additionalProperties": {
                         "$ref": "#/$defs/SlaDefinition"
                     }
                 },
@@ -318,9 +375,9 @@
             "description": "Contains array of data quality dimensions with optional computational monitoring object. Under this element Data Quality is divided into declarative and executable parts.",
             "properties": {
                 "declarative": {
-                    "type": "array",
+                    "type": "object",
                     "description": "Captures target levels for defined quality dimensions.",
-                    "items": {
+                    "additionalProperties": {
                         "$ref": "#/$defs/DQDefinition"
                     }
                 },
@@ -334,16 +391,73 @@
             }
         },
         "DataAccess": {
-            "type": "array",
-            "description": "This object must always be present and named exactly default.",
-            "items": {
-                "$ref": "#/$defs/DataAccessItem"
+            "type": "object",
+            "description": "Named data access definitions. The default access profile is required.",
+            "properties": {
+                "default": {
+                    "$ref": "#/$defs/DataAccessProfile"
+                }
+            },
+            "required": [
+                "default"
+            ],
+            "additionalProperties": {
+                "$ref": "#/$defs/DataAccessProfile"
             }
         },
+        "DataAccessProfilePackageReference": {
+            "type": "object",
+            "description": "References an external package containing named data access profiles. The referenced package must contain a default profile.",
+            "properties": {
+                "$ref": {
+                    "type": "string",
+                    "format": "uri-reference"
+                }
+            },
+            "required": [
+                "$ref"
+            ],
+            "additionalProperties": false
+        },
+        "DataAccessConfiguration": {
+            "description": "Named data access profiles defined inline or supplied as an external package.",
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/DataAccess"
+                },
+                {
+                    "$ref": "#/$defs/DataAccessProfilePackageReference"
+                }
+            ]
+        },
+        "DataAccessProfileReference": {
+            "type": "object",
+            "description": "References one external data access profile.",
+            "properties": {
+                "$ref": {
+                    "type": "string",
+                    "format": "uri-reference"
+                }
+            },
+            "required": [
+                "$ref"
+            ],
+            "additionalProperties": false
+        },
+        "DataAccessProfile": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/DataAccessItem"
+                },
+                {
+                    "$ref": "#/$defs/DataAccessProfileReference"
+                }
+            ]
+        },
         "PaymentGateway": {
-            "type": "array",
-            "description": "This object must always be present and named exactly default.",
-            "items": {
+            "type": "object",
+            "description": "Named payment gateway definitions, commonly including default.",
+            "additionalProperties": {
                 "$ref": "#/$defs/PaymentGateways"
             }
         },
@@ -507,17 +621,27 @@
             }
         },
         "DQDefinition": {
+            "type": "object",
+            "not": {
+                "required": [
+                    "displayTitle"
+                ]
+            },
             "properties": {
-                "displayTitle": {
-                    "type": "array",
+                "displaytitle": {
+                    "type": "object",
                     "description": "Dimension title to be shown in UIs.",
-                    "items": {
-                        "type": "object",
-                        "$ref": "#/$defs/Languages"
-                    }
+                    "$ref": "#/$defs/Languages"
                 },
                 "description": {
-                    "type": "string",
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "$ref": "#/$defs/Languages"
+                        }
+                    ],
                     "description": "Describe the dimension so that it can be used for example in info boxes in UI."
                 },
                 "type": {
@@ -542,8 +666,11 @@
                     "description": "Provide URL pointing to the reference documentation."
                 },
                 "spec": {
-                    "type": "object",
-                    "description": "The content for Data Quality monitoring expressed as code. Accepted as inline YAML, a valid URL pointing to YAML, or a plain string if type is Custom."
+                    "type": [
+                        "object",
+                        "string"
+                    ],
+                    "description": "Data Quality monitoring logic. Use an inline YAML object for standard monitoring systems. For type Custom, use an inline YAML object, a URI to an external specification, or a plain string."
                 },
                 "dimensions": {
                     "type": "array",
@@ -551,7 +678,28 @@
                         "$ref": "#/$defs/DQDimension"
                     }
                 }
-            }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "Custom"
+                            }
+                        },
+                        "required": [
+                            "type"
+                        ]
+                    },
+                    "else": {
+                        "properties": {
+                            "spec": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                }
+            ]
         },
         "SLADimension": {
             "type": "object",
@@ -592,6 +740,7 @@
                         "milliseconds",
                         "seconds",
                         "minutes",
+                        "hours",
                         "days",
                         "weeks",
                         "months",
@@ -606,22 +755,25 @@
                     "type": "string",
                     "description": "the description of the SLA dimension"
                 },
-                "displayTitle": {
-                    "type": "array",
+                "displaytitle": {
+                    "type": "object",
                     "description": "Dimension title to be shown in UIs.",
-                    "items": {
-                        "type": "object",
-                        "$ref": "#/$defs/Languages"
-                    }
+                    "$ref": "#/$defs/Languages"
                 }
             }
         },
         "DQDimension": {
             "type": "object",
             "description": "Defines the Data Quality dimension.",
+            "not": {
+                "required": [
+                    "displayTitle"
+                ]
+            },
             "properties": {
-                "displayTitle": {
-                    "type": "string",
+                "displaytitle": {
+                    "type": "object",
+                    "$ref": "#/$defs/Languages",
                     "description": "Dimension title to be shown in various UIs.."
                 },
                 "dimension": {
@@ -654,7 +806,14 @@
                     ]
                 },
                 "description": {
-                    "type": "string",
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "$ref": "#/$defs/Languages"
+                        }
+                    ],
                     "description": "Describe the dimension so that it can be used for example in info boxes in UI."
                 }
             }
@@ -671,7 +830,10 @@
                     "description": "The primary currency used in pricing. Platforms are assumed to use this as primary currency if currency conversions are used to display product pricing in different locations for various currencies. If the unit is revenue-sharing, then this attribute value MUST be percentage."
                 },
                 "price": {
-                    "type": "string",
+                    "type": [
+                        "string",
+                        "number"
+                    ],
                     "description": "he offer price of a product, or of a price component, or revenue-sharing percentage."
                 },
                 "billingDuration": {
@@ -699,7 +861,8 @@
                         "Open-data",
                         "Value-based",
                         "On-request",
-                        "Trial"
+                        "Trial",
+                        "recurring"
                     ]
                 },
                 "maxTransactionQuantity": {
@@ -909,6 +1072,9 @@
         },
         "DataAccessItem": {
             "type": "object",
+            "required": [
+                "outputPortType"
+            ],
             "properties": {
                 "name": {
                     "type": "object",
@@ -937,15 +1103,26 @@
                     "enum": [
                         "TOON",
                         "JSON",
+                        "JSONL",
                         "XML",
                         "CSV",
                         "Excel",
+                        "Parquet",
                         "zip",
                         "plain text",
                         "GraphQL",
                         "MCP"
                     ],
                     "description": "Specifies the data format made available through this access channel."
+                },
+                "compression": {
+                    "type": "string",
+                    "enum": [
+                        "none",
+                        "gzip",
+                        "zstd"
+                    ],
+                    "description": "Optional content compression applied to the delivered representation. Declare the underlying format separately; for example, format JSONL with compression zstd."
                 },
                 "authenticationMethod": {
                     "type": "string",
@@ -983,6 +1160,10 @@
                     "format": "uri",
                     "description": "A human-readable documentation or guide for access setup, authentication steps, or onboarding."
                 },
+                "contract": {
+                    "$ref": "#/$defs/ContractReference",
+                    "description": "Optional reference to the named data contract profile governing this access interface."
+                },
                 "hashType": {
                     "type": "string",
                     "examples": [
@@ -1000,6 +1181,15 @@
             }
         },
         "DataHolder": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-z]{2}$": {
+                    "$ref": "#/$defs/DataHolderDetails"
+                }
+            },
+            "minProperties": 1
+        },
+        "DataHolderDetails": {
             "type": "object",
             "properties": {
                 "legalName": {
@@ -1124,7 +1314,10 @@
                     "description": "Points to documentation or developer reference for the payment gateway system."
                 },
                 "spec": {
-                    "type": "object",
+                    "type": [
+                        "object",
+                        "string"
+                    ],
                     "description": "Contains the executable or declarative logic for the payment gateway integration. Can be inline YAML, stringified logic, or link to external file."
                 }
             }

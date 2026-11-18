@@ -1,7 +1,7 @@
 /**
  * @file test/unit/exchange-odps-length.test.ts
- * @description The node generates an ODPS v4.1 document for every EXCHANGE listing, and some of its text
- *   fields have a maxLength in the schema this repo vendors (`test/fixtures/odps-v4.1.schema.json`)
+ * @description The node generates an ODPS v4.2 document for every EXCHANGE listing, and some of its text
+ *   fields have a maxLength in the schema this repo vendors (`test/fixtures/odps-v4.2.schema.json`)
  *   while the authoring schemas accept far more. `license.scope.restrictions` is the one that bit: it is
  *   the node's own usage sentences (0 to 120 characters) joined with the provider's usageTerms.note and
  *   odps.license.restrictions, capped at 255, and an outside validator refused the document while the
@@ -11,6 +11,9 @@
  *   real JSON Schema validator refuses, and the warning to the reconcile report a publish reads.
  * @usage cd aimeat && pnpm exec vitest run test/unit/exchange-odps-length.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-18 — ODPS v4.2: the data holder's caps sit under its language key
+ *     (`$defs.DataHolderDetails`), and the validator reads the whole document, because v4.2 declares
+ *     `dataAccess` and `paymentGateways` as the named mappings the node writes.
  *   v1.1.0 — 2026-09-13 — The listing warning is for text a stored source already carries; the refusal
  *     of changed text lives in exchange-odps-write.test.ts. The message says a changing write is refused.
  *   v1.0.0 — 2026-09-13 — Initial (appdev pitfall usageterms-note-caps-at-156-not-255).
@@ -25,7 +28,7 @@ import type { Offering } from '../../src/services/exchange/market.js';
 import { offeringToOdps, odpsLengthOverruns, ODPS_TEXT_LIMITS } from '../../src/services/exchange/odps.js';
 import { reconcileOwnerOfferings } from '../../src/services/exchange/projection.js';
 
-const schema = JSON.parse(readFileSync(new URL('../fixtures/odps-v4.1.schema.json', import.meta.url), 'utf8'));
+const schema = JSON.parse(readFileSync(new URL('../fixtures/odps-v4.2.schema.json', import.meta.url), 'utf8'));
 
 /** Every maxLength in the vendored schema, as a path into the generated document. */
 function schemaLimits(): Map<string, number> {
@@ -33,7 +36,7 @@ function schemaLimits(): Map<string, number> {
   const roots: Array<[string, string]> = [
     ['/properties/product/properties/details/patternProperties/^[a-z]{2}$', 'product.details.*'],
     ['/$defs/License', 'product.license'],
-    ['/$defs/DataHolder', 'product.dataHolder'],
+    ['/$defs/DataHolderDetails', 'product.dataHolder.*'],
   ];
   const walk = (node: unknown, pointer: string): void => {
     if (!node || typeof node !== 'object') return;
@@ -50,6 +53,7 @@ function schemaLimits(): Map<string, number> {
   // The two $defs are reached from the product through a $ref; if that ever changes the mapping above lies.
   expect(schema.properties.product.properties.license.$ref).toBe('#/$defs/License');
   expect(schema.properties.product.properties.dataHolder.$ref).toBe('#/$defs/DataHolder');
+  expect(schema.$defs.DataHolder.patternProperties['^[a-z]{2}$'].$ref).toBe('#/$defs/DataHolderDetails');
   return out;
 }
 
@@ -69,7 +73,7 @@ function offering(over: Partial<Offering> = {}): Offering {
 const doc = (o: Offering) => offeringToOdps({ offering: o, rakePercent: 5, baseUrl: 'https://node.test', nodeId: 'node-x' });
 
 describe('the limits table', () => {
-  it('is the vendored ODPS v4.1 schema, field for field', () => {
+  it('is the vendored ODPS v4.2 schema, field for field', () => {
     const fromSchema = schemaLimits();
     const fromTable = new Map(ODPS_TEXT_LIMITS.map(l => [l.path, l.maxLength]));
     expect(Object.fromEntries(fromTable)).toEqual(Object.fromEntries(fromSchema));
@@ -112,13 +116,9 @@ describe('odpsLengthOverruns', () => {
         },
       },
     }));
-    const validatable = { ...d, product: { ...d.product } } as Record<string, unknown> & { product: Record<string, unknown> };
-    // The published schema contradicts itself on these two (see e2e-exchange.ts); neither carries a maxLength.
-    delete validatable.product.dataAccess;
-    delete validatable.product.paymentGateways;
     const ajv = new Ajv2020({ strict: false, allErrors: true });
     addFormats(ajv);
-    ajv.validate(schema, validatable);
+    ajv.validate(schema, d);
     const refused = (ajv.errors ?? []).filter(e => e.keyword === 'maxLength')
       .map(e => e.instancePath.slice(1).split('/').join('.')).sort();
     expect(refused.length).toBeGreaterThan(10);

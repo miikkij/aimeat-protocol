@@ -1,16 +1,19 @@
 /**
  * @file test/unit/datapackage-odps.test.ts
  * @description The acceptance line "the package is sellable", made checkable: the ODPS sheet
- *   generated from a descriptor validates against the VENDORED ODPS v4.1 schema, with no mapping
+ *   generated from a descriptor validates against the VENDORED ODPS v4.2 schema, with no mapping
  *   layer in between.
  *
  *   WHY VALIDATE AGAINST THE VENDORED COPY. A projection that only satisfies our own idea of the
  *   spec is a projection nobody else can read. The schema in test/fixtures is the published one, and
- *   the interesting failures are its CLOSED enums — `dataAccess[].format`, `specification`, the SLA
+ *   the interesting failures are its CLOSED enums — `dataAccess.<name>.format`, `specification`, the SLA
  *   dimension names. Those are exactly where a generator drifts by filling a field with the closest
  *   wrong answer, so the tests below name each one.
  * @usage cd aimeat && pnpm exec vitest run test/unit/datapackage-odps.test.ts
  * @version-history
+ *   v1.2.0 -- 2026-11-18 -- ODPS v4.2. The whole document is validated: v4.2 declares `dataAccess` as the
+ *     named mapping its examples always showed, so the exclusion and its tripwire are gone. The SLA reads
+ *     `declarative.default`, and the data holder is checked under its language key.
  *   v1.1.0 -- 2026-11-01 -- The audience: visibility, authenticationMethod and x-aimeat.audience follow it (plan doc-mvwxcas3dom3, D0.1).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1).
  */
@@ -23,34 +26,16 @@ import { descriptorToOdps, odpsToYamlDocument } from '../../src/services/datapac
 import { inferSchema, toCsv } from '../../src/services/datapackage/table.js';
 import { bytesHash, type Descriptor } from '../../src/services/datapackage/contract.js';
 
-const odpsSchema = JSON.parse(readFileSync(new URL('../fixtures/odps-v4.1.schema.json', import.meta.url), 'utf8'));
+const odpsSchema = JSON.parse(readFileSync(new URL('../fixtures/odps-v4.2.schema.json', import.meta.url), 'utf8'));
 const ajv = new Ajv2020({ strict: false, allErrors: true });
 addFormats(ajv);
 const rawValidate = ajv.compile(odpsSchema);
 
-/**
- * Validate everything the published schema can actually judge.
- *
- * `product.dataAccess` is excluded, and NOT because ours is wrong. The published v4.1 schema
- * contradicts itself there: the `product.dataAccess` property is `type: object` while it `$ref`s an
- * array-typed definition, so no document can satisfy both halves. The spec's own examples show a
- * MAPPING of named access blocks, which is what this node emits and what services/exchange/odps.ts
- * already decided for the EXCHANGE projection. The tripwire below fails the day upstream fixes it,
- * so this exclusion cannot outlive its reason.
- */
+/** Validate the whole document against the published schema. */
 function validate(doc: unknown): { ok: boolean; errors: unknown[] } {
-    const d = doc as { product: Record<string, unknown> };
-    const validatable = { ...d, product: { ...d.product } };
-    delete validatable.product.dataAccess;
-    const ok = rawValidate(validatable) as boolean;
+    const ok = rawValidate(doc) as boolean;
     return { ok, errors: rawValidate.errors ?? [] };
 }
-
-it('TRIPWIRE: the published schema still contradicts itself on dataAccess', () => {
-    // The day this fails, upstream fixed it: validate the whole document and delete the exclusion.
-    expect(odpsSchema.properties.product.properties.dataAccess.type).toBe('object');
-    expect(odpsSchema.$defs.DataAccess.type).toBe('array');
-});
 
 const ROWS = [
     { vnr: '001000', name: 'Burana, 400 mg', shortage: true, reported: '2026-08-10', packages: 12 },
@@ -94,7 +79,7 @@ const project = (d: Descriptor) => descriptorToOdps({
     resourceUrls: { rows: 'https://aimeat.io/v1/pub/alice%40node/datapkg/shortages-weekly/aaa/data/rows.csv' },
 });
 
-describe('descriptorToOdps — validates against the vendored ODPS v4.1 schema', () => {
+describe('descriptorToOdps — validates against the vendored ODPS v4.2 schema', () => {
     it('a scheduled package produces a conformant document', () => {
         const { ok, errors } = validate(project(descriptor()));
         expect(errors).toEqual([]);
@@ -112,6 +97,24 @@ describe('descriptorToOdps — validates against the vendored ODPS v4.1 schema',
     it('survives a round trip through YAML, which is the form it is stored in', () => {
         const yaml = odpsToYamlDocument(project(descriptor()));
         expect(validate(parseYaml(yaml)).errors).toEqual([]);
+    });
+
+    it('a stated data holder sits under the sheet\'s language key and validates', () => {
+        const doc = descriptorToOdps({
+            descriptor: descriptor(), ownerGhii: 'alice@node', baseUrl: 'https://aimeat.io',
+            descriptorUrl: 'https://aimeat.io/d.json', resourceUrls: { rows: 'https://aimeat.io/r.csv' },
+            dataHolder: { legalName: 'Alice Data Oy', businessID: '1234567-8' },
+        }) as any;
+        expect(validate(doc).errors).toEqual([]);
+        expect(doc.product.dataHolder).toEqual({ en: { legalName: 'Alice Data Oy', businessID: '1234567-8' } });
+    });
+
+    it('v4.2 refuses the shapes this sheet used under v4.1, so the schema in use is the strict one', () => {
+        const doc = project(descriptor()) as any;
+        const old = { ...doc, product: { ...doc.product, SLA: { declarative: [doc.product.SLA.declarative.default] } } };
+        expect(validate(old).ok).toBe(false);
+        const noDefault = { ...doc, product: { ...doc.product, dataAccess: { csv: doc.product.dataAccess.default } } };
+        expect(validate(noDefault).ok).toBe(false);
     });
 });
 
@@ -131,7 +134,7 @@ describe('the closed enums the spec will not bend', () => {
 
     it('the SLA dimension is the enum\'s own word, and the unit is one of its units', () => {
         const doc = project(descriptor()) as any;
-        const dim = doc.product.SLA.declarative[0].dimensions[0];
+        const dim = doc.product.SLA.declarative.default.dimensions[0];
         expect(dim.dimension).toBe('updateFrequency');
         expect(['days', 'weeks', 'months']).toContain(dim.unit);
     });
@@ -140,7 +143,7 @@ describe('the closed enums the spec will not bend', () => {
 describe('the cadence comes from the producer cron, not from prose', () => {
     const freq = (cron: string | undefined) => {
         const doc = project(descriptor({ producer: { kind: 'extension', schedule: cron } })) as any;
-        return doc.product.SLA?.declarative[0].dimensions[0];
+        return doc.product.SLA?.declarative.default.dimensions[0];
     };
 
     it('a weekly cron reads as weekly', () => {
@@ -221,7 +224,7 @@ describe('the sheet states who reads the version (plan doc-mvwxcas3dom3, D0.1)',
         expect(JSON.stringify(doc.product.dataAccess)).toMatch(/bearer token/);
     });
 
-    it('authenticationMethod stays on the ODPS v4.1 enum', () => {
+    it('authenticationMethod stays on the ODPS v4.2 enum', () => {
         const allowed = odpsSchema.$defs.DataAccessItem.properties.authenticationMethod.enum as string[];
         for (const a of ['public', 'members', 'organism:o', 'private']) {
             for (const m of methods(withAudience(a))) expect(allowed).toContain(m);

@@ -40,7 +40,7 @@
  *   v1.4.0 — 2026-07-25 — `tollMorsels`: a tool declares its own pacing burn, so a node default of 0
  *     means "paced only where a provider asked for it" instead of "never paced".
  *   v1.4.0 — 2026-07-25 — ODPS: per-tool `provenance` + `odps` (the authoring block projected into the
- *     tool's ODPS v4.1 document) and APP-LEVEL defaults of both on the manifest root, inherited by every
+ *     tool's ODPS v4.2 document) and APP-LEVEL defaults of both on the manifest root, inherited by every
  *     tool. Additive; existing manifests validate unchanged.
  *   v1.3.0 — 2026-07-25 — TARGET-050: the manifest becomes the SOURCE OF TRUTH for the EXCHANGE listing —
  *     `exchange` (list publicly), `pricesMoney` (EUR *and* USD on one tool) and `usageTerms` (the licence,
@@ -172,7 +172,7 @@ export const AppToolSchema = z.object({
    * why this is optional and permissive rather than strict.
    */
   aiProvenance: z.record(z.string(), z.unknown()).optional(),
-  /** ODPS v4.1 fields the node cannot derive (value proposition, SLA/quality commitments, data holder…). */
+  /** ODPS v4.2 fields the node cannot derive (value proposition, SLA/quality commitments, data holder…). */
   odps: OdpsExtrasSchema.optional(),
 });
 

@@ -7844,7 +7844,7 @@
       },
       "langBase": "Perustekstit, jotka myös muun kielinen lukija saa",
       "langOther": "Tekstit kielellä {lang}. Lukija, jonka kieli on {lang}, saa nämä. Tyhjän kentän tilalla näkyy perusteksti.",
-      "odpsTitle": "Kuvaus, jonka koneet lukevat (ODPS 4.1, ote)",
+      "odpsTitle": "Kuvaus, jonka koneet lukevat (ODPS 4.2, ote)",
       "noOdps": "Kuvaus näkyy, kun esikatselu läpäisee tarkistukset."
     },
     "sched": {
@@ -30485,7 +30485,7 @@
     "monetize.currency2": "Valuutta",
     "monetize.money2Hint": "Valinnainen: myy sama kutsu toisessa valuutassa. Ostaja valitsee valuutan sopimusta avatessaan.",
     "odps.title": "EXCHANGE ja ODPS",
-    "odps.hint": "Myykö tämä sovellus jotain markkinalla, ja mikä tuotekuvaus jokaisen listauksen mukana kulkee. Listattu työkalu julkaistaan Open Data Product Specification v4.1 -dokumenttina, jota ulkoiset katalogit ja ostavat agentit osaavat lukea.",
+    "odps.hint": "Myykö tämä sovellus jotain markkinalla, ja mikä tuotekuvaus jokaisen listauksen mukana kulkee. Listattu työkalu julkaistaan Open Data Product Specification v4.2 -dokumenttina, jota ulkoiset katalogit ja ostavat agentit osaavat lukea.",
     "odps.statusOn": "Markkinalla: {live} / {total} työkalua",
     "odps.statusOff": "Ei markkinalla ({total} työkalua määritelty)",
     "odps.statusBlocked": "{n} työkalua on merkitty EXCHANGEen mutta ei vielä listaudu — syy näkyy työkalun kohdalla.",
