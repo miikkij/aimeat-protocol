@@ -11,6 +11,7 @@
  *   contains.
  * @usage pnpm test -- app-tools-manifest-safety
  * @version-history
+ *   v1.0.1 — 2026-11-18 — ODPS v4.2: the data holder is read under its language key.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8 step 0c.
  */
 import { describe, it, expect } from 'vitest';
@@ -116,7 +117,10 @@ describe('the live manifest, widened', () => {
     } as unknown as Offering;
 
     const doc = offeringToOdps({ offering, rakePercent: 10, baseUrl: 'https://aimeat.io', nodeId: 'n' });
-    const holder = doc.product.dataHolder as Record<string, unknown>;
+    // ODPS keys the data holder by the listing's language (dataHolder.en.legalName).
+    const byLang = doc.product.dataHolder as Record<string, Record<string, unknown>>;
+    expect(Object.keys(byLang)).toEqual([((first.odps as { language?: string } | null)?.language) ?? 'en']);
+    const holder = Object.values(byLang)[0];
     expect(holder.legalName).toBe('Overscale Solutions Oy');
     expect(holder.businessID).toBe('3323553-5');
     const ext = doc.product['x-aimeat'] as Record<string, unknown>;
