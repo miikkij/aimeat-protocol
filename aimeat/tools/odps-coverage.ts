@@ -84,7 +84,11 @@ function paths(node: any, prefix: string, out: string[], depth = 0): void {
   if (resolved.patternProperties) {
     for (const v of Object.values<any>(resolved.patternProperties)) paths(v, prefix, out, depth + 1);
   }
-  if (resolved.additionalProperties && typeof resolved.additionalProperties === 'object') paths(resolved.additionalProperties, prefix, out, depth + 1);
+  // A mapping whose `default` entry is declared by name (DataAccess, ContractProfileCollection) is
+  // walked through `default` alone, so its fields are counted once.
+  const addl = resolved.additionalProperties;
+  const namedDefault = resolved.properties?.default?.$ref && addl?.$ref === resolved.properties.default.$ref;
+  if (addl && typeof addl === 'object' && !namedDefault) paths(addl, prefix, out, depth + 1);
   if (Array.isArray(resolved.oneOf)) for (const branch of resolved.oneOf) paths(branch, prefix, out, depth + 1);
   if (resolved.properties) {
     for (const [k, v] of Object.entries<any>(resolved.properties)) {
