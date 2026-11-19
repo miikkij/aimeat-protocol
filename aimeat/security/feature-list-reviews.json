@@ -15,7 +15,7 @@
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/routes/connect-install.ts"
       ],
-      "digest": "sha256:433c8ecb7c4c531989159801"
+      "digest": "sha256:4bd99fc36c5803ba237afc64"
     },
     "2. Accounts and sign-in": {
       "reviewedOn": "2026-11-19",
@@ -526,7 +526,7 @@
       "aimeat/src/services/mcp-client/personal-sign-in.ts": "fd79749d63cbfc91",
       "aimeat/src/services/mcp-client/pool.ts": "bc8e7ff176cc1b3d",
       "aimeat/src/services/mcp-client/registry-settings.ts": "eba5331a2df657d2",
-      "aimeat/src/services/mcp-client/registry.ts": "e3de346f32de1304",
+      "aimeat/src/services/mcp-client/registry.ts": "fc7cd97876fb76d5",
       "aimeat/src/services/mcp-client/stdio-policy.ts": "66b71b01f90d95d2",
       "aimeat/src/services/mcp-client/transport-secrets.ts": "1480b86d882b3485",
       "aimeat/src/services/mcp-client/transport.ts": "2838488c8f42b050",

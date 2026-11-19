@@ -303,10 +303,10 @@
      "slug": "g-1-workspace-mcp-access",
      "cells": [
       "<strong>Workspace MCP access</strong>",
-      "Bind a group's server to one workspace to use that workspace's roles. The access policy allows contributors to call, lets viewers see the server, and excludes group members with no workspace role. Limits: the workspace id is not checked when you attach, so a wrong id lets nobody in.",
+      "Bind a group's server to one workspace to use that workspace's roles. The same people call it as write the workspace: its creator and the group's owners and admins, and every other member with the contributor role. A viewer sees the server and cannot call it, and a group member with no workspace role does not see it. Limits: the workspace id is not checked when you attach, so a wrong id lets nobody in.",
       "<code>POST /v1/mcp-servers/organism</code> · <code>aimeat_mcp_attach</code> with <code>organism_id</code> and <code>ws</code>"
      ],
-     "plain": "Workspace MCP access Bind a group's server to one workspace to use that workspace's roles. The access policy allows contributors to call, lets viewers see the server, and excludes group members with no workspace role. Limits: the workspace id is not checked when you attach, so a wrong id lets nobody in. POST /v1/mcp-servers/organism · aimeat_mcp_attach with organism_id and ws"
+     "plain": "Workspace MCP access Bind a group's server to one workspace to use that workspace's roles. The same people call it as write the workspace: its creator and the group's owners and admins, and every other member with the contributor role. A viewer sees the server and cannot call it, and a group member with no workspace role does not see it. Limits: the workspace id is not checked when you attach, so a wrong id lets nobody in. POST /v1/mcp-servers/organism · aimeat_mcp_attach with organism_id and ws"
     },
     {
      "slug": "g-1-attached-tools-are-findable",
