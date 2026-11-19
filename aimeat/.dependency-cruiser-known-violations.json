@@ -41,75 +41,6 @@
   },
   {
     "type": "cycle",
-    "from": "src/config.ts",
-    "to": "src/config/overrides.ts",
-    "unresolvedTo": "./config/overrides.js",
-    "dependencyTypes": [
-      "local",
-      "export"
-    ],
-    "rule": {
-      "severity": "warn",
-      "name": "no-circular-type-only"
-    },
-    "cycle": [
-      {
-        "name": "src/config/overrides.ts",
-        "dependencyTypes": [
-          "local",
-          "export"
-        ]
-      },
-      {
-        "name": "src/storage/interface.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      },
-      {
-        "name": "src/storage/repositories/app.repository.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      },
-      {
-        "name": "src/storage/types/apps.ts",
-        "dependencyTypes": [
-          "local",
-          "type-import"
-        ]
-      },
-      {
-        "name": "src/services/app/ai-posture.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/protected-resource.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/config.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/data/aimeat-iam-package.ts",
     "to": "src/data/example-packages.ts",
     "unresolvedTo": "./example-packages.js",
@@ -812,6 +743,75 @@
         "name": "src/server-bootstrap/config-init.ts",
         "dependencyTypes": [
           "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/services/app/ai-posture.ts",
+    "to": "src/services/protected-resource.ts",
+    "unresolvedTo": "../protected-resource.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular-type-only"
+    },
+    "cycle": [
+      {
+        "name": "src/services/protected-resource.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/config.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      },
+      {
+        "name": "src/config/overrides.ts",
+        "dependencyTypes": [
+          "local",
+          "export"
+        ]
+      },
+      {
+        "name": "src/storage/interface.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/repositories/app.repository.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/types/apps.ts",
+        "dependencyTypes": [
+          "local",
+          "type-import"
+        ]
+      },
+      {
+        "name": "src/services/app/ai-posture.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
           "import"
         ]
       }
