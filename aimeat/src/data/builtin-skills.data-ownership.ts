@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-19 — The account export's row names the records it carries since 2026-11-19 (routes/owners/export-records.ts).
  *   2026-11-15 — An imported agent's trust score is capped on import, not "on the way in".
  *   2026-11-15 — Section 4: an AI's delete in a team waits for a lead while the team's approval gate
  *     is on (services/team/action-gate.ts, team setup T7).
@@ -148,7 +149,7 @@ it for them.
 
 | What | How | Who |
 |---|---|---|
-| Everything they own: profile, memory of their own and of every agent, work, consents and their history, files (as a list, not the bytes), memberships, disputes, published apps (as a list with their versions), AI provenance records, outside-account connections (never their credentials), messages with their agents, apps they took | the Data Wallet page, \`/v1/profile?tab=dataWallet\` (\`GET /v1/owners/{name}/export\`) | the person in their own session |
+| Everything they own: profile, memory of their own and of every agent, work, consents and their history, files (as a list, not the bytes), memberships, disputes, published apps (as a list with their versions), AI provenance records, outside-account connections (never their credentials), messages with their agents, apps they took, their message threads and contacts, companies (never a mail password), invoices, receipts, fiscal years, outbound contacts and mail, their agents' tasks with events, schedules, capabilities, installed packages, help questions, sharing groups, decision results and account events | the Data Wallet page, \`/v1/profile?tab=dataWallet\` (\`GET /v1/owners/{name}/export\`) | the person in their own session |
 | Memory as one JSON file, optionally one key prefix or one agent | the Memory page, \`/v1/profile?tab=memory\`, backup section (\`GET /v1/memory/export\`) | the person; an agent exports its own records |
 | Chosen records and files as one ZIP | the Memory page, select and download (\`POST /v1/memory/bundle\`) | the person |
 | An organism, or one workspace in it, as a ZIP | \`aimeat_organism_export\`, \`aimeat_workspace_transfer\` with \`direction: "export"\` | a member; a workspace needs its creator or an organism admin |

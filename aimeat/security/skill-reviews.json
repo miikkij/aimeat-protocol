@@ -393,7 +393,7 @@
       "digest": "sha256:9bcaeebc446f611f88924b02"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/connect-tunnel/push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -402,7 +402,7 @@
         "aimeat/src/services/agent/profile-write.ts",
         "aimeat/src/services/agent/task-rules.ts"
       ],
-      "digest": "sha256:b29711163c41930266282fce"
+      "digest": "sha256:5c6485f8b5a43aeb74d0d952"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-15",
@@ -440,7 +440,7 @@
       "digest": "sha256:6737809fb5a17180a03ad88c"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -451,7 +451,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:2532f394aad8bd1e93eced11",
+      "digest": "sha256:8ec7d436f7df83e8d0b218e0",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -626,12 +626,12 @@
       "note": "The locale loop it teaches, and the commit-msg hook whose limits it states (the limits themselves are in check-commit-msg.ts, which its eval grader within-hook-limits also mirrors)."
     },
     "project:security-audit": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:1f95b72833e4aaf2953932f8",
+      "digest": "sha256:ce48bc07aa4054763efd6386",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -643,12 +643,12 @@
       "note": "It checks pages on the session's sandbox node; its viewports follow skill aimeat-frontend-verify."
     },
     "agent:gatekeeper": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:1f95b72833e4aaf2953932f8",
+      "digest": "sha256:ce48bc07aa4054763efd6386",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -926,7 +926,7 @@
       "aimeat/src/routes/organisms/workspace-ops.ts": "7e41ee0b50b5dad4",
       "aimeat/src/routes/organisms/workspace-access.ts": "70baa83db72f7051",
       "aimeat/src/services/agent/profile-write.ts": "f07930903c42ff93",
-      "aimeat/src/services/agent/task-rules.ts": "d46214216b90ec51"
+      "aimeat/src/services/agent/task-rules.ts": "6fe6b779efdd6d20"
     },
     "node:aimeat-extension-builder": {
       "aimeat/src/services/builder/extension-prompt.ts": "91ab68a199b0d408",
@@ -942,7 +942,7 @@
       "aimeat/src/routes/memory/key.ts": "68aa87147c323b2f",
       "aimeat/src/services/memory/bin.ts": "99a904bb4e2ce94d",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
-      "aimeat/src/routes/owners/export.ts": "c557a4c9fc849d0e",
+      "aimeat/src/routes/owners/export.ts": "c7913eda009f7f9a",
       "aimeat/src/services/owner/erasure.ts": "b46801247bc0bec4",
       "aimeat/src/services/archive.ts": "6ddbae831830e2e9",
       "aimeat/src/mcp/organisms.ts": "bcafa8624d90288d"
@@ -1046,14 +1046,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "5f3afecaf4910626"
+      "aimeat/test/run-e2e-ci.ts": "70624c3a49711df9"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "5f3afecaf4910626"
+      "aimeat/test/run-e2e-ci.ts": "70624c3a49711df9"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"

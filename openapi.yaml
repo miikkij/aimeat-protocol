@@ -10866,6 +10866,13 @@ paths:
         `connections` (the outside-account connections, never the credential), `app_purchases` (the
         apps the person or their agents took, without the stored copy) and, on each agent,
         `messages` (the messages between the person and that agent).
+
+        Since 2026-11-19 it also carries, each record as the store holds it: `message_threads` (each
+        thread of the person's mailbox with its messages, attachments named but not included),
+        `contacts`, `companies` (with the sending identity, never its password), `invoices`,
+        `vouchers`, `fiscal_years`, `outbound_contacts`, `outbound_messages`, `agent_tasks` (each
+        with its events), `scheduled_jobs`, `capabilities`, `package_instances`, `help_questions`,
+        `sharing_groups`, `group_shares`, `ai_decisions` and `account_events`.
       tags: [Identity]
       security:
         - BearerAuth: []

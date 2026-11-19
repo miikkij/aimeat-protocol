@@ -13,6 +13,11 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   2026-11-19 — Seventeen sections the export lacked (export-records.ts): `message_threads`,
+ *     `contacts`, `companies`, `invoices`, `vouchers`, `fiscal_years`, `outbound_contacts`,
+ *     `outbound_messages`, `agent_tasks`, `scheduled_jobs`, `capabilities`, `package_instances`,
+ *     `help_questions`, `sharing_groups`, `group_shares`, `ai_decisions`, `account_events`. The
+ *     existing sections are unchanged (feature audit 2026-11-19, item 4.2).
  *   2026-11-04 — `memories` carries the account's service namespace records after its own records
  *     (services/service-records.ts); none exist before a service writes one, so the export is unchanged
  *     until then (codebase analysis 2026-11-03, item B6).
@@ -76,6 +81,7 @@ import { memoryTarget } from '../../services/classification/labels.js';
 import { scopeOrganism } from '../../services/classification/policy.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator/override.js';
 import { exportExtraSections, exportAgentMessages } from './export-sections.js';
+import { exportAccountRecords } from './export-records.js';
 import { appendRequest } from '../../services/compliance/docs.js';
 import { logger } from '../../utils/logger.js';
 import { isValidGHII } from '../../utils/gaii.js';
@@ -513,6 +519,9 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     // ── Published apps, AI provenance, outside-account connections (never the credential) and the
     //    apps taken (feature-list audit #160) ──
     const extra = await exportExtraSections(storage, ghii, agentGaiis);
+    // ── Message threads, contacts, companies and bookkeeping, outbound mail, agent tasks and the
+    //    account's other records (feature audit 2026-11-19, item 4.2). Each is read by the GHII. ──
+    const records = ghii ? await exportAccountRecords(storage, ghii, [ghii, ...agentGaiis]) : null;
 
     // The export is an access and portability request the node answered (GDPR art. 15 and 20): it
     // logs itself in the node's request list (plan doc-mvlftkh9zmc9, C4.3).
@@ -546,6 +555,23 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       ai_provenance: extra.ai_provenance,
       connections: extra.connections,
       app_purchases: extra.app_purchases,
+      message_threads: records?.message_threads ?? [],
+      contacts: records?.contacts ?? [],
+      companies: records?.companies ?? [],
+      invoices: records?.invoices ?? [],
+      vouchers: records?.vouchers ?? [],
+      fiscal_years: records?.fiscal_years ?? [],
+      outbound_contacts: records?.outbound_contacts ?? [],
+      outbound_messages: records?.outbound_messages ?? [],
+      agent_tasks: records?.agent_tasks ?? [],
+      scheduled_jobs: records?.scheduled_jobs ?? [],
+      capabilities: records?.capabilities ?? [],
+      package_instances: records?.package_instances ?? [],
+      help_questions: records?.help_questions ?? [],
+      sharing_groups: records?.sharing_groups ?? [],
+      group_shares: records?.group_shares ?? [],
+      ai_decisions: records?.ai_decisions ?? [],
+      account_events: records?.account_events ?? [],
       // Organism content is in this export because it is the person's own data; the file carries
       // content an organism classified, so it says which keys (decided 2026-09-30).
       ...(organismKeys.length ? {

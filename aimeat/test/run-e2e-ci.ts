@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- test/e2e-owner-export-records.ts joins ALL_SUITES (feature audit 2026-11-19, item 4.2).
  *   2026-11-19 -- test/e2e-app-task-start.ts joins ALL_SUITES (feature audit 2026-11-19, item 2.1).
  *   2026-11-15 -- test/e2e-federation-peer-proofs.ts joins ALL_SUITES (audit 2026-11 M130, L056).
  *   2026-11-15 -- e2e-app-icon-upload.ts joins the list (not the guard tier): aimeat_app_manage icon_upload and the install block.
@@ -1083,6 +1084,8 @@ const ALL_SUITES = [
     'test/e2e-owner-home.ts',
     // One export, every section of it: the Article 15 and 20 door read against fixtures built first.
     'test/e2e-owner-export.ts',
+    // The export's records beyond memory: threads, companies, bookkeeping, outbound mail, agent tasks.
+    'test/e2e-owner-export-records.ts',
     // The setup wizard and the verification doors: spawns nodes of its own on 28320
     // (E2E_SETUP_SECOND_PORT). Lane 0 in the coverage runner.
     'test/e2e-setup-and-verification.ts',

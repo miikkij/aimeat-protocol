@@ -1,6 +1,6 @@
 # 05 Data protection
 
-> Checked against AIMEAT node 4.3.1 (commit e8556865a) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 02af615c2) on 2026-11-19. Maintained with the code: see the README for how.
 
 This page is for the DPO, the security officer and the database administrator. It answers: which data the node keeps, where it keeps it, whether it is personal data, how long it stays and how it is deleted; what the node encrypts itself and what it leaves to the operator; how data classification works and how to set it for an organisation; what the GDPR export and the account deletion do; and which data leaves the operator's own systems.
 
@@ -101,7 +101,7 @@ Source: `aimeat/.env.example`, `aimeat/src/config/data-access.ts`.
 
 | Right | Route | What it does | Source |
 |---|---|---|---|
-| Access and portability (Art. 15, 20) | `GET /v1/owners/:name/export` | the person or an operator; one JSON document with the account, profile, memory records, file metadata (not the bytes), agents with their memory and messages, organism memberships, published apps, AI provenance, connections (never the credential), purchases and the person's classified organism content. Stored credentials are redacted. Each export is logged as a completed data subject request. There is no MCP tool for it | `aimeat/src/routes/owners/export.ts`, `aimeat/src/routes/owners/export-sections.ts`, `aimeat/src/data/builtin-skills.data-ownership.ts` |
+| Access and portability (Art. 15, 20) | `GET /v1/owners/:name/export` | the person or an operator; one JSON document with the account, profile, memory records, file metadata (not the bytes), agents with their memory and messages, organism memberships, published apps, AI provenance, connections (never the credential), purchases, the person's message threads (attachments named, not included) and contacts, companies (never the mail password), invoices, vouchers, fiscal years, outbound contacts and messages, agent tasks with their events, schedules, capabilities, package installations, help questions, sharing groups, decision-model results, account events and the person's classified organism content. Stored credentials are redacted. Each export is logged as a completed data subject request. There is no MCP tool for it | `aimeat/src/routes/owners/export.ts`, `aimeat/src/routes/owners/export-sections.ts`, `aimeat/src/routes/owners/export-records.ts`, `aimeat/src/data/builtin-skills.data-ownership.ts` |
 | Erasure (Art. 17) | `DELETE /v1/owners/:name` | the person in their own local session, or an operator. Immediate, no grace period, one database transaction with a savepoint per step | `aimeat/src/routes/owners.ts`, `aimeat/src/services/owner/erasure.ts` |
 | An organism's data | `aimeat_organism_export` | an organism's export for its members | [Data ownership](../data-ownership.md) |
 
