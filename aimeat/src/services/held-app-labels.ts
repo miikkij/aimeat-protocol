@@ -26,6 +26,9 @@
  *   await holdAppLabels(storage, ownerName, filename, config);       // when an app goes away
  *   scheduler.registerCoreHandler('held-label-release', () => sweepHeldAppLabels(storage, config));
  * @version-history
+ *   v1.1.1 — 2026-11-20 — holdAppLabelsOfErasedAccount leaves a label the operator chose (origin
+ *     'operator') as the operator set it: that mapping is the operator's decision, and the operator
+ *     releases or moves it on the Subdomains page (test/e2e-app-silent.ts holds a consent case on one).
  *   v1.1.0 — 2026-11-19 — holdAppLabelsOfErasedAccount: an erased account's labels are held for nobody,
  *     so the next holder of the released name does not get them back (services/owner/erasure.ts).
  *   v1.0.1 — 2026-10-25 — The mappings are read a page at a time (listSubdomainSitesPage), and whether
@@ -112,14 +115,16 @@ export async function holdAppLabels(storage: Storage, ownerBare: string, filenam
  * same file name got the label back, and with it what the erased person's visitors kept in their
  * browsers on that origin. The target becomes `<pseudonym>/<filename>`: no account can be the
  * pseudonym (storage/erased-party.ts), so the label serves nobody, and the daily sweep releases it
- * after apps.held_label_days as it does every held label. Returns how many labels were changed.
+ * after apps.held_label_days as it does every held label. A label the operator chose (origin
+ * 'operator') stays as the operator set it: the operator decides what that address serves.
+ * Returns how many labels were changed.
  */
 export async function holdAppLabelsOfErasedAccount(storage: Storage, ownerBare: string, pseudonym: string): Promise<number> {
   const now = new Date().toISOString();
   const who = ownerBare.toLowerCase();
   let n = 0;
   for (const s of await allSites(storage)) {
-    if (s.kind !== 'app') continue;
+    if (s.kind !== 'app' || s.origin === 'operator') continue;
     const owner = ownerOfTarget(s.target);
     if (!owner || localAccountName(owner).toLowerCase() !== who) continue;
     await storage.updateSubdomainSite(s.subdomain, { target: `${pseudonym}${s.target.slice(owner.length)}`, heldSince: s.heldSince ?? now });

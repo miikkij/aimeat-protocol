@@ -6,6 +6,8 @@
 // and GET /v1/messages/broadcast/:id aggregates the results.
 //
 // Version history:
+//   2026-11-20 — Tests 15 and 16 register their own names (bcsum, bcnoread): test 8 already holds
+//     bcdave and bcerin, so the second registration answered 409.
 //   2026-11-19 — Tests 15 and 16: an agent reads the results of the broadcast it sent, over MCP
 //     (aimeat_dm_broadcast_summary) and REST, never another account's, and not without messages:read
 //     (feature audit 2026-11-19, 4.4 item 5).
@@ -510,7 +512,7 @@ await test('14. THE LIMIT: sends and broadcasts share one per-minute limit per a
 });
 
 await test('15. From the chat: an agent sends a broadcast and reads its results with aimeat_dm_broadcast_summary', async () => {
-    const dave = await registerWithPassword(BASE, `bcdave${stamp}`);
+    const dave = await registerWithPassword(BASE, `bcsum${stamp}`);
     const agent = await makeAgent(BASE, dave, ['messages:send', 'messages:read']);
     const s = await openSession(BASE, agent.token, 'e2e-broadcast-summary');
     const sent = await callTool(s, 'aimeat_dm_broadcast', { to: [bob.ghii, carol.ghii], mode: 'broadcast', body: 'From the chat, to two.' });
@@ -530,7 +532,7 @@ await test('15. From the chat: an agent sends a broadcast and reads its results 
 });
 
 await test('16. An agent without messages:read reads no results, and its owner still reads their own', async () => {
-    const erin = await registerWithPassword(BASE, `bcerin${stamp}`);
+    const erin = await registerWithPassword(BASE, `bcnoread${stamp}`);
     const agent = await makeAgent(BASE, erin, ['messages:send']);
     const s = await openSession(BASE, agent.token, 'e2e-broadcast-summary-noscope');
     const r = await callTool(s, 'aimeat_dm_broadcast_summary', { broadcast_id: bcId });

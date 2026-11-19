@@ -26,6 +26,7 @@
  *   account. The rest of the kept stores are kept for the same reasons (STORES says each one).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-erasure-apps
  * @version-history
+ *   v1.2.0 — 2026-11-20 — An address the operator chose for B stays as the operator set it.
  *   v1.1.0 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); another owner is refused
  *     the erasure of this account (403 ACCESS_DENIED) and its apps stay.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, part 1 of agent F).
@@ -94,6 +95,11 @@ await test('setup: an owner with two apps and another owner with one, each with 
             createdAt: now, updatedAt: now, origin: 'publisher', heldSince: null,
         } as never);
     }
+    // An address the operator chose for B: the operator's decision, which the erasure leaves alone.
+    await storage.createSubdomainSite({
+        subdomain: `op-${B.slug}-${stamp}`, kind: 'app', target: B.id, enabled: true, createdBy: OPERATOR.ghii,
+        createdAt: now, updatedAt: now, origin: 'operator', heldSince: null,
+    } as never);
 });
 
 await test('before the erasure, every store of the fixture holds all three apps', async () => {
@@ -147,6 +153,11 @@ await test('A\'s address is held for nobody, and C\'s still serves C', async () 
     assert(!!a && a.target.startsWith('erased:') && a.target.endsWith(`/${A.file}`) && !!a.heldSince, `A's address: ${JSON.stringify(a)}`);
     const c = await storage.getSubdomainSite(`${C.slug}-${stamp}`);
     assert(c?.target === C.id && !c.heldSince, `C's address: ${JSON.stringify(c)}`);
+});
+
+await test('an address the operator chose for B stays as the operator set it', async () => {
+    const b = await storage.getSubdomainSite(`op-${B.slug}-${stamp}`);
+    assert(b?.target === B.id && b.origin === 'operator', `B's operator address: ${JSON.stringify(b)}`);
 });
 
 await test('app C of the other owner keeps every store it had', async () => {
