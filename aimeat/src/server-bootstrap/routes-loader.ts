@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-19 — /.well-known/did.json is registered at mount time and waits for the node key; it
+ *     was registered after the key loaded, behind the 404 fallthrough, and answered 404 everywhere.
  *   2026-11-14 — helpRouter and helpAdminRouter mounted (Ask someone who knows).
  *   2026-11-14 — teamsRouter mounted beside the organisms (team setup and status).
  *   2026-11-14 — secretSharesRouter mounted beside the vault (secret shares and requests).
@@ -674,16 +676,20 @@ export async function mountRoutes(
   app.use(samlLoginRouter(config, storage));
 
   // DID Document + VC signing key — Phase 3.3
-  // Node key is loaded async; once available, enable VC signing and serve DID Document
-  storage.getNodeKey().then(async (nodeKeyPair) => {
-    if (!nodeKeyPair) return;
+  // The node key loads async. The route is registered NOW, in its place before the 404 fallthrough,
+  // and waits for the key: registered inside the .then() it landed after the fallthrough and every
+  // node answered 404 (feature audit 2026-11-19). No key: the request falls through as before.
+  const didDocReady = storage.getNodeKey().then(async (nodeKeyPair) => {
+    if (!nodeKeyPair) return null;
     vcIssuerService.setNodeKeyPair(nodeKeyPair);
     const publicJwk = await vcIssuerService.getPublicJwk();
-    const didDocService = createDidDocumentService(vcIssuerService.getIssuerDid(), publicJwk);
-    app.get('/.well-known/did.json', (_req, res) => {
-      res.json(didDocService.getDocument());
-    });
-  }).catch(err => logger.warn('DID Document setup failed', { error: String(err) }));
+    return createDidDocumentService(vcIssuerService.getIssuerDid(), publicJwk);
+  }).catch((err) => { logger.warn('DID Document setup failed', { error: String(err) }); return null; });
+  app.get('/.well-known/did.json', async (_req, res, next) => {
+    const didDocService = await didDocReady;
+    if (!didDocService) { next(); return; }
+    res.json(didDocService.getDocument());
+  });
 
   // Genesis peering service — Phase 3.4
   const genesisPeeringService = createGenesisPeeringService(config, storage);

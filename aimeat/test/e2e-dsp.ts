@@ -126,6 +126,15 @@ async function run(): Promise<void> {
         assert((await dsp('/negotiations/urn:x', X)).status === 404, 'negotiation while off');
     });
 
+    // The node's own DID document was registered only after the node key loaded, behind the 404
+    // fallthrough, so it answered 404 on every node (feature audit 2026-11-19, aimeat.io).
+    await test('D8 off: /.well-known/did.json is the node\'s own DID document', async () => {
+        const r = await call('/.well-known/did.json');
+        assert(r.status === 200, show(r));
+        assert(typeof r.body.id === 'string' && r.body.id.startsWith('did:'), `id: ${show(r)}`);
+        assert(Array.isArray(r.body.verificationMethod) && r.body.verificationMethod.length > 0, `verificationMethod: ${show(r)}`);
+    });
+
     await test('The operator switches it on with two static participants and the callback origin', async () => {
         const r = await setConfig([
             { path: 'dataspace.enabled', value: true },
