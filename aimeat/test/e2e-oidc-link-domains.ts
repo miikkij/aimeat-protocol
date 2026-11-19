@@ -18,6 +18,9 @@
  *        her account; a token from another tenant is refused with ENTRA_WRONG_TENANT.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=oidc-link-domains
  * @version-history
+ *   v1.1.0 — 2026-11-19 — 1b: an account that is not the operator is refused setting a link domain
+ *     (403 ACCESS_DENIED), and its address still does not link. The database this process opened to
+ *     mark the addresses verified is closed before the folder is removed (EPERM on Windows).
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 4.5).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -30,9 +33,9 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner, setupOperator } from './helpers/owner-login.js';
-import { markEmailVerified } from './helpers/verified-email.js';
+import { markEmailVerified, storageFor } from './helpers/verified-email.js';
 import { startFakeOidcIdp, type FakeOidcIdp } from './helpers/fake-oidc-idp.js';
-import { BASE as RUNNER_BASE, assert, finish, json as runnerJson, test } from './helpers/harness.js';
+import { BASE as RUNNER_BASE, assert, expectRefusal, finish, json as runnerJson, test } from './helpers/harness.js';
 
 const PORT = Number(new URL(RUNNER_BASE).port || '40251') + 264;
 const BASE = `http://localhost:${PORT}`;
@@ -80,6 +83,9 @@ const dir = mkdtempSync(join(tmpdir(), 'aimeat-oidc-'));
 let idp!: FakeOidcIdp;
 let child: ChildProcess | null = null;
 let opToken = '';
+let aliceToken = '';
+/** The database markEmailVerified opened from this process; closed before the folder is removed. */
+let verifiedAt: string | undefined;
 
 const setDomains = async (path: string, value: string) => {
   const r = await json('/v1/admin/config', { method: 'PUT', headers: auth(opToken), body: JSON.stringify({ changes: [{ path, value }] }) });
@@ -113,9 +119,10 @@ try {
     await waitForServer(child, BASE, { label: `the OIDC node on port ${PORT}` });
     const op = await setupOperator(BASE, ADMIN_PW, 'oidcop');
     opToken = op.token;
-    await registerOwner(BASE, 'alice');
+    aliceToken = (await registerOwner(BASE, 'alice')).token;
     await registerOwner(BASE, 'bob');
     const at = { sqlitePath: db.dbUrl || db.sqlitePath, nodeId: NODE_ID };
+    verifiedAt = at.sqlitePath;
     await markEmailVerified('alice', 'alice@trusted.example', at);
     await markEmailVerified('bob', 'bob@other.example', at);
     // Discovery runs after the start, through the network: wait until both providers answer.
@@ -134,6 +141,13 @@ try {
   console.log('\n1. Casdoor, no link domain');
   await test('1. With the setting empty, alice\'s verified Casdoor address does not link: she goes to the new-account step', async () => {
     const o = await signIn(idp, 'casdoor', { email: 'alice@trusted.example', email_verified: true, name: 'Alice' });
+    assert(o.kind === 'new-account', `expected the new-account step, got ${o.kind}: ${o.location}`);
+  });
+
+  await test('1b. FAILURE: alice, who is not the operator, is refused setting a link domain, and hers still does not link', async () => {
+    const r = await json('/v1/admin/config', { method: 'PUT', headers: auth(aliceToken), body: JSON.stringify({ changes: [{ path: 'auth.casdoor_link_domains', value: 'trusted.example' }] }) });
+    expectRefusal(r, 403, 'ACCESS_DENIED');
+    const o = await signIn(idp, 'casdoor', { email: 'alice@trusted.example', email_verified: true });
     assert(o.kind === 'new-account', `expected the new-account step, got ${o.kind}: ${o.location}`);
   });
 
@@ -189,6 +203,8 @@ try {
     if (c.exitCode === null && c.signalCode === null) await once(c, 'exit');
   }
   await idp?.close();
+  // On Windows an open SQLite file keeps its folder from being removed (EPERM).
+  if (verifiedAt) await ((await storageFor(verifiedAt)) as unknown as { close?: () => unknown }).close?.();
   rmSync(dir, { recursive: true, force: true });
 }
 

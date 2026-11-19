@@ -17,6 +17,8 @@
  *   The trust record is a file of this suite's own (AIMEAT_COMMAND_TRUST_FILE), outside the home.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=connector-command-approval
  * @version-history
+ *   v1.1.0 — 2026-11-19 — 2b: an agent of the owner without agent:write is refused allowing the
+ *     runner (403 SCOPE_DENIED), and the runner stays held.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 4.5).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -26,7 +28,7 @@ import { stringify as yamlStringify } from 'yaml';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent } from './helpers/mcp-session.js';
-import { BASE, assert, finish, json, test } from './helpers/harness.js';
+import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
@@ -151,6 +153,15 @@ try {
     const id = await newTask('before the owner allows it');
     await sleep(6_000);
     assert(!ran(id), 'the held runner ran');
+  });
+
+  await test('2b. An agent of the owner without agent:write is refused allowing it, and the runner stays held', async () => {
+    const reader = await makeAgent(BASE, owner, ['memory:read'], `cmdread${stamp % 1_000_000}`);
+    const row = await programRow();
+    const d = await json(`/v1/agents/v2/connectors/${encodeURIComponent(row.connector)}/programs/${hash}`, { method: 'PUT', headers: auth(reader.token), body: JSON.stringify({ decision: 'allow' }) });
+    expectRefusal(d, 403, 'SCOPE_DENIED');
+    assert((await programRow())?.status === 'waiting', 'the program still waits for the owner');
+    assert(trustOf(hash) === null, `the machine still trusts nothing for it: ${JSON.stringify(trustOf(hash))}`);
   });
 
   console.log('\n3. The owner allows it');

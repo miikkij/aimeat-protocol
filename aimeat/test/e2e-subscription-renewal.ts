@@ -18,6 +18,8 @@
  *     4. a cancelled subscription is not renewed.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=subscription-renewal
  * @version-history
+ *   v1.1.0 — 2026-11-19 — 2e: the buyer's agent without wallet:read is refused the buyer's
+ *     subscriptions (403 SCOPE_DENIED).
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 4.5).
  */
 import { randomBytes } from 'node:crypto';
@@ -29,6 +31,7 @@ import { runSubscriptionRenewals } from '../src/commerce/subscriptions.js';
 import { runAsNode } from '../src/utils/gaii.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
 import { BASE as RUNNER_BASE, assert, expectRefusal, finish, json as runnerJson, test } from './helpers/harness.js';
 
 const PORT = Number(new URL(RUNNER_BASE).port || '40251') + 263;
@@ -180,6 +183,12 @@ try {
     // The request is the reader's: to anyone else it does not exist, as for an id nobody issued.
     expectRefusal(d, 404, 'NOT_FOUND');
     assert(Number((await mine(reader)).amount) === 3_000_000, 'the reader\'s subscription is as the reader left it');
+  });
+
+  await test('2e. FAILURE: the reader\'s agent without wallet:read is refused the reader\'s subscriptions', async () => {
+    const agent = await makeAgent(BASE, reader, ['memory:read'], `renagent${stamp}`);
+    const r = await json('/v1/commerce/subscriptions', { headers: auth(agent.token) });
+    expectRefusal(r, 403, 'SCOPE_DENIED');
   });
 
   console.log('\n3. A declined card');

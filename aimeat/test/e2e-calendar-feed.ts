@@ -14,6 +14,8 @@
  *   The last two tests hold the same key from the chat: aimeat_workspace_share with ics_key makes
  *   the key the feed opens with and ends it, and a plain member's agent is refused.
  * @version-history
+ *   v1.3.0 — 2026-11-19 — An agent of the creator without memory:read is refused the share state
+ *     (GET .../workspace/share, 403 SCOPE_DENIED).
  *   v1.2.0 — 2026-11-19 — aimeat_workspace_share takes ics_key: the creator's agent makes and ends
  *     the feed key over MCP, a plain member's agent is refused (feature audit 2026-11-19, 4.4 item 4).
  *   v1.1.0 — 2026-10-13 — A shared event space with no event yet answers an empty calendar.
@@ -148,6 +150,13 @@ async function run() {
   await test('a plain member cannot make a feed key', async () => {
     const r = await share(B, { ics_key: true });
     assert(r.status === 403, `expected 403, got ${r.status}: ${r.text}`);
+  });
+
+  await test('an agent of the creator without memory:read is refused the share state', async () => {
+    const agent = await makeAgent(BASE, aOwner, ['ai:use'],`calnoread${stamp % 100000}`);
+    const r = await call(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { headers: { Authorization: `Bearer ${agent.token}` } });
+    assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status}: ${r.text}`);
+    assert(!r.text.includes('password'), 'and nothing of the share leaves with the refusal');
   });
 
   let key = '';

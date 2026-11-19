@@ -20,6 +20,8 @@
  *   organism owner's bare name, where no grant is stored, so the source was broken.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspace-server
  * @version-history
+ *   v1.1.0 — 2026-11-19 — A contributor who is no admin of the group is refused attaching a server
+ *     to the workspace (403 NOT_ALLOWED): attaching is the group's owners' and admins' decision.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 4.5).
  */
 import http from 'node:http';
@@ -115,6 +117,11 @@ try {
     const g = await json('/v1/mcp-servers/organism', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ organism_id: orgId, name: 'grouptools', url: UPSTREAM_URL }) });
     assert(g.status === 201, `group server: ${g.status} ${JSON.stringify(g.body)}`);
     groupServerId = g.body.data.server.id;
+  });
+
+  await test('Bob, a contributor but no admin of the group, is refused attaching a server to the workspace', async () => {
+    const r = await json('/v1/mcp-servers/organism', { method: 'POST', headers: auth(bob.token), body: JSON.stringify({ organism_id: orgId, ws, name: 'bobtools', url: UPSTREAM_URL }) });
+    expectRefusal(r, 403, 'NOT_ALLOWED');
   });
 
   console.log('\n1. A contributor calls');

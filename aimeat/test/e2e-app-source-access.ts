@@ -20,6 +20,8 @@
  * @structure fixture · ROUTES · the audience loop · the frame token · public again · no account
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-source-access
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The signed-in outsider's refusal of the app read and the fork is held to
+ *     403 ACCESS_DENIED in its own test, beside the anonymous 401.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, 1.1 and 1.2).
  */
 import { assert, BASE, expectRefusal, finish, json, test } from './helpers/harness.js';
@@ -186,6 +188,13 @@ for (const route of ROUTES) {
         assert(seen.saw, `alice did not get it: ${seen.detail}`);
     });
 }
+
+await test('FAILURE: carol, signed in but not in the organism, is refused the app read and the fork with 403', async () => {
+    const read = await json(`/v1/apps/${alice.owner.name}/${FILE}`, { headers: auth(carol.owner.token) });
+    expectRefusal(read, 403, 'ACCESS_DENIED');
+    const fork = await json(`/v1/apps/${alice.owner.name}/${FILE}/fork`, { method: 'POST', headers: auth(carol.owner.token), body: JSON.stringify({ new_filename: `refused-${stamp}.html` }) });
+    expectRefusal(fork, 403, 'ACCESS_DENIED');
+});
 
 await test('a member\'s gallery frame opens the genre preview with the listed token and no session', async () => {
     const r = await json('/v1/designbook?kind=genre&limit=200', { headers: auth(bob.owner.token) });

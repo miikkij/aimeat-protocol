@@ -15,12 +15,14 @@
  *        the owner's stream.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=live-page-events
  * @version-history
+ *   v1.1.0 — 2026-11-19 — 3b: an agent of the owner without memory:write is refused starting a crew
+ *     trial (403 SCOPE_DENIED), and no `crew-try` reaches the owner's stream.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 4.6).
  */
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent } from './helpers/mcp-session.js';
 import { TunnelClient } from './helpers/tunnel-harness.js';
-import { BASE, assert, finish, json, test } from './helpers/harness.js';
+import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
 
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 const stamp = Date.now().toString(36);
@@ -140,6 +142,23 @@ await test('3. A trial run that ends is `crew-try` on its owner\'s stream and on
     await new Promise((r) => setTimeout(r, 1_200));
     assert(!theirs.domains().includes('crew-try'), 'another owner heard the trial end');
   } finally { mine.close(); theirs.close(); await tunnel.close(); }
+});
+
+await test('3b. FAILURE: an agent of the owner without memory:write is refused starting a trial, and no trial ends', async () => {
+  const reader = await makeAgent(BASE, alice, ['memory:read'], 'livereader');
+  const mine = await openStream(alice.token);
+  try {
+    await new Promise((r) => setTimeout(r, 500));
+    const doc = {
+      agent_name: 'livecrew',
+      agents: [{ name: 'r', role: 'Researcher', goal: 'Find', backstory: 'Reads', tools: ['web'], allow_delegation: false }],
+      tasks: [{ id: 'research', description: 'Do this: {{ctx.prompt}}', expected_output: 'A brief', agent: 'r', context: [], async: false }],
+    };
+    const start = await json('/v1/agents/livecrew/crew/try', { method: 'POST', headers: auth(reader.token), body: JSON.stringify({ doc, prompt: 'dogs' }) });
+    expectRefusal(start, 403, 'SCOPE_DENIED');
+    await new Promise((r) => setTimeout(r, 1_200));
+    assert(!mine.domains().includes('crew-try'), `a refused trial was heard as ended: ${JSON.stringify(mine.domains())}`);
+  } finally { mine.close(); }
 });
 
 console.log('\n4. The connect-an-agent step');

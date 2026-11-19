@@ -17,11 +17,13 @@
  *   ago, which no route can make; it is held nowhere yet, and this suite does not claim it.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=trust-score
  * @version-history
+ *   v1.1.0 — 2026-11-19 — 1a+: the provider and another requester are refused rating a work item
+ *     they did not request (403 ACCESS_DENIED), so nobody but the requester moves the score.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 4.5).
  */
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, type McpAgent } from './helpers/mcp-session.js';
-import { BASE, assert, finish, json, test } from './helpers/harness.js';
+import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 const ACTION = 'trust-test-action';
@@ -89,6 +91,14 @@ await test('1a. One requester, delivered and rated positive: the score is 40', a
   await ratePositive(requesters[0], codes[0]);
   const s = await storedScore();
   assert(s === 40, `one requester: ${s}`);
+});
+
+await test('1a+. The provider and another requester are refused rating that work, and the score stays 40', async () => {
+  for (const who of [provider, requesters[1]]) {
+    const r = await json(`/v1/work/${codes[0]}/rate`, { method: 'POST', headers: auth(who.token), body: JSON.stringify({ rating: 'positive' }) });
+    expectRefusal(r, 403, 'ACCESS_DENIED');
+  }
+  assert(await storedScore() === 40, `after the refused ratings: ${await storedScore()}`);
 });
 
 await test('1b. The same requester again: still 40, however good the work', async () => {

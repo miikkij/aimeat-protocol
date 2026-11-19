@@ -122,8 +122,10 @@ await test('1b. Bob\'s own line about his own app is unchanged', async () => {
 });
 
 await test('1c. Bob, who is not the operator, is refused the site change log and the flag list', async () => {
-  expectRefusal(await json('/v1/site/changelog?limit=100', { token: bob.token }), 403, 'ACCESS_DENIED');
-  expectRefusal(await json('/v1/flags?per_page=100', { token: bob.token }), 403, 'ACCESS_DENIED');
+  const log = await json('/v1/site/changelog?limit=100', { token: bob.token });
+  expectRefusal(log, 403, 'ACCESS_DENIED');
+  const flags = await json('/v1/flags?per_page=100', { token: bob.token });
+  expectRefusal(flags, 403, 'ACCESS_DENIED');
 });
 
 console.log('\n2. The public activity feed');
