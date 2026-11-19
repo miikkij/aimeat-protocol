@@ -24,7 +24,7 @@
  *   Drawn with the page kit's own parts: Rail beside the page (.og-grid) and railFold as the closed
  *   row a narrow screen shows instead (css/components/tab-page.css switches between the two at
  *   1100px).
- * @structure useRailSections(root) · contentsRail({ title, sections, pagesLabel, pages }) · readSections(root)
+ * @structure useRailSections(root, { kit }) · contentsRail({ title, sections, pagesLabel, pages }) · readSections(root, { kit })
  * @usage
  *   const [root, setRoot] = useState(null);
  *   const sections = useRailSections(root);
@@ -32,19 +32,42 @@
  *   html`${rail && railFold([rail])}
  *     <div class="og-grid"><div class="og-main og-main--flow" ref=${setRoot}>…</div>${rail && html`<${Rail} ...${rail} />`}</div>`
  * @version-history
+ *   v1.1.0 — 2026-11-19 — `kit`: the page kit's own sections (.og-sec) with their own numbers and
+ *     counts, for the admin pages' contents rail (admin.js); a section's own number wins over the
+ *     running one. Additive: the marker mode reads as before.
  *   v1.0.0 — 2026-11-14 — Initial: the contents rail of the home and of the Settings & Controls overview.
  */
 import { useEffect, useState } from 'preact/hooks';
 import { scrollToElement } from '/components/Rail.js';
 
-/** The words a heading shows: its own text and the text of any child that is not a control. */
-function headingWords(heading) {
+/**
+ * The words a heading shows: its own text and the text of any child that is not a control. `skip`
+ * names more children to leave out (a page-kit heading's number or count in its small).
+ */
+function headingWords(heading, skip) {
+  const controls = `button, [role="button"], .help-tip, svg${skip ? `, ${skip}` : ''}`;
   let words = '';
   for (const node of heading.childNodes) {
     if (node.nodeType === 3) words += node.textContent;
-    else if (node.nodeType === 1 && !node.matches('button, [role="button"], .help-tip, svg')) words += node.textContent;
+    else if (node.nodeType === 1 && !node.matches(controls)) words += node.textContent;
   }
   return words.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * A page-kit section's own number or count, from the small beside its title (PageSection draws a
+ * count after a hidden ": " and a number alone).
+ * @param {Element|null} heading
+ */
+function kitMarks(heading) {
+  const small = heading?.querySelector(':scope > small');
+  if (!small) return { num: '', count: '' };
+  const hidden = small.querySelector('.visually-hidden');
+  const text = [...small.childNodes].filter((n) => n !== hidden).map((n) => n.textContent).join('').trim();
+  // A page that puts words in the count's place ("Morsels: a pacer, not a currency") gives the rail no
+  // count: the rail's count column holds a short figure only.
+  const figure = /\d/.test(text) && text.length <= 12 ? text : '';
+  return hidden ? { num: '', count: figure } : { num: text, count: '' };
 }
 
 /**
@@ -60,45 +83,53 @@ function targetOf(el) {
 
 /**
  * What the root holds right now, in document order.
+ * `kit`: read the page kit's own sections instead of markers (every `.og-sec` with a title, as
+ * PageSection draws it), each with its own number and count from the small beside its title. The
+ * admin pages are read this way: they number their sections already and carry no markers.
  * @param {Element} root
- * @returns {Array<{ key: string, label: string, count: string, el: Element }>}
+ * @param {{ kit?: boolean }} [opts]
+ * @returns {Array<{ key: string, label: string, count: string, num: string, el: Element }>}
  */
-export function readSections(root) {
+export function readSections(root, opts = {}) {
+  const selector = opts.kit ? '.og-sec' : '[data-rail]';
   const out = [];
-  for (const el of root.querySelectorAll('[data-rail]')) {
+  for (const el of root.querySelectorAll(selector)) {
     // A section inside another section (a block inside a group of the home) is part of that one.
-    const outer = el.parentElement?.closest('[data-rail]');
+    const outer = el.parentElement?.closest(selector);
     if (outer && root.contains(outer)) continue;
     const target = targetOf(el);
     // Nothing drawn, or drawn with no box (a block that answered null, a panel still empty).
     if (!target || !el.firstElementChild || target.getClientRects().length === 0) continue;
-    const heading = el.querySelector('h2, h3');
-    const label = el.getAttribute('data-rail-label') || (heading ? headingWords(heading) : '');
+    const heading = opts.kit ? el.querySelector(':scope > .og-sec-h h2, :scope > h3') : el.querySelector('h2, h3');
+    const label = el.getAttribute('data-rail-label') || (heading ? headingWords(heading, opts.kit ? 'small, .og-sec-doors' : '') : '');
     if (!label) continue;
+    const marks = opts.kit ? kitMarks(heading) : { num: '', count: '' };
     const counted = el.hasAttribute('data-rail-count') ? el : el.querySelector('[data-rail-count]');
-    const count = counted ? String(counted.getAttribute('data-rail-count') ?? '') : '';
-    out.push({ key: el.getAttribute('data-rail') || label, label, count, el: target });
+    const count = counted ? String(counted.getAttribute('data-rail-count') ?? '') : marks.count;
+    out.push({ key: el.getAttribute('data-rail') || el.id || label, label, count, num: marks.num, el: target });
   }
   return out;
 }
 
 const same = (a, b) => a.length === b.length
-  && a.every((s, i) => s.key === b[i].key && s.label === b[i].label && s.count === b[i].count && s.el === b[i].el);
+  && a.every((s, i) => s.key === b[i].key && s.label === b[i].label && s.count === b[i].count && s.num === b[i].num && s.el === b[i].el);
 
 /**
  * The sections drawn under `root`, kept current as the page draws. The root is an element held in
  * state (a callback ref), not a ref object: the page mounts it only once its data has answered,
  * after the first render, and a ref object's change would not run the effect again.
  * @param {Element|null} root
+ * @param {{ kit?: boolean }} [opts] readSections' options.
  */
-export function useRailSections(root) {
+export function useRailSections(root, opts = {}) {
+  const kit = !!opts.kit;
   const [sections, setSections] = useState(/** @type {ReturnType<typeof readSections>} */ ([]));
   useEffect(() => {
     if (!root) { setSections([]); return undefined; }
     let frame = 0;
     const read = () => {
       frame = 0;
-      const next = readSections(root);
+      const next = readSections(root, { kit });
       setSections((was) => (same(was, next) ? was : next));
     };
     const later = () => { if (!frame) frame = requestAnimationFrame(read); };
@@ -106,7 +137,7 @@ export function useRailSections(root) {
     const watch = new MutationObserver(later);
     watch.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-rail-count', 'data-rail-label', 'hidden', 'class'] });
     return () => { watch.disconnect(); if (frame) cancelAnimationFrame(frame); };
-  }, [root]);
+  }, [root, kit]);
   return sections;
 }
 
@@ -120,7 +151,7 @@ export function contentsRail({ title, sections, pagesLabel, pages }) {
   if (!sections.length) return null;
   const own = sections.map((s, i) => ({
     key: s.key,
-    mark: String(i + 1).padStart(2, '0'),
+    mark: s.num || String(i + 1).padStart(2, '0'),
     label: s.label,
     count: s.count || undefined,
     onClick: () => scrollToElement(s.el),
