@@ -14,6 +14,9 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-11-19 — The map, the listing, the part read and the preview offer a genre grown out of an app
+ *     only to the readers the app's audience admits; a genre's preview_url carries the preview token,
+ *     so a member's frame opens it without a session (feature audit 2026-11-19, 1.2).
  *   2026-11-08 — GET /v1/designbook/:id/preview shows the node's genre template when a part by that
  *     id exists but the reader may not see it (unpublished, or a narrower kit), instead of 404: the
  *     spec's "See it" link for genre-receipt answered 404 on production.
@@ -88,7 +91,7 @@ import { loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, se
 import { DesignBookError } from '../services/design-book/validate.js';
 import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
 import { getAppTemplates } from '../data/app-templates.js';
-import { grownGenreFramePage, grownGenrePage, isGrownGenreBody } from '../services/design-book/grown-genre.js';
+import { genreReaderOf, grownGenreFramePage, grownGenrePage, isGrownGenreBody } from '../services/design-book/grown-genre.js';
 import { resolveAppUrls } from './apps/helpers.js';
 import { isOperatorCaller } from '../services/operator/override.js';
 import { designBookPreviewToken, designBookPreviewTokenOpens } from '../services/design-book/preview-token.js';
@@ -149,7 +152,9 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
     for (const r of rows) {
       const base = `/v1/designbook/${encodeURIComponent(r.id)}/preview`;
       // A kit may be narrower than the node, and its frame carries no session either: always the token.
-      out.set(r.id, r.status === 'published' && r.kind !== 'kit' ? base : `${base}?t=${encodeURIComponent(await designBookPreviewToken(r.id))}`);
+      // So may a genre grown out of an app opened to some people only (grown-genre.ts): a genre's
+      // preview carries the token too, which opens only that part's preview.
+      out.set(r.id, r.status === 'published' && r.kind !== 'kit' && r.kind !== 'genre' ? base : `${base}?t=${encodeURIComponent(await designBookPreviewToken(r.id))}`);
     }
     return out;
   }
@@ -163,7 +168,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // The whole published shelf as one page of text, for a reader that does not know yet what
       // to search for. Public, as the listing is.
       if (req.query.view === 'map') {
-        const out = await book.map();
+        const out = await book.map(isSignedIn(req) ? caller(req) : null);
         res.json(success(config.nodeId, { ...out, note: MAP_NOTE }, [
           { description: 'Read one part whole', method: 'GET', url: '/v1/designbook/{id}' },
           { description: 'Search by word or kind', method: 'GET', url: '/v1/designbook?q={word}' },
@@ -320,7 +325,11 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // own card of the app instead: its screenshot, its name, a link out, and no script at all.
       let grownHtml: string | undefined;
       if (part && part.kind === 'genre' && isGrownGenreBody(part.body)) {
-        const page = await grownGenrePage(storage, config, part.proposed_by_owner, part.body);
+        // Only for a reader the app's audience admits: the signed-in caller, or a frame holding the
+        // token a listing handed to such a reader (grown-genre.ts genreAudienceAdmits).
+        const reader = await designBookPreviewTokenOpens(req.query.t, id) ? 'admitted' as const
+          : await genreReaderOf(storage, config, isSignedIn(req) ? caller(req) : null);
+        const page = await grownGenrePage(storage, config, part.proposed_by_owner, part.body, reader);
         const url = page ? (await resolveAppUrls(config, storage, [{ owner: page.owner, filename: page.filename }]))[`${page.owner}/${page.filename}`] : undefined;
         if (!page || !url) {
           return res.status(404).json(error(config.nodeId, 'NOT_RENDERABLE', `"${id}" grew out of an app that is no longer offered, so there is nothing to show.`));

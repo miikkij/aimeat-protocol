@@ -19045,7 +19045,9 @@ paths:
         ships come the genres that grew out of a published app (`source: design-book`), each listed
         only while its app stands: kept by its owner, open for forking, not parked or hidden.
         GET /v1/app-templates/{id} answers one of those with the version its owner kept and
-        `grew_from` naming the app.
+        `grew_from` naming the app. A genre whose app opens for some people only (one organism, or
+        signed-in accounts) is listed and handed over to those people alone, read from the caller's
+        session; to anyone else it is absent (404 on the id).
       tags:
         - Discovery
       parameters:
@@ -44031,6 +44033,11 @@ paths:
         A source behind an access code needs that code from anyone but its owner and an operator, as
         opening it does: `access_code` in the body, or `?code=` / `X-Access-Code` as on the read route
         (else `403 ACCESS_DENIED`).
+
+        A source whose audience does not admit the caller (an app opened to one organism, and the
+        caller not in it) refuses everyone but its owner and an operator with the answer the app's own
+        read gives: `403 ACCESS_DENIED`, or `401 SIGN_IN_REQUIRED` for a caller with no account on this
+        node. A fork copies the page, so it asks who may open the app, as the read does.
 
         The fork is created free (source price/license terms are dropped) and not itself forkable by
         default. This is the sanctioned, provenance-recording path — prefer it over reading the bytes

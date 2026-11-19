@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-19 — The Atelier part with the Design Book's map names the reader, so a genre grown out of
+ *     an app opened to some people only is listed for those people alone (feature audit 1.2).
  *   2026-11-14 — The handbook carries the teams the person is in after their contexts
  *     (services/team/index-line.ts).
  *   2026-11-13 — The prompt tiers fill their {{variables}} from services/prompts/handbook-fill.ts, which
@@ -87,6 +89,7 @@ import type { CallerContext } from '../services/caller-context.js';
 import { buildAtelierPrompt } from '../services/builder/atelier-prompt.js';
 import { atelierPieceIds } from '../services/builder/atelier-layers.js';
 import { atelierPieceWithBook } from '../services/builder/atelier-book.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { toolError } from './tool-error.js';
 import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { V2_ROLES, toolsForSurface, type SurfaceRole } from '../tool-catalog/surfaces.js';
@@ -198,7 +201,10 @@ export function registerPromptsTools(
                 const full = buildAtelierPrompt(config, { mode: 'new', lang: 'en' }).full;
                 const id = tierKey.slice('build-app-atelier/'.length) || 'start';
                 // Part `book` arrives with the Design Book's map in it (build-atelier-book.ts).
-                const piece = await atelierPieceWithBook(full, id, config, storage);
+                // The map names the reader: a genre grown out of an app opened to some people only is
+                // on it for those people alone (design-book/grown-genre.ts).
+                const piece = await atelierPieceWithBook(full, id, config, storage,
+                    isAnonymousPrincipal({ sub: getAgentGaii() }) ? null : getAgentGaii());
                 if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
                 return toolError('NOT_FOUND', `The Atelier build specification has no part "${id}". It has: ${atelierPieceIds().join(', ')}. Ask for "build-app-atelier" to read the first part, which lists the others.`);
             }

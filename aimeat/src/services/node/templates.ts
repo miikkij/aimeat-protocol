@@ -10,10 +10,12 @@
  *   build run asked it for `shell-pure-client` and was told the template did not exist
  *   (2026-09-18). One function, read by the MCP tool and by GET /v1/appdev/templates/:id, which is
  *   what the connector's two doors call, so the three cannot answer differently.
- * @structure nodeTemplateAnswer(id) · nodeTemplateIndex() · templateAnswer(storage, config, id) ·
- *   templateIndex(storage, config) · unknownTemplateMessage(id)
- * @usage const t = await templateAnswer(storage, config, 'shell-pure-client');   // null when nothing answers to that id
+ * @structure nodeTemplateAnswer(id) · nodeTemplateIndex() · templateAnswer(storage, config, id, reader, part?) ·
+ *   templateIndex(storage, config, reader) · unknownTemplateMessage(id)
+ * @usage const t = await templateAnswer(storage, config, 'shell-pure-client', callerIdentity);   // null when nothing answers to that id
  * @version-history
+ *   v1.3.0 — 2026-11-19 — templateAnswer() and templateIndex() take the reader: a genre grown out of an
+ *     app opened to some people only reaches those people alone (feature audit 2026-11-19, 1.2).
  *   v1.2.0 — 2026-09-20 — templateAnswer() and templateIndex(): the doors also answer a genre that
  *     grew out of an app (design-book/grown-genre.ts), so a builder forks it the way it forks a
  *     shipped one. The cutting into parts is one helper for both.
@@ -92,10 +94,13 @@ const HOW_TO_START_GROWN = 'This genre grew out of an app its owner said turned 
  * an app (design-book/grown-genre.ts) while that app still stands. The shipped one wins a name,
  * and propose refuses a grown genre under a shipped id, so the order never decides anything.
  */
-export async function templateAnswer(storage: Storage, config: AimeatConfig, id: string, part?: number): Promise<Record<string, unknown> | null> {
+export async function templateAnswer(
+  storage: Storage, config: AimeatConfig, id: string, reader: string | null, part?: number,
+): Promise<Record<string, unknown> | null> {
   const shipped = nodeTemplateAnswer(id, part);
   if (shipped) return shipped;
-  const grown = await new DesignBookService(storage, config).grownGenre(id);
+  // `reader` is the caller's identity: a grown genre reaches only the people its app opens for.
+  const grown = await new DesignBookService(storage, config).grownGenre(id, reader);
   if (!grown) return null;
   return onePartOf({
     id: grown.id, kind: 'genre', title: grown.title, description: grown.summary, light: grown.page.light,
@@ -105,8 +110,10 @@ export async function templateAnswer(storage: Storage, config: AimeatConfig, id:
 }
 
 /** The shipped index, and after it the genres that grew out of apps and still stand. */
-export async function templateIndex(storage: Storage, config: AimeatConfig): Promise<Array<{ id: string; kind: string; tier?: string; track?: string; title: string; source?: string }>> {
-  const grown = await new DesignBookService(storage, config).grownGenres();
+export async function templateIndex(
+  storage: Storage, config: AimeatConfig, reader: string | null,
+): Promise<Array<{ id: string; kind: string; tier?: string; track?: string; title: string; source?: string }>> {
+  const grown = await new DesignBookService(storage, config).grownGenres(reader);
   return [...nodeTemplateIndex(), ...grown.map(g => ({ id: g.id, kind: 'genre', title: g.title, source: 'design-book' }))];
 }
 

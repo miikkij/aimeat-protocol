@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- e2e-app-source-access.ts joins the list (not the guard tier): every route that hands an app's source to another person asks the app's audience (feature audit 2026-11-19, 1.1 and 1.2).
  *   2026-11-15 -- test/e2e-federation-peer-proofs.ts joins ALL_SUITES (audit 2026-11 M130, L056).
  *   2026-11-15 -- e2e-app-icon-upload.ts joins the list (not the guard tier): aimeat_app_manage icon_upload and the install block.
  *   2026-11-15 -- The plan moves to test/run-e2e-plan.ts (E2E report of 2026-11-15, section 4):
@@ -637,6 +638,8 @@ const ALL_SUITES = [
     'test/e2e-themes.ts',
     'test/e2e-theme-fonts.ts',
     'test/e2e-app-fork.ts',
+    // Every route that hands an app's source to another person asks the app's audience (feature audit 2026-11-19, 1.1 and 1.2).
+    'test/e2e-app-source-access.ts',
     'test/e2e-app-marks.ts',
     'test/e2e-app-ai-use.ts',
     'test/e2e-app-news.ts',

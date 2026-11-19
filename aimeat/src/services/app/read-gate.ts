@@ -10,11 +10,14 @@
  *   hiddenFromReader() where it asked the operator-hidden question inline, and routes/apps/open.ts
  *   signInGateRefused() asks signInGateOf(). The access code and the pacing licence stay in the read
  *   route: they guard the app's content, and a version list carries none.
- * @structure AppReader · hiddenFromReader() · signInGateOf() · callerAppReader() · appReadRefusal() · SIGN_IN_REFUSAL
+ * @structure AppReader · hiddenFromReader() · signInGateOf() · callerAppReader() · accountAppReader() · appReadRefusal() · SIGN_IN_REFUSAL
  * @usage
  *   const refusal = await appReadRefusal(storage, config, app, current, reader, notFoundMessage);
  *   if (refusal) return refuse(refusal.status, refusal.code, refusal.message);
  * @version-history
+ *   2026-11-19 — accountAppReader(): the fork gate and the grown-genre offer ask signInGateOf() too, so
+ *     an app opened to one organism gives its source only to the people the read gate admits (feature
+ *     audit 2026-11-19, 1.1 and 1.2).
  *   2026-11-04 — Initial: the operator-hidden and sign-in gates of the app read, extracted for the
  *     version list (codebase analysis 2026-11-03, item A1).
  */
@@ -87,6 +90,16 @@ export function callerAppReader(
         storage, config, auth, { ownerOf: appOwnerName, area: 'app', action: 'read', subject: filename })),
     };
   };
+}
+
+/**
+ * A caller named by its credential and its account name, as an AppReader with no operator pass and no
+ * opening grant. For a code path that asks the sign-in gate and then decides the operator's pass on its
+ * own (the fork gate, services/app/fork-gate.ts), or that offers an app's source in a listing where an
+ * operator's look is not a read (a grown genre, services/design-book/grown-genre.ts).
+ */
+export function accountAppReader(auth: AudienceAuth | null | undefined, owner: string): AppReader {
+  return { auth: auth ?? undefined, viewerOwner: async () => owner, operatorReads: async () => false };
 }
 
 /** The two refusals of the sign-in gate, as the app read sends them to an API caller. */

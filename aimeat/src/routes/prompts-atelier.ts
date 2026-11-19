@@ -12,6 +12,8 @@
  *   import { registerAtelierPrompt } from './prompts-atelier.js';
  *   registerAtelierPrompt(router, config);   // BEFORE /v1/prompts/:tier
  * @version-history
+ *   v1.5.0 — 2026-11-19 — The parts name the reader (a signed-in caller, else nobody) for the Design
+ *     Book's map, which lists a genre grown out of an app opened to some people only for those people.
  *   v1.4.0 — 2026-09-19 — Part `libraries` arrives with the Design Book's map in it
  *     (build-atelier-book.ts), so the route takes the storage.
  *   v1.3.0 — 2026-09-19 — The specification in parts: GET …/build-app-atelier/sections and
@@ -22,7 +24,7 @@
  *   v1.1.0 — 2026-09-02 — The game shell is a link beside the Atelier shell.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074).
  */
-import type { Router } from 'express';
+import type { Request, Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success, error } from '../middleware/envelope.js';
 import { sendPlainText } from '../middleware/plain-text.js';
@@ -30,6 +32,8 @@ import { buildAtelierPrompt, buildAtelierSpecToken } from '../services/builder/a
 import type { Storage } from '../storage/interface.js';
 import { ATELIER_PARTS, atelierPieceIds } from '../services/builder/atelier-layers.js';
 import { atelierPieceWithBook } from '../services/builder/atelier-book.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 /**
  * Register the Atelier build-spec route. Public for the same reason build-app is: build
@@ -41,13 +45,16 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig, stor
     lang: typeof query.lang === 'string' ? query.lang : 'en',
     idea: typeof query.idea === 'string' ? query.idea : '',
   }).full;
+  // Who reads the map in part `book`: the signed-in caller, else nobody (design-book/grown-genre.ts).
+  const readerOf = (req: Request): string | null =>
+    req.auth && !isAnonymousPrincipal(req.auth) ? resolveIdentity(req.auth, config.nodeId) : null;
 
   // The parts, registered before the whole so the longer paths are matched first.
   router.get('/v1/prompts/build-app-atelier/sections', async (req, res) => {
     const full = fullFor(req.query);
     const parts = [];
     for (const p of ATELIER_PARTS) {
-      parts.push({ id: p.id, what: p.what, chars: (await atelierPieceWithBook(full, p.id, config, storage))?.text.length ?? 0 });
+      parts.push({ id: p.id, what: p.what, chars: (await atelierPieceWithBook(full, p.id, config, storage, readerOf(req)))?.text.length ?? 0 });
     }
     res.json(success(config.nodeId, { parts, spec_token: buildAtelierSpecToken(config) }, [
       { description: 'One part by id', method: 'GET', url: '/v1/prompts/build-app-atelier/sections/{id}' },
@@ -57,7 +64,7 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig, stor
   router.get('/v1/prompts/build-app-atelier/sections/:id', async (req, res) => {
     const id = req.params.id as string;
     // The same function the MCP handbook tool reads, so the two doors cannot answer differently.
-    const piece = await atelierPieceWithBook(fullFor(req.query), id, config, storage);
+    const piece = await atelierPieceWithBook(fullFor(req.query), id, config, storage, readerOf(req));
     if (!piece) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND',
         'The Atelier build specification has no part "' + id + '". It has: ' + atelierPieceIds().join(', ') + '.'));
