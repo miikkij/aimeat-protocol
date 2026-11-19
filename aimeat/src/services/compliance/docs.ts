@@ -36,6 +36,7 @@
  *   v1.1.0 — 2026-10-24 — patchDocItem(): one entry changed in place, the rest untouched (C7.7).
  *   v1.2.0 — 2026-11-01 — The document `intermediation`, at the node and organism scopes (plan
  *     doc-mvwxcas3dom3, D7.2).
+ *   v1.4.0 — 2026-11-19 — The document `aml`, at the node and organism scopes (services/aml/).
  *   v1.3.0 — 2026-11-13 — The documents `lias` and `trial` at the app scope and `contact` at the
  *     organism scope (lia-schemas.ts); a kind that is one object is parsed and stamped as one.
  *   v1.2.1 — 2026-11-05 — Moved unchanged from src/services/compliance-docs.ts to src/services/compliance/docs.ts (codebase analysis 2026-11-03, item D-h).
@@ -64,6 +65,8 @@ export const SCOPES_OF: Record<ComplianceDocKind, ReadonlyArray<ComplianceScope[
   processors: ['node'],
   // The node's provider (mode node), or an organism that runs its own marketplace (mode owners).
   intermediation: ['node', 'organism'],
+  // The operator's own obliged-entity declaration (mode node), or an organism's (services/aml/).
+  aml: ['node', 'organism'],
   // An app's balancing tests and its trial mark (lia-schemas.ts); an organism's privacy contact.
   lias: ['app'],
   trial: ['app'],

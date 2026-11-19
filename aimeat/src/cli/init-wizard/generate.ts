@@ -92,6 +92,7 @@ export function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_ANONYMOUS' },
         { key: 'AIMEAT_PUBLISH_GATE', comment: 'Who asks the owner before making something public: off | agents | agents-and-apps' },
         { key: 'AIMEAT_DATA_INTERMEDIATION', comment: 'Whether this node runs a data intermediation service (EU 2022/868): report | none | node | owners' },
+        { key: 'AIMEAT_AML_MODE', comment: 'Whether this node or its owners do anti-money-laundering obliged work (EU 2024/1624): report | none | owners | node' },
         { key: 'AIMEAT_DEFAULT_MEMORY_VISIBILITY', comment: 'An entry saved with no level: private | owner | members' },
         { key: 'AIMEAT_DEFAULT_FILE_VISIBILITY', comment: 'A file uploaded with no level: private | owner | members' },
         { key: 'AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY', comment: 'A file an app uploads with visibility "default" (the asset library): public | private | owner | members' },

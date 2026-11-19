@@ -1428,6 +1428,8 @@ const ALL_SUITES = [
     'test/e2e-data-lifecycle.ts',
     // Data intermediation: the setting's four modes, the notification record, section 12's findings and Article 12 rows (plan doc-mvwxcas3dom3, D7).
     'test/e2e-data-intermediation.ts',
+    // Anti-money-laundering: the setting's four modes, an obliged entity's declaration, section 13's findings and obligations (services/aml/).
+    'test/e2e-aml-mode.ts',
     // A data package sold on EXCHANGE: the projection, the metered feed, the outside buyer, deliversData, ODPS, the intermediation gate (plan doc-mvwxcas3dom3, D5).
     'test/e2e-exchange-datapackage.ts',
     // An app's own users as outside parties: the setting, signup by mail, data isolation, the roster (plan doc-mvwxcas3dom3, D4). Runs its own node with mail on.

@@ -114,6 +114,12 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           value: config.dataIntermediation,
           defaultVal: 'report',
         },
+        {
+          envVar: 'AIMEAT_AML_MODE',
+          description: 'Anti-money-laundering obliged work (EU 2024/1624): report | none | owners | node',
+          value: config.amlMode,
+          defaultVal: 'report',
+        },
       ],
     },
     {
