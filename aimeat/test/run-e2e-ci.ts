@@ -1355,6 +1355,7 @@ const ALL_SUITES = [
     'test/e2e-contact-picker.ts',
     'test/e2e-contacts.ts',
     'test/e2e-colleagues.ts',               // a company server: everyone on it sees each other (members see each other)
+    'test/e2e-cross-owner-dm.ts',           // a co-member of a closed organism is past the first-contact gate
     // Too long, a control character, NUL and a broken character are refused with the field named, on REST and MCP.
     'test/e2e-input-validation.ts',
     // The answers of selected operations against openapi.yaml: status, schema, no undeclared field.
