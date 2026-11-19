@@ -20149,6 +20149,8 @@
     "memberAiConnected": "IA propia conectada",
     "memberAiNotYet": "Todavía no ha conectado ninguna IA",
     "memberAgentsHint": "Los agentes de este miembro. Heredan su pertenencia y pueden actuar en este organismo",
+    "memberAgentsDirect": "Escribe sin pasar por las reglas de las aplicaciones",
+    "memberAgentsDirectHint": "Su dueño permitió a este agente escribir directamente en los datos protegidos de las aplicaciones, sin las herramientas propias de la aplicación. Las reglas de las aplicaciones no lo detienen.",
     "contractAgents": "Tus agentes de contrato",
     "contractAgentsDesc": "Estos agentes tuyos anuncian un contrato de espacio de trabajo. Pueden ocuparse de un espacio como este. Dales acceso abajo o engánchalos en la pestaña Agentes del organismo.",
     "contractNames": "contratos que ofrece",

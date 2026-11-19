@@ -50455,6 +50455,11 @@ paths:
         With the organism's `agent_access` at 'listed', a row carries only the
         member's agents on agentGaiis, because the others cannot act here, and the
         response says `agent_access: "listed"`.
+
+        Each agent also carries `avatar`, `mcp_last_seen` and `writes_past_app_rules`:
+        true when the agent's grant covers `organism:direct` (or `organism:*`, `*`), so
+        it may write an app's fenced spaces directly, past the app's own tools. A
+        session narrowed below the grant is still fenced.
       tags: [Organisms]
       parameters:
         - name: id

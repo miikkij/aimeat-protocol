@@ -22094,6 +22094,8 @@
     "memberAiConnected": "Oma tekoäly kytketty",
     "memberAiNotYet": "Tekoälyä ei ole vielä kytketty",
     "memberAgentsHint": "Jäsenen agentit. Ne perivät jäsenyyden ja voivat toimia tässä organismissa",
+    "memberAgentsDirect": "Kirjoittaa sovellusten sääntöjen ohi",
+    "memberAgentsDirectHint": "Omistaja on antanut tälle agentille luvan kirjoittaa sovellusten suojattuun tietoon suoraan, ilman sovelluksen omia työkaluja. Sovellusten säännöt eivät pysäytä sitä.",
     "contractAgents": "Sopimusagenttisi",
     "contractAgentsDesc": "Nämä agenttisi tarjoavat workspace-sopimusta. Ne osaavat käsitellä tällaista työtilaa. Myönnä pääsy (alla) tai liitä ne organismin Agentit-välilehdellä.",
     "contractNames": "tarjotut sopimukset",

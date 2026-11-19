@@ -21327,6 +21327,8 @@
     "memberAiConnected": "Own AI connected",
     "memberAiNotYet": "No AI connected yet",
     "memberAgentsHint": "This member's agents. They inherit the membership and can act in this organism",
+    "memberAgentsDirect": "Writes past the apps' rules",
+    "memberAgentsDirectHint": "Its owner let this agent write the apps' protected data directly, without the app's own tools. The apps' rules do not stop it.",
     "contractAgents": "Your contract agents",
     "contractAgentsDesc": "These agents of yours advertise a workspace contract. They can process a workspace like this one. Grant access (below) or attach them in the organism Agents tab.",
     "contractNames": "contracts offered",

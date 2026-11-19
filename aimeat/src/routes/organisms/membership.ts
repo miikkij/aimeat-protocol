@@ -17,6 +17,8 @@
  *     /:id/invitations/accept read through services/organism-read/manager.ts and name-invitations.ts,
  *     which the name invitation tools ask too; the answers are unchanged (structure programme 2026-11,
  *     unit 2b).
+ *   2026-11-19 — Each agent on GET /v1/organisms/:id/members carries `writes_past_app_rules`: its
+ *     grant covers organism:direct, so it may write an app's fenced spaces directly.
  *   2026-11-13 — GET /v1/organisms/:id/members takes the agents it names from rosterAgentsFor
  *     (services/organism-privacy.ts), the rule aimeat_organism_members asks too; its answer is
  *     unchanged (structure programme 2026-11, unit 7).
@@ -69,7 +71,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
 import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { canSeeMembers, rosterAgentsFor, rosterCallerFromAuth } from '../../services/organism/privacy.js';
+import { canSeeMembers, rosterAgentsFor, rosterCallerFromAuth, writesPastAppRules } from '../../services/organism/privacy.js';
 import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwner } from '../../services/organism/ownership.js';
 import { organismForManager, organismForOwner } from '../../services/organism-read/manager.js';
 import { nameInvitationsOf, nameInvitationTo } from '../../services/organism-read/name-invitations.js';
@@ -139,7 +141,9 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
         ...m,
         // mcp_last_seen: when the agent last opened an MCP session, the node's test for "this member's
         // own AI is connected" (services/agent/mcp-touch.ts); null for one that never did.
-        agents: admitted[i].map(a => ({ gaii: a.gaii, name: a.name, avatar: avatars.get(a.gaii) ?? null, mcp_last_seen: a.mcpLastSeen ?? null })),
+        // writes_past_app_rules: the agent's grant covers organism:direct, so it may write an app's
+        // fenced spaces past the app's own tools (services/organism/privacy.ts writesPastAppRules).
+        agents: admitted[i].map(a => ({ gaii: a.gaii, name: a.name, avatar: avatars.get(a.gaii) ?? null, mcp_last_seen: a.mcpLastSeen ?? null, writes_past_app_rules: writesPastAppRules(a) })),
       }));
       res.json(success(config.nodeId, { members: enriched, total: enriched.length, agents_included: true, agent_access: agentAccessOf(organism) }));
       return;

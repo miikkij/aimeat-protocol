@@ -824,6 +824,7 @@ const ALL_SUITES = [
     // Which of its members' agents an organism admits: the refusal on REST, MCP and the key namespace,
     // who may change the list and the setting, and the member list naming only the admitted.
     'test/e2e-organism-agent-access.ts',
+    'test/e2e-cross-owner-roster.ts',       // the member list names the agents that may write past an app's rules
     // The MCP task lifecycle, which nothing exercised — which is why five differences from the REST
     // routes survived every green run.
     'test/e2e-mcp-agent-tasks.ts',
