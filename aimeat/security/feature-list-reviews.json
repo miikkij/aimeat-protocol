@@ -86,7 +86,7 @@
         "aimeat/src/routes/account-events.ts",
         "aimeat/src/routes/permissions.ts"
       ],
-      "digest": "sha256:5d8ab1edd35eec883c728334"
+      "digest": "sha256:0dcaf1d58efee5aaaee8d2b8"
     },
     "5. Memory, files and search": {
       "reviewedOn": "2026-11-19",
@@ -619,7 +619,7 @@
       "aimeat/src/routes/secrets.ts": "d97badf3c10162f4",
       "aimeat/src/services/group-shares.ts": "1cd8a1e622cc5749",
       "aimeat/src/routes/sharing-groups.ts": "9e303d6918e58a3e",
-      "aimeat/src/services/db/data-wallet-db-service.ts": "b11661ccd7c64f0e",
+      "aimeat/src/services/db/data-wallet-db-service.ts": "ce3ab7e06bc670db",
       "aimeat/src/routes/parties.ts": "9498a48235a10e5b",
       "aimeat/src/routes/account-events.ts": "8d72e9e3074424b0",
       "aimeat/src/routes/permissions.ts": "dabea2ea9473668b"
