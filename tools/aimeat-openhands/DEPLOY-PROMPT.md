@@ -110,7 +110,7 @@ Show me the list before disabling if you're unsure which to keep.
    - Skill in the image: `docker run --rm --entrypoint sh aimeat/agent-server:1.26.0-python -lc 'cat /home/openhands/.openhands/skills/aimeat-app-builder/SKILL.md | head -3'`.
    - **Decisive probe:** in a fresh conversation ask *"Do you have a skill about building AIMEAT
      apps? Quote its one golden rule."* Success = the agent names `aimeat-app-builder` and the
-     `/v1/prompts/build-app` rule (it will be in the conversation's `SystemPromptEvent`). If it
+     `/v1/prompts/build-app-atelier` rule (it will be in the conversation's `SystemPromptEvent`). If it
      says it has no such skill, confirm the app is actually using the custom image
      (`AGENT_SERVER_IMAGE_REPOSITORY`/`TAG` in the running container's env) and that a new
      conversation was started after `up`.

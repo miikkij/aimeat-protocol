@@ -16,6 +16,9 @@
  *   2026-11-11 — +bundled-agent-block, +bundled-agent-permissions: how an app declares the agent it
  *     brings, and which permissions that agent gets (services/app-bundled-crews.ts names both in the publish hints).
  *   (2026-11-08) hand-rolled names 390×844 and 1280×900, the skill's size matrix, where it said 390 and 1440.
+ *   (2026-11-19) The Classic track is retired: track-drift is "a new app that is not an Atelier app",
+ *     track-mixing and the starting-point and dead-URL fixes name the Atelier spec and section
+ *     from-classic only.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-25 — intake-form-undeclared: the forms a page submits to are named in <meta name="aimeat-intake"> (services/app-intake-forms.ts).
  *   2026-10-19 — no-max-tokens: a text job runs uncapped and its record says truncated (wish
@@ -110,7 +113,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'invented-lib-urls',
     title: 'Invented script/style URLs 404 and break the app',
     symptom: 'The app references a plausible-looking node URL (e.g. /i18n/translations.js, /components/x.js) that does not exist. Publishing REFUSES a node path that answers 404 (APP_ARTIFACT_BROKEN); a relative path or an outside host only gets a warning, and then the page half-loads in the browser.',
-    fix: 'Only load URLs the build spec lists. Fetch the build spec first (GET /v1/prompts/build-app-atelier, or /v1/prompts/build-app for an app already on the Classic track) and use exactly the library and script URLs it names, and GET /v1/library-packs for everything the node vendors. Never guess one.',
+    fix: 'Only load URLs the build spec lists. Fetch the build spec first (GET /v1/prompts/build-app-atelier, with its platform section engines) and use exactly the library and script URLs it names, and GET /v1/library-packs for everything the node vendors. Never guess one.',
     appliesTo: ['app', 'publish'],
     severity: 'critical',
     source: 'curated',
@@ -167,7 +170,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'app-declared-unused',
     title: 'Loaded, declared, and never used',
     symptom: 'The published app opens with no sign-in and no way to change language or theme, or it downloads daisyUI and renders unstyled. Every stylesheet is linked and none of it shows. The publish answer warns about all three shapes; the person finds it in five seconds by opening the app.',
-    fix: 'Start from what the node hands you, never from an empty page. A new app forks a genre (`aimeat_app_template_get { id: "genre-<id>" }`) and adds the sign-in bar the way the Atelier specification\'s fork section shows. An app already on Classic keeps its shell from `GET /v1/app-templates`, which carries the login pill (the sign-in, the language switch and the theme control), daisyUI and the head declarations. If you keep a stylesheet or `aimeat-auth.js` in the head, use what it provides: mount the bar with `AIMEAT.auth.mountLoginButton(sel, { onSession })`, which restores a returning session and handles a fresh sign-in (see handle-both-auth-paths).',
+    fix: 'Start from what the node hands you, never from an empty page. A new app forks a genre (`aimeat_app_template_get { id: "genre-<id>" }`) and adds the sign-in bar the way the Atelier specification\'s fork section shows; a prototype or an ordinary page starts from `shell-atelier`, whose frame carries the sign-in. An app built on the retired Classic track is moved with the specification\'s section `from-classic`. If you keep a stylesheet or `aimeat-auth.js` in the head, use what it provides: mount the bar with `AIMEAT.auth.mountLoginButton(sel, { onSession })`, which restores a returning session and handles a fresh sign-in (see handle-both-auth-paths).',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
@@ -178,7 +181,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'track-mixing',
     title: 'An app built from two guides at once',
     symptom: 'The app declares one build track and carries the other track\'s vocabulary: Classic declared with the Atelier shell drawn (atelier.app()) or with the kit loaded and nothing in it called, Atelier declared with the kit missing or with raw daisyUI class markup outside a section escape hatch, or the Atelier kit loaded with no track declared at all. Publishing warns; the visible cost comes later, when an edit session loads the declared track\'s guide and half-understands the file.',
-    fix: 'Pick the track first and stay on it. `<meta name="aimeat-track" content="classic">` means daisyUI classes and the Classic build guide; `content="atelier"` means the Atelier kit is the vocabulary, and raw markup lives only inside a section body the app fills itself (`AIMEAT.atelier.section`). The declaration is what routes every later improve session to the right guide, so it must match what the page actually does. A Classic page may load the kit for the library blocks it uses (AIMEAT.atelier.members, joinRequest, aiTask, copy, workspaceTeam); that is not a mix.',
+    fix: 'Declare `<meta name="aimeat-track" content="atelier">` and let the Atelier kit be the vocabulary; raw markup lives only inside a section body the app fills itself (`AIMEAT.atelier.section`). A page built on the retired Classic track keeps `content="classic"` until it is moved (the specification\'s section `from-classic`), and meanwhile it may load the kit for the library blocks it uses (AIMEAT.atelier.members, joinRequest, aiTask, copy, workspaceTeam); that is not a mix. The declaration must match what the page actually does.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
@@ -231,9 +234,9 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'track-drift',
-    title: 'A new app that ended up on the Classic track',
-    symptom: 'A new app is published on Classic, or a build that read the Atelier specification publishes an app with no Atelier kit in it. It works and it looks like every hand-built page: a header written by hand, a sign-in bar that breaks at phone width, states nobody designed. Publishing warns (`app_hints`, pitfall `track-drift`). It happens because the Classic shell can be started from at once and the Atelier track asks for a genre and its own specification first.',
-    fix: 'A new app is built on the Atelier track: load `node:aimeat-app-builder-atelier`, read its specification (`aimeat_handbook_get { tier: "build-app-atelier" }`, in parts; over HTTP `GET /v1/prompts/build-app-atelier`), fork a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`) and keep its shell. Classic is for improving an app that is already Classic, or when the owner asks for it by name, and then you say so to the owner. Never change track in the middle of a build: stop and tell the owner what you found.',
+    title: 'A new app that is not an Atelier app',
+    symptom: 'A new app is published with no Atelier kit in it and no track declared. It works and it looks like every hand-built page: a header written by hand, a sign-in bar that breaks at phone width, states nobody designed. Publishing warns (`app_hints`, pitfall `track-drift`). It happens because a blank page can be started from at once and the Atelier specification asks for a level and a genre or shell first.',
+    fix: 'Every app is built with the Atelier specification: load `node:aimeat-app-builder-atelier`, read it (`aimeat_handbook_get { tier: "build-app-atelier" }`, in parts; over HTTP `GET /v1/prompts/build-app-atelier`), and fork a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`) or start from `shell-atelier`. A page with a look or an engine of its own goes inside the Atelier shell and names its register as `custom:<name>`. The Classic track was retired on 2026-11-19; an update of an app built on it stays quiet, and it is moved with the specification\'s section `from-classic`.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',

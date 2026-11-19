@@ -885,8 +885,9 @@ When starting a new ext+cortex+app stack:
   and the built-in skill `aimeat-extension-builder` — the full `ctx` table,
   manifest, secrets, pacing and money price, install
 - `GET /v1/prompts/build-app-atelier` (source `src/services/builder/atelier-prompt.ts`) —
-  the node-served specification for a new app. `GET /v1/prompts/build-app`
-  (source `src/services/builder/app-prompt.ts`) is the Classic track's
+  the node-served specification for every app, with its platform sections
+  (`src/services/builder/atelier-platform.ts`). The retired Classic address
+  `GET /v1/prompts/build-app` serves the same text
 - `aimeat/src/routes/agent-tasks.ts` — every task API endpoint, listed in
   its header
 - `aimeat/src/services/extension/ctx-contract.ts` — what `ctx` contains,

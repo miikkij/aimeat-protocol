@@ -31,6 +31,7 @@
  * @usage
  *   cd aimeat && pnpm cold-agent --suite skills --model sonnet --runs 3
  * @version-history
+ *   (2026-11-19) Fixing an app expects the Atelier skill alone; the Classic one is retired.
  *   (2026-11-08) Three sentences for aimeat-context, the skill for a person's contexts.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-09-18 — Initial: 7 skills, 30 sentences, 6 of them needing no skill.
@@ -48,7 +49,8 @@ export const SKILL_CASES: SkillCase[] = [
     { expect: 'aimeat-app-builder-atelier', say: 'Can you make me a little app for tracking which plants I have watered?' },
     { expect: 'aimeat-app-builder-atelier', say: 'I need a page where my football team can see who is bringing the snacks each week.' },
     { expect: 'aimeat-app-builder-atelier', say: 'Build a simple expense splitter I can open on my phone.' },
-    { expect: ['aimeat-app-builder-atelier', 'aimeat-app-builder'], say: 'My app looks broken on mobile. Can you fix it and publish it again?' },
+    // The Classic skill was retired on 2026-11-19; changing an app is the Atelier skill's too.
+    { expect: 'aimeat-app-builder-atelier', say: 'My app looks broken on mobile. Can you fix it and publish it again?' },
     // Games
     { expect: 'aimeat-phaser', say: 'I want to make a little platform game for my kid.' },
     { expect: 'aimeat-phaser', say: 'Could you build a space shooter where the ship follows my finger?' },

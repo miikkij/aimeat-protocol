@@ -14,9 +14,9 @@ verification skill before editing platform UI.
 ## A hosted application
 
 Read the target node's `GET /v1/prompts/build-app-atelier` first. It is the build
-specification for a new app. `GET /v1/prompts/build-app` is the Classic track, for an
-app already on it or when the owner asks for it. Use `GET /v1/app-templates` or the node's app-building tools to
-select a supported starter.
+specification for every app; its platform sections cover what only some apps need. The
+Classic track was retired on 2026-11-19. Use `GET /v1/app-templates` or the node's
+app-building tools to select a supported starter (a genre, the Atelier shell or a use case).
 
 Hosted apps have their own origins and owner-approved grants. Use the served
 authentication and data SDK. The node's internal `/js/api.js` module and owner
