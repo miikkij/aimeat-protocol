@@ -57,6 +57,8 @@
  * @usage
  *   await removeAppLeftovers(storage, config, { ownerName, ownerGhii, filename, buckets: [app.ownerGaii] });
  * @version-history
+ *   v1.1.1 — 2026-11-19 — The AI settings step keeps the owner's own role bindings of the app: the roles
+ *     view shows them under the app marked gone, for the owner to remove (test/e2e-ai-roles.ts 13).
  *   v1.1.0 — 2026-11-19 — Each step runs in its own savepoint, so the account erasure, which runs this
  *     inside its transaction for every app the account owns, keeps going past a refused statement.
  *   v1.0.0 — 2026-11-19 — Initial: the delete completeness fix (feature audit 2026-11-19, 4.3). The
@@ -301,6 +303,10 @@ export const APP_SWEEP_STEPS: ReadonlyArray<{ name: string; run: (c: SweepCtx) =
       const { storage, t, appId } = c;
       const names = (owner: string, v: string) => equalAppId(v, appId) || (owner === t.ownerGhii && v === t.filename);
       for (const r of await refsOf(storage, null, ROLES_KEY)) {
+        // The owner's own bindings stay: the roles view marks the app `gone` and the owner removes
+        // them there (services/ai/roles-view.ts; test/e2e-ai-roles.ts test 13 holds it). Another
+        // person's binding of this owner's app goes, because that person has no app left to see it by.
+        if (r.ownerGaii === t.ownerGhii) continue;
         await updateMemoryRecord(storage, r.ownerGaii, r.key, rec => {
           const v = rec?.value as { bindings?: Record<string, unknown> } | null;
           const drop = Object.keys(v?.bindings ?? {}).filter(k => names(r.ownerGaii, k.slice(0, k.lastIndexOf('#'))));
