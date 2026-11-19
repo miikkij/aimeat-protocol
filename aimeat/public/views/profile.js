@@ -10,6 +10,10 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-11-19 — The "Customer due diligence" tab (views/profile/kyc-tab.js, id 'kyc'): an obliged
+ *     organism's customer cards, suspicions and settings, and one's own verification; and the hidden
+ *     'identify' tab (views/profile/kyc/identify.js), where a customer gives their verified identity
+ *     through a firm's link (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  *   2026-11-14 — The "Vault" tab (views/profile/vault-tab.js, id 'vault'): the secrets a person shares
  *     and receives, and this browser's key for end-to-end shares
  *     (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
@@ -160,6 +164,10 @@ const TABS = [
   { id: 'agreements',    key: 'profile.tabs.agreements',     load: () => import('./profile/agreements-tab.js').then(byDefault),     minTier: 'new' },
   { id: 'sharedData',    key: 'profile.tabs.sharedData',     load: () => import('./profile/shared-data-tab.js').then(byDefault),    minTier: 'new' },
   { id: 'dataWallet',    key: 'profile.tabs.dataWallet',     load: () => import('./profile/data-wallet-tab.js').then(byDefault),    minTier: 'active' },
+  // Customer due diligence (KYC) in an obliged organism, and one's own verification history.
+  { id: 'kyc',           key: 'profile.tabs.kyc',            load: () => import('./profile/kyc-tab.js').then(byDefault),            minTier: 'active' },
+  // The identify link's page: not in the menu, reached by ?tab=identify&token=… from a firm's link.
+  { id: 'identify',      key: 'kyc.id.pageTitle',            load: () => import('./profile/kyc/identify.js').then(byDefault),       minTier: 'new' },
   { id: 'storage',       key: 'profile.tabs.storage',        load: () => import('./profile/storage-tab.js').then(byDefault),        minTier: 'new' },
   { id: 'nodeStats',     key: 'profile.tabs.nodeStats',      load: () => import('./profile/node-stats-tab.js').then(byDefault),     minTier: 'experienced' },
   // 'new', not 'experienced': this tab is where two-step sign-in is switched on, and that is not an

@@ -64,13 +64,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The hold ledger and its state machine, plus the seller's payment settings."
     },
-    "src/commerce/test-money-ledger.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listAllMemoryPages": 1
-      },
-      "why": "Reviewed 2026-11-15, the node's own read: the test money provider's books (commerce.test-money.* under system@<node>), written and read only by the test money handler and the operator's ledger route while test money is on; no person's content."
-    },
     "src/commerce/pacing-pack.ts": {
       "reads": {
         "getMemory": 1
@@ -133,6 +126,13 @@
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-10-18 (Comicland v3 A-5), the node's own read: an extension's own published offer (`subscription.plans` in ext:{name}), the buyer's service-owned subscription records (commerce.subscription.*) to extend, list, cancel and renew them, and the seller's payment setup (commerce.psp) for the renewal charge. What a buyer is shown is their own records' facts without the kept card's ids; no content is shown to anyone else. 2026-11-08 (secaudit2026nov08b round 15): renewOne also asks whether the seller holds the period's undelivered-payment record, a presence test whose value is not read or shown."
+    },
+    "src/commerce/test-money-ledger.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listAllMemoryPages": 1
+      },
+      "why": "Reviewed 2026-11-15, the node's own read: the test money provider's books (commerce.test-money.* under system@<node>), written and read only by the test money handler and the operator's ledger route while test money is on; no person's content."
     },
     "src/commerce/ucp-guest-checkout.ts": {
       "reads": {
@@ -889,6 +889,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI usage counters."
     },
+    "src/services/aml/findings.ts": {
+      "reads": {
+        "listAllMemoryPages": 4
+      },
+      "why": "Reviewed 2026-11-19, the node's own read: the revenue split records (bensplit.* in the beneficiary-split namespace), the beneficiary books (commerce.benefit.*), the agent purchase limits (commerce.agent-limits) and the payment settings (commerce.psp), counted for section 13 of the compliance report. Only counts, rails and account names leave it; no content and no key is shown to anyone."
+    },
     "src/services/anonymous-principal-records.ts": {
       "reads": {
         "listMemory": 1,
@@ -1427,6 +1433,12 @@
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, v81 and v82), the node's own read: a group send reads an attachment's metadata only, to stamp the version that was sent; no bytes are read and nothing is shown."
     },
+    "src/services/cortex/activation.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Moved unchanged from src/routes/cortex/activation.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of cortex ontology, prompt and seed records."
+    },
     "src/services/cortex/holder-change.ts": {
       "reads": {
         "getMemory": 1
@@ -1445,17 +1457,17 @@
       },
       "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUNDLED_CORTEX_NAME_HELD incident twice. No content."
     },
-    "src/services/cortex/activation.ts": {
-      "reads": {
-        "getMemory": 3
-      },
-      "why": "Moved unchanged from src/routes/cortex/activation.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of cortex ontology, prompt and seed records."
-    },
     "src/services/credential-search-reindex.ts": {
       "reads": {
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the once-only start step lists the credential records only to store each again, unchanged, so the search text is rebuilt without its value; nothing is shown to anyone."
+    },
+    "src/services/crews/def-envelope.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Moved unchanged from src/services/crew-def-store.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-10-16 (QA audit F07b-02), the node's own read: crewSitesWriteRefusal reads the stored live definition's browser site list to compare it with a write; nothing is returned to the caller."
     },
     "src/services/crews/def-store.ts": {
       "reads": {
@@ -1470,23 +1482,11 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: LLM-choice settings and the agent's published LLM catalogue."
     },
-    "src/services/crews/def-envelope.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Moved unchanged from src/services/crew-def-store.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-10-16 (QA audit F07b-02), the node's own read: crewSitesWriteRefusal reads the stored live definition's browser site list to compare it with a write; nothing is returned to the caller."
-    },
     "src/services/dangling-refs.ts": {
       "reads": {
         "listAllMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Source records pass reader.show before titles and refs become findings; the archived rows and the registry give ids only."
-    },
-    "src/services/aml/findings.ts": {
-      "reads": {
-        "listAllMemoryPages": 4
-      },
-      "why": "Reviewed 2026-11-19, the node's own read: the revenue split records (bensplit.* in the beneficiary-split namespace), the beneficiary books (commerce.benefit.*), the agent purchase limits (commerce.agent-limits) and the payment settings (commerce.psp), counted for section 13 of the compliance report. Only counts, rails and account names leave it; no content and no key is shown to anyone."
     },
     "src/services/data-intermediation/findings.ts": {
       "reads": {
@@ -2250,6 +2250,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest existence check and read-to-update of an entry."
     },
+    "src/services/knowledge/package-links.ts": {
+      "reads": {
+        "getMemoryByKeysAnyOwner": 1
+      },
+      "why": "Written 2026-11-14 (structure programme 2026-11, unit 2b, B15), passes the reader at the point of use: packageLinksFor reads the copies of one package manifest key by that key, chooses the one the caller may read (its own account, a public copy, or an audience that admits it) and returns it only through presentMemory with the caller's classification reader, as GET /v1/knowledge/:id/links and aimeat_knowledge_links answer it."
+    },
     "src/services/knowledge/publish-ask.ts": {
       "reads": {
         "getMemory": 2
@@ -2269,11 +2275,25 @@
       },
       "why": "Reviewed 2026-11-02 (WP11), passes the reader at the point of use: the cached node-wide scan of knowledge package manifests shared with members or an organism; sharedKnowledgeFor admits each by knowledgeAudienceAllows and then runs presentMemories with the caller's classification reader before the library answers, as GET /v1/knowledge/:id does."
     },
-    "src/services/knowledge/package-links.ts": {
+    "src/services/kyc/identify.ts": {
       "reads": {
-        "getMemoryByKeysAnyOwner": 1
+        "getMemory": 1
       },
-      "why": "Written 2026-11-14 (structure programme 2026-11, unit 2b, B15), passes the reader at the point of use: packageLinksFor reads the copies of one package manifest key by that key, chooses the one the caller may read (its own account, a public copy, or an audience that admits it) and returns it only through presentMemory with the caller's classification reader, as GET /v1/knowledge/:id/links and aimeat_knowledge_links answer it."
+      "why": "Reviewed 2026-11-19, the node's own record: the identify link's record kyc.link.<sha256> of system@<node>, read to check the link before the customer gives their verification. No owner content."
+    },
+    "src/services/kyc/screening/store.ts": {
+      "reads": {
+        "listMemory": 1,
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-11-19, the node's own records: the EU and UN sanctions lists the node fetched, kept as kyc.lists.* of system@<node> and read to screen. Public lists, no owner content."
+    },
+    "src/services/kyc/store.ts": {
+      "reads": {
+        "getMemory": 5,
+        "listMemory": 5
+      },
+      "why": "Reviewed 2026-11-19, the node's own records: customer due diligence cards, suspicions, settings and link records are records of system@<node> under kyc.org.* (services/kyc/store.ts), read for the organism's officers and staff after services/kyc/access.ts decided their role. They are never an owner's content and never reach a model through this read."
     },
     "src/services/ledger/billing.ts": {
       "reads": {
@@ -2343,6 +2363,19 @@
       },
       "why": "Written 2026-10-26 (MCP Tasks extension), the node's own read: the service-owned task record (mcp.tasks.<id>) in the calling principal's own namespace, read back only to that principal. Its result is the answer of a tool call the same principal made, which the tool already read through its own classification path; the record is never sent to a model."
     },
+    "src/services/memory-patch/patch.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Moved unchanged from routes/memory/patch.ts on 2026-11-09 with its review: Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader (the echoed value goes through presentMemory with the caller's reader); the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): the first reads the record's visibility, for the audience cap before the write; the second is the merge loop's re-read."
+    },
+    "src/services/memory-versions/history.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemoryHistory": 1
+      },
+      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the earlier versions of one record, read only by the record's own principal or the same person in person or through memory:read-as-owner; the organism read rule applies, and the current value and every archived version go through presentMemories with the caller's classification reader (and the credential mask) under the record's own target before anything is shown or compared."
+    },
     "src/services/memory/bin.ts": {
       "reads": {
         "getMemory": 1,
@@ -2368,12 +2401,6 @@
       },
       "why": "Reviewed 2026-11-04 (codebase analysis 2026-11-03, item C1): the values of one page of GET /v1/memory?limit=N, read by key for rows the route has already passed through the classification reader (reader.show on the meta rows, the same reader presentMemories applies), with the credential mask applied to each value; the byte sum reads the values of the masked keys only to measure them, and returns no content."
     },
-    "src/services/memory-patch/patch.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Moved unchanged from routes/memory/patch.ts on 2026-11-09 with its review: Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader (the echoed value goes through presentMemory with the caller's reader); the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): the first reads the record's visibility, for the audience cap before the write; the second is the merge loop's re-read."
-    },
     "src/services/memory/query.ts": {
       "reads": {
         "memoryDb.searchOwnerScope": 1,
@@ -2390,13 +2417,6 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
-    },
-    "src/services/memory-versions/history.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listMemoryHistory": 1
-      },
-      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the earlier versions of one record, read only by the record's own principal or the same person in person or through memory:read-as-owner; the organism read rule applies, and the current value and every archived version go through presentMemories with the caller's classification reader (and the credential mask) under the record's own target before anything is shown or compared."
     },
     "src/services/memory/write.ts": {
       "reads": {
@@ -2422,6 +2442,12 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's network policy record."
+    },
+    "src/services/node-admin/teams-view.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-15 (team setup T16): reads the team's structure snapshot (organism.{id}.meta.structure) for its updatedAt only, the date the operator's team list shows. No value of it is answered."
     },
     "src/services/node/resident-agent.ts": {
       "reads": {
@@ -2476,13 +2502,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding marker and track records."
     },
-    "src/services/onboarding/validator.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Agent commands, config and offers checked for onboarding."
-    },
     "src/services/onboarding/markers.ts": {
       "reads": {
         "getMemory": 1
@@ -2495,6 +2514,13 @@
         "listMemory": 2
       },
       "why": "Moved unchanged from src/routes/agent-onboarding.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence checks on commands, config and tag records; no values are returned."
+    },
+    "src/services/onboarding/validator.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Agent commands, config and offers checked for onboarding."
     },
     "src/services/once-only-step.ts": {
       "reads": {
@@ -2515,6 +2541,12 @@
       },
       "why": "Reviewed 2026-10-02, the node's own read: the run-once marker under the node's system identity, and each owner's openrouter.settings record, read to clear the free router a key-only save wrote. No content is shown to anyone. 2026-10-18: the marker is read by services/once-only-step.ts."
     },
+    "src/services/organism-read/workspace-access-requests.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Moved 2026-11-13 from src/mcp/workspace-members.ts and two reads of src/routes/organisms/workspace-access.ts with listWorkspaceAccessRequests (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: workspace access-request state records."
+    },
     "src/services/organism/comments.ts": {
       "reads": {
         "listAllMemory": 2
@@ -2528,12 +2560,6 @@
         "getMemoryByKeysAnyOwner": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The manifest for gate policy, decision-log pruning, the publish state machine, and registry and manifest indexes."
-    },
-    "src/services/organism-read/workspace-access-requests.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Moved 2026-11-13 from src/mcp/workspace-members.ts and two reads of src/routes/organisms/workspace-access.ts with listWorkspaceAccessRequests (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: workspace access-request state records."
     },
     "src/services/organism/readme.ts": {
       "reads": {
@@ -2771,19 +2797,19 @@
       },
       "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the owner's portfolio.config records under each of the owner's identities, read to tell whether a memory write would make the served welcome page public; only the switch and who may open the page are compared, and nothing is shown to the writer."
     },
-    "src/services/portfolio/read-hold.ts": {
-      "reads": {
-        "getStorageFile": 1,
-        "getMemory": 4
-      },
-      "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. 2026-11-01 (secaudit2026oct31w2 round 11): the same record read again by the generic write's note and the once-only step, and the finished record of that step under system@<node>. Nothing of the page or the records is shown to anyone or sent to a model."
-    },
     "src/services/portfolio/published.ts": {
       "reads": {
         "getMemory": 1,
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-11-12, moved from src/routes/portfolio.ts by extraction (resolvePublishedPortfolio): the owner's own portfolio config record (portfolio.config) and the owner's own published page file, read under the owner's own identities to serve that owner's welcome page and to tell who may open it. The page is the owner's published page; its `access` decides who reads it."
+    },
+    "src/services/portfolio/read-hold.ts": {
+      "reads": {
+        "getStorageFile": 1,
+        "getMemory": 4
+      },
+      "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. 2026-11-01 (secaudit2026oct31w2 round 11): the same record read again by the generic write's note and the once-only step, and the finished record of that step under system@<node>. Nothing of the page or the records is shown to anyone or sent to a model."
     },
     "src/services/presence.ts": {
       "reads": {
@@ -3106,12 +3132,6 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-11-02, checked: a scheduled task's deliverable, read under its agent for the owner who commissioned it; it goes to that owner's own bell, and to their e-mail only after passing leave (external, e-mail), as ecosystem-automation-notify.ts does. A record that stays behind is logged by key and goes to the bell only."
-    },
-    "src/services/node-admin/teams-view.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-11-15 (team setup T16): reads the team's structure snapshot (organism.{id}.meta.structure) for its updatedAt only, the date the operator's team list shows. No value of it is answered."
     },
     "src/services/team/onboarding.ts": {
       "reads": {

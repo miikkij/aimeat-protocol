@@ -32,6 +32,7 @@ const MENU_FILE = resolve(here, '../public/views/profile/landing-page.cards.js')
 const ALLOWED_ORPHANS: Record<string, string> = {
   messages: 'has its own top-level sidebar button above the groups, not a group item',
   nodeStats: 'lives as a tab on the Nodes page since 2026-06; the route id is kept for old links',
+  identify: 'the customer due diligence identify link a firm sends its customer (services/kyc/identify.ts); it opens with a token, never from the menu',
 };
 
 function read(path: string): string {

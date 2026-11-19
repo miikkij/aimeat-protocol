@@ -87,24 +87,26 @@
       "digest": "sha256:83ed49c991f52a003e3acd58"
     },
     "07-security.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/config/posture.ts",
         "aimeat/src/middleware/cors.ts",
         "aimeat/src/utils/env-validator.ts",
         "docs/security/verification-matrix.md",
         "aimeat/src/services/sign-in-policy.ts",
-        "aimeat/src/services/mcp-client/capability-use-setting.ts"
+        "aimeat/src/services/mcp-client/capability-use-setting.ts",
+        "aimeat/src/services/sd-jwt.ts",
+        "aimeat/src/services/eudiw.ts"
       ],
-      "digest": "sha256:30b730b1528e2ec7e188011e"
+      "digest": "sha256:29e0e373f66650210f0f98b5"
     },
     "08-threat-model.md": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "docs/security/threat-model.md",
         "aimeat/src/cli/connect/command-trust.ts"
       ],
-      "digest": "sha256:6cfffd43ecb828c8eb236fda"
+      "digest": "sha256:77e9ceaf0787ce2750b6a0cc"
     },
     "09-hardening-guide.md": {
       "reviewedOn": "2026-11-15",
@@ -178,14 +180,16 @@
       "digest": "sha256:5d0146f1c7a3bb004525adfb"
     },
     "16-known-limitations.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "docs/known_gaps.md",
         "docs/security/threat-model.md",
         "aimeat/src/services/operator/access-audit.ts",
-        "aimeat/src/services/schedule/fire-claim.ts"
+        "aimeat/src/services/schedule/fire-claim.ts",
+        "aimeat/src/services/sd-jwt.ts",
+        "aimeat/src/services/eudiw.ts"
       ],
-      "digest": "sha256:8d0ba0942b8ed7bc4ab9add0"
+      "digest": "sha256:b98317421ef3deaf2f8c2031"
     },
     "17-exit-plan.md": {
       "reviewedOn": "2026-11-15",
@@ -197,7 +201,7 @@
       "digest": "sha256:e48c7f9b5cedd4b37cdcba7c"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/schedule/fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -224,7 +228,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:70547c6a97bf39dcc15e2d3b"
+      "digest": "sha256:daa068f28296232eefd57e1a"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -270,11 +274,11 @@
       "digest": "sha256:20bb1e6281cafcfa6822765b"
     },
     "templates/risk-assessment.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "docs/security/threat-model.md"
       ],
-      "digest": "sha256:db699b8ee97460824040043e"
+      "digest": "sha256:c7f6dc3ef23eba5885c20636"
     }
   },
   "fileDigests": {
@@ -341,10 +345,12 @@
       "aimeat/src/utils/env-validator.ts": "ccbc5f8f8169ffad",
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
       "aimeat/src/services/sign-in-policy.ts": "abdf689f004d2cac",
-      "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec"
+      "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec",
+      "aimeat/src/services/sd-jwt.ts": "1e1fe714561f17a0",
+      "aimeat/src/services/eudiw.ts": "b6f5af6030b3bcd3"
     },
     "08-threat-model.md": {
-      "docs/security/threat-model.md": "211b04c0cc93e8fe",
+      "docs/security/threat-model.md": "10cf3cf1952417f9",
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce"
     },
     "09-hardening-guide.md": {
@@ -392,9 +398,11 @@
     },
     "16-known-limitations.md": {
       "docs/known_gaps.md": "9b4977634dac65c3",
-      "docs/security/threat-model.md": "211b04c0cc93e8fe",
+      "docs/security/threat-model.md": "10cf3cf1952417f9",
       "aimeat/src/services/operator/access-audit.ts": "0706dd521e11a994",
-      "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580"
+      "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580",
+      "aimeat/src/services/sd-jwt.ts": "1e1fe714561f17a0",
+      "aimeat/src/services/eudiw.ts": "b6f5af6030b3bcd3"
     },
     "17-exit-plan.md": {
       "docs/data-ownership.md": "46190f389def808b",
@@ -421,7 +429,7 @@
       "aimeat/src/services/docsign/statement.ts": "65d24a2c3e04407e"
     },
     "templates/risk-assessment.md": {
-      "docs/security/threat-model.md": "211b04c0cc93e8fe"
+      "docs/security/threat-model.md": "10cf3cf1952417f9"
     },
     "18-scope-and-deployment-patterns.md": {
       "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580",
@@ -437,7 +445,7 @@
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
-      "aimeat/security/process-local-baseline.json": "f598655c66522e13",
+      "aimeat/security/process-local-baseline.json": "5bf06e3781908574",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52",

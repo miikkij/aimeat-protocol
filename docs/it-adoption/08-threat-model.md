@@ -1,6 +1,6 @@
 # 08 Threat model
 
-> Checked against AIMEAT node 4.2.0 (commit 2303f0ce6) on 2026-11-08. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 0f929df17) on 2026-11-19. Maintained with the code: see the README for how.
 
 This page is for the security officer who writes the risk assessment. For each main threat it names the control in AIMEAT with its source, the risk that stays, and what the organisation must do itself. The repository's own map of assets, boundaries and required checks is [docs/security/threat-model.md](../security/threat-model.md); this page builds on it and does not repeat it. The settings named here are explained in [07 Security](07-security.md) and set in [09 Hardening guide](09-hardening-guide.md). Use [templates/risk-assessment.md](templates/risk-assessment.md) to record the decision.
 

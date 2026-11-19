@@ -6,6 +6,8 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.20.0 — 2026-11-19 — The page "Customer due diligence" (aml, views/admin/aml-tab.js) after
+ *     Compliance: the sanctions lists and each obliged organism's customer cards, counted, never named.
  *   v1.19.0 — 2026-11-19 — The contents rail ("On this page") beside every admin page with two or
  *     more sections, read from the sections the page drew (ContentsRail kit mode), as on the Settings &
  *     Controls pages; on a narrow screen the closed row over the page. Config keeps its own index.
@@ -78,6 +80,7 @@ import SecurityTab     from './admin/security-tab.js';
 import InternetOpeningsTab from './admin/internet-openings-tab.js';
 import ReceiversAdminTab from './admin/receivers-tab.js';
 import ComplianceTab   from './admin/compliance-tab.js';
+import AmlAdminTab     from './admin/aml-tab.js';
 import HelpAdminTab    from './admin/help-tab.js';
 import CorsTab         from './admin/cors-tab.js';
 import MaintenanceTab  from './admin/maintenance-tab.js';
@@ -139,6 +142,7 @@ const NAV_GROUPS = [
     { id: 'internet-openings', key: 'admin.internetOpenings.title', component: InternetOpeningsTab },
     { id: 'receivers',    key: 'receivers.admin.title', component: ReceiversAdminTab },
     { id: 'compliance',   key: 'admin.compliance.title', component: ComplianceTab },
+    { id: 'aml',          key: 'admin.aml.title',       component: AmlAdminTab },
     { id: 'help',         key: 'admin.help.title',      component: HelpAdminTab },
     { id: 'cors',         key: 'dashboard.cors',       component: CorsTab },
     { id: 'maintenance',  key: 'dashboard.maintenance',component: MaintenanceTab },

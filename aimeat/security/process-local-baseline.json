@@ -289,14 +289,38 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/node-admin/siem-export.ts :: let :: bound": { "count": 1, "reason": "nothing; every process binds the same config at boot and sends its own events" },
-    "src/services/node-admin/siem-export.ts :: set :: warned": { "count": 1, "reason": "nothing; each process warns once in its own log" },
-    "src/services/node-admin/siem-export.ts :: let :: offTrail": { "count": 1, "reason": "nothing; each process listens to its own usage stream, which holds its own calls" },
-    "src/services/node-admin/siem-export.ts :: let :: udp": { "count": 1, "reason": "nothing; each process opens its own socket to the collector" },
-    "src/services/node-admin/siem-export.ts :: let :: tcp": { "count": 1, "reason": "nothing; each process keeps its own connection to the collector" },
-    "src/services/node-admin/siem-export.ts :: let :: batch": { "count": 1, "reason": "a process that stops loses its last second of OTLP events; each process posts its own" },
-    "src/services/node-admin/siem-export.ts :: let :: flushTimer": { "count": 1, "reason": "nothing; each process flushes its own batch" },
-    "src/services/team/action-gate.ts :: set :: ACTIONS": { "count": 1, "reason": "nothing; a constant set of three action names, the same in every process" },
+    "src/services/node-admin/siem-export.ts :: let :: bound": {
+      "count": 1,
+      "reason": "nothing; every process binds the same config at boot and sends its own events"
+    },
+    "src/services/node-admin/siem-export.ts :: set :: warned": {
+      "count": 1,
+      "reason": "nothing; each process warns once in its own log"
+    },
+    "src/services/node-admin/siem-export.ts :: let :: offTrail": {
+      "count": 1,
+      "reason": "nothing; each process listens to its own usage stream, which holds its own calls"
+    },
+    "src/services/node-admin/siem-export.ts :: let :: udp": {
+      "count": 1,
+      "reason": "nothing; each process opens its own socket to the collector"
+    },
+    "src/services/node-admin/siem-export.ts :: let :: tcp": {
+      "count": 1,
+      "reason": "nothing; each process keeps its own connection to the collector"
+    },
+    "src/services/node-admin/siem-export.ts :: let :: batch": {
+      "count": 1,
+      "reason": "a process that stops loses its last second of OTLP events; each process posts its own"
+    },
+    "src/services/node-admin/siem-export.ts :: let :: flushTimer": {
+      "count": 1,
+      "reason": "nothing; each process flushes its own batch"
+    },
+    "src/services/team/action-gate.ts :: set :: ACTIONS": {
+      "count": 1,
+      "reason": "nothing; a constant set of three action names, the same in every process"
+    },
     "src/server-bootstrap/service-init.ts :: interval :: initializeServices": {
       "count": 7,
       "reason": "DEBT"
@@ -1672,6 +1696,14 @@
     "src/utils/version.ts :: let :: cached": {
       "count": 1,
       "reason": "DEBT"
+    },
+    "src/services/kyc/screening/match.ts :: map :: preparedCache": {
+      "count": 1,
+      "reason": "The sanctions lists prepared for screening, by list version: a second process prepares its own from the same stored list; nothing differs but the time of the first screen."
+    },
+    "src/services/kyc/screening/store.ts :: map :: cache": {
+      "count": 1,
+      "reason": "A sanctions list read from storage, by version: a second process reads its own copy of the same version."
     }
   }
 }

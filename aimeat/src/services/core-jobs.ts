@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-19 — kyc-lists and kyc-daily: customer due diligence (services/kyc/jobs.ts).
  *   2026-11-16 — The notice of a timed-out dispute that waits for a ruling opens that dispute on the admin Work page.
  *   2026-11-14 — team-weekly: the team's week to its leads (services/team/weekly-report.ts).
  *   2026-11-14 — help-sweep and help-report: the hourly round and the report job of Ask someone who knows.
@@ -261,6 +262,17 @@ export function registerCoreHandlers(
   // The data intermediation listing gate reads the running config on code paths that carry none (the
   // EXCHANGE projection from memory write hooks). Installed here at boot for the same reason as above.
   setIntermediationConfig(config);
+
+  // Customer due diligence (services/kyc/jobs.ts): the sanctions lists and a re-screen when one
+  // changed; reviews due and the retention purge (AMLR art. 26, 77).
+  scheduler.registerCoreHandler('kyc-lists', async () => {
+    const { runKycLists } = await import('./kyc/jobs.js');
+    await runKycLists(storage, config);
+  });
+  scheduler.registerCoreHandler('kyc-daily', async () => {
+    const { runKycDaily } = await import('./kyc/jobs.js');
+    await runKycDaily(storage, config);
+  });
 
   // Decision records past their retention window (TARGET-080). One indexed delete across owners.
   scheduler.registerCoreHandler('ai-decision-prune', async () => {

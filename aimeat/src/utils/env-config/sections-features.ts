@@ -120,6 +120,18 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           value: config.amlMode,
           defaultVal: 'report',
         },
+        {
+          envVar: 'AIMEAT_KYC_SANCTIONS_SOURCES',
+          description: 'Sanctions lists for customer due diligence: empty (EU and UN) | none | eu-fsf=<url>,un=<url>',
+          value: config.kycSanctionsSources,
+          defaultVal: '',
+        },
+        {
+          envVar: 'AIMEAT_KYC_AI',
+          description: 'AI models that may read customer due diligence data: local | node | off',
+          value: config.kycAi,
+          defaultVal: 'local',
+        },
       ],
     },
     {

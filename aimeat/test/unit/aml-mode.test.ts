@@ -24,7 +24,8 @@ const decl = (over: Partial<AmlDeclaration> = {}): AmlDeclaration => ({
 
 const facts = (over: Partial<AmlFacts> = {}): AmlFacts => ({
     mode: 'report', owner: null, now: NOW, declarations: [], reviews: new Map(),
-    splitsForOthers: [], cryptoPayouts: [], agentLimits: [], sellers: [], personalServices: [], traders: [], ...over,
+    splitsForOthers: [], cryptoPayouts: [], agentLimits: [], sellers: [], personalServices: [], traders: [],
+        kyc: { lists: [], cards: 0, due: 0, notScreened: 0 }, ...over,
 });
 
 const orgDecl = (d: AmlDeclaration, organismId = 'org-1') => ({ scope: { kind: 'organism' as const, organismId }, declaration: d, organismName: 'Alice Tilit' });
@@ -119,12 +120,18 @@ describe('amlObligations', () => {
         }
     });
 
-    it('names what is not built yet as missing once obliged work is allowed', () => {
-        const rows = amlObligations(facts({ mode: 'owners', sellers: [{ owner: 'alice', rails: ['card'] }] }), { ftnEnabled: true });
-        expect(rows.find(r => r.code === 'aml-ob-sanctions')!.status).toBe('missing');
-        expect(rows.find(r => r.code === 'aml-ob-monitoring')!.status).toBe('missing');
-        expect(rows.find(r => r.code === 'aml-ob-retention')!.status).toBe('missing');
-        expect(rows.find(r => r.code === 'aml-ob-cdd')!.status).toBe('check');
-        expect(amlObligations(facts({ mode: 'owners' }), { ftnEnabled: false }).find(r => r.code === 'aml-ob-cdd')!.status).toBe('missing');
+    it('reads customer due diligence once obliged work is allowed: screening needs a fetched list, the hold and the calendar are there', () => {
+        const noList = amlObligations(facts({ mode: 'owners', sellers: [{ owner: 'alice', rails: ['card'] }] }), { ftnEnabled: true });
+        expect(noList.find(r => r.code === 'aml-ob-sanctions')!.status).toBe('missing');
+        expect(noList.find(r => r.code === 'aml-ob-retention')!.status).toBe('evidence');
+        expect(noList.find(r => r.code === 'aml-ob-monitoring')!.status).toBe('evidence');
+        expect(noList.find(r => r.code === 'aml-ob-cdd')!.status).toBe('evidence');
+        const lists = [{ source: 'eu-fsf', entries: 6000, fetchedAt: '2026-11-19T05:10:00.000Z' }, { source: 'un', entries: 1000, fetchedAt: '2026-11-19T05:10:00.000Z' }];
+        const withLists = amlObligations(facts({ mode: 'owners', kyc: { lists, cards: 3, due: 1, notScreened: 0 } }), { ftnEnabled: false });
+        expect(withLists.find(r => r.code === 'aml-ob-sanctions')!.status).toBe('evidence');
+        expect(withLists.find(r => r.code === 'aml-ob-monitoring')!.status).toBe('check');
+        expect(withLists.find(r => r.code === 'aml-ob-cdd')!.status).toBe('check');
+        const unscreened = amlObligations(facts({ mode: 'owners', kyc: { lists, cards: 3, due: 0, notScreened: 2 } }), { ftnEnabled: true });
+        expect(unscreened.find(r => r.code === 'aml-ob-sanctions')!.status).toBe('check');
     });
 });

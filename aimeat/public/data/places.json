@@ -264,6 +264,7 @@
         { "id": "internet-openings", "labelKey": "admin.internetOpenings.title" },
         { "id": "receivers", "labelKey": "receivers.admin.title" },
         { "id": "compliance", "labelKey": "admin.compliance.title" },
+        { "id": "aml", "labelKey": "admin.aml.title" },
         { "id": "help", "labelKey": "admin.help.title" },
         { "id": "cors", "labelKey": "dashboard.cors" },
         { "id": "maintenance", "labelKey": "dashboard.maintenance" },

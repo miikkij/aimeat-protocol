@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-19 -- definitions/kyc.ts: aimeat_kyc_customer, aimeat_kyc_suspicion_mark and aimeat_kyc_settings.
  *   v1.x -- 2026-11-15 -- definitions/disputes.ts: aimeat_admin_disputes and aimeat_admin_dispute_rule.
  *   v1.x -- 2026-11-14 -- definitions/help.ts: aimeat_help_find, _ask, _inbox, _respond, _close,
  *     _profile_set, _report_data and _report_write (Ask someone who knows).
@@ -142,6 +143,7 @@ import { datapackageSellTools } from './definitions/datapackage-sell.js';
 import { keyReencryptTools } from './definitions/key-reencrypt.js';
 import { disputeTools } from './definitions/disputes.js';
 import { csmTools } from './definitions/csm.js';
+import { kycTools } from './definitions/kyc.js';
 
 const CATALOG = [
     ...agentMessagingTools,
@@ -205,6 +207,7 @@ const CATALOG = [
     ...keyReencryptTools,
     ...disputeTools,
     ...csmTools,
+    ...kycTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;

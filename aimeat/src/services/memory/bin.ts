@@ -21,6 +21,7 @@
  *   deleteMemoryRecord() · restoreLevel() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-11-19 — A customer due diligence record (kyc.org.*) is refused on delete and restore, for every caller: only the retention purge removes it (AMLR art. 77).
  *   2026-11-15 — deleteMemoryRecord asks the team approval gate last (services/team/action-gate.ts,
  *     team setup T7): an AI's delete in a team's workspaces waits for a lead.
  *   2026-11-08 — restoreMemoryRecord asks the key ceiling and byte quota (flipWithinCeilings): a
@@ -82,6 +83,9 @@
  *     became append-only could be put back past the space's write path.
  *   v1.0.0 — 2026-09-03 — Initial, with the delete and restore it exists to hold.
  */
+import { isKycKey } from '../kyc/store.js';
+
+const KYC_RETAINED_MESSAGE = 'A customer due diligence record is kept by the anti-money-laundering law (AMLR art. 77) and is deleted only by the retention purge, five years after the relationship ends. End the relationship on the customer card (POST /v1/kyc/{organism}/customers/{id}/end).';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { emitRecordChange } from '../event-bus.js';
@@ -109,7 +113,7 @@ export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 export interface MemoryBinRefusal {
   ok: false;
   code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD'
-    | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | 'SERVICE_RECORD' | 'QUOTA_EXCEEDED'
+    | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | 'SERVICE_RECORD' | 'QUOTA_EXCEEDED' | 'KYC_RETAINED'
     | LegacyPacingWriteRefusal['code'] | TeamGateRefusal['code'];
   message: string;
   /** The team gate's approval: its id and where a lead decides it (services/team/action-gate.ts). */
@@ -231,6 +235,7 @@ export async function bulkDeleteKeyRefusal(
   if (isSecretRecordKey(req.key)) {
     return { ok: false, code: 'SECRET_RECORD', message: secretRecordBinRefusal(req.key, 'delete').message, status: 403 };
   }
+  if (isKycKey(req.key)) return { ok: false, code: 'KYC_RETAINED', message: KYC_RETAINED_MESSAGE, status: 403 };
   const appRefusal = appReservedKeyRefusal(req.roles, req.key);
   if (appRefusal) return { ok: false, code: 'RESERVED_KEY', message: appRefusal, status: 403 };
   const parts = parseWorkspaceRecordKey(req.key);
@@ -267,6 +272,9 @@ export async function bulkDeleteKeyRefusal(
  * binned before its space became append-only could be put back past the space's write path.
  */
 async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'delete' | 'restore'): Promise<MemoryBinRefusal | null> {
+  // Customer due diligence records (services/kyc/store.ts) are kept by law and go only by the
+  // retention purge, for every caller, an operator included.
+  if (isKycKey(req.key)) return { ok: false, code: 'KYC_RETAINED', message: KYC_RETAINED_MESSAGE, status: 403 };
   // An account's service namespace (services/service-records.ts) is removed from and put back into
   // by its service only, so an operator's ?owner= naming it is refused, whatever the key.
   if (isServiceNamespace(req.ownerOverride)) {

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — verificationLevel's comment says what the code writes: 3 is FTN or the EU wallet, 2 the operator.
  *   v1.14.0 — 2026-10-25 — AgentRecord.credentialsValidAfter: a key rotation ends every credential issued
  *     before it (migration 0117; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.13.0 — 2026-10-23 — AgentRuntimeSource.llm takes 'local': the model runs on the crew's own
@@ -551,7 +552,10 @@ export interface GHIIRecord {
    */
   timezone?: string;
   passwordHash?: string;          // scrypt hash for cross-device login
-  verificationLevel: 0 | 1 | 2 | 3;  // 0=none, 1=email, 2=eidas/ftn, 3=eudiw-wallet
+  // 0 none, 1 e-mail, 2 confirmed by the operator, 3 strong electronic identification (FTN bank ID or the
+  // EU wallet, which is what the verification routes write). The eIDAS level and the history of each
+  // verification are in services/account/verification-history.ts (eidasLevelOf).
+  verificationLevel: 0 | 1 | 2 | 3;
   ownerName: string;              // links to OwnerRecord.name
   createdAt: string;
   updatedAt: string;

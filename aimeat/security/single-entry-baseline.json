@@ -825,8 +825,8 @@
         "why": "The request object to an EUDI wallet, signed with the signing credential's own key and certificate chain."
       },
       "src/services/sd-jwt.ts": {
-        "count": 1,
-        "why": "Verifies an outside issuer's SD-JWT with that issuer's key."
+        "count": 2,
+        "why": "Verifies two outside JWTs, neither signed by this node: the issuer's SD-JWT with that issuer's key, and the holder's Key Binding JWT with the key the credential names in cnf.jwk (EU wallet holder binding, 2026-11-19)."
       },
       "src/services/vc-issuer.ts": {
         "count": 2,

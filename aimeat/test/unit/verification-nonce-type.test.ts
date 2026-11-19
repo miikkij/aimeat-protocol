@@ -7,11 +7,13 @@
  *   the wrong door, and a door written for one flow was reading a row written for another. Each
  *   callback now refuses another flow's state as unknown and leaves that round where it is.
  *
- *   A unit suite rather than E2E because neither door can be driven on a real node here: EUDIW
- *   refuses to boot at all (src/config/eudiw-guard.ts), and FTN needs a live OIDC client. The router
- *   is the real one, on a real SQLite storage, with the two external services stubbed.
+ *   A unit suite rather than E2E because neither callback completes on a real node here without an
+ *   outside party: EUDIW needs a wallet presentation from a trusted issuer, and FTN a live OIDC
+ *   client. The router is the real one, on a real SQLite storage, with the two external services
+ *   stubbed.
  * @usage cd aimeat && pnpm exec vitest run test/unit/verification-nonce-type.test.ts
  * @version-history
+ *   2026-11-19 — Header: EUDIW no longer refuses to boot (holder binding, nonce and audience checks exist).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';

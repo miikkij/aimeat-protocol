@@ -167,11 +167,11 @@
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:d4b83b04dfb87f4c68cab403"
+      "digest": "sha256:a23319625bd108691e8090a4"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-11-13",
@@ -701,7 +701,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "2a088f6543fe6834"
+      "aimeat/src/services/ai/completion.ts": "f05cc450cdfe3b80"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "6f921f29104aea7d",
@@ -940,7 +940,7 @@
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "2df6f6444c486365",
       "aimeat/src/routes/memory/key.ts": "68aa87147c323b2f",
-      "aimeat/src/services/memory/bin.ts": "99a904bb4e2ce94d",
+      "aimeat/src/services/memory/bin.ts": "073bd69ddaab0c80",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
       "aimeat/src/routes/owners/export.ts": "c557a4c9fc849d0e",
       "aimeat/src/services/owner/erasure.ts": "b46801247bc0bec4",

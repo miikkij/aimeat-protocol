@@ -6,6 +6,7 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-19 — DELETE /v1/organisms/:id answers 409 KYC_RECORDS_RETAINED while the organism keeps customer due diligence records (AMLR art. 77).
  *   2026-11-15 — DELETE /v1/organisms/:id asks the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-14 — GET /v1/organisms and GET /v1/organisms/:id carry `team_names` ({ names, language })
  *     for an organism set up as a team (services/team/record.ts teamNamesFor), so a page names the
@@ -92,6 +93,7 @@
  *     a listAllMemory scan per organism.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  */
+import { retainedUntil } from '../../services/kyc/store.js';
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import { validateBody } from '../../models/schemas.js';
@@ -400,6 +402,16 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     // An AI's delete of a whole team waits for a lead (services/team/action-gate.ts, T7).
     const held = await teamDeleteGate({ storage, config }, callerOf(req, config.nodeId, storage), [`organism.${id}.*`], 'delete the whole team');
     if (held) { res.status(held.status).json(error(config.nodeId, held.code, held.message, held.status, held.details)); return; }
+
+    // Customer due diligence records the law keeps (AMLR art. 77) outlive the organism's own wish to
+    // go: they are the firm's, kept five years after each relationship ends (services/kyc/store.ts).
+    const kept = await retainedUntil(storage, config.nodeId, id);
+    if (kept) {
+      res.status(409).json(error(config.nodeId, 'KYC_RECORDS_RETAINED',
+        `Archive this organism instead: it keeps customer records the anti-money-laundering law holds ${kept.until ? `until ${kept.until}` : 'for five years after each relationship ends'}, and they go on their own then.`,
+        409, { cards: kept.cards, suspicions: kept.reports, until: kept.until, archive: `POST /v1/organisms/${id}/archive` }));
+      return;
+    }
 
     // The organism and every record that belongs to it (services/organism/lifecycle.ts).
     await deleteOrganismRecords(storage, config.nodeId, id);

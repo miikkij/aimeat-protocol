@@ -5,6 +5,16 @@
  * @description Routes for identity verification (EUDIW, FTN), W3C VC issuance,
  *   MyData consent receipts, and trusted issuer management.
  * @version-history
+ *   2026-11-19 — GET /v1/ghii/verify/ftn/authorize takes return_to: after the bank the person comes back to
+ *     the customer due diligence identify link they started from (that exact path shape only).
+ *   2026-11-19 — Each FTN and EU wallet verification is also kept as an entry of the person's verification
+ *     history (services/account/verification-history.ts), which customer due diligence reads.
+ *   2026-11-19 — EUDIW: POST /v1/ghii/verify/eudiw requires `state`; both presentation handlers spend the
+ *     round by the atomic delete (EUDIW_REPLAY when another request took it) and pass the round's nonce
+ *     and config.eudiwClientId to verifyPresentation, which checks holder binding, nonce, aud and spends
+ *     the nonce; its refusals answer 400 with EUDIW_HOLDER_BINDING, EUDIW_NONCE_MISMATCH,
+ *     EUDIW_AUDIENCE_MISMATCH or EUDIW_REPLAY before the GHII is written. GET .../eudiw/request answers
+ *     503 EUDIW_NO_TRUSTED_ISSUER when no trusted eudiw issuer exists.
  *   2026-10-25 -- A verification keeps the given and family name it proved (services/verified-name.ts), which a wallet signature's seal compares with instead of the display name (secaudit2026oct22, lead 3924).
  *   2026-10-18 — An EUDI wallet or a bank identification that shows 18 or older records the account
  *     holder as a verified adult (services/adult-assurance.ts); the birth date is not kept (Comicland v3 A-3).
@@ -53,7 +63,11 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { isAdultByClaims, recordAdult } from '../services/adult-assurance.js';
 import { verifiedNameOfClaims, recordVerifiedName } from '../services/verified-name.js';
+import { recordVerification } from '../services/account/verification-history.js';
 import { operatorOverride } from '../services/operator/override.js';
+
+/** The one place the bank sign-in may send a person back to: an identify link (services/kyc/identify.ts). */
+const FTN_RETURN = /^\/v1\/profile\?tab=identify&token=[A-Za-z0-9_-]{20,64}$/;
 
 export function verificationRouter(
   config: AimeatConfig,
@@ -80,6 +94,13 @@ export function verificationRouter(
     try {
       if (!config.eudiwEnabled) {
         res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'EUDIW verification not available'));
+        return;
+      }
+      // A round that no trusted issuer can complete is not opened: every presentation would be
+      // refused as untrusted after the person had already gone through their wallet.
+      const issuers = await storage.listTrustedIssuers({ type: 'eudiw' });
+      if (!issuers.some((i) => i.trusted)) {
+        res.status(503).json(error(config.nodeId, 'EUDIW_NO_TRUSTED_ISSUER', 'Ask the operator to add a trusted EU wallet issuer first: this server has none yet.'));
         return;
       }
       const state = randomUUID();
@@ -118,28 +139,43 @@ export function verificationRouter(
         return;
       }
 
-      // Validate nonce/state if provided. Only a round of THIS flow: a state another flow minted
-      // (a connection's, a sign-in's) is not one, and is left untouched for its own callback.
-      if (state) {
-        const nonceRecord = await storage.getVerificationNonce(state);
-        if (!nonceRecord || nonceRecord.type !== 'eudiw') {
-          res.status(400).json(error(config.nodeId, 'INVALID_STATE', 'This verification link has expired. Start the check again and you will get a fresh one.'));
-          return;
-        }
-        if (nonceRecord.owner !== req.auth!.owner) {
-          res.status(403).json(error(config.nodeId, 'STATE_MISMATCH', 'State does not belong to this user'));
-          return;
-        }
-        if (new Date(nonceRecord.expiresAt) < new Date()) {
-          await storage.deleteVerificationNonce(state);
-          res.status(400).json(error(config.nodeId, 'STATE_EXPIRED', 'Verification request expired'));
-          return;
-        }
+      // The state is required: its round holds the nonce the Key Binding JWT must answer, so a
+      // presentation without one cannot be bound to a request of this node. Only a round of THIS
+      // flow: a state another flow minted (a connection's, a sign-in's) is not one, and is left
+      // untouched for its own callback.
+      if (!state || typeof state !== 'string') {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Missing state parameter'));
+        return;
+      }
+      const nonceRecord = await storage.getVerificationNonce(state);
+      if (!nonceRecord || nonceRecord.type !== 'eudiw') {
+        res.status(400).json(error(config.nodeId, 'INVALID_STATE', 'This verification link has expired. Start the check again and you will get a fresh one.'));
+        return;
+      }
+      if (nonceRecord.owner !== req.auth!.owner) {
+        res.status(403).json(error(config.nodeId, 'STATE_MISMATCH', 'State does not belong to this user'));
+        return;
+      }
+      if (new Date(nonceRecord.expiresAt) < new Date()) {
         await storage.deleteVerificationNonce(state);
+        res.status(400).json(error(config.nodeId, 'STATE_EXPIRED', 'Verification request expired'));
+        return;
+      }
+      // The delete is the spend of the round: of concurrent requests carrying this state exactly
+      // one removes the row, and the others are refused as a replay before anything is verified.
+      if (!(await storage.deleteVerificationNonce(state))) {
+        res.status(400).json(error(config.nodeId, 'EUDIW_REPLAY', 'This verification round has already been used'));
+        return;
       }
 
-      const result = await eudiwService.verifyPresentation(vp_token, presentation_submission ?? {});
+      const result = await eudiwService.verifyPresentation(vp_token, presentation_submission ?? {}, {
+        nonce: nonceRecord.nonce, clientId: config.eudiwClientId,
+      });
       if (!result.valid) {
+        if (result.code) {
+          res.status(400).json(error(config.nodeId, result.code, result.error ?? 'Verification failed'));
+          return;
+        }
         const statusCode = result.error === 'Credential expired' ? 401 : result.error === 'Untrusted issuer' ? 403 : 400;
         res.status(statusCode).json(error(config.nodeId, 'VERIFICATION_FAILED', result.error ?? 'Verification failed'));
         return;
@@ -168,6 +204,8 @@ export function verificationRouter(
       // The name the credential proved, which a wallet signature's seal compares with (services/verified-name.ts).
       const eudiwName = verifiedNameOfClaims(result.attributes);
       if (eudiwName) await recordVerifiedName(storage, ghii.ghii, eudiwName, 'eudiw');
+      // Kept as one more entry of the person's verification history, never over the last (customer due diligence).
+      await recordVerification(storage, ghii.ghii, { level: 3, method: 'eudiw', issuer: result.issuer, attributes: verifiedAttributes, credentialHash, by: ghii.ghii });
 
       res.json(success(config.nodeId, {
         ghii: ghii.ghii,
@@ -215,7 +253,12 @@ export function verificationRouter(
         res.status(400).json(error(config.nodeId, 'STATE_EXPIRED', 'Verification request expired'));
         return;
       }
-      await storage.deleteVerificationNonce(state);
+      // The delete is the spend of the round: of concurrent callbacks carrying this state exactly
+      // one removes the row, and the others are refused as a replay before anything is verified.
+      if (!(await storage.deleteVerificationNonce(state))) {
+        res.status(400).json(error(config.nodeId, 'EUDIW_REPLAY', 'This verification round has already been used'));
+        return;
+      }
 
       if (typeof presentation_submission === 'string') {
         try {
@@ -226,8 +269,14 @@ export function verificationRouter(
         }
       }
 
-      const result = await eudiwService.verifyPresentation(vp_token, presentation_submission ?? {});
+      const result = await eudiwService.verifyPresentation(vp_token, presentation_submission ?? {}, {
+        nonce: nonceRecord.nonce, clientId: config.eudiwClientId,
+      });
       if (!result.valid) {
+        if (result.code) {
+          res.status(400).json(error(config.nodeId, result.code, result.error ?? 'Verification failed'));
+          return;
+        }
         const statusCode = result.error === 'Credential expired' ? 401 : result.error === 'Untrusted issuer' ? 403 : 400;
         res.status(statusCode).json(error(config.nodeId, 'VERIFICATION_FAILED', result.error ?? 'Verification failed'));
         return;
@@ -256,6 +305,8 @@ export function verificationRouter(
       // The name the credential proved, which a wallet signature's seal compares with (services/verified-name.ts).
       const eudiwName = verifiedNameOfClaims(result.attributes);
       if (eudiwName) await recordVerifiedName(storage, ghii.ghii, eudiwName, 'eudiw');
+      // Kept as one more entry of the person's verification history, never over the last (customer due diligence).
+      await recordVerification(storage, ghii.ghii, { level: 3, method: 'eudiw', issuer: result.issuer, attributes: verifiedAttributes, credentialHash, by: ghii.ghii });
 
       res.json(success(config.nodeId, {
         ghii: ghii.ghii,
@@ -288,13 +339,16 @@ export function verificationRouter(
 
       const authRequest = oidcClient.createAuthRequest();
       const nonceTtl = config.nonceTtlSeconds * 1000;
+      // Where the person goes after the bank: only a customer due diligence identify link of this node,
+      // matched whole, so the parameter cannot send anyone to another address.
+      const returnTo = typeof req.query.return_to === 'string' && FTN_RETURN.test(req.query.return_to) ? req.query.return_to : '';
       await storage.createVerificationNonce({
         id: randomUUID(),
         owner: req.auth!.owner,
         type: 'ftn',
         state: authRequest.state,
         nonce: authRequest.nonce,
-        redirectUri: '',
+        redirectUri: returnTo,
         createdAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + nonceTtl).toISOString(),
       });
@@ -373,9 +427,12 @@ export function verificationRouter(
       // The name the bank proved, which a wallet signature's seal compares with (services/verified-name.ts).
       const ftnName = verifiedNameOfClaims(tokenResult.claims);
       if (ftnName) await recordVerifiedName(storage, ghii.ghii, ftnName, 'ftn');
+      // Kept as one more entry of the person's verification history, never over the last (customer due diligence).
+      await recordVerification(storage, ghii.ghii, { level: 3, method: 'ftn', issuer: config.ftnProviderUrl, attributes: verifiedAttributes, credentialHash, by: ghii.ghii });
 
       if (req.accepts('html')) {
-        res.redirect(`${config.baseUrl}/v1/profile`);
+        const back = FTN_RETURN.test(nonceRecord.redirectUri ?? '') ? nonceRecord.redirectUri : '/v1/profile';
+        res.redirect(`${config.baseUrl}${back}`);
       } else {
         res.json(success(config.nodeId, {
           ghii: ghii.ghii,

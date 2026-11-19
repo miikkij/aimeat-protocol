@@ -25,8 +25,11 @@
  * @structure ITEM_CAP · AmlFacts · gatherAmlFacts · buildAmlFindings
  * @usage const facts = await gatherAmlFacts(deps, { owner }); const findings = buildAmlFindings(facts);
  * @version-history
+ *   2026-11-19 — The facts carry the customer due diligence state (lists, cards, due, not screened) for section 13's duties.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design, stage A).
  */
+import { listMetas } from '../kyc/screening/store.js';
+import { listHeads, organismsWithKyc } from '../kyc/store.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
@@ -59,6 +62,8 @@ export interface AmlFacts {
   sellers: Array<{ owner: string; rails: string[] }>;
   personalServices: Array<{ offeringId: string; title: string; provider: string }>;
   traders: Array<{ provider: string; offerings: number }>;
+  /** Customer due diligence on this server (services/kyc/): the lists fetched, and the cards kept. */
+  kyc: { lists: Array<{ source: string; entries: number; fetchedAt: string }>; cards: number; due: number; notScreened: number };
 }
 
 const isLocalAccount = (ghii: string, nodeId: string): boolean => ghii.endsWith(`@${nodeId}`) && !ghii.includes('#');
@@ -150,8 +155,22 @@ export async function gatherAmlFacts(deps: { storage: Storage; config: AimeatCon
     if (o.kind === 'agent-work') personalServices.push({ offeringId: o.offeringId, title: o.title, provider: o.providerOwner });
   }
 
+  // Customer due diligence: counts only, on the node's view; an owner's slice carries none.
+  const kyc: AmlFacts['kyc'] = { lists: [], cards: 0, due: 0, notScreened: 0 };
+  if (!owner) {
+    kyc.lists = (await listMetas(storage, config.nodeId)).map(m => ({ source: m.source, entries: m.entries, fetchedAt: m.fetchedAt }));
+    const today = (opts.now ?? new Date().toISOString()).slice(0, 10);
+    for (const org of await organismsWithKyc(storage, config.nodeId)) {
+      for (const h of await listHeads(storage, config.nodeId, org)) {
+        kyc.cards++;
+        if (h.status !== 'ended' && h.nextReviewAt && h.nextReviewAt <= today) kyc.due++;
+        if (h.status !== 'ended' && h.sanctions === 'not-screened') kyc.notScreened++;
+      }
+    }
+  }
+
   return {
-    mode: config.amlMode, owner, now: opts.now ?? new Date().toISOString(), declarations, reviews,
+    mode: config.amlMode, owner, now: opts.now ?? new Date().toISOString(), declarations, reviews, kyc,
     splitsForOthers, cryptoPayouts: [...payoutCounts.values()], agentLimits, sellers, personalServices,
     traders: [...byProvider.entries()].map(([provider, offerings]) => ({ provider, offerings })),
   };

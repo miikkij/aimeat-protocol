@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-19 — kycRouter: customer due diligence (services/kyc/).
  *   2026-11-14 — helpRouter and helpAdminRouter mounted (Ask someone who knows).
  *   2026-11-14 — teamsRouter mounted beside the organisms (team setup and status).
  *   2026-11-14 — secretSharesRouter mounted beside the vault (secret shares and requests).
@@ -222,6 +223,7 @@ import { adminSchedulerRouter } from '../routes/admin/scheduler.js';
 import { adminComplianceRouter } from '../routes/admin/compliance.js';
 import { complianceRouter } from '../routes/compliance.js';
 import { complianceDocsRouter } from '../routes/compliance-docs.js';
+import { kycRouter } from '../routes/kyc/routes.js';
 import { complianceAgreementsRouter } from '../routes/compliance-agreements.js';
 import { goalsRouter } from '../routes/goals.js';
 import { buildWithYouRouter } from '../routes/build-with-you.js';
@@ -758,6 +760,10 @@ export async function mountRoutes(
   // The records of processing and the documents beside them, of the node, an organism and an app
   // (plan doc-mvlftkh9zmc9). The scope's own rule decides who reads and writes (compliance-docs-access.ts).
   app.use(complianceDocsRouter(config, storage));
+
+  // Customer due diligence (EU AMLR 2024/1624): an obliged organism's customer cards, suspicions and
+  // goAML drafts, a person's verification history, the identify link (services/kyc/).
+  app.use(kycRouter(config, storage));
 
   // Data processing agreements (GDPR art. 28, plan doc-mvmr4i2wdk0p): the operator's agreements with
   // its customers, their signing in four ways and the notices each step sends.

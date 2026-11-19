@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.37.1 -- 2026-11-19 -- A declared organism's customer due diligence: aimeat_kyc_customer,
+ *     aimeat_kyc_suspicion_mark and aimeat_kyc_settings; decisions in person on the card.
  *   v1.37.0 -- 2026-11-19 -- Anti-money-laundering: the setting AIMEAT_AML_MODE, section 13 of the report,
  *     the part `aml` and the concept explanations with their official sources (services/aml/).
  *   v1.36.6 -- 2026-11-15 -- The SSO and offboarding paragraphs say connection, sign-in and action, not door.
@@ -323,7 +325,12 @@ declaration and a person's decision on a finding go through \`aimeat_compliance_
 (\`part: "aml"\`, items of \`type\` declaration or review). When a person asks what AML, KYC, PEP,
 sanctions or a beneficial owner mean, read the settings explanations concept.aml, concept.kyc,
 concept.pep, concept.sanctions, concept.obliged-entity and concept.beneficial-owner: they carry the
-official sources to point to. Say that it is a reading of the regulation, not legal advice.
+official sources to point to. Say that it is a reading of the regulation, not legal advice. In a
+declared organism, on a node in mode \`owners\` or \`node\`, its staff do the customer due diligence
+with \`aimeat_kyc_customer\` (the customer cards, screened against the EU and UN sanctions lists),
+\`aimeat_kyc_suspicion_mark\` (a suspicion for its officers) and \`aimeat_kyc_settings\`. Decisions are
+made in person on the card: a sanctions hit, a high-risk customer's approval and the settings wait
+for a person in Settings & Controls.
 
 **Data processing agreements (operator).** When the operator processes a customer's personal data
 (hosting, care, remote access), GDPR article 28 asks for a written agreement, and the node makes it:

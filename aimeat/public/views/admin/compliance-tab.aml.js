@@ -27,6 +27,7 @@
  *   AmlSection (default) · AmlPrint
  * @usage html`<${AmlSection} aml=${report.aml} switchPage=${switchPage} onChanged=${reload} onMessage=${msg} />`
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The head's second action opens the admin page Customer due diligence (aml).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design, stage A).
  */
 import { h } from 'preact';
@@ -91,9 +92,13 @@ export function findingText(f) {
 export function obligationText(row) {
   if (row.status === 'not_applicable' && row.code !== 'aml-ob-sanctions') return A('ob.notApplicable');
   const e = row.evidence || {};
-  const variant = row.code === 'aml-ob-sanctions' ? (row.status === 'missing' ? 'textMissing' : 'textNone')
-    : row.code === 'aml-ob-cdd' ? (e.bank_identification ? 'textOn' : 'textOff') : 'text';
-  return AOr(`ob.${row.code}.${variant}`, row.text, { n: String(e.sellers ?? e.declarations ?? 0) });
+  const screened = Array.isArray(e.lists) && e.lists.length > 0 && row.status !== 'missing' && row.status !== 'not_applicable';
+  const variant = row.code === 'aml-ob-sanctions' ? (screened ? (e.cards_not_screened ? 'textScreenedSome' : 'textScreened') : row.status === 'missing' ? 'textMissing' : 'textNone')
+    : row.code === 'aml-ob-cdd' ? (e.bank_identification ? 'textOn' : 'textOff')
+    : row.code === 'aml-ob-monitoring' ? (e.due ? 'textDue' : 'text') : 'text';
+  const n = row.code === 'aml-ob-sanctions' ? (screened ? e.cards_not_screened : e.sellers)
+    : row.code === 'aml-ob-cdd' ? e.cards : row.code === 'aml-ob-monitoring' ? e.due : (e.declarations ?? 0);
+  return AOr(`ob.${row.code}.${variant}`, row.text, { n: String(n ?? 0) });
 }
 
 /** A row's state: evidence (fine), check (attention), missing (danger), not applicable (off). */
@@ -216,7 +221,8 @@ export default function AmlSection({ aml, switchPage, onChanged, onMessage }) {
   };
 
   const title = html`${A('title')} <${HelpTip} term="concept.aml" label=${A('title')} />`;
-  const modeDoor = html`<${Action} small soft onClick=${toSetting}>${A('changeSetting')}<//>`;
+  const modeDoor = html`<${Action} small soft onClick=${toSetting}>${A('changeSetting')}<//>
+    <${Action} small soft onClick=${() => switchPage?.('aml')}>${A('toKyc')}<//>`;
   return html`
     <${Section} id="adm-cmp-13" num="13" title=${title} doors=${modeDoor}>
       <${Note} kind="lead">${A('lead')}<//>

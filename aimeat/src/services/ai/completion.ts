@@ -21,6 +21,7 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   2026-11-19 — CompleteForOwnerOptions.requires.local passes on to prepareAiCall (customer due diligence data, AIMEAT_KYC_AI=local).
  *   v3.19.0 -- 2026-11-07 -- An agent's own text model (the chat's model) comes first; under the operator's lock (ai.models_locked) the owner's model choices, roles and a named model are set aside (Jouni, 2026-11-07).
  *   v3.18.0 -- 2026-11-02 -- An ecosystem app's call: the record names the app as who asked (aiAskerOf), and its modelRole is not an app role it never declared (secaudit2026nov02d round 13).
  *   v3.17.0 -- 2026-11-01 -- `requires.tools` reaches the route plan, so a region whose endpoint has no tool calling is passed over (ai.region_mode).
@@ -221,6 +222,8 @@ export interface CompleteForOwnerOptions {
   lang?: RequestLanguage;
   /** Optional image attachments (data: or https URLs) for vision-capable models. */
   images?: string[];
+  /** Only a provider on this machine (PrepareAiCallOptions.requires.local): customer due diligence data under AIMEAT_KYC_AI=local. */
+  requires?: { local?: boolean };
   /** Files (a PDF among them) for a model that reads them itself: the capability becomes `files`. */
   files?: TextFile[];
   /**
@@ -665,6 +668,7 @@ export async function completeForOwner(
     ...(opts.provider ? { provider: opts.provider } : {}),
     ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
     ...(capability ? { capability } : {}), ...(opts.lang ? { lang: opts.lang } : {}),
+    ...(opts.requires?.local ? { requires: { local: true } } : {}),
     // About four characters to a token; the answer's ceiling when the call set one.
     estimate: {
       promptTokens: Math.ceil((opts.prompt.length + (opts.systemPrompt?.length ?? 0)) / 4),

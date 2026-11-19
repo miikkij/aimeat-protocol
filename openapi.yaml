@@ -8430,6 +8430,261 @@ components:
                 key_id: { type: string }
                 removed: { type: boolean, const: true }
 
+    # --- Customer due diligence (EU AMLR 2024/1624; src/services/kyc/contract.ts) ---
+    KycBeneficialOwner:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        birthDate: { type: string, maxLength: 10, description: YYYY-MM-DD }
+        country: { type: string, minLength: 2, maxLength: 56 }
+        share: { type: number, minimum: 0, maximum: 100, description: Ownership share in percent, when ownership is the ground. }
+        control: { type: string, maxLength: 500, description: Control by other means (AMLR art. 52), in words. }
+    KycIdentity:
+      type: object
+      description: How the customer's identity was verified.
+      required: [level, method, verifiedAt]
+      properties:
+        level: { type: string, enum: [none, low, substantial, high] }
+        method: { type: string, enum: [ftn, eudiw, document, register, other], description: 'ftn: Finnish Trust Network bank ID; eudiw: EU wallet; document: seen in person; register: trade register.' }
+        issuer: { type: string, maxLength: 200 }
+        verifiedAt: { type: string, minLength: 10, maxLength: 40 }
+        expiresAt: { type: string, minLength: 10, maxLength: 40 }
+        faceToFace: { type: boolean, default: false }
+        ghii: { type: string, maxLength: 200, description: The person's account on this node, when they gave their own verification through the identify link. Set by the server. }
+        evidence: { type: string, maxLength: 500, description: The document or register extract the verification rests on (number, issuer). }
+    KycScreeningHit:
+      type: object
+      required: [source, id, kind, matchedName, listedName, score, reasons, programme, subject, verdict]
+      properties:
+        source: { type: string, enum: [eu-fsf, un] }
+        id: { type: string }
+        kind: { type: string, enum: [person, entity] }
+        matchedName: { type: string }
+        listedName: { type: string }
+        score: { type: number, minimum: 0, maximum: 1 }
+        reasons: { type: array, items: { type: string } }
+        programme: { type: string }
+        subject: { type: string, description: '"customer", or "owner:<index>" for a beneficial owner.' }
+        verdict: { type: string, enum: [open, false-positive, confirmed] }
+        decidedBy: { type: string }
+        decidedAt: { type: string }
+        note: { type: string }
+    KycCustomerInput:
+      type: object
+      description: The card fields a person or an agent sets directly; the server derives the rest. Opening a card needs kind and name.
+      properties:
+        kind: { type: string, enum: [person, entity] }
+        name: { type: string, minLength: 1, maxLength: 300 }
+        aliases: { type: array, maxItems: 20, items: { type: string, maxLength: 300 } }
+        birthDate: { type: string, maxLength: 10 }
+        nationality: { type: string, minLength: 2, maxLength: 56 }
+        country: { type: string, minLength: 2, maxLength: 56, description: Country of residence (person) or registration (entity). }
+        businessId: { type: string, maxLength: 40 }
+        contact: { type: string, maxLength: 300 }
+        beneficialOwners: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/KycBeneficialOwner' } }
+        ownershipLayers: { type: integer, minimum: 0, maximum: 20 }
+        nomineeOrBearerShares: { type: boolean }
+        cashIntensive: { type: boolean }
+        productRisk: { type: string, enum: [low, medium, high] }
+        purpose: { type: string, maxLength: 2000, description: What the customer means to do (AMLR art. 20(1)(c)). }
+        sourceOfFunds: { type: string, maxLength: 2000 }
+        pep: { type: string, enum: ['no', 'yes', family, close-associate, former, unknown] }
+        pepDetail: { type: string, maxLength: 1000 }
+    KycCustomerVersion:
+      description: One version of a customer card, the whole card as it stood after one change. Every change appends a version; none is overwritten.
+      allOf:
+        - $ref: '#/components/schemas/KycCustomerInput'
+        - type: object
+          required: [id, organism, n, at, by, change, kind, name, status]
+          properties:
+            id: { type: string, pattern: '^[a-z0-9-]{4,64}$' }
+            organism: { type: string }
+            n: { type: integer, minimum: 1, description: The version number. }
+            at: { type: string, description: When this version was written. }
+            by: { type: string, description: Who wrote it (a GHII, or an agent's GAII). }
+            change: { type: string, enum: [opened, updated, identified, screened, hit-decided, rated, approved, reviewed, ended, hold-extended, reopened] }
+            note: { type: string, maxLength: 2000 }
+            identity: { oneOf: [{ $ref: '#/components/schemas/KycIdentity' }, { type: 'null' }] }
+            screening:
+              type: object
+              required: [status, lists, hits]
+              properties:
+                status: { type: string, enum: [not-screened, clear, possible, confirmed] }
+                screenedAt: { type: string }
+                lists: { type: object, additionalProperties: { type: string }, description: The version of each list read (sha256 prefix of its bytes). }
+                hits: { type: array, items: { $ref: '#/components/schemas/KycScreeningHit' } }
+            risk:
+              oneOf:
+                - type: 'null'
+                - type: object
+                  required: [level, score, dueDiligence, reasons, needsSeniorApproval, blocking, ratedAt, ratedBy]
+                  properties:
+                    level: { type: string, enum: [low, medium, high, prohibited] }
+                    score: { type: number }
+                    dueDiligence: { type: string, enum: [simplified, standard, enhanced] }
+                    reasons:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          code: { type: string }
+                          text: { type: string }
+                          points: { type: number }
+                          ref: { type: string }
+                    needsSeniorApproval: { type: boolean }
+                    blocking: { type: array, items: { type: string } }
+                    ratedAt: { type: string }
+                    ratedBy: { type: string }
+                    approvedBy: { type: string }
+                    approvedAt: { type: string }
+            status: { type: string, enum: [open, active, blocked, ended] }
+            lastReviewedAt: { type: string }
+            nextReviewAt: { type: [string, 'null'] }
+            endedAt: { type: string }
+            retainUntil: { type: string, description: The day the card is deleted, relationship end + 5 years (AMLR art. 77) or later by a hold. }
+            holdBasis: { type: string }
+    KycCustomerHead:
+      type: object
+      description: A card's newest version, as a list shows it.
+      required: [id, n, name, kind, status, risk, sanctions, pep, nextReviewAt, retainUntil, openedAt, updatedAt]
+      properties:
+        id: { type: string }
+        n: { type: integer, minimum: 1 }
+        name: { type: string }
+        kind: { type: string, enum: [person, entity] }
+        status: { type: string, enum: [open, active, blocked, ended] }
+        risk: { type: [string, 'null'], enum: [low, medium, high, prohibited, null] }
+        sanctions: { type: string, enum: [not-screened, clear, possible, confirmed] }
+        pep: { type: string, enum: ['no', 'yes', family, close-associate, former, unknown] }
+        nextReviewAt: { type: [string, 'null'] }
+        retainUntil: { type: [string, 'null'] }
+        openedAt: { type: string }
+        updatedAt: { type: string }
+    KycSettings:
+      type: object
+      properties:
+        staff: { type: array, maxItems: 200, items: { type: string, maxLength: 200 }, description: Members (GHII) who do customer due diligence. }
+        officers: { type: array, maxItems: 10, items: { type: string, maxLength: 200 }, description: The compliance officer and deputy (AMLR art. 11); the only readers of a suspicion report. }
+        highRiskCountries: { type: array, maxItems: 100, items: { type: string, pattern: '^[A-Z]{2}$' } }
+        reviewMonths:
+          type: object
+          required: [low, medium, high]
+          properties:
+            low: { type: integer, minimum: 1, maximum: 60 }
+            medium: { type: integer, minimum: 1, maximum: 60 }
+            high: { type: integer, minimum: 1, maximum: 12 }
+        updatedAt: { type: string }
+        updatedBy: { type: string }
+    KycSuspicionReport:
+      type: object
+      description: A suspicion and its report to the FIU. Only the officers read it (AMLR art. 73).
+      required: [id, organism, status, observation, markedBy, markedAt, indicators, transactions, updatedAt, updatedBy]
+      properties:
+        id: { type: string, pattern: '^[a-z0-9-]{4,64}$' }
+        organism: { type: string }
+        customerId: { type: string }
+        status: { type: string, enum: [marked, draft, submitted, not-reported] }
+        observation: { type: string, maxLength: 4000 }
+        markedBy: { type: string }
+        markedAt: { type: string }
+        reportType: { type: string, enum: [STR, SAR], description: 'goAML report type: STR (transaction) or SAR (activity).' }
+        indicators: { type: array, maxItems: 30, items: { type: string, maxLength: 200 } }
+        transactions:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [date, amount, currency, description]
+            properties:
+              date: { type: string, maxLength: 10 }
+              amount: { type: number }
+              currency: { type: string, maxLength: 3 }
+              description: { type: string, maxLength: 500 }
+        narrative: { type: string, maxLength: 20000 }
+        decision: { type: string, maxLength: 2000 }
+        submittedAt: { type: string }
+        goamlRef: { type: string, maxLength: 120 }
+        updatedAt: { type: string }
+        updatedBy: { type: string }
+        retainUntil: { type: string }
+    KycLinkView:
+      type: object
+      description: What the customer sees before giving their verification through an identify link.
+      required: [organism, shared, verification, verifyPath]
+      properties:
+        organism: { type: object, required: [id, name], properties: { id: { type: string }, name: { type: string } } }
+        shared: { type: array, items: { type: string }, description: What the firm receives. }
+        verification:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [level, method, at]
+              properties:
+                level: { type: string }
+                method: { type: string }
+                at: { type: string }
+        verifyPath: { type: [string, 'null'], description: Where to verify first, when the person has no strong verification. }
+    KycCustomerVersionEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/KycCustomerVersion' }
+    KycCustomerHeadsEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { type: array, items: { $ref: '#/components/schemas/KycCustomerHead' } }
+    KycCustomerReadEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data:
+              description: The card (no as_of), or the card as it stood at as_of.
+              oneOf:
+                - type: object
+                  required: [card, versions]
+                  properties:
+                    card: { $ref: '#/components/schemas/KycCustomerVersion' }
+                    versions:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          n: { type: integer }
+                          at: { type: string }
+                          by: { type: string }
+                          change: { type: string }
+                          note: { type: string }
+                - type: object
+                  required: [asOf, card, newer]
+                  properties:
+                    asOf: { type: string, description: The moment read; a bare date means the end of that day. }
+                    card: { oneOf: [{ $ref: '#/components/schemas/KycCustomerVersion' }, { type: 'null' }] }
+                    newer: { type: integer, description: How many versions were written after it. }
+    KycSettingsEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data:
+              oneOf:
+                - type: object
+                  required: [settings, role]
+                  properties:
+                    settings: { $ref: '#/components/schemas/KycSettings' }
+                    role: { type: string, enum: [officer, staff, manager] }
+                - $ref: '#/components/schemas/KycSettings'
+    KycSuspicionReportEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/KycSuspicionReport' }
+
   # === Reusable Response Wrappers ===
   responses:
     AimeatSuccess:
@@ -8495,6 +8750,29 @@ components:
                     properties:
                       code:
                         example: BAD_REQUEST
+
+    EudiwPresentationRefused:
+      description: |
+        The EU wallet presentation or its round is refused, and nothing is written to the account.
+        EUDIW_HOLDER_BINDING: no Key Binding JWT, or it is not signed by the credential's `cnf.jwk`,
+        is not typed `kb+jwt`, has an `iat` outside the window or an `sd_hash` that does not cover
+        the presented SD-JWT. EUDIW_NONCE_MISMATCH: its `nonce` is not the round's nonce.
+        EUDIW_AUDIENCE_MISMATCH: its `aud` is not this node's verifier client id. EUDIW_REPLAY: the
+        round or the nonce has already been used. VALIDATION_ERROR, INVALID_STATE, STATE_EXPIRED and
+        VERIFICATION_FAILED (the issuer JWT or a disclosure) as before.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AimeatEnvelope'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [EUDIW_HOLDER_BINDING, EUDIW_NONCE_MISMATCH, EUDIW_AUDIENCE_MISMATCH, EUDIW_REPLAY, VALIDATION_ERROR, INVALID_STATE, STATE_EXPIRED, VERIFICATION_FAILED]
 
     NotFound:
       description: Resource not found
@@ -25872,6 +26150,959 @@ paths:
             application/pdf: { schema: { type: string, format: binary } }
             text/markdown: { schema: { type: string } }
             application/json: { schema: { type: object } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # --- Customer due diligence (EU AMLR 2024/1624; src/routes/kyc/routes.ts, services/kyc/) ---
+  # Every /v1/kyc/{org}/* route first answers the organism's KYC context (services/kyc/access.ts):
+  # 400 INVALID_ORGANISM; 403 KYC_VISITOR (a session from another node), KYC_NOT_ENABLED (the operator's
+  # compliance.aml_mode is not owners or node, or the organism has not declared itself obliged),
+  # AGENT_NOT_ADMITTED; 404 ORGANISM_NOT_FOUND. An agent needs compliance:read for a GET and
+  # compliance:write for every other method.
+  /v1/kyc/me:
+    get:
+      operationId: getKycMine
+      summary: Your own verification history and what you gave to obliged firms
+      tags: [Compliance]
+      description: >
+        Every identity verification of your account (with its eIDAS level) and every disclosure you
+        made to an obliged organism through an identify link. A disclosure cannot be taken back: the
+        firm keeps its copy five years after the relationship ends (AMLR art. 77). Refusals: 403
+        KYC_VISITOR.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The history and the disclosures.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [verifications, disclosures, note]
+                        properties:
+                          verifications:
+                            type: array
+                            items:
+                              type: object
+                              required: [at, level, method, eidasLevel]
+                              properties:
+                                at: { type: string }
+                                level: { type: integer, enum: [0, 1, 2, 3] }
+                                method: { type: string, enum: [ftn, eudiw, operator, email] }
+                                issuer: { type: string }
+                                attributes: { type: array, items: { type: string } }
+                                credentialHash: { type: string }
+                                by: { type: string }
+                                eidasLevel: { type: string, enum: [low, substantial, high] }
+                          disclosures:
+                            type: array
+                            items:
+                              type: object
+                              required: [at, organism, organismName, card, what]
+                              properties:
+                                at: { type: string }
+                                organism: { type: string }
+                                organismName: { type: string }
+                                card: { type: string }
+                                what: { type: array, items: { type: string } }
+                          note: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/kyc/organisms:
+    get:
+      operationId: listKycOrganisms
+      summary: The obliged organisms you belong to, with your KYC role in each
+      tags: [Compliance]
+      description: >
+        The node's aml mode, and each organism you are an active member of that has declared itself an
+        obliged entity or names you in its KYC settings, with your role (officer, staff, manager, none).
+        A session from another node gets an empty list.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The mode and the organisms.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [mode, organisms]
+                        properties:
+                          mode: { type: string, enum: [report, none, owners, node] }
+                          organisms:
+                            type: array
+                            items:
+                              type: object
+                              required: [id, name, role, declared]
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                role: { type: string, enum: [officer, staff, manager, none] }
+                                declared: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/kyc/links/{token}:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{20,64}$' } }
+    get:
+      operationId: describeKycLink
+      summary: What an identify link asks the customer to give
+      tags: [Compliance]
+      description: >
+        The firm, what it receives (verified name, verification level, method and issuer, time), and
+        the customer's own strongest verification, or where to verify first. The customer, signed in,
+        in person. Refusals: 403 IN_PERSON_ONLY; 404 LINK_NOT_FOUND; 410 LINK_USED, LINK_EXPIRED.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The link's view.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/KycLinkView' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/AimeatError' }
+    post:
+      operationId: acceptKycLink
+      summary: Give your own verified identity to the firm
+      tags: [Compliance]
+      description: >
+        Spends the link once, writes the customer's verification onto the card (a version written by
+        the customer) and records the disclosure in the customer's own history. Refusals: 403
+        IN_PERSON_ONLY; 404 LINK_NOT_FOUND; 409 NOT_VERIFIED (verify with a bank ID first); 410
+        LINK_USED, LINK_EXPIRED.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: What was given, and to whom.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [organism, given]
+                        properties:
+                          organism: { type: string, description: The organism's name. }
+                          given: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/admin/kyc:
+    get:
+      operationId: getKycOperatorView
+      summary: The operator's counts of customer due diligence (no names)
+      tags: [Compliance, Admin]
+      description: >
+        The aml mode, the server's AI setting for KYC data, the sanctions sources and the stored list
+        versions, and per obliged organism only counts: cards by status and risk, cards due for
+        review, open hits, cards not screened, officers. No customer, suspicion or card content.
+        Refusals: 403 OPERATOR_ONLY.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The counts.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [mode, sources, lists, organisms]
+                        properties:
+                          mode: { type: string, enum: [report, none, owners, node] }
+                          ai: { type: string, enum: [local, node, 'off'], description: 'The setting compliance.kyc_ai: whose model may read KYC data for a narrative draft.' }
+                          sources: { type: array, items: { type: string, enum: [eu-fsf, un] } }
+                          lists:
+                            type: array
+                            items:
+                              type: object
+                              required: [source, version, fetchedAt, url, entries, parts]
+                              properties:
+                                source: { type: string, enum: [eu-fsf, un] }
+                                version: { type: string }
+                                fetchedAt: { type: string }
+                                url: { type: string }
+                                entries: { type: integer }
+                                parts: { type: integer }
+                          organisms:
+                            type: array
+                            items:
+                              type: object
+                              required: [id, name, cards, byStatus, byRisk, due, openHits, notScreened, officers]
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                cards: { type: integer }
+                                byStatus: { type: object, additionalProperties: { type: integer } }
+                                byRisk: { type: object, additionalProperties: { type: integer } }
+                                due: { type: integer }
+                                openHits: { type: integer }
+                                notScreened: { type: integer }
+                                officers: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/admin/kyc/lists/refresh:
+    post:
+      operationId: refreshKycLists
+      summary: Fetch the sanctions lists now, and screen every open card again when one changed
+      tags: [Compliance, Admin]
+      description: >
+        Fetches every configured sanctions source (the EU financial sanctions file and the UN list,
+        or the sources the operator named) and stores the ones whose bytes changed. When any changed,
+        every open card of every obliged organism is screened again, and each organism's officers are
+        told how many cards got a new possible hit. The scheduled job does the same. Refusals: 403
+        OPERATOR_ONLY.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Each source's outcome, and how many cards got a new possible hit.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [lists, flagged]
+                        properties:
+                          lists:
+                            type: array
+                            items:
+                              type: object
+                              required: [source, changed]
+                              properties:
+                                source: { type: string, enum: [eu-fsf, un] }
+                                changed: { type: boolean }
+                                version: { type: string }
+                                entries: { type: integer }
+                                error: { type: string, description: Why this source could not be fetched; the stored version stays. }
+                          flagged: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/kyc/{org}/settings:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+    get:
+      operationId: getKycSettings
+      summary: The organism's KYC settings and your role in it
+      tags: [Compliance]
+      description: >
+        Who does the due diligence, who the officers are, the high-risk third countries and the review
+        intervals per risk level, with the caller's role. Refusals: the KYC context codes above; 403
+        KYC_NOT_STAFF.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The settings and the role.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycSettingsEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: updateKycSettings
+      summary: Change the organism's KYC settings
+      tags: [Compliance]
+      description: >
+        Merges the fields sent into the stored settings; the rest stay. An admin of the organism or
+        its compliance officer, in person: an agent is refused. Refusals: the KYC context codes above;
+        403 KYC_NOT_MANAGER, KYC_DECISION_IN_PERSON.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                staff: { type: array, maxItems: 200, items: { type: string, maxLength: 200 } }
+                officers: { type: array, maxItems: 10, items: { type: string, maxLength: 200 } }
+                highRiskCountries: { type: array, maxItems: 100, items: { type: string, pattern: '^[A-Z]{2}$' } }
+                reviewMonths:
+                  type: object
+                  properties:
+                    low: { type: integer, minimum: 1, maximum: 60 }
+                    medium: { type: integer, minimum: 1, maximum: 60 }
+                    high: { type: integer, minimum: 1, maximum: 12 }
+      responses:
+        '200':
+          description: The settings as stored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycSettingsEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/kyc/{org}/customers:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+    get:
+      operationId: listKycCustomers
+      summary: The organism's customer cards
+      tags: [Compliance]
+      description: >
+        Each card's newest version, short. `due=true` keeps the cards that are not ended and are due for
+        review, have no review date, or have an open sanctions hit. Officers, staff and admins, and
+        their agents. Refusals: the KYC context codes above; 403 KYC_NOT_STAFF.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: due, in: query, required: false, schema: { type: string, enum: ['true', '1'] } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, active, blocked, ended] } }
+      responses:
+        '200':
+          description: The cards.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerHeadsEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: openKycCustomer
+      summary: Open a customer card
+      tags: [Compliance]
+      description: >
+        Version 1 of a new card, screened against the stored sanctions lists and rated at once.
+        Refusals: the KYC context codes above; 400 INVALID_INPUT (kind and name are needed); 403
+        KYC_NOT_STAFF.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KycCustomerInput' }
+      responses:
+        '200':
+          description: The card's first version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerVersionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/kyc/{org}/customers/{id}:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The customer card. }
+    get:
+      operationId: getKycCustomer
+      summary: One customer card with its versions, or the card as it stood at a moment
+      tags: [Compliance]
+      description: >
+        Without `as_of`: the newest version and the list of every version (who, when, what change,
+        why). With `as_of` (a date, meaning the end of that day, or an ISO 8601 time): the version in
+        force then and how many were written after it, which is what the firm knew that day.
+        Refusals: the KYC context codes above; 400 INVALID_INPUT (as_of); 403 KYC_NOT_STAFF; 404
+        CUSTOMER_NOT_FOUND.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: as_of, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: The card and its versions, or the card as of the moment.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerReadEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: updateKycCustomer
+      summary: Change a customer card's fields
+      tags: [Compliance]
+      description: >
+        Writes a new version with the fields sent (the rest kept), screened and rated again. `note`
+        says why and is kept on the version. Refusals: the KYC context codes above; 400 INVALID_INPUT;
+        403 KYC_NOT_STAFF; 404 CUSTOMER_NOT_FOUND; 409 CUSTOMER_ENDED, CUSTOMER_CHANGED (read again and
+        repeat).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/KycCustomerInput'
+                - type: object
+                  properties:
+                    note: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: The new version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerVersionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/customers/{id}/identity:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The customer card. }
+    post:
+      operationId: recordKycCustomerIdentity
+      summary: Record how the customer's identity was verified
+      tags: [Compliance]
+      description: >
+        A new version carrying the identity (a document seen, a register extract, a bank ID), rated
+        again. Refusals: the KYC context codes above; 400 INVALID_INPUT; 403 KYC_NOT_STAFF; 404
+        CUSTOMER_NOT_FOUND; 409 CUSTOMER_ENDED, CUSTOMER_CHANGED.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/KycIdentity'
+                - type: object
+                  properties:
+                    note: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: The new version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerVersionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/customers/{id}/screen:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The customer card. }
+    post:
+      operationId: screenKycCustomer
+      summary: Screen the customer and its beneficial owners again
+      tags: [Compliance]
+      description: >
+        Against the stored EU and UN sanctions lists; a decision on a hit found again is kept. A new
+        version, rated again. Refusals: the KYC context codes above; 403 KYC_NOT_STAFF; 404
+        CUSTOMER_NOT_FOUND; 409 CUSTOMER_ENDED, CUSTOMER_CHANGED.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The new version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerVersionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/customers/{id}/hits:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The customer card. }
+    post:
+      operationId: decideKycHit
+      summary: Decide a sanctions hit (a person, in person)
+      tags: [Compliance]
+      description: >
+        Marks one hit a false positive or confirmed, with the ground. A person's decision: an agent is
+        refused. Refusals: the KYC context codes above; 400 INVALID_INPUT (verdict, note); 403
+        KYC_NOT_STAFF, KYC_DECISION_IN_PERSON; 404 CUSTOMER_NOT_FOUND, HIT_NOT_FOUND; 409
+        CUSTOMER_ENDED, CUSTOMER_CHANGED.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verdict, source, hit_id, note]
+              properties:
+                verdict: { type: string, enum: [false-positive, confirmed] }
+                source: { type: string, enum: [eu-fsf, un] }
+                hit_id: { type: string }
+                subject: { type: string, default: customer, description: '"customer", or "owner:<index>".' }
+                note: { type: string, maxLength: 1000 }
+      responses:
+        '200':
+          description: The new version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerVersionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/customers/{id}/approve:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The customer card. }
+    post:
+      operationId: approveKycCustomer
+      summary: Senior approval of a high-risk or PEP customer (in person)
+      tags: [Compliance]
+      description: >
+        AMLR art. 34 and 43: the compliance officer or an admin of the organism, in person. Refusals:
+        the KYC context codes above; 403 KYC_NOT_STAFF, KYC_DECISION_IN_PERSON, KYC_NOT_MANAGER; 404
+        CUSTOMER_NOT_FOUND; 409 NO_APPROVAL_NEEDED, CUSTOMER_BLOCKED, CUSTOMER_ENDED, CUSTOMER_CHANGED.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: The new version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerVersionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/customers/{id}/review:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The customer card. }
+    post:
+      operationId: reviewKycCustomer
+      summary: Review a customer (periodic or event-driven)
+      tags: [Compliance]
+      description: >
+        AMLR art. 26: screened and rated again, the next review set from today. Refusals: the KYC
+        context codes above; 403 KYC_NOT_STAFF; 404 CUSTOMER_NOT_FOUND; 409 CUSTOMER_ENDED,
+        CUSTOMER_CHANGED.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: The new version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerVersionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/customers/{id}/end:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The customer card. }
+    post:
+      operationId: endKycCustomer
+      summary: End the customer relationship
+      tags: [Compliance]
+      description: >
+        The card stops changing and is kept five years from the end (AMLR art. 77), then deleted by the
+        daily job. Refusals: the KYC context codes above; 403 KYC_NOT_STAFF; 404 CUSTOMER_NOT_FOUND;
+        409 CUSTOMER_ENDED, CUSTOMER_CHANGED.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 2000 }
+                ended_at: { type: string, description: When the relationship ended (ISO date or time). Absent or unreadable, now. }
+      responses:
+        '200':
+          description: The ended version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerVersionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/customers/{id}/hold:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The customer card. }
+    post:
+      operationId: extendKycHold
+      summary: Keep an ended card longer (an officer, in person)
+      tags: [Compliance]
+      description: >
+        An authority's request or a proceeding keeps the card past its five years, at most ten years
+        from the end. Refusals: the KYC context codes above; 400 INVALID_INPUT (basis), INVALID_HOLD
+        (the date); 403 KYC_NOT_OFFICER, KYC_OFFICER_IN_PERSON; 404 CUSTOMER_NOT_FOUND; 409
+        CUSTOMER_NOT_ENDED, CUSTOMER_CHANGED.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [until, basis]
+              properties:
+                until: { type: string, description: The new last day (YYYY-MM-DD). }
+                basis: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: The new version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycCustomerVersionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/customers/{id}/link:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The customer card. }
+    post:
+      operationId: createKycLink
+      summary: Make a one-time identify link for a person customer
+      tags: [Compliance]
+      description: >
+        The customer opens it signed in to their own account and gives their own bank-ID or wallet
+        verification to the card. Valid 14 days, used once. Refusals: the KYC context codes above;
+        403 KYC_NOT_STAFF; 404 CUSTOMER_NOT_FOUND; 409 NOT_A_PERSON, CUSTOMER_ENDED.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The token, the path to hand the customer, and when it expires.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [token, path, expiresAt]
+                        properties:
+                          token: { type: string }
+                          path: { type: string }
+                          expiresAt: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/suspicions:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+    post:
+      operationId: markKycSuspicion
+      summary: Mark a suspicion for the compliance officers
+      tags: [Compliance]
+      description: >
+        Staff, officers and admins, and their agents. The marker learns only that it was received; the
+        officers are told and handle it (AMLR art. 73: nobody else learns of it). Refusals: the KYC
+        context codes above; 400 INVALID_INPUT (at least a sentence); 403 KYC_NOT_STAFF; 404
+        CUSTOMER_NOT_FOUND.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [observation]
+              properties:
+                observation: { type: string, minLength: 10, maxLength: 4000 }
+                customer_id: { type: string }
+      responses:
+        '200':
+          description: Received.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [id, received]
+                        properties:
+                          id: { type: string }
+                          received: { type: boolean, const: true }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    get:
+      operationId: listKycSuspicions
+      summary: The organism's suspicions and reports (officers, in person)
+      tags: [Compliance]
+      description: >
+        Refusals: the KYC context codes above; 403 KYC_NOT_OFFICER, KYC_OFFICER_IN_PERSON.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The reports.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/KycSuspicionReport' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/kyc/{org}/suspicions/{id}:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The suspicion report. }
+    get:
+      operationId: getKycSuspicion
+      summary: One suspicion report (officers, in person)
+      tags: [Compliance]
+      description: >
+        Refusals: the KYC context codes above; 403 KYC_NOT_OFFICER, KYC_OFFICER_IN_PERSON; 404
+        REPORT_NOT_FOUND.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycSuspicionReportEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: updateKycSuspicion
+      summary: Write the goAML draft of a suspicion (officers, in person)
+      tags: [Compliance]
+      description: >
+        Sets the report type, indicators, transactions and narrative; the report becomes a draft.
+        Refusals: the KYC context codes above; 400 INVALID_INPUT; 403 KYC_NOT_OFFICER,
+        KYC_OFFICER_IN_PERSON; 404 REPORT_NOT_FOUND; 409 REPORT_CLOSED.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reportType: { type: string, enum: [STR, SAR] }
+                indicators: { type: array, maxItems: 30, items: { type: string, maxLength: 200 } }
+                transactions:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [date, amount, currency, description]
+                    properties:
+                      date: { type: string, maxLength: 10 }
+                      amount: { type: number }
+                      currency: { type: string, maxLength: 3 }
+                      description: { type: string, maxLength: 500 }
+                narrative: { type: string, maxLength: 20000 }
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycSuspicionReportEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/suspicions/{id}/submit:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The suspicion report. }
+    post:
+      operationId: submitKycSuspicion
+      summary: Record that the report was sent in goAML (officers, in person)
+      tags: [Compliance]
+      description: >
+        The reference goAML answered and when; the report is kept five years from then. A second call
+        on a submitted report changes nothing. Refusals: the KYC context codes above; 400 INVALID_INPUT
+        (goaml_ref); 403 KYC_NOT_OFFICER, KYC_OFFICER_IN_PERSON; 404 REPORT_NOT_FOUND.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [goaml_ref]
+              properties:
+                goaml_ref: { type: string, maxLength: 120 }
+                submitted_at: { type: string }
+                decision: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycSuspicionReportEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/kyc/{org}/suspicions/{id}/close:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The suspicion report. }
+    post:
+      operationId: closeKycSuspicion
+      summary: Decide not to report, with the ground (officers, in person)
+      tags: [Compliance]
+      description: >
+        The decision is kept with the case for five years. Refusals: the KYC context codes above; 400
+        INVALID_INPUT (decision); 403 KYC_NOT_OFFICER, KYC_OFFICER_IN_PERSON; 404 REPORT_NOT_FOUND; 409
+        REPORT_CLOSED.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KycSuspicionReportEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/kyc/{org}/suspicions/{id}/assist:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+      - { name: id, in: path, required: true, schema: { type: string }, description: The suspicion report. }
+    post:
+      operationId: assistKycSuspicionNarrative
+      summary: A narrative draft from the server's AI (officers, in person)
+      tags: [Compliance]
+      description: >
+        On the model the operator's setting compliance.kyc_ai allows (a local model by default).
+        Nothing is saved. Refusals: the KYC context codes above; 403 KYC_NOT_OFFICER,
+        KYC_OFFICER_IN_PERSON, KYC_AI_OFF; 404 REPORT_NOT_FOUND.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The draft and the model that wrote it.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [narrative, model]
+                        properties:
+                          narrative: { type: string }
+                          model: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -54929,6 +56160,14 @@ paths:
         Wallet (EUDIW). Validates the VP token and presentation submission
         against the previously generated authorization request. On success,
         updates the GHII verification level and stores verified attributes.
+
+        The vp_token is an SD-JWT VC with a Key Binding JWT. The node checks the
+        issuer signature against a trusted issuer, that every disclosure has a
+        digest in the signed payload, that the KB-JWT is signed by the key in the
+        credential's `cnf.jwk` (typ `kb+jwt`, `iat` at most 5 minutes old, `sd_hash`
+        over the presented SD-JWT), that its `nonce` is the round's nonce and its
+        `aud` is this node's verifier client id. The round and the nonce are spent
+        once. A refusal writes nothing to the account.
       tags: [Verification]
       security:
         - BearerAuth: []
@@ -54938,14 +56177,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [vp_token]
+              required: [vp_token, state]
               properties:
                 vp_token:
                   type: string
-                  description: Verifiable Presentation token (JWT or JSON-LD)
+                  description: SD-JWT VC presentation with a Key Binding JWT (`<issuer-jwt>~<disclosure>~...~<kb-jwt>`)
                 state:
                   type: string
-                  description: The state of a round GET /v1/ghii/verify/eudiw/request opened. Given, it must be this owner's EUDIW round and unexpired.
+                  description: The state of a round GET /v1/ghii/verify/eudiw/request opened. It must be this owner's EUDIW round, unexpired and unused; its nonce is the one the Key Binding JWT must carry.
                 presentation_submission:
                   type: object
                   description: OpenID4VP presentation submission descriptor. Left out, an empty one is used.
@@ -54995,7 +56234,7 @@ paths:
                             type: string
                             format: date-time
         '400':
-          $ref: '#/components/responses/BadRequest'
+          $ref: '#/components/responses/EudiwPresentationRefused'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -55048,7 +56287,23 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '503':
-          $ref: '#/components/responses/FeatureDisabled'
+          description: |
+            No round is opened. FEATURE_DISABLED when EUDIW verification is switched off;
+            EUDIW_NO_TRUSTED_ISSUER when no trusted issuer of type eudiw is configured, so no
+            presentation could be verified.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            enum: [FEATURE_DISABLED, EUDIW_NO_TRUSTED_ISSUER]
 
   /v1/ghii/verify/ftn:
     post:
@@ -83083,6 +84338,12 @@ paths:
         redirect the user to. Requires the FTN feature to be enabled (503 otherwise).
       security:
         - BearerAuth: []
+      parameters:
+        - name: return_to
+          in: query
+          required: false
+          description: Where the person goes after the bank, only a customer due diligence identify link of this node (`/v1/profile?tab=identify&token=…`); any other value is ignored and the person lands on /v1/profile.
+          schema: { type: string, maxLength: 200 }
       responses:
         '200':
           description: Authorization request created
@@ -83154,6 +84415,9 @@ paths:
         Cross-device OpenID4VP wallet presentation callback (no auth — validated by the `state`
         nonce). Verifies the verifiable presentation and, on success, raises the GHII to
         verification level 3 (eIDAS). Requires the EUDIW feature to be enabled (503 otherwise).
+        The presentation checks and refusal codes are those of POST /v1/ghii/verify/eudiw: holder
+        binding through the Key Binding JWT, the round's nonce, this node's client id as `aud`, and
+        one use of the round and the nonce.
       requestBody:
         required: true
         content:
@@ -83189,7 +84453,7 @@ paths:
                           issuer: { type: string }
                           verifiedAt: { type: string }
         '400':
-          $ref: '#/components/responses/BadRequest'
+          $ref: '#/components/responses/EudiwPresentationRefused'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

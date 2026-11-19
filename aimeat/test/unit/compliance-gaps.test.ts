@@ -17,6 +17,7 @@
  *   already covered.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-gaps.test.ts
  * @version-history
+ *   2026-11-19 — The stub lists no memory: section 13 now reads the customer due diligence state.
  *   v1.4.1 — 2026-11-15 — The storage answers countAppParties (none): an app's registered people are
  *     AppParty rows, which the records of processing count. The setup no longer matched the report's reads.
  *   v1.4.0 — 2026-11-01 — The storage answers the consents and organisms the data intermediation
@@ -92,6 +93,8 @@ function storageWith(opts: {
       (key in memory ? { value: memory[key], version: 1, createdAt: '', updatedAt: '' } : null),
     // The people registered to an app are table rows since 2026-11-15: none here.
     countAppParties: async () => 0,
+    // Section 13 reads the customer due diligence state (services/kyc/): no lists and no cards here.
+    listMemory: async () => [],
   } as unknown as Storage;
 }
 

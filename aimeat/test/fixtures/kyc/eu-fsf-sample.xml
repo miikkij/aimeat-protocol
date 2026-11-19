@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Hand-written sample in the EU Financial Sanctions Files export format. Every name is invented. -->
+<export xmlns="http://eu.europa.ec/fpi/fsd/export" generationDate="2026-11-18T18:00:00.000+01:00" globalFileId="900001">
+  <sanctionEntity designationDetails="" unitedNationId="" euReferenceNumber="EU.9001.01" logicalId="900101">
+    <regulation regulationType="regulation" organisationType="council" publicationDate="2022-03-15" entryIntoForceDate="2022-03-15" numberTitle="2022/9001 (OJ L 900)" programme="RUS" logicalId="910001">
+      <publicationUrl>https://example.invalid/eli/reg/2022/9001</publicationUrl>
+    </regulation>
+    <regulation regulationType="amendment" organisationType="council" publicationDate="2023-02-25" entryIntoForceDate="2023-02-25" numberTitle="2023/9002 (OJ L 901)" programme="RUS" logicalId="910002">
+      <publicationUrl>https://example.invalid/eli/reg/2023/9002</publicationUrl>
+    </regulation>
+    <subjectType code="person" classificationCode="P"/>
+    <nameAlias firstName="Ivan" middleName="" lastName="Petrovski" wholeName="Ivan Petrovski" function="Board member" gender="M" title="" nameLanguage="" strong="true" regulationLanguage="en" logicalId="920001">
+      <regulationSummary regulationType="regulation" publicationDate="2022-03-15" numberTitle="2022/9001"/>
+    </nameAlias>
+    <nameAlias firstName="Иван" middleName="" lastName="Петровский" wholeName="Иван Петровский" function="" gender="M" title="" nameLanguage="RU" strong="true" regulationLanguage="en" logicalId="920002"/>
+    <nameAlias firstName="Ivan" middleName="" lastName="Petrovskiy" wholeName="" function="" gender="M" title="" nameLanguage="" strong="false" regulationLanguage="en" logicalId="920003"/>
+    <citizenship region="" countryIso2Code="RU" countryDescription="RUSSIAN FEDERATION" regulationLanguage="en" logicalId="930001"/>
+    <birthdate circa="false" calendarType="GREGORIAN" city="Testgrad" zipCode="" birthdate="1971-04-12" dayOfMonth="12" monthOfYear="4" year="1971" region="" place="" countryIso2Code="RU" countryDescription="RUSSIAN FEDERATION" regulationLanguage="en" logicalId="940001"/>
+  </sanctionEntity>
+  <sanctionEntity designationDetails="" unitedNationId="" euReferenceNumber="EU.9002.02" logicalId="900102">
+    <regulation regulationType="regulation" organisationType="council" publicationDate="2023-06-23" entryIntoForceDate="2023-06-23" numberTitle="2023/9003" programme="UKR" logicalId="910003"/>
+    <subjectType code="enterprise" classificationCode="E"/>
+    <nameAlias firstName="" middleName="" lastName="" wholeName="DARKWATER SHIPPING LLC" function="" gender="" title="" nameLanguage="" strong="true" regulationLanguage="en" logicalId="920004"/>
+    <nameAlias firstName="" middleName="" lastName="" wholeName="Darkwater Maritime Ltd." function="" gender="" title="" nameLanguage="" strong="true" regulationLanguage="en" logicalId="920005"/>
+    <address city="Testport" street="Harbour Road 1" poBox="" zipCode="" region="" place="" asAtListingTime="false" countryIso2Code="AE" countryDescription="UNITED ARAB EMIRATES" regulationLanguage="en" logicalId="950001"/>
+  </sanctionEntity>
+  <sanctionEntity designationDetails="" unitedNationId="" euReferenceNumber="EU.9003.03" logicalId="900103">
+    <regulation regulationType="regulation" organisationType="council" publicationDate="2024-01-10" entryIntoForceDate="2024-01-10" numberTitle="2024/9004" programme="BLR" logicalId="910004"/>
+    <subjectType code="person" classificationCode="P"/>
+    <nameAlias firstName="Aleksandr" middleName="Viktorovich" lastName="Volkonov" wholeName="Aleksandr Viktorovich Volkonov" function="" gender="M" title="" nameLanguage="" strong="true" regulationLanguage="en" logicalId="920006"/>
+    <nameAlias firstName="Alexander" middleName="" lastName="Volkonov" wholeName="Alexander Volkonov" function="" gender="M" title="" nameLanguage="" strong="true" regulationLanguage="en" logicalId="920007"/>
+    <nameAlias firstName="Sasha" middleName="" lastName="Volkonov" wholeName="Sasha Volkonov" function="" gender="M" title="" nameLanguage="" strong="false" regulationLanguage="en" logicalId="920008"/>
+    <citizenship region="" countryIso2Code="00" countryDescription="UNKNOWN" regulationLanguage="en" logicalId="930002"/>
+    <citizenship region="" countryIso2Code="BY" countryDescription="BELARUS" regulationLanguage="en" logicalId="930003"/>
+    <birthdate circa="true" calendarType="GREGORIAN" city="" zipCode="" birthdate="" dayOfMonth="" monthOfYear="" year="1965" region="" place="" countryIso2Code="00" countryDescription="UNKNOWN" regulationLanguage="en" logicalId="940002"/>
+  </sanctionEntity>
+</export>
