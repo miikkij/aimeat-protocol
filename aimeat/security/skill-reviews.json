@@ -207,7 +207,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:234fc3f8f4c19ea43ff32759"
+      "digest": "sha256:525dc5e007abade2f721ff26"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -543,7 +543,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:45267f99f406c92b9e5d2c16",
+      "digest": "sha256:b577df2ab68fc5ad7dc75183",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -717,7 +717,7 @@
       "aimeat/src/services/app/spec-gate.ts": "b414412b238a5b98"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/builder/atelier-prompt.ts": "5006bb9ae1a9d192",
+      "aimeat/src/services/builder/atelier-prompt.ts": "9686f784704f1257",
       "aimeat/src/services/builder/atelier-layers.ts": "eed956574db1cdc3",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "7cca5c1ee7fc64f9",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
@@ -830,7 +830,7 @@
     "project:aimeat-app-building": {
       "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
       "aimeat/src/routes/app-templates.ts": "c04b6dda6dd9ed2f",
-      "aimeat/src/services/builder/atelier-prompt.ts": "5006bb9ae1a9d192",
+      "aimeat/src/services/builder/atelier-prompt.ts": "9686f784704f1257",
       "aimeat/src/services/builder/app-prompt.ts": "785fc0f78cc3040f",
       "aimeat/src/services/app/publish.ts": "5187be36e9d0aed7",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",

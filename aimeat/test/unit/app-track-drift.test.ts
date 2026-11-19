@@ -5,6 +5,8 @@
  *   them every week, and a warning on each of those would teach everybody to stop reading hints.
  * @usage cd aimeat && pnpm vitest run test/unit/app-track-drift.test.ts
  * @version-history
+ *   v2.0.0 — 2026-11-19 — One track: a new non-Atelier page is named whatever token it carried, and an
+ *     update of a Classic app is quiet with the Atelier token too (track-drift.ts v2.0.0).
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -12,16 +14,19 @@ import { trackDriftFindings } from '../../src/services/app/track-drift.js';
 
 const base = { isUpdate: false, track: undefined, loadsAtelier: false, carriedAtelierToken: false } as const;
 
-describe('a build that left the Atelier track', () => {
-  it('read the Atelier specification and published a Classic app: the track changed mid-build', () => {
+// One track since 2026-11-19 (track-drift.ts v2.0.0): the retired Classic address hands out the
+// Atelier token too, so the token no longer says which guide a build read.
+describe('a new app that is not an Atelier app', () => {
+  it('is named whichever token it carried, with the shell and custom:<name> for a page of its own', () => {
     const f = trackDriftFindings({ ...base, carriedAtelierToken: true });
     expect(f.map(x => x.pitfall)).toEqual(['track-drift']);
-    expect(f[0].message).toMatch(/carried the Atelier/i);
     expect(f[0].message).toMatch(/owner/i);
+    expect(f[0].message).toMatch(/shell-atelier/);
+    expect(f[0].message).toMatch(/custom:<name>/);
   });
 
-  it('says the same on an UPDATE, because the token is proof of which guide this session read', () => {
-    expect(trackDriftFindings({ ...base, isUpdate: true, track: 'classic', carriedAtelierToken: true })).toHaveLength(1);
+  it('an UPDATE of a Classic app stays quiet even with the Atelier token', () => {
+    expect(trackDriftFindings({ ...base, isUpdate: true, track: 'classic', carriedAtelierToken: true })).toEqual([]);
   });
 
   it('a NEW app on Classic is named, once, with what to tell the owner', () => {
