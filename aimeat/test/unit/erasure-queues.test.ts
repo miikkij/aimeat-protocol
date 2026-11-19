@@ -23,6 +23,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-queues.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-queues.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   v1.6.0 — 2026-11-14 — The visibility and behaviour counters.
  *   v1.5.0 — 2026-11-14 — The agent telemetry buffer.
  *   v1.4.0 — 2026-11-14 — The content intake queue.
@@ -79,7 +80,7 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
     recordCallDuration(s, p.aliceGhii, 'ext1', 'act', 12);
     recordCallDuration(s, p.bobGhii, 'ext1', 'act', 15);
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushCallTimings(s);
 
     expect(await s.getMemory(p.aliceGhii, timingKey('ext1', 'act'))).toBeNull();
@@ -110,7 +111,7 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
     logPartyRead(s, p.bobGhii, read('u2'));
     vi.useRealTimers();
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushOwner(p.aliceGhii);
     await flushOwner(p.bobGhii);
 
@@ -147,7 +148,7 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
     logDelivery(s, p.bobGhii, 'sensor', delivery());
     vi.useRealTimers();
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushReceiverLogs(p.aliceGhii);
     await flushReceiverLogs(p.bobGhii);
 
@@ -186,7 +187,7 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
       try {
         classifyAfterWrite(deps(), p.aliceGhii, 'notes.invoice', { text: IBAN });
         classifyAfterWrite(deps(), p.bobGhii, 'notes.invoice', { text: IBAN });
-        await eraseOwner(s, NODE, p.alice);
+        await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
         vi.runOnlyPendingTimers();
       } finally { vi.useRealTimers(); }
       await flushWriteClassification();
@@ -230,7 +231,7 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
       try {
         contentAfterStore(deps(), p.aliceGhii, 'docs/a.txt');
         contentAfterStore(deps(), p.bobGhii, 'docs/b.txt');
-        await eraseOwner(s, NODE, p.alice);
+        await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
         vi.runOnlyPendingTimers();
       } finally { vi.useRealTimers(); }
       await flushContentIntake();
@@ -267,7 +268,7 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
     recordTelemetryActivity(p.star, llmCall);
     recordTelemetryActivity(bobAgent, llmCall);
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushTelemetryBuffer();
 
     expect(await s.getActivityHistory(p.star)).toEqual([]);
@@ -305,7 +306,7 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
     await visit(p.aliceGhii);
     await visit(p.bobGhii);
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushVisibility(s);
 
     expect(await months(p.aliceGhii)).toEqual([]);
@@ -330,7 +331,7 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
     view(p.aliceGhii);
     view(p.bobGhii);
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushBehaviour(s);
 
     expect(await behaviour(p.aliceGhii)).toBeNull();

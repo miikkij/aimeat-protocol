@@ -15,6 +15,7 @@
  *   Runs on SQLite in memory, and on Postgres too when DATABASE_URL is set (names carry a run tag there).
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-member-erasure.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.0.0 — 2026-10-01 — Initial: erasure left app-membership records behind for a reused name.
  */
@@ -24,6 +25,7 @@ import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
+import type { AimeatConfig } from '../../src/config.js';
 import {
   getCarryPlan, getMemberRow, listRequests, listVisits, noteVisit, putCarryPlan, putMember, putRequest, removeMember,
 } from '../../src/services/app/members.js';
@@ -43,6 +45,8 @@ beforeAll(async () => {
 afterAll(async () => { for (const s of providers.values()) await s.close(); });
 
 const NODE = 'erasure-test';
+/** eraseOwner reads the node's config for the app sweep and the log pseudonym. */
+const CONFIG = { nodeId: NODE } as AimeatConfig;
 const now = new Date().toISOString();
 
 describe.each(names)('%s: erasing an account takes its app-roster records', provider => {
@@ -96,7 +100,7 @@ describe.each(names)('%s: erasing an account takes its app-roster records', prov
     expect(await getBlanketLevel(s, bob, carol)).toBe(20);
 
     try {
-      const { deletionLog } = await eraseOwner(s, NODE, bob);
+      const { deletionLog } = await eraseOwner(s, NODE, bob, CONFIG);
 
       // (a) What bob held on alice's apps.
       expect(await getMemberRow(s, club, bob)).toBeNull();
@@ -123,7 +127,7 @@ describe.each(names)('%s: erasing an account takes its app-roster records', prov
       expect(await getCarryPlan(s, club)).not.toBeNull();
       expect(await getBlanketLevel(s, alice, carol)).toBe(20);
     } finally {
-      for (const name of [alice, carol, bobby, bob]) await eraseOwner(s, NODE, name);
+      for (const name of [alice, carol, bobby, bob]) await eraseOwner(s, NODE, name, CONFIG);
     }
   }, 60_000);
 });

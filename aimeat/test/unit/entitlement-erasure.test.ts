@@ -18,6 +18,7 @@
  *   Runs on SQLite in memory, and on Postgres too when DATABASE_URL is set (names carry a run tag there).
  * @usage cd aimeat && pnpm exec vitest run test/unit/entitlement-erasure.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.0.0 — 2026-10-01 — Initial: erasure left exchange contracts and grants active for a reused name.
  */
@@ -27,6 +28,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
+import type { AimeatConfig } from '../../src/config.js';
 import {
   authorizeAndCharge, entitlementKey, grantKey, issueGrant, persistEntitlement, readContractForCall,
   readEntitlementForCall, readGrantForCall, NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement,
@@ -102,7 +104,7 @@ describe.each(names)('%s: erasing an account revokes its exchange contracts and 
     expect((await readEntitlementForCall(s, carolG, ext, 'c'))?.state).toBe('active');
 
     try {
-      const { deletionLog } = await eraseOwner(s, NODE, bob);
+      const { deletionLog } = await eraseOwner(s, NODE, bob, { nodeId: NODE } as AimeatConfig);
 
       // (a) What bob consumed: the contract, the grant, the agent's contract, the caller-keyed row.
       expect((await readContractForCall(s, bobG, ext, 'a'))?.state).toBe('revoked');
@@ -131,7 +133,7 @@ describe.each(names)('%s: erasing an account revokes its exchange contracts and 
       expect((await readContractForCall(s, bobG, ext, 'e'))?.updatedAt).toBe(OLD);
       expect(await history()).toBe(historyBefore);
     } finally {
-      for (const name of [alice, carol, bobby, bob]) await eraseOwner(s, NODE, name);
+      for (const name of [alice, carol, bobby, bob]) await eraseOwner(s, NODE, name, { nodeId: NODE } as AimeatConfig);
       const refs = [
         ...[[bobG, 'a'], [bobG, 'b'], [bobG, 'e'], [carolG, 'c'], [bobbyG, 'a'], [bobRemote, 'a']]
           .map(([who, action]) => ({ ownerGaii: NS_ENTITLEMENT, key: entitlementKey(who, ext, action) })),

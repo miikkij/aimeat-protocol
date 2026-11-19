@@ -18,12 +18,14 @@
  *     - a row recorded while the organism's storage delete runs is not written afterwards.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-audit-write-in-progress.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { ClassificationAuditRow } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
+import type { AimeatConfig } from '../../src/config.js';
 import { deleteOrganismRecords } from '../../src/services/organism/lifecycle.js';
 import {
   initClassificationAudit, recordClassificationAudit, flushClassificationAudit, shutdownClassificationAudit,
@@ -116,7 +118,7 @@ describe('the classification audit while a batch is being written', () => {
     const flush = flushClassificationAudit();
     await hold.began;
 
-    const erased = eraseOwner(storage, N, 'alice');
+    const erased = eraseOwner(storage, N, 'alice', { nodeId: N } as AimeatConfig);
     await settledOrWaiting(erased);
     hold.release();
     await Promise.all([flush, erased]);

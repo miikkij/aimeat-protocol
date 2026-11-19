@@ -17,6 +17,7 @@
  *   Runs on SQLite, and on Postgres too when DATABASE_URL is set (names carry a run tag).
  * @usage cd aimeat && pnpm exec vitest run test/unit/knowledge-link-owner.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v78 and v79).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -27,6 +28,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryLinkRecord } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
+import type { AimeatConfig } from '../../src/config.js';
 import { placeKnowledgeLinkOwnersOnce } from '../../src/services/knowledge/link-owner-keep.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 
@@ -110,7 +112,7 @@ describe.each(names)('%s: knowledge link rows', provider => {
     await s.createLink(row(`packages/${tag}-d2/manifest`, pub, 'D-bare', dName), '');         // written before 2026-10-22
     await s.createLink(row(`packages/${tag}-k1/manifest`, pub, 'K-row', keep), keep);
 
-    const { deletionLog } = await eraseOwner(s, NODE, dName);
+    const { deletionLog } = await eraseOwner(s, NODE, dName, { nodeId: NODE } as AimeatConfig);
     expect(deletionLog.some(l => l.startsWith('knowledge_links:'))).toBe(true);
     expect((await s.listLinks(pub, { direction: 'incoming' })).map(l => l.description)).toEqual(['K-row']);
   });

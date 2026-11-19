@@ -12,6 +12,7 @@
  *   expectation after the erasure is red (bob's two requests are still listed); restored.
  * @usage pnpm exec vitest run test/unit/join-request-erasure.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   v1.0.0 — 2026-11-12 — Initial.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -20,6 +21,7 @@ import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, JoinRequestRecord } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
+import type { AimeatConfig } from '../../src/config.js';
 
 requirePostgresWhenAsked('join-request-erasure');
 
@@ -61,7 +63,7 @@ describe.each(names)('%s: erasing an account takes its join requests', provider 
     expect(before.map(r => r.id).sort()).toEqual([`carol-${tag}`, `old-${tag}`, `open-${tag}`]);
     expect(before.find(r => r.id === `open-${tag}`)?.via).toEqual({ kind: 'app', ref: `${alice}/tool.html`, label: 'Tool' });
 
-    const { deletionLog } = await eraseOwner(s, NODE, bob);
+    const { deletionLog } = await eraseOwner(s, NODE, bob, { nodeId: NODE } as AimeatConfig);
 
     const after = await s.listJoinRequests(org);
     expect(after.map(r => r.id)).toEqual([`carol-${tag}`]);

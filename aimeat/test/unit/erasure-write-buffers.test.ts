@@ -22,6 +22,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-write-buffers.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-write-buffers.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   v1.5.0 — 2026-11-14 — The shared setup and the call hold move to erasure-test-kit.ts.
  *   v1.4.0 — 2026-11-14 — The agent refusal notes.
  *   v1.3.0 — 2026-11-14 — The record of the permissions a `*` agent uses.
@@ -34,6 +35,7 @@ import { randomUUID } from 'node:crypto';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
+import type { AimeatConfig } from '../../src/config.js';
 import { twoProviders, NODE, now, people, holdFirst, eraseDuring, until, type People } from './erasure-test-kit.js';
 import { initConsentAuditBuffer, bufferConsentAudit, flushConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent/audit-buffer.js';
 import { initUsageBuffer, recordUsageCall, flushUsageBuffer, resetUsageBuffer } from '../../src/services/usage/usage-buffer.js';
@@ -73,7 +75,7 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
     bufferConsentAudit(audit(p.bobGhii, p.aliceGhii));
     vi.useRealTimers();
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushConsentAudit();
 
     expect(await s.listConsentAudit(p.aliceGhii)).toEqual([]);
@@ -103,7 +105,7 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
     recordUsageCall({ ownerGhii: p.aliceGhii, actorGaii: p.star, actorKind: 'agent', surface: 'mcp', coordinate: 'aimeat_memory_write' });
     recordUsageCall({ ownerGhii: p.bobGhii, surface: 'mcp', coordinate: 'aimeat_memory_read' });
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushUsageBuffer();
 
     expect(await s.listUsageCalls({ ownerGhii: p.aliceGhii })).toEqual([]);
@@ -147,7 +149,7 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
     recordMemoryTouch({ ownerGaii: p.aliceGhii, key: 'notes.a', writerPrincipal: p.star, kind: 'write' });
     recordMemoryTouch({ ownerGaii: p.bobGhii, key: 'notes.b', writerPrincipal: p.bobGhii, kind: 'write' });
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushWriteTallyBuffer();
 
     expect(await tally(s, p.aliceGhii)).toEqual([]);
@@ -163,7 +165,7 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
     await firstSightingsWritten(async () => (await tally(s, p.bobGhii, 'shared.c')).length === 1);
     recordMemoryTouch({ ownerGaii: p.bobGhii, key: 'shared.c', writerPrincipal: p.aliceGhii, kind: 'write' });
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushWriteTallyBuffer();
 
     const rows = await tally(s, p.bobGhii, 'shared.c');
@@ -193,7 +195,7 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
     initScopeUse(s);
     noteScopeUse(p.star, ['memory:read']);
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushScopeUse(s);
 
     expect(await s.getMemory(p.aliceGhii, SCOPE_USE_KEY)).toBeNull();
@@ -225,7 +227,7 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
     await until(async () => (await refusalNote(s, p)) !== null, 'the first note');
     refused(p, 'POST /v1/memory');
 
-    await eraseOwner(s, NODE, p.alice);
+    await eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
     await flushAgentRefusals();
 
     expect(await refusalNote(s, p)).toBeNull();

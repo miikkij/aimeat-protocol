@@ -12,6 +12,7 @@
  *   const held = holdFirst(s, 'setMemory', 'before', a => String((a[0] as { key: string }).key).startsWith('x.'));
  *   await eraseDuring(s, p, held, flushSomething());
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   v1.0.0 — 2026-11-14 — Moved out of erasure-write-buffers.test.ts, with a call filter for holdFirst.
  */
 import { afterAll, beforeAll } from 'vitest';
@@ -19,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
+import type { AimeatConfig } from '../../src/config.js';
 
 export type TestStorage = Storage & { close(): void | Promise<void> };
 
@@ -105,7 +107,7 @@ export async function settledOrWaiting(work: Promise<unknown>): Promise<void> {
 /** Erase alice while `held` holds a call open, then release it and wait for both. */
 export async function eraseDuring(s: Storage, p: People, held: { began: Promise<void>; release: () => void }, write: Promise<unknown>): Promise<void> {
   await held.began;
-  const erased = eraseOwner(s, NODE, p.alice);
+  const erased = eraseOwner(s, NODE, p.alice, { nodeId: NODE } as AimeatConfig);
   await settledOrWaiting(erased);
   held.release();
   await Promise.all([write, erased]);

@@ -11,6 +11,7 @@
  *   Runs on SQLite in memory, and on PostgreSQL too when DATABASE_URL is set.
  * @usage cd aimeat && pnpm exec vitest run test/unit/name-bound-grants-erasure.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   2026-10-27 -- Initial (secaudit2026oct26: beneficiary-release and accountant-access name reuse).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -63,7 +64,7 @@ describe.each(names)('%s: a beneficiary approval and an accountant grant stay wi
     expect((await beneficiaryEligibility(s, config, `${bob}@${NODE}`)).eligible).toBe(true);
     expect(await reads(s, bob, alice)).toBe(true);
 
-    await eraseOwner(s, NODE, bob);
+    await eraseOwner(s, NODE, bob, { nodeId: NODE } as AimeatConfig);
     await account(s, bob, new Date().toISOString());
     const gate = await beneficiaryEligibility(s, config, `${bob}@${NODE}`);
     expect(gate.eligible).toBe(false);

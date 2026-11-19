@@ -14,6 +14,7 @@
  *     exception in force stays.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-retention.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   v1.0.0 — 2026-09-30 — Initial (TARGET-082 test gaps).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -68,7 +69,7 @@ describe('classification records leave the node (TARGET-082)', () => {
       expect(pendingClassificationAudit({ ownerGaii: ALICE }).length).toBeGreaterThan(0);
       expect((await listExceptions(deps(), { level: 'owner', subject: ALICE })).length).toBe(1);
 
-      const { deletionLog } = await eraseOwner(storage, N, 'alice');
+      const { deletionLog } = await eraseOwner(storage, N, 'alice', { nodeId: N } as AimeatConfig);
 
       expect(await listExceptions(deps(), { level: 'owner', subject: ALICE })).toEqual([]);
       expect(pendingClassificationAudit({ ownerGaii: ALICE })).toEqual([]);

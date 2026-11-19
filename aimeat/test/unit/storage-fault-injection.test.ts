@@ -14,6 +14,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-fault-injection.test.ts
  *        DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/storage-fault-injection.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   2026-10-16 — A run that asks for PostgreSQL without DATABASE_URL fails here (postgres-arm.ts, QA audit P4-02).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W26).
  */
@@ -108,7 +109,7 @@ describe('E6-01: a step that fails inside the deactivation transaction', () => {
     const name = uniq('erased');
     await seedAccount(p.storage, name);
     const s = injected(p.storage, { deleteAllMemory: (() => rejectByDatabase(p)) as never });
-    await eraseOwner(s, NODE, name);
+    await eraseOwner(s, NODE, name, { nodeId: NODE } as AimeatConfig);
     expect(await p.storage.getOwner(name), 'one broken step must not block the erasure').toBeNull();
   });
 });

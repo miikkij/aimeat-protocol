@@ -18,6 +18,7 @@
  *     SERVICE_OWNED_KEY_PREFIXES moved in item B6.
  * @usage cd aimeat && pnpm exec vitest run test/unit/service-records.test.ts
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, item B6).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -248,7 +249,7 @@ describe('the service namespace (codebase analysis 2026-11-03, item B6)', () => 
       expect(exp.status).toBe(200);
       const memories = exp.body.data.memories as Array<{ key: string; value: unknown }>;
       expect(memories.find(m => m.key === KEY)?.value).toEqual({ amount: 42 });
-      const result = await eraseOwner(s(), N, 'alice');
+      const result = await eraseOwner(s(), N, 'alice', { nodeId: N } as AimeatConfig);
       expect(await storage.getMemory(SVC, KEY)).toBeNull();
       expect(JSON.stringify(result)).toContain('service_records:1');
     });
@@ -284,7 +285,7 @@ describe('the service namespace (codebase analysis 2026-11-03, item B6)', () => 
     });
 
     it('an account erasure with no service records logs no service_records entry', async () => {
-      expect(JSON.stringify(await eraseOwner(s(), N, 'alice'))).not.toContain('service_records');
+      expect(JSON.stringify(await eraseOwner(s(), N, 'alice', { nodeId: N } as AimeatConfig))).not.toContain('service_records');
     });
   });
 });

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Actual erasure and same-name recreation on both providers.
  * @version-history
+ *   2026-11-19 — eraseOwner takes the node's config (the app sweep and the log pseudonym read it).
  *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   1.0.0 2026-09-27 Private memory, consent and remote credential boundaries.
  */
@@ -14,6 +15,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import { eraseOwner } from '../../src/services/owner/erasure.js';
+import type { AimeatConfig } from '../../src/config.js';
 
 requirePostgresWhenAsked('owner-reuse-contract');
 
@@ -60,7 +62,7 @@ describe.each(names)('%s same-name recreation', provider => {
     expect((await s.getMcpServer(server.id))?.credential).toBe(server.credential);
     expect(await s.listConsents(ghii, {})).toHaveLength(1);
     try {
-      const erased = await eraseOwner(s, node, name);
+      const erased = await eraseOwner(s, node, name, { nodeId: node } as AimeatConfig);
       expect(erased.deletionLog).toContain('mcp_servers:1');
       await create('new-public-key');
       expect((await s.getOwner(name))?.publicKey).toBe('new-public-key');
@@ -69,7 +71,7 @@ describe.each(names)('%s same-name recreation', provider => {
       expect(await s.getMcpServer(server.id)).toBeUndefined();
       expect((await s.getMcpServer(nodeServer.id))?.credential).toBe(nodeServer.credential);
     } finally {
-      await eraseOwner(s, node, name);
+      await eraseOwner(s, node, name, { nodeId: node } as AimeatConfig);
       await s.deleteMcpServer(nodeServer.id);
     }
   }, 60_000);
