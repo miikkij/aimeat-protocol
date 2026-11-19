@@ -87977,6 +87977,28 @@ paths:
             text/plain:
               schema: { type: string }
 
+  /.well-known/security.txt:
+    get:
+      operationId: getSecurityTxt
+      summary: Where to report a vulnerability in this node (RFC 9116)
+      description: >-
+        The node's security.txt, built at each request from the operator's settings: one Contact
+        line for each address in operator.security_contact (AIMEAT_OPERATOR_SECURITY_CONTACT, mailto:
+        or https:), Expires 180 days after the request, Canonical with this file's address on the
+        node's public address, Policy when operator.security_policy_url is set, and
+        Preferred-Languages en, fi. With no contact set the node serves no file and answers 404: it
+        never invents a contact. Public, CORS-open. Apex only.
+      tags: [Catalogue]
+      security: []
+      responses:
+        '200':
+          description: The security.txt document
+          content:
+            text/plain:
+              schema: { type: string }
+        '404':
+          description: No contact is set, so the node publishes no security.txt
+
   /.well-known/webmcp.json:
     get:
       operationId: getWebmcpManifest

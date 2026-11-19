@@ -16,6 +16,8 @@
  * @usage
  *   import { missingOperatorConfig } from './operator.js';
  * @version-history
+ *   v1.4.0 — 2026-11-19 — operatorFromEnv reads AIMEAT_OPERATOR_SECURITY_CONTACT and
+ *     AIMEAT_OPERATOR_SECURITY_POLICY_URL, the node's security.txt.
  *   v1.3.0 — 2026-11-01 — missingOperatorConfig asks a private person for no postal address: their
  *     pages give the email only (Jouni, 2026-11-01 11.39). A company, organisation or association still must give one.
  *   v1.2.0 — 2026-10-24 — operatorFromEnv(): the operator block read from the environment, moved from config.ts
@@ -49,6 +51,8 @@ export function operatorFromEnv(env: NodeJS.ProcessEnv): OperatorConfig {
     signerName: env.AIMEAT_OPERATOR_SIGNER_NAME ?? '',
     signerRole: env.AIMEAT_OPERATOR_SIGNER_ROLE ?? '',
     emailFooter: env.AIMEAT_OPERATOR_EMAIL_FOOTER ?? '',
+    securityContact: env.AIMEAT_OPERATOR_SECURITY_CONTACT ?? '',
+    securityPolicyUrl: env.AIMEAT_OPERATOR_SECURITY_POLICY_URL ?? '',
   };
 }
 

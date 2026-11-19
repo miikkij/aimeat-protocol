@@ -15121,6 +15121,8 @@
     "cfg_operator_country": "Country",
     "cfg_operator_email": "Privacy contact email",
     "cfg_operator_security_email": "Security contact email",
+    "cfg_operator_security_contact": "Vulnerability report contact (security.txt)",
+    "cfg_operator_security_policy_url": "Vulnerability disclosure policy page",
     "cfg_operator_email_footer": "Mail footer line",
     "cfg_operator_hosting_name": "Hosting provider",
     "cfg_operator_hosting_location": "Hosting location",
@@ -15415,6 +15417,8 @@
     "cfgDesc_operator_country": "Country this instance is operated from. Decides the governing law and the international-transfer wording",
     "cfgDesc_operator_email": "Where privacy questions and data-subject requests are sent. Printed on both public pages",
     "cfgDesc_operator_security_email": "Where security reports are sent. Empty falls back to the privacy address",
+    "cfgDesc_operator_security_contact": "Where a security researcher reports a vulnerability in this server: one or more mailto: or https: addresses, separated by commas, the first one to try first. Set, the server publishes them at /.well-known/security.txt; empty, that address answers 404.",
+    "cfgDesc_operator_security_policy_url": "The page that says how you handle a vulnerability report, as an https: address. security.txt names it on its Policy line. Empty leaves the line out.",
     "cfgDesc_operator_email_footer": "The line at the foot of every mail sent from here, in place of \"Sent by AIMEAT Protocol\" and the profile note. One line of text, at most 200 characters. Empty keeps the default.",
     "cfgDesc_operator_hosting_name": "Hosting provider, listed as a sub-processor in the privacy policy",
     "cfgDesc_operator_hosting_location": "Where that provider keeps the data, e.g. \"France (EU/EEA)\". The transfers section reads it",
@@ -31798,6 +31802,17 @@
       }
     },
     "config": {
+      "operator": {
+        "security_contact": {
+          "title": "Vulnerability report contact",
+          "short": "Where people report a security problem in this server. Set, the server publishes a security.txt file; empty, it publishes none.",
+          "what": "security.txt (RFC 9116) is a small text file at /.well-known/security.txt. Security researchers and scanners read it to find out where to report a vulnerability. The server builds the file from this setting at each request: one Contact line for each address, an Expires line 180 days ahead, a Canonical line with the file's own address on this server, the Policy line when you set a policy page, and Preferred-Languages: en, fi. The server never makes up a contact: with this setting empty, /.well-known/security.txt answers 404, and the privacy and security e-mail settings are not used in its place.",
+          "range": "Empty (the default), or one to ten addresses separated by commas. Each one starts with mailto: (an e-mail address) or https: (a web page or a form). Any other value is refused.",
+          "ex1": "mailto:security@example.org: reports come by e-mail to your security team.",
+          "ex2": "https://example.org/report-a-vulnerability, mailto:security@example.org: a report form first, and e-mail as the second way.",
+          "tip": "Use an address that a person reads every working day. A report that nobody reads is worse than no file, because the researcher thinks you were told."
+        }
+      },
       "node": {
         "processes": {
           "title": "Server processes",

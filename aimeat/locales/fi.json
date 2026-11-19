@@ -15888,6 +15888,8 @@
     "cfg_operator_country": "Maa",
     "cfg_operator_email": "Tietosuojan yhteysosoite",
     "cfg_operator_security_email": "Tietoturvan yhteysosoite",
+    "cfg_operator_security_contact": "Haavoittuvuusilmoitusten yhteystieto (security.txt)",
+    "cfg_operator_security_policy_url": "Haavoittuvuuksien käsittelyperiaatteiden sivu",
     "cfg_operator_email_footer": "Sähköpostin alatunniste",
     "cfg_operator_hosting_name": "Palvelintarjoaja",
     "cfg_operator_hosting_location": "Palvelinten sijainti",
@@ -16182,6 +16184,8 @@
     "cfgDesc_operator_country": "Maa, josta instanssia pyöritetään. Ratkaisee sovellettavan lain ja siirtoehtojen sanamuodon.",
     "cfgDesc_operator_email": "Osoite, johon tietosuojakysymykset ja rekisteröityjen pyynnöt lähetetään. Näytetään molemmilla julkisilla sivuilla (tietosuojaseloste ja ehdot).",
     "cfgDesc_operator_security_email": "Osoite, johon tietoturvailmoitukset lähetetään. Tyhjä ohjaa tietosuojaosoitteeseen.",
+    "cfgDesc_operator_security_contact": "Mihin tietoturvatutkija ilmoittaa tämän palvelimen haavoittuvuudesta: yksi tai useampi mailto:- tai https:-osoite pilkuin erotettuina, ensimmäinen ensin. Kun arvo on asetettu, palvelin julkaisee osoitteet tiedostossa /.well-known/security.txt. Tyhjänä se osoite vastaa 404.",
+    "cfgDesc_operator_security_policy_url": "Sivu, jolla kerrot, miten käsittelet haavoittuvuusilmoituksen (https:-osoite). security.txt mainitsee sen Policy-rivillä. Tyhjänä riviä ei ole.",
     "cfgDesc_operator_email_footer": "Rivi jokaisen tämän palvelimen lähettämän viestin lopussa. Se korvaa tekstin \"Sent by AIMEAT Protocol\" ja profiilia koskevan huomautuksen. Yksi tekstirivi, enintään 200 merkkiä. Tyhjä pitää oletuksen.",
     "cfgDesc_operator_hosting_name": "Palvelintarjoaja, joka listataan tietosuojaselosteessa alikäsittelijänä.",
     "cfgDesc_operator_hosting_location": "Missä tarjoaja pitää datan, esim. \"Ranska (EU/ETA)\". Siirto-osio lukee tämän.",
@@ -32546,6 +32550,17 @@
       }
     },
     "config": {
+      "operator": {
+        "security_contact": {
+          "title": "Haavoittuvuusilmoitusten yhteystieto",
+          "short": "Mihin ihmiset ilmoittavat tämän palvelimen tietoturvaongelmasta. Kun arvo on asetettu, palvelin julkaisee security.txt-tiedoston. Tyhjänä tiedostoa ei ole.",
+          "what": "security.txt (RFC 9116) on pieni tekstitiedosto osoitteessa /.well-known/security.txt. Tietoturvatutkijat ja skannerit lukevat sen, kun he etsivät, mihin haavoittuvuudesta ilmoitetaan. Palvelin kokoaa tiedoston tästä asetuksesta jokaisella pyynnöllä: Contact-rivi jokaiselle osoitteelle, Expires-rivi 180 päivän päähän, Canonical-rivi, jossa on tiedoston oma osoite tällä palvelimella, Policy-rivi, kun olet asettanut periaatesivun, ja Preferred-Languages: en, fi. Palvelin ei keksi yhteystietoa itse: kun asetus on tyhjä, /.well-known/security.txt vastaa 404, eikä tietosuojan tai tietoturvan sähköpostiosoitetta käytetä sen tilalla.",
+          "range": "Tyhjä (oletus) tai 1–10 osoitetta pilkuin erotettuina. Jokainen alkaa mailto: (sähköpostiosoite) tai https: (verkkosivu tai lomake). Palvelin hylkää muun arvon.",
+          "ex1": "mailto:security@example.org: ilmoitukset tulevat sähköpostilla tietoturvatiimillesi.",
+          "ex2": "https://example.org/report-a-vulnerability, mailto:security@example.org: ensin ilmoituslomake, sähköposti toisena vaihtoehtona.",
+          "tip": "Käytä osoitetta, jota joku lukee joka arkipäivä. Ilmoitus, jota kukaan ei lue, on huonompi kuin tiedoston puuttuminen, koska tutkija luulee, että asiasta on kerrottu."
+        }
+      },
       "node": {
         "processes": {
           "title": "Palvelimen prosessit",

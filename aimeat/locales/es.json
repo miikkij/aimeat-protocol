@@ -14252,6 +14252,8 @@
     "cfg_operator_country": "País",
     "cfg_operator_email": "Correo de privacidad",
     "cfg_operator_security_email": "Correo de seguridad",
+    "cfg_operator_security_contact": "Contacto para reportar vulnerabilidades (security.txt)",
+    "cfg_operator_security_policy_url": "Página de la política de divulgación de vulnerabilidades",
     "cfg_operator_email_footer": "Pie de los correos",
     "cfg_operator_hosting_name": "Proveedor de alojamiento",
     "cfg_operator_hosting_location": "Ubicación del alojamiento",
@@ -14546,6 +14548,8 @@
     "cfgDesc_operator_country": "País desde el que se opera esta instancia. Decide la ley aplicable y el texto de transferencias internacionales.",
     "cfgDesc_operator_email": "Adónde llegan las preguntas de privacidad y las solicitudes de los interesados. Impreso en ambas páginas públicas.",
     "cfgDesc_operator_security_email": "Adónde llegan los avisos de seguridad. Vacío usa la dirección de privacidad.",
+    "cfgDesc_operator_security_contact": "Adónde un investigador de seguridad reporta una vulnerabilidad de este servidor: una o más direcciones mailto: o https:, separadas por comas; la primera es la que se intenta primero. Con un valor, el servidor las publica en /.well-known/security.txt; vacío, esa dirección responde 404.",
+    "cfgDesc_operator_security_policy_url": "La página donde dices cómo manejas un reporte de vulnerabilidad (una dirección https:). security.txt la nombra en su línea Policy. Vacío, la línea no aparece.",
     "cfgDesc_operator_email_footer": "La línea al pie de cada correo que se envía desde aquí, en lugar de \"Sent by AIMEAT Protocol\" y la nota sobre el perfil. Una sola línea de texto, de 200 caracteres como máximo. Vacío mantiene la predeterminada.",
     "cfgDesc_operator_hosting_name": "Proveedor de alojamiento, listado como subencargado en la política de privacidad.",
     "cfgDesc_operator_hosting_location": "Dónde guarda los datos ese proveedor, p. ej. \"Francia (UE/EEE)\". La sección de transferencias lo lee.",
@@ -30168,6 +30172,17 @@
       }
     },
     "config": {
+      "operator": {
+        "security_contact": {
+          "title": "Contacto para reportar vulnerabilidades",
+          "short": "Adónde las personas reportan un problema de seguridad de este servidor. Con un valor, el servidor publica un archivo security.txt; vacío, no publica ninguno.",
+          "what": "security.txt (RFC 9116) es un pequeño archivo de texto en /.well-known/security.txt. Los investigadores de seguridad y los escáneres lo leen para saber adónde reportar una vulnerabilidad. El servidor arma el archivo con este ajuste en cada solicitud: una línea Contact por cada dirección, una línea Expires 180 días adelante, una línea Canonical con la dirección del propio archivo en este servidor, la línea Policy cuando configuras una página de política, y Preferred-Languages: en, fi. El servidor nunca inventa un contacto: con este ajuste vacío, /.well-known/security.txt responde 404, y los correos de privacidad y de seguridad no se usan en su lugar.",
+          "range": "Vacío (el valor predeterminado), o de una a diez direcciones separadas por comas. Cada una empieza con mailto: (un correo) o https: (una página web o un formulario). Cualquier otro valor se rechaza.",
+          "ex1": "mailto:security@example.org: los reportes llegan por correo a tu equipo de seguridad.",
+          "ex2": "https://example.org/report-a-vulnerability, mailto:security@example.org: primero un formulario de reporte, y el correo como segunda opción.",
+          "tip": "Usa una dirección que una persona lea cada día hábil. Un reporte que nadie lee es peor que no tener archivo, porque el investigador cree que ya te avisó."
+        }
+      },
       "node": {
         "processes": {
           "title": "Procesos del servidor",

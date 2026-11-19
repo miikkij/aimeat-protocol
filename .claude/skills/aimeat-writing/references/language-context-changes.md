@@ -245,3 +245,7 @@ newest at the top.
   (feature audit 2026-11-19, 2.4). The words follow the page's own: *estävä koukku* / *gancho
   bloqueante* and *toiminto* / *acción*, as the held-name notice already says them; the choice names
   the event (*tapahtuma* / *evento*) the hook checks.
+- **2026-11-19**: the vulnerability report contact and the security.txt file (feature audit
+  2026-11-19, 4.7). *Haavoittuvuus* / *vulnerabilidad* is the industry word; the Finnish keeps
+  *tietoturvailmoitus* for the existing security e-mail setting, and *haavoittuvuusilmoitus* names a
+  report of one vulnerability. The file name stays English.

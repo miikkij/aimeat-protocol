@@ -167,7 +167,9 @@ GitHub Actions in these workflows are pinned by commit hash (`.github/workflows/
 
 ## Vulnerability disclosure
 
-Report privately, through GitHub private vulnerability reporting or by email to the maintainer named in `.github/SECURITY.md`. The stated aim is an acknowledgement within 48 hours, an assessment within a week and a fix within two weeks. Only the newest release receives security fixes ([Security policy](../../.github/SECURITY.md)). The node's own incident procedure (severity levels, containment commands) is in [Incident response](../security/incident-response.md).
+Report privately, through GitHub private vulnerability reporting or by email to the maintainer named in `.github/SECURITY.md`. The stated aim is an acknowledgement within 48 hours, an assessment within a week and a fix within two weeks. Only the newest release receives security fixes ([Security policy](../../.github/SECURITY.md)).
+
+That policy is for the AIMEAT software. A vulnerability in your installation is reported to you: set `AIMEAT_OPERATOR_SECURITY_CONTACT` (one or more `mailto:` or `https:` addresses) and the node serves them at `/.well-known/security.txt` in the RFC 9116 format, with an Expires date 180 days after each request and, when `AIMEAT_OPERATOR_SECURITY_POLICY_URL` is set, your policy page. With no contact set the address answers 404; the node does not fall back to `AIMEAT_OPERATOR_SECURITY_EMAIL` (`aimeat/src/services/security-txt.ts`, `aimeat/src/routes/security-txt.ts`). The node's own incident procedure (severity levels, containment commands) is in [Incident response](../security/incident-response.md).
 
 ## Security work done
 
