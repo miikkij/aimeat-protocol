@@ -11,6 +11,7 @@
  *   - balance ops: debitBalance, creditBalance, creditBalanceCapped (atomic)
  *
  * @version-history
+ *   2026-11-19 — countAgents: the two numbers of the front page counters, counted in the database.
  *   2026-11-04 — setAgentScopesIf is required: both providers implement it (codebase analysis
  *     2026-11-03, item D-e).
  *   v1.3.0 — 2026-10-20 — clearGrantsToIdentity: the references where ANOTHER party named this GAII
@@ -58,6 +59,12 @@ export interface AgentRepository {
    */
   clearGrantsToIdentity(gaii: string): Promise<GrantsToIdentityCleared>;
   listAgents(): Promise<AgentRecord[]>;
+  /**
+   * How many agents the node holds (`total`), and how many of them were last seen after `seenAfterIso`
+   * (`seen`). Counted in the database, so the front page counters (services/live/node-totals.ts)
+   * read no agent row.
+   */
+  countAgents(seenAfterIso: string): Promise<{ total: number; seen: number }>;
 
   /** Atomically debit balance. Returns false if insufficient funds. */
   debitBalance(gaii: string, amount: number): Promise<boolean>;

@@ -133,9 +133,6 @@
     "src/routes/admin/setup-register.ts": {
       "listOwners": 1
     },
-    "src/routes/appeals.ts": {
-      "listAgents": 1
-    },
     "src/routes/catalogue.ts": {
       "listAgents": 1
     },
@@ -174,7 +171,7 @@
       "listAgents": 1
     },
     "src/routes/public-stats.ts": {
-      "listAgents": 3
+      "listAgents": 2
     },
     "src/routes/setup.ts": {
       "listOwners": 2

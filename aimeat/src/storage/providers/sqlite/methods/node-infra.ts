@@ -8,6 +8,7 @@
  * @structure nodeInfraMethods
  * @usage Object.assign(SqliteStorage.prototype, nodeInfraMethods) in ../index.ts
  * @version-history
+ *   v1.3.0 — 2026-11-19 — deletePushSubscriptionsForApp: one DELETE for the devices of one app.
  *   v1.2.0 — 2026-11-19 — pseudonymiseSiteChangeLog: an erased account's lines name the erasure's pseudonym.
  *   v1.1.0 — 2026-10-09 — deleteVerificationNonce returns whether it removed the row.
  *   v1.0.0 — 2026-10-05 — 18 methods (createPushSubscription, markPushSubscriptionDelivered,
@@ -21,6 +22,7 @@ import type {
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { siteChangeLogNamings } from '../../../erased-logs.js';
+import { appIdIsSql } from './app-grants.js';
 
 /** One push_subscriptions row → the record. Shared by the three readers so they cannot drift. */
 function toPushSubscription(row: Record<string, unknown>): PushSubscriptionRecord {
@@ -83,6 +85,13 @@ export const nodeInfraMethods = {
       ? this.db.prepare('DELETE FROM push_subscriptions WHERE ownerName = ?').run(ownerName)
       : this.db.prepare('DELETE FROM push_subscriptions WHERE ownerName = ? AND endpoint = ?').run(ownerName, endpoint);
     return result.changes > 0;
+  },
+
+  async deletePushSubscriptionsForApp(this: SqliteStorage, appId: string): Promise<number> {
+    const result = this.db.prepare(
+      `DELETE FROM push_subscriptions WHERE appId IS NOT NULL AND ${appIdIsSql('appId')}`,
+    ).run({ appId });
+    return result.changes;
   },
 
   async listPushSubscriptions(this: SqliteStorage): Promise<PushSubscriptionRecord[]> {

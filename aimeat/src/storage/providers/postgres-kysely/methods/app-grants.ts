@@ -8,6 +8,7 @@
  *   the owner's grant list, and revoke. Translated 1:1 from the SQLite/Prisma implementations — `scopes`
  *   is a native Postgres text[] column; timestamps are ISO on the record, Date in the column.
  * @version-history
+ *   v1.6.0 — 2026-11-19 — revokeAppGrantsForApp: one UPDATE for every live grant of one app.
  *   v1.5.1 — 2026-10-23 — The freshest-grant read takes LIMIT 1 (check:unbounded-lists).
  *   v1.5.0 — 2026-10-18 — setAppGrantScopesIf: one UPDATE conditional on the scope list that was read (check:atomic-writes, boot migrations).
  *   v1.4.0 — 2026-09-26 — ownerAddedScopes (migration 0084): the words the owner added by hand.
@@ -21,7 +22,7 @@ import type { Selectable } from 'kysely';
 import type { AppGrantRecord } from '../../../interface.js';
 import type { AppGrant } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { dbError, scopeListIs } from '../helpers.js';
+import { appIdIs, dbError, scopeListIs } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoN = (t: Date | string | null | undefined): string | null => (t == null ? null : iso(t));
@@ -97,5 +98,13 @@ export const appGrantMethods = {
         .where('grantId', '=', grantId).where(scopeListIs('scopes', expected)).executeTakeFirst();
       return Number(r.numUpdatedRows ?? 0) > 0;
     } catch (err) { throw dbError('setAppGrantScopesIf', err); }
+  },
+  async revokeAppGrantsForApp(this: PostgresKyselyStorage, appId: string): Promise<number> {
+    try {
+      const r = await this.db.updateTable('AppGrant').set({ revoked: true, refreshTokenHash: null } as never)
+        .where('revoked', '=', false).where(appIdIs('app', appId))
+        .executeTakeFirst();
+      return Number(r.numUpdatedRows ?? 0);
+    } catch (err) { throw dbError('revokeAppGrantsForApp', err); }
   },
 };

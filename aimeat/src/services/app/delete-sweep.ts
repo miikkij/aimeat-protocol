@@ -57,6 +57,8 @@
  * @usage
  *   await removeAppLeftovers(storage, config, { ownerName, ownerGhii, filename, buckets: [app.ownerGaii] });
  * @version-history
+ *   v1.1.2 — 2026-11-19 — The grants and push devices steps remove by app id in storage
+ *     (revokeAppGrantsForApp, deletePushSubscriptionsForApp) instead of reading every row on the node.
  *   v1.1.1 — 2026-11-19 — The AI settings step keeps the owner's own role bindings of the app: the roles
  *     view shows them under the app marked gone, for the owner to remove (test/e2e-ai-roles.ts 13).
  *   v1.1.0 — 2026-11-19 — Each step runs in its own savepoint, so the account erasure, which runs this
@@ -282,19 +284,12 @@ export const APP_SWEEP_STEPS: ReadonlyArray<{ name: string; run: (c: SweepCtx) =
   },
   {
     // Every live grant people gave the app is revoked; a later app of the same name asks again.
-    name: 'grants', run: async c => {
-      for (const g of await c.storage.listAppGrants()) {
-        if (equalAppId(g.app, c.appId)) await c.storage.updateAppGrant(g.grantId, { revoked: true, refreshTokenHash: null });
-      }
-    },
+    // One statement in storage, which reads no other app's grants.
+    name: 'grants', run: async c => { await c.storage.revokeAppGrantsForApp(c.appId); },
   },
   {
     // Devices that subscribed to notifications from the app's own origin.
-    name: 'push devices', run: async c => {
-      for (const s of await c.storage.listPushSubscriptions()) {
-        if (s.appId && equalAppId(s.appId, c.appId)) await c.storage.deletePushSubscription(s.ownerName, s.endpoint);
-      }
-    },
+    name: 'push devices', run: async c => { await c.storage.deletePushSubscriptionsForApp(c.appId); },
   },
   {
     // People's AI settings that name the app: a role bound to one of its declared roles, a daily

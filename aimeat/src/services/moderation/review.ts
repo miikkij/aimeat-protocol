@@ -21,13 +21,15 @@
  *   const out = await reviewAppeal({ storage, config }, req.auth!, id, { decision, note });
  *   if (!out.ok) res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   v1.0.1 — 2026-11-19 — getContentOwner finds a bare key by key (listMemoryKeysByPrefix), not by
+ *     reading every agent and asking each one.
  *   v1.0.0 — 2026-11-19 — Initial: moved out of routes/flags.ts and routes/appeals.ts for the MCP
  *     tools (feature audit 2026-11-19, 4.4 item 3).
  */
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { resolveIdentity, isForeignPrincipal } from '../../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal, isValidGAII } from '../../utils/gaii.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { isOperatorCaller, operatorOverride } from '../operator/override.js';
 import { archiveRoleOf } from '../archive.js';
@@ -122,9 +124,11 @@ export async function getContentOwner(storage: Storage, targetType: string, targ
                 const direct = await storage.getMemory(targetId.slice(0, sep), targetId.slice(sep + 2));
                 if (direct) return direct.ownerGaii;
             }
-            const agents = await storage.listAgents();
-            for (const agent of agents) {
-                const mem = await storage.getMemory(agent.gaii, targetId);
+            // The records with that exact key, in an agent's namespace: read by key, not by walking
+            // every agent on the node.
+            for (const row of await storage.listMemoryKeysByPrefix(targetId)) {
+                if (row.key !== targetId || !isValidGAII(row.ownerGaii)) continue;
+                const mem = await storage.getMemory(row.ownerGaii, targetId);
                 if (mem) return mem.ownerGaii;
             }
             return null;

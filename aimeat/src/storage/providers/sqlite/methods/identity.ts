@@ -8,6 +8,7 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   v1.12.0 — 2026-11-19 — countAgents: the total and the recently seen agents in one aggregate query.
  *   2026-11-08 — deleteOwner keeps the person's schema locks in force under the erasure's pseudonym
  *     (repos/schema-lock-erasure.ts; secaudit2026nov08 round 14).
  *   v1.11.0 — 2026-11-19 — taskStartAppWaits on create, update and read, 1 or NULL (migration 0133).
@@ -453,6 +454,14 @@ export const identityMethods = {
   async listAgents(this: SqliteStorage): Promise<AgentRecord[]> {
     const rows = this.db.prepare('SELECT * FROM agents').all() as Record<string, unknown>[];
     return rows.map(r => this.deserializeAgent(r));
+  },
+
+  async countAgents(this: SqliteStorage, seenAfterIso: string): Promise<{ total: number; seen: number }> {
+    // lastSeen is an ISO text, so the text compare is the time compare.
+    const r = this.db.prepare(
+      'SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN lastSeen > ? THEN 1 ELSE 0 END), 0) AS seen FROM agents',
+    ).get(seenAfterIso) as { total: number; seen: number } | undefined;
+    return { total: Number(r?.total ?? 0), seen: Number(r?.seen ?? 0) };
   },
 
   /**

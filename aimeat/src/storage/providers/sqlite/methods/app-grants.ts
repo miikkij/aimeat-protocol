@@ -8,6 +8,7 @@
  * @structure appGrantMethods
  * @usage Object.assign(SqliteStorage.prototype, appGrantMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-11-19 — revokeAppGrantsForApp: one UPDATE for every live grant of one app.
  *   v1.1.0 — 2026-10-18 — setAppGrantScopesIf: the scope list written only if it still equals the list read (check:atomic-writes, boot migrations).
  *   v1.0.0 — 2026-10-05 — createAppGrant, getAppGrant, getAppGrantByRefreshHash, getAppGrantByOwnerAndApp,
  *     listAppGrantsByOwner, listAppGrants, updateAppGrant, deserializeAppGrant moved here from apps.ts so the
@@ -16,6 +17,16 @@
 import type { AppGrantRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { sameScopeList } from '../../../scope-list.js';
+
+/**
+ * The condition "the app id in `column` is the named parameter @appId": the owner part (before the
+ * first slash) compares without case, the rest with case, as equalAppId (services/app/record-keys.ts)
+ * does. The Postgres twin is appIdIs in postgres-kysely/helpers.ts.
+ */
+export function appIdIsSql(column: string): string {
+  const canon = (x: string) => `lower(substr(${x}, 1, instr(${x}, '/') - 1)) || substr(${x}, instr(${x}, '/'))`;
+  return `${canon(column)} = ${canon('@appId')}`;
+}
 
 export const appGrantMethods = {
 
@@ -99,6 +110,13 @@ export const appGrantMethods = {
       this.db.prepare('UPDATE app_grants SET scopes = ? WHERE grantId = ?').run(JSON.stringify(next), grantId);
       return true;
     }).immediate();
+  },
+
+  async revokeAppGrantsForApp(this: SqliteStorage, appId: string): Promise<number> {
+    const result = this.db.prepare(
+      `UPDATE app_grants SET revoked = 1, refreshTokenHash = NULL WHERE revoked = 0 AND ${appIdIsSql('app')}`,
+    ).run({ appId });
+    return result.changes;
   },
 
   deserializeAppGrant(this: SqliteStorage, row: Record<string, unknown>): AppGrantRecord {

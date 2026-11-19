@@ -2082,6 +2082,72 @@ describe('storage providers agree on what they do, not just on their signatures'
         }
     }, 60_000);
 
+    // An app delete (services/app/delete-sweep.ts) revokes the app's grants and removes the devices
+    // that subscribed from its origin by app id in storage, so it reads no other app's rows. The owner
+    // part of the id compares without case and the filename with case, as equalAppId does.
+    it('an app delete revokes its grants and removes its push devices by app id, and nothing else', async () => {
+        const node = 'aimeat-conformance-001';
+        for (const { name, storage } of provs) {
+            const who = `confappdel${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            await seedOwner(storage, who);
+            const now = new Date().toISOString();
+            const grant = async (id: string, app: string) => storage.createAppGrant({
+                grantId: id, app, appName: 'conf', appOrigin: 'http://localhost:9911', owner: who, gaii: `${who}@${node}`,
+                scopes: ['memory:read'], refreshTokenHash: `rt-${id}`, createdAt: now, lastUsedAt: now, revoked: false,
+            });
+            await grant(`g1-${who}`, `${who}/brain.html`);
+            await grant(`g2-${who}`, `${who.toUpperCase()}/brain.html`);
+            await grant(`g3-${who}`, `${who}/Brain.html`);
+            await grant(`g4-${who}`, `${who}/other.html`);
+            const keys = { p256dh: 'conf-p256dh', auth: 'conf-auth' };
+            const device = (end: string, appId: string | null) => storage.createPushSubscription({
+                ownerName: who, endpoint: `https://push.example.test/${who}/${end}`, keys, createdAt: now, lastUsedAt: null, appId,
+            });
+            await device('a', `${who}/brain.html`);
+            await device('b', `${who.toUpperCase()}/brain.html`);
+            await device('c', `${who}/Brain.html`);
+            await device('d', null);
+
+            const revoked = await storage.revokeAppGrantsForApp(`${who}/brain.html`);
+            const again = await storage.revokeAppGrantsForApp(`${who}/brain.html`);
+            const removed = await storage.deletePushSubscriptionsForApp(`${who}/brain.html`);
+            const live = async (id: string) => {
+                const g = await storage.getAppGrant(id);
+                return g ? { revoked: g.revoked, token: g.refreshTokenHash !== null } : null;
+            };
+            const shape = {
+                revoked, again, removed,
+                g1: await live(`g1-${who}`), g2: await live(`g2-${who}`), g3: await live(`g3-${who}`), g4: await live(`g4-${who}`),
+                devices: (await storage.listPushSubscriptionsByOwner(who)).map(s => s.endpoint.split('/').pop()).sort(),
+            };
+            expect(shape, `${name}: the app delete's grant and device removal`).toEqual({
+                revoked: 2, again: 0, removed: 2,
+                g1: { revoked: true, token: false }, g2: { revoked: true, token: false },
+                g3: { revoked: false, token: true }, g4: { revoked: false, token: true },
+                devices: ['c', 'd', 'laptop'],
+            });
+            await storage.deleteOwner(who);
+        }
+    }, 60_000);
+
+    // The front page counters (services/live/node-totals.ts) read two numbers, not every agent row.
+    it('countAgents counts every agent and the ones seen after the given time', async () => {
+        for (const { name, storage } of provs) {
+            const who = `confcount${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+            const before = await storage.countAgents(cutoff);
+            await seedOwner(storage, who); // one agent, seen now
+            await storage.createAgent({
+                name: 'sleeper', owner: who, gaii: `sleeper#${who}@aimeat-conformance-001`, publicKey: 'pk', trustScore: 50,
+                morselBalance: 0, capabilities: [], createdAt: '2020-01-01T00:00:00.000Z', lastSeen: '2020-01-01T00:00:00.000Z',
+            });
+            const after = await storage.countAgents(cutoff);
+            expect({ total: after.total - before.total, seen: after.seen - before.seen }, `${name}: countAgents`)
+                .toEqual({ total: 2, seen: 1 });
+            await storage.deleteOwner(who);
+        }
+    }, 60_000);
+
     it('a write started outside an open transaction is not swallowed by its rollback', async () => {
         for (const { name, storage } of provs) {
             const owner = `conftx4${Date.now()}${Math.floor(Math.random() * 1000)}`;

@@ -12,6 +12,8 @@
  *   - extension and cortex-extension/lib-file CRUD
  *
  * @version-history
+ *   v1.7.0 — 2026-11-19 — deletePushSubscriptionsForApp: an app delete removes the devices that
+ *     subscribed from its origin in one statement instead of reading every subscription.
  *   v1.6.0 — 2026-11-19 — pseudonymiseSiteChangeLog: an erased account's lines name the erasure's
  *     pseudonym (storage/erased-logs.ts).
  *   v1.5.0 — 2026-10-09 — getNodeKey reports `sealed` and throws when a sealed row does not open
@@ -70,6 +72,12 @@ export interface NodeRepository {
   listPushSubscriptionsByOwner(ownerName: string): Promise<PushSubscriptionRecord[]>;
   /** With `endpoint`, unregister that one device; without it, every device of the owner. */
   deletePushSubscription(ownerName: string, endpoint?: string): Promise<boolean>;
+  /**
+   * Unregister every device, of any owner, that subscribed from the app `appId` ("owner/filename").
+   * The owner part compares without case, the filename with case, as equalAppId
+   * (services/app/record-keys.ts) does. Answers how many rows it removed.
+   */
+  deletePushSubscriptionsForApp(appId: string): Promise<number>;
   listPushSubscriptions(): Promise<PushSubscriptionRecord[]>;
   createTrustedIssuer(record: TrustedIssuerRecord): Promise<TrustedIssuerRecord>;
   listTrustedIssuers(opts?: { type?: string }): Promise<TrustedIssuerRecord[]>;

@@ -10,6 +10,8 @@
  *            token hash, the live (owner, app) lookup, and listing by owner.
  * @usage import type { AppGrantRepository } from './repositories/app-grant.repository.js';
  * @version-history
+ *   2026-11-19 — revokeAppGrantsForApp: an app delete revokes its grants in one statement instead of
+ *     reading every grant on the node.
  *   2026-11-04 — setAppGrantScopesIf is required: both providers implement it (codebase analysis
  *     2026-11-03, item D-e).
  *   v1.4.0 — 2026-10-18 — setAppGrantScopesIf: the scope list written on the list that was read (check:atomic-writes, boot migrations).
@@ -46,4 +48,11 @@ export interface AppGrantRepository {
   updateAppGrant(grantId: string, updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels' | 'scopesFixedAt' | 'ownerAddedScopes'>>): Promise<AppGrantRecord | null>;
   /** The scope list written only if the stored one still equals `expected` (agent.repository.ts setAgentScopesIf). */
   setAppGrantScopesIf(grantId: string, expected: readonly string[], next: string[]): Promise<boolean>;
+  /**
+   * Revoke every live grant for the app `appId` ("owner/filename"), whoever gave it, in one statement,
+   * and clear its refresh token hash. The owner part compares without case, the filename with case,
+   * as equalAppId (services/app/record-keys.ts) does. Answers how many grants it revoked. The app
+   * delete sweep (services/app/delete-sweep.ts) reads no grant to do it.
+   */
+  revokeAppGrantsForApp(appId: string): Promise<number>;
 }

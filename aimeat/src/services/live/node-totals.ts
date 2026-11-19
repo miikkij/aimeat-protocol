@@ -22,6 +22,7 @@
  *   startNodeTotalsLive · stopNodeTotalsLive
  * @usage startNodeTotalsLive(storage, config); // at boot, beside the other process buffers
  * @version-history
+ *   v1.0.1 — 2026-11-19 — The agent figures come from storage.countAgents, not from every agent row.
  *   v1.0.0 — 2026-11-19 — Initial: the computation moved from routes/public-stats.ts unchanged, and
  *     the live domain (feature audit 2026-11-19, 4.6).
  */
@@ -73,10 +74,10 @@ export async function computeNodeTotals(storage: Storage): Promise<NodeTotals> {
     organisms = orgs.length;
   } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
   try {
-    const all = await storage.listAgents();
-    agents = all.length;
-    const cutoff = Date.now() - 10 * 60 * 1000;
-    agentsOnline = all.filter(a => a.lastSeen && new Date(a.lastSeen).getTime() > cutoff).length;
+    // Counted in the database: the two numbers, and no agent row read.
+    const counted = await storage.countAgents(new Date(Date.now() - 10 * 60 * 1000).toISOString());
+    agents = counted.total;
+    agentsOnline = counted.seen;
   } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
   try {
     // Public knowledge packages are public memory entries keyed packages/{id}/manifest.

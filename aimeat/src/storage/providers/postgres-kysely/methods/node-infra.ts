@@ -11,6 +11,7 @@
  *   - nodeInfraMethods: push-subscription upsert+CRUD, trusted-issuer create/list, nonce CRUD + expiry
  *     sweep, realtime-room create/get/update/delete, site-change-log append + cursor-paginated list
  * @version-history
+ *   v1.5.0 — 2026-11-19 — deletePushSubscriptionsForApp: one DELETE for the devices of one app.
  *   v1.4.0 — 2026-11-19 — pseudonymiseSiteChangeLog: an erased account's lines name the erasure's pseudonym.
  *   v1.3.1 — 2026-10-23 — The freshest push subscription read takes LIMIT 1 (check:unbounded-lists).
  *   v1.3.0 — 2026-10-09 — deleteVerificationNonce returns whether it removed the row.
@@ -26,7 +27,7 @@ import type {
 } from '../../../interface.js';
 import type { PushSubscription, RealtimeRoom, SiteChangeLog, TrustedIssuer, VerificationNonce } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb } from '../helpers.js';
+import { appIdIs, jsonb } from '../helpers.js';
 import { siteChangeLogNamings } from '../../../erased-logs.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
@@ -109,6 +110,12 @@ export const nodeInfraMethods = {
     if (endpoint !== undefined) q = q.where('endpoint', '=', endpoint);
     const r = await q.executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
+  },
+  async deletePushSubscriptionsForApp(this: PostgresKyselyStorage, appId: string): Promise<number> {
+    const r = await this.db.deleteFrom('PushSubscription')
+      .where('appId', 'is not', null).where(appIdIs('appId', appId))
+      .executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
   },
   async listPushSubscriptions(this: PostgresKyselyStorage): Promise<PushSubscriptionRecord[]> {
     return (await this.db.selectFrom('PushSubscription').selectAll().execute()).map(toPushSub);

@@ -7,6 +7,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-11-19 — countAgents: the total and the recently seen agents in one aggregate query.
  *   2026-11-19 — taskStartAppWaits on create, update and read, TRUE or NULL (migration 0133).
  *   2026-11-02 — listOperatorNames: the active operator accounts' names, one filtered query with a limit.
  *   2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
@@ -244,6 +245,13 @@ export const identityMethods = {
   },
   async listAgents(this: PostgresKyselyStorage): Promise<AgentRecord[]> {
     return (await this.db.selectFrom('Agent').selectAll().execute()).map(toAgentRecord);
+  },
+  async countAgents(this: PostgresKyselyStorage, seenAfterIso: string): Promise<{ total: number; seen: number }> {
+    const r = await this.db.selectFrom('Agent').select([
+      sql<string>`count(*)`.as('total'),
+      sql<string>`count(*) filter (where ${sql.ref('lastSeen')} > ${new Date(seenAfterIso)})`.as('seen'),
+    ]).executeTakeFirst();
+    return { total: Number(r?.total ?? 0), seen: Number(r?.seen ?? 0) };
   },
   async updateAgent(this: PostgresKyselyStorage, gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null> {
     // Json columns must be wrapped with jsonb(); Date columns need Date coercion. Everything else passes
