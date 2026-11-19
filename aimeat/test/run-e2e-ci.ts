@@ -17,6 +17,7 @@
  *   2026-11-19 -- test/e2e-connector-command-approval.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 4).
  *   2026-11-19 -- test/e2e-subscription-renewal.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 5).
  *   2026-11-19 -- test/e2e-trust-score.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 6).
+ *   2026-11-19 -- test/e2e-mcp-workspace-server.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 2).
  *   2026-11-19 -- test/e2e-mcp-grant-limits.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 1).
  *   2026-11-19 -- test/e2e-organism-approvals-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 1).
  *   2026-11-19 -- test/e2e-moderation-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 3).
@@ -1743,6 +1744,9 @@ const ALL_SUITES = [
     // An MCP grant's end date and call ceiling on a real far side: the date refuses, the ceiling
     // counts the agent's own ok calls from the usage stream (feature audit 2026-11-19, 4.5).
     'test/e2e-mcp-grant-limits.ts',
+    // An MCP server bound to one workspace: the workspace creator, the group's owners and admins and
+    // a contributor call it, a viewer only sees it, a plain member neither (feature audit 2026-11-19, 4.5).
+    'test/e2e-mcp-workspace-server.ts',
     // The trust score rules on the stored score: the three-requester ceiling of 40, the first-week
     // ceiling of 65, and a declined request and a lost dispute counted (feature audit 2026-11-19, 4.5).
     'test/e2e-trust-score.ts',
