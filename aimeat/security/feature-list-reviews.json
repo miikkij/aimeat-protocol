@@ -15,7 +15,7 @@
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/routes/connect-install.ts"
       ],
-      "digest": "sha256:4bd99fc36c5803ba237afc64"
+      "digest": "sha256:084b871d2d094c8324c7068e"
     },
     "2. Accounts and sign-in": {
       "reviewedOn": "2026-11-19",
@@ -217,7 +217,7 @@
         "aimeat/src/routes/app-store.ts",
         "aimeat/src/services/dependency-map.ts"
       ],
-      "digest": "sha256:ba1b22a8850fe9bdfe1c01f5"
+      "digest": "sha256:6ba4711ccd3dd6bc5cbaaf5c"
     },
     "11. Served libraries and the Design Book": {
       "reviewedOn": "2026-11-19",
@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:52536154b39a029bab16e34c"
+      "digest": "sha256:edcd8422add6b2d8c9fc72c8"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-19",
@@ -248,7 +248,7 @@
         "aimeat/src/services/message/broadcast.ts",
         "aimeat/src/tool-catalog/definitions/broadcast-summary.ts"
       ],
-      "digest": "sha256:05282ae305551feaa129008e"
+      "digest": "sha256:b34cbeab9fab14261aa726f3"
     },
     "13. Notifications, boards and live updates": {
       "reviewedOn": "2026-11-19",
@@ -336,7 +336,7 @@
         "aimeat/src/services/data-intermediation",
         "aimeat/src/services/provenance-embed"
       ],
-      "digest": "sha256:90b8aab20919e94380090d7c"
+      "digest": "sha256:6279e58f95c574e1a2770e05"
     },
     "18. Federation and your own node": {
       "reviewedOn": "2026-11-19",
@@ -511,7 +511,7 @@
       "aimeat/src/mcp/oauth.ts": "aa06ed227468977b",
       "aimeat/src/mcp/oauth-consent-info.ts": "36d3fc455b40c6ee",
       "aimeat/src/mcp/protocol-version.ts": "f57eb3836e14df1e",
-      "aimeat/src/routes/bootstrap.ts": "a493d4620b7527e7",
+      "aimeat/src/routes/bootstrap.ts": "740c9622a3a61903",
       "aimeat/src/mcp/legacy-sessions.ts": "00cf232e02a68804",
       "aimeat/src/mcp/tasks-extension.ts": "ef9e3abaac54ea08",
       "aimeat/src/routes/mcp-servers.ts": "1938c72a19158ba4",
@@ -758,7 +758,7 @@
       "aimeat/src/services/app/config.ts": "40bbad5aede08707",
       "aimeat/src/routes/apps/read.ts": "244e130843f60138",
       "aimeat/src/tool-catalog/definitions/app-manage.ts": "a53f0c7cdfe3ff29",
-      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "3e6fffbf576765ea",
+      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "82e0985e955951b0",
       "aimeat/src/services/app/fork-gate.ts": "532f9095f35a4de8",
       "aimeat/src/services/design-book/grown-genre.ts": "e7193f3fd41c1cc2",
       "aimeat/src/services/app/lineage.ts": "626a0b907ec974eb",
@@ -774,30 +774,30 @@
       "aimeat/src/services/dependency-map.ts": "376c0e1e7ccf2e18"
     },
     "11. Served libraries and the Design Book": {
-      "aimeat/src/data/library-packs/cortex.ts": "df0bb1b9347ed957",
-      "aimeat/src/data/library-packs/sdk-ai.ts": "6172745e3847a23a",
-      "aimeat/src/data/library-packs/sdk-calendar-print.ts": "5958964e0bd4fa3a",
-      "aimeat/src/data/library-packs/sdk-datapackage.ts": "58279c6aa485c815",
-      "aimeat/src/data/library-packs/sdk-decide.ts": "cd2d6ed1ff161e1d",
-      "aimeat/src/data/library-packs/sdk-intake-connect.ts": "a6113b118b75bd22",
-      "aimeat/src/data/library-packs/sdk-labels.ts": "81000777fcd90359",
-      "aimeat/src/data/library-packs/sdk-living.ts": "14098ee3ca6dd8eb",
-      "aimeat/src/data/library-packs/sdk-offline.ts": "95a574132aa0c0c7",
-      "aimeat/src/data/library-packs/sdk-parties.ts": "3c0f1e7890a609e3",
-      "aimeat/src/data/library-packs/sdk-prompt.ts": "a5dd8c9c0710b36c",
-      "aimeat/src/data/library-packs/sdk-refinery.ts": "f6c8fdf7ee5643d3",
-      "aimeat/src/data/library-packs/sdk-ui.ts": "f1c86490fe3f3c5e",
-      "aimeat/src/data/library-packs/sdk-validate.ts": "b3e3f73ce3da5803",
-      "aimeat/src/data/library-packs/sdk-webhook.ts": "380259a55fa99614",
-      "aimeat/src/data/library-packs/sdk-workflows.ts": "c6e9f84492d5ef6e",
-      "aimeat/src/data/library-packs/sdk.ts": "aabd15b1eb0e25a9",
+      "aimeat/src/data/library-packs/cortex.ts": "922ad4c03b0a4963",
+      "aimeat/src/data/library-packs/sdk-ai.ts": "c843264ab2802f18",
+      "aimeat/src/data/library-packs/sdk-calendar-print.ts": "7ce80495af762d55",
+      "aimeat/src/data/library-packs/sdk-datapackage.ts": "575d27ad2b902691",
+      "aimeat/src/data/library-packs/sdk-decide.ts": "c8bd5ef8318fdfe9",
+      "aimeat/src/data/library-packs/sdk-intake-connect.ts": "bb3617568df540bd",
+      "aimeat/src/data/library-packs/sdk-labels.ts": "8883e9e13f480ee6",
+      "aimeat/src/data/library-packs/sdk-living.ts": "5166a313dd422449",
+      "aimeat/src/data/library-packs/sdk-offline.ts": "c52596254719d433",
+      "aimeat/src/data/library-packs/sdk-parties.ts": "817db4bccccb2be4",
+      "aimeat/src/data/library-packs/sdk-prompt.ts": "7f6cc16b4bd0c3ac",
+      "aimeat/src/data/library-packs/sdk-refinery.ts": "a23e1337130b3c7d",
+      "aimeat/src/data/library-packs/sdk-ui.ts": "99e746d46e9bb65f",
+      "aimeat/src/data/library-packs/sdk-validate.ts": "74cb81e57ef423c4",
+      "aimeat/src/data/library-packs/sdk-webhook.ts": "e8cd8123c3d9d65a",
+      "aimeat/src/data/library-packs/sdk-workflows.ts": "7f6ca17f8180fa7b",
+      "aimeat/src/data/library-packs/sdk.ts": "d044752e589a9074",
       "aimeat/src/data/library-packs/translations.ts": "3683cb9315747ead",
-      "aimeat/src/data/library-packs/types.ts": "87a59175f62929e9",
-      "aimeat/src/data/library-packs/vendored-creative.ts": "7b36a75cea8da2f1",
-      "aimeat/src/data/library-packs/vendored-maps.ts": "4e1d918c02fb441e",
-      "aimeat/src/data/library-packs/vendored-media.ts": "78ba81fcb70eb465",
-      "aimeat/src/data/library-packs/vendored-motion.ts": "bdfa3acb333336c9",
-      "aimeat/src/data/library-packs/vendored.ts": "6fc1851a18331ac2",
+      "aimeat/src/data/library-packs/types.ts": "e9a3a4616aabd40e",
+      "aimeat/src/data/library-packs/vendored-creative.ts": "d441ba5b6ac9c4d4",
+      "aimeat/src/data/library-packs/vendored-maps.ts": "a3a3af4e0fb2c409",
+      "aimeat/src/data/library-packs/vendored-media.ts": "74a41e912fa4331f",
+      "aimeat/src/data/library-packs/vendored-motion.ts": "c3a96d871a0f0134",
+      "aimeat/src/data/library-packs/vendored.ts": "aec88fdb7174bded",
       "aimeat/src/tool-catalog/definitions/designbook.ts": "af2c090e031b7508",
       "aimeat/src/services/design-book/grown-genre.ts": "e7193f3fd41c1cc2",
       "aimeat/src/services/design-book/kit-defaults.ts": "65653540823c7163",
@@ -806,7 +806,7 @@
     },
     "12. Messages, contacts and email": {
       "aimeat/src/routes/outbound.ts": "bdb77e334bc4bd61",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "f78244c998428584",
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "6ebe664306f2c089",
       "aimeat/src/tool-catalog/definitions/dm-groups.ts": "abb2efa534fe1126",
       "aimeat/src/tool-catalog/definitions/dm-reactions.ts": "7aed76c7b8c2db88",
       "aimeat/src/tool-catalog/definitions/connections.ts": "6f921f29104aea7d",
@@ -921,7 +921,7 @@
     "17. AI transparency and compliance": {
       "aimeat/src/data/compliance-domains.ts": "3671999359e598ed",
       "aimeat/src/services/compliance/domain-floor.ts": "f25a30a0b00a9fa9",
-      "aimeat/src/tool-catalog/definitions/compliance.ts": "f5a6c3ac83872f8d",
+      "aimeat/src/tool-catalog/definitions/compliance.ts": "83ae759b2cda0f63",
       "aimeat/src/routes/owners/export-sections.ts": "e13ba3d2a3b0f831",
       "aimeat/src/services/mydata-receipt.ts": "5c067e160c40e46c",
       "aimeat/src/routes/ai-provenance.ts": "0f53e7e4d0e5b99a",
