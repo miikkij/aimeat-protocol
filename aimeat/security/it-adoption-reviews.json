@@ -75,16 +75,15 @@
       "digest": "sha256:1311ba54921ca8d088eb6b17"
     },
     "06-ai-and-models.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
-        "aimeat/src/services/ai/adapters/index.ts",
-        "aimeat/src/services/ai/adapters/sdk.ts",
+        "aimeat/src/services/ai/adapters",
         "aimeat/src/services/ai/types.ts",
         "aimeat/src/services/ai/providers.ts",
         "aimeat/src/services/ai/openrouter-region.ts",
         "aimeat/src/services/ai/node-model-rules.ts"
       ],
-      "digest": "sha256:83ed49c991f52a003e3acd58"
+      "digest": "sha256:f000d3fd757657f8134efc3a"
     },
     "07-security.md": {
       "reviewedOn": "2026-11-15",
@@ -107,7 +106,7 @@
       "digest": "sha256:6cfffd43ecb828c8eb236fda"
     },
     "09-hardening-guide.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/config/posture.ts",
         "aimeat/src/utils/env-validator.ts",
@@ -117,12 +116,14 @@
       "digest": "sha256:ac5894f0d18492951afac887"
     },
     "10-logging-monitoring.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/utils/logger.ts",
-        "aimeat/docs/observability-guide.md"
+        "aimeat/docs/observability-guide.md",
+        "aimeat/src/services/node-admin",
+        "aimeat/src/services/hooks.ts"
       ],
-      "digest": "sha256:a3eec7b960928ad6b1577e84"
+      "digest": "sha256:35afdaf6a1f00aa1ebf70284"
     },
     "11-backup-recovery.md": {
       "reviewedOn": "2026-11-15",
@@ -145,7 +146,7 @@
       "digest": "sha256:f295b5e86ff61802b1cde501"
     },
     "13-apps-agents-endpoints.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/cli/connect/command-trust.ts",
         "aimeat/src/routes/connect-install.ts",
@@ -178,7 +179,7 @@
       "digest": "sha256:5d0146f1c7a3bb004525adfb"
     },
     "16-known-limitations.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "docs/known_gaps.md",
         "docs/security/threat-model.md",
@@ -328,7 +329,11 @@
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68"
     },
     "06-ai-and-models.md": {
+      "aimeat/src/services/ai/adapters/audio.ts": "254929d4cb5beacc",
+      "aimeat/src/services/ai/adapters/extension.ts": "98261749b0784a87",
+      "aimeat/src/services/ai/adapters/image.ts": "a9237fe60c971735",
       "aimeat/src/services/ai/adapters/index.ts": "65c67e56fbf43ea3",
+      "aimeat/src/services/ai/adapters/openai-chat.ts": "2aee5873c12b34f7",
       "aimeat/src/services/ai/adapters/sdk.ts": "b7c86872fb7946c4",
       "aimeat/src/services/ai/types.ts": "0f3be25098513231",
       "aimeat/src/services/ai/providers.ts": "8567ca45d7c6d5ad",
@@ -355,7 +360,17 @@
     },
     "10-logging-monitoring.md": {
       "aimeat/src/utils/logger.ts": "b8403e0859974c28",
-      "aimeat/docs/observability-guide.md": "e024876107c7f044"
+      "aimeat/docs/observability-guide.md": "e024876107c7f044",
+      "aimeat/src/services/node-admin/activity.ts": "fb5038819af84b53",
+      "aimeat/src/services/node-admin/agent-list.ts": "1744c3aca7b0d08c",
+      "aimeat/src/services/node-admin/backup-projection.ts": "0bc9ba7a93e580dc",
+      "aimeat/src/services/node-admin/organism-ownership-view.ts": "6acf17fbaca2b29e",
+      "aimeat/src/services/node-admin/password.ts": "db5e6071dd8480a4",
+      "aimeat/src/services/node-admin/restore.ts": "5f7e914244ba1c78",
+      "aimeat/src/services/node-admin/setup-secret.ts": "7c37998e518e50ba",
+      "aimeat/src/services/node-admin/siem-export.ts": "36297d5eba7c1438",
+      "aimeat/src/services/node-admin/teams-view.ts": "54307d42939f63cb",
+      "aimeat/src/services/hooks.ts": "6046e16123954e14"
     },
     "11-backup-recovery.md": {
       "docs/operations/backup-and-restore.md": "a0eead9e2df11d96",

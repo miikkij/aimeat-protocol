@@ -1,6 +1,6 @@
 # 09 Hardening guide
 
-> Checked against AIMEAT node 4.3.1 (commit 226c692d3) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 89dc5e6bb) on 2026-11-19. Maintained with the code: see the README for how.
 
 This page is the organisation-level hardening checklist for the sysadmin and the security officer who take a node into production. The node-level checklist that every deployment runs first is [docs/security/deployment-checklist.md](../security/deployment-checklist.md); the proxy, TLS and health-check detail is in [Production deployment](../operations/production-deployment.md). This page adds the decisions an organisation makes on top of those, and says for each item whether the shipped default already does it or the operator must change something. The reasons behind each default are in [07 Security](07-security.md); the threats they answer are in [08 Threat model](08-threat-model.md).
 
@@ -75,7 +75,7 @@ Marks used below:
 ## 7. Logging, backup and checks
 
 - [ ] **[change]** Set `NODE_ENV=production` in the process environment so the log is JSON, one object per line. Why: the logger writes JSON only under `NODE_ENV=production` (`aimeat/src/utils/logger.ts`); the Docker image sets it (`aimeat/Dockerfile`), the systemd unit does not (`aimeat/deploy/aimeat.service`).
-- [ ] **[change]** Log export to the SIEM: ship the process log (journald or the container log) and the refusal log file `AIMEAT_AUTH_LOG_PATH`, and scrape `/v1/metrics`. Details and alert rules: [10 Logging and monitoring](10-logging-monitoring.md).
+- [ ] **[change]** Log export to the SIEM: set `AIMEAT_SIEM_SYSLOG` (syslog over UDP or TCP) or `AIMEAT_SIEM_OTLP_URL` (OTLP logs over HTTP), or both, so the node pushes its security events as they happen; both are empty by default, and then nothing is sent (`aimeat/src/services/node-admin/siem-export.ts`). Also ship the process log (journald or the container log) and scrape `/v1/metrics`. Details and alert rules: [10 Logging and monitoring](10-logging-monitoring.md).
 - [ ] **[change]** Backups of the database, the `.env` and the node key, off the machine and encrypted; a restore tested once a month ([11 Backup and recovery](11-backup-recovery.md); [Backup and restore](../operations/backup-and-restore.md)).
 - [ ] **[change]** Run `aimeat validate` before every start after a configuration change. It checks the environment offline and exits 1 on an error, for example an invalid storage type, an app origin without a host, no data key set (none of `AIMEAT_ENCRYPTION_KEY`, `AIMEAT_TOTP_ENCRYPTION_KEY` and `AIMEAT_ENCRYPTION_KEY_1`), a second data key that is not 64 hex characters, or `AIMEAT_ENCRYPTION_KEY_CURRENT=1` without the second key. Dev mode, `http://` on a public host and a short admin password are warnings and do not change the exit code; read them too (`aimeat/src/utils/env-validator.ts`, dispatched from `aimeat/src/index.ts`).
 - [ ] **[change]** Read the startup self-check after every start: each `SECURITY:` line in the start log names one unsafe setting (`aimeat/src/config/posture.ts`).

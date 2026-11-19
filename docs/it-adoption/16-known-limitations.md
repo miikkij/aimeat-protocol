@@ -1,6 +1,6 @@
 # 16 Known limitations
 
-> Checked against AIMEAT node 4.3.1 (commit 979333322) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 89dc5e6bb) on 2026-11-19. Maintained with the code: see the README for how.
 
 Every known limitation of AIMEAT in one place, for the IT, security and data protection staff deciding whether to run it. Each row says what the limitation is, what follows from it, what the organisation can do about it, and where it is recorded. A limitation that has a setting is listed with that setting; "off by default" means the protection exists and the organisation must turn it on. The pages of this package carry their own `## Limits`; those the tables do not already carry are in the section "From the other pages" below.
 
@@ -117,7 +117,7 @@ carry are below, grouped by topic, each with the page that explains it.
 ### Apps, agents and endpoints ([13](13-apps-agents-endpoints.md))
 
 - Any account can publish an app, and with the code defaults (`AIMEAT_APP_DEFAULT_ACCESS=anyone`, `AIMEAT_APP_DEFAULT_LISTING=listed`) a new app is open to anyone and listed. No operator reviews an app's code before it is published.
-- `AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE` is off by default: a sign-in request from an app origin is logged, not refused.
+- `AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE` is off by default, and the default stays off: a sign-in request from an app origin is logged and let through, because the SDK's sign-in window in an app signs in from the app's own address. Turning it on stops password sign-in in every app.
 - An extension's own namespace `ext:<name>` is readable by anyone without sign-in.
 - Installing a package is the owner's decision; IT has no approval step for it.
 - An agent holding `agent:write` can allow a program on the owner's computer that the computer already holds, without the owner in person. On the first start after an update the connector adopts the commands it already had, and a command whose files kept old timestamps can be adopted the same way.

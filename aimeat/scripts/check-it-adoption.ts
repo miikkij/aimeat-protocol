@@ -15,7 +15,9 @@
  *
  *   THE SAME SHAPE AS check:skill-reviews. Each page has an entry in
  *   security/it-adoption-reviews.json that names the source files the page makes claims about
- *   (`watches`) and holds a digest of them as they stood on the review day. The gate fails when:
+ *   (`watches`) and holds a digest of them as they stood on the review day. A watch may be a
+ *   folder: then every file git tracks under it counts, so a new file there asks for a re-read too
+ *   (scripts/lib/watch-digest.ts). The gate fails when:
  *     - a page has no entry, or an entry names a page or a watched file that is gone;
  *     - the digest differs: the code changed after the page was read. The message names the page
  *       and the files, so whoever changed the code is the one asked to re-read the page;
@@ -41,13 +43,16 @@
  *   pnpm check:it-adoption --record --all
  *   pnpm check:it-adoption --list                   # every page, its date and what it watches
  * @version-history
+ *   v1.1.0 -- 2026-11-19 -- A watched folder digests every file git tracks under it, through
+ *     scripts/lib/watch-digest.ts, which check:feature-list shares. Page 10 said the node had no
+ *     SIEM exporter for four days after one landed in a folder the page did not watch.
  *   v1.0.0 -- 2026-11-01 -- Initial, with the first version of the package.
  */
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { changedFiles, digestOf as digestOfWatches } from './lib/watch-digest.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = join(here, '..', '..');
@@ -61,7 +66,7 @@ const STAMP_RE = /^> Checked against AIMEAT node (\d+)\.(\d+)\.(\d+) \(commit ([
 interface Entry {
     /** ISO date of the last reading against the code. */
     reviewedOn: string;
-    /** Repo-relative files or directories the page makes claims about. A directory means every file under it. */
+    /** Repo-relative files or directories the page makes claims about. A directory means every tracked file under it. */
     watches: string[];
     /** sha256 over the watched files as they stood on the review day. */
     digest: string;
@@ -85,18 +90,8 @@ function pages(): string[] {
     return filesUnder(PACKAGE_DIR).filter(f => f.endsWith('.md')).map(f => f.slice(PACKAGE_DIR.length + 1)).sort();
 }
 
-/** The digest of the watched files, in a stable order, with line endings folded. */
-function digestOf(watches: string[]): { digest: string; files: Record<string, string>; missing: string[] } {
-    const files: Record<string, string> = {};
-    const missing: string[] = [];
-    for (const watch of watches) {
-        const found = filesUnder(watch);
-        if (!found.length) missing.push(watch);
-        for (const file of found) files[file] = createHash('sha256').update(read(file), 'utf8').digest('hex').slice(0, 16);
-    }
-    const lines = Object.keys(files).sort().map(f => `${f} ${files[f]}`).join('\n');
-    return { digest: lines ? 'sha256:' + createHash('sha256').update(lines, 'utf8').digest('hex').slice(0, 24) : '', files, missing };
-}
+/** The digest of the watched files (scripts/lib/watch-digest.ts). */
+const digestOf = (watches: string[]) => digestOfWatches(REPO, watches);
 
 /** The text of every source file under a directory, joined, for a name lookup. */
 function corpus(dirs: string[]): string {
@@ -232,7 +227,7 @@ function main(): void {
         for (const m of missing) problems.push(`${page} watches "${m}", which does not exist. Point the entry at where that code lives now.`);
         if (!missing.length && digest !== entry.digest) {
             const before = ledger.fileDigests?.[page] ?? {};
-            const changed = [...new Set([...Object.keys(files), ...Object.keys(before)])].filter(f => files[f] !== before[f]);
+            const changed = changedFiles(files, before);
             problems.push(`${PACKAGE_DIR}/${page}: the code it describes changed after it was read on ${entry.reviewedOn}${changed.length ? ` (${changed.join(', ')})` : ''}. `
                 + `Read the page against that change, correct what is no longer true for an organisation's IT, then: pnpm check:it-adoption --record ${page}`);
         }

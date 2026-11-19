@@ -1,6 +1,6 @@
 # 13 Apps, agents and endpoints
 
-> Checked against AIMEAT node 4.3.1 (commit c785cfbb8) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 89dc5e6bb) on 2026-11-19. Maintained with the code: see the README for how.
 
 This page covers the code that runs on behalf of people: apps published on the node, extensions and packages installed into it, the connector on a person's own computer, AI chats that connect over MCP, outside MCP servers the node calls, and the `aimeat-crewai` agent runtime. It is for the security officer and the workstation and network owners. Each section says what runs where, who approves it, and how to remove it.
 
@@ -202,7 +202,7 @@ An incoming webhook is an address and an API key an owner gives an outside progr
 - Any account can publish an app, and with the code defaults (`AIMEAT_APP_DEFAULT_ACCESS=anyone`, `AIMEAT_APP_DEFAULT_LISTING=listed`, `AIMEAT_PUBLISH_GATE=off`) a new app is open to anyone and listed. There is no operator review of an app's code before it is published.
 - Asking for access to an app or a page opened to one organism is on by default for every organism, also one that is joined by invitation only. The switch is each organism owner's; there is no node-wide setting that turns it off. A request gives no access by itself: an owner or admin of the organism approves each one (`aimeat/src/services/organism-join-requests/requests.ts`).
 - App origin isolation is off by default on the local security profile and needs wildcard DNS and a wildcard certificate on a public one. With it off, apps share the node's origin.
-- `AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE` is `false` by default: a sign-in request from an app origin is logged, not refused, until the operator turns refusal on (`aimeat/.env.example`).
+- `AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE` is `false` by default, and the default stays so: a sign-in request from an app origin is logged and let through. The sign-in window the served SDK shows inside an app sends the password sign-in (`/v1/ghii/login`) from the app's own address, so turning refusal on stops password sign-in in every app. The setting is for a node that wants that trade (`aimeat/src/middleware/app-origin-sign-in.ts`, `aimeat/src/static/sdk-libs/auth/session.js`).
 - `AIMEAT_MCP_CAPABILITY_USE_APPROVAL` defaults to `operators`: a capability an operator account published over a server where each person signs in with their own account runs on the person's own sign-in there without asking. Set `ask` when every such use should be confirmed by the person.
 - `AIMEAT_EXT_INSTALL_ROLE` defaults to `owner`: every account can install server-side extension code unless the operator sets `operator`.
 - An extension's own namespace `ext:<name>` is readable by anyone without sign-in.

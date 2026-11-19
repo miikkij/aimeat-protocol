@@ -1,6 +1,6 @@
 # 10 Logging and monitoring
 
-> Checked against AIMEAT node 4.3.1 (commit 776f8fa94) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 89dc5e6bb) on 2026-11-19. Maintained with the code: see the README for how.
 
 This page is for the sysadmin and the SOC that must watch a node. It lists what the node records, where each record lives and how long it is kept, what the process log looks like and what it masks, how to get the records into a SIEM, which health and metrics endpoints exist, what to alert on, and which compliance reports the node keeps. The operator's own monitoring guide is [aimeat/docs/observability-guide.md](../../aimeat/docs/observability-guide.md); health checks are in [Production deployment](../operations/production-deployment.md#health-checks).
 
@@ -71,9 +71,9 @@ Other sources to collect from:
 | Refusal log | a file shipper tailing `AIMEAT_AUTH_LOG_PATH` | JSON lines; rotates by rename, so the shipper must follow renames |
 | Metrics | Prometheus scrape of `GET /v1/metrics` with an operator token (`AIMEAT_METRICS_ENABLED=true`) | [observability guide](../../aimeat/docs/observability-guide.md) |
 | Statistics | `GET /v1/stats` JSON | `AIMEAT_STATS_ACCESS=operator` |
-| Operator and usage trail | poll `GET /v1/admin/usage/calls` with an operator token | No push; polling interval is the export delay |
+| Operator and usage trail | poll `GET /v1/admin/usage/calls` with an operator token | The history. As they happen, operator acts go out as the `operator` kind above, and the trail as the `trail` kind when it is named |
 | Refusals | poll `GET /v1/admin/auth-refusals` | Same data as the file |
-| Lifecycle hooks | `aimeat_admin_hook_set` binds a published action's webhook to one of ten live moments: owner and agent registration (before and after), agent rekey, work request, work delivery, settlement, board post, federation peer request. `owner_recovery` is still listed, but nothing fires it | These are lifecycle moments, not security events. A `pre_` hook is a gate: if its address stops answering it refuses everything it guards (`aimeat/src/services/hooks.ts`) |
+| Lifecycle hooks | `aimeat_admin_hook_set` binds a published action's webhook to one of twelve live moments: owner and agent registration (before and after), agent rekey, work request, work delivery, settlement, board post, federation peer request, a question sent to a helper, and a question solved or expired. `owner_recovery` is still listed, but nothing fires it | These are lifecycle moments, not security events. A `pre_` hook is a gate: if its address stops answering it refuses everything it guards (`aimeat/src/services/hooks.ts`) |
 
 ## Health and metrics endpoints
 
@@ -117,7 +117,7 @@ The compliance register and records of processing are described in [Data classif
 
 ## Limits
 
-- No native syslog, OTLP or SIEM exporter. The usage trail and operator actions reach a SIEM only by polling admin routes.
+- The SIEM export keeps no queue. An event that arrives while the collector is down, or while the TCP connection to it is being made, is dropped; syslog over UDP has no delivery confirmation; the OTLP export sends at most 500 events per second from each process and drops the rest (`aimeat/src/services/node-admin/siem-export.ts`). The usage trail goes out only when `trail` is named in `AIMEAT_SIEM_EVENTS`.
 - The shipped systemd unit does not set `NODE_ENV=production`, so the process log is not JSON under it until the operator adds the variable.
 - The refusal log keeps one older generation after 5 MiB; under a long attack the oldest refusals are lost.
 - The consent audit and the classification audit wait in memory for up to one second before they are written. A stop of the node (a deploy, SIGTERM) writes them first; a process that ends without stopping (a kill, a crash) loses at most that last second. A failed database write is tried again every 60 s.
