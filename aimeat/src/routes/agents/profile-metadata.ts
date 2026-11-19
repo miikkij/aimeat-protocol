@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — PATCH /v1/agents/:name/task-start takes task_start_app_waits (setAgentTaskStartSettings).
  *   2026-11-14 — GET /v1/agents/:gaii reads the agent, its trust score (computed and stored) and its
  *     avatar through agentProfileNow (services/agent/profile-read.ts), which aimeat_agent_profile asks too (unit 2b, B4).
  *   2026-11-13 — GET /v1/agents asks services/agent/owner-roster.ts for the app refusal, the read and the
@@ -93,7 +94,7 @@ import { ownerRoster } from '../../services/agent/owner-roster.js';
 import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
-import { setAgentTaskStart, setAgentTaskStartFloor, taskStartView, scopeUseLookup } from '../../services/agent/task-start-write.js';
+import { setAgentTaskStart, setAgentTaskStartSettings, setAgentTaskStartFloor, taskStartView, scopeUseLookup } from '../../services/agent/task-start-write.js';
 import { callerOf } from '../../middleware/caller.js';
 import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../../services/agent/refusals.js';
 import { agentProfileNow } from '../../services/agent/profile-read.js';
@@ -553,9 +554,18 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // mode's answer. `agent:write` and same-owner like run-mode below, plus one fence of its own: never
   // the agent itself. The permission floor still holds every task of an agent that can spend, send
   // or delete as the owner, and the answer says so (`task_start_held_by`).
+  // `task_start_app_waits` beside it (or alone): whether a task that waits for the owner in person
+  // waits also when an app starts it; an app may switch it on and never off
+  // (services/agent/task-start-write.ts setAgentTaskStartSettings). A body without it takes the
+  // path it always took.
   router.patch('/v1/agents/:name/task-start', requireAuth(), requireScope('agent:write'), async (req, res) => {
-    const outcome = await setAgentTaskStart({ storage, config }, req.auth!.owner as string,
-      resolveIdentity(req.auth!, config.nodeId), (req.params.name as string), req.body?.task_start);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const caller = callerOf(req, config.nodeId, storage);
+    const outcome = 'task_start_app_waits' in body
+      ? await setAgentTaskStartSettings({ storage, config }, { owner: caller.owner, principal: caller.principal, isApp: caller.kind === 'app' },
+        (req.params.name as string), { taskStart: body.task_start, appWaits: body.task_start_app_waits })
+      : await setAgentTaskStart({ storage, config }, req.auth!.owner as string,
+        resolveIdentity(req.auth!, config.nodeId), (req.params.name as string), req.body?.task_start);
     if (!outcome.ok) {
       res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
       return;

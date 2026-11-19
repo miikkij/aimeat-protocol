@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 -- aimeat_agent_task_start_set forwards task_start_app_waits, and sends task_start only when given with it.
  *   2026-11-13 -- aimeat_agents_list forwards run_mode (unit 3b).
  *   2026-11-13 -- aimeat_message_history forwards direction (unit 3b).
  *   2026-11-13 -- aimeat_task_todo forwards completed_at (unit 3b).
@@ -611,12 +612,19 @@ export const agentTools: ConnectCliToolDefinition[] = [
         description: "Set whether one of the owner's agents starts its tasks on its own ('automatic') or waits for the owner's OK on each ('confirm'); null leaves it to the agent's mode. Never for yourself.",
         input: {
             target_agent_name: { type: 'string', required: true, description: 'The agent this is about.' },
-            task_start: { type: 'string', required: true, enum: ['automatic', 'confirm'], description: "'automatic', 'confirm', or null." },
+            task_start: { type: 'string', enum: ['automatic', 'confirm'], description: "'automatic', 'confirm', or null; leave it out to change only task_start_app_waits." },
+            task_start_app_waits: { type: 'boolean', description: 'true: a task that waits for the owner waits also when an app starts it; false or null: the app may start it.' },
         },
         // null is a VALUE here, as with run_mode above: read explicitly, the route decides the vocabulary.
+        // A field left out is not sent, so the route tells "leave it" from "clear it".
         handler: ({ client }, input) => client.patch(
             `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/task-start`,
-            { task_start: input.task_start === null ? null : requiredString(input, 'task_start') },
+            {
+                ...(input.task_start === undefined && input.task_start_app_waits !== undefined ? {}
+                    : { task_start: input.task_start === null ? null : requiredString(input, 'task_start') }),
+                ...(input.task_start_app_waits === undefined ? {}
+                    : { task_start_app_waits: input.task_start_app_waits === null ? null : optionalBoolean(input, 'task_start_app_waits') ?? null }),
+            },
         ),
     },
     // Stop, start and where its work goes: tool-call-defs-agent-standing.ts (max-file-lines).

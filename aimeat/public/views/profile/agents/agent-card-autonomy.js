@@ -17,6 +17,8 @@
  *   AutonomyLine({ agent, showToast }) · StoppedLine({ agent, showToast }) · WildcardLine({ agent, showToast })
  * @usage <${FactsLine} agent=${agent} /> <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
  * @version-history
+ *   v1.9.0 — 2026-11-19 — AppWaitsLine under AutonomyLine: the person makes work that waits for them
+ *     wait also when an app starts it (task_start_app_waits; feature audit 2026-11-19, item 2.1).
  *   v1.8.1 — 2026-10-28 — WildcardLine says the agent keeps all permissions until the owner narrows
  *     it, what the narrowing takes away, and that only the owner narrows (the texts are in the
  *     locales, the code is unchanged).
@@ -208,6 +210,45 @@ export function AutonomyLine({ agent, showToast }) {
       <span>${held ? f('selfStartHeld') : on ? f('selfStartOn') : f('selfStartOff')}</span>
     <//>
     <${FloorLine} agent=${agent} heldBy=${heldBy} accepted=${accepted} onSaved=${setFloor} showToast=${showToast} />
+    <${AppWaitsLine} agent=${agent} showToast=${showToast} />
+  `;
+}
+
+/**
+ * "Waits for you also when an app starts it": on is `task_start_app_waits: true` (PATCH
+ * /v1/agents/:name/task-start). An app the person let start tasks may start work that waits for them
+ * in person, and they get a notification each time; with this on, such work waits for them also then
+ * (services/task/start-op.ts). Shown with AutonomyLine, for every agent that takes tasks.
+ */
+function AppWaitsLine({ agent, showToast }) {
+  const [on, setOn] = useState(agent.task_start_app_waits === true);
+  const [saving, setSaving] = useState(false);
+  // The setting also changes from the person's AI; follow the list.
+  useEffect(() => { setOn(agent.task_start_app_waits === true); }, [agent.task_start_app_waits]);
+
+  async function toggle() {
+    if (saving) return;
+    const next = !on;
+    setSaving(true);
+    setOn(next);
+    try {
+      await apiPatch(`/v1/agents/${encodeURIComponent(agent.name)}/task-start`, { task_start_app_waits: next });
+      showToast?.(next ? f('appWaitsOnSaved') : f('appWaitsOffSaved'), 'success');
+    } catch (err) {
+      // Put it back: a switch that disagrees with the node is worse than the failed write.
+      setOn(!next);
+      swallowed('agent-card: app start waits', err);
+      showToast?.(f('selfStartFailed'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return html`
+    <${CardLine} label=${html`<${HelpLabel} term="agent.app_start_waits" label=${f('appWaits')}>${f('appWaits')}<//>`}>
+      <${Switch} on=${on} onToggle=${toggle} label=${on ? f('yes') : f('no')} ariaLabel=${f('appWaits')} />
+      <span>${on ? f('appWaitsOn') : f('appWaitsOff')}</span>
+    <//>
   `;
 }
 

@@ -13,6 +13,8 @@
  *     task fan-out service no longer imports a route file (structure programme 2026-11, unit 4).
  *   2026-11-13 — refuseTaskAccess(): the 404 and 403 a taskToActOn refusal answers with
  *     (services/agent/task-access.ts; structure programme 2026-11, unit 2b).
+ *   2026-11-19 — startCallerOf() carries the app grant's id, so an app's start can name the app to
+ *     the owner (services/task/app-start-notice.ts).
  */
 
 import type { Response } from 'express';
@@ -31,12 +33,13 @@ export type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
  * `resolve`), so an agent compares as its GAII and never as its owner's bare name.
  */
 export function startCallerOf(
-  auth: { roles: string[]; scopes?: string[]; federated?: boolean },
+  auth: { roles: string[]; scopes?: string[]; federated?: boolean; app_grant?: string },
   principal: string,
 ): StartCaller {
   return {
     ownerInPerson: isOwnerInPerson(auth),
     app: auth.roles.includes('app'),
+    appGrant: auth.app_grant ?? null,
     principal,
     scopes: heldScopes(auth),
   };

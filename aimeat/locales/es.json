@@ -7395,7 +7395,7 @@
       },
       "task": {
         "read": "Ver las tareas de tus agentes, sus ejecuciones y sus resultados.",
-        "write": "Crear e iniciar tareas para tus propios agentes."
+        "write": "Crear e iniciar tareas para tus propios agentes. También puede iniciar una tarea que de otro modo te esperaría, y recibes una notificación cada vez que lo hace."
       },
       "catalogue": {
         "read": "Leer el catálogo público."
@@ -12939,6 +12939,12 @@
   "notiftext.task_waiting.open": "Abrir",
   "notiftext.task_waiting_held.title": "{agent} espera tu permiso: {title}",
   "notiftext.task_waiting_held.body": "El plan tiene {steps} pasos. Solo tú puedes empezar esta tarea, porque el agente puede gastar dinero, enviar correo o borrar cosas en tu nombre, o su plan dice que lo hará.",
+  "notiftext.task_started_by_app.title": "{app} inició una tarea que te esperaba: {title}",
+  "notiftext.task_started_by_app.body": "La tarea de {agent} esperaba tu permiso, porque el agente puede gastar dinero, enviar correo o borrar cosas en tu nombre, o su plan dice que lo hará. {app} pudo iniciarla porque le permitiste iniciar tareas de tus agentes. En la tarjeta del agente puedes hacer que esas tareas te esperen también cuando las inicie una aplicación.",
+  "notiftext.task_started_by_app.open": "Abrir",
+  "notiftext.task_started_by_app.settings": "Ajustes del agente",
+  "notiftext.task_restarted_by_app.title": "{app} volvió a iniciar una tarea: {title}",
+  "notiftext.task_restarted_by_app.body": "La tarea de {agent} estaba en pausa o atascada, y solo tú podías volver a iniciarla. {app} pudo iniciarla porque le permitiste iniciar tareas de tus agentes. En la tarjeta del agente puedes hacer que esas tareas te esperen también cuando las inicie una aplicación.",
   "notiftext.basic_agents_start_on.title": "Tus agentes básicos ahora empiezan sus tareas por sí solos",
   "notiftext.basic_agents_start_on.body": "{agents} ahora empiezan una tarea en cuanto llega: cada uno propone su plan y sigue, y tú ves lo que hizo. Una tarea que gasta dinero, envía correo en tu nombre o elimina algo para siempre sigue esperando tu permiso. Para cambiarlo, abre el agente en la página Agentes y usa el interruptor \"Empieza el trabajo por sí solo\".",
   "notiftext.basic_agents_start_on.open": "Abrir Agentes",
@@ -22772,6 +22778,11 @@
         "floorWithdraw": "Retirar",
         "floorAcceptedSaved": "Ahora empieza el trabajo sin tu permiso.",
         "floorWithdrawnSaved": "Su trabajo vuelve a esperar tu permiso.",
+        "appWaits": "Te espera también si lo inicia una aplicación",
+        "appWaitsOn": "El trabajo que espera tu permiso sigue esperando cuando una aplicación lo inicia. Solo tú puedes iniciarlo.",
+        "appWaitsOff": "Una aplicación a la que le permitiste iniciar tareas puede iniciar el trabajo que espera tu permiso. Recibes una notificación cada vez.",
+        "appWaitsOnSaved": "Ahora su trabajo te espera también cuando lo inicia una aplicación.",
+        "appWaitsOffSaved": "Una aplicación a la que le permitiste iniciar tareas ahora puede iniciar su trabajo. Recibes una notificación cada vez.",
         "takesWork": "Recibe trabajo nuevo",
         "takesWorkOn": "Trabaja como siempre.",
         "takesWorkOff": "Detenido. Las tareas y los mensajes esperan hasta que actives esto.",
@@ -29543,12 +29554,21 @@
       "self_start": {
         "title": "Empieza el trabajo por sí solo",
         "short": "Activado: el trabajo que recibe el agente empieza de inmediato. Desactivado: el trabajo espera hasta que lo inicies.",
-        "what": "El trabajo llega al agente en forma de tareas: de ti, de una programación o de otro agente. Con el interruptor activado, el agente empieza cada tarea de inmediato, y después ves lo que hizo. Con el interruptor desactivado, cada tarea espera en la cola hasta que presionas Empezar o le pides a tu IA que la inicie. Un agente que puede gastar dinero, enviar correo o borrar cosas en tu nombre siempre espera tu permiso, y el interruptor no se activa, salvo que tú, con tu propia sesión, le dejes empezar igualmente con esos permisos (\"Dejar que empiece igualmente\" en la tarjeta). El agente no puede cambiar este ajuste por sí mismo.",
+        "what": "El trabajo llega al agente en forma de tareas: de ti, de una programación o de otro agente. Con el interruptor activado, el agente empieza cada tarea de inmediato, y después ves lo que hizo. Con el interruptor desactivado, cada tarea espera en la cola hasta que presionas Empezar o le pides a tu IA que la inicie. Un agente que puede gastar dinero, enviar correo o borrar cosas en tu nombre siempre espera tu permiso, y el interruptor no se activa, salvo que tú, con tu propia sesión, le dejes empezar igualmente con esos permisos (\"Dejar que empiece igualmente\" en la tarjeta). Una aplicación a la que le permitiste iniciar tareas aún puede iniciar una tarea así, y recibes una notificación cada vez; \"Te espera también si lo inicia una aplicación\" en la tarjeta lo impide. El agente no puede cambiar este ajuste por sí mismo.",
         "range": "Activado o desactivado. Si nadie lo ha fijado, un agente hecho para ejecutar tareas empieza por sí solo, y los demás agentes esperan.",
         "ex1": "Activado: un agente que escribe cada mañana un resumen de noticias según una programación. Nadie tiene que estar despierto para iniciarlo.",
         "ex2": "Desactivado: un agente nuevo que aún no conoces bien. Lees su plan y presionas Empezar.",
         "ex3": "Siempre desactivado: un agente que puede pagar facturas. Cada pago espera tu permiso, y el interruptor no se activa.",
         "tip": "Empieza con el interruptor desactivado, y actívalo cuando el agente haya hecho bien el mismo tipo de trabajo unas cuantas veces. Una tarea puede llevar su propia indicación, como \"consúltame primero\", y esa indicación va antes que este interruptor."
+      },
+      "app_start_waits": {
+        "title": "Te espera también si lo inicia una aplicación",
+        "short": "Activado: una tarea que espera tu permiso también espera cuando la inicia una aplicación. Desactivado: la aplicación puede iniciarla, y recibes una notificación.",
+        "what": "Algunas tareas esperan a que tú, con tu propia sesión, las inicies: la tarea de un agente que puede gastar dinero, enviar correo o borrar cosas en tu nombre, una tarea cuyo plan dice que hará algo de eso, y una tarea en pausa o atascada. Tu IA y tus otros agentes no pueden iniciar una tarea así. Una aplicación a la que le permitiste iniciar tareas de tus agentes sí puede, para que haga el trabajo para el que la usas. Cada vez que lo hace, recibes una notificación que dice qué aplicación inició qué tarea y por qué la tarea esperaba, y el inicio aparece en tu Registro de actividad con el nombre de la aplicación. Con el interruptor activado, una tarea así te espera también cuando la inicia una aplicación, y la aplicación recibe un rechazo. El agente no puede cambiar este ajuste por sí mismo, y una aplicación puede activarlo pero nunca desactivarlo.",
+        "range": "Activado o desactivado. Desactivado si nadie lo ha fijado: una aplicación a la que le permitiste iniciar tareas puede iniciar la tarea.",
+        "ex1": "Desactivado: una aplicación que ejecuta tu agente de compras según el horario que fijaste en la aplicación. Lees la notificación después.",
+        "ex2": "Activado: un agente que paga facturas. Cada pago espera a que tú presiones Empezar, sin importar qué aplicación lo pida.",
+        "tip": "Actívalo para un agente cuyo trabajo quieres ver antes de que empiece, sin importar quién lo inicie. Las aplicaciones a las que les permitiste iniciar tareas aparecen en la página Acceso y seguridad, y ahí puedes retirarles ese permiso."
       },
       "stopped": {
         "title": "Recibe trabajo nuevo",

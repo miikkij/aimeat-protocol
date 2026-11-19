@@ -13628,6 +13628,13 @@ paths:
         send mail or a message as the owner, or delete as the owner always waits; the answer names
         those permissions in `task_start_held_by`.
 
+        **An app's start.** An app the owner granted `task:write` may start a task that waits for the
+        owner in person (the floor, a plan's declared effect, a paused or stalled task), and the
+        owner gets a trail entry (`task.started_by_app`) and a notification each time.
+        `task_start_app_waits: true` makes such a task wait for the owner also when an app starts
+        it; `false` or `null` goes back to letting the app start it. An app may switch it on, never
+        off. Send `task_start`, `task_start_app_waits` or both; a body with neither is refused.
+
         `agent:write` and same-owner, like `run-mode`, and never the agent itself.
         Also `aimeat_agent_task_start_set`.
       tags: [Identity]
@@ -13645,12 +13652,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [task_start]
               properties:
                 task_start:
                   type: string
                   nullable: true
                   enum: [automatic, confirm, null]
+                task_start_app_waits:
+                  type: boolean
+                  nullable: true
+                  description: true makes a task that waits for the owner in person wait also when an app starts it.
       responses:
         '200':
           description: The setting, what applies, and the permissions that hold every task
@@ -13670,8 +13680,9 @@ paths:
                           task_start_effective: { type: string, enum: [automatic, confirm] }
                           task_start_held_by: { type: array, items: { type: string } }
                           task_start_floor_accepted: { type: array, items: { type: string } }
+                          task_start_app_waits: { type: boolean }
         '400':
-          description: task_start is not one of the two values or null
+          description: Neither field was sent, task_start is not one of the two values or null, or task_start_app_waits is not true, false or null
         '403':
           description: Not your agent, or the agent itself asked
         '404':
@@ -13733,6 +13744,7 @@ paths:
                           task_start_effective: { type: string, enum: [automatic, confirm] }
                           task_start_held_by: { type: array, items: { type: string } }
                           task_start_floor_accepted: { type: array, items: { type: string } }
+                          task_start_app_waits: { type: boolean }
         '400':
           description: task_start_floor is missing, not a list, or names a permission outside the seven
         '403':
@@ -14729,6 +14741,9 @@ paths:
                                       type: array
                                       items: { type: string }
                                       description: The permissions of that kind the owner in person let this agent start work with (PATCH .../task-start-floor). They no longer hold its tasks.
+                                    task_start_app_waits:
+                                      type: boolean
+                                      description: True when a task that waits for the owner in person waits also when an app the owner granted task:write starts it (PATCH .../task-start). False lets the app start it, and the owner is told each time.
                                     stopped:
                                       type: boolean
                                       description: True while the owner has stopped the agent (POST .../stop). It starts no new work; what it is given waits until POST .../start.
@@ -25911,7 +25926,9 @@ paths:
         Every action on the caller's account, newest first, from the usage stream: each MCP tool call and
         each authenticated REST change, with at, actor, actorName, actorKind (person, ai, agent, app,
         operator), action (an English phrase), code (the tool or METHOD and route), target, readOnly,
-        outcome, and event (agent.approved, agent.ran, app.published) on the entries that carry one.
+        outcome, and event (agent.approved, agent.ran, app.published, task.started_by_app) on the entries
+        that carry one. task.started_by_app is an app's start of a task that waited for the owner in
+        person, and its entry carries `detail`: which app, which task, and why it waited.
         `next` is the `before` of the following page. The owner, or the owner's agent with `memory:read`.
         MCP: aimeat_trail_list.
       security:

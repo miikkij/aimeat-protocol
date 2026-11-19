@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-11-19 — AgentRecord.taskStartAppWaits: the owner makes an app's start of a task
+ *     that waits for them wait as any other caller's does (migration 0133).
  *   v1.14.0 — 2026-10-25 — AgentRecord.credentialsValidAfter: a key rotation ends every credential issued
  *     before it (migration 0117; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.13.0 — 2026-10-23 — AgentRuntimeSource.llm takes 'local': the model runs on the crew's own
@@ -315,6 +317,19 @@ export interface AgentRecord {
    * absent = none accepted, which is every agent until its owner says otherwise.
    */
   taskStartFloor?: string[] | null;
+  /**
+   * WAIT FOR THE OWNER ALSO WHEN AN APP STARTS A TASK (migration 0133).
+   *
+   * A same-owner app holding `task:write` may start a task that otherwise waits for the owner in
+   * person: one the permission floor or a declared effect holds, or a paused or stalled one
+   * (services/task/start-op.ts). The owner is told each time. With this true, the app's start is
+   * decided as any other caller's is, so such a task waits for the owner in person. Null or absent =
+   * the app may start it, which is every agent until its owner says otherwise.
+   *
+   * Set by the owner, or by a same-owner agent holding `agent:write`, never by the agent itself, and
+   * never switched off by an app (services/agent/task-start-write.ts).
+   */
+  taskStartAppWaits?: boolean | null;
   /**
    * ISO time. An agent credential issued before it is refused on every request (auth/agent-alive.ts),
    * whatever kind it is; POST /v1/agents/:gaii/rekey sets it. Absent = the agent's key was never

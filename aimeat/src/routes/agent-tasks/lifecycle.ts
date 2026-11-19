@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — POST .../start marks the request recorded when the service wrote its own
+ *     task.started_by_app trail entry (services/task/app-start-notice.ts).
  *   2026-11-13 — propose-todos reads its task through services/agent/task-access.ts taskToActOn, the
  *     read and the gate aimeat_task_propose_todos calls (structure programme 2026-11, unit 2b).
  *   2026-11-12 — DELETE /v1/agents/:name/tasks/:id runs services/agents/remove-task.ts, which also admits
@@ -326,6 +328,9 @@ export function registerTaskLifecycleRoutes(
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
+    // The service wrote this start's own trail entry (task.started_by_app); the middleware's line
+    // for the same request would only repeat it.
+    if (out.appStartNoted) res.locals.trailRecorded = true;
     res.json(success(config.nodeId, { task: out.task }));
   });
 

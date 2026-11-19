@@ -9,11 +9,13 @@
  *   NEVER THE AGENT ITSELF. `agent:write` is the word that changes a sibling's mode, run mode and
  *   tags, and this follows it, with one addition: an agent may not set its own. A setting the party
  *   it constrains can loosen is not a setting.
- * @structure setAgentTaskStart() · setAgentTaskStartFloor() · taskStartView() · scopeUseLookup()
+ * @structure setAgentTaskStart() · setAgentTaskStartSettings() · setAgentTaskStartFloor() · taskStartView() · scopeUseLookup()
  * @usage
  *   const out = await setAgentTaskStart({ storage, config }, req.auth!.owner, resolve(req), name, req.body?.task_start);
  *   res.json(success(nodeId, { name: out.agent.name, ...taskStartView(out.agent) }));
  * @version-history
+ *   v1.4.0 — 2026-11-19 — setAgentTaskStartSettings() and `task_start_app_waits` in the view: the owner
+ *     makes a task that waits for them wait also when an app starts it (feature audit 2026-11-19, 2.1).
  *   v1.3.1 — 2026-10-28 — task_start_wildcard describes the narrowing the owner may apply, never one
  *     the node makes: the node no longer narrows an agent holding `*` by itself (Jouni 2026-10-28).
  *   v1.3.0 — 2026-10-23 — setAgentTaskStartFloor (owner in person only) and `task_start_floor_accepted`
@@ -27,7 +29,7 @@
 import type { AgentRecord } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
 import { resolveAgentTarget, type AgentWriteDeps, type AgentWriteOutcome } from './profile-write.js';
-import { agentStartDefault, floorScopesOf, acceptedFloorOf, TASK_START_FLOOR } from './task-rules.js';
+import { agentStartDefault, floorScopesOf, acceptedFloorOf, appStartWaits, TASK_START_FLOOR } from './task-rules.js';
 import { readScopeUse, wildcardStatus, flushScopeUse, type AgentScopeUse, type ScopeUseRecord } from '../scope/use.js';
 import type { Storage } from '../../storage/interface.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
@@ -47,15 +49,18 @@ import { ownerGhiiOf } from '../../utils/gaii.js';
  *                       node never applies it. Null for every other agent.
  *   task_start_floor_accepted the floor permissions the owner in person accepted for this agent and it
  *                       holds: they no longer hold its tasks (agent-task-rules.ts acceptedFloorOf).
+ *   task_start_app_waits true when a task that waits for the owner in person waits also when an app
+ *                       starts it (task-rules.ts appStartWaits); false lets the app start it.
  */
 export function taskStartView(
-    agent: Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes' | 'taskStartFloor'>>,
+    agent: Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes' | 'taskStartFloor' | 'taskStartAppWaits'>>,
     use?: AgentScopeUse,
 ): {
     task_start: 'automatic' | 'confirm' | null;
     task_start_effective: 'automatic' | 'confirm';
     task_start_held_by: string[];
     task_start_floor_accepted: string[];
+    task_start_app_waits: boolean;
     task_start_wildcard: { ready: boolean; days_left: number; since: string | null; used: string[]; proposal: string[] } | null;
 } {
     const w = wildcardStatus(agent, use);
@@ -64,6 +69,7 @@ export function taskStartView(
         task_start_effective: agentStartDefault(agent),
         task_start_held_by: floorScopesOf(agent),
         task_start_floor_accepted: acceptedFloorOf(agent),
+        task_start_app_waits: appStartWaits(agent),
         task_start_wildcard: w.holds ? { ready: w.ready, days_left: w.daysLeft, since: w.since, used: w.used, proposal: w.proposal } : null,
     };
 }
@@ -108,6 +114,52 @@ export async function setAgentTaskStart(
         return { ok: false, code: 'INVALID_INPUT', message: "task_start must be 'automatic', 'confirm', or null to leave it to the agent's mode" };
     }
     const updated = await deps.storage.updateAgent(gaii, { taskStart: clearing ? null : raw });
+    if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
+    emitChange('agents');
+    return { ok: true, agent: updated };
+}
+
+/**
+ * Set how `identifier`'s tasks start, both answers at once: `taskStart` as setAgentTaskStart reads
+ * it, and `appWaits` (`taskStartAppWaits`): true makes a task that waits for the owner in person
+ * wait also when an app starts it, false or null lets the app start it again. `undefined` leaves a
+ * field as it is; both undefined is refused. Every value is checked before anything is written.
+ *
+ * The same callers as setAgentTaskStart, with one fence of its own: an app (`callerIsApp`) may
+ * switch appWaits on and never off. The setting constrains the app, and a setting the party it
+ * constrains can loosen is not a setting.
+ */
+export async function setAgentTaskStartSettings(
+    deps: AgentWriteDeps,
+    caller: { owner: string; principal: string; isApp: boolean },
+    identifier: string,
+    input: { taskStart?: unknown; appWaits?: unknown },
+): Promise<AgentWriteOutcome> {
+    if (input.taskStart === undefined && input.appWaits === undefined) {
+        return { ok: false, code: 'INVALID_INPUT', message: 'Send task_start, task_start_app_waits, or both.' };
+    }
+    if (input.taskStart !== undefined && input.taskStart !== null && input.taskStart !== 'automatic' && input.taskStart !== 'confirm') {
+        return { ok: false, code: 'INVALID_INPUT', message: "task_start must be 'automatic', 'confirm', or null to leave it to the agent's mode" };
+    }
+    if (input.appWaits !== undefined && input.appWaits !== null && typeof input.appWaits !== 'boolean') {
+        return { ok: false, code: 'INVALID_INPUT', message: 'task_start_app_waits must be true, false or null' };
+    }
+    const gaii = resolveAgentTarget(deps.config, caller.owner, identifier);
+    const agent = await deps.storage.getAgent(gaii);
+    if (!agent) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
+    if (agent.owner !== caller.owner) {
+        return { ok: false, code: 'ACCESS_DENIED', message: 'You can only set how the tasks of your own agents start' };
+    }
+    if (caller.principal === gaii) {
+        return { ok: false, code: 'ACCESS_DENIED', message: 'An agent cannot change how its own tasks start. Ask the owner, or another of their agents with agent:write.' };
+    }
+    if (caller.isApp && input.appWaits !== undefined && input.appWaits !== true) {
+        return { ok: false, code: 'ACCESS_DENIED', message: 'An app cannot let itself start tasks that wait for the owner. Ask the owner to change it on the agent card.' };
+    }
+    const updates: Partial<AgentRecord> = {};
+    if (input.taskStart !== undefined) updates.taskStart = input.taskStart as AgentRecord['taskStart'];
+    if (input.appWaits !== undefined) updates.taskStartAppWaits = input.appWaits === true ? true : null;
+    const updated = await deps.storage.updateAgent(gaii, updates);
     if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
     emitChange('agents');
     return { ok: true, agent: updated };

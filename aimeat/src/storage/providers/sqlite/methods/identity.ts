@@ -10,6 +10,7 @@
  * @version-history
  *   2026-11-08 — deleteOwner keeps the person's schema locks in force under the erasure's pseudonym
  *     (repos/schema-lock-erasure.ts; secaudit2026nov08 round 14).
+ *   v1.11.0 — 2026-11-19 — taskStartAppWaits on create, update and read, 1 or NULL (migration 0133).
  *   v1.10.0 — 2026-11-02 — listOperatorNames: the active operator accounts' names, one filtered query with a limit.
  *   v1.9.0 — 2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
  *   v1.8.0 — 2026-10-25 — credentialsValidAfter on update and read (migration 0117; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
@@ -284,8 +285,8 @@ export const identityMethods = {
       this.db.prepare(
         `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
          webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl, registeredBy,
-         runMode, runtimeSource, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen, taskStart, stoppedAt, stoppedBy, clearance, taskStartFloor)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         runMode, runtimeSource, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen, taskStart, stoppedAt, stoppedBy, clearance, taskStartFloor, taskStartAppWaits)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -318,6 +319,7 @@ export const identityMethods = {
         agent.stoppedBy ?? null,
         agent.clearance ?? null,
         agent.taskStartFloor?.length ? JSON.stringify(agent.taskStartFloor) : null,
+        agent.taskStartAppWaits ? 1 : null,
       );
       return agent;
     } catch (err: unknown) {
@@ -373,7 +375,7 @@ export const identityMethods = {
        dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?, registeredBy = ?,
        runMode = ?, runtimeSource = ?, identityVersion = ?, cardJws = ?, cardIssuedAt = ?, enrolledAt = ?,
        mcpClient = ?, mcpLastSeen = ?, taskStart = ?, stoppedAt = ?, stoppedBy = ?, clearance = ?, taskStartFloor = ?,
-       credentialsValidAfter = ?
+       credentialsValidAfter = ?, taskStartAppWaits = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -420,6 +422,7 @@ export const identityMethods = {
       updated.clearance ?? null,
       updated.taskStartFloor?.length ? JSON.stringify(updated.taskStartFloor) : null,
       updated.credentialsValidAfter ?? null,
+      updated.taskStartAppWaits ? 1 : null,
       gaii,
     );
     return updated;
@@ -522,6 +525,7 @@ export const identityMethods = {
     const floor = floorListOf(row.taskStartFloor);
     if (floor) record.taskStartFloor = floor;
     if (row.credentialsValidAfter) record.credentialsValidAfter = row.credentialsValidAfter as string;
+    if (row.taskStartAppWaits === 1) record.taskStartAppWaits = true;
     return record;
   },
 

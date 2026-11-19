@@ -9,6 +9,7 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-19 — aimeat_agent_task_start_set takes task_start_app_waits (setAgentTaskStartSettings).
  *   2026-11-13 — aimeat_task_create, _propose_todos, _event, _todo, _complete, _fail and _decline read
  *     their agent or task through services/agent/task-access.ts (taskCreateTarget, taskToActOn), the
  *     read and the gate their REST routes call; aimeat_agent_scope_narrow runs
@@ -107,7 +108,7 @@ import { startWaitingTask } from '../services/task/start-op.js';
 import { removeTask } from '../services/agents/remove-task.js';
 import { removeAgent } from '../services/agents/remove-agent.js';
 import { closeMcpSessionsForGaii } from './session-registry.js';
-import { setAgentTaskStart, taskStartView } from '../services/agent/task-start-write.js';
+import { setAgentTaskStart, setAgentTaskStartSettings, taskStartView } from '../services/agent/task-start-write.js';
 import { narrowOwnAgent } from '../services/agent/narrow-own-agent.js';
 import { setAgentStopped } from '../services/agent/stop.js';
 import { stoppedView } from '../services/agent/stop-rules.js';
@@ -529,8 +530,12 @@ export function registerAgentTaskTools(
             inputSchema: zodShapeFor('aimeat_agent_task_start_set'),
             annotations: annotationsFor('aimeat_agent_task_start_set'),
         },
-        async ({ target_agent_name, task_start }) => {
-            const out = await setAgentTaskStart({ storage, config }, localAccountName(agentGaii), agentGaii, target_agent_name, task_start);
+        async ({ target_agent_name, task_start, task_start_app_waits }) => {
+            // Without task_start_app_waits, the call takes the path it always took.
+            const out = task_start_app_waits === undefined
+                ? await setAgentTaskStart({ storage, config }, localAccountName(agentGaii), agentGaii, target_agent_name, task_start)
+                : await setAgentTaskStartSettings({ storage, config }, { owner: localAccountName(agentGaii), principal: agentGaii, isApp: false },
+                    target_agent_name, { taskStart: task_start, appWaits: task_start_app_waits });
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, ...taskStartView(out.agent) }, null, 2) }] };
         },

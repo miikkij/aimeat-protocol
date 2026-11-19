@@ -9,6 +9,8 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './grant-vocabulary.js';
  * @version-history
+ *   2026-11-19 — task:write says that the app can also start a task that waits for the owner, and
+ *     that the owner is told each time.
  *   2026-11-04 — Moved unchanged from routes/ to services/: build-app-prompt.ts read it through
  *     routes/app-grants.ts, which closed a 14-file run-time import cycle, and two more services read
  *     it from routes/ (codebase analysis 2026-11-03, item D-d).
@@ -90,7 +92,9 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // tasks for agents whose owner is the app's own owner) and workflow routes already resolve to
   // the owner's memory namespace, so a granted app never reaches another owner's agents/data.
   'task:read': "See your agents' tasks, runs, and results",
-  'task:write': 'Create and start tasks for your own agents on your behalf',
+  // It also starts a task that otherwise waits for the owner in person, and the owner is told each
+  // time (services/task/app-start-notice.ts); the sentence says so (feature audit 2026-11-19, 2.1).
+  'task:write': 'Create and start tasks for your own agents on your behalf. It can also start a task that would otherwise wait for you, and you get a notification each time it does',
   'workflow:read': 'See your automations (workflows) and their runs',
   'workflow:write': 'Create, save, and run your automations (workflows)',
   // Giving an agent work: an automation step that dispatches to one of the owner's agents costs it

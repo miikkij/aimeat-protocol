@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- test/e2e-app-task-start.ts joins ALL_SUITES (feature audit 2026-11-19, item 2.1).
  *   2026-11-15 -- test/e2e-federation-peer-proofs.ts joins ALL_SUITES (audit 2026-11 M130, L056).
  *   2026-11-15 -- e2e-app-icon-upload.ts joins the list (not the guard tier): aimeat_app_manage icon_upload and the install block.
  *   2026-11-15 -- The plan moves to test/run-e2e-plan.ts (E2E report of 2026-11-15, section 4):
@@ -1700,6 +1701,9 @@ const ALL_SUITES = [
     // A task starts on its own or waits for the owner's OK: the agent's setting and the task's word,
     // the notice with a Start button, the owner's own AI starting on their word, and the floor.
     'test/e2e-task-start.ts',
+    // An app's start of a task that waited for the owner in person: the trail entry, the notice,
+    // and the agent's setting that makes such a task wait also when an app starts it.
+    'test/e2e-app-task-start.ts',
     // The owner stops an agent and starts it again: new work waits and nobody can start it, a
     // scheduled run is skipped, the runtime is not woken, and a start releases what waited.
     'test/e2e-agent-stop.ts',

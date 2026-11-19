@@ -40,6 +40,7 @@
  *   - agentStartDefault() — the agent's own answer, or the mode-derived one
  *   - decideTaskStart() — does this task start now, and if not, why
  *   - mayLoosenStart() / mayStartWaitingTask() — who may set `automatic`, who may lift a wait
+ *   - appStartWaits() — does an app's start of this agent's task wait like any other caller's
  *   - mayManageSiblingTasks() — who may read or remove the tasks of another agent of the same owner
  *   - resolveAutoActivation() — the create-time status, from decideTaskStart
  *   - autoStartEvent() / startedOnItsOwn() — the marked 'started' event of a task the node started
@@ -50,6 +51,8 @@
  *   const d = decideTaskStart(agent, { policy: task.startPolicy, todos });
  *   if (!canProposeTodos(task)) return refuse(TODO_PROPOSE_REFUSAL(task.status));
  * @version-history
+ *   v2.7.0 — 2026-11-19 — appStartWaits() and StartCaller.appGrant: the owner may make an app's start
+ *     of a task that waits for them wait as any other caller's does (feature audit 2026-11-19, 2.1).
  *   v2.6.0 — 2026-11-12 — mayManageSiblingTasks(): another agent of the same owner reads or removes
  *     an agent's tasks with the task word and agent:write (services/agents/remove-task.ts,
  *     wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
@@ -222,6 +225,8 @@ export interface StartCaller {
     ownerInPerson: boolean;
     /** A same-owner app grant that already passed its own task:write check. */
     app: boolean;
+    /** The app grant's id when `app` is true, so a start can name the app to the owner. */
+    appGrant?: string | null;
     /** The caller's principal (GAII for an agent). */
     principal: string;
     /** Every scope the caller holds, already narrowed to its record. */
@@ -240,7 +245,17 @@ export function mayLoosenStart(caller: StartCaller, targetGaii: string): boolean
 }
 
 /**
- * May this caller start a task that waits? The owner in person and their app: always. Another of
+ * Does the owner want an app's start of this agent's tasks decided as any other caller's is
+ * (`taskStartAppWaits`)? Then a task that waits for the owner in person waits also when an app
+ * starts it (services/task/start-op.ts). False for every agent whose owner has not said.
+ */
+export function appStartWaits(agent: Partial<Pick<AgentRecord, 'taskStartAppWaits'>> | null | undefined): boolean {
+    return agent?.taskStartAppWaits === true;
+}
+
+/**
+ * May this caller start a task that waits? The owner in person and their app: always (an app
+ * unless the agent's owner set appStartWaits; start-op.ts then asks this with `app: false`). Another of
  * the owner's agents holding task:write (the person's own chat AI, acting on their word): only a
  * task that waits because of the setting. Never the task's own agent, and never a task the floor
  * or a declared effect holds; those wait for the owner in person.

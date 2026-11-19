@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-11-19 -- manage-my-agents: an app's start of a waiting task, and task_start_app_waits on
+ *     aimeat_agent_task_start_set.
  *   2026-11-15 -- node-operations: a dispute that waits for a ruling, with aimeat_admin_disputes and
  *     aimeat_admin_dispute_rule.
  *   2026-11-15 -- node-operations: aimeat_admin_teams, every team as counts only (team setup T16).
@@ -291,6 +293,10 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
   owner's OK. Say that in those words before you set it. An agent that can spend money, send mail
   or delete things in the owner's name always waits, whatever this says. When a task waits and the
   owner says "go ahead", start it with \`aimeat_task_start\`.
+- **An app the owner let start tasks** (\`task:write\`) can start such a waiting task, and the owner
+  gets a notification each time. When the owner says "don't let apps start its tasks", call
+  \`aimeat_agent_task_start_set\` with \`task_start_app_waits: true\`; \`false\` lets the app start it
+  again. You may turn it on or off on the owner's word; the agent itself may not.
 - **Stop an agent** with \`aimeat_agent_stop\` when the owner says so ("stop the news agent",
   "pause it while I am away"), and bring it back with \`aimeat_agent_start\`. Tell them what a stop
   does in these words: the work it is doing finishes, its scheduled runs are skipped, and the tasks

@@ -85,6 +85,8 @@ export interface Agent {
   clearance: string | null;
   /** JSON list of the floor permissions the owner in person lets the agent start work with; null = none (migration 0115). */
   taskStartFloor: string | null;
+  /** TRUE: an app's start of this agent's task waits for the owner like any other caller's; null = the app may start it (migration 0133). */
+  taskStartAppWaits: boolean | null;
   /** ISO text: an agent credential issued before it is refused; a key rotation sets it (migration 0117). */
   credentialsValidAfter: string | null;
   /** What code backs this agent, as its runtime reports it (AgentRuntimeSource). */

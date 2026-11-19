@@ -10,6 +10,7 @@
  * @structure applyAgentRuntimeColumns(safeAddColumn)
  * @usage applyAgentRuntimeColumns(safeAddColumn) from sqlite/schema.ts initializeSchema.
  * @version-history
+ *   v1.5.0 — 2026-11-19 — agents.taskStartAppWaits (migration 0133).
  *   v1.4.0 — 2026-10-25 — agents.credentialsValidAfter (migration 0117; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.3.0 — 2026-10-23 — agents.taskStartFloor (migration 0115).
  *   v1.2.0 — 2026-10-22 — ecosystem_apps.capabilityApprovals, the outside-app principal's twin of an
@@ -74,6 +75,8 @@ export function applyAgentRuntimeColumns(safeAddColumn: SafeAddColumn): void {
   safeAddColumn('agents', 'clearance', 'TEXT');
   // The floor permissions the owner in person lets the agent start work with; JSON list or NULL (migration 0115).
   safeAddColumn('agents', 'taskStartFloor', 'TEXT');
+  // 1: an app's start of the agent's task waits for the owner like any other caller's; NULL or 0: the app may start it (migration 0133).
+  safeAddColumn('agents', 'taskStartAppWaits', 'INTEGER');
   // An agent credential issued before this instant is refused; a key rotation stamps it (migration 0117).
   safeAddColumn('agents', 'credentialsValidAfter', 'TEXT');
 

@@ -7,6 +7,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-11-19 — taskStartAppWaits on create, update and read, TRUE or NULL (migration 0133).
  *   2026-11-02 — listOperatorNames: the active operator accounts' names, one filtered query with a limit.
  *   2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
  *   2026-10-25 — credentialsValidAfter on read (migration 0117); updateAgent passes it through
@@ -96,6 +97,7 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     ...(r.clearance ? { clearance: r.clearance } : {}),
     ...(floorListOf(r.taskStartFloor) ? { taskStartFloor: floorListOf(r.taskStartFloor) } : {}),
     ...(r.credentialsValidAfter ? { credentialsValidAfter: r.credentialsValidAfter } : {}),
+    ...(r.taskStartAppWaits === true ? { taskStartAppWaits: true } : {}),
     scheduleConstraintDefaults: (r.scheduleConstraintDefaults ?? undefined) as AgentRecord['scheduleConstraintDefaults'],
     createdAt: iso(r.createdAt), lastSeen: iso(r.lastSeen),
   };
@@ -213,6 +215,7 @@ export const identityMethods = {
       mcpClient: a.mcpClient ?? null, mcpLastSeen: a.mcpLastSeen ?? null, taskStart: a.taskStart ?? null,
       stoppedAt: a.stoppedAt ?? null, stoppedBy: a.stoppedBy ?? null, clearance: a.clearance ?? null,
       taskStartFloor: a.taskStartFloor?.length ? JSON.stringify(a.taskStartFloor) : null,
+      taskStartAppWaits: a.taskStartAppWaits ? true : null,
       tags: a.tags ?? [], createdAt: new Date(a.createdAt), lastSeen: new Date(a.lastSeen),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();
@@ -253,6 +256,8 @@ export const identityMethods = {
       if (jsonCols.has(k)) data[k] = jsonb((v ?? null) as Parameters<typeof jsonb>[0]);
       // A TEXT column holding a JSON list: pg would write a JS array as its own array literal.
       else if (k === 'taskStartFloor') data[k] = Array.isArray(v) && v.length ? JSON.stringify(v) : null;
+      // Stored as TRUE or NULL, as SQLite stores 1 or NULL: false and "nobody has said" read the same.
+      else if (k === 'taskStartAppWaits') data[k] = v === true ? true : null;
       else if (dateCols.has(k)) data[k] = v == null ? null : new Date(v as string);
       else data[k] = v;
     }

@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-19 — aimeat_agent_task_start_set takes task_start_app_waits, and task_start may be left
+ *     out to change only that (feature audit 2026-11-19, item 2.1).
  *   2026-11-14 — aimeat_task_event takes revision_requested, as POST …/tasks/:id/event does
  *     (AgentTaskEventSchema); both read the task through taskToActOn at the standard readiness level.
  *   2026-11-13 — aimeat_memory_list takes archived (unit 3b).
@@ -415,7 +417,7 @@ export const schedulesTasksMemoryTools = [
     },
     {
         name: 'aimeat_agent_task_start_set',
-        description: "Set whether one of the owner's agents starts its tasks on its own ('automatic': it proposes its plan and goes on, and the owner sees what was done) or waits for the owner's OK on each ('confirm'). Use it when the person says so (\"let the concierge start its tasks by itself\"). null leaves it to the agent's mode again. Never for yourself. An agent that can spend money, send mail as the owner or delete as the owner always waits whatever this says; the answer's task_start_held_by names those permissions.",
+        description: "Set whether one of the owner's agents starts its tasks on its own ('automatic': it proposes its plan and goes on, and the owner sees what was done) or waits for the owner's OK on each ('confirm'). Use it when the person says so (\"let the concierge start its tasks by itself\"). null leaves it to the agent's mode again. Never for yourself. An agent that can spend money, send mail as the owner or delete as the owner always waits whatever this says; the answer's task_start_held_by names those permissions. An app the person let start tasks may still start such a waiting task, and the person is told each time; task_start_app_waits true makes it wait for the person also then (\"don't let apps start the buyer's tasks\"), false lets the app start it again. Send task_start, task_start_app_waits or both.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Set How an Agent\'s Tasks Start', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -424,7 +426,8 @@ export const schedulesTasksMemoryTools = [
         surfaces: ['agent'],
         input: {
             target_agent_name: { type: 'string', required: true, description: 'The agent this is about (same owner as you, never yourself).' },
-            task_start: { type: 'string', required: true, enum: ['automatic', 'confirm'], description: "'automatic' or 'confirm'; null = leave it to the agent's mode.", zod: z.enum(['automatic', 'confirm']).nullable() },
+            task_start: { type: 'string', enum: ['automatic', 'confirm'], description: "'automatic' or 'confirm'; null = leave it to the agent's mode. Leave it out to change only task_start_app_waits.", zod: z.enum(['automatic', 'confirm']).nullable().optional() },
+            task_start_app_waits: { type: 'boolean', description: 'true: a task that waits for the owner in person waits also when an app starts it. false or null: the app may start it, and the owner is told each time.', zod: z.boolean().nullable().optional() },
         },
     },
     {

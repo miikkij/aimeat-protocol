@@ -18,10 +18,15 @@
  *   when the owner makes an agent, approves one their AI proposed, or approves an agent's device
  *   authorization (routes/agents/device-auth.ts records those two itself),
  *   agent.ran on an agent's successful call (the place's own chat agent excluded: it is not an agent the
- *   person made), and app.published when an app is published by any route or tool.
+ *   person made), and app.published when an app is published by any route or tool. A fourth is for
+ *   the owner rather than the fleet: task.started_by_app, when an app the owner granted task:write
+ *   starts a task that otherwise waits for the owner in person (services/task/app-start-notice.ts),
+ *   with a `detail` sentence naming the app, the task and why it waited.
  * @structure TrailEntry · TRAIL_EVENTS · recordTrailEvent · trailEntryOf · TrailError · readOwnTrail · readTrail
  * @usage const { entries, next } = await readTrail(storage, { ownerGhii, since, before, limit });
  * @version-history
+ *   v1.1.0 — 2026-11-19 — task.started_by_app, TrailEntry.detail, and recordTrailEvent for an app
+ *     grant (appId, and the app's name as the entry's actorName) (feature audit 2026-11-19, item 2.1).
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi", part C; Jouni, 1.11 16.22).
  */
 import type { Storage, UsageCallRecord, UsageCallFilter } from '../storage/interface.js';
@@ -45,14 +50,16 @@ export interface TrailEntry {
   code: string;
   /** What it was done to, when the call named it: a key, a filename, an id. Empty otherwise. */
   target: string;
-  /** agent.approved, agent.ran or app.published; absent on every other entry. */
+  /** agent.approved, agent.ran, app.published or task.started_by_app; absent on every other entry. */
   event?: string;
+  /** A sentence that says what happened, on an entry a route wrote itself with one; absent otherwise. */
+  detail?: string;
   /** True for a call that only read. */
   readOnly: boolean;
   outcome: 'ok' | 'error';
 }
 
-export const TRAIL_EVENTS = ['agent.approved', 'agent.ran', 'app.published'] as const;
+export const TRAIL_EVENTS = ['agent.approved', 'agent.ran', 'app.published', 'task.started_by_app'] as const;
 
 /** The codes that publish an app, whichever door: the MCP tools and the REST routes behind them. */
 const APP_PUBLISH_CODES = new Set([
@@ -85,15 +92,28 @@ function toolOf(name: string): { title: string; readOnly: boolean } | undefined 
  * route whose credential arrives in the body, as the device approval's does). The caller sets
  * `res.locals.trailRecorded` so the middleware does not write the same request twice.
  */
-export function recordTrailEvent(input: { actor: string; code: string; target?: string; event?: string }): void {
+export function recordTrailEvent(input: {
+  actor: string; code: string; target?: string; event?: string;
+  /** An app grant acting: its `owner/filename`, so the row is the app's and not the account's own. */
+  appId?: string;
+  /** A sentence for the person reading the trail (TrailEntry.detail). */
+  detail?: string;
+  /** The name the entry shows for its actor (an app's display name), instead of the account's. */
+  actorName?: string;
+}): void {
   recordUsageCall({
     ownerGhii: ownerGhiiOf(input.actor),
     actorGaii: input.actor,
-    actorKind: input.actor.includes('#') ? 'agent' : 'owner',
+    actorKind: input.appId ? 'app' : input.actor.includes('#') ? 'agent' : 'owner',
+    ...(input.appId ? { appId: input.appId } : {}),
     surface: 'http',
     coordinate: input.code,
     outcome: 'ok',
-    meta: { ...(input.target ? { target: input.target } : {}), ...(input.event ? { event: input.event } : {}) },
+    meta: {
+      ...(input.target ? { target: input.target } : {}), ...(input.event ? { event: input.event } : {}),
+      ...(input.detail ? { detail: input.detail.slice(0, 500) } : {}),
+      ...(input.actorName ? { actorName: input.actorName.slice(0, 200) } : {}),
+    },
   });
 }
 
@@ -142,12 +162,14 @@ export function trailEntryOf(row: UsageCallRecord): TrailEntry | null {
   return {
     at: row.ts,
     actor: row.actorGaii,
-    actorName: row.actorGaii.includes('#') ? agentName(row.actorGaii) : localAccountName(row.actorGaii),
+    actorName: typeof row.meta?.actorName === 'string' && row.meta.actorName ? row.meta.actorName
+      : row.actorGaii.includes('#') ? agentName(row.actorGaii) : localAccountName(row.actorGaii),
     actorKind: kind,
     action,
     code: row.coordinate,
     target,
     ...(event ? { event } : {}),
+    ...(typeof row.meta?.detail === 'string' && row.meta.detail ? { detail: row.meta.detail } : {}),
     readOnly: tool?.readOnly ?? false,
     outcome: row.outcome === 'ok' ? 'ok' : 'error',
   };

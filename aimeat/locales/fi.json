@@ -8632,7 +8632,7 @@
       },
       "task": {
         "read": "Näkee agenttiesi tehtävät, ajot ja tulokset.",
-        "write": "Luo ja käynnistää tehtäviä omille agenteillesi."
+        "write": "Luo ja käynnistää tehtäviä omille agenteillesi. Se voi käynnistää myös tehtävän, joka muuten odottaisi sinua, ja saat siitä joka kerta ilmoituksen."
       },
       "catalogue": {
         "read": "Lukee julkista hakemistoa."
@@ -14244,6 +14244,12 @@
   "notiftext.task_waiting.open": "Avaa",
   "notiftext.task_waiting_held.title": "{agent} odottaa lupaasi: {title}",
   "notiftext.task_waiting_held.body": "Suunnitelmassa on {steps} vaihetta. Vain sinä voit käynnistää tämän, koska agentti voi käyttää rahaa, lähettää postia tai poistaa asioita sinun nimissäsi, tai sen suunnitelma kertoo tekevänsä niin.",
+  "notiftext.task_started_by_app.title": "{app} käynnisti tehtävän, joka odotti sinua: {title}",
+  "notiftext.task_started_by_app.body": "Agentin {agent} tehtävä odotti lupaasi, koska agentti voi käyttää rahaa, lähettää postia tai poistaa asioita nimissäsi, tai sen suunnitelma kertoo tekevänsä niin. {app} sai käynnistää sen, koska annoit sovellukselle luvan käynnistää agenttiesi tehtäviä. Agentin kortilla voit asettaa tällaiset tehtävät odottamaan sinua myös, kun sovellus käynnistää ne.",
+  "notiftext.task_started_by_app.open": "Avaa",
+  "notiftext.task_started_by_app.settings": "Agentin asetukset",
+  "notiftext.task_restarted_by_app.title": "{app} käynnisti tehtävän uudelleen: {title}",
+  "notiftext.task_restarted_by_app.body": "Agentin {agent} tehtävä oli keskeytetty tai jumissa, ja vain sinä saatoit käynnistää sen uudelleen. {app} sai käynnistää sen, koska annoit sovellukselle luvan käynnistää agenttiesi tehtäviä. Agentin kortilla voit asettaa tällaiset tehtävät odottamaan sinua myös, kun sovellus käynnistää ne.",
   "notiftext.basic_agents_start_on.title": "Perusagenttisi aloittavat nyt tehtävänsä itse",
   "notiftext.basic_agents_start_on.body": "{agents} aloittavat nyt tehtävän heti, kun se tulee: kukin ehdottaa suunnitelmansa ja jatkaa, ja sinä näet, mitä se teki. Tehtävä, joka käyttää rahaa, lähettää postia sinun nimissäsi tai poistaa jotain lopullisesti, odottaa yhä lupaasi. Voit muuttaa tämän Agentit-sivulla: avaa agentti ja käytä kytkintä \"Aloittaa työn itse\".",
   "notiftext.basic_agents_start_on.open": "Avaa Agentit",
@@ -24900,6 +24906,11 @@
         "floorWithdraw": "Peru",
         "floorAcceptedSaved": "Agentti aloittaa nyt työn ilman lupaasi.",
         "floorWithdrawnSaved": "Agentin työ odottaa taas lupaasi.",
+        "appWaits": "Odottaa sinua myös, kun sovellus käynnistää",
+        "appWaitsOn": "Lupaasi odottava työ odottaa myös, kun sovellus käynnistää sen. Vain sinä voit käynnistää sen.",
+        "appWaitsOff": "Sovellus, jolle annoit luvan käynnistää tehtäviä, voi käynnistää lupaasi odottavan työn. Saat siitä joka kerta ilmoituksen.",
+        "appWaitsOnSaved": "Agentin työ odottaa nyt sinua myös, kun sovellus käynnistää sen.",
+        "appWaitsOffSaved": "Sovellus, jolle annoit luvan käynnistää tehtäviä, voi nyt käynnistää agentin työn. Saat siitä joka kerta ilmoituksen.",
         "takesWork": "Ottaa uutta työtä",
         "takesWorkOn": "Agentti tekee työtä tavalliseen tapaan.",
         "takesWorkOff": "Pysäytetty. Tehtävät ja viestit odottavat, kunnes käännät tämän päälle.",
@@ -31940,12 +31951,21 @@
       "self_start": {
         "title": "Aloittaa työn itse",
         "short": "Päällä: agentille lähetetty työ alkaa heti. Pois: työ odottaa, kunnes käynnistät sen.",
-        "what": "Työ tulee agentille tehtävinä: sinulta, ajastukselta tai toiselta agentilta. Kun kytkin on päällä, agentti aloittaa jokaisen tehtävän heti, ja näet jälkikäteen, mitä se teki. Kun kytkin on pois, jokainen tehtävä odottaa jonossa, kunnes painat Käynnistä tai pyydät tekoälyäsi käynnistämään sen. Agentti, joka voi käyttää rahaa, lähettää postia tai poistaa asioita nimissäsi, odottaa aina lupaasi, eikä kytkin käänny päälle. Poikkeus: sinä itse kirjautuneena voit antaa sen aloittaa silti näillä oikeuksilla (kortin \"Anna aloittaa silti\"). Agentti ei voi muuttaa tätä asetusta itse.",
+        "what": "Työ tulee agentille tehtävinä: sinulta, ajastukselta tai toiselta agentilta. Kun kytkin on päällä, agentti aloittaa jokaisen tehtävän heti, ja näet jälkikäteen, mitä se teki. Kun kytkin on pois, jokainen tehtävä odottaa jonossa, kunnes painat Käynnistä tai pyydät tekoälyäsi käynnistämään sen. Agentti, joka voi käyttää rahaa, lähettää postia tai poistaa asioita nimissäsi, odottaa aina lupaasi, eikä kytkin käänny päälle. Poikkeus: sinä itse kirjautuneena voit antaa sen aloittaa silti näillä oikeuksilla (kortin \"Anna aloittaa silti\"). Sovellus, jolle annoit luvan käynnistää tehtäviä, voi silti käynnistää tällaisen tehtävän, ja saat siitä joka kerta ilmoituksen. Kortin \"Odottaa sinua myös, kun sovellus käynnistää\" estää sen. Agentti ei voi muuttaa tätä asetusta itse.",
         "range": "Päällä tai pois. Jos kukaan ei ole asettanut sitä, tehtäviä ajamaan tehty agentti aloittaa työn itse, ja muut agentit odottavat.",
         "ex1": "Päällä: agentti kirjoittaa ajastuksen mukaan joka aamu uutiskoosteen. Kenenkään ei tarvitse olla hereillä käynnistämässä sitä.",
         "ex2": "Pois: uusi agentti, jota et vielä tunne hyvin. Luet sen suunnitelman ja painat Käynnistä.",
         "ex3": "Aina pois: agentti, joka saa maksaa laskuja. Jokainen maksu odottaa lupaasi, eikä kytkin käänny päälle.",
         "tip": "Aloita pois-asennosta ja käännä kytkin päälle, kun agentti on tehnyt samanlaisen työn hyvin muutaman kerran. Tehtävällä voi olla oma ohjeensa, kuten \"tarkista ensin minulta\", ja silloin se menee tämän kytkimen edelle."
+      },
+      "app_start_waits": {
+        "title": "Odottaa sinua myös, kun sovellus käynnistää",
+        "short": "Päällä: lupaasi odottava tehtävä odottaa myös, kun sovellus käynnistää sen. Pois: sovellus voi käynnistää sen, ja saat ilmoituksen.",
+        "what": "Osa tehtävistä odottaa, että sinä itse kirjautuneena käynnistät ne: sellaisen agentin tehtävä, joka voi käyttää rahaa, lähettää postia tai poistaa asioita nimissäsi, tehtävä, jonka suunnitelma kertoo tekevänsä jotakin näistä, sekä keskeytetty tai jumissa oleva tehtävä. Tekoälysi ja muut agenttisi eivät voi käynnistää tällaista tehtävää. Sovellus, jolle annoit luvan käynnistää agenttiesi tehtäviä, voi, jotta se pystyy tekemään työn, jota varten käytät sitä. Saat siitä joka kerta ilmoituksen, joka kertoo, mikä sovellus käynnisti minkä tehtävän ja miksi tehtävä odotti, ja käynnistys näkyy Toimintalokissa sovelluksen nimellä. Kun kytkin on päällä, tällainen tehtävä odottaa sinua myös, kun sovellus käynnistää sen, ja sovellus saa kieltävän vastauksen. Agentti ei voi muuttaa tätä asetusta itse. Sovellus voi kääntää sen päälle mutta ei koskaan pois.",
+        "range": "Päällä tai pois. Pois, jos kukaan ei ole asettanut sitä: sovellus, jolle annoit luvan käynnistää tehtäviä, voi käynnistää tehtävän.",
+        "ex1": "Pois: sovellus ajaa hankinta-agenttiasi aikataululla, jonka asetit sovelluksessa. Luet ilmoituksen jälkikäteen.",
+        "ex2": "Päällä: agentti, joka maksaa laskuja. Jokainen maksu odottaa, että painat itse Käynnistä, pyysipä sitä mikä sovellus tahansa.",
+        "tip": "Käännä kytkin päälle agentille, jonka työn haluat nähdä ennen kuin se alkaa, käynnistipä sen kuka tahansa. Sovellukset, joille annoit luvan käynnistää tehtäviä, näet Pääsy ja turvallisuus -sivulla, ja voit perua luvan siellä."
       },
       "stopped": {
         "title": "Ottaa uutta työtä",

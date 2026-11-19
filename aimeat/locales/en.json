@@ -7865,7 +7865,7 @@
       },
       "task": {
         "read": "See your agents' tasks, their runs and their results.",
-        "write": "Create and start tasks for your own agents."
+        "write": "Create and start tasks for your own agents. It can also start a task that would otherwise wait for you, and you get a notification each time it does."
       },
       "catalogue": {
         "read": "Read the public catalogue and directory."
@@ -13477,6 +13477,12 @@
   "notiftext.task_waiting.open": "Open",
   "notiftext.task_waiting_held.title": "{agent} waits for your OK: {title}",
   "notiftext.task_waiting_held.body": "The plan has {steps} steps. Only you can start this one, because the agent can spend money, send mail or delete things in your name, or its plan says it will.",
+  "notiftext.task_started_by_app.title": "{app} started a task that waited for you: {title}",
+  "notiftext.task_started_by_app.body": "The task of {agent} waited for your OK, because the agent can spend money, send mail or delete things in your name, or its plan says it will. {app} could start it because you let the app start tasks for your agents. On the agent's card you can make such tasks wait for you also when an app starts them.",
+  "notiftext.task_started_by_app.open": "Open",
+  "notiftext.task_started_by_app.settings": "Agent settings",
+  "notiftext.task_restarted_by_app.title": "{app} started a task again: {title}",
+  "notiftext.task_restarted_by_app.body": "The task of {agent} was paused or stalled, and only you could start it again. {app} could start it because you let the app start tasks for your agents. On the agent's card you can make such tasks wait for you also when an app starts them.",
   "notiftext.basic_agents_start_on.title": "Your basic agents now start their tasks by themselves",
   "notiftext.basic_agents_start_on.body": "{agents} now start a task as soon as it arrives: each proposes its plan and goes on, and you see what it did. A task that spends money, sends mail in your name or deletes something for good still waits for your OK. To change it, open the agent on the Agents page and use the switch \"Starts work by itself\".",
   "notiftext.basic_agents_start_on.open": "Open Agents",
@@ -24133,6 +24139,11 @@
         "floorWithdraw": "Take back",
         "floorAcceptedSaved": "It now starts work without your OK.",
         "floorWithdrawnSaved": "Its work waits for your OK again.",
+        "appWaits": "Waits for you also when an app starts it",
+        "appWaitsOn": "Work that waits for your OK keeps waiting when an app starts it. Only you can start it.",
+        "appWaitsOff": "An app you let start tasks can start work that waits for your OK. You get a notification each time.",
+        "appWaitsOnSaved": "Its work now waits for you also when an app starts it.",
+        "appWaitsOffSaved": "An app you let start tasks can now start its work. You get a notification each time.",
         "takesWork": "Takes new work",
         "takesWorkOn": "It works as usual.",
         "takesWorkOff": "Stopped. Tasks and messages wait until you turn this on.",
@@ -31173,12 +31184,21 @@
       "self_start": {
         "title": "Starts work by itself",
         "short": "On: work sent to the agent starts at once. Off: the work waits until you start it.",
-        "what": "Work reaches an agent as tasks: from you, from a schedule or from another agent. With this switch on, the agent starts each task at once, and you see afterwards what it did. With the switch off, each task waits in the queue until you press Start, or ask your AI to start it. An agent that can spend money, send mail or delete things in your name always waits for your OK, and the switch does not turn on, unless you, signed in yourself, let it start anyway with those permissions (\"Let it start anyway\" on the card). The agent cannot change this setting for itself.",
+        "what": "Work reaches an agent as tasks: from you, from a schedule or from another agent. With this switch on, the agent starts each task at once, and you see afterwards what it did. With the switch off, each task waits in the queue until you press Start, or ask your AI to start it. An agent that can spend money, send mail or delete things in your name always waits for your OK, and the switch does not turn on, unless you, signed in yourself, let it start anyway with those permissions (\"Let it start anyway\" on the card). An app that you let start tasks can still start such a task, and you get a notification each time; \"Waits for you also when an app starts it\" on the card stops that. The agent cannot change this setting for itself.",
         "range": "On or off. When nobody has set it, an agent made to run tasks starts by itself, and every other agent waits.",
         "ex1": "On: an agent that writes a news summary every morning from a schedule. Nobody needs to be awake to start it.",
         "ex2": "Off: a new agent that you do not know well yet. You read its plan and press Start.",
         "ex3": "Always off: an agent that may pay invoices. Every payment waits for your OK, and the switch does not turn on.",
         "tip": "Start with off, and turn the switch on when the agent has done the same kind of work well a few times. A task can carry its own word, such as \"check with me first\", and that word goes before this switch."
+      },
+      "app_start_waits": {
+        "title": "Waits for you also when an app starts it",
+        "short": "On: a task that waits for your OK waits also when an app starts it. Off: the app can start it, and you get a notification.",
+        "what": "Some tasks wait for you, signed in yourself: a task of an agent that can spend money, send mail or delete things in your name, a task whose plan says it will do one of those, and a task that is paused or stalled. Your AI and your other agents cannot start such a task. An app that you let start tasks for your agents can, so that the app can do the work you use it for. Each time it does, you get a notification that says which app started which task and why the task waited, and the start shows in your Activity log under the app's name. With this switch on, such a task waits for you also when an app starts it, and the app gets a refusal. The agent cannot change this setting for itself, and an app can turn it on but never off.",
+        "range": "On or off. Off when nobody has set it: an app you let start tasks can start the task.",
+        "ex1": "Off: an app that runs your purchasing agent on the schedule you set in the app. You read the notification afterwards.",
+        "ex2": "On: an agent that pays invoices. Every payment waits for your own press, whichever app asks.",
+        "tip": "Turn it on for an agent whose work you want to see before it starts, whatever starts it. The apps you let start tasks are listed on the Access and security page, and you can take that permission away there."
       },
       "stopped": {
         "title": "Takes new work",

@@ -49,7 +49,7 @@
         "aimeat/src/routes/storage-files.ts",
         "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts"
       ],
-      "digest": "sha256:d319d14767aa43284740a3a1"
+      "digest": "sha256:5ea8779626ca169e2fb0f87d"
     },
     "6. Organisms, workspaces and knowledge": {
       "reviewedOn": "2026-11-19",
@@ -67,7 +67,7 @@
         "aimeat/src/services/task/start-op.ts",
         "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts"
       ],
-      "digest": "sha256:b5b4366ebf8fcc3fd1fcc88f"
+      "digest": "sha256:7a6a0ed3876ffb120e5c4fbd"
     },
     "8. Automation: schedules, workflows and extensions": {
       "reviewedOn": "2026-11-19",
@@ -332,7 +332,7 @@
     "5. Memory, files and search": {
       "aimeat/src/routes/memory.ts": "7f04e5dd4346b09f",
       "aimeat/src/routes/storage-files.ts": "667834c5d654373d",
-      "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "bea146b336f139f0"
+      "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "5c906fac55b9a3ff"
     },
     "6. Organisms, workspaces and knowledge": {
       "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "ddd271b2249e51bc",
@@ -340,9 +340,9 @@
       "aimeat/src/services/organism-join-requests/requests.ts": "67a2eb271e9fb2a9"
     },
     "7. The agent fleet": {
-      "aimeat/src/services/agent/task-rules.ts": "d46214216b90ec51",
-      "aimeat/src/services/task/start-op.ts": "8769c3c528f77fbf",
-      "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "bea146b336f139f0"
+      "aimeat/src/services/agent/task-rules.ts": "6fe6b779efdd6d20",
+      "aimeat/src/services/task/start-op.ts": "4be59ac3ec83da86",
+      "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "5c906fac55b9a3ff"
     },
     "8. Automation: schedules, workflows and extensions": {
       "aimeat/src/services/hooks.ts": "60779a210c48ef47",

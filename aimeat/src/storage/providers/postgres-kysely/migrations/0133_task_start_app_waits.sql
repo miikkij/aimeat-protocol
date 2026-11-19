@@ -1,0 +1,18 @@
+-- 0133_task_start_app_waits.sql
+--
+-- Whether an app's start of this agent's task waits for the owner in person.
+--
+-- A same-owner app the owner granted task:write may start a task that otherwise waits for the owner
+-- in person: one the permission floor or a declared effect holds, or a paused or stalled one
+-- (services/task/start-op.ts). The owner is told each time it does. This column lets the owner make
+-- such a task wait also when an app starts it.
+--
+--   "Agent"."taskStartAppWaits"   TRUE: an app's start is decided as any other caller's is.
+--                                 NULL or FALSE: the app may start it, which is every existing agent,
+--                                 so nothing changes for them.
+--
+-- Who may write it is decided in code (services/agent/task-start-write.ts): the owner, or a
+-- same-owner agent holding agent:write, never the agent itself, and never switched off by an app.
+--
+-- Mirrors the SQLite column added in schema-columns-agents.ts.
+ALTER TABLE "Agent" ADD COLUMN IF NOT EXISTS "taskStartAppWaits" BOOLEAN;
