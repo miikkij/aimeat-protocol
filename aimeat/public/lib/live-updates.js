@@ -39,7 +39,8 @@
  * calls watchBuild() once, so a node restarted on new code reloads the open page on the reconnect. It
  * replaces the shell's fetch of /v1/build every 60 s (Jouni: live data is an event, never a poll). A
  * signed-out page holds a visitor stream for it (POST /v1/events/visitor-ticket), which carries the
- * build and nothing else, and a view that brings a session reopens the stream signed.
+ * build and the public domains (2026-11-19: `node-totals`, the front page's counters, read through
+ * subscribe()), and a view that brings a session reopens the stream signed.
  * Signed-in-only node (2026-10-19): there the gate refuses the visitor ticket, so a page without a
  * session opens no stream, and the first view that brings one opens it signed. Before, the shell's
  * build watch asked for a visitor ticket before the auth lib had loaded, got 401 on every page load
@@ -90,7 +91,7 @@ let pendingDomains = new Set();       // null ⇒ "everything changed" (sticky f
 let hadHiddenUpdate = false;
 
 // The build watch (watchBuild below): a signed-out page opens a visitor stream, which carries the
-// build and nothing else; a page that signs in later reopens it signed.
+// build and the public domains; a page that signs in later reopens it signed.
 let visitorOk = false;
 let streamSigned = false;
 let buildReloadPending = false;
@@ -277,7 +278,7 @@ async function _open() {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${jwt}` },
       })
-      // Signed out: the visitor stream, which carries the build and nothing else (watchBuild).
+      // Signed out: the visitor stream, which carries the build and the public domains (watchBuild).
       : await fetch('/v1/events/visitor-ticket', { method: 'POST', credentials: 'omit' });
     if (!resp.ok) {
       console.warn('[SSE] Ticket request failed:', resp.status);

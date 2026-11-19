@@ -25,6 +25,8 @@
  *   const out = await crewPublish({ storage, config }, caller, 'json-demo', doc);
  *   if (!out.ok) return renderRefusal(out);
  * @version-history
+ *   2026-11-19 — A trial run that ends emits the live domain `crew-try` to the agent's owner, so the
+ *     crew tab reads the result on the event instead of every 2 s (feature audit 2026-11-19, 4.6).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-15 — Every publishing path (publish, seed, restore) checks the browser site list: its shape, and
@@ -49,6 +51,10 @@ import {
 import { logger } from '../../utils/logger.js';
 import { crewDefWarnings, type CrewDefWarning } from './def-warnings.js';
 import { isStopped } from '../agent/stop-rules.js';
+import { emitChange } from '../event-bus.js';
+
+/** The live domain told to the agent's owner when a trial run of its crew ends (done or failed). */
+export const CREW_TRY_DOMAIN = 'crew-try';
 
 export interface CrewDeps { storage: Storage; config: AimeatConfig }
 
@@ -264,6 +270,9 @@ export async function crewTryStart(deps: CrewDeps, caller: CrewCaller, identifie
     run.finishedAt = new Date().toISOString();
     if (asked.ok) { run.status = 'done'; run.result = asked.result; }
     else { run.status = 'failed'; run.error = { code: asked.code, message: asked.message }; run.result = asked.details ?? null; }
+    // The page that started it reads the result on this event instead of asking every 2 s. Scoped to
+    // the agent's owner: the timing of a trial is that person's business.
+    emitChange(CREW_TRY_DOMAIN, agent.gaii);
   });
   return { ok: true, try_id: run.id, status: 'running', started_at: run.startedAt, timeout_ms: deps.config.crewTryTimeoutMs };
 }

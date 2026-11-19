@@ -32,6 +32,9 @@
  *   v1.5.0 — 2026-11-04 — The three counters read memory metadata (listAllMemoryMeta), never a value,
  *     and node-totals reads every app's download count in one query (getAppDownloadsForApps). Same
  *     rows, same order, same numbers (codebase analysis 2026-11-03, item C4).
+ *   2026-11-19 — node-totals reads services/live/node-totals.ts readNodeTotals, the computation moved
+ *     there unchanged beside the watcher that emits the `node-totals` live domain (feature audit
+ *     2026-11-19, 4.6).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -41,6 +44,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { cached, TTL } from '../services/cache.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import { readNodeTotals } from '../services/live/node-totals.js';
 
 export function publicStatsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -128,44 +132,10 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
   // GET /v1/public/node-totals — cumulative public counters for the landing panel.
   // Always-meaningful "this node has X" figures so the landing never reads as broken-empty.
   // All real numbers; on very large nodes the bounded sweeps make a figure a floor, not a lie. Cached 30s.
+  // The computation and the cache entry live in services/live/node-totals.ts, beside the watcher that
+  // tells the streams when a counter moves (live domain `node-totals`).
   router.get('/v1/public/node-totals', rateLimit({ windowMs: 60_000, max: 60 }), async (_req, res) => {
-    const payload = await cached('public:node-totals', TTL.catalogue, async () => {
-      let apps = 0, downloads = 0, organisms = 0, agents = 0, agentsOnline = 0, knowledgePackages = 0;
-      try {
-        // No ownerGaii/viewerGhii → public, latest-version, non-parked apps only.
-        const { apps: list, total } = await storage.listApps({ limit: 1000 });
-        apps = total || list.length;
-        // One query for every app's count (getAppDownloadsForApps), where one query per app ran at
-        // once against a pool of 20. Summed per listed app, as before; a failed read counts 0.
-        const counts = await storage.getAppDownloadsForApps(list.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename })))
-          .catch((err: unknown): Record<string, number> => { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); return {}; });
-        downloads = list.reduce((s, a) => s + (Number(counts[`${a.ownerGaii} ${a.filename}`]) || 0), 0);
-      } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
-      try {
-        const orgs = await storage.listOrganisms({ visibility: 'public', perPage: 1000, archived: 'exclude' });
-        organisms = orgs.length;
-      } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
-      try {
-        const all = await storage.listAgents();
-        agents = all.length;
-        const cutoff = Date.now() - 10 * 60 * 1000;
-        agentsOnline = all.filter(a => a.lastSeen && new Date(a.lastSeen).getTime() > cutoff).length;
-      } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
-      try {
-        // Public knowledge packages are public memory entries keyed packages/{id}/manifest.
-        // Scope the query to the packages/ prefix — an unscoped recent-1000 scan of all public
-        // memory gets swamped by the public activity feed (activity/…) on busy nodes, pushing
-        // the manifests past the limit and undercounting to 0 (catalogue is unaffected: it
-        // queries per-owner with the same prefix).
-        const mem = await storage.listAllMemoryMeta({ visibility: 'public', prefix: 'packages/', limit: 1000 });
-        knowledgePackages = mem.items.filter(m => /^packages\/[^/]+\/manifest$/.test(m.key)).length;
-      } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
-      return {
-        apps, downloads, organisms,
-        agents, agents_online: agentsOnline,
-        knowledge_packages: knowledgePackages,
-      };
-    }, ['domain:apps', 'domain:organisms', 'domain:agents', 'domain:memory']);
+    const payload = await readNodeTotals(storage);
     res.json(success(config.nodeId, payload));
   });
 

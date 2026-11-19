@@ -46598,7 +46598,8 @@ paths:
         the often-empty activity feed: public apps, public organisms, connected agents
         (+ online now), public knowledge packages, and total app downloads. Aggregates
         only; no per-user data. No auth; rate-limited. On very large nodes bounded
-        sweeps make a figure a floor, not a lie.
+        sweeps make a figure a floor, not a lie. When a figure changes, the live stream
+        (`GET /v1/events`, a visitor's stream included) sends the domain `node-totals`.
       tags: [Public]
       responses:
         '200':
@@ -83713,8 +83714,11 @@ paths:
         account. The stream it opens carries the opening `event: hello` (the build that answers: an
         open page reloads after the node restarts on new code) and, with `{ "app": "owner/filename" }`,
         that app's new versions as `event: app` frames, when anyone may open the app (no access code,
-        no sign-in gate, no pacing amount, not hidden). Never a domain frame, never a draft. Open
-        visitor streams are capped per node and per address; over the cap `GET /v1/events` answers 503.
+        no sign-in gate, no pacing amount, not hidden). Never a draft. A stream without `app` carries
+        the public domains as `data: {"domains":[...]}` frames and no other: `node-totals`, when a
+        figure of `GET /v1/public/node-totals` changed. A stream for one app carries no domain frame.
+        Open visitor streams are capped per node and per address; over the cap `GET /v1/events`
+        answers 503.
       requestBody:
         required: false
         content:

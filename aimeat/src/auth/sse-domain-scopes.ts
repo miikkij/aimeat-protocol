@@ -22,6 +22,8 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.17.0 — 2026-11-19 — `crew-try` → memory:read: a trial run of an agent's crew ended (feature audit
+ *     2026-11-19, 4.6).
  *   v1.16.0 — 2026-11-14 — `help` → help:answer (Ask someone who knows).
  *   v1.15.0 — 2026-11-14 — `secret-shares` → secrets:share.
  *   v1.14.0 — 2026-11-09 — An extension's own domain (`ext:<installer>/<name>`, sent by its ctx.changed())
@@ -139,6 +141,9 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   'agent-capabilities': 'task:read',
   'agent-directives': 'task:read',
   'agent-onboarding': 'task:read',
+  // A trial run of an agent's crew ended (services/crews/ops.ts). The word the trial's own read asks
+  // (GET /v1/agents/{name}/crew/try/{id}).
+  'crew-try': 'memory:read',
   // The owner's agent goals (services/goals/): read with the same word as the tasks they become.
   goals: 'task:read',
 

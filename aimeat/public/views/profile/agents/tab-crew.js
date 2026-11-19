@@ -18,6 +18,9 @@
  *   - TabCrew — load, actions (validate / try / publish / draft / restore), the header and the
  *     form-or-JSON body; sections live in ./crew-editor.js, templates in ./crew-templates.js
  * @version-history
+ *   v1.20.0 -- 2026-11-19 -- The trial's result is read when the live stream says `crew-try`, and
+ *     once at the trial's deadline; it was asked every 2 s for up to five minutes (feature audit
+ *     2026-11-19, 4.6).
  *   v1.19.1 -- 2026-09-26 -- The try output scrolls after 400px again, as main's
  *     .pf-agd-crew-try-output did (Code scroll="large"; fix pass).
  *   v1.19.0 -- 2026-09-26 -- Onto the components: the head is SubHeading with the two Status marks
@@ -68,6 +71,7 @@ import { api, apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Mark, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
@@ -84,7 +88,6 @@ import { anchorErrors, ErrorLines, IdentitySection, CrewSection, RunSection, Con
 
 const html = htm.bind(h);
 const K = 'profile.agents.detail.crew';
-const TRY_POLL_MS = 2000;
 /** The start tile that opens the JSON editor instead of a template. */
 const PASTE_JSON = '__paste_json__';
 
@@ -116,6 +119,9 @@ export default function TabCrew({ agentName, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
   const docRef = useRef(doc);
   docRef.current = doc;
+  // Ends the wait for a running trial: its live listener and its one deadline timer (tryOnce).
+  const tryWaitRef = useRef(null);
+  useEffect(() => () => tryWaitRef.current?.(), []);
   const base = `/v1/agents/${encodeURIComponent(agentName)}/crew`;
 
   const load = useCallback(async ({ keepEdits = true } = {}) => {
@@ -278,18 +284,27 @@ export default function TabCrew({ agentName, showToast }) {
     try {
       const started = await apiPost(`${base}/try`, { doc, prompt: tryPrompt.trim() });
       const id = started?.data?.try_id;
-      const deadline = Date.now() + (started?.data?.timeout_ms || 300_000) + 10_000;
+      const waitMs = (started?.data?.timeout_ms || 300_000) + 10_000;
       setTryRun({ id, status: 'running', result: null, error: null });
-      while (Date.now() < deadline) {
-        await new Promise(r => setTimeout(r, TRY_POLL_MS));
-        const poll = await apiGet(`${base}/try/${encodeURIComponent(id)}`).catch(err => { swallowed('tab-crew: try poll', err); return null; });
-        const d = poll?.data;
-        if (!d) continue;
-        if (d.status === 'done' || d.status === 'failed') {
-          setTryRun({ id, status: d.status, result: d.result, error: d.error });
-          if (d.status === 'failed') showToast(t(`${K}.messages.tryFailed`, { msg: d.error?.message || '' }), true);
-          return;
-        }
+      // The node says when the trial ended (live domain `crew-try`, services/crews/ops.ts); the page
+      // reads the result once then. A reconnect of the stream reconciles every domain, which reads it
+      // too. The one timer is the trial's own deadline, which asks once more before giving up.
+      const look = async () => (await apiGet(`${base}/try/${encodeURIComponent(id)}`).catch(err => { swallowed('tab-crew: try read', err); return null; }))?.data ?? null;
+      const ended = (d) => d && (d.status === 'done' || d.status === 'failed');
+      const d = await new Promise((resolve) => {
+        let off = () => {};
+        const timer = setTimeout(() => { void look().then(last => finish(ended(last) ? last : null)); }, waitMs);
+        const finish = (value) => { off(); clearTimeout(timer); tryWaitRef.current = null; resolve(value); };
+        tryWaitRef.current = () => finish(undefined);
+        off = onLiveUpdate(['crew-try'], () => { void look().then(now => { if (ended(now)) finish(now); }); });
+        // A trial that ended before the listener was in place.
+        void look().then(now => { if (ended(now)) finish(now); });
+      });
+      if (d === undefined) return;   // the tab closed while it ran
+      if (d) {
+        setTryRun({ id, status: d.status, result: d.result, error: d.error });
+        if (d.status === 'failed') showToast(t(`${K}.messages.tryFailed`, { msg: d.error?.message || '' }), true);
+        return;
       }
       setTryRun({ id, status: 'failed', result: null, error: { code: 'TIMEOUT', message: t(`${K}.messages.tryTimedOut`) } });
     } catch (err) {

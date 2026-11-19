@@ -16,6 +16,13 @@
  *   2026-11-19 -- test/e2e-calibrator-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 5).
  *   2026-11-19 -- test/e2e-living-author-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 5).
  *   2026-11-19 -- test/e2e-site-template-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 5).
+ *   2026-11-19 -- test/e2e-live-page-events.ts joins ALL_SUITES (feature audit 2026-11-19, 4.6).
+ *   2026-11-19 -- test/e2e-oidc-link-domains.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 3).
+ *   2026-11-19 -- test/e2e-connector-command-approval.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 4).
+ *   2026-11-19 -- test/e2e-subscription-renewal.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 5).
+ *   2026-11-19 -- test/e2e-trust-score.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 6).
+ *   2026-11-19 -- test/e2e-mcp-workspace-server.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 2).
+ *   2026-11-19 -- test/e2e-mcp-grant-limits.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 1).
  *   2026-11-19 -- test/e2e-organism-approvals-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 1).
  *   2026-11-19 -- test/e2e-moderation-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 3).
  *   2026-11-19 -- test/e2e-ecosystem-apps-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 2).
@@ -1750,6 +1757,27 @@ const ALL_SUITES = [
     // After an account erasure no log names the person: the site change log, the public activity
     // feed and moderation; another person's lines are unchanged.
     'test/e2e-owner-erasure-logs.ts',
+    // An MCP grant's end date and call ceiling on a real far side: the date refuses, the ceiling
+    // counts the agent's own ok calls from the usage stream (feature audit 2026-11-19, 4.5).
+    'test/e2e-mcp-grant-limits.ts',
+    // An MCP server bound to one workspace: the workspace creator, the group's owners and admins and
+    // a contributor call it, a viewer only sees it, a plain member neither (feature audit 2026-11-19, 4.5).
+    'test/e2e-mcp-workspace-server.ts',
+    // The trust score rules on the stored score: the three-requester ceiling of 40, the first-week
+    // ceiling of 65, and a declined request and a lost dispute counted (feature audit 2026-11-19, 4.5).
+    'test/e2e-trust-score.ts',
+    // A subscription renews on its kept card once per period, a raised price waits for the buyer's
+    // yes, a declined card tells the buyer once (in-process node, feature audit 2026-11-19, 4.5).
+    'test/e2e-subscription-renewal.ts',
+    // The real connector daemon on a folder that brings its own runner: held until the owner allows
+    // it on the node, run after, stopped again (feature audit 2026-11-19, 4.5).
+    'test/e2e-connector-command-approval.ts',
+    // Casdoor and Entra sign-in through a real OIDC provider over HTTPS on a node of its own: the
+    // link domains admit and refuse an address by its domain (feature audit 2026-11-19, 4.5).
+    'test/e2e-oidc-link-domains.ts',
+    // The live events four pages read on instead of a timer: `node-totals` on a visitor's stream,
+    // `boards`, `crew-try` to its owner only, and `agents` on a device request (feature audit 2026-11-19, 4.6).
+    'test/e2e-live-page-events.ts',
     // The owner stops an agent and starts it again: new work waits and nobody can start it, a
     // scheduled run is skipped, the runtime is not woken, and a start releases what waited.
     'test/e2e-agent-stop.ts',

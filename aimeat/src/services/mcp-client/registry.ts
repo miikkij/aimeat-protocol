@@ -28,6 +28,9 @@
  *   detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   2026-11-19 — organismAdmits reads a workspace server's roles from the workspace creator's grants,
+ *     where they are stored, instead of under the organism owner's bare name, where none ever was;
+ *     the workspace creator and the organism's owners and admins call it as they write the workspace.
  *   2026-11-02 — attachNodeServer and attachOrganismServer take `personalSignIn`: the row is auth and
  *     callerIdentity per-user-oauth, holds no credential, starts active and is not probed, since each
  *     person signs in with their own account. updateMcpServerSettings and detachMcpServer moved to
@@ -72,6 +75,7 @@ import { withPersonalSignIn } from './personal-sign-in.js';
 import { recordAccountEvent } from '../account/events.js';
 import { organismOwners } from '../organism/ownership.js';
 import { listWorkspaceMemberRoles } from '../workspace/roles.js';
+import { findWorkspaceRegistration } from '../workspace/meta-read.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
 
@@ -531,16 +535,24 @@ export async function organismAdmits(
   // Bound to the organism as a whole: membership is the answer.
   if (!server.ws) return true;
 
-  // Bound to one workspace inside it. The roles live as consents, and listWorkspaceMemberRoles is
-  // the one shared implementation of them — asking storage directly here would be the second.
+  // Bound to one workspace inside it. The same people may call it as may write the workspace
+  // (services/organism/namespace-access.ts): the workspace's creator and the organism's owners and
+  // admins without a grant, everyone else on the contributor role the creator granted.
+  const registration = await findWorkspaceRegistration(storage, server.organismId, server.ws);
+  if (!registration) return false;
+  const account = localAccountName(ownerGhii);
+  const managers = [...organismOwners(organism), ...(organism.admins ?? [])];
+  if (`${registration.creator}@${config.nodeId}` === ownerGhii || onRoll(managers, ownerGhii, config.nodeId)) return true;
+
+  // The roles live as consents OWNED BY THE WORKSPACE CREATOR, and listWorkspaceMemberRoles is the
+  // one shared implementation of them; asking storage directly here would be the second.
   const roles = await listWorkspaceMemberRoles(storage, config, {
-    creatorGhii: organismOwners(organism)[0] ?? '',
+    creatorGhii: `${registration.creator}@${config.nodeId}`,
     orgId: server.organismId,
     ws: server.ws,
   });
-  // The roles are keyed by this node's account names (listWorkspaceMemberRoles), which is what
-  // localAccountName gives for an owner here.
-  const role = roles.get(localAccountName(ownerGhii))?.role;
+  // The roles are keyed by this node's account names (listWorkspaceMemberRoles).
+  const role = roles.get(account)?.role;
   if (!role) return false;
   return wantToCall ? role === 'contributor' : true;
 }
