@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-19 — Names part `platform` (the sections only some apps need, services/builder/
+ *     atelier-platform.ts) and section `server-side`, which points at node:aimeat-extension-builder
+ *     and its Microservices Central section. Until now this skill named neither.
  *   2026-11-15 — A component is customised "in the four ways above", not "through the four doors".
  *   2026-11-11 — Step 7 names the two checks the specification's Finishing gained: the console read
  *     with the browser's own warnings while the app works, and an app that computes every frame run
@@ -212,6 +215,17 @@ because one tool result cannot carry all of it. The genres: \`aimeat_designbook_
 "genre" }\` lists them with what each is for, and \`aimeat_app_template_get { id: "genre-<id>" }\`
 returns the page to fork; a genre is larger than one result, so it says how many parts it has and
 you ask for each with \`part\`. Pitfalls: \`aimeat_appdev_pitfall_list\`.
+
+**What only some apps need is a section of its own.** Part \`platform\` (\`aimeat_handbook_get {
+tier: "build-app-atelier/platform" }\`, over HTTP \`GET /v1/prompts/build-app-atelier/sections/platform\`)
+lists them, each with the situation it covers: a team sharing data, an audit log, people without an
+account, anonymous intake, files, AI in the app or in the person's own chat, the AI label, spending,
+legal pages, live presence, an agent face, a phone install, and publishing by hand when you cannot
+connect. Read the ones this app is in before you write that part of it, and leave the others.
+**Server-side work** (an outside service with a key, a rule the browser cannot break, work on a
+schedule) is section \`server-side\`: it is a server extension, built with skill
+\`node:aimeat-extension-builder\`, and when an extension is not enough, a service on a Microservices
+Central (that skill's section 11; \`aimeat_appdev_overview\` answers \`microservices\`).
 
 **A new app asks for its style kit before it picks a genre.** \`aimeat_designbook_kit\` (with
 \`organism\` when the app is built for one) answers the kit the person or their organism chose: the

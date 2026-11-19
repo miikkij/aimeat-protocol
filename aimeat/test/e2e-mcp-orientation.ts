@@ -17,6 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-11-19 — 17p: the Atelier platform index and its sections, the same over MCP and REST, 404 for an unknown one.
  *   2026-11-08 — 17b: the first part says which parts come before code by level.
  *   2026-11-05 — 17c, 17d: the Atelier specification has seven parts; `motion` was split from `look` in effc2bcaa.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -587,6 +588,29 @@ async function main() {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');
             assert(/start, genre, libraries, book, patterns, look, motion/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
+        });
+
+        // The platform sections (services/builder/atelier-platform.ts): what only some apps need, once
+        // only in the Classic specification. Part `start` names the index, the index names each
+        // section with its situation, and MCP and REST answer the same text.
+        await test('17p. the Atelier platform index and a platform section arrive the same over MCP and REST', async () => {
+            const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier' } }, 480)).body);
+            assert(start.includes('- `platform` —'), 'part start names the platform index');
+            const index = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/platform' } }, 481)).body);
+            assert(index.includes('- `group` —') && index.includes('- `server-side` —'), `the index names its sections: ${index.slice(0, 200)}`);
+            const group = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/group' } }, 482)).body);
+            const rest = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/group?format=txt`).then(r => r.text());
+            assert(group === rest && group.startsWith('## '), `section group equals REST: ${group.slice(0, 120)}`);
+            assert(!/\bT[123]\b|shell-pure-client|onSession/.test(group), 'the section teaches no Classic tier or shell');
+            const one = await json('/v1/prompts/build-app-atelier/sections/server-side');
+            assert(one.body.data.kind === 'section' && /aimeat-extension-builder/.test(one.body.data.prompt), 'server-side is a section that names the extension skill');
+            const list = await json('/v1/prompts/build-app-atelier/sections');
+            const sections = list.body.data.sections as Array<{ id: string; when: string }>;
+            assert(sections.some(s => s.id === 'public-intake' && s.when.length > 0), 'the list carries each section with its situation');
+            const full = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(r => r.text());
+            assert(!full.includes('## Server-side work'), 'the platform sections are not in the whole text');
+            const missing = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/no-such-section`);
+            assert(missing.status === 404, `an unknown section is 404, got ${missing.status}`);
         });
 
         // The feature map (guided journey P6): what this node can do, in parts an AI can read once it

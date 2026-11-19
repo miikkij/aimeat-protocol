@@ -12,6 +12,8 @@
  *   import { registerAtelierPrompt } from './prompts-atelier.js';
  *   registerAtelierPrompt(router, config);   // BEFORE /v1/prompts/:tier
  * @version-history
+ *   v1.5.0 — 2026-11-19 — …/sections lists the platform sections with their `when`, and
+ *     …/sections/:id answers them (`kind: "section"`) beside the parts (atelier-platform.ts).
  *   v1.4.0 — 2026-09-19 — Part `libraries` arrives with the Design Book's map in it
  *     (build-atelier-book.ts), so the route takes the storage.
  *   v1.3.0 — 2026-09-19 — The specification in parts: GET …/build-app-atelier/sections and
@@ -30,6 +32,7 @@ import { buildAtelierPrompt, buildAtelierSpecToken } from '../services/builder/a
 import type { Storage } from '../storage/interface.js';
 import { ATELIER_PARTS, atelierPieceIds } from '../services/builder/atelier-layers.js';
 import { atelierPieceWithBook } from '../services/builder/atelier-book.js';
+import { ATELIER_PLATFORM } from '../services/builder/atelier-platform.js';
 
 /**
  * Register the Atelier build-spec route. Public for the same reason build-app is: build
@@ -49,8 +52,10 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig, stor
     for (const p of ATELIER_PARTS) {
       parts.push({ id: p.id, what: p.what, chars: (await atelierPieceWithBook(full, p.id, config, storage))?.text.length ?? 0 });
     }
-    res.json(success(config.nodeId, { parts, spec_token: buildAtelierSpecToken(config) }, [
-      { description: 'One part by id', method: 'GET', url: '/v1/prompts/build-app-atelier/sections/{id}' },
+    // The platform sections only some apps need, each with the situation it covers (atelier-platform.ts).
+    const sections = ATELIER_PLATFORM.map(s => ({ id: s.id, when: s.when }));
+    res.json(success(config.nodeId, { parts, sections, spec_token: buildAtelierSpecToken(config) }, [
+      { description: 'One part or platform section by id', method: 'GET', url: '/v1/prompts/build-app-atelier/sections/{id}' },
     ]));
   });
 
@@ -69,7 +74,7 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig, stor
     }
     res.json(success(config.nodeId, {
       id: 'build-app-atelier/' + piece.id,
-      kind: 'part',
+      kind: ATELIER_PARTS.some(p => p.id === piece.id) ? 'part' : 'section',
       prompt: piece.text,
       spec_token: buildAtelierSpecToken(config),
     }, [

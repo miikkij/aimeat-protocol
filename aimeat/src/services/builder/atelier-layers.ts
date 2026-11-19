@@ -22,6 +22,9 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.8.0 — 2026-11-19 — The platform sections (atelier-platform.ts): part `start` names the index
+ *     `platform` in one line, and atelierPiece answers `platform` and each section id with text cut
+ *     from the build text. They are not in the full text, so the parts still rebuild it exactly.
  *   v1.7.0 — 2026-11-09 — "The pattern shelf" moved from `genre` to `look`, and "Finishing" from
  *     `start` to `libraries` (pure moves; every level reads `libraries`): the genre part needed room
  *     for the one-top-bar rule a real build met as a contradiction, and `start` stood 16 characters
@@ -50,6 +53,7 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { MAX_PART_CHARS } from './app-layers.js';
+import { ATELIER_PLATFORM_PART_LINE, atelierPlatformIds, atelierPlatformPiece } from './atelier-platform.js';
 
 export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns' | 'look' | 'motion';
 
@@ -150,17 +154,22 @@ function partsIndex(nodeUrl: string, specToken: string | null): string {
     + 'Read `libraries` and `patterns` BEFORE you write any code, and on `fine` `genre` and `book` too: on `fine` an Atelier app is forked from a genre and the publish refuses one that names no register (a `proto` or `plain` app starts from `shell-atelier`), a mechanism you write by hand is usually one this node already serves, and a piece of page you make by hand is often one the Design Book already holds. '
     + 'Over MCP: `aimeat_handbook_get { tier: "build-app-atelier/<id>" }`. Over HTTP the whole text in one piece: `GET ' + nodeUrl + '/v1/prompts/build-app-atelier?format=txt`.\n';
   for (const p of ATELIER_PARTS.filter(x => x.id !== 'start')) out += '- `' + p.id + '` — ' + p.what + '\n';
+  out += ATELIER_PLATFORM_PART_LINE;
   return out;
 }
 
-export interface AtelierPiece { id: AtelierPartId; text: string }
+/** A part (`AtelierPartId`), the platform index `platform`, or one platform section by its id. */
+export interface AtelierPiece { id: string; text: string }
 
-/** One part by id, or null. Joined the way the full text joins its sections. */
+/**
+ * One part by id, or the platform index or one platform section (atelier-platform.ts), or null.
+ * A part is joined the way the full text joins its sections; a platform piece is not in the full text.
+ */
 export function atelierPiece(full: string, id: string, baseUrl: string): AtelierPiece | null {
-  if (!ATELIER_PARTS.some(p => p.id === id)) return null;
+  if (!ATELIER_PARTS.some(p => p.id === id)) return atelierPlatformPiece(id, baseUrl);
   const mine = splitAtelierSpec(full).filter(s => s.part === id);
   if (!mine.length) return null;
-  if (id !== 'start') return { id: id as AtelierPartId, text: mine.map(s => s.text).join('\n') };
+  if (id !== 'start') return { id, text: mine.map(s => s.text).join('\n') };
   const out: string[] = [];
   let indexed = false;
   const token = /spec_token: (atelier-[0-9a-f]{12})/.exec(full)?.[1] ?? null;
@@ -172,6 +181,7 @@ export function atelierPiece(full: string, id: string, baseUrl: string): Atelier
   return { id: 'start', text: out.join('\n') };
 }
 
-export function atelierPieceIds(): string[] { return ATELIER_PARTS.map(p => p.id); }
+/** Every id atelierPiece answers to: the parts in reading order, then the platform index and its sections. */
+export function atelierPieceIds(): string[] { return [...ATELIER_PARTS.map(p => p.id as string), ...atelierPlatformIds()]; }
 
 export { MAX_PART_CHARS };
