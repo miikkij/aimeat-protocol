@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-19: `githubOnly: true` on check:field-reach, the CodeQL pass (793 s of the slow eight's 1527 s). `pnpm ready` runs every other check here before it pushes (check:fast --before-push, about three minutes); the CodeQL pass stays on GitHub.
  *  - 2026-11-15: `slow: true` on the eight checks that took 1527 of 2158 s of check time on a quiet laptop (check:field-reach alone 793 s, the CodeQL measurement). check:fast skips them on a workstation and runs them in CI and on `pnpm ready`'s branch, so the one local run before ready takes about three minutes, not eighteen.
  *  - 2026-11-15: check:picture-words, no new door, road, way in, machine room or showroom in the string literals of src/ and public/ or the visible text of the HTML pages (the locale files have check:locales).
  *  - 2026-11-15: check:design-language-publish, the node copy of skill aimeat-design-language is the repository copy as last published (decision P7 of the instruction audit).
@@ -180,7 +181,7 @@ export const FAST_CHECKS = [
     { script: 'check:doc-links', label: 'Served text links no repository file the node does not serve' },
     // Built on 2026-09-03 for exactly this axis and wired into nothing until 2026-09-14, when an
     // agent's company update dropped organism_id in silence: REST took the field and MCP did not.
-    { script: 'check:field-reach', label: 'A record field REST can set, an agent can set too', slow: true },
+    { script: 'check:field-reach', label: 'A record field REST can set, an agent can set too', slow: true, githubOnly: true },
     { script: 'check:liaison-surface', label: 'Published surfaces match, and neither needs a release' },
     // The whole-tree silent-exception pass, which until 2026-09-13 ran nowhere: the hook sees only
     // staged files and nothing else called it, so the three cleaned shapes were held at zero by

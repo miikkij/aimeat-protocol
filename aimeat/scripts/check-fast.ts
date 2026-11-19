@@ -23,7 +23,10 @@
  *   cd aimeat && pnpm check:fast              # the hook's set, four at a time
  *   cd aimeat && pnpm check:fast --jobs=8     # more, on a wider machine
  *   cd aimeat && pnpm check:fast --list       # the set, and nothing runs
+ *   cd aimeat && pnpm check:fast --before-push  # every check but the CodeQL pass (pnpm ready runs it)
  * @version-history
+ *   v1.3.0 — 2026-11-19 — `--before-push`: every check but the CodeQL pass (`githubOnly` in the
+ *     registry), which pnpm ready runs before it pushes.
  *   v1.2.0 — 2026-11-15 — A workstation skips the checks marked `slow` in the registry (they run in CI,
  *     where CI is set, and on pnpm ready's branch); `--all` runs them here too.
  *   v1.1.0 — 2026-11-15 — One run at a time on a machine (scripts/lib/machine-lock.ts): a second
@@ -46,13 +49,20 @@ interface Check {
     label: string;
     /** Minutes on a workstation: run in CI and on `pnpm ready`'s branch, skipped locally unless --all. */
     slow?: boolean;
+    /** The CodeQL pass: run on GitHub only, also by --before-push. */
+    githubOnly?: boolean;
 }
 
 // A workstation runs the quick set; CI (and `--all`) runs everything. The slow eight took 1527 of
 // 2158 s of check time on a quiet laptop on 2026-11-15, check:field-reach's CodeQL pass 793 s alone.
+// `--before-push` (pnpm ready, before it pushes): every check but the CodeQL pass. The other seven
+// slow ones took 101 s one after another on 2026-11-19; a red one found here costs minutes, found on
+// GitHub it cost a 40-minute run.
 const ALL = !!process.env.CI || process.argv.includes('--all');
-const SKIPPED: Check[] = ALL ? [] : FAST_CHECKS.filter(c => (c as Check).slow);
-const CHECKS: Check[] = ALL ? FAST_CHECKS : FAST_CHECKS.filter(c => !(c as Check).slow);
+const BEFORE_PUSH = !ALL && process.argv.includes('--before-push');
+const skip = (c: Check): boolean => !ALL && (BEFORE_PUSH ? !!c.githubOnly : !!c.slow);
+const SKIPPED: Check[] = FAST_CHECKS.filter(c => skip(c as Check));
+const CHECKS: Check[] = FAST_CHECKS.filter(c => !skip(c as Check));
 
 interface Outcome { check: Check; code: number; out: string; ms: number }
 
@@ -118,7 +128,7 @@ async function main(): Promise<void> {
     const queue = [...CHECKS];
     const done: Outcome[] = [];
     console.log(`[check:fast] ${CHECKS.length} checks, ${jobs} at a time\n`);
-    if (SKIPPED.length) console.log(`[check:fast] ${SKIPPED.length} slow checks run in CI and on pnpm ready's branch, not here (--all runs them): ${SKIPPED.map(c => c.script).join(', ')}\n`);
+    if (SKIPPED.length) console.log(`[check:fast] ${SKIPPED.length} ${BEFORE_PUSH ? 'check runs on GitHub only' : "slow checks run in CI and on pnpm ready's branch, not here (--all runs them)"}:${SKIPPED.map(c => c.script).join(', ')}\n`);
 
     const worker = async (): Promise<void> => {
         for (let next = queue.shift(); next; next = queue.shift()) {

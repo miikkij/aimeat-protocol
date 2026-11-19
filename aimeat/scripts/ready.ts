@@ -19,13 +19,28 @@
  *   branch is named by it), a HEAD behind origin/main (rebase first, then the run tests the work on
  *   today's main), and nothing to bring.
  *
+ *   THE CHECKS FIRST, HERE. Before anything is pushed, every check but the CodeQL pass runs on this
+ *   machine (`check:fast --before-push`, about three minutes). A red one stops here, nothing is pushed,
+ *   and it costs minutes instead of a 40-minute run on GitHub. On 2026-11-19 two of one branch's four
+ *   red runs were such checks: one of the slow ones check:fast leaves out, and check:fast itself, not
+ *   run after a last fix. `--no-checks` skips them (when they were just run on this exact tree).
+ *
+ *   A SUITE RED FOR TIMING. The full sweep is dispatched with `retry_red`: a suite red in its shard runs
+ *   once more, alone (test/run-e2e-retry.ts). Red again, the run is red. Green alone, it does not stop
+ *   the merge, and this report lists it under FLAKY: its timing still needs a fix, and the nightly,
+ *   which does not retry, keeps showing it red until it has one.
+ *
  *   MAIN MOVED DURING THE RUN. Other sessions push while the run is going. When origin/main is no longer
  *   under HEAD at the end, the commits are rebased onto it and pushed; CI runs on main as always. They
  *   are not tested a second time, or a busy day would never end.
  * @usage
  *   cd aimeat && AIMEAT_SESSION=cc-alice-x pnpm ready         # push, run, wait, merge
  *   cd aimeat && pnpm ready --no-merge                         # stop after a green run
+ *   cd aimeat && pnpm ready --no-checks                        # skip the local checks
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The checks run here before the push (check:fast --before-push), and the sweep
+ *     reruns a red suite alone (retry_red); a suite green alone is listed as FLAKY, not red
+ *     (wish-pnpm-ready-slow-checks-locally-first-a-failed-suite-rerun-al).
  *   v1.0.0 — 2026-11-15 — Initial.
  */
 import { execFileSync } from 'node:child_process';
@@ -55,13 +70,24 @@ async function main(): Promise<void> {
     const ahead = Number(git('rev-list', '--count', 'origin/main..HEAD'));
     if (ahead === 0) refuse('nothing to bring: HEAD is origin/main.');
 
+    // Every check but the CodeQL pass, here and before the push: a red one costs minutes, not a run.
+    if (!process.argv.includes('--no-checks')) {
+        console.log('[ready] the checks first, on this machine (check:fast --before-push; the CodeQL pass stays on GitHub)');
+        try {
+            execFileSync(process.execPath, ['--import', 'tsx', 'scripts/check-fast.ts', '--before-push'], { stdio: 'inherit' });
+        } catch {
+            refuse('a check is red (above). Nothing was pushed: fix every red line, commit, and run pnpm ready again.');
+        }
+    }
+
     const head = git('rev-parse', 'HEAD');
     const branch = `ready/${session}`;
     console.log(`[ready] ${ahead} commit(s), ${head.slice(0, 9)} → ${branch}`);
     sh('git', ['push', '--force', 'origin', `HEAD:refs/heads/${branch}`], { inherit: true });
 
     const started = Date.now();
-    gh('workflow', 'run', WORKFLOW, '--ref', branch);
+    // retry_red: a suite red in its shard runs once more alone; green alone is FLAKY, not red.
+    gh('workflow', 'run', WORKFLOW, '--ref', branch, '-f', 'retry_red=true');
     // Two runs answer for the work: the full E2E sweep (dispatched above) and CI, which the push to a
     // ready/ branch starts and which runs every check, the slow ones check:fast skips here included.
     const findRun = async (workflow: string): Promise<number> => {
@@ -101,6 +127,16 @@ async function main(): Promise<void> {
         process.exit(1);
     }
     console.log(`[ready] GREEN after ${minutes} min (full E2E and CI).`);
+    // The suites that were red in the sweep and green alone: not a stop, but each one's timing needs a
+    // fix, so they are named here for the session to record.
+    try {
+        const log = sh('gh', ['run', 'view', String(runs[0].id), '--log']);
+        const flaky = [...new Set(log.split('\n').map(l => /\[e2e-flaky\].*/.exec(l)?.[0]).filter((l): l is string => !!l))];
+        if (flaky.length) {
+            console.log(`[ready] FLAKY: ${flaky.length} suite(s) were red in the sweep and green alone. Not a stop; record each one as an incident on Lifecycle Central so its timing gets a fix:`);
+            for (const l of flaky) console.log(`    ${l}`);
+        }
+    } catch (err) { console.warn(`[ready] the sweep's log could not be read for flaky suites (${String((err as Error).message).split('\n')[0]}); they are on the run's page.`); }
     if (noMerge) { console.log(`[ready] --no-merge: ${branch} is kept, main is not touched.`); return; }
 
     git('fetch', '-q', 'origin', 'main');

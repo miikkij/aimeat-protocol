@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- `--retry-red`: a red suite runs once more, alone; one that passes alone is read as timing and printed with the [e2e-flaky] mark (test/run-e2e-retry.ts). pnpm ready's sweep passes it, the nightly does not.
  *   2026-11-15 -- test/e2e-federation-peer-proofs.ts joins ALL_SUITES (audit 2026-11 M130, L056).
  *   2026-11-15 -- e2e-app-icon-upload.ts joins the list (not the guard tier): aimeat_app_manage icon_upload and the install block.
  *   2026-11-15 -- The plan moves to test/run-e2e-plan.ts (E2E report of 2026-11-15, section 4):
@@ -563,8 +564,9 @@ import { holdBasePort, lanePortFor } from '../scripts/lib/e2e-ports.js';
 import { classify, formatHeader, formatRow } from '../scripts/lib/e2e-results.js';
 import { githubAnnotations, githubSummary } from '../scripts/lib/e2e-github-report.js';
 import { runLane, type SuiteResult } from './run-e2e-lane.js';
+import { retryRed } from './run-e2e-retry.js';
 import { checkRunnerNodeFree, laneWeight, needsRunnerNode, parseShard, planLanesBalanced, shardOf, suiteSeconds } from './run-e2e-plan.js';
-import { writeRunResults } from '../scripts/lib/e2e-run-results.js';
+import { flakyLine, writeRunResults } from '../scripts/lib/e2e-run-results.js';
 import { clearNodeLogs, nodeLogDir } from './helpers/runner-node-log.js';
 import { adminUrlOf, dropDatabases, listE2eDatabases, liveBases, runDatabasesOf } from '../scripts/lib/e2e-databases.js';
 
@@ -2283,6 +2285,7 @@ const NOT_SUITES = new Map<string, string>([
     ['run-e2e-ci.ts', 'this runner'],
     ['run-e2e-server.ts', "the runner's server lifecycle, environment pins and database cleanup: imported, never spawned"],
     ['run-e2e-lane.ts', "the runner's lane loop (restart, run one suite under its time limit, read its result): imported, never spawned"],
+    ['run-e2e-retry.ts', "the runner's --retry-red (a red suite run once more, alone): imported, never spawned"],
     ['run-e2e-plan.ts', "the runner's lane plan (which suites need a node, measured weights, port groups, shards): imported, never spawned"],
     ['run-e2e-production-lane.ts','the production-settings lane: the settings and the per-suite exceptions, imported by run-e2e-server.ts'],
     ['run-playwright-ci.ts', 'the Playwright runner; that suite is not run here, frontend changes are verified by driving a real browser'],
@@ -2721,6 +2724,11 @@ async function main() {
             console.error(`Lane failed: ${(s.reason as Error).message}`);
             return lanes[k].map(suite => ({ name: basename(suite, '.ts'), passed: 0, failed: 0, skipped: 0, total: 0, time: '0.00s', exitCode: 1, lane: k, cycleMs: 0, anonymous: '-', notRun: reason }));
         });
+        // `--retry-red` (pnpm ready's sweep, never the nightly): a red suite runs once more, alone on
+        // lane 0's node, and one that passes alone is read as timing and named (test/run-e2e-retry.ts).
+        if (process.argv.includes('--retry-red') && !TARGET.external) {
+            results = await retryRed(results, suites, r => classify(r, { guard: guards.has(r.name) }), targets[0], laneOpts);
+        }
     } catch (e) {
         console.error(`Runner failed: ${(e as Error).message}`);
         process.exit(1);
@@ -2768,6 +2776,7 @@ async function main() {
     ];
     for (const [status, text] of kinds) if (count(status) > 0) console.log(`  ${count(status)} suite(s) ${text}.`);
     if (anyFailed && !TARGET.external) console.log(`  The node's output for each red suite is kept in ${nodeLogDir()}.`);
+    for (const r of results) if (r.flaky) console.log(`  ${flakyLine(TARGET.dbType, r.name, r.flaky)}`);
     // Repeated from the start of the run, because the summary is the part anyone reads.
     if (unregistered.length > 0) {
         console.log(`  ${unregistered.length} file(s) in test/ are on no list and ran nowhere: ${unregistered.join(', ')}`);

@@ -14,6 +14,14 @@ on:
     # 00:00 UTC is 03:00 in Helsinki during summer time and 02:00 in winter.
     - cron: '0 0 * * *'
   workflow_dispatch:
+    inputs:
+      # pnpm ready sets it (2026-11-19): a suite red in its shard runs once more alone, and one that
+      # passes alone is named [e2e-flaky] instead of stopping the merge. The nightly leaves it off, so
+      # a suite that fails for timing stays red there, where it is seen and fixed.
+      retry_red:
+        description: 'Run a red suite once more, alone; green alone is named flaky, not red'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -141,7 +149,7 @@ jobs:
         env:
           AIMEAT_E2E_NODE_ENTRY: dist
           AIMEAT_E2E_NO_ANNOTATIONS: '1'
-        run: pnpm test:e2e:${{ matrix.backend }} --shard=${{ matrix.shard }}/4 --results-out=test-results/e2e-shard/results-${{ matrix.backend }}-${{ matrix.shard }}.json
+        run: pnpm test:e2e:${{ matrix.backend }} --shard=${{ matrix.shard }}/4 --results-out=test-results/e2e-shard/results-${{ matrix.backend }}-${{ matrix.shard }}.json ${{ inputs.retry_red && '--retry-red' || '' }}
 
       - name: Hand the shard's results to the merge job
         if: ${{ !cancelled() }}
