@@ -7,10 +7,13 @@
  *   resolving organism-scoped moderation config when a flagged memory key belongs to an organism.
  *
  * @structure
- *   - VALID_REVIEW_STATUSES: the statuses a reviewer may set
  *   - flagsRouter(config, storage): POST /v1/flags plus flag listing/review routes
  *
  * @version-history
+ *   2026-11-19 — GET /v1/flags and PUT /v1/flags/:id run services/moderation/review.ts
+ *     (listFlagsForReview, reviewFlag), which the MCP tools aimeat_admin_flags and
+ *     aimeat_admin_flag_review run too; the review rules and VALID_REVIEW_STATUSES moved there
+ *     unchanged (feature audit 2026-11-19, 4.4 item 3).
  *   2026-10-31 — The public summary's `hidden` counts active flags once per reporting account, as the
  *     board hide does (secaudit2026oct31w2 round 10, W2-8).
  *   v1.3.1 — 2026-10-16 — PUT /v1/flags/:id: the organism-admin branch compares admins[] with the bare owner name as well as the GHII. admins[] holds bare names, so the branch matched nobody and an organism admin in person got 403 on their organism's flags (QA audit F13-03, test/e2e-flag-review.ts).
@@ -27,8 +30,8 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireOperator, requireScope, isOwnerPrincipal } from '../auth/middleware.js';
-import { isForeignPrincipal } from '../utils/gaii.js';
+import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
+import { listFlagsForReview, reviewFlag, pageOf } from '../services/moderation/review.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { FlagCreateSchema, validateBody } from '../models/schemas.js';
@@ -38,9 +41,6 @@ import {
     resolveOrganismForFlag,
     activeReporterCount,
 } from '../services/moderation-flags.js';
-import { isOperatorCaller } from '../services/operator/override.js';
-
-const VALID_REVIEW_STATUSES = ['dismissed', 'actioned'] as const;
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -112,10 +112,9 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
     router.get('/v1/flags', requireAuth(), requireOperator(storage), async (req, res) => {
         const status = req.query.status as string | undefined;
         const targetType = req.query.targetType as string | undefined;
-        const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
-        const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string, 10) || 20));
+        const { page, perPage } = pageOf(req.query.page, req.query.per_page);
 
-        const flags = await storage.listFlags({ status, targetType, page, perPage });
+        const flags = await listFlagsForReview(storage, { status, targetType, page, perPage });
 
         res.json(success(config.nodeId, flags, [
             { description: 'Create a new flag', method: 'POST', url: '/v1/flags' },
@@ -125,61 +124,14 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
     // ── PUT /v1/flags/:id — Update flag status (operator or organism admin) ──
     router.put('/v1/flags/:id', requireAuth(), async (req, res) => {
         const id = param(req.params.id);
-        const { status: newStatus } = req.body ?? {};
-
-        if (!newStatus || !(VALID_REVIEW_STATUSES as readonly string[]).includes(newStatus)) {
-            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR',
-                `Invalid status. Must be one of: ${VALID_REVIEW_STATUSES.join(', ')}`));
+        // Who may decide, and the order of the checks: services/moderation/review.ts reviewFlag, which
+        // aimeat_admin_flag_review runs too.
+        const out = await reviewFlag({ storage, config }, req.auth!, id, req.body?.status);
+        if (!out.ok) {
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
             return;
         }
-
-        const existing = await storage.getFlag(id);
-        if (!existing) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Flag not found: ${id}`));
-            return;
-        }
-
-        // Phase 2.4 — Allow organism admins to moderate flags within their organism
-        //
-        // THE ADMIN PATH ASKS WHO IS CALLING, not whose name the call carries. It read the GHII from
-        // `req.auth.owner`, which every principal acting for that person carries — so the admin's
-        // own agent, holding no scope for this and never granted it, moderated in their name, and a
-        // visitor signed in from another node under the same name did too, on a door whose only
-        // gate is requireAuth(). The owner name is not a principal (invariant 11). Found by the AI
-        // triage of 2026-09-13.
-        // Moderating a flag is the node's moderation work, not an act in one person's account, so
-        // the operator check writes no trail.
-        const isOperator = await isOperatorCaller(storage, req.auth);
-        let isOrganismAdmin = false;
-        if (!isOperator && isOwnerPrincipal(req.auth) && !isForeignPrincipal(req.auth)) {
-            const organism = await resolveOrganismForFlag(storage, existing.targetType, existing.targetId);
-            if (organism) {
-                // admins[] holds the bare owner name everywhere it is written (organism-lifecycle,
-                // membership, workspace-access), so the comparison with the GHII alone matched nobody
-                // and an organism admin got 403 here until 2026-10-16. The bare name is safe to
-                // compare only because the principal test above has already refused an agent, an app,
-                // an ecosystem principal and a visitor from another node. The GHII form stays for a
-                // record written in that form; routes/appeals.ts asks the same two questions.
-                const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);
-                if (organism.admins.includes(req.auth!.owner)
-                    || (ghiiRecord && organism.admins.includes(ghiiRecord.ghii))) {
-                    isOrganismAdmin = true;
-                }
-            }
-        }
-
-        if (!isOperator && !isOrganismAdmin) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-                'Only operators or organism admins can moderate flags'));
-            return;
-        }
-
-        const now = new Date().toISOString();
-        const updated = await storage.updateFlag(id, {
-            status: newStatus,
-            reviewedBy: req.auth!.sub,
-            reviewedAt: now,
-        });
+        const { flag: updated, existing } = out;
 
         res.json(success(config.nodeId, updated, [
             { description: 'View all flags', method: 'GET', url: '/v1/flags' },

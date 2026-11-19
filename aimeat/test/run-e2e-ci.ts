@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- test/e2e-moderation-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 3).
  *   2026-11-19 -- test/e2e-ecosystem-apps-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 2).
  *   2026-11-19 -- test/e2e-owner-export-records.ts joins ALL_SUITES (feature audit 2026-11-19, item 4.2).
  *   2026-11-19 -- test/e2e-app-task-start.ts joins ALL_SUITES (feature audit 2026-11-19, item 2.1).
@@ -1717,6 +1718,9 @@ const ALL_SUITES = [
     // The outside apps connected to an account, listed and removed from the chat
     // (aimeat_ecosystem_app_list, _revoke) and over REST by the owner's agent with account:security.
     'test/e2e-ecosystem-apps-mcp.ts',
+    // The moderation review from the chat: the operator's flag list and decision, an appeal, and the
+    // appeals an organism's creator decides through their own agent.
+    'test/e2e-moderation-mcp.ts',
     // The owner stops an agent and starts it again: new work waits and nobody can start it, a
     // scheduled run is skipped, the runtime is not woken, and a start releases what waited.
     'test/e2e-agent-stop.ts',

@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.38.0 -- 2026-11-19 -- Moderation review: aimeat_admin_flags, _flag_review, aimeat_flag_appeal, aimeat_appeals, aimeat_appeal_review.
  *   v1.37.0 -- 2026-11-19 -- Outside apps: aimeat_ecosystem_app_list and aimeat_ecosystem_app_revoke.
  *   v1.36.6 -- 2026-11-15 -- The SSO and offboarding paragraphs say connection, sign-in and action, not door.
  *   v1.36.5 -- 2026-11-15 -- The usage paragraph says "this server's own key", not "the house key".
@@ -349,6 +350,10 @@ an author with \`author_key\`, which collapses \`alice\` and \`alice@node-id\` i
 call a \`maturity\` with \`declared: false\` an undeclared word rather than printing it as ours.
 \`reviews\` and \`last_review\` are how you answer "has anybody looked at this") ·
 \`aimeat_flag_report\` — report content (board post, agent, etc.) for moderation.
+The review: \`aimeat_admin_flags\` lists the flags and \`aimeat_admin_flag_review\` dismisses or
+actions one (operator, with \`operator:admin\`); the content owner appeals with \`aimeat_flag_appeal\`;
+\`aimeat_appeals\` lists the appeals your owner decides (every one for an operator, an organism's for
+its creator or an admin) and \`aimeat_appeal_review\` upholds or overturns one. Ask before you decide.
 
 **Sharing groups (owner governance).** \`aimeat_group_list\` · \`aimeat_group_get\` ·
 \`aimeat_group_create\` · \`aimeat_group_add_member\` · \`aimeat_group_remove_member\`. Groups back

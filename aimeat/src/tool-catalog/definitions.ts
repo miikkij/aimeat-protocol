@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-19 -- definitions/moderation.ts: aimeat_admin_flags, aimeat_admin_flag_review,
+ *     aimeat_flag_appeal, aimeat_appeals and aimeat_appeal_review.
  *   v1.x -- 2026-11-19 -- definitions/ecosystem-apps.ts: aimeat_ecosystem_app_list and _revoke.
  *   v1.x -- 2026-11-15 -- definitions/disputes.ts: aimeat_admin_disputes and aimeat_admin_dispute_rule.
  *   v1.x -- 2026-11-14 -- definitions/help.ts: aimeat_help_find, _ask, _inbox, _respond, _close,
@@ -130,6 +132,7 @@ import { organismAgentTools } from './definitions/organism-agents.js';
 import { teamTools } from './definitions/teams.js';
 import { organismJoinRequestTools } from './definitions/organism-join-requests.js';
 import { ecosystemAppTools } from './definitions/ecosystem-apps.js';
+import { moderationTools } from './definitions/moderation.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
@@ -208,6 +211,7 @@ const CATALOG = [
     ...disputeTools,
     ...csmTools,
     ...ecosystemAppTools,
+    ...moderationTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;

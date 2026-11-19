@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-11-19 — registerModerationReviewTools (the moderation review: flags and appeals, mcp/flags.ts).
  *   2026-11-19 — registerEcosystemAppTools (aimeat_ecosystem_app_list and _revoke, mcp/ecosystem-apps.ts).
  *   2026-11-14 — registerHelpTools (aimeat_help_*: Ask someone who knows, mcp/help.ts).
  *   2026-11-14 — registerSecretShareTools (aimeat_secret_share_*: secret shares and requests, mcp/secret-shares.ts).
@@ -140,7 +141,7 @@ import { registerCommerceTools } from './commerce.js';
 import { registerExchangeTools } from './exchange.js';
 import { registerExchangeRunTools } from './exchange-run.js';
 import { registerChatInstancesTools } from './chat-instances.js';
-import { registerFlagsTools } from './flags.js';
+import { registerFlagsTools, registerModerationReviewTools } from './flags.js';
 import { registerPromptsTools } from './prompts.js';
 import { registerCapabilitiesTools } from './capabilities.js';
 import { registerCortexTools } from './cortex.js';
@@ -291,6 +292,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerExchangeRunTools(mcp, storage, config, agentGaii, getToken, scopes);
     registerChatInstancesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
     registerFlagsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerModerationReviewTools(mcp, storage, config, caller);
     registerPromptsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, deps.role ?? 'all', caller);
     registerCapabilitiesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, getToken, scopes, caller);
     // The second primitive, beside aimeat_discover: run what you found. Needs the session's

@@ -259,9 +259,11 @@
         "aimeat/src/routes/realtime.ts",
         "aimeat/src/services/moderation-flags.ts",
         "aimeat/src/routes/flags.ts",
-        "aimeat/src/routes/appeals.ts"
+        "aimeat/src/routes/appeals.ts",
+        "aimeat/src/services/moderation",
+        "aimeat/src/tool-catalog/definitions/moderation.ts"
       ],
-      "digest": "sha256:e10936ff4bb21276031058d0"
+      "digest": "sha256:c2bc0a4aa739f26b3f7e42c9"
     },
     "14. Economy, marketplace and payments": {
       "reviewedOn": "2026-11-19",
@@ -834,8 +836,10 @@
       "aimeat/src/routes/presence.ts": "392e73e3f49e1c74",
       "aimeat/src/routes/realtime.ts": "996d262342183a1a",
       "aimeat/src/services/moderation-flags.ts": "a980133ff2cdb4af",
-      "aimeat/src/routes/flags.ts": "d317dcf0be89e219",
-      "aimeat/src/routes/appeals.ts": "612154b6fc922cb4"
+      "aimeat/src/routes/flags.ts": "2ca2b2eb6fa311b9",
+      "aimeat/src/routes/appeals.ts": "7bcd674e560cc7c7",
+      "aimeat/src/services/moderation/review.ts": "2f0c402c832ebc53",
+      "aimeat/src/tool-catalog/definitions/moderation.ts": "ae6a9716b37aa0a0"
     },
     "14. Economy, marketplace and payments": {
       "aimeat/src/tool-catalog/definitions/commerce.ts": "8575293c37968368",
