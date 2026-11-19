@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.37.0 -- 2026-11-19 -- Outside apps: aimeat_ecosystem_app_list and aimeat_ecosystem_app_revoke.
  *   v1.36.6 -- 2026-11-15 -- The SSO and offboarding paragraphs say connection, sign-in and action, not door.
  *   v1.36.5 -- 2026-11-15 -- The usage paragraph says "this server's own key", not "the house key".
  *   v1.36.4 -- 2026-11-15 -- consent.app_party_max: the most people one app holds (10 000), in place of the fixed 1000.
@@ -358,6 +359,8 @@ for what purpose, with TTL) · \`aimeat_consent_list\` · \`aimeat_consent_revok
 what the server enforces on cross-agent reads — this is the access-control layer, not just metadata.
 \`aimeat_consent_list\` shows you the consents you gave yourself; to see every consent of your owner's
 account, the owner's own and the other agents', ask the owner for \`consent:read-as-owner\`.
+The outside programs connected to the account (ecosystem apps) are \`aimeat_ecosystem_app_list\` and
+\`aimeat_ecosystem_app_revoke\`, both behind account:security.
 
 **Owner-managed agent classification.** \`aimeat_agent_mode_set\` (autonomous/interactive/task-runner/
 coordinator/workstation) · \`aimeat_agent_tags_set\` (crew:/role:/project: tags, max 20).

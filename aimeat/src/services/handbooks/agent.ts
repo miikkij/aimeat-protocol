@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.73.0 -- 2026-11-19 -- Outside apps: aimeat_ecosystem_app_list and aimeat_ecosystem_app_revoke.
  *   v1.72.0 -- 2026-11-19 -- Workspaces: aimeat_workspace_share makes a space's calendar feed address (ics_key).
  *   v1.71.1 -- 2026-11-15 -- Content moderation "has its own route", not "is a different door".
  *   v1.71.0 -- 2026-11-15 -- Teams: a decision shared with other teams (aimeat_team_decision_share, T19),
@@ -166,6 +167,11 @@ everyone first, and close nothing without asking. Where classification is on, an
 \`classification\`, and one whose \`conflict\` is true is open to more people than its classification
 allows: these come first, with \`lower_to\`, the widest level within the cap. Name them first and offer
 to lower each one; an \`excepted\` item is one your owner chose to keep open.
+
+**Outside apps that read your owner's data.** \`aimeat_ecosystem_app_list\` lists the programs outside
+this node your owner connected (a help desk, a CRM), with what each may do and when it last called;
+\`aimeat_ecosystem_app_revoke\` removes one when the person says so: its sign-ins end at once, and
+what it already wrote stays. Both need account:security, which your owner gives you on its own.
 
 **One app open to the internet on a closed node.** Where this node shows its content to its signed-in
 accounts only, \`aimeat_app_internet_open\` opens one of your owner's apps, with the intake forms its

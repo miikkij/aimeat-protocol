@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-11-19 — registerEcosystemAppTools (aimeat_ecosystem_app_list and _revoke, mcp/ecosystem-apps.ts).
  *   2026-11-14 — registerHelpTools (aimeat_help_*: Ask someone who knows, mcp/help.ts).
  *   2026-11-14 — registerSecretShareTools (aimeat_secret_share_*: secret shares and requests, mcp/secret-shares.ts).
  *   2026-11-13 — registerAgentOnboardingTools, registerAgentCapabilityTools and registerAgentMessageTools receive the session's caller
@@ -203,6 +204,7 @@ import { registerGoalTools } from './goals.js';
 import { registerBuildWithYouTools } from './build-with-you.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
+import { registerEcosystemAppTools } from './ecosystem-apps.js';
 import { registerSecretTools } from './secrets.js';
 import { registerSecretShareTools } from './secret-shares.js';
 import { registerHelpTools } from './help.js';
@@ -280,6 +282,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerWalletExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerConsentTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAccessTools(mcp, storage, config, agentGaii);
+    registerEcosystemAppTools(mcp, storage, config, caller);
     registerSecretTools(mcp, storage, config, agentGaii);
     registerSecretShareTools(mcp, storage, config, caller);
     registerHelpTools(mcp, storage, config, caller);

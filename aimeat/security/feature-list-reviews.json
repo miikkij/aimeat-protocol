@@ -56,6 +56,7 @@
         "aimeat/src/routes/ecosystem-apps-reconnect.ts",
         "aimeat/src/services/ecosystem",
         "aimeat/src/routes/ecosystem-apps-capability-approvals.ts",
+        "aimeat/src/tool-catalog/definitions/ecosystem-apps.ts",
         "aimeat/src/routes/agents-v2.ts",
         "aimeat/src/routes/access-tokens.ts",
         "aimeat/src/routes/attestations.ts",
@@ -63,7 +64,7 @@
         "aimeat/src/routes/docsign.ts",
         "aimeat/src/routes/docsign-wallet.ts"
       ],
-      "digest": "sha256:40bda691b9bcecb963f8f6b0"
+      "digest": "sha256:1635bb69d1ebeba808ce18a7"
     },
     "4. Access, consent and sharing": {
       "reviewedOn": "2026-11-19",
@@ -555,7 +556,7 @@
       "aimeat/src/routes/agents/permission-allow.ts": "66eac8b49cd632fc",
       "aimeat/src/services/agent/refusals.ts": "f8353846562df23f",
       "aimeat/src/services/place-agent-scopes.ts": "0c1e9e8f9a79bcc1",
-      "aimeat/src/routes/ecosystem-apps.ts": "7dd14225da5eabbf",
+      "aimeat/src/routes/ecosystem-apps.ts": "4de20cfc792c45e2",
       "aimeat/src/routes/ecosystem-apps-reconnect.ts": "fe3694c59c04e72b",
       "aimeat/src/services/ecosystem/access.ts": "5116793e3d6ff610",
       "aimeat/src/services/ecosystem/automation-advisories.ts": "ca57bc645a9e1fb5",
@@ -563,9 +564,11 @@
       "aimeat/src/services/ecosystem/automation.ts": "0b61c56d9a2e3a3d",
       "aimeat/src/services/ecosystem/events.ts": "1374e9573e3fd937",
       "aimeat/src/services/ecosystem/own-tick-scopes.ts": "29008c8458081c7a",
+      "aimeat/src/services/ecosystem/owner-apps.ts": "f473c450af3e1b1d",
       "aimeat/src/services/ecosystem/refresh.ts": "d6b692dc36602de1",
       "aimeat/src/services/ecosystem/subscriptions-by-owner.ts": "a61b41227110bcee",
       "aimeat/src/routes/ecosystem-apps-capability-approvals.ts": "eb04114d3b453d71",
+      "aimeat/src/tool-catalog/definitions/ecosystem-apps.ts": "c4caa827e051b133",
       "aimeat/src/routes/agents-v2.ts": "bfce91f673f63f62",
       "aimeat/src/routes/access-tokens.ts": "9e601703a10719ba",
       "aimeat/src/routes/attestations.ts": "3278901c711258d5",

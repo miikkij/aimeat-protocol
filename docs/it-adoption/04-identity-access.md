@@ -202,12 +202,13 @@ The node has one account role above a person, `operator`. There is no separate `
 | Grant or revoke the operator role | yes (not the last operator, not self) | no | no | no | only with `operator:admin` | no | no |
 | Read and write own memory, files, apps | yes | yes | yes | yes | within its scopes | within its scopes and data areas | within the granted scopes |
 | Change password, recovery address, second factor, passkeys | own account | own account | own account | own account | only with `account:security`, an exact tick | no | never |
+| List and remove the ecosystem apps connected to the account | own account | own account | own account | own account | only with `account:security`, an exact tick | no | no |
 | Invite and remove organism members, grant workspace roles | as owner of the organism | as owner of the organism | yes | no | with `organism:invite`, where its owner may | no | no |
 | Read a workspace | as granted | as granted | yes | as granted (`viewer`, `contributor`) | its owner's grants, within its scopes and clearance | as scoped | as scoped |
 | Publish an app | yes | yes | yes | yes | with `app:write` | within its scopes | not with `app:write`, which an app cannot ask |
 | Approve an agent | own agents | own agents | own agents | own agents | a sibling, never with more scopes than its own | no | no |
 
-Sources: `aimeat/src/auth/middleware.ts` (role order operator, owner, agent or ecosystem), `aimeat/src/routes/admin/monitoring.ts` (operator grant and revoke), `aimeat/src/auth/account-security.ts` (account security doors), `aimeat/src/services/workspace/roles.ts` (workspace roles go to the person and their agents), `aimeat/src/services/app/grant-vocabulary.ts` (what an app may ask), `aimeat/src/utils/scope-coverage.ts` (words outside every wildcard).
+Sources: `aimeat/src/auth/middleware.ts` (role order operator, owner, agent or ecosystem), `aimeat/src/routes/admin/monitoring.ts` (operator grant and revoke), `aimeat/src/auth/account-security.ts` (account security doors), `aimeat/src/routes/ecosystem-apps.ts` (listing and removing ecosystem apps), `aimeat/src/services/workspace/roles.ts` (workspace roles go to the person and their agents), `aimeat/src/services/app/grant-vocabulary.ts` (what an app may ask), `aimeat/src/utils/scope-coverage.ts` (words outside every wildcard).
 
 ## Agent identities
 

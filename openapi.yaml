@@ -9191,6 +9191,9 @@ paths:
     get:
       operationId: ecosystemAppsList
       summary: List the owner's connected GEAIs
+      description: |
+        The owner, or the owner's own agent holding `account:security` (the scope no wildcard
+        carries); never an app grant or an ecosystem app. Also `aimeat_ecosystem_app_list`.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -9708,6 +9711,8 @@ paths:
         changed and so holds, are the owner's and keep working; `receivers_kept` names them (`why`
         is `made` or `key`) and the owner gets a notice when there are any.
         Returns `{ deleted: true, app, geai, receivers_kept }`.
+        The owner, or the owner's own agent holding `account:security`; never an app grant or an
+        ecosystem app. Also `aimeat_ecosystem_app_revoke`.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -9721,7 +9726,7 @@ paths:
         '200':
           description: "Deleted. Response data is `{ deleted: true, app, geai, receivers_kept: { count, receivers: [{ name, display_name, state, why }] } }`."
         '403':
-          description: Owner role required.
+          description: Neither the owner nor the owner's agent holding account:security.
         '404':
           description: Ecosystem app not found for this owner.
 

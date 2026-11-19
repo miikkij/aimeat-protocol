@@ -22,6 +22,11 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   2026-11-19 — GET /v1/ecosystem-apps and DELETE /v1/ecosystem-apps/:app admit the owner's own
+ *     agent holding account:security as well as the owner, never an app grant or an ecosystem app,
+ *     and run services/ecosystem/owner-apps.ts, which the MCP tools aimeat_ecosystem_app_list and
+ *     aimeat_ecosystem_app_revoke run too (feature audit 2026-11-19, 4.4 item 2). The list and the
+ *     removal moved there unchanged.
  *   2026-11-15 — A `memory` data area is accepted at hello and approve and left out of what is stored
  *     and shown: GET /pending, the approved binding and GET /v1/ecosystem-apps carry organism areas
  *     and any other area, never a memory one, since a GEAI's own namespace needs no grant and no gate
@@ -80,21 +85,20 @@
  *     stored at /hello, copied onto the EcosystemApp at /approve, returned from GET /v1/ecosystem-apps.
  *     The portal renders it (locale-appropriate) as the app's own setup guidance in the card.
  */
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, EcoDataAreaGrant, EcosystemAppRecord, EcoAutomationRecipe } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope } from '../auth/middleware.js';
+import { callerOf } from '../middleware/caller.js';
+import { listOwnerEcosystemApps, revokeOwnerEcosystemApp } from '../services/ecosystem/owner-apps.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateAppName, validateOwnerName, buildGEAI, generateUserCode } from '../utils/gaii.js';
-import { receiversMadeBy, noticeReceiversKept } from '../services/receivers/makers.js';
-import { exceedsCeiling } from '../utils/scope-coverage.js';
+import { exceedsCeiling, ACCOUNT_SECURITY_SCOPE } from '../utils/scope-coverage.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
 import { validateEcoManifest } from '../models/ecosystem-manifest.js';
 import { emitChange } from '../services/event-bus.js';
-import { emitEcosystemBindingRevoked } from '../services/ecosystem/events.js';
-import { logger } from '../utils/logger.js';
 import { pendingPrefix, PENDING_TYPE, type PendingAdvisoryRecord } from '../services/ecosystem/automation-advisories.js';
 import { registerEcosystemAdvisoryRoutes } from './ecosystem-apps-advisories.js';
 import { registerEcoCapabilityApprovalRoutes } from './ecosystem-apps-capability-approvals.js';
@@ -115,6 +119,15 @@ function scopesWithinCeiling(requested: string[], ceiling: string[]): string[] {
 
 export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler): Router {
   const router = Router();
+
+  // The list and the removal admit the account holder and the holder's own agents; never an app
+  // grant or an ecosystem app, which are themselves keys on that list. False when it refused.
+  const ownerOrOwnAgent = (req: Request, res: Response): boolean => {
+    const caller = callerOf(req, config.nodeId, storage);
+    if (caller.kind === 'owner' || caller.kind === 'agent') return true;
+    res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'This is for the account holder and their own agents.'));
+    return false;
+  };
 
   // ── POST /v1/ecosystem-apps/hello — start the "hello integration" handshake ──
   // Bidirectional: works whether the ecosystem app dials in or the owner initiates from AIMEAT.
@@ -513,28 +526,12 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
   });
 
   // ── GET /v1/ecosystem-apps — owner lists their connected GEAIs ──
-  router.get('/v1/ecosystem-apps', requireAuth(), requireRole('owner'), async (req, res) => {
-    const apps = await storage.getEcosystemAppsByOwner(req.auth!.owner);
+  // The owner, or the owner's own agent holding account:security (aimeat_ecosystem_app_list): an
+  // outside app is a key to the account, read where the Access page's keys are read.
+  router.get('/v1/ecosystem-apps', requireAuth(), requireRoleOrScope('owner', ACCOUNT_SECURITY_SCOPE), async (req, res) => {
+    if (!ownerOrOwnAgent(req, res)) return;
     res.json(success(config.nodeId, {
-      ecosystem_apps: apps.map((a) => ({
-        geai: a.geai,
-        app: a.app,
-        owner: a.owner,
-        display_name: a.displayName,
-        description: a.description,
-        scopes: a.scopes,
-        // An app approved before 2026-11-15 can still hold a `memory` area; it is not shown (L045).
-        data_areas: approvableDataAreas(a.dataAreas ?? []),
-        status: a.status,
-        public_key: a.publicKey,
-        capabilities: a.capabilities ?? [],
-        automation: a.automation ?? null,
-        setup: a.setup ?? null,
-        // What the owner allowed other accounts' capabilities to have this app run, and what waits.
-        capability_approvals: a.capabilityApprovals ?? [],
-        created_at: a.createdAt,
-        last_seen: a.lastSeen,
-      })),
+      ecosystem_apps: await listOwnerEcosystemApps(storage, req.auth!.owner),
     }, [
       { description: 'Connect a new ecosystem app', method: 'POST', url: '/v1/ecosystem-apps/hello' },
     ]));
@@ -747,56 +744,16 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
   // card vanishes from the list (no lingering 'revoked' ghost), and (3) clean up the app-owned
   // automation config (recipe + eco-capability schedules + pending advisories). The owner's
   // DEPOSITED insight data (e.g. feedback.stats.*) is the owner's refined data and is PRESERVED.
-  router.delete('/v1/ecosystem-apps/:app', requireAuth(), requireRole('owner'), async (req, res) => {
-    const app = req.params.app as string;
-    const owner = req.auth!.owner;
-    const record = await storage.getEcosystemAppByOwnerAndApp(owner, app);
-    if (!record) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Ecosystem app "${app}" not found under owner "${owner}"`));
+  // The owner, or the owner's own agent holding account:security (aimeat_ecosystem_app_revoke). The
+  // steps and what stays are services/ecosystem/owner-apps.ts revokeOwnerEcosystemApp.
+  router.delete('/v1/ecosystem-apps/:app', requireAuth(), requireRoleOrScope('owner', ACCOUNT_SECURITY_SCOPE), async (req, res) => {
+    if (!ownerOrOwnAgent(req, res)) return;
+    const out = await revokeOwnerEcosystemApp({ storage, config, scheduler }, req.auth!.owner, req.params.app as string);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-    const ownerGhii = `${owner}@${config.nodeId}`;
-
-    // 1) Lifecycle outbound event FIRST (best-effort) — emit while the grant is still present so the
-    //    live grant re-check passes; the connected app/desk reacts to binding.revoked and drops its side.
-    await emitEcosystemBindingRevoked(storage, config, ownerGhii, record.geai, 'owner_revoked').catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: best-effort', { error: String(err) }); });
-
-    // 2) End every credential this app holds, THEN delete the principal row. Deleting the row alone
-    //    left the app's ninety-day bearer authenticating for the rest of its life — the card was
-    //    gone, DELETE answered 404, and the owner had no surface left to stop it. Every session
-    //    rather than one, because each re-approval mints another. Order matters: the row has to go
-    //    after, or a token minted between the two calls survives.
-    for (const s of await storage.listActiveSessions(owner)) {
-      if (s.gaii === record.geai) await storage.revokeSession(s.sessionId);
-    }
-
-    await storage.deleteEcosystemApp(record.geai);
-
-    // 3a) Remove the app's automation recipe (the "data published → run agents" rule), if any.
-    await storage.deleteAutomationRecipe(owner, app).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: best-effort', { error: String(err) }); });
-
-    // 3b) Remove the app's eco-capability schedules (cron jobs that invoke this app's capability).
-    const jobs = await storage.listScheduledJobs({ type: 'eco-capability', ownerScope: ownerGhii }).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: continuing after a suppressed failure', { error: String(err) }); return []; });
-    for (const job of jobs) {
-      if ((job.input as { app?: string } | undefined)?.app === app) {
-        scheduler.removeJob(job.id);
-        await storage.deleteScheduledJob(job.id).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: best-effort', { error: String(err) }); });
-      }
-    }
-
-    // 3c) Drop any pending (awaiting-approval) advisories parked in owner memory for this app.
-    const pendingItems = await storage.listMemory(ownerGhii, { prefix: pendingPrefix(app) }).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: continuing after a suppressed failure', { error: String(err) }); return []; });
-    for (const item of pendingItems) {
-      await storage.deleteMemory(ownerGhii, item.key).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: best-effort', { error: String(err) }); });
-    }
-
-    // NOTE: the app's DEPOSITED insight data (its eco: namespace writes into the owner's Memory)
-    // is the owner's refined data and is intentionally LEFT IN PLACE. So are the receivers it made:
-    // they are the owner's and keep working; the answer and a notice say so (ruling 3, 2026-11-08).
-    const receiversKept = await receiversMadeBy(storage, ownerGhii, record.geai);
-    await noticeReceiversKept(storage, ownerGhii, app, receiversKept);
-
-    res.json(success(config.nodeId, { deleted: true, app, geai: record.geai, receivers_kept: receiversKept }));
+    res.json(success(config.nodeId, out.data));
     emitChange('ecosystem-apps');
   });
 

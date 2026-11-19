@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- test/e2e-ecosystem-apps-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 2).
  *   2026-11-19 -- test/e2e-owner-export-records.ts joins ALL_SUITES (feature audit 2026-11-19, item 4.2).
  *   2026-11-19 -- test/e2e-app-task-start.ts joins ALL_SUITES (feature audit 2026-11-19, item 2.1).
  *   2026-11-19 -- e2e-data-wallet-agent-consents.ts joins the list (not the guard tier): the Data Wallet lists and revokes the consents the person's agents gave (feature audit 2026-11-19, 1.4).
@@ -1713,6 +1714,9 @@ const ALL_SUITES = [
     // An app's start of a task that waited for the owner in person: the trail entry, the notice,
     // and the agent's setting that makes such a task wait also when an app starts it.
     'test/e2e-app-task-start.ts',
+    // The outside apps connected to an account, listed and removed from the chat
+    // (aimeat_ecosystem_app_list, _revoke) and over REST by the owner's agent with account:security.
+    'test/e2e-ecosystem-apps-mcp.ts',
     // The owner stops an agent and starts it again: new work waits and nobody can start it, a
     // scheduled run is skipped, the runtime is not woken, and a start releases what waited.
     'test/e2e-agent-stop.ts',
