@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-19 — Section 6: erasure removes each app as its delete does, and no node log names the
+ *     erased person afterwards: the site change log and reviews name a pseudonym, flags on their
+ *     content and their appeals go, the activity feed drops their app events (services/owner/erasure.ts).
  *   2026-11-19 — The account export's row names the records it carries since 2026-11-19 (routes/owners/export-records.ts).
  *   2026-11-15 — An imported agent's trust score is capped on import, not "on the way in".
  *   2026-11-15 — Section 4: an AI's delete in a team waits for a lead while the team's approval gate
@@ -359,7 +362,14 @@ let knowledge age, and you should offer them, not wait to be asked:
   and requests they made (a secret someone already picked up stays with that person) and their browsers'
   keys for end-to-end secrets, the questions they asked others here and their choices for being asked
   (a question someone else asked them goes from their side too), and apps, with the people who
-  registered to those apps without an account and everything those people kept in them. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
+  registered to those apps without an account and everything those people kept in them. Each app
+  goes the way its own delete goes, so what only that app used goes with it: the permissions other
+  people gave the app, the devices that took its notifications and the AI settings of other people
+  that name it. No log of the node names them after the erasure: the lines of the site change log
+  about their app deletes and forks name a pseudonym instead of their name, flags on their content
+  and their appeals go, a review they made names the pseudonym, and the public activity feed drops
+  the events about their apps. A notification in another person's inbox stays, as that person's own
+  copy, and expires within 90 days. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a
   pseudonym: finished work and disputes (the other party has a right to them), other people's ledger

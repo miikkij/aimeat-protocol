@@ -199,7 +199,7 @@
       "digest": "sha256:e48c7f9b5cedd4b37cdcba7c"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/schedule/fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -226,7 +226,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:70547c6a97bf39dcc15e2d3b"
+      "digest": "sha256:ce161ecc6fb18bbd69da0192"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -454,7 +454,7 @@
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
-      "aimeat/security/process-local-baseline.json": "f598655c66522e13",
+      "aimeat/security/process-local-baseline.json": "ba1feda9ff48b632",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52",

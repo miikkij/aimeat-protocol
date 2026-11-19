@@ -30,6 +30,8 @@
  * @structure WORKSPACE_CONTRACTS_SKILL_ENTRY
  * @usage import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
  * @version-history
+ *   v1.1.5 — 2026-11-19 — Section 9: an app's start of a waiting task waits too when the owner set
+ *     task_start_app_waits (services/agent/task-rules.ts appStartWaits).
  *   v1.1.4 — 2026-10-28 — The task-start floor reads permissions given by name; `*` holds no task.
  *   v1.1.3 — 2026-10-17 — A document space's own strict schema lists `id`: the node writes it into every
  *     document, and a schema without it refuses every page.
@@ -255,7 +257,10 @@ owner lets that agent start tasks by itself (\`aimeat_agent_task_start_set\`, or
 when the owner has said nothing); otherwise it waits for the owner's OK. An agent given by name a
 permission to spend money, or to send or delete in its owner's name, waits for the owner whatever that
 setting says, unless the owner has let it start work with that permission on its card. All
-permissions (\`*\`) does not hold a task: the owner gave it. For an agent of another
+permissions (\`*\`) does not hold a task: the owner gave it. An app the owner gave \`task:write\`
+may start a task that waits, and the owner gets a notification that names the app and the task. When
+the owner sets \`task_start_app_waits\` on the agent (\`aimeat_agent_task_start_set\`), the task waits
+for the owner also when an app starts it. For an agent of another
 account, the creator first gives its owner the contributor role; the adopt task itself is created by
 the agent's own owner.
 

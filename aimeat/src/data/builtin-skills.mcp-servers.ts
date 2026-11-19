@@ -23,6 +23,8 @@
  * @structure MCP_SERVERS_SKILL_ENTRY
  * @usage import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
  * @version-history
+ *   2026-11-19 — Section 4: a server bound to one workspace is called by the workspace creator, the
+ *     group's owners and admins and the members with the contributor role; a viewer only sees it.
  *   2026-11-02 — Section 1: a ready-made server, template "atlassian" (models/mcp-server-templates.ts).
  *   2026-11-02 — Section 1: aimeat_mcp_attach takes auth "oauth". Section 4: a group's server is
  *     reached through the MCP tools by its id, and its OAuth sign-in finishes; a shared server where
@@ -162,8 +164,11 @@ The person in their own session, on their own server, needs no grant.
   can make it free. Servers that run as a local program (stdio) exist only when the operator turned
   them on in the node's configuration and named the allowed commands.
 - **A group's server.** An owner or admin of an organism attaches a server for the group with
-  \`organism_id\` (and \`ws\` to bind it to one workspace, where the workspace roles decide: a
-  contributor may call, a viewer only sees it). Name a group's server by its **id** from
+  \`organism_id\`. With \`ws\` it is bound to one workspace, and the people who may write that
+  workspace may call it: the person who made the workspace, the group's owners and admins, and the
+  members the workspace creator gave the contributor role. A member with the viewer role sees that
+  the server is there and cannot call it, and a member with no role in that workspace does not see
+  it; both get 404, as for a server that does not exist. Name a group's server by its **id** from
   \`aimeat_mcp_list\`; its short name finds it only where it is the person's own or the node's.
 - **Each person with their own account.** For a team tool everybody already has an account on
   (Jira, Confluence, a company wiki), attach the group's server with \`auth: "per-user-oauth"\`; the

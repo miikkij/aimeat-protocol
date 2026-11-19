@@ -9,6 +9,8 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY · AI_GEN_RULES_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-11-19 — configure-routing, aimeat-ai-model-policy, aimeat-gen-rules: an applied change leaves
+ *     an ai_settings_changed account event naming who applied it (services/ai/settings-trail.ts).
  *   2026-11-08 — ai-transparency: what a receiver writes is said as what an incoming webhook writes
  *     (secaudit2026nov08b round 15b).
  *   2026-11-07 — configure-routing: an agent's own text model (the chat's is agent "chat") and the operator's
@@ -265,7 +267,9 @@ chooses the model and nobody else does); \`operator\` on \`GET /v1/ai/policy\` s
 - Model routing and the daily budget go through \`aimeat_operator_ai_config\`: call it without
   \`confirm_token\` to get current/proposed/diff, show the owner the diff, then call again with
   the token. The API key can never be read or changed through it. The model policy works the same
-  way through \`aimeat_ai_policy_set\`.
+  way through \`aimeat_ai_policy_set\`. A change you apply to the model policy, or to the routing
+  through \`PUT /v1/ai/routing\`, leaves a line on the person's account events (\`ai_settings_changed\`,
+  \`GET /v1/account/events\`) that names the setting and your agent.
 - When spend looks wrong, correlate \`/v1/ai/usage/history\` with schedules (\`aimeat_schedule_list\`)
   before blaming a model. An ecosystem app the owner approved with ai:use spends from the owner's
   budget and shows there under \`eco:<name>\`.
@@ -335,7 +339,8 @@ model serves the capability; a model the catalogue does not know counts as a tex
 policy it changes nothing: it returns the proposal and a token. Show the owner what changes, in
 their words ("only the recommended models, for your apps and agents too"), then call again with
 the same policy and \`confirm_token\` (valid ten minutes, one use). The owner in person changes it
-at once (\`PUT /v1/ai/policy\` in their own session).
+at once (\`PUT /v1/ai/policy\` in their own session). Each applied change leaves a line on the
+owner's account events (\`ai_settings_changed\`) that names who applied it.
 
 When the owner has an AI provider and no policy, and the node recommends models, suggest
 \`{ mode: "recommended" }\` once: it gives quality at once, without trying models.
@@ -398,6 +403,8 @@ directive you put into the prompt.
 \`aimeat_ai_gen_rules_set { gen_rules }\` changes nothing at first: it returns the proposal and a
 token. Tell the owner what changes in their words ("people in pictures only as drawings, for all
 your apps"), then call again with the same \`gen_rules\` and \`confirm_token\` (ten minutes, one use).
+The applied change leaves a line on the owner's account events (\`ai_settings_changed\`) that names
+who applied it.
 \`gen_rules\` is \`{ rules?: { "people-artistic": true | false | null }, exceptions?: [{ rule, app:
 "<owner>/<file>.html" (or an ecosystem app's "eco:<name>") | agent: "<name>", reason }] }\`; \`null\` gives the choice back to the node,
 and a given \`exceptions\` replaces the list. The owner also switches them on the AI settings page.

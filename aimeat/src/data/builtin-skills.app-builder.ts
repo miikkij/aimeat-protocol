@@ -25,6 +25,8 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   2026-11-19 — First section: a genre grown out of an app open to some people only is listed and
+ *     given only to those people (services/node/templates.ts, the app's read gate).
  *   2026-11-08 — "Which model builds it" says the model rule by quality (MODEL_QUALITY_ADVICE), never
  *     by name (Jouni).
  *   2026-11-08 — The description's first sentence says a new app is built with
@@ -118,7 +120,9 @@ specification replaces the specification, the templates and the styling this ski
 below; the research, the proposal in the person's own words and the finish still apply.
 
 Over MCP the Atelier specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\`, in
-parts, and the genres are in \`aimeat_app_template_list\` (the ids that begin \`genre-\`).
+parts, and the genres are in \`aimeat_app_template_list\` (the ids that begin \`genre-\`). A genre
+grown out of an app that is open only to some people (one organism, for instance) is listed and
+given only to the people that app admits. Fork only a genre the list gives you.
 
 **Before your first question on a new app, start its structure page**, on either track: pick a
 filename, call \`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose, proposals }\`
