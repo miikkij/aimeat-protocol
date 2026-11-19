@@ -29,6 +29,8 @@
  * @usage
  *   import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
  * @version-history
+ *   v1.0.2 — 2026-11-19 — "What does NOT change" names the Atelier spec and guide only, and section
+ *     from-classic for an app built on the retired Classic track.
  *   v1.0.1 — 2026-09-19 — "What does NOT change" names the Atelier spec and guide beside the
  *     classic ones. The publish size note points here for EVERY oversized app whatever its track
  *     (services/app-size-health.ts), so an Atelier app arriving here was sent to the one spec its
@@ -145,13 +147,11 @@ much, something was inlined.
 ## What does NOT change
 
 - The app is still one HTML file: no imports at runtime, no bundler output with module syntax, no
-  CDN. Everything it loads is a URL the build spec lists — \`GET /v1/prompts/build-app\`, or
-  \`GET /v1/prompts/build-app-atelier\` when the app was built on the Atelier track.
+  CDN. Everything it loads is a URL the build spec lists — \`GET /v1/prompts/build-app-atelier\`.
 - The build step is **yours**, on your machine. The node does not build anything; it serves what
   you publish.
-- Whichever of the two guides built this app still applies — \`aimeat-app-builder\` or
-  \`aimeat-app-builder-atelier\`, and the app's own \`<meta name="aimeat-track">\` line says which.
-  The spec first, research before building, the agent face and the bound skill after publishing.
+- The guide still applies: \`aimeat-app-builder-atelier\` and its specification. An app built on the
+  retired Classic track is moved with the specification's section \`from-classic\`. The spec first, research before building, the agent face and the bound skill after publishing.
 
 ## When you have finished a change
 

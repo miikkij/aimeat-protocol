@@ -36,7 +36,6 @@ export const WEBHOOK_PACKS: LibraryPack[] = [
     changelog: [
       { version: '1.1.0', date: '2026-10-16', summary: 'CHANGED: hosts() throws with err.code when the node refused the allowlist read, and allowHost() then throws and writes nothing; only a missing record reads as an empty list. Before, a refused read let allowHost() store a list holding only the new host.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['webhook', 'post to', 'send to url', 'forward', 'integration', 'zapier', 'make.com', 'callback url', 'push data'],
     sizeEstimate: '~5KB',
     status: 'preview',

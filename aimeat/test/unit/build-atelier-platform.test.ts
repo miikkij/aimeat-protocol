@@ -7,7 +7,7 @@
  *   retired Classic track or its tiers, part `start` names the index, and the parts still rebuild
  *   the full text because the platform sections are not in it.
  * @version-history
- *   v1.0.0 — 2026-11-19 — Initial.
+ *   v1.0.0 — 2026-11-19 — Initial, with `from-classic` and the paste delivery.
  */
 import { describe, it, expect } from 'vitest';
 import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
@@ -36,9 +36,10 @@ describe('Atelier platform sections', () => {
     }
   });
 
-  it('teaches nothing of the Classic track or its tiers', () => {
-    for (const id of ['platform', ...ATELIER_PLATFORM.map(s => s.id)]) {
-      const text = atelierPlatformPiece(id, LONG)!.text;
+  it('teaches nothing of the Classic track or its tiers, except the section that moves a Classic app', () => {
+    for (const id of ['platform', ...ATELIER_PLATFORM.map(s => s.id).filter(x => x !== 'from-classic')]) {
+      // The index names the section that moves a Classic app; that one line may say Classic.
+      const text = atelierPlatformPiece(id, LONG)!.text.split('\n').filter(l => !l.startsWith('- `from-classic`')).join('\n');
       expect(CLASSIC.exec(text)?.[0] ?? null, id).toBeNull();
     }
   });
@@ -59,6 +60,22 @@ describe('Atelier platform sections', () => {
   it('stays out of the full text, so the parts still rebuild it', () => {
     expect(full).not.toContain('## The platform: sections only some apps need');
     expect(full).not.toContain('## Server-side work: an extension');
+  });
+
+  it('moves a Classic app with the Atelier shell, its keys kept and the migration pitfall named', () => {
+    const text = atelierPlatformPiece('from-classic', LONG)!.text;
+    expect(text).toContain('AIMEAT.atelier.section(');
+    expect(text).toContain('every memory key');
+    expect(text).toContain('atelier-kit-migration-traps');
+    expect(text).not.toMatch(/\bT[123]\b|shell-pure-client/);
+  });
+
+  it('gives an AI that cannot connect a preface and the publish-by-hand section', () => {
+    const paste = buildAtelierPrompt(config, { mode: 'new', delivery: 'paste' }).full;
+    expect(paste.startsWith('## Before you start: you are not connected')).toBe(true);
+    expect(paste).toContain('## When the app is ready');
+    expect(paste).toContain(full);
+    expect(buildAtelierPrompt(config, { mode: 'new' }).full).toBe(full);
   });
 
   it('points server-side work at the extension skill and the Microservices Central', () => {

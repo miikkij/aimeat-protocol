@@ -8,7 +8,7 @@ export const CALENDAR_PRINT_PACKS: LibraryPack[] = [
   {
     id:'aimeat-calendar',kind:'sdk',category:'core',title:'Calendar logic',
     description:'Recurring events in IANA timezones, moved and cancelled instances, all-day dates, ISO weeks, ICS import/export, overlapping intervals and available time.',
-    url:'/v1/libs/aimeat-calendar.js',include:['<script src="{{BASE_URL}}/v1/libs/aimeat-calendar.js"></script>'],requires:[],license:'MIT',apiSurface:'AIMEAT.calendar',tierHint:'T1',status:'preview',modelTier:'needs-doc',
+    url:'/v1/libs/aimeat-calendar.js',include:['<script src="{{BASE_URL}}/v1/libs/aimeat-calendar.js"></script>'],requires:[],license:'MIT',apiSurface:'AIMEAT.calendar',status:'preview',modelTier:'needs-doc',
     interviewTriggers:['calendar','booking','schedule','recurrence','kalenteri','ajanvaraus','vuorot'],
     sizeEstimate:'~500KB including timezone and recurrence engines',
     promptGroup:'core',promptLine:'- aimeat-calendar.js: recurring events, IANA zones, ICS and free intervals; the app owns storage.',
@@ -32,7 +32,7 @@ export const CALENDAR_PRINT_PACKS: LibraryPack[] = [
   {
     id:'aimeat-print',kind:'sdk',category:'ui',title:'Printing and paged documents',
     description:'Print HTML, Markdown, tables, cards and calendar occurrences as measured pages with repeated headers, footers and page numbers. Includes preview, branding and browser Save as PDF.',
-    url:'/v1/libs/aimeat-print.js',include:['<script src="{{BASE_URL}}/v1/libs/aimeat-print.js"></script>'],requires:[],license:'MIT',apiSurface:'AIMEAT.print',tierHint:'T1',status:'preview',modelTier:'needs-doc',
+    url:'/v1/libs/aimeat-print.js',include:['<script src="{{BASE_URL}}/v1/libs/aimeat-print.js"></script>'],requires:[],license:'MIT',apiSurface:'AIMEAT.print',status:'preview',modelTier:'needs-doc',
     interviewTriggers:['print','report','pdf','tulosta','tulostus','raportti'],sizeEstimate:'~35KB',
     promptGroup:'core',promptLine:'- aimeat-print.js: paged print preview for HTML, Markdown, tables, cards and calendars; headers, footers and page numbers.',
     aiDoc:[

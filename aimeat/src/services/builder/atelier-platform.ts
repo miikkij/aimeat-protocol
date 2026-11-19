@@ -58,7 +58,23 @@ export const ATELIER_PLATFORM: Array<{ id: string; from?: string; when: string }
   { id: 'agent-face', when: 'Other AI agents should be able to read or operate the published app.' },
   { id: 'install', when: 'The app is installed on a phone: the home-screen icon.' },
   { id: 'publish-by-hand', from: 'publish', when: 'You cannot publish over MCP: you hand the person one HTML file and tell them how to put it on the node.' },
+  { id: 'from-classic', when: 'The app you change was built on the retired Classic track: it loads daisyUI, writes its own sign-in, or declares `aimeat-track` `classic`.' },
 ];
+
+/** The edit path for an app built on the retired Classic track (decision of 2026-11-19, point 2). */
+export const FROM_CLASSIC_SECTION = '## An app built on the retired Classic track\n'
+  + 'Until November 2026 an app could be built on the Classic track: a page that loads daisyUI and Tailwind (`/lib/aimeat-daisyui-bridge.css`), '
+  + 'boots its own sign-in with `AIMEAT.auth.onSession`, carries the theme-restore snippet, and declares `<meta name="aimeat-track" content="classic">` or no track at all. '
+  + 'Classic is retired and has no guide of its own any more. Such an app is changed with THIS specification, in one of two ways, and the owner chooses:\n\n'
+  + '1. **Move it now.** Start from `shell-atelier`, or from the genre the owner picks on the level `fine`, and carry the logic, the dictionary and the data over unchanged. '
+  + 'The hand-made screens become the kit\'s components; the hand-written sign-in and the theme snippet go, because the shell does both and hands you the session in `onReady`.\n'
+  + '2. **Change only what was asked.** Put the page inside the Atelier shell (`AIMEAT.atelier.app(...)`) and keep the old markup in one section body '
+  + '(`var s = AIMEAT.atelier.section({ target: a.main, title: \'…\' }); s.body.appendChild(oldMarkup);`). daisyUI and Tailwind classes are allowed there and nowhere else, '
+  + 'so the page keeps loading their stylesheet until the section is rebuilt with the kit. The sign-in still moves to the shell. Move the rest when the owner asks.\n\n'
+  + 'Either way: keep the filename and every memory key, so the published address and the person\'s data stay where they are; read the app\'s data map first (`aimeat_datamap_get`); '
+  + 'declare `<meta name="aimeat-track" content="atelier">`; and publish with this specification\'s `spec_token`. '
+  + 'Read the pitfall `atelier-kit-migration-traps` (`aimeat_appdev_pitfall_list`) before you start: a side navigation, the phone bar, strict schemas and daisyUI rules that outrank the kit\'s have each broken a moved app. '
+  + 'Compare the old and the new screen on the same walk before you publish.\n';
 
 /** The one line part `start` gives this index (atelier-layers.ts partsIndex). Keep it short: `start` is near MAX_PART_CHARS. */
 export const ATELIER_PLATFORM_PART_LINE = '- `platform` — the sections only some apps need (a team, files, AI, intake, outside users, payments, server-side work), each with when to read it. Read the index, then the ones this app is in.\n';
@@ -98,11 +114,30 @@ function cutSection(from: string, baseUrl: string): string | null {
   return section ? section.text.replace(/^#{2,3} /, '## ') : null;
 }
 
+/**
+ * What an AI that cannot connect to the node reads before the Atelier text. The text is written for
+ * an AI connected over MCP: it calls tools for the structure page and the publish. Pasted into a
+ * chat with no connection, those steps cannot run, and until 2026-11-19 nothing told that AI how the
+ * finished file reaches the node.
+ */
+export const PASTE_PREFACE = '## Before you start: you are not connected to this node\n'
+  + 'The person pasted this into a chat that is not connected to their AIMEAT. Follow the specification below with three changes. '
+  + 'Skip every step that calls an `aimeat_*` tool (the structure page, the audit, the publish): you cannot call them. '
+  + 'Open the addresses it names (the genres, the shell, the platform sections) if you can read web pages; if you cannot, build on the level `proto`, which uses the kit\'s components as they come and needs nothing but this text. '
+  + 'When the app is built, hand the person ONE complete HTML file, and end your reply as the section "When the app is ready" in this text says.\n\n';
+
+/** The Atelier text for an AI that cannot connect: the preface, the text, and how the person publishes the file. */
+export function atelierPasteDelivery(full: string, baseUrl: string): string {
+  const publish = atelierPlatformPiece('publish-by-hand', baseUrl);
+  return PASTE_PREFACE + full + (publish ? '\n' + publish.text : '');
+}
+
 /** The index (`platform`) or one section by id. Null for an id the platform does not have. */
 export function atelierPlatformPiece(id: string, baseUrl: string): { id: string; text: string } | null {
   const nodeUrl = baseUrl.replace(/\/+$/, '');
   if (id === 'platform') return { id, text: platformIndex(nodeUrl) };
   if (id === 'server-side') return { id, text: SERVER_SIDE_SECTION };
+  if (id === 'from-classic') return { id, text: FROM_CLASSIC_SECTION };
   const entry = ATELIER_PLATFORM.find(s => s.id === id);
   if (!entry) return null;
   const text = cutSection(entry.from ?? entry.id, nodeUrl);

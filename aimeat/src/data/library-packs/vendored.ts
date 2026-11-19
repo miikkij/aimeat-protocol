@@ -10,6 +10,9 @@
  * @structure VENDORED_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   2026-11-19 — The Classic track is retired: no tierHint, the demos that were the Classic shells
+ *     are shell-atelier, and the styling pack (daisyUI) says it is for a Classic app and for the part
+ *     of one kept inside an Atelier section; it has no demo of its own any more.
  *   2026-10-25 — Mermaid 12.2.0 as a new path (/lib/mermaid@12/, /lib/mermaid/ stays v11); in place:
  *     daisyUI 5.7.50, chart.js 4.6.1, pdf.js 6.4.299, yaml 2.9.1 (was 2.8.2 labelled 2.x), KaTeX 0.19.1.
  *   2026-10-25 — NEW proj4leaflet pack (proj4 2.22.0 + Proj4Leaflet 1.0.2), in ./vendored-maps.ts
@@ -117,7 +120,9 @@ export const VENDORED_PACKS: LibraryPack[] = [
       '',
       'The Tailwind file is an in-browser JIT compiler (~270KB): fine for single-file apps, skip it',
       'for tiny pages where a handful of CSS variables is enough.',
-      'This is the SAME stack the app-shell templates use — prefer it over hand-rolled CSS frameworks.',
+      'An Atelier page gets its components from the kit (aimeat-atelier) and uses these classes only',
+      'inside a `section` body. This stack is for an app built on the retired Classic track, and for',
+      'the part of such an app kept inside a section until it is moved (build-app-atelier/from-classic).',
       'Cortex UI libs (aimeat-ui-viewers/forms/layout/nav/dialogs/motion) also carry `aui-*` classes',
       'the bridge keeps theme-correct; you do not write those yourself, the libs emit them.',
     ].join('\n'),
@@ -129,8 +134,6 @@ export const VENDORED_PACKS: LibraryPack[] = [
       { version: 'tailwind 4.3.1 · daisyui 5.5.23 · aimeat-theme 1.0.0', date: '2026-07-25', summary: 'NEW /lib/aimeat-theme.css: the AIMEAT daisyUI theme. --color-primary is now the house coral instead of daisyUI indigo, dark gets a designed surface ramp (daisyUI dark separated page from card by 1.05:1, so cards were invisible), and every semantic colour gets a `-content` pair chosen against its own fill per theme (daisyUI shipped ONE pair for both). Verified by pnpm check:theme. The bridge @imports it, so apps already loading the bridge pick it up with no edit — a published app WILL change from indigo to coral. Remove any hardcoded #E8564A and use the primary token.' },
       { version: 'tailwind 4.3.1 · daisyui 5.5.23', date: '2026-06-26', summary: 'Initial vendoring: @tailwindcss/browser 4.3.1 + daisyui 5.5.23 + aimeat-daisyui-bridge.css self-hosted at /lib/ (replaces CDN loads in templates). No app-facing API changes since.' },
     ],
-    demoTemplateId: 'shell-pure-client',
-    tierHint: 'T1',
     interviewTriggers: ['style', 'design', 'ui', 'tailwind', 'daisyui'],
     sizeEstimate: '~270KB JIT + ~950KB CSS',
     status: 'stable',
@@ -167,8 +170,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
       { version: '4.6.1', date: '2026-10-25', summary: 'chart.js 4.5.1 -> 4.6.1 in place, no API change. Pie, doughnut and polarArea spacing is corrected (slices sit a little differently), a scale title can take a stroke, the canvas is sized in whole pixels, and a filled line no longer extends past the line on an index scale with offset: true and a min/max. Existing charts keep working unchanged.' },
       { version: '4.5.1', date: '2026-06-26', summary: 'Initial vendoring of chart.js 4.5.1 UMD at /lib/chartjs@4.js. The @4 filename is the compatibility contract — minor/patch updates land in place, a future v5 ships as a NEW chartjs@5.js file.' },
     ],
-    demoTemplateId: 'shell-cortex',
-    tierHint: 'T1',
+    demoTemplateId: 'shell-atelier',
     interviewTriggers: ['chart', 'graph', 'plot', 'dashboard', 'kaavio', 'diagrammi'],
     sizeEstimate: '~204KB',
     status: 'stable',
@@ -272,8 +274,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
           'pdf.js 6.3.289 -> 6.4.299 in place at the same /lib/pdfjs@6/ paths, no API change. Fixes in annotation rendering, font conversion, form handling, pattern rendering and text selection, a text stroke width that came out wrong from a stale cache, and faster parsing. getDocument, getPage and getTextContent behave as before, so text extraction with page numbers needs no edit.',
       },
     ],
-    demoTemplateId: 'shell-extension',
-    tierHint: 'T3',
+    demoTemplateId: 'shell-atelier',
     interviewTriggers: ['pdf', 'document', 'asiakirja', 'liite', 'attachment', 'tarjouspyyntö', 'citation', 'sitaatti'],
     sizeEstimate: '~442KB + 1.2MB worker',
     status: 'stable',
@@ -309,8 +310,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
       { version: '2.9.1', date: '2026-10-25', summary: 'yaml 2.8.2 -> 2.9.1 in place at /lib/yaml.mjs, same exports (parse, stringify, parseDocument, parseAllDocuments, Document, visit and the rest). 2.9.1 caps how deep merge keys (<<) may recurse through aliases, so a hostile document can no longer exhaust the parser with nested merges; ordinary anchors and merges parse as before. The file is now jsDelivr\'s single-file ESM bundle instead of an esm.sh one, and its version is pinned rather than "2.x".' },
       { version: '2.x', date: '2026-07-25', summary: 'Registered as an app-facing pack. The file was already vendored for the SPA but marked internal, so app builders could not discover it and hand-rolled YAML parsers instead.' },
     ],
-    demoTemplateId: 'shell-pure-client',
-    tierHint: 'T1',
+    demoTemplateId: 'shell-atelier',
     interviewTriggers: ['yaml', 'config', 'manifest', 'odps', 'front matter'],
     sizeEstimate: '~104KB ESM',
     status: 'preview',
@@ -393,8 +393,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
         summary: 'Initial vendoring of @ffmpeg/core 0.12.6 (ffmpeg 5.1.4, single-threaded) at /lib/ffmpeg-core@0.12.6/ — ESM + UMD loaders committed, the 32 MB .wasm fetched by `pnpm vendor:libs` from a sha256-pinned URL. In-browser video encoding was impossible on the node before this: the app CSP refused to compile WebAssembly at all, and apps fell back to a 32 MB unpkg load that the CSP then blocked at the blob fetch. Both CSP gaps are closed in the same change.',
       },
     ],
-    demoTemplateId: 'shell-pure-client',
-    tierHint: 'T1',
+    demoTemplateId: 'shell-atelier',
     interviewTriggers: ['video', 'mp4', 'encode', 'transcode', 'ffmpeg', 'export video', 'audio', 'gif', 'vienti', 'video-vienti'],
     sizeEstimate: '~114KB loader + 32MB wasm (cached a year)',
     status: 'preview',
@@ -474,8 +473,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
         summary: 'Initial vendoring of @duckdb/duckdb-wasm 1.32.0 at /lib/duckdb-wasm@1.32.0/ — an esbuild IIFE carrying duckdb plus apache-arrow 17.0.0 (the published duckdb-browser.mjs imports bare apache-arrow, which no browser can resolve from a static path), the eh worker committed beside it, and the 33 MB .wasm fetched by `pnpm vendor:libs` from a sha256-pinned URL. The DuckDB Parquet extension is mirrored too: reading Parquet otherwise fetches 3 MB from extensions.duckdb.org at runtime, which the CSP happens to allow and which self-hosting exists to remove.',
       },
     ],
-    demoTemplateId: 'shell-pure-client',
-    tierHint: 'T2',
+    demoTemplateId: 'shell-atelier',
     interviewTriggers: ['sql', 'query', 'aggregate', 'parquet', 'dataset', 'data package', 'analytics', 'kysely', 'datapaketti', 'suodata', 'ryhmittele'],
     sizeEstimate: '~236KB loader + 755KB worker + 33MB wasm (cached a year)',
     status: 'preview',
@@ -511,7 +509,6 @@ export const VENDORED_PACKS: LibraryPack[] = [
     changelog: [
       { version: '7.9.0', date: '2026-08-30', summary: 'Initial vendoring: d3 7.9.0 UMD at /lib/d3@7.min.js (~273 kB), approved in the component-expansion round. Role: the app builder\'s free tool for visualisations beyond the Atelier chart family; the kit itself does not load it.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['d3', 'custom chart', 'force graph', 'network physics', 'projection', 'visualisointi'],
     sizeEstimate: '~273KB',
     status: 'stable',
@@ -557,7 +554,6 @@ export const VENDORED_PACKS: LibraryPack[] = [
       { version: '12.2.0', date: '2026-10-25', summary: 'MAJOR, as a NEW path: Mermaid 12.2.0 at /lib/mermaid@12/mermaid.min.js, and the include line now names it. /lib/mermaid/mermaid.min.js stays v11.17.2 unchanged, so an app that already names it keeps rendering exactly as before. window.mermaid and the initialize/render idioms are the same. What a diagram looks like changes: ELK is bundled and lays out flowchart, state, class and ER diagrams by default (layout: "dagre" keeps the v11 arrangement), and the default look is new (look: "classic" keeps the v11 shapes). v12 needs ES2024, so Safari 17.4 or newer. flowchart.defaultRenderer is ignored. AIMEAT.md.renderRich() and the portal render ```mermaid fences with v12 from this date. The file is 5.5 MB against 3.6 MB, because ELK is inlined; it is still loaded only when a diagram is on screen.' },
     ],
     demoTemplateId: 'comp-mermaid-diagram',
-    tierHint: 'T1',
     interviewTriggers: ['diagram', 'flowchart', 'sequence', 'gantt', 'mindmap', 'kaavio', 'vuokaavio'],
     sizeEstimate: '~5.5MB',
     status: 'stable',
@@ -599,7 +595,6 @@ export const VENDORED_PACKS: LibraryPack[] = [
       { version: '0.19.1', date: '2026-10-25', summary: 'KaTeX 0.18.5 -> 0.19.1 in place at /lib/katex@0/, same include lines, same katex.render and renderToString. New commands \\reflectbox and \\mapsfrom (0.18.7); tags on an empty final row of align now place correctly (0.18.6, 0.18.8); % is allowed inside a raw argument (0.19.1). The one change 0.19.0 marks as breaking already shipped in 0.18.11: a character the fonts lack is reported through the strict setting as symbolNotInFont. With the default strict ("warn") that is a console warning and the formula still renders; only an app that sets strict: "error" or a strict callback sees it differently. The CSS fallback face is now KaTeX_Main, math, Times New Roman. The stylesheet no longer leaves a trailing comma in each @font-face src, which made the src descriptor invalid CSS in the 0.18.5 file.' },
       { version: '0.18.5', date: '2026-09-05', summary: 'Initial vendoring at /lib/katex@0/, for the living document (aimeat-living), which loads it only when a formula is actually printed. The stylesheet is the published one with the woff and ttf entries removed from each @font-face src: those are the pre-2015 fallbacks in the same list, every browser this node serves takes woff2, and carrying them costs 876 kB nobody requests.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['formula', 'equation', 'maths', 'math', 'latex', 'kaava', 'yhtälö', 'matematiikka'],
     sizeEstimate: '~590kB (268kB script, 22kB stylesheet, 296kB fonts)',
     status: 'preview',
@@ -642,7 +637,6 @@ export const VENDORED_PACKS: LibraryPack[] = [
     changelog: [
       { version: 'Baloo 2 v23 · Bangers v25', date: '2026-07-19', summary: 'Initial vendoring (latin + latin-ext woff2, OFL 1.1 — see /lib/fonts/LICENSE.md). Born from pitfall app/candy-palette-alone-is-not-a-game-look: the node had no display fonts, so game UIs fell back to system faces.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['game', 'font', 'fontti', 'typography', 'logo', 'arcade', 'playful'],
     sizeEstimate: '~101KB (4 woff2 subsets)',
     status: 'preview',   // policy: new packs start preview; flip stable with an AEB result
@@ -717,7 +711,6 @@ export const VENDORED_PACKS: LibraryPack[] = [
       { version: '1', date: '2026-10-09', summary: 'connect() no longer puts the session token in the socket URL, where reverse proxies logged it: it POSTs /v1/ws/ticket for a single-use 60-second ticket and connects with ?ticket=. connect() now returns a promise (it never rejects; a refused ticket emits error then close), and frames sent while the ticket is fetched are queued like frames sent while the socket opens. Existing apps need no change.' },
     ],
     demoTemplateId: 'comp-realtime-room',
-    tierHint: 'T1',
     interviewTriggers: ['multiplayer', 'realtime', 'collaboration', 'chat', 'live', 'moninpeli', 'yhteismuokkaus'],
     sizeEstimate: '~17KB',
     status: 'stable',
@@ -763,7 +756,6 @@ export const VENDORED_PACKS: LibraryPack[] = [
       { version: '1.9.4', date: '2026-08-29', summary: 'Initial vendoring: dist leaflet.js + leaflet.css + images/ under /lib/leaflet@1/. First consumer: the Atelier kit\'s `map` component; classic-track apps may load it directly.' },
     ],
     demoTemplateId: 'comp-leaflet-map',
-    tierHint: 'T1',
     interviewTriggers: ['map', 'kartta', 'osm', 'openstreetmap', 'sijainti', 'location', 'geo'],
     sizeEstimate: '~160KB',
     status: 'preview',

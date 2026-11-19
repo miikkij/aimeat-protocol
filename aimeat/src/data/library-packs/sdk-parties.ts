@@ -83,7 +83,6 @@ export const PARTIES_PACKS: LibraryPack[] = [
       { version: '1.1.0', date: '2026-11-01', summary: 'A fetch method carries the person\'s sign-in to the node for AIMEAT.iam, which now answers for a registered person as for an account holder; the window event aimeat-party-session when the sign-in starts or ends. Additive.' },
       { version: '1.0.0', date: '2026-11-01', summary: 'Initial: signUp, signIn, ready, me, signOut, registration, and data.get/set/remove over /v1/apps/{owner}/{app}/parties and party-data.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['register', 'sign up', 'customers', 'members without account', 'marketplace users', 'rekisteröityminen', 'asiakkaat', 'kauppapaikka'],
     sizeEstimate: '~4KB',
     status: 'preview',

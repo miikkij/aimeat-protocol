@@ -20,6 +20,7 @@
  *   · buildLlmsPacksTable()
  * @usage import { getLibraryPacks, buildPromptLibrarySections } from '../data/library-packs.js';
  * @version-history
+ *   v1.4.0 — 2026-11-19 — The index carries no tierHint: the Classic track's T1/T2/T3 are retired.
  *   v1.3.0 — 2026-11-10 — The Classic specification's library list leaves out a pack marked
  *     promptTrack 'atelier': that list is one part under a size limit and was full.
  *   v1.2.0 — 2026-10-09 — PackChange, PackProof and LibraryPack come from ./library-packs/types.ts
@@ -65,7 +66,7 @@ export function renderPackText(text: string, baseUrl: string): string {
  * Pass a lang (e.g. 'fi') for localized title/description where a translation exists.
  */
 export function getLibraryPackIndex(lang?: string): Array<
-  Pick<LibraryPack, 'id' | 'kind' | 'category' | 'title' | 'description' | 'url' | 'include' | 'requires' | 'version' | 'license' | 'apiSurface' | 'demoTemplateId' | 'skillRef' | 'tierHint' | 'interviewTriggers' | 'sizeEstimate' | 'status' | 'modelTier' | 'proofs' | 'apiCaveat' | 'supersededBy' | 'showcaseUrl'>
+  Pick<LibraryPack, 'id' | 'kind' | 'category' | 'title' | 'description' | 'url' | 'include' | 'requires' | 'version' | 'license' | 'apiSurface' | 'demoTemplateId' | 'skillRef' | 'interviewTriggers' | 'sizeEstimate' | 'status' | 'modelTier' | 'proofs' | 'apiCaveat' | 'supersededBy' | 'showcaseUrl'>
 > {
   const tr = (lang && TRANSLATIONS[lang]) || null;
   return PACKS.map(p => {
@@ -76,7 +77,7 @@ export function getLibraryPackIndex(lang?: string): Array<
       description: (o && o.description) || p.description,
       url: p.url, include: p.include, requires: p.requires, version: p.version,
       license: p.license, apiSurface: p.apiSurface, demoTemplateId: p.demoTemplateId,
-      skillRef: p.skillRef, tierHint: p.tierHint, interviewTriggers: p.interviewTriggers,
+      skillRef: p.skillRef, interviewTriggers: p.interviewTriggers,
       sizeEstimate: p.sizeEstimate, status: p.status,
       // AI-acceleration tier + per-model proof ledger + the frontier-pack caveat (tools/aeb/acceleration-tiers.md).
       modelTier: p.modelTier, proofs: p.proofs, apiCaveat: p.apiCaveat,

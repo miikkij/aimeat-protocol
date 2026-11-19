@@ -6,7 +6,9 @@
  *   the llms.txt flow pointer, and the bootstrap app_building research/flow pointers.
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-flow).
- * @version-history v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 7).
+ * @version-history
+ *   v1.1.0 — 2026-11-19 — Discovery offers no classic_build_prompt and its note names no tier.
+ *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 7).
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -96,7 +98,10 @@ await test('bootstrap app_building carries research_overview + flow_prompt + bui
     assert(/appdev-flow/.test(app?.flow_prompt ?? ''), 'flow_prompt missing');
     assert(/aimeat-app-builder-atelier/.test(app?.builder_skill ?? ''), 'builder_skill does not name the Atelier skill');
     assert(/\/v1\/prompts\/build-app-atelier$/.test(app?.build_prompt ?? ''), `build_prompt does not name the Atelier spec: ${app?.build_prompt}`);
-    assert(/\/v1\/prompts\/build-app$/.test(app?.classic_build_prompt ?? ''), `classic_build_prompt missing: ${app?.classic_build_prompt}`);
+    // The Classic track is retired (2026-11-19): discovery names one specification and no tier.
+    assert(app?.classic_build_prompt === undefined, `classic_build_prompt is still offered: ${app?.classic_build_prompt}`);
+    assert(!/T1\/T2\/T3|\bT1\b/.test(app?.note ?? ''), 'the note still names the Classic tiers');
+    assert(/from-classic/.test(app?.note ?? '') && /delivery=paste/.test(app?.note ?? ''), 'the note names section from-classic and the paste delivery');
     assert(/appdev\/pitfalls/.test(app?.pitfalls_endpoint ?? ''), 'pitfalls_endpoint missing');
 });
 

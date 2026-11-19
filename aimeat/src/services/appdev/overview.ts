@@ -5,7 +5,7 @@
  * @description The "big picture" research surface for AI agents building apps ON AIMEAT —
  *   one call returns compact INDEXES of everything relevant to framing a build: the owner's
  *   existing apps (best templates), library packs (with per-model AEB proof summaries),
- *   app-shell templates (T1/T2/T3), skills (the paved-path builder skill first), curated +
+ *   the Atelier shells and genres a build starts from, skills (the paved-path builder skill first), curated +
  *   learned pitfalls (model-faceted), and the owner's agent-proposed template proposals.
  *   Progressive disclosure by design: indexes only, hard caps per list, drill-down via the
  *   existing endpoints/tools each section names. Scope: app development on the platform only.
@@ -14,6 +14,10 @@
  *   import { buildAppdevOverview } from './overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   2026-11-19 — Atelier is the only build guide: app_templates leaves out the Classic track's tiered
+ *     shells and lists the Atelier shells, then the genres; `tier` and tier_guide give way to
+ *     start_guide, which names the level, the genre or shell, and the platform sections. builder_skill
+ *     names the Atelier skill for every app and section from-classic for a Classic one.
  *   2026-11-15 — The skills section puts aimeat-app-builder second after the Atelier skill, so the
  *     cap of 25 never drops the Classic builder skill that builder_skill names.
  *   2026-11-07 — `microservices` (appdev/microservices.ts): the Microservices Central of the person or
@@ -127,7 +131,7 @@ export async function buildAppdevOverview(
     // knowledge tools did (secaudit 2026-10, v56 shape). A surface that passes no view shows less.
     const view: OwnerScopeViewer = opts.view ?? { principal: callerGaii, readsAll: false };
     const out: Record<string, unknown> = {
-        scope_note: 'App development ON AIMEAT only. Flow: research (this) → frame (tier, packs, iam?) → propose to the user → build → publish + report learnings.',
+        scope_note: 'App development ON AIMEAT only. Flow: research (this) → frame (the level, the genre or shell, the platform sections the app needs, packs, iam?) → propose to the user → build → publish + report learnings.',
         secrets_note: 'A key for an outside service is never held by an app or typed into one. The call lives in an extension whose header names it as {{secret:NAME}}; the node fills it from the signed-in person\'s vault on the way out, and a missing name fails as SECRET_UNKNOWN naming it. The person stores it FOR THE HOST the extension calls ("store NAME for host api.example.com") on their Access page (Secrets section) or via an agent holding secrets:manage (aimeat_secret_set { name, value, host }); aimeat_secret_list shows names, addresses and who used them, never a value. The extension declares the name and host in its manifest\'s uses_secrets, so a first use to that host binds by itself; any other first use is refused with SECRET_HOST and names a page where the owner allows it with one press.',
         ...(model ? { model } : {}),
     };
@@ -203,24 +207,22 @@ export async function buildAppdevOverview(
         };
     }
 
-    // ── App-shell templates (T1/T2/T3) + components ──
+    // ── Where a build starts: the Atelier shells, then the genres, then components and use cases ──
     if (wanted.has('app_templates')) {
-        // THE SHELLS FIRST, and the cap is why. This section is named for T1/T2/T3, and they are
-        // what a build starts from, but the index also carries every genre and component: 54
-        // entries on 2026-09-20, of which exactly three have a tier, all behind 51 that do not. A
-        // cap of 25 in the index's own order therefore returned no shell at all, and an agent
-        // asking where to start was handed components. e2e-appdev-overview has said so since
-        // 2026-09-19 ("T1 shell missing") on both backends.
-        const idx = getAppTemplateIndex();
-        const tiered = (t: { tier?: string }) => Boolean(t.tier);
-        const ordered = [...idx.filter(tiered), ...idx.filter(t => !tiered(t))];
+        // THE SHELLS FIRST, and the cap is why: the index carries every genre and component, and a
+        // cap of 25 in its own order once returned no shell at all (e2e-appdev-overview, 2026-09-19).
+        // Since 2026-11-19 the shells are the Atelier ones: the Classic track's three tiered shells
+        // (T1/T2/T3) are retired and never offered here (decision-atelier-is-the-only-app-build-
+        // guide-classic-and-t1-t2-t3-are), so a builder is never handed a tier to choose.
+        const idx = getAppTemplateIndex().filter(t => !('tier' in t && t.tier));
+        const rank = (t: { kind: string }) => (t.kind === 'app-shell' ? 0 : t.kind === 'genre' ? 1 : 2);
+        const ordered = [...idx].sort((a, b) => rank(a) - rank(b));
         out.app_templates = {
             ...capped(ordered.map(t => ({
                 id: t.id, kind: t.kind,
-                ...('tier' in t && t.tier ? { tier: t.tier } : {}),
                 title: (t as { title?: string }).title ?? t.id,
             }))),
-            tier_guide: 'T1 pure client (auth+data) · T2 +cortex UI libs · T3 +extension (server-side work)',
+            start_guide: 'On the level fine a new app forks a genre (genre-<id>); on proto or plain it starts from shell-atelier; a game starts from shell-phaser-game. What only some apps need (a team, files, AI, intake, server-side work) is a platform section of the Atelier spec: aimeat_handbook_get { tier: "build-app-atelier/platform" }.',
             // Both doors: the tool read agent proposals only until 2026-09-18, so a chat connected
             // over MCP was pointed at a call it could not make.
             drill_down: 'The scaffold content of one: aimeat_app_template_get { id } over MCP, or GET /v1/app-templates/{id}.',
@@ -237,14 +239,14 @@ export async function buildAppdevOverview(
             listSkills(storage, config, 'node', accessor).catch(err => { logger.warn('title: continuing after a suppressed failure', { error: String(err) }); return []; }),
             owner ? listSkills(storage, config, 'user', accessor, owner).catch(err => { logger.warn('title: continuing after a suppressed failure', { error: String(err) }); return []; }) : Promise.resolve([]),
         ]);
-        // Both builder skills ahead of the cap: builder_skill below names them, and with more node
-        // skills than CAP the Classic one fell past the cut whenever the store listed it late, which
+        // The builder skill ahead of the cap: builder_skill below names it, and with more node skills
+        // than CAP a named skill fell past the cut whenever the store listed it late, which
         // PostgreSQL does in no fixed order (nightly 43700514021).
-        const BUILDERS = ['aimeat-app-builder-atelier', 'aimeat-app-builder'];
+        const BUILDERS = ['aimeat-app-builder-atelier'];
         const rank = (n: string): number => { const i = BUILDERS.indexOf(n); return i < 0 ? BUILDERS.length : i; };
         const builderFirst = [...nodeSkills].sort((a, b) => rank(a.name) - rank(b.name));
         out.skills = {
-            builder_skill: 'node:aimeat-app-builder-atelier — load this FIRST (aimeat_skill_get) for a new app; node:aimeat-app-builder for an app already on the Classic track',
+            builder_skill: 'node:aimeat-app-builder-atelier — load this FIRST (aimeat_skill_get), for a new app and for changing one; an app built on the retired Classic track is moved with section from-classic of the Atelier spec',
             node: capped(builderFirst.map(s => ({ ref: s.ref, description: s.description ?? null }))),
             user: capped(userSkills.map(s => ({ ref: s.ref, description: s.description ?? null, binding: s.binding ?? null }))),
             drill_down: 'aimeat_skill_get {ref}; app-bound skills via aimeat_skill_list binding=app:{owner}/{filename}',

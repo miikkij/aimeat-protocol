@@ -27864,8 +27864,6 @@
     "pb.giveHintImprove": "Copia el prompt y pégalo en tu IA conectada. Publica ella misma la nueva versión. Las versiones anteriores quedan en el historial de la aplicación.",
     "pb.otherTitle": "¿Tu IA no puede conectarse?",
     "pb.otherHint": "Microsoft 365 Copilot, por ejemplo, no puede conectarse. Entonces copia este prompt más largo: lleva consigo las instrucciones de construcción. La IA te entrega un archivo HTML y tú lo añades aquí.",
-    "pb.otherClassic": "Con este prompt, una aplicación nueva se construye en la vía Clásica, no en Atelier.",
-    "pb.otherPacks": "Incluido para tu idea",
     "pb.otherCopy": "Copia el prompt largo",
     "card.view": "Abrir",
     "card.open": "Abrir",

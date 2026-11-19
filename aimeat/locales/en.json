@@ -29494,8 +29494,6 @@
     "pb.giveHintImprove": "Copy the prompt and paste it into your connected AI. It publishes the new version itself; the earlier versions stay in the app's history.",
     "pb.otherTitle": "Your AI cannot connect?",
     "pb.otherHint": "Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself.",
-    "pb.otherClassic": "This prompt builds a new app on the Classic track, not on Atelier.",
-    "pb.otherPacks": "Included for your idea",
     "pb.otherCopy": "Copy the long prompt",
     "card.view": "Open",
     "card.open": "Open",

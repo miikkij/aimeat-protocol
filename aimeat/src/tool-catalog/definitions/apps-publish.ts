@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-11-19 — spec_token names the Atelier specification only; the Classic one is retired.
  *   2026-11-15 — aimeat_app_fork takes access_code, the code of a source app behind one (E2E audit M093).
  *   2026-11-14 — aimeat_app_list's `search` says it reads the file name too, as both storages do.
  *   2026-11-13 — aimeat_app_draft_save takes mime_type (unit 3b).
@@ -55,7 +56,7 @@ const imageInputShape = z.object({
 const SPEC_GATE_INPUT = {
     spec_token: {
         type: 'string',
-        description: 'The `spec_token` from GET /v1/prompts/build-app-atelier, or from GET /v1/prompts/build-app for an app on the Classic track — the digest of the build spec you built against. '
+        description: 'The `spec_token` from GET /v1/prompts/build-app-atelier — the digest of the build spec you built against. '
             + 'It changes when the spec changes. Omitting it publishes anyway and returns spec_check.status "missing"; '
             + 'an out-of-date one returns "stale". Fetch the spec and pass the token rather than guessing a value: '
             + 'the point is that you read what it currently says.',

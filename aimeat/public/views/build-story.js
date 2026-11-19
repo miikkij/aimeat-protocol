@@ -19,6 +19,7 @@
  * @structure BEATS · BeatRail · Beat · default export BuildStory({ navigate })
  * @usage routed at /v1/how-an-app-builds by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.1.3 -- 2026-11-19 -- The copied prompt is the Atelier one for pasting (landing-builder.js v2.2.0), not the retired Classic one.
  *   v1.1.2 -- 2026-11-15 -- The fallbacks say steps, ways, choice and the front page, as en.json does,
  *     in place of a road, two doors and the wall.
  *   v1.1.1 -- 2026-09-28 -- No escHtml() on the prompt preview: preact escapes text itself, so the
@@ -71,7 +72,7 @@ export default function BuildStory({ navigate }) {
   // The prompt the second beat copies is the node's own, in the visitor's language.
   useEffect(() => {
     let alive = true;
-    fetchCanonicalBuildPrompt(getLocale(), 'classic')
+    fetchCanonicalBuildPrompt(getLocale())
       .then(p => { if (alive) setPrompt(p); })
       .catch(err => swallowed('build-story: prompt', err));
     return () => { alive = false; };

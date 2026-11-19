@@ -17,7 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
- *   2026-11-19 — 17p: the Atelier platform index and its sections, the same over MCP and REST, 404 for an unknown one.
+ *   2026-11-19 — 17p: the Atelier platform index and its sections, the same over MCP and REST, 404 for an unknown one, and ?delivery=paste.
  *   2026-11-08 — 17b: the first part says which parts come before code by level.
  *   2026-11-05 — 17c, 17d: the Atelier specification has seven parts; `motion` was split from `look` in effc2bcaa.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -611,6 +611,10 @@ async function main() {
             assert(!full.includes('## Server-side work'), 'the platform sections are not in the whole text');
             const missing = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/no-such-section`);
             assert(missing.status === 404, `an unknown section is 404, got ${missing.status}`);
+            // An AI that cannot connect gets the same text with a preface and the way the file comes back.
+            const paste = await fetch(`${BASE}/v1/prompts/build-app-atelier?delivery=paste&format=txt`).then(r => r.text());
+            assert(paste.startsWith('## Before you start: you are not connected') && paste.includes('## When the app is ready') && paste.includes(full),
+                'the paste delivery wraps the whole text with the preface and the publish-by-hand section');
         });
 
         // The feature map (guided journey P6): what this node can do, in parts an AI can read once it

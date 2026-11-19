@@ -37,7 +37,6 @@ export const OFFLINE_PACKS: LibraryPack[] = [
       { version: '1.0.1', date: '2026-11-11', summary: 'The kept page holds only parts from the app\'s own address; a part from another address is left to the browser. Before, such a part failed to load while the page was kept.' },
       { version: '1.0.0', date: '2026-11-10', summary: 'shell (the kept page), identity(), copy() and queue().' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['offline', 'no connection', 'without internet', 'no network', 'on a train', 'airplane', 'field work', 'sync later', 'works offline', 'pwa'],
     sizeEstimate: '~9KB',
     status: 'preview',

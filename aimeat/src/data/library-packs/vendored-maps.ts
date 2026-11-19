@@ -60,7 +60,6 @@ export const MAP_PACKS: LibraryPack[] = [
     changelog: [
       { version: '1.0.2', date: '2026-10-25', summary: 'Initial vendoring: proj4 2.22.0 (dist/proj4.js) under /lib/proj4@2/ and Proj4Leaflet 1.0.2 (src/proj4leaflet.js) under /lib/proj4leaflet@1/, both as published on npm (the repository stores Proj4Leaflet with LF line endings, upstream has CRLF; nothing else differs). First consumer: a hunting-area map drawing MML\'s maps in EPSG:3067.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['epsg:3067', 'tm35fin', 'etrs-tm35fin', 'proj4', 'projection', 'projektio', 'maanmittauslaitos', 'mml', 'peruskartta', 'kapsi'],
     sizeEstimate: '~137KB',
     status: 'preview',   // policy: new packs start preview; flip stable with an AEB result

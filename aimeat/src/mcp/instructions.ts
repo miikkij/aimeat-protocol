@@ -15,6 +15,7 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.9.1 — 2026-11-19 — The "not this" example names an Atelier spec token and genre, not a Classic T1 shell.
  *   v1.9.0 — 2026-11-08 — The person's context index (services/context/index-line.ts), after the
  *     permission line and before DETAIL, for a session that reads memory. CORE is unchanged, so no
  *     measured cut moves (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
@@ -130,8 +131,8 @@ More on asking the operators. \`support@operators\` gives you a conversation id 
 SPEAK TO THE PERSON, NOT ABOUT THE SYSTEM. They did not ask for a receipt, and most of them will
 never learn our vocabulary. Say what you did and what happens next, in their words:
 
-  not this  "Read user:alice/workshop-requests (v1.0.5), build spec spec-31169dc, T1 shell
-             shell-pure-client, appdev pitfalls (ownerScope, login event, locales-meta). Workshop
+  not this  "Read user:alice/workshop-requests (v1.0.5), build spec atelier-31169dc, genre
+             genre-pressctl, appdev pitfalls (ownerScope, login event, locales-meta). Workshop
              t_48be5aae is alive (heartbeat 18:25, 9/10 free)."
   this      "I read the instructions and checked the workshop is free. Starting now."
 

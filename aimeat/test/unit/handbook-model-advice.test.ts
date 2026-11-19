@@ -34,8 +34,9 @@ describe('the model rule, wherever a builder reads it', () => {
         expect(apps).not.toMatch(NAMED);
     });
 
-    it('appdev: the build flow carries it at the track step', () => {
-        const flow = APPDEV_HANDBOOK.slice(APPDEV_HANDBOOK.indexOf('0. THE TRACK'), APPDEV_HANDBOOK.indexOf('1. RESEARCH'));
+    // Step 0 was "THE TRACK" until 2026-11-19, when Atelier became the only build guide.
+    it('appdev: the build flow carries it at the guide step', () => {
+        const flow = APPDEV_HANDBOOK.slice(APPDEV_HANDBOOK.indexOf('0. THE GUIDE'), APPDEV_HANDBOOK.indexOf('1. RESEARCH'));
         expect(flow).toContain(MODEL_QUALITY_ADVICE);
         expect(flow).not.toMatch(NAMED);
     });

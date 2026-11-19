@@ -30242,8 +30242,6 @@
     "pb.giveHintImprove": "Kopioi kehote ja liitä se kytkettyyn tekoälyysi. Tekoäly julkaisee uuden version itse. Aiemmat versiot säilyvät sovelluksen historiassa.",
     "pb.otherTitle": "Eikö tekoälysi voi kytkeytyä?",
     "pb.otherHint": "Esimerkiksi Microsoft 365 Copilot ei voi kytkeytyä. Kopioi silloin tämä pidempi kehote: rakennusohjeet kulkevat sen mukana. Tekoäly antaa sinulle yhden HTML-tiedoston, ja sinä lisäät sen tänne itse.",
-    "pb.otherClassic": "Tällä kehotteella uusi sovellus rakennetaan perinteisellä tavalla, ei Atelierilla.",
-    "pb.otherPacks": "Ideaasi varten mukana",
     "pb.otherCopy": "Kopioi pitkä kehote",
     "card.view": "Avaa",
     "card.open": "Avaa",

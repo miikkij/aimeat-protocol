@@ -6,6 +6,8 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   (2026-11-19) Application Builder Full: an AI that cannot connect fetches the Atelier specification
+ *     with ?delivery=paste, no longer the Classic one.
  *   (2026-11-07) The Package Builder's description of AIMEAT follows the story (docs/AIMEAT-Story.md).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.1.0 — 2026-09-18 — platform-app-builder and platform-api are short pointers now. Both taught
@@ -41,7 +43,7 @@ It carries the interview, the data and sign-in rules, the client libraries, the 
 
 How the app is delivered:
 - You are connected to this AIMEAT over MCP: read the specification in parts with aimeat_handbook_get { tier: "build-app-atelier" }, publish with aimeat_app_publish and hand the person the app's address.
-- You cannot connect: fetch GET {{node_url}}/v1/prompts/build-app instead, the Classic specification, and produce one self-contained HTML file. Its last section tells the person how to bring it back.
+- You cannot connect: fetch GET {{node_url}}/v1/prompts/build-app-atelier?delivery=paste&format=txt instead, the same specification for an AI without a connection, and produce one self-contained HTML file. Its last section tells the person how to bring it back.
 
 Sign-in is the person's own, in the browser, as the document describes. An app needs no key and no password from the person, so ask for neither.
 

@@ -28,6 +28,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.48.0 — 2026-11-19 — `delivery: 'paste'` (atelier-platform.ts atelierPasteDelivery): the text an
+ *     AI that cannot connect reads, with a preface that skips the tool steps and the publish-by-hand
+ *     section at the end. The body and its token are unchanged.
  *   v1.47.0 — 2026-11-15 — ADDITIVE: Finishing gains "Installing the app, and its home-screen icon"
  *     (icon_upload, who can install), the same text as build-app-prompt.ts
  *     (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
@@ -194,6 +197,7 @@ import { ATELIER_REVIEW_SECTION } from './atelier-review.js';
 import { ornamentsPromptPart } from '../../data/atelier-ornaments.js';
 import { KIT_PROMPT_PARAGRAPH } from '../design-book/kit.js';
 import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
+import { atelierPasteDelivery } from './atelier-platform.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -355,6 +359,8 @@ export interface AtelierPromptOptions {
   lang?: string;
   mode?: 'new' | 'improve';
   idea?: string;
+  /** `paste`: for an AI that cannot connect, with the preface and the publish-by-hand section (atelier-platform.ts). */
+  delivery?: 'mcp' | 'paste';
 }
 
 /** The platform-instructions body (the part the spec token digests). */
@@ -862,5 +868,6 @@ export function buildAtelierPrompt(
   const token = buildAtelierSpecToken(config);
   const body = composeBody(config).replaceAll(SPEC_TOKEN_SLOT, token);
   const full = (opts.mode === 'improve' ? body : composeFull(config, composeBody(config), opts).replaceAll(SPEC_TOKEN_SLOT, token));
-  return { full, body };
+  // The token digests the body only, so a pasted text proves the same specification.
+  return { full: opts.delivery === 'paste' ? atelierPasteDelivery(full, config.baseUrl) : full, body };
 }

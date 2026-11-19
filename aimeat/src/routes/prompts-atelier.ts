@@ -12,7 +12,9 @@
  *   import { registerAtelierPrompt } from './prompts-atelier.js';
  *   registerAtelierPrompt(router, config);   // BEFORE /v1/prompts/:tier
  * @version-history
- *   v1.5.0 — 2026-11-19 — …/sections lists the platform sections with their `when`, and
+ *   v1.5.0 — 2026-11-19 — ?delivery=paste on the whole text: the preface and the publish-by-hand
+ *     section for an AI that cannot connect, which until now got the MCP text and no way back.
+ *     …/sections lists the platform sections with their `when`, and
  *     …/sections/:id answers them (`kind: "section"`) beside the parts (atelier-platform.ts).
  *   v1.4.0 — 2026-09-19 — Part `libraries` arrives with the Design Book's map in it
  *     (build-atelier-book.ts), so the route takes the storage.
@@ -86,7 +88,9 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig, stor
     const mode = req.query.mode === 'improve' ? 'improve' as const : 'new' as const;
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
-    const { full, body } = buildAtelierPrompt(config, { lang, mode, idea });
+    // ?delivery=paste: the text a person pastes into an AI that cannot connect (atelier-platform.ts).
+    const delivery = req.query.delivery === 'paste' ? 'paste' as const : 'mcp' as const;
+    const { full, body } = buildAtelierPrompt(config, { lang, mode, idea, delivery });
     if (req.query.format === 'txt') {
       sendPlainText(res, full);
       return;
