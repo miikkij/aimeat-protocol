@@ -25,6 +25,8 @@
  *     the kit's components the page calls, how many styles it made for itself, the libraries it
  *     read about, and whether it keeps its own colours. The book held 90 parts and none from a
  *     builder; whether that starts to move is only visible if a run's report says what it did there.
+ *   v1.2.1 — 2026-11-19 — The Classic track is retired: tier "build-app" is reported as the retired
+ *     address it now is, and a page that is not an Atelier app as NOT ATELIER.
  *   v1.1.0 — 2026-09-19 — The build track. The measurement passed three Classic apps in a row as
  *     good on the day the developer was handed a Classic app by a model that had started on
  *     Atelier and changed over because Classic was quicker to begin. Nothing here looked at which
@@ -235,10 +237,11 @@ export function describeQuality(q: AppQuality): string {
         ...(q.loadsAuthLib || onAtelier(q) ? [] : ['no aimeat-auth']),
         ...(q.viewportMeta ? [] : ['no viewport meta']),
     ];
-    // "The spec" is the Classic one; the Atelier parts are reported beside the track.
-    const read = q.readSpec ? `read the Classic spec${q.sectionsRead.length ? ' + ' + q.sectionsRead.join(', ') : ''}`
-        : onAtelier(q) ? 'Classic spec not read, as it should be' : 'did NOT read the spec';
-    const track =`${onAtelier(q) ? 'ATELIER' : q.loadsAtelier ? 'Atelier kit, no register' : 'CLASSIC'}${q.register ? ' (' + q.register.slice(0, 40) + ')' : ''}`
+    // Tier "build-app" is the retired Classic address, which serves the Atelier text since 2026-11-19;
+    // reading it means the agent followed an old pointer. The Atelier parts are reported beside the track.
+    const read = q.readSpec ? `asked for the retired build-app address${q.sectionsRead.length ? ' + ' + q.sectionsRead.join(', ') : ''}`
+        : onAtelier(q) ? 'no retired address read, as it should be' : 'did NOT read the spec';
+    const track =`${onAtelier(q) ? 'ATELIER' : q.loadsAtelier ? 'Atelier kit, no register' : 'NOT ATELIER'}${q.register ? ' (' + q.register.slice(0, 40) + ')' : ''}`
         + `; Atelier spec ${q.atelierPartsRead.length ? 'read: ' + q.atelierPartsRead.join(', ') : 'not read'}`
         + `; templates ${q.templatesFetched.length ? q.templatesFetched.join(' → ') : 'none'}`
         + `; languages ${q.locales.join(' ') || 'NONE DECLARED'}${q.locales.length >= 2 && !q.usesDictionary ? ' (declared, but no dictionary in the page)' : ''}`

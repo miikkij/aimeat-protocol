@@ -18,6 +18,7 @@
  *   communityPackDetail() · libraryPackIds()
  * @usage app.use(libraryPacksRouter(config, storage)) from routes-loader.
  * @version-history
+ *   2026-11-19 — A community pack carries no tierHint (the Classic tiers are retired).
  *   2026-10-25 — A community pack's url is built by cortexLibPath, so a cortex named `<owner>/<name>`
  *     is served from its two segments (owner namespaces wish, secaudit2026oct22).
  *   v1.3.1 — 2026-09-26 — The proof ledger's writer is named with localAccountName (utils/gaii.ts),
@@ -91,7 +92,6 @@ function communityIndexEntry(ext: CortexExtensionRecord, baseUrl: string) {
     version: ext.version,
     license: ext.license || 'unspecified',
     apiSurface: `AIMEAT (see ai_doc — community lib by ${ext.author || ext.installedBy})`,
-    tierHint: 'T2' as const,
     interviewTriggers: ext.tags || [],
     sizeEstimate: '?',
     // Community packs are unvetted by the node — always preview (no AEB gate ran on them).

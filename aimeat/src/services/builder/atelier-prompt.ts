@@ -28,6 +28,11 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.48.0 — 2026-11-19 — "The Atelier track" and "Never" say this is the one build guide and the
+ *     Classic one is retired, with section from-classic for an app built on it.
+ *   v1.48.0 — 2026-11-19 — `delivery: 'paste'` (atelier-platform.ts atelierPasteDelivery): the text an
+ *     AI that cannot connect reads, with a preface that skips the tool steps and the publish-by-hand
+ *     section at the end. The body and its token are unchanged.
  *   v1.47.0 — 2026-11-15 — ADDITIVE: Finishing gains "Installing the app, and its home-screen icon"
  *     (icon_upload, who can install), the same text as build-app-prompt.ts
  *     (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
@@ -194,6 +199,7 @@ import { ATELIER_REVIEW_SECTION } from './atelier-review.js';
 import { ornamentsPromptPart } from '../../data/atelier-ornaments.js';
 import { KIT_PROMPT_PARAGRAPH } from '../design-book/kit.js';
 import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
+import { atelierPasteDelivery } from './atelier-platform.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -355,6 +361,8 @@ export interface AtelierPromptOptions {
   lang?: string;
   mode?: 'new' | 'improve';
   idea?: string;
+  /** `paste`: for an AI that cannot connect, with the preface and the publish-by-hand section (atelier-platform.ts). */
+  delivery?: 'mcp' | 'paste';
 }
 
 /** The platform-instructions body (the part the spec token digests). */
@@ -363,11 +371,10 @@ function composeBody(config: AimeatConfig): string {
   let body = '';
 
   body += '## The Atelier track\n\n';
-  body += 'You are building on the ATELIER track. Its guide is THIS document and the '
-    + '`node:aimeat-app-builder-atelier` skill — never the standard build spec at '
-    + '/v1/prompts/build-app, whose vocabulary (daisyUI classes, hand-written boilerplate) does '
-    + 'not apply here. The app declares `<meta name="aimeat-track" content="atelier">` so a '
-    + 'later session loads the right guide.\n\n';
+  body += 'You are building on the ATELIER track, the one build guide on this node: THIS document and the '
+    + '`node:aimeat-app-builder-atelier` skill. The Classic guide it replaced (daisyUI classes, '
+    + 'hand-written boilerplate, its own shells) was retired on 2026-11-19; an app built on it is '
+    + 'moved with the platform section `from-classic`. The app declares `<meta name="aimeat-track" content="atelier">`.\n\n';
   body += 'ON THE LEVEL `fine`, THE FIRST MOVE OF THE BUILD IS THE GENRE FORK. A `fine` app (and a '
     + 'page that states no level, which is held to `fine`) starts from a committed '
     + 'register, never from the bare shell: list the genres with `GET ' + base
@@ -810,7 +817,7 @@ function composeBody(config: AimeatConfig): string {
     + '- Hand-written ARIA, focus management or animation code — the components carry them.\n'
     + '- A theme, palette or language control — the login pill owns all three.\n'
     + '- An invented script/style URL — everything the app loads is named in the shell.\n'
-    + '- The Classic build spec — two tracks, two guides, no mixing.\n';
+    + '- The retired Classic build spec or its shells — an app built on Classic is moved with section `from-classic`.\n';
 
   return body;
 }
@@ -862,5 +869,6 @@ export function buildAtelierPrompt(
   const token = buildAtelierSpecToken(config);
   const body = composeBody(config).replaceAll(SPEC_TOKEN_SLOT, token);
   const full = (opts.mode === 'improve' ? body : composeFull(config, composeBody(config), opts).replaceAll(SPEC_TOKEN_SLOT, token));
-  return { full, body };
+  // The token digests the body only, so a pasted text proves the same specification.
+  return { full: opts.delivery === 'paste' ? atelierPasteDelivery(full, config.baseUrl) : full, body };
 }

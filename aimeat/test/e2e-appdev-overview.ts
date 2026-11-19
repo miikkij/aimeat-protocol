@@ -8,6 +8,9 @@
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-overview).
  * @version-history
  *   v1.4.2 — 2026-11-15 — Audit M051: B's include_shared list is read before A shares the entry.
+ *   v1.5.0 — 2026-11-19 — The Classic track is retired: app_templates leads with shell-atelier, offers
+ *     no tiered shell and carries start_guide; the Atelier builder skill leads the node skills alone;
+ *     the shipped-shell checks read shell-atelier.
  *   v1.4.1 — 2026-11-15 — The node skills start with the Atelier and the Classic builder skill, in that
  *     order; the Classic one had fallen past the cap of 25 on PostgreSQL (nightly 43700514021).
  *   v1.4.0 — 2026-11-07 — +`microservices`: none named for an owner without a Central; the owner's own
@@ -117,7 +120,7 @@ await test('overview returns every section with caps + drill-downs', async () =>
         const r = await json('/v1/appdev/overview', { headers: { Authorization: `Bearer ${tokenA}` } });
         assert(r.status === 200, `status ${r.status}`);
         d = r.body.data;
-        if (d?.skills?.node?.items?.some((s: any) => s.ref === 'node:aimeat-app-builder')) break;
+        if (d?.skills?.node?.items?.some((s: any) => s.ref === 'node:aimeat-app-builder-atelier')) break;
         await new Promise(r2 => setTimeout(r2, 250));
     }
     for (const s of ['apps', 'library_packs', 'app_templates', 'skills', 'pitfalls_curated', 'pitfalls_learned', 'template_proposals']) {
@@ -127,13 +130,16 @@ await test('overview returns every section with caps + drill-downs', async () =>
     assert(d.apps.items.some((a: any) => a.filename === 'overview-demo.html'), 'own app missing from apps section');
     assert(d.library_packs.items.length > 0 && d.library_packs.items.length <= 25, 'library_packs not capped index');
     assert(d.library_packs.items.every((p: any) => p.id && p.model_tier), 'pack index entries malformed');
-    assert(d.app_templates.items.some((t: any) => t.tier === 'T1'), 'T1 shell missing');
-    assert(/aimeat-app-builder/.test(d.skills.builder_skill), 'builder skill not surfaced first');
-    assert(d.skills.node.items.some((s: any) => s.ref === 'node:aimeat-app-builder'), 'builder skill missing from node skills');
-    // Both builder skills lead, whatever order the store lists the node skills in: with more node
+    // The Classic track is retired (2026-11-19): the index starts with the Atelier shells, names no
+    // tier, and offers no Classic shell; start_guide says where a build starts instead.
+    assert(d.app_templates.items[0]?.id === 'shell-atelier', `the Atelier shell leads the templates: ${d.app_templates.items[0]?.id}`);
+    assert(!d.app_templates.items.some((t: any) => t.tier || /^shell-(pure-client|cortex|extension)$/.test(t.id)), 'a Classic tiered shell is still offered');
+    assert(d.app_templates.tier_guide === undefined && /shell-atelier/.test(d.app_templates.start_guide ?? ''), 'start_guide replaces tier_guide');
+    assert(d.app_templates.items.some((t: any) => t.kind === 'genre'), 'the genres are in the index');
+    assert(/aimeat-app-builder-atelier/.test(d.skills.builder_skill) && /from-classic/.test(d.skills.builder_skill), 'builder skill names the Atelier skill and section from-classic');
+    // The builder skill leads, whatever order the store lists the node skills in: with more node
     // skills than the cap, a builder skill left to the store's order can fall past the cut.
-    const lead = d.skills.node.items.slice(0, 2).map((s: any) => s.ref);
-    assert(JSON.stringify(lead) === JSON.stringify(['node:aimeat-app-builder-atelier', 'node:aimeat-app-builder']), `the builder skills lead the node skills: ${JSON.stringify(lead)}`);
+    assert(d.skills.node.items[0]?.ref === 'node:aimeat-app-builder-atelier', `the builder skill leads the node skills: ${d.skills.node.items[0]?.ref}`);
     assert(d.pitfalls_curated.total >= 20 && d.pitfalls_curated.facets, 'curated pitfalls index missing');
 });
 
@@ -447,11 +453,11 @@ await test('templates REST: seed manifest → list/get with source app → cross
     // The templates the node ships answer on the same two routes (2026-09-18): this is what the
     // connector's aimeat_app_template_get calls, and the shell every build starts from was not
     // reachable through it. A's proposal stays invisible to B above; a shipped shell is for anyone.
-    assert(list.data.node_templates.some((t: any) => t.id === 'shell-pure-client'), 'the list names the shipped shell');
-    const { status: ss, body: shell } = await json('/v1/appdev/templates/shell-pure-client', { headers: { Authorization: `Bearer ${tokenB}` } });
+    assert(list.data.node_templates.some((t: any) => t.id === 'shell-atelier'), 'the list names the shipped shell');
+    const { status: ss, body: shell } = await json('/v1/appdev/templates/shell-atelier', { headers: { Authorization: `Bearer ${tokenB}` } });
     assert(ss === 200 && shell.data.template.source === 'node' && String(shell.data.template.content).includes('<html'), `shipped shell: ${ss}`);
     const { status: ns, body: none } = await json('/v1/appdev/templates/no-such-template', { headers: { Authorization: `Bearer ${tokenA}` } });
-    assert(ns === 404 && String(none.error?.message).includes('shell-pure-client'), `unknown id names the shells: ${ns}`);
+    assert(ns === 404 && String(none.error?.message).includes('shell-atelier'), `unknown id names the shells: ${ns}`);
 
     const { status: ds } = await json('/v1/appdev/templates/ui-test-template', { method: 'DELETE', headers: { Authorization: `Bearer ${tokenA}` } });
     assert(ds === 200, `delete ${ds}`);

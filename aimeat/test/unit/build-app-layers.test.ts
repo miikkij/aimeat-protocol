@@ -9,13 +9,17 @@
  *   layer by a person (a new one fails here until somebody decides); an id names one section; and
  *   the core plus the on-demand sections cover the whole specification between them.
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The Classic specification is retired and its four parts are served to
+ *     nobody: the part-size check is gone. The text is still cut by these sections, because the
+ *     Atelier platform sections are cut from it, and each of those is held to one tool result in
+ *     build-atelier-platform.test.ts.
  *   v1.0.1 — 2026-10-19 — The part sizes are measured on a long node address as well.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import { buildAppPrompt, buildAppSpecToken } from '../../src/services/builder/app-prompt.js';
 import {
-  SECTION_TABLE, SPEC_PARTS, MAX_PART_CHARS, splitBuildAppSpec, layeredBuildAppPrompt, buildAppPiece, buildAppPieceIds,
+  SECTION_TABLE, SPEC_PARTS, splitBuildAppSpec, layeredBuildAppPrompt, buildAppPiece, buildAppPieceIds,
 } from '../../src/services/builder/app-layers.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-example' } as never;
@@ -60,25 +64,6 @@ describe('the layered build specification', () => {
         }
         expect(prompt).toContain('aimeat_handbook_get { tier: "build-app/<id>" }');
         expect(prompt).toContain('https://node.example/v1/prompts/build-app/sections/<id>?format=txt');
-      });
-
-      it('serves the core in four parts, each small enough to arrive as one tool result', () => {
-        // Measured 2026-09-18 in the Claude client: 18 071 characters arrived whole, and 66 174
-        // were written to a file the chat could not read. If this fails, a section grew: move it
-        // to another part, or make a fifth, rather than raising the number.
-        for (const p of SPEC_PARTS) {
-          const piece = buildAppPiece(full, p.id, 'https://node.example');
-          expect(piece?.kind, p.id).toBe('part');
-          expect(piece!.text.length, p.id).toBeLessThan(MAX_PART_CHARS);
-        }
-        // The node's address is written into the parts many times, so a part measured on this
-        // 20-character address passed here while the E2E node's 24 008 characters failed the
-        // nightly sweep (2026-10-18). Measured again on an address of 48 characters.
-        const longUrl = 'https://aimeat.a-long-organisation-name.example.org';
-        const longFull = buildAppPrompt({ baseUrl: longUrl, nodeId: 'node-example' } as never, { mode, lang: 'en' }).full;
-        for (const p of SPEC_PARTS) {
-          expect(buildAppPiece(longFull, p.id, longUrl)!.text.length, p.id + ' on ' + longUrl).toBeLessThan(MAX_PART_CHARS);
-        }
       });
 
       it('puts every core section in exactly one part, whole, and no on-demand section in any', () => {

@@ -35,6 +35,7 @@
  *   `network:` is ignored, so the unlisted host is reached. Each assertion of the new behaviour is
  *   marked `// HOLE:`.
  * @version-history
+ *   2026-11-19 — The far side listens on a port the OS picks (FAR_PORT was the node's port + 230, which met another suite's far side on the next CI lane).
  *   v1.2.0 — 2026-10-09 — An in-place update keeps the host field and, by upload, the stored secret.
  *   v1.1.0 — 2026-10-09 — Host fields (wish-a-package-s-extension-hosts-settable-per-install-the-soc-s-w).
  *   v1.0.0 — 2026-10-08 — Initial (aimeat-soc core).
@@ -42,6 +43,7 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-rows
 
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { ZipArchive } from 'archiver';
 import { ownerSignIn } from './helpers/owner-login.js';
 
@@ -73,8 +75,9 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 console.log('\n=== Extension rows (unattended) and declared hosts E2E ===\n');
 
 // ─── A far side for ctx.fetch: /ok answers, /hop redirects to the same port by IP ───
-// Far from the node's port, as e2e-mcp-proxy keeps its upstream: neighbouring sessions run suites.
-const FAR_PORT = Number(new URL(BASE).port || '40251') + 230;
+// The OS picks a free port: a fixed offset from the node's port met another suite's offset on the
+// next lane (CI lanes take neighbouring ports: 20002 + 241 and 20003 + 240 are both 20243).
+let FAR_PORT = 0;
 const far = http.createServer((req, res) => {
     if (req.url === '/hop') { res.writeHead(302, { Location: `http://127.0.0.1:${FAR_PORT}/ok` }); res.end(); return; }
     // An address that answers too late for a script that gave the call its own deadline.
@@ -82,7 +85,8 @@ const far = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('far-ok');
 });
 // No host: dual-stack, so `localhost` answers whether it resolves to ::1 or 127.0.0.1.
-await new Promise<void>(r => far.listen(FAR_PORT, () => r()));
+await new Promise<void>(r => far.listen(0, () => r()));
+FAR_PORT = (far.address() as AddressInfo).port;
 
 const STAMP = Date.now();
 const EXT = `exrows${STAMP}`;        // A's: rows + hosts

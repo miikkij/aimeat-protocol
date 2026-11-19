@@ -7,20 +7,16 @@ description: >
 license: MIT
 metadata:
   author: AIMEAT
-  version: "1.1"
+  version: "2.0"
 ---
 
 > **Canonical version lives on the node.** This baked-in copy is a bootstrap seed. If the
-> `aimeat_skill_get` tool is available, fetch `node:aimeat-app-builder` and follow THAT
-> version — it is kept current (research flow, pitfall registry, new tooling). Both versions
-> agree on the core rule: the live spec of the app's track always wins over this file
-> (`GET /v1/prompts/build-app-atelier` for a new app, `GET /v1/prompts/build-app` for a
-> Classic one).
->
-> **A new app is built on the Atelier track.** Load `node:aimeat-app-builder-atelier` and read
-> `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts (over HTTP,
-> `GET /v1/prompts/build-app-atelier`). The rest of this file is the Classic track, for an app
-> that is already Classic or when the owner asks for Classic by name.
+> `aimeat_skill_get` tool is available, fetch `node:aimeat-app-builder-atelier` and follow THAT
+> version — it is kept current (research flow, pitfall registry, new tooling). Both agree on the
+> core rule: the live Atelier specification always wins over this file
+> (`GET /v1/prompts/build-app-atelier`). The Classic track this file used to describe was
+> retired on 2026-11-19; an app built on it is moved with the specification's section
+> `from-classic`.
 
 # Building AIMEAT apps
 
@@ -30,49 +26,46 @@ to this instance over MCP. The MCP tools are named `aimeat_*` (e.g. `aimeat_app_
 publish directly to the node — you do **not** need the AIMEAT web UI.
 
 An **AIMEAT app** is a **single self-contained HTML file**. The node hosts it and serves it
-on its own subdomain (e.g. `https://<name>.apps.aimeat.io/`). It logs the user in, reads and
-writes their data, and uses node-hosted UI/AI libraries — all from `<script>` tags pointing at
-the node. There is **no build step and no backend to write**: the node is the backend.
+on its own subdomain (e.g. `https://<name>.apps.aimeat.io/`). Its head is a few lines and its
+interface is calls into the served component kit (`AIMEAT.atelier`), which carries the header,
+the sign-in, the language switch and the loading, empty and error states. There is **no build
+step and no backend to write**: the node is the backend.
 
 ## The one rule that matters: fetch the canonical spec first
 
-The node serves the **authoritative, always-current build-app specification**. It is the
-single source of truth for available libraries, allowed script URLs, the required `<meta>`
-tags, auth/data APIs, and the templates. **Before writing any app, fetch it and follow it
-exactly:**
+The node serves the **authoritative, always-current build specification**. It is the single
+source of truth for the component kit, the libraries, allowed script URLs, the required
+`<meta>` tags, the data patterns and the publish steps. **Before writing any app, fetch it and
+follow it exactly:**
 
 ```bash
-curl -s https://aimeat.io/v1/prompts/build-app
+curl -s "https://aimeat.io/v1/prompts/build-app-atelier?format=txt"
 ```
 
-Also pull the ready-made templates and library list (start from a template — do not invent
-structure):
+Over MCP the same specification comes in parts: `aimeat_handbook_get { tier: "build-app-atelier" }`
+is the first and lists the rest. Its part `platform` lists the sections only some apps need (a
+team, files, AI, anonymous intake, server-side work); read the ones this app is in.
+
+Start from a frame the node ships — never a blank file:
 
 ```bash
-curl -s https://aimeat.io/v1/app-templates          # starter templates
-curl -s https://aimeat.io/llms.txt                   # discovery: build prompt + template links
+curl -s https://aimeat.io/v1/designbook?kind=genre                 # the genres a fine app forks
+curl -s https://aimeat.io/v1/app-templates/shell-atelier           # the frame for a prototype or a plain page
+curl -s https://aimeat.io/v1/app-templates                         # every template, use cases included
 ```
 
 If the node base URL is not `aimeat.io`, use the one configured for this instance (see the
-`AIMEAT_BASE_URL` env / the MCP server URL). Everything the app loads at runtime — CSS, auth,
-data, UI libraries — must be a URL **listed in that spec**. Never invent script/style `src`
-URLs (e.g. `/i18n/translations.js`, `/components/*.js`); those 404 and break the app. Only use
-the libraries the spec names.
+`AIMEAT_BASE_URL` env / the MCP server URL). Everything the app loads at runtime must be a URL
+**listed in that spec**. Never invent script/style `src` URLs (e.g. `/i18n/translations.js`,
+`/components/*.js`); those 404 and break the app.
 
 ## Workflow
 
-1. **Fetch the spec** (above). Treat it as law. Skim the templates; pick the closest one.
-2. **Build one HTML file.** Single file, no bundler. Include the required meta tags the spec
-   lists — at minimum:
-   ```html
-   <meta name="aimeat-app" content="<filename>.html">
-   <meta name="aimeat-scopes" content="memory:read memory:write memory:delete">
-   ```
-   Load only the node libraries the spec lists (auth, data, ui viewers/forms, the daisyUI +
-   Tailwind theme bridge). Use `AIMEAT.auth.mountLoginButton(...)` + `AIMEAT.auth.login()` for
-   sign-in, `AIMEAT.data.get/set(key, value, { visibility })` for storage, and the
-   `AIMEAT.ui.*` helpers for lists/forms. Respect the AIMEAT light/dark theme via
-   `data-theme` + the theme CSS variables (never hardcode brand colors).
+1. **Fetch the spec** (above). Treat it as law. Ask the owner the level first (a quick
+   prototype, an ordinary page or the finest), then fork the genre or start from the shell.
+2. **Build one HTML file.** Single file, no bundler. Keep the head the shell or genre gives you,
+   with `<meta name="aimeat-track" content="atelier">`, the app's filename and its scopes. Build
+   the screens from the kit's components; never write your own sign-in, theme or language switch.
 3. **Verify locally before publishing.** Do not publish blind:
    - Check JS syntax with a command that names the file explicitly, so a missing path cannot
      read as a pass:
@@ -83,40 +76,34 @@ the libraries the spec names.
      parses that, and exits 0 printing nothing — indistinguishable from a real pass.
    - Serve the file locally and `curl` it back; confirm it is well-formed and the script tags
      resolve to real node URLs.
-4. **Publish over MCP.** Call the `aimeat_app_publish` tool. For any file bigger than ~1 KB
-   use the **presigned upload** mode: call the tool **without** the content parameter → it
-   returns an `upload_url` → `PUT` the raw HTML to that URL:
+4. **Publish over MCP.** Call the `aimeat_app_publish` tool with the `spec_token` the
+   specification carries. For any file bigger than ~1 KB use the **presigned upload** mode: call
+   the tool **without** the content parameter → it returns an `upload_url` → `PUT` the raw HTML
+   to that URL:
    ```bash
    curl -s -X PUT "<upload_url>" -H "Content-Type: text/html" --data-binary @app.html
    ```
    Provide `filename` (e.g. `my-app.html`), `name`, `description`, `category`, `tags`, and an
-   `icon` (emoji). Re-publishing the same `filename` bumps the version — it does not create a
-   duplicate.
+   `icon`. Re-publishing the same `filename` bumps the version — it does not create a duplicate.
 5. **Return the live URL.** After publishing, report the app's live address to the user
-   (`https://aimeat.io/v1/apps/<owner>/<filename>` and/or the subdomain
-   `https://<name>.apps.aimeat.io/`). Confirm with `aimeat_app_list` if unsure of the URL.
+   (the subdomain `https://<name>.apps.aimeat.io/`). Confirm with `aimeat_app_list` if unsure.
 
-## When the app needs external data (an extension)
+## When the app needs server-side work (an extension)
 
-If the app needs a third-party API (weather, maps, a public dataset), that call belongs in an
-**AIMEAT extension** (a sandboxed server-side function), not in the browser. The build spec and
-`aimeat_extension_install` / `aimeat_extension_invoke` cover this. An extension:
-- Owns its own `ext:<name>` memory namespace and makes outbound HTTP via `ctx.fetch()`.
-- Exports actions as `export default async function (ctx, input) { ... }`.
-- Is read by the app **through** the node's cortex libs, never called directly from the page.
-
-Only reach for an extension when the app genuinely needs data the browser cannot fetch
-directly. Most apps (games, note tools, trackers, dashboards over the user's own AIMEAT data)
-need **no** extension — just auth + data + UI libs.
+If the app calls a third-party API with a key, needs a rule the browser cannot break, or works
+on a schedule, that belongs in an **AIMEAT extension** (a sandboxed server-side function), not
+in the browser. The specification's platform section `server-side` and the node skill
+`node:aimeat-extension-builder` cover it. The page reads it **through** the node's cortex libs,
+never by calling it directly. Most apps need **no** extension.
 
 ## Do / Don't
 
-- **Do** fetch `/v1/prompts/build-app` every time — it changes and it is canonical.
-- **Do** start from a template and keep the app a single HTML file.
+- **Do** fetch `/v1/prompts/build-app-atelier` every time — it changes and it is canonical.
+- **Do** start from a genre or the Atelier shell and keep the app a single HTML file.
 - **Do** verify locally, then publish over MCP, then hand back the live URL.
 - **Don't** invent library/script URLs or reference files the spec doesn't list.
 - **Don't** build a separate backend, a bundler, or a multi-file app — the node is the backend.
-- **Don't** hardcode brand colors or bypass the AIMEAT auth/data/UI libraries.
+- **Don't** hardcode colours or bypass the kit — its `--ak-*` tokens are the look.
 
 Full API detail lives in `./references/aimeat-cheatsheet.md`, but the live spec at
-`/v1/prompts/build-app` always wins on any conflict.
+`/v1/prompts/build-app-atelier` always wins on any conflict.

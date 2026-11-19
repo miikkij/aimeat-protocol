@@ -12,6 +12,7 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.36.0 — 2026-11-19 — A description cell breaks a long identifier as the name and who cells do: beside the admin pages' contents rail a metric's label ran 25px past its column.
  *   v1.35.0 — 2026-11-15 — mark-name-tags-stats-doors stacks from 861 to 1320px too: beside an organism's contents rail the workspace name fell to a few letters a line.
  *   v1.34.0 —2026-11-01 — The cut name-state-who-n-doors (the Offers page's data products, WP9a): the
  *     product, its freshness, who may use it, its reads this week, a door; the rows stack on a phone.
@@ -121,7 +122,7 @@
    outside a Listing row (Jouni's decision "Meta line"). */
 .listing-name small, .listing-meta { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
 .listing-name small.is-warn { color: var(--accent); }
-.listing-row > .listing-desc { display: block; align-content: center; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.listing-row > .listing-desc { display: block; align-content: center; font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
 .listing-row > .listing-who { display: block; align-content: center; font-size: .85rem; font-weight: 600; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
 .listing-who small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
 .listing-row > .listing-doors { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }

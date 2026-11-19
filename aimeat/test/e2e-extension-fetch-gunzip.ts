@@ -17,11 +17,13 @@
  *   FIRST FAIL: against the tree before this change the 8 MB manifest installs with the limit
  *   dropped, so the guide fails with 4 MB on both extensions, and the gzip bytes are read as text.
  * @version-history
+ *   2026-11-19 — The far side listens on a port the OS picks (FAR_PORT was the node's port + 240, which met another suite's far side on the next CI lane).
  *   v1.0.0 — 2026-10-09 — Initial (wish-tv-opas-ilmaisstreameille-ja-oma-tv-kalenteri).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-fetch-gunzip
 
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { gzipSync } from 'node:zlib';
 import { ownerSignIn } from './helpers/owner-login.js';
 
@@ -54,8 +56,9 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 console.log('\n=== Extension ctx.fetch gunzip and limits.fetch_max_mb E2E ===\n');
 
 // ─── A far side for ctx.fetch: a gzipped guide, a gzip bomb, a plain document ───
-// Far from the node's port, as e2e-extension-rows keeps its far side: neighbouring sessions run suites.
-const FAR_PORT = Number(new URL(BASE).port || '40251') + 240;
+// The OS picks a free port: a fixed offset from the node's port met another suite's offset on the
+// next lane (CI lanes take neighbouring ports: 20002 + 241 and 20003 + 240 are both 20243).
+let FAR_PORT = 0;
 const PROGRAMME = '<programme start="20261009180000 +0300" stop="20261009190000 +0300" channel="YLE.TV1.fi"><title lang="fi">Uutiset</title><desc lang="fi">Päivän uutiset ja sää.</desc></programme>\n';
 const PROGRAMMES = Math.ceil((6 * MB) / Buffer.byteLength(PROGRAMME));
 const GUIDE_XML = '<?xml version="1.0" encoding="UTF-8"?>\n<tv>\n' + PROGRAMME.repeat(PROGRAMMES) + '</tv>\n';
@@ -66,7 +69,8 @@ const far = http.createServer((req, res) => {
     if (req.url === '/bomb.xml.gz') { res.writeHead(200, { 'Content-Type': 'application/octet-stream' }); res.end(BOMB_GZ); return; }
     res.writeHead(404, { 'Content-Type': 'application/xml' }); res.end('<tv/>');
 });
-await new Promise<void>(r => far.listen(FAR_PORT, () => r()));
+await new Promise<void>(r => far.listen(0, () => r()));
+FAR_PORT = (far.address() as AddressInfo).port;
 
 const STAMP = Date.now();
 const EXT_WIDE = `exgzwide${STAMP}`;   // limits.fetch_max_mb: 8
@@ -152,8 +156,12 @@ await test('Signed out, the action is refused; another owner cannot re-install i
     const anon = await json(`/v1/ext/${EXT_WIDE}/pull`, { method: 'POST', body: JSON.stringify({ port: FAR_PORT, file: 'guide.xml.gz' }) });
     assert(anon.status === 401, `signed out: expected 401, got ${anon.status}: ${JSON.stringify(anon.body?.error)}`);
     const X = await setupOwner('x');
-    const take = await json('/v1/extensions', { method: 'POST', headers: auth(X.token), body: JSON.stringify({ manifest: manifestFor(EXT_WIDE, { limits: { fetch_max_mb: 32 } }), scripts: SCRIPTS, update: true }) });
-    assert(take.status >= 400, `other owner update: expected a refusal, got ${take.status}`);
+    // A second install under the same name is refused as a duplicate (409) whoever sends it; the
+    // update path is PUT /v1/extensions/{name}, and there the other owner is refused as not the owner.
+    const again = await json('/v1/extensions', { method: 'POST', headers: auth(X.token), body: JSON.stringify({ manifest: manifestFor(EXT_WIDE, { limits: { fetch_max_mb: 32 } }), scripts: SCRIPTS, update: true }) });
+    assert(again.status === 409, `other owner re-install: expected 409, got ${again.status}: ${JSON.stringify(again.body?.error)}`);
+    const take = await json(`/v1/extensions/${EXT_WIDE}`, { method: 'PUT', headers: auth(X.token), body: JSON.stringify({ manifest: manifestFor(EXT_WIDE, { limits: { fetch_max_mb: 32 } }), scripts: SCRIPTS }) });
+    assert(take.status === 403, `other owner update: expected 403, got ${take.status}: ${JSON.stringify(take.body?.error)}`);
     const rec = await json(`/v1/extensions/${EXT_WIDE}`, { headers: auth(A.token) });
     const limits = rec.body.data?.extension?.limits ?? rec.body.data?.limits;
     assert(limits?.fetchMaxBytes === 8 * MB, `ceiling after the other owner's attempt: ${JSON.stringify(limits)}`);

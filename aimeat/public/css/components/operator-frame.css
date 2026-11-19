@@ -7,6 +7,7 @@
  *   the centred card of a signed-out or refused visit. Drawn by components/OperatorFrame.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-11-19 — The contents rail beside an admin page stays in sight under the bar (top 78px).
  *   v1.1.0 — 2026-09-27 — A section brought to the top lands under the bar, its headline in sight
  *     (scroll-margin-top, which Rail's scrollToSection now reads; Jouni).
  *   v1.0.0 — 2026-09-27 — Moved out of views/admin.css (.adm, .adm-main, .adm-topbar,
@@ -44,6 +45,8 @@
 .operator-frame-page .og-sec { --poster-section-size: 1.5rem; }
 /* A section brought to the top lands under the bar that stays there (62px), not behind it. */
 .operator-frame-page .og-sec { scroll-margin-top: 78px; }
+/* The contents rail beside the page stays in sight under the same bar (tab-page.css gives it 1rem). */
+.operator-frame-page .og-rail { top: 78px; max-height: calc(100vh - 94px); }
 .operator-frame-page .og-sec-h h2 small {
   font-family: var(--font-mono);
   font-size: .78rem;

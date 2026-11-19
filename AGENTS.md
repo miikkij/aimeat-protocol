@@ -63,9 +63,9 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
 - **A new app is built on the Atelier track; on the finest level it is forked from a genre.** A
   quick prototype or an ordinary page starts from the Atelier shell with no genre. Load the skill
   `node:aimeat-app-builder-atelier` and read its specification: `aimeat_handbook_get { tier:
-  "build-app-atelier" }`, in parts: `genre`, `libraries`, `book` and `patterns` before any code. The Classic track is
-  for an app that is already Classic, or when Jouni asks for it by name. "Quicker to start" is not
-  a reason, and a track is never changed in the middle of a build.
+  "build-app-atelier" }`, in parts: `genre`, `libraries`, `book` and `patterns` before any code, and
+  the platform sections the app needs. The Classic track was retired on 2026-11-19: an app built on
+  it is changed with the Atelier specification and moved with its section `from-classic`.
 - **Ask the level first.** A quick prototype (the kit as it comes, no styling), an ordinary page
   (a ready layout and look from the Design Book), or the finest (a forked genre, the Book's parts,
   components of its own, each written down with its reason). All three are Atelier and

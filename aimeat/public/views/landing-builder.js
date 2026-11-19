@@ -22,6 +22,9 @@
  *   OtherAi · BuildAppPrompt · BuildInvite
  * @usage import { BuildInvite } from './landing-builder.js';
  * @version-history
+ *   v2.2.0 — 2026-11-19 — The long prompt for an AI that cannot connect is the Atelier specification
+ *     with ?delivery=paste (its preface and how to publish the file by hand), no longer the Classic
+ *     one; the idea goes in front of it, and the fold's hint no longer says Classic. fetchCanonicalBuildPrompt takes the locale only.
  *   v2.1.2 — 2026-11-15 — The other-AI hint's fallback says "This prompt builds the app", as en.json does.
  *   v2.1.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.1.0 — 2026-10-25 — No "Connect your AI" step, in the steps or the loop line, for a signed-in
@@ -54,17 +57,15 @@ import { useAiConnected } from '/views/home/journey-steps.js';
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-// Canonical build prompt from the node - the single source of truth the app-catalog + agentic
-// coders use. TWO TRACKS, TWO GUIDES (TARGET-074): Classic reads /v1/prompts/build-app (the
-// daisyUI vocabulary, templates and capability packs), Atelier reads /v1/prompts/build-app-atelier
-// (the served kit, the looks, the mosaic). Neither prompt teaches the other's mechanics. Cached per
-// locale and track.
+// The build prompt for an AI that cannot connect, from the node: the Atelier specification with the
+// preface that skips the tool steps and the section on publishing the file by hand
+// (?delivery=paste). Atelier is the only build guide since 2026-11-19; the Classic one is retired.
+// Cached per locale.
 const _canonicalPromptCache = {};
-export async function fetchCanonicalBuildPrompt(locale, track) {
-  const key = (locale || 'en') + '|' + (track || 'classic');
+export async function fetchCanonicalBuildPrompt(locale) {
+  const key = locale || 'en';
   if (_canonicalPromptCache[key]) return _canonicalPromptCache[key];
-  const path = track === 'atelier' ? '/v1/prompts/build-app-atelier' : '/v1/prompts/build-app';
-  const d = await (await fetch(path + '?mode=new&lang=' + encodeURIComponent(locale || 'en'))).json();
+  const d = await (await fetch('/v1/prompts/build-app-atelier?mode=new&delivery=paste&lang=' + encodeURIComponent(locale || 'en'))).json();
   const full = d && d.data && d.data.prompt;
   if (typeof full === 'string' && full.length > 500) { _canonicalPromptCache[key] = full; return full; }
   throw new Error('no canonical prompt');
@@ -73,9 +74,9 @@ export async function fetchCanonicalBuildPrompt(locale, track) {
 // Same filter the catalog applies: engines and wrappers a person would pick on purpose.
 const PACK_CATEGORIES = ['visualization', 'diagrams', 'canvas', 'game', '3d', 'realtime'];
 
-// The canonical prompt carries a placeholder for the idea. Replacing it beats appending, so the
-// AI reads the idea where it expects to and the interview step adapts itself.
-const IDEA_PLACEHOLDER = 'My initial idea: (not given yet — ask me what to build)';
+// The idea goes first, in the words the Atelier text itself uses for it (atelier-prompt.ts composeFull),
+// so the interview reads it and skips what it already answers.
+const IDEA_PREFIX = "The app idea, in the owner's words: ";
 
 /* The half-finished thought, kept for the length of the browser tab.
    sessionStorage rather than localStorage on purpose: this is an unfinished draft, not a
@@ -119,7 +120,7 @@ function OtherAi({ idea }) {
   const [packDocs, setPackDocs] = useState({});
 
   useEffect(() => {
-    fetchCanonicalBuildPrompt(getLocale(), 'classic').then(setCanonical).catch(err => { swallowed('landing: prompt', err); });
+    fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing: prompt', err); });
     fetch('/v1/library-packs?lang=' + encodeURIComponent(getLocale())).then(r => r.json()).then(d => {
       const all = (d.data && d.data.packs) || [];
       setPacks(all.filter(pk => {
@@ -148,7 +149,7 @@ function OtherAi({ idea }) {
 
   const prompt = (() => {
     if (!canonical) return '';
-    let out = idea.trim() ? canonical.replace(IDEA_PLACEHOLDER, 'My initial idea: ' + idea.trim()) : canonical;
+    let out = idea.trim() ? IDEA_PREFIX + idea.trim() + '\n\n' + canonical : canonical;
     const docs = selected.map(pk => packDocs[pk.id]).filter(Boolean);
     if (docs.length) {
       out += '\n## Selected capability packs (self-hosted on my node — use these, never a CDN)\n';
@@ -163,7 +164,7 @@ function OtherAi({ idea }) {
 
   return html`
     <div class="ld-gen-other">
-      <p class="ld-gen-hint">${tr('landing.genOtherHint', 'Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself. This prompt builds the app on the Classic track, not on Atelier.')}</p>
+      <p class="ld-gen-hint">${tr('landing.genOtherHint', 'Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself.')}</p>
       ${selected.length ? html`<p class="ld-gen-contains">${tr('landing.genOtherPacks', 'Included for your idea')}: ${selected.map(pk => pk.title || pk.id).join(' · ')}.</p>` : ''}
       <div class="ld-gen-preview-label">${tr('landing.genPreview', 'Prompt preview')}</div>
       <div class="ld-gen-preview">${prompt || tr('landing.buildLoading', 'Loading the build prompt from this node…')}</div>

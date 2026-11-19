@@ -14,6 +14,7 @@
  *   It is the site's Modal with the library's parts inside (Note lead, Facts, the row label, the
  *   dashed aside); its own sheet, css/components/explain-dialog.css, only spaces the examples and
  *   the aside.
+ *   - `src1` … `src6` (optional): official sources, each "Label | https://address" (sourcesOf).
  *   - `terms` (optional): glossary terms, comma-separated ("Agent,Scope"). The dialog lists each with
  *     its plain sentence in the reader's language, read from GET /v1/glossary.json.
  *   Every dialog ends with "Ask your AI more": a prompt the person copies into their own AI, carrying
@@ -23,6 +24,9 @@
  * @structure ExplainDialog({ term, label, open, onClose, mine }) · explainOf(term, part)
  * @usage html`<${ExplainDialog} term="ai.temperature" open=${open} onClose=${() => setOpen(false)} />`
  * @version-history
+ *   v1.3.0 — 2026-11-19 — `src1` … `src6` ("Label | https://address"): the official sources a concept
+ *     names, listed as "Read more and ask" links and carried into the "Ask your AI more" prompt. They
+ *     add to the explanation and never replace it (rules/page-guidance.md; the AML concepts first).
  *   v1.2.0 — 2026-10-31 — `terms` lists glossary entries, `mine` the person's own figures, and every
  *     dialog ends with "Ask your AI more" (Jouni, 2026-10-31; wish-kokonaiskuva-koneet-agentit-sovellukset-tieto-ja-tarjoukset-).
  *   v1.1.0 — 2026-10-27 — `tipLabel`, so a notice, a Security page incident and a waiting request can
@@ -80,6 +84,19 @@ export function explainOf(term, part) {
 }
 
 /**
+ * The official sources a term's explanation names in `src1` … `src6`, each "Label | https://address".
+ * Only an https address is kept: the words are locale data, and a link from them opens a new tab.
+ */
+export function sourcesOf(part) {
+  return [1, 2, 3, 4, 5, 6].map((n) => part('src' + n)).filter(Boolean).map((s) => {
+    const at = s.lastIndexOf('|');
+    const label = at > 0 ? s.slice(0, at).trim() : '';
+    const url = at > 0 ? s.slice(at + 1).trim() : '';
+    return label && /^https:\/\/[^\s"<>]+$/.test(url) ? { label, url } : null;
+  }).filter(Boolean);
+}
+
+/**
  * @param {{ term: string, label?: string, mine?: string, open: boolean, onClose: () => void }} props `term` names the
  *   explanation; `label` is the setting's name on the page, the title when the locale gives none.
  */
@@ -95,12 +112,14 @@ export function ExplainDialog({ term, label, open, onClose, mine }) {
     part('high') ? { k: part('highLabel') || t('explain.high'), v: part('high') } : null,
   ].filter(Boolean);
   const examples = [1, 2, 3, 4, 5, 6].map((n) => part('ex' + n)).filter(Boolean);
+  const sources = sourcesOf(part);
   // The glossary's plain sentence in the reader's language; a term without one shows its English
   // definition, which is what the glossary page shows for a builder-only term.
   const termRows = terms.map((g) => ({ k: g.term, v: g.plain || g.definition }));
   const prompt = buildAskPrompt({
     subject: title,
-    explanation: [part('what'), ...rows.map((r) => `${r.k}: ${r.v}`), ...examples, part('tip')],
+    explanation: [part('what'), ...rows.map((r) => `${r.k}: ${r.v}`), ...examples, part('tip'),
+      ...sources.map((s) => `${t('explain.sources')}: ${s.label} ${s.url}`)],
     terms: terms.map((g) => ({ term: g.term, definition: g.definition })),
     mine, locale: getLocale(), base: location.origin,
   });
@@ -123,6 +142,11 @@ export function ExplainDialog({ term, label, open, onClose, mine }) {
         <div class="explain-terms">
           <span class="poster-label">${t('explain.terms')}</span>
           <${Facts} rows=${termRows} />
+        </div>` : null}
+      ${sources.length ? html`
+        <div class="explain-sources">
+          <span class="poster-label">${t('explain.sources')}</span>
+          <ul>${sources.map((s) => html`<li key=${s.url}><a href=${s.url} target="_blank" rel="noopener noreferrer">${s.label}</a></li>`)}</ul>
         </div>` : null}
       ${mine ? html`<p class="explain-mine">${mine}</p>` : null}
       <aside class="poster-aside poster-aside--small explain-ask">

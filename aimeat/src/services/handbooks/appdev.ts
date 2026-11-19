@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-19 — The research-first flow names one guide, the Atelier specification, its part
+ *     `platform` and section `from-classic`; the Classic spec, skill and tiers are gone from it.
  *   2026-11-15 — "Installing the app, and its icon": who can install, action icon_upload, and that an
  *     upload never becomes the icon by its key (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
  *   2026-11-11 — "An agent that comes with the app": the aimeat-crews block, the approval, and the
@@ -258,25 +260,25 @@ connects it, and \`aimeat_ai_roles\` shows which app roles wait. Skill: aimeat-a
 
 **Research & knowledge (the research-first flow).** \`aimeat_appdev_overview\` — ONE call before
 framing any build: the owner's apps + template proposals, library packs with per-model proofs,
-T1/T2/T3 templates, curated + learned pitfalls (pass your model id) · \`aimeat_appdev_pitfall_list\`
+the Atelier shells and genres, curated + learned pitfalls (pass your model id) · \`aimeat_appdev_pitfall_list\`
 (scope own/platform/all, paginated) · \`aimeat_appdev_pitfall_report\` (record what bit you — model
 required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_template_propose\`/
 \`_list\`/\`_get\` (distill a reusable template after a publish; the next build starts from it).
 
 ## Research-first build flow (research → frame → propose → build → finish)
-0. THE TRACK: a NEW app is built on the **Atelier track**, on the finest level (\`fine\`) forked from
-   a genre and on \`proto\` or \`plain\` started from the shell \`shell-atelier\`, with the served
-   component kit carrying the header, the sign-in and the states. Load
-   \`node:aimeat-app-builder-atelier\` and read its specification, \`aimeat_handbook_get { tier:
-   "build-app-atelier" }\` (in parts; over HTTP \`GET /v1/prompts/build-app-atelier\`). The Classic
-   track below is for improving an app that is already Classic, or when the owner asks for it by
-   name. A track is not changed in the middle of a build. ${MODEL_QUALITY_ADVICE}
+0. THE GUIDE: every app is built and changed with the **Atelier specification**, on the finest
+   level (\`fine\`) forked from a genre and on \`proto\` or \`plain\` started from the shell
+   \`shell-atelier\`, with the served component kit carrying the header, the sign-in and the states.
+   Load \`node:aimeat-app-builder-atelier\` and read the specification, \`aimeat_handbook_get { tier:
+   "build-app-atelier" }\` (in parts; over HTTP \`GET /v1/prompts/build-app-atelier\`). Its part
+   \`platform\` lists what only some apps need (a team, files, AI, intake, server-side work). An app
+   built on the retired Classic track is moved with its section \`from-classic\`. ${MODEL_QUALITY_ADVICE}
 1. RESEARCH: load the \`node:aimeat-app-builder-atelier\` skill (\`aimeat_skill_get\`), call
-   \`aimeat_appdev_overview\`, and on the Classic track load \`node:aimeat-app-builder\` and fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law). Over MCP the same spec
-   comes in parts: \`aimeat_handbook_get { tier: "build-app" }\` is the first and lists the rest.
-2. FRAME: a new app on the level \`fine\` forks a genre, one on \`proto\` or \`plain\` starts from \`shell-atelier\`; a Classic app keeps its tier (T1 pure client / T2 +cortex /
-   T3 +extension). Packs, start point (fork a prior app / template proposal / genre), own-users → aimeat-iam pack (gate) + AIMEAT.iam (panel),
-   decided NOW. A role belongs to the PERSON: a member's agents inherit it.
+   \`aimeat_appdev_overview\`, and read the specification's parts (it is law).
+2. FRAME: the level first; on \`fine\` a genre to fork, on \`proto\` or \`plain\` \`shell-atelier\`. The
+   platform sections the app needs, packs, start point (fork a prior app / template proposal / genre),
+   own-users → aimeat-iam pack (gate) + AIMEAT.iam (panel), decided NOW. A role belongs to the
+   PERSON: a member's agents inherit it.
 3. PROPOSE the frame to the user in 3-5 lines; adjust.
 4. BUILD flexibly within the frame; verify locally; publish (presigned upload > ~1 KB).
 5. FINISH: the four things every app owes — agent face, bound skill (\`metadata.binding\`), data map

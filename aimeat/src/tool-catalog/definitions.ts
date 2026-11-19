@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-19 -- CatalogTool is the union of the groups' entry types and CATALOG is typed by
+ *     it: the inferred literal type of the whole list passed what a declaration file can hold (TS7056).
  *   v1.x -- 2026-11-19 -- definitions/calibrator.ts: aimeat_calibrator.
  *   v1.x -- 2026-11-19 -- definitions/living.ts: aimeat_living_author.
  *   v1.x -- 2026-11-19 -- definitions/site-template.ts: aimeat_site_template.
@@ -159,7 +161,9 @@ import { keyReencryptTools } from './definitions/key-reencrypt.js';
 import { disputeTools } from './definitions/disputes.js';
 import { csmTools } from './definitions/csm.js';
 
-const CATALOG = [
+// Typed by CatalogTool below, a union that names each group: inferred, the whole array's literal
+// type grew past what the compiler writes into a declaration file (TS7056, 2026-11-19).
+const CATALOG: CatalogTool[] = [
     ...agentMessagingTools,
     ...crewTools,
     ...schedulesTasksMemoryTools,
@@ -236,7 +240,28 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;
  * Every catalog entry with its literal type, for a group file declared `as const satisfies`: what
  * zodShapeFor() (zod-shape.ts) reads to type a tool's handler arguments from its catalog entry.
  */
-export type CatalogTool = (typeof CATALOG)[number];
+export type CatalogTool =
+    | (typeof agentMessagingTools)[number] | (typeof crewTools)[number] | (typeof schedulesTasksMemoryTools)[number]
+    | (typeof aiJobTools)[number] | (typeof decideTools)[number] | (typeof voiceTools)[number]
+    | (typeof aiModelTools)[number] | (typeof discoveryWorkBoardsTools)[number] | (typeof capabilitiesGroupsSkillsTools)[number]
+    | (typeof operatorConfigTools)[number] | (typeof organismsWorkspacesAppsTools)[number] | (typeof appManageTools)[number]
+    | (typeof extensionsCortexTools)[number] | (typeof packagesTools)[number] | (typeof commerceTools)[number]
+    | (typeof companyTools)[number] | (typeof exchangeTools)[number] | (typeof complianceTools)[number]
+    | (typeof installSetTools)[number] | (typeof dataMapTools)[number] | (typeof classificationTools)[number]
+    | (typeof surfaceLayoutTools)[number] | (typeof designbookTools)[number] | (typeof uiLibraryTools)[number]
+    | (typeof themeTools)[number] | (typeof connectionTools)[number] | (typeof connectionFileTools)[number]
+    | (typeof refineryTools)[number] | (typeof contentTools)[number] | (typeof mcpProxyTools)[number]
+    | (typeof visibilityTools)[number] | (typeof docsignTools)[number] | (typeof complianceAgreementTools)[number]
+    | (typeof goalTools)[number] | (typeof exposureTools)[number] | (typeof internetOpeningTools)[number]
+    | (typeof fileStoreTools)[number] | (typeof dmGroupTools)[number] | (typeof dmReactionTools)[number]
+    | (typeof organismAgentTools)[number] | (typeof teamTools)[number] | (typeof organismJoinRequestTools)[number]
+    | (typeof organismApprovalTools)[number] | (typeof publishRequestTools)[number] | (typeof accountRightsTools)[number]
+    | (typeof secretAddressTools)[number] | (typeof secretShareTools)[number] | (typeof helpTools)[number]
+    | (typeof dataProductTools)[number] | (typeof partyTools)[number] | (typeof receiverTools)[number]
+    | (typeof buildWithYouTools)[number] | (typeof datapackageSellTools)[number] | (typeof dataspaceTools)[number]
+    | (typeof keyReencryptTools)[number] | (typeof disputeTools)[number] | (typeof csmTools)[number]
+    | (typeof ecosystemAppTools)[number] | (typeof moderationTools)[number] | (typeof broadcastSummaryTools)[number]
+    | (typeof siteTemplateTools)[number] | (typeof livingTools)[number] | (typeof calibratorTools)[number];
 
 const definitionByName = new Map(CLI_FALLBACK_TOOL_DEFINITIONS.map(definition => [definition.name, definition]));
 

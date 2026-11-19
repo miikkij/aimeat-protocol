@@ -80,7 +80,6 @@ export const DATAPACKAGE_PACKS: LibraryPack[] = [
     changelog: [
       { version: '1.0.0', date: '2026-08-15', summary: 'Initial: create/addResource/validate/publish plus open/rows/urlFor/exportAs, over /v1/datapackages.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['dataset', 'data package', 'csv', 'export', 'publish data', 'open data', 'datapaketti', 'avoin data', 'vie exceliin'],
     sizeEstimate: '~5KB',
     status: 'preview',

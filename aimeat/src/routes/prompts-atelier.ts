@@ -12,7 +12,11 @@
  *   import { registerAtelierPrompt } from './prompts-atelier.js';
  *   registerAtelierPrompt(router, config);   // BEFORE /v1/prompts/:tier
  * @version-history
- *   v1.5.0 — 2026-11-19 — The parts name the reader (a signed-in caller, else nobody) for the Design
+ *   v1.5.0 — 2026-11-19 — ?delivery=paste on the whole text: the preface and the publish-by-hand
+ *     section for an AI that cannot connect, which until now got the MCP text and no way back.
+ *     …/sections lists the platform sections with their `when`, and
+ *     …/sections/:id answers them (`kind: "section"`) beside the parts (atelier-platform.ts).
+ *   v1.6.0 — 2026-11-19 — The parts name the reader (a signed-in caller, else nobody) for the Design
  *     Book's map, which lists a genre grown out of an app opened to some people only for those people.
  *   v1.4.0 — 2026-09-19 — Part `libraries` arrives with the Design Book's map in it
  *     (build-atelier-book.ts), so the route takes the storage.
@@ -34,6 +38,7 @@ import { ATELIER_PARTS, atelierPieceIds } from '../services/builder/atelier-laye
 import { atelierPieceWithBook } from '../services/builder/atelier-book.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { ATELIER_PLATFORM } from '../services/builder/atelier-platform.js';
 
 /**
  * Register the Atelier build-spec route. Public for the same reason build-app is: build
@@ -56,8 +61,10 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig, stor
     for (const p of ATELIER_PARTS) {
       parts.push({ id: p.id, what: p.what, chars: (await atelierPieceWithBook(full, p.id, config, storage, readerOf(req)))?.text.length ?? 0 });
     }
-    res.json(success(config.nodeId, { parts, spec_token: buildAtelierSpecToken(config) }, [
-      { description: 'One part by id', method: 'GET', url: '/v1/prompts/build-app-atelier/sections/{id}' },
+    // The platform sections only some apps need, each with the situation it covers (atelier-platform.ts).
+    const sections = ATELIER_PLATFORM.map(s => ({ id: s.id, when: s.when }));
+    res.json(success(config.nodeId, { parts, sections, spec_token: buildAtelierSpecToken(config) }, [
+      { description: 'One part or platform section by id', method: 'GET', url: '/v1/prompts/build-app-atelier/sections/{id}' },
     ]));
   });
 
@@ -76,7 +83,7 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig, stor
     }
     res.json(success(config.nodeId, {
       id: 'build-app-atelier/' + piece.id,
-      kind: 'part',
+      kind: ATELIER_PARTS.some(p => p.id === piece.id) ? 'part' : 'section',
       prompt: piece.text,
       spec_token: buildAtelierSpecToken(config),
     }, [
@@ -88,7 +95,9 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig, stor
     const mode = req.query.mode === 'improve' ? 'improve' as const : 'new' as const;
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
-    const { full, body } = buildAtelierPrompt(config, { lang, mode, idea });
+    // ?delivery=paste: the text a person pastes into an AI that cannot connect (atelier-platform.ts).
+    const delivery = req.query.delivery === 'paste' ? 'paste' as const : 'mcp' as const;
+    const { full, body } = buildAtelierPrompt(config, { lang, mode, idea, delivery });
     if (req.query.format === 'txt') {
       sendPlainText(res, full);
       return;

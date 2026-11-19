@@ -17,6 +17,7 @@
  *   about what the author meant. → docs/pitfalls.md on the hook reading the worktree.
  * @structure PackChange · PackProof · LibraryPack
  * @version-history
+ *   v1.2.0 — 2026-11-19 — tierHint is gone: it named the Classic track's shell tier, which is retired.
  *   v1.1.0 — 2026-10-09 — Now the one definition: library-packs.ts imports and re-exports these three
  *     instead of keeping its own copy, and vendored-media.ts imports from here, so a pack file no
  *     longer stands in a cycle with the registry (pnpm gate, check:deps).
@@ -85,8 +86,6 @@ export interface LibraryPack {
   demoTemplateId?: string;
   /** node:-scoped skill carrying deep docs (@semver-pinnable), when the aiDoc is not enough. */
   skillRef?: string;
-  /** Which app-shell tier the pack implies (cortex packs → T2 shell). */
-  tierHint: 'T1' | 'T2' | 'T3';
   /** Idea-text keywords that pre-select this pack in the interview / catalog picker. */
   interviewTriggers: string[];
   sizeEstimate: string;

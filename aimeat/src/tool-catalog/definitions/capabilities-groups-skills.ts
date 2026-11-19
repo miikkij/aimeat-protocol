@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-19 — aimeat_appdev_overview names the Atelier shells and genres instead of the T1/T2/T3
+ *     shells; aimeat_app_template_propose no longer asks for a tier (optional and deprecated).
  *   2026-11-13 — aimeat_group_list and aimeat_group_get say which groups an agent sees with and without
  *     consent:groups (developer ruling 2026-11-13; structure programme 2026-11, unit 7).
  *   2026-11-13 — aimeat_knowledge_links takes relation (unit 3b).
@@ -569,7 +571,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_appdev_overview',
-        description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, T1/T2/T3 app-shell templates, loadable skills (node:aimeat-app-builder-atelier first), curated pitfalls, every active learned pitfall you can read (your own and those other owners shared, critical first), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<YOUR OWN model id — self-identify, never ask the user> to mark proven packs and list the pitfalls your model wrote first (it never hides one). Flow: research (this) → frame → propose to the user → build.',
+        description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, the Atelier shells and genres a build starts from, loadable skills (node:aimeat-app-builder-atelier first), curated pitfalls, every active learned pitfall you can read (your own and those other owners shared, critical first), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<YOUR OWN model id — self-identify, never ask the user> to mark proven packs and list the pitfalls your model wrote first (it never hides one). Flow: research (this) → frame → propose to the user → build.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'AppDev Research Overview', readOnlyHint: true },
@@ -641,7 +643,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_app_template_propose',
-        description: 'Record a reusable TEMPLATE distilled from an app you just built/published on this node — call after a successful publish when anything generalizes. Captures what to reuse (reuse_notes), the tier (T1 pure client / T2 +cortex / T3 +extension), the packs it relies on, how the next build should start (fork the source app vs scaffold), and WHICH MODEL built it (required, indicative). Proposing the same id again UPDATES the proposal. Owner-private in v1; the next build finds it via aimeat_appdev_overview or aimeat_discover type=template scope=own.',
+        description: 'Record a reusable TEMPLATE distilled from an app you just built/published on this node — call after a successful publish when anything generalizes. Captures what to reuse (reuse_notes), the packs it relies on, how the next build should start (fork the source app vs scaffold), and WHICH MODEL built it (required, indicative). Proposing the same id again UPDATES the proposal. Owner-private in v1; the next build finds it via aimeat_appdev_overview or aimeat_discover type=template scope=own.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Propose App Template', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -653,7 +655,7 @@ export const capabilitiesGroupsSkillsTools = [
             title: { type: 'string', required: true, description: 'Template title.', zod: z.string().min(3).max(160) },
             description: { type: 'string', required: true, description: 'What the template is for.', zod: z.string().min(5).max(10_000) },
             derived_from: { type: 'object', required: true, description: '{owner, filename} of YOUR published source app.', zod: z.object({ owner: z.string().min(1).max(INPUT_LIMITS.id).describe('Your own owner name'), filename: z.string().min(1).max(INPUT_LIMITS.id).describe('The published app this template distills') }) },
-            tier: { type: 'string', required: true, enum: ['T1', 'T2', 'T3'], description: 'T1 pure client · T2 +cortex · T3 +extension.' },
+            tier: { type: 'string', enum: ['T1', 'T2', 'T3'], description: 'Deprecated: the retired Classic track\'s tier. Leave it out; it is kept only on proposals written before 2026-11-19.' },
             reuse_notes: { type: 'string', required: true, description: 'What generalizes — the parts a next build should copy/keep.', zod: z.string().min(10).max(40_000) },
             model: { type: 'string', required: true, description: 'YOUR OWN model id — the model that built the source app. Self-identify, never ask the user (indicative).', zod: z.string().min(1).max(64) },
             tags: { type: 'array', description: 'Discovery tags.', zod: z.array(z.string().max(30)).max(12) },

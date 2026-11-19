@@ -24,8 +24,8 @@ in two lines, without anyone opening the source.
   whole map**: read it first, change what you need, and send all of it back. A body without
   `"spec": "aimeat.datamap/2"` is refused.
 - The build specification has the same rules for an AI that builds an app:
-  `aimeat_handbook_get { tier: "build-app/data-map" }` or
-  `GET /v1/prompts/build-app/sections/data-map`.
+  `aimeat_handbook_get { tier: "build-app-atelier/data-map" }` or
+  `GET /v1/prompts/build-app-atelier/sections/data-map`.
 
 ## The document
 

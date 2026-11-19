@@ -26,7 +26,6 @@ export const VALIDATE_PACKS: LibraryPack[] = [
     requires: [],
     license: 'MIT',
     apiSurface: 'AIMEAT.validate',
-    tierHint: 'T1',
     status: 'preview',
     modelTier: 'needs-doc',
     interviewTriggers: ['form', 'validation', 'validate', 'input', 'lomake', 'validointi', 'tarkistus', 'y-tunnus', 'iban', 'henkilötunnus', 'formulario'],

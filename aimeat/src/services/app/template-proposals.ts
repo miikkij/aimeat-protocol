@@ -14,6 +14,8 @@
  *   getTemplateProposal/deleteTemplateProposal; templateProposalKey()
  * @usage import { proposeTemplate, listTemplateProposals } from './template-proposals.js';
  * @version-history
+ *   v1.1.0 — 2026-11-19 — `tier` is optional: the retired Classic track's T1/T2/T3, kept on older
+ *     proposals and tagged only when given. Atelier has no tiers.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
  *   v1.0.1 — 2026-09-26 — The caller's account comes from localAccountOf, so a visitor from another
  *     node has none here and never reaches the local namesake's proposals (secaudit 2026-09, F-1).
@@ -39,8 +41,11 @@ export interface TemplateProposalManifest {
     description: string;
     /** The app this template was distilled from. */
     derivedFrom: { owner: string; filename: string; version: number; node: string };
-    /** Curated AppTemplate vocabulary — promotion to the registry is a copy. */
-    tier: 'T1' | 'T2' | 'T3';
+    /**
+     * The retired Classic track's tier. Kept on proposals written before 2026-11-19 and still
+     * accepted, but no longer asked for: Atelier has no tiers (atelier-platform.ts).
+     */
+    tier?: 'T1' | 'T2' | 'T3';
     tags: string[];
     /** What generalizes: the parts a next build should copy/keep, in plain prose. */
     reuseNotes: string;
@@ -70,7 +75,7 @@ export interface ProposeTemplateInput {
     title: string;
     description: string;
     derived_from: { owner: string; filename: string };
-    tier: 'T1' | 'T2' | 'T3';
+    tier?: 'T1' | 'T2' | 'T3';
     tags?: string[];
     reuse_notes: string;
     start_mode?: 'fork' | 'scaffold' | 'either';
@@ -124,7 +129,7 @@ export async function proposeTemplate(
                 version: app.versionNumber,
                 node: config.nodeId,
             },
-            tier: input.tier,
+            ...(input.tier ? { tier: input.tier } : {}),
             tags: (input.tags ?? []).slice(0, 12),
             reuseNotes: input.reuse_notes,
             startMode: input.start_mode ?? 'either',
@@ -150,7 +155,7 @@ export async function proposeTemplate(
         return {
             value: manifest,
             visibility: existing?.visibility ?? 'private',
-            tags: ['template', 'template-proposal', `model:${manifest.model}`, `tier:${manifest.tier}`],
+            tags: ['template', 'template-proposal', `model:${manifest.model}`, ...(manifest.tier ? [`tier:${manifest.tier}`] : [])],
             ttlHours: null,
         };
     });

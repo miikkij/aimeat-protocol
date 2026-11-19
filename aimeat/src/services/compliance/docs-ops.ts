@@ -20,6 +20,8 @@
  * @usage
  *   const out = await writeDocOp(deps, caller, 'registers', { scope: 'organism', organism_id }, body, { dryRun });
  * @version-history
+ *   2026-11-19 — A write of the document `aml` asks services/aml/gate.ts first: AIMEAT_AML_MODE none
+ *     refuses an organism's new obliged-entity declaration with 403 AML_NOT_OFFERED.
  *   2026-11-13 — An app's balancing tests and trial mark and an organism's privacy contact go through
  *     lia-write.ts before they are stored; a read of the tests says where each stands; an app's
  *     register write answers with `balancing_test` when its legal basis asks for a test.
@@ -47,6 +49,7 @@ import {
 import { scopeGaps, nodeOnlyGaps } from './scope-gaps.js';
 import { DOC_SCHEMAS, isComplianceDocKind, isSingleDocKind, COMPLIANCE_DOC_KINDS, type ComplianceDocKind, type ComplianceDocs } from './docs-schemas.js';
 import { appLiaReading } from './lia-need.js';
+import { amlDocRefusal } from '../aml/gate.js';
 import { balancingTestStep, liasForRead, prepareContactWrite, prepareLiasWrite, prepareTrialWrite, trialForRead } from './lia-write.js';
 
 export class ComplianceDocError extends Error {
@@ -153,6 +156,11 @@ async function prepared<K extends ComplianceDocKind>(
     const lias = await prepareLiasWrite(deps, caller, scope, parsed.data as ComplianceDocs['lias']);
     if (!lias.ok) throw new ComplianceDocError(lias.status, lias.code, lias.message);
     return lias.doc as ComplianceDocs[K];
+  }
+  // AIMEAT_AML_MODE none refuses an organism's new obliged-entity declaration (services/aml/gate.ts).
+  if (kind === 'aml') {
+    const refused = await amlDocRefusal(deps, scope, parsed.data as ComplianceDocs['aml']);
+    if (refused) throw new ComplianceDocError(refused.status, refused.code, refused.message);
   }
   return parsed.data as ComplianceDocs[K];
 }

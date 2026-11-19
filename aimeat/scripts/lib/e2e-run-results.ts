@@ -10,8 +10,9 @@
  *   job, Lifecycle Central's ci_sweep_ingest, `pnpm nightly:preflight`) reads one job per backend
  *   named `sweep (<backend>)`, so the shards hand their results to that job as artifacts, and it
  *   writes the annotations the readers know (scripts/lib/e2e-github-report.ts).
- * @structure RunResults · writeRunResults() · readRunResults()
+ * @structure RunResults · FlakyNote · flakyLine() · writeRunResults() · readRunResults()
  * @version-history
+ *   v1.1.0 -- 2026-11-19 -- `flaky` on a suite that was red in the run and green alone (--retry-red).
  *   v1.0.0 -- 2026-11-15 -- Initial: the results of a shard of the nightly sweep.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -21,6 +22,17 @@ export interface RunSuite {
     name: string; passed: number; failed: number; skipped: number; total: number; time: string;
     exitCode: number; lane: number; cycleMs: number; anonymous: string;
     red: boolean; note: string; failures?: string[];
+    /** The suite was red in the run and green when run again alone (`--retry-red`). */
+    flaky?: FlakyNote;
+}
+
+/** What the first run said about a suite that then passed alone (test/run-e2e-retry.ts). */
+export interface FlakyNote { passed: number; total: number; note: string; failures: string[] }
+
+/** The line `pnpm ready` collects: one per suite that failed in the run and passed alone. */
+export function flakyLine(dbType: string, name: string, f: FlakyNote): string {
+    const why = f.failures[0] ?? f.note ?? '';
+    return `[e2e-flaky] ${dbType} ${name}: red in the run (${f.passed}/${f.total}${why ? `: ${why.replace(/\s+/g, ' ').slice(0, 200)}` : ''}), green alone`;
 }
 
 export interface RunResults {

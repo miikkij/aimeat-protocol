@@ -5,6 +5,7 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   2026-11-19 — 27b3 reads the Atelier builder skill, and checks that the retired Classic one points to it.
  *   2026-10-29 — 34 and 34b read the refusal's code, SCOPE_ADDITION_REFUSED, and the word it names: the
  *     sentence changed when agent:permissions-add arrived; the refusal did not.
  *   2026-10-26 — Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss): test 6
@@ -1133,20 +1134,19 @@ await test('27b2b. a fresh node carries the six conversation skills, and the fir
     assert((await res.text()).includes('aimeat_portfolio_publish'), 'and it is the welcome-page skill');
 });
 
-await test('27b3. seeded aimeat-app-builder is public and serves the paved-path workflow', async () => {
-    const idxRes = await rawFetch('/.well-known/agent-skills/index.json');
-    const idx = await idxRes.json() as any;
-    const entry = idx.skills.find((s: any) => s.name === 'aimeat-app-builder');
-    assert(entry, `aimeat-app-builder missing from index: ${JSON.stringify(idx.skills.map((s: any) => s.name))}`);
-    const res = await rawFetch('/.well-known/agent-skills/aimeat-app-builder/SKILL.md');
+// The paved path is the Atelier skill's since 2026-11-19; the retired Classic skill points to it.
+await test('27b3. seeded aimeat-app-builder-atelier is public and serves the paved-path workflow; the retired Classic one points to it', async () => {
+    const idx = await (await rawFetch('/.well-known/agent-skills/index.json')).json() as any;
+    const entry = idx.skills.find((s: any) => s.name === 'aimeat-app-builder-atelier');
+    assert(entry, `aimeat-app-builder-atelier missing from index: ${JSON.stringify(idx.skills.map((s: any) => s.name))}`);
+    const res = await rawFetch('/.well-known/agent-skills/aimeat-app-builder-atelier/SKILL.md');
     assert(res.status === 200, `status ${res.status}`);
     const body = await res.text();
     const actual = `sha256:${createHash('sha256').update(body, 'utf8').digest('hex')}`;
     assert(actual === entry.digest, `served bytes hash ${actual} != index digest ${entry.digest}`);
-    assert(body.includes('/v1/prompts/build-app'), 'skill misses the spec-first rule');
-    assert(body.includes('/v1/appdev/pitfalls'), 'skill misses the pitfall registry');
-    assert(body.includes('Research before building'), 'skill misses the research phase');
-    assert(body.includes('aimeat_app_publish'), 'skill misses the MCP publish path');
+    for (const [s, what] of [['/v1/prompts/build-app-atelier', 'the spec-first rule'], ['/v1/appdev/pitfalls', 'the pitfall registry'], ['Say it in their words', 'the plain-words proposal'], ['aimeat_app_publish', 'the MCP publish path']]) assert(body.includes(s), `skill misses ${what}`);
+    const retired = await (await rawFetch('/.well-known/agent-skills/aimeat-app-builder/SKILL.md')).text();
+    assert(retired.includes('node:aimeat-app-builder-atelier') && retired.includes('from-classic'), 'the retired skill sends the reader to the Atelier skill and section from-classic');
 });
 
 await test('27c. SKILL.md URL serves the digested bytes anonymously; members-only + unknown skills 404', async () => {

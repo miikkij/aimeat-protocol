@@ -27,6 +27,8 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   (2026-11-19) One track: build-app hands out the Atelier token, a new non-Atelier page is warned
+ *     whatever token it carried, and an update of a Classic app stays quiet.
  *   (2026-11-15) Audit M276: DOOR 3 asserts the refused draft left no catalogue row and no version.
  *   (2026-11-08) The acceptance line names the one size matrix (390×844, 1280×900, 1280×460), not 390 and 1440.
  *   (2026-11-05) The Atelier specification has seven parts: `motion` was split from `look` in effc2bcaa.
@@ -142,8 +144,8 @@ const publish = (token: string, body: Record<string, unknown>) =>
     await test('GET /v1/prompts/build-app hands out a spec token, and the prompt itself names it', async () => {
         const r = await json('/v1/prompts/build-app');
         assert(r.status === 200, `build-app ${r.status}`);
-        specToken = r.body.data.spec_token;
-        assert(typeof specToken === 'string' && specToken.startsWith('spec-'),
+        specToken = r.body.data.spec_token; // the retired Classic address serves the Atelier spec and its token (2026-11-19)
+        assert(typeof specToken === 'string' && specToken.startsWith('atelier-'),
             `no usable spec_token: ${JSON.stringify(specToken)}`);
         // The plain-text reader never sees the envelope, so the token has to be IN the prompt too.
         assert((r.body.data.prompt as string).includes(specToken),
@@ -208,7 +210,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
         atelierToken = r.body.data.spec_token;
         assert(typeof atelierToken === 'string' && atelierToken.startsWith('atelier-'),
             `the Atelier token must be recognisable as the Atelier one: ${JSON.stringify(atelierToken)}`);
-        assert(atelierToken !== specToken, 'the two specs share one token — the gate could not tell the tracks apart');
+        assert(atelierToken === specToken, `one specification since 2026-11-19, so one token: ${specToken} vs ${atelierToken}`);
         const prompt = r.body.data.prompt as string;
         // The spec is self-contained for its track: it names its shell and its token, and it
         // never sends the builder to the Classic spec.
@@ -288,7 +290,8 @@ const publish = (token: string, body: Record<string, unknown>) =>
     const drift = (r: any) => ((r.body.data.app_hints ?? []) as any[]).filter(h => h.pitfall === 'track-drift');
     const driftName = `gatedrift${Date.now()}.html`;
 
-    await test('a NEW app on Classic is published, and the hints say which track a new app is built on', async () => {
+    // One track since 2026-11-19: a NEW non-Atelier page is warned, an update of a Classic app is quiet (track-drift.ts v2.0.0).
+    await test('a NEW app that is not an Atelier app is published, and the hint names the Atelier specification', async () => {
         const r = await publish(o.token, {
             filename: driftName, mime_type: 'text/html', content: b64(app(driftName)),
             name: 'New on Classic', description: 'A new app built on the Classic track.', spec_token: specToken,
@@ -308,14 +311,13 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(drift(r).length === 0, `an update of a Classic app must stay quiet: ${JSON.stringify(drift(r))}`);
     });
 
-    await test('the ATELIER token with a Classic app says the track changed mid-build, on an update too', async () => {
+    await test('the ATELIER token on an update of a Classic app says nothing either: the Classic address hands out that token', async () => {
         const r = await publish(o.token, {
             filename: driftName, mime_type: 'text/html', content: b64(app(driftName)),
             name: 'New on Classic', description: 'A new app built on the Classic track.', spec_token: atelierToken,
         });
         assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
-        const d = drift(r);
-        assert(d.length === 1 && /carried the Atelier/i.test(d[0].message), `expected the mid-build hint, got ${JSON.stringify(d)}`);
+        assert(drift(r).length === 0, `an update of a Classic app must stay quiet, whatever token: ${JSON.stringify(drift(r))}`);
     });
 
     await test('a NEW Atelier app leaves no track-drift hint', async () => {

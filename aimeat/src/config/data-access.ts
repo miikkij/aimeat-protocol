@@ -22,6 +22,9 @@
  *   v1.8.0 — 2026-11-02 — secaudit2026nov02d round 13: appPartySignupsPerHour
  *     (AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR, 30) and appPartyPendingHours (AIMEAT_APP_PARTY_PENDING_HOURS,
  *     24); 0 is no limit for each.
+ *   v1.8.0 — 2026-11-19 — amlMode (AIMEAT_AML_MODE: report, the code default | none | owners | node):
+ *     whether this node or its owners do work the EU anti-money-laundering regulation (2024/1624)
+ *     makes an obliged entity's (services/aml/; decision-aml-velvoitteet-ovat-operaattorin-aktivoima-tila).
  *   v1.7.0 — 2026-11-02 — partyPurchasesPerHour (AIMEAT_PARTY_PURCHASES_PER_HOUR, 20, 0 = no limit):
  *     purchases one address may open an hour without a party key (secaudit2026nov02d round 13).
  *   v1.6.0 — 2026-11-01 — The Dataspace Protocol provider's settings (config-dataspace.ts) are spread in
@@ -98,6 +101,9 @@ export function dataAccessDefaults() {
     // Whether the node asks for the balancing test of an app on legitimate interests (services/compliance/lia-need.ts).
     // optional, the default: the test is there to use and nothing asks for it.
     balancingTest: parseBalancingTestMode(process.env.AIMEAT_COMPLIANCE_BALANCING_TEST),
+    // Whether this node or its owners do anti-money-laundering obliged work (EU 2024/1624), and who
+    // (services/aml/). report, the code default, refuses nothing and lists what it finds.
+    amlMode: parseAmlMode(process.env.AIMEAT_AML_MODE),
     // Whether an app's own users may register as outside parties of its owner (services/app-parties/).
     // off, the default, refuses every signup; a node that shows its content to signed-in accounts only forces off.
     partySelfRegistration: parsePartySelfRegistration(process.env.AIMEAT_PARTY_SELF_REGISTRATION),
@@ -152,6 +158,22 @@ export const BALANCING_TEST_MODES: readonly BalancingTestMode[] = ['required', '
 /** An unknown value is `optional`, the default. */
 export function parseBalancingTestMode(v: unknown): BalancingTestMode {
   return BALANCING_TEST_MODES.find(m => m === v) ?? 'optional';
+}
+
+/**
+ * The anti-money-laundering setting (Regulation (EU) 2024/1624; services/aml/). report: nothing is
+ * refused, and the compliance report lists what could make this node or an owner an obliged entity.
+ * none: neither the node nor its owners do obliged work, so an organism's declaration that it is an
+ * obliged entity is refused. owners: an organism that declared itself an obliged entity and named its
+ * compliance officer does that work here; the node holds no funds. node: the operator itself is an
+ * obliged entity, and every owner's declaration is accepted too.
+ */
+export type AmlMode = 'report' | 'none' | 'owners' | 'node';
+export const AML_MODES: readonly AmlMode[] = ['report', 'none', 'owners', 'node'];
+
+/** An unknown value is `report`, the one that refuses nothing. */
+export function parseAmlMode(v: unknown): AmlMode {
+  return AML_MODES.find(m => m === v) ?? 'report';
 }
 
 /** A whole number from 0 to `max`; anything else is `fallback`. */

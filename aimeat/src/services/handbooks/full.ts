@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   (2026-11-19) Apps: the Atelier specification for every app, section from-classic for a Classic
+ *     one; the Classic tier is no longer named.
  *   (2026-11-09) "Who you explain to": read the person's profile.explain record (role and level)
  *     before explaining a page, a setting or a word (guidance audit 2026-11-09). Additive.
  *   (2026-11-08) The Apps line says the model rule by quality (MODEL_QUALITY_ADVICE), never by name (Jouni).
@@ -68,9 +70,9 @@ Three grounds carry most of the work:
   prefix plus something that reads it, so look before you build.
 - **Apps** are single-file web apps published on this node. \`aimeat_app_list\` gives each one the
   \`url\` you hand the person. ${MODEL_QUALITY_ADVICE} Before you build one, load the skill
-  \`node:aimeat-app-builder-atelier\`: a new app is built on the Atelier track, from a genre, and its
-  specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\` in parts. \`{ tier:
-  "build-app" }\` is the Classic track's, for an app that is already Classic. **A new app's first
+  \`node:aimeat-app-builder-atelier\`: every app is built and changed with the Atelier
+  specification, \`aimeat_handbook_get { tier: "build-app-atelier" }\` in parts, and an app built on
+  the retired Classic track is moved with its section \`from-classic\`. **A new app's first
   message carries its structure page**: before your first question, call \`aimeat_app_manage\`
   \`{ action: "structure_set", filename, name, purpose, proposals }\` with two or three layouts you
   drew for the app in \`proposals.layout\`, and give the person \`page_url\`; there they follow the

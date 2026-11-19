@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-19 — tier "build-app" and "build-app/<id>" answer with the Atelier part or platform
+ *     section the Classic id now has (classic-retired.ts); the Classic specification is retired.
  *   2026-11-19 — The Atelier part with the Design Book's map names the reader, so a genre grown out of
  *     an app opened to some people only is listed for those people alone (feature audit 1.2).
  *   2026-11-14 — The handbook carries the teams the person is in after their contexts
@@ -81,8 +83,7 @@ import { skillsBySituation } from '../services/skills-by-situation.js';
 import { journeyHandbookFor } from '../services/journey-state.js';
 import { substituteVariables } from '../services/prompts/variables.js';
 import { handbookFill } from '../services/prompts/handbook-fill.js';
-import { buildAppPrompt } from '../services/builder/app-prompt.js';
-import { buildAppPiece, buildAppPieceIds } from '../services/builder/app-layers.js';
+import { CLASSIC_RETIRED_NOTICE, retiredPieceId } from '../services/builder/classic-retired.js';
 import { buildAppAgentContext } from '../services/builder/app-agent-context.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -187,12 +188,17 @@ export function registerPromptsTools(
                 const next = 'Next: read the build specification, aimeat_handbook_get { tier: "build-app-atelier" }.';
                 return { content: [{ type: 'text' as const, text: `${ctx.text}\n${next}\n` }] };
             }
+            // The Classic specification is retired (2026-11-19): "build-app" and "build-app/<id>" answer
+            // with the Atelier part or platform section the Classic id now has, the first part behind
+            // the retired notice (services/builder/classic-retired.ts), as the REST routes do.
             if (tierKey === 'build-app' || tierKey.startsWith('build-app/')) {
-                const full = buildAppPrompt(config, { mode: 'new', lang: 'en' }).full;
-                const id = tierKey.slice('build-app/'.length) || 'start';
-                const piece = buildAppPiece(full, id, config.baseUrl);
-                if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
-                return toolError('NOT_FOUND', `The build specification has no part or section "${id}". It has: ${buildAppPieceIds(full).join(', ')}. Ask for "build-app" to read the first part, which lists the others.`);
+                const asked = tierKey.slice('build-app/'.length) || 'start';
+                const id = retiredPieceId(asked);
+                const full = buildAtelierPrompt(config, { mode: 'new', lang: 'en' }).full;
+                const piece = id ? await atelierPieceWithBook(full, id, config, storage,
+                    isAnonymousPrincipal({ sub: getAgentGaii() }) ? null : getAgentGaii()) : null;
+                if (piece) return { content: [{ type: 'text' as const, text: piece.id === 'start' ? CLASSIC_RETIRED_NOTICE + piece.text : piece.text }] };
+                return toolError('NOT_FOUND', `The Classic build specification is retired, and "${asked}" has no place in the Atelier specification that replaced it. It has: ${atelierPieceIds().join(', ')}. Ask for "build-app-atelier" to read the first part, which lists the others.`);
             }
             // The Atelier specification had no MCP door at all until 2026-09-19: it is 68 kB, a
             // chat with no HTTP tool could not read it, and the track every app is meant to be

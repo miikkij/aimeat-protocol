@@ -164,12 +164,12 @@
       "digest": "sha256:ffaee4ce1607f90ca88a25e2"
     },
     "14-compliance-mapping.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/compliance/derived.ts",
         "aimeat/src/tool-catalog/definitions/compliance.ts"
       ],
-      "digest": "sha256:d175956b4ec8d15054fe8ccf"
+      "digest": "sha256:f46ed8c6af59d4cd5ec5b4e4"
     },
     "15-operations-runbook.md": {
       "reviewedOn": "2026-11-15",
@@ -401,7 +401,7 @@
     },
     "14-compliance-mapping.md": {
       "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",
-      "aimeat/src/tool-catalog/definitions/compliance.ts": "f5a6c3ac83872f8d"
+      "aimeat/src/tool-catalog/definitions/compliance.ts": "83ae759b2cda0f63"
     },
     "15-operations-runbook.md": {
       "docs/operations/production-deployment.md": "e8f08bb52e1c9426",

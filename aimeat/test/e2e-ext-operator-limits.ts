@@ -16,10 +16,12 @@
  *   FIRST FAIL: before the change, PUT /v1/admin/config answers 400 for every path (unknown setting).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-ext-operator-limits
  * @version-history
+ *   2026-11-19 — The far side listens on a port the OS picks (FAR_PORT was the node's port + 247, which met another suite's far side on the next CI lane).
  *   v1.1.0 — 2026-10-25 — The run slots (secaudit2026oct22, lead 817).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, leads 750).
  */
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -150,12 +152,14 @@ await test('extensions.max_instances 0 is no limit: the second copy is made', as
 
 // ── Request-driven runs: the node's pool and one account's share (lead 817) ──
 // A far side that holds each answer for 1.5 s, so a run stays in progress while the next request comes.
-// Far from the node's port, as the other extension suites keep theirs.
-const FAR_PORT = Number(new URL(BASE).port || '40251') + 247;
+// The OS picks a free port: a fixed offset from the node's port met another suite's offset on the
+// next lane (CI lanes take neighbouring ports: 20002 + 241 and 20003 + 240 are both 20243).
+let FAR_PORT = 0;
 const far = http.createServer((req, res) => {
   setTimeout(() => { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('slow'); }, 1500);
 });
-await new Promise<void>(r => far.listen(FAR_PORT, () => r()));
+await new Promise<void>(r => far.listen(0, () => r()));
+FAR_PORT = (far.address() as AddressInfo).port;
 const waitRun = (token: string) => call('POST', `/v1/ext/${EXT}/wait`, token, { port: FAR_PORT });
 const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
 let other!: RegisteredOwner;

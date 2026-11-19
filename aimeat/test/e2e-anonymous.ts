@@ -706,33 +706,33 @@ await test('Get share prompt', async () => {
     assert(body.data.gaii === ANON_GAII, `Expected gaii ${ANON_GAII}`);
 });
 
-await test('Get build-app prompt (canonical app-building prompt, public)', async () => {
+// (2026-11-19) The Classic spec is retired; its address serves the Atelier one behind a notice (classic-retired.ts).
+await test('Get build-app prompt (public): the Atelier specification behind the retired notice', async () => {
     const { status, body } = await json('/v1/prompts/build-app');
     assert(status === 200, `Expected 200, got ${status}`);
-    assert(body.data.id === 'build-app', `Expected id build-app, got ${body.data.id}`);
+    assert(body.data.id === 'build-app' && body.data.retired === true, `Expected id build-app, retired: ${body.data.id}`);
     assert(body.data.mode === 'new', `Expected default mode new, got ${body.data.mode}`);
-    assert(body.data.prompt.includes('Step 1 — Interview me first'), 'Expected the interview step in new mode');
-    assert(body.data.prompt.includes('mountLoginButton'), 'Expected the login-bar auth pattern');
+    assert(body.data.prompt.startsWith('## This address now serves the Atelier specification'), 'Expected the retired notice first');
+    assert(body.data.prompt.includes('## First, a short interview'), 'Expected the Atelier interview in new mode');
+    assert(!body.data.prompt.includes('### Auth Pattern') && !body.data.prompt.includes("Choose the app's shape"), 'The Classic sign-in and tier sections are gone');
     assert(body.data.prompt.includes('/v1/libs/'), 'Expected the client-library catalog');
-    assert(body.data.prompt.includes('how to publish'), 'Expected the publish walkthrough in new mode');
-    assert(body.data.body.startsWith('## Step 2'), 'Expected body to start at the platform-instructions core');
+    assert(body.data.prompt.includes('## When the app is ready'), 'Expected how the file comes back');
     assert(body.data.prompt.includes(body.data.body), 'Expected the full prompt to contain the body core');
+    assert(/^atelier-/.test(body.data.spec_token), `Expected the Atelier token, got ${body.data.spec_token}`);
 });
 
-await test('build-app prompt improve mode omits interview + publish walkthrough', async () => {
+await test('build-app prompt improve mode omits the interview', async () => {
     const { status, body } = await json('/v1/prompts/build-app?mode=improve');
     assert(status === 200, `Expected 200, got ${status}`);
     assert(body.data.mode === 'improve', `Expected mode improve, got ${body.data.mode}`);
-    assert(!body.data.prompt.includes('Interview me first'), 'Improve mode must not include the interview');
-    assert(!body.data.prompt.includes('how to publish'), 'Improve mode must not include the publish walkthrough');
-    assert(body.data.body.startsWith('## AIMEAT Platform Instructions'), 'Expected the improve-mode heading');
+    assert(!body.data.prompt.includes('## First, a short interview'), 'Improve mode must not include the interview');
+    assert(body.data.prompt.includes(body.data.body), 'Expected the body core');
 });
 
-await test('build-app prompt embeds the idea and falls back to English on unknown lang', async () => {
+await test('build-app prompt embeds the idea', async () => {
     const { status, body } = await json('/v1/prompts/build-app?idea=' + encodeURIComponent('a poll app for friends') + '&lang=sv');
     assert(status === 200, `Expected 200, got ${status}`);
-    assert(body.data.prompt.includes('My initial idea: a poll app for friends'), 'Expected the idea embedded in the header');
-    assert(body.data.prompt.includes('in English'), 'Unknown lang must fall back to English');
+    assert(body.data.prompt.includes('a poll app for friends'), 'Expected the idea embedded in the header');
 });
 
 await test('app-grant scope vocabulary is served machine-readable', async () => {
@@ -747,8 +747,8 @@ await test('app-grant scope vocabulary is served machine-readable', async () => 
     assert(body.data.notes.some((n: string) => n.includes('storage:write')), 'Expected the write-covers-delete note');
 });
 
-await test('build-app prompt includes the scope vocabulary section', async () => {
-    const { status, body } = await json('/v1/prompts/build-app');
+await test('the scope vocabulary is the Atelier platform section `scopes`', async () => {
+    const { status, body } = await json('/v1/prompts/build-app-atelier/sections/scopes');
     assert(status === 200, `Expected 200, got ${status}`);
     assert(body.data.prompt.includes('App permissions (scopes)'), 'Expected the scopes section');
     assert(body.data.prompt.includes('aimeat-scopes'), 'Expected the meta-tag declaration');
@@ -761,7 +761,7 @@ await test('build-app prompt format=txt returns raw text/plain', async () => {
     assert(res.status === 200, `Expected 200, got ${res.status}`);
     assert((res.headers.get('content-type') ?? '').includes('text/plain'), 'Expected text/plain');
     const text = await res.text();
-    assert(text.includes('mountLoginButton'), 'Expected the auth pattern in the raw text');
+    assert(text.startsWith('## This address now serves the Atelier specification'), 'Expected the retired notice in the raw text');
 });
 
 await test('Normal tiers still work', async () => {

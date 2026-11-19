@@ -6,6 +6,9 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.19.0 — 2026-11-19 — The contents rail ("On this page") beside every admin page with two or
+ *     more sections, read from the sections the page drew (ContentsRail kit mode), as on the Settings &
+ *     Controls pages; on a narrow screen the closed row over the page. Config keeps its own index.
  *   v1.18.0 — 2026-11-14 — The `help` page (views/admin/help-tab.js): Ask someone who knows, its
  *     settings, report and status.
  *   v1.17.0 — 2026-11-09 — Every admin page starts with PageStart (`pageStart.admin.<id>.*`: what the
@@ -60,6 +63,9 @@ import { loadPlaces, placeWords, indexGroups } from '/js/services/places.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { Note } from '/components/Note.js';
 import { PageStart, PageInfo } from '/components/PageStart.js';
+import { Rail } from '/components/Rail.js';
+import { railFold } from '/components/SettingsPage.js';
+import { useRailSections, contentsRail } from '/components/ContentsRail.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
@@ -213,6 +219,10 @@ function AdminStart({ id, title }) {
     <//>`;
 }
 
+// The pages that draw an index of their own and get no contents rail: Config lists its groups in
+// its own left index (Jouni, 2026-11-19: "se on special case").
+const OWN_INDEX = new Set(['config']);
+
 // Page title lookup
 const PAGE_TITLES = {};
 NAV_GROUPS.forEach(g => g.items.forEach(i => {
@@ -236,6 +246,11 @@ export default function Admin({ navigate, locale }) {
   const [placesIndex, setPlacesIndex] = useState(null);
   const [configFind, setConfigFind] = useState(null);
   useEffect(() => { loadPlaces().then(setPlacesIndex); }, []);
+  // The contents rail beside the page ("On this page"): the page's own numbered sections, read from
+  // what it drew (components/ContentsRail.js, kit mode). Config keeps its own index of groups.
+  const [railRoot, setRailRoot] = useState(null);
+  const ownIndex = OWN_INDEX.has(activePage);
+  const railSections = useRailSections(ownIndex ? null : railRoot, { kit: true });
 
   // Auth listener
   useEffect(() => {
@@ -479,6 +494,8 @@ export default function Admin({ navigate, locale }) {
   const activeItem = allItems.find(i => i.id === activePage) || allItems[0];
   const ActiveComponent = activeItem.component;
   const pageInfo = PAGE_TITLES[activePage] || { key: '' };
+  // A page of one section has nothing to find on it, so the rail stands from two sections up.
+  const rail = !ownIndex && railSections.length > 1 ? contentsRail({ title: t('dashboard.railTitle'), sections: railSections }) : null;
 
   const tabProps = { data, reload: loadAll, session, navigate, locale, switchPage, configFind };
 
@@ -534,7 +551,12 @@ export default function Admin({ navigate, locale }) {
       ${error && html`<${ErrorNote} text=${t('dashboard.failedToLoad')} hint=${error} />`}
       ${!data && !error && html`<${Note} kind="loading">${t('dashboard.loading')}<//>`}
       ${data && html`<${AdminStart} key=${activeItem.id} id=${activeItem.id} title=${t(pageInfo.key)} />`}
-      ${data && html`<${ActiveComponent} ...${tabProps} />`}
+      ${data && rail ? railFold([rail]) : null}
+      ${data && html`
+        <div class=${rail ? 'og-grid' : undefined}>
+          <div class="og-main og-main--flow" ref=${setRailRoot}><${ActiveComponent} ...${tabProps} /></div>
+          ${rail ? html`<${Rail} ...${rail} />` : null}
+        </div>`}
     <//>
   `;
 }

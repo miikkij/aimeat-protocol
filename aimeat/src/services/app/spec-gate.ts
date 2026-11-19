@@ -28,6 +28,9 @@
  *   import { evaluateSpecCheck } from './spec-gate.js';
  *   const specCheck = evaluateSpecCheck(config, { specToken, specAck });
  * @version-history
+ *   (2026-11-19) The stale and missing answers name the Atelier specification only, and section
+ *     from-classic; the retired Classic address now hands out the Atelier token. A Classic token
+ *     carried by an older client still reads as ok while it is current.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.2.0 — 2026-08-27 — Two tracks, two tokens (TARGET-074): the Atelier spec's digest
  *     (`atelier-…`, /v1/prompts/build-app-atelier) satisfies the gate exactly as the Classic one
@@ -121,8 +124,7 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
     return {
       status: 'stale',
       message: 'The build spec has changed since the token you carried. Fetch GET /v1/prompts/build-app-atelier '
-        + '(or /v1/prompts/build-app for an app already on the Classic track) and pass spec_token. Read what '
-        + 'changed before the next publish — the parts you did not read are the parts that bite.',
+        + 'and pass spec_token. Read what changed before the next publish — the parts you did not read are the parts that bite.',
       skill: ATELIER_BUILDER_SKILL_REF,
       spec_url: specUrl,
     };
@@ -130,8 +132,8 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
 
   return {
     status: 'missing',
-    message: 'Fetch GET /v1/prompts/build-app-atelier and pass spec_token — or, for an app already on the Classic track, '
-      + 'GET /v1/prompts/build-app. The spec names the library URLs that exist, the theme '
+    message: 'Fetch GET /v1/prompts/build-app-atelier and pass spec_token; it is the one build spec, and its section '
+      + 'from-classic says how an app built on the retired Classic track moves. The spec names the library URLs that exist, the theme '
       + 'tokens, and how to read data your agents wrote — three things a published app gets wrong '
       + 'when it is modelled on an older template instead.',
     skill: ATELIER_BUILDER_SKILL_REF,

@@ -8,7 +8,7 @@
  *   an open generator on the front page held nobody) and a stranger then never saw the road.
  *
  *   THE COPY IS THE GENERATOR'S. The track descriptions, the "paste it into any AI" line and the
- *   two doors at the end are the same keys landing-builder.js reads (landing.trackClassicDesc,
+ *   two doors at the end are the same keys landing-builder.js reads (landing.trackAtelierDesc,
  *   landing.genStep2Hint, landing.genStep3Hint, landing.genStep3Mcp), so the story and the tool
  *   cannot say different things. The prompt the second beat copies is the node's canonical build
  *   prompt, fetched the same way the builder fetches it. Beat four shows real cards from the wall
@@ -19,6 +19,8 @@
  * @structure BEATS · BeatRail · Beat · default export BuildStory({ navigate })
  * @usage routed at /v1/how-an-app-builds by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.1.3 -- 2026-11-19 -- The copied prompt is the Atelier one for pasting (landing-builder.js v2.2.0), not the retired Classic one;
+ *     beat 1 shows the Atelier card alone and no longer asks the visitor to pick a track.
  *   v1.1.2 -- 2026-11-15 -- The fallbacks say steps, ways, choice and the front page, as en.json does,
  *     in place of a road, two doors and the wall.
  *   v1.1.1 -- 2026-09-28 -- No escHtml() on the prompt preview: preact escapes text itself, so the
@@ -71,7 +73,7 @@ export default function BuildStory({ navigate }) {
   // The prompt the second beat copies is the node's own, in the visitor's language.
   useEffect(() => {
     let alive = true;
-    fetchCanonicalBuildPrompt(getLocale(), 'classic')
+    fetchCanonicalBuildPrompt(getLocale())
       .then(p => { if (alive) setPrompt(p); })
       .catch(err => swallowed('build-story: prompt', err));
     return () => { alive = false; };
@@ -130,13 +132,9 @@ export default function BuildStory({ navigate }) {
         <div class="bs-beat-copy">
           <span class="bs-num">1</span>
           <h2 class="ld-sh-h2"><span>${tr('story.b1Title1', 'Say what')}</span><span class="ld-sh-accent">${tr('story.b1Title2', 'you need')}</span></h2>
-          <p class="ld-sh-text">${tr('story.b1Text', 'Describe the app in your own words. One line is enough; a paragraph is better. Then pick how it should be built: the proven way with templates and capability packs, or the new track with living looks your AI can rearrange later.')}</p>
+          <p class="ld-sh-text">${tr('story.b1Text', 'Describe the app in your own words. One line is enough; a paragraph is better. It is built with living looks your AI can rearrange later.')}</p>
           <a class="bs-ideabox" href="#bs-builder" onClick=${toBuilder}>${tr('landing.genIdeaPh', 'Describe what the app should do…')}</a>
           <div class="bs-tracks">
-            <div class="bs-track">
-              <span class="bs-track-name">${tr('landing.trackClassic', 'Classic')}</span>
-              <span class="bs-track-desc">${tr('landing.trackClassicDesc', 'The proven way: templates, capability packs, the familiar clean style.')}</span>
-            </div>
             <div class="bs-track bs-track--new">
               <span class="bs-track-name">${tr('landing.trackAtelier', 'Atelier')} <span class="ld-sh-accent">· ${tr('landing.trackNew', 'new')}</span></span>
               <span class="bs-track-desc">${tr('landing.trackAtelierDesc', 'The new track: living looks (newspaper, gallery, neon console…), layouts your AI can rearrange later without republishing, motion built in.')}</span>

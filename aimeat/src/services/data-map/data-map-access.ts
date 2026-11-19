@@ -12,6 +12,7 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-11-19 — The refusal points at the Atelier spec's data-map section (build-app-atelier/data-map).
  *   2026-11-15 — The hands coverage note says "the writes a person, an agent or an app made", not a door.
  *   2026-11-13 — stateProgramMap answers `balancingTest` when the written map makes the app need a
  *     balancing test it has no approved one of (services/compliance/lia-write.ts).
@@ -296,7 +297,7 @@ function readMap(body: Partial<DataMap>, at: string): DataMap | string {
       + '"machinery": [], "leaves": [], "held": [ ...one row per key family... ], "elsewhere": [] }. '
       + 'This write REPLACES the map, which is why a body without the spec is refused rather than half-stored: read the map first '
       + '(aimeat_datamap_get, or GET on this address) and send all of it back. The fields of a `held` row and every allowed value are in '
-      + 'the build specification: aimeat_handbook_get { tier: "build-app/data-map" }, or GET /v1/prompts/build-app/sections/data-map.';
+      + 'the build specification: aimeat_handbook_get { tier: "build-app-atelier/data-map" }, or GET /v1/prompts/build-app-atelier/sections/data-map.';
   }
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
   const invites = readInvites(body.invites);

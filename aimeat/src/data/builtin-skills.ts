@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-19 -- "Build and publish apps" names the Atelier spec and its platform part; the Classic spec is retired.
  *   2026-11-14 -- +ask-someone-who-knows (builtin-skills.ask-someone.ts): asking and answering the people
  *     on this node who know, and the operator's report; shown only while the feature is on.
  *   2026-11-13 -- +balancing-test (builtin-skills.balancing-test.ts): how an AI writes the balancing
@@ -432,8 +433,8 @@ from the node library.
 ## Build and publish apps
 
 - \`GET /v1/prompts/build-app-atelier\` (public; \`?format=txt\` for plain text) — the canonical guided
-  prompt for building a new app on this node. \`GET /v1/prompts/build-app\` is the Classic track's,
-  for an app already on it.
+  prompt for building or changing an app on this node; its part \`platform\` lists what only some
+  apps need.
 - \`GET /v1/app-templates\` — starter scaffolds. Publish with \`POST /v1/apps\`;
   browse the catalog at \`/v1/appcat\`. Apps can bind skills that teach agents to
   drive them — check \`GET /v1/apps/{owner}/{filename}/skills\` before operating any app.

@@ -7,6 +7,8 @@
  *   a PromptSeedEntry[] slice of PROMPT_SEEDS (same ids and order as before the extraction).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   (2026-11-19) An AI that cannot connect reads the Atelier specification with ?delivery=paste; the
+ *     Classic one is retired.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.1.0 — 2026-09-18 — The five app-builder prompts keep what the app IS and hand the HOW to the
  *     build specification (BUILD_FROM_SPEC). Each carried its own short platform guide, and by the
@@ -33,7 +35,7 @@ The complete, current build specification for a new app on this AIMEAT is the At
 
 Connected over MCP, the same document comes in parts: aimeat_handbook_get { tier: "build-app-atelier" } is the first and lists the rest.
 
-An AI that cannot connect to this AIMEAT reads GET {{node_url}}/v1/prompts/build-app?format=txt instead: that document says how a finished file comes back.
+An AI that cannot connect to this AIMEAT reads GET {{node_url}}/v1/prompts/build-app-atelier?delivery=paste&format=txt instead: the same specification, with the steps it cannot run marked and how a finished file comes back.
 
 It decides everything this prompt leaves out: which libraries to load and from where, how a person signs in, where data is kept and in what shape, the design system, realtime and live updates, and how the finished app is published or brought back. Where this prompt and that document disagree, the document is right.
 {{cortex_extensions}}`;

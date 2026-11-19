@@ -17,6 +17,9 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-11-19 — 15-17, 17e, 17f, 18, 19: the Classic specification and shells are retired; its
+ *     addresses answer with the Atelier text behind a notice, and the shell read is shell-atelier.
+ *   2026-11-19 — 17p: the Atelier platform index and its sections, the same over MCP and REST, 404 for an unknown one, and ?delivery=paste.
  *   2026-11-08 — 17b: the first part says which parts come before code by level.
  *   2026-11-05 — 17c, 17d: the Atelier specification has seven parts; `motion` was split from `look` in effc2bcaa.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -451,58 +454,54 @@ async function main() {
         // Until 2026-09-18 the handbook tool answered "Prompt not found" for build-app, because the
         // specification is code-built and the tool read managed prompts only, so a chat connected
         // over MCP built apps without it.
-        await test('15. tier "build-app" returns the first part: small enough to arrive, the same text REST serves, naming the rest', async () => {
+        // The Classic specification was retired on 2026-11-19. Its addresses stay, because prompts and
+        // models carry them, and answer with the Atelier specification behind a notice that says so
+        // (services/builder/classic-retired.ts).
+        await test('15. tier "build-app" returns the Atelier first part behind the retired notice, the same text REST serves', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app' } }, 400);
             assert(!body.result?.isError, `not an error: ${toolText(body).slice(0, 160)}`);
             const start = toolText(body);
             const rest = await fetch(`${BASE}/v1/prompts/build-app/sections/start?format=txt`).then(r => r.text());
             assert(start === rest, `the MCP part equals the REST part (${start.length} vs ${rest.length})`);
-            // 66 kB in one result never reached the model in the first measured run; 18 kB did.
             assert(start.length < 24_000, `one tool result carries it: ${start.length} characters`);
-            const full = await json('/v1/prompts/build-app');
-            assert(start.includes(full.body.data.spec_token), 'it names the same spec token as the full spec');
-            assert(start.includes('### Auth Pattern'), 'a section of this part is in it');
-            assert(!start.includes('### If several people share it'), 'an on-demand section is not');
-            for (const id of ['libraries', 'data', 'look', 'group']) assert(start.includes('- `' + id + '` — '), `the index names ${id}`);
+            assert(start.startsWith('## This address now serves the Atelier specification'), 'it says first that Classic is retired');
+            const atelierStart = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/start?format=txt`).then(r => r.text());
+            assert(start.endsWith(atelierStart), 'after the notice it is the Atelier first part, unchanged');
+            assert(!/### Auth Pattern|Choose the app's shape/.test(start), 'no Classic sign-in or tier section is in it');
         });
 
-        await test('15b. the four parts are each under the limit and carry the whole core between them', async () => {
-            const core = await fetch(`${BASE}/v1/prompts/build-app/core?format=txt`).then(r => r.text());
+        await test('15b. a Classic part or section id answers with its Atelier place; the list is the Atelier one', async () => {
             const list = await json('/v1/prompts/build-app/sections');
-            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,libraries,data,look', `four parts in order: ${JSON.stringify(list.body.data.parts)}`);
-            for (const p of list.body.data.parts) {
-                const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app/' + p.id } }, 410);
-                const text = toolText(body);
-                assert(text.length === p.chars && text.length < 24_000, `${p.id}: ${text.length} characters, listed as ${p.chars}`);
-            }
-            for (const s of list.body.data.sections.filter((x: any) => x.layer === 'core')) {
-                const part = await fetch(`${BASE}/v1/prompts/build-app/sections/${s.part}?format=txt`).then(r => r.text());
-                const own = await fetch(`${BASE}/v1/prompts/build-app/sections/${s.id}?format=txt`).then(r => r.text());
-                assert(s.id === s.part || (part.includes(own) && core.includes(own)), `core section ${s.id} is whole in part ${s.part} and in the one-piece core`);
-            }
+            assert(list.body.data.retired === true, 'the list says the specification is retired');
+            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,book,patterns,look,motion', `the Atelier parts: ${JSON.stringify(list.body.data.parts)}`);
+            assert(list.body.data.sections.some((s: any) => s.id === 'group'), 'the platform sections are listed');
+            const data = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app/data' } }, 410)).body);
+            const storage = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/data-storage?format=txt`).then(r => r.text());
+            assert(data === storage, 'Classic part `data` is the Atelier platform section data-storage');
+            const core = await fetch(`${BASE}/v1/prompts/build-app/core?format=txt`).then(r => r.text());
+            assert(core.startsWith('## This address now serves the Atelier specification'), 'the core address says so too');
         });
 
-        await test('16. "build-app/<id>" returns that section byte for byte; the sections put together are the full spec', async () => {
+        await test('16. "build-app/<id>" returns the Atelier section of that id; the whole text is the paste delivery', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app/group' } }, 401);
             const section = toolText(body);
-            assert(section.startsWith('### If several people share it'), `the section starts at its heading: ${section.slice(0, 60)}`);
+            const atelier = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/group?format=txt`).then(r => r.text());
+            assert(section === atelier, `the section is the Atelier one: ${section.slice(0, 60)}`);
             const fullTxt = await fetch(`${BASE}/v1/prompts/build-app?format=txt`).then(r => r.text());
-            assert(fullTxt.includes(section), 'the section is a piece of the full text, unchanged');
-            const list = await json('/v1/prompts/build-app/sections');
-            const parts: string[] = [];
-            for (const s of list.body.data.sections) {
-                parts.push(await fetch(`${BASE}/v1/prompts/build-app/sections/${s.id}?format=txt`).then(r => r.text()));
-            }
-            assert(parts.join('\n') === fullTxt, 'nothing is lost: the sections in order are the full specification');
+            assert(fullTxt.startsWith('## This address now serves the Atelier specification') && fullTxt.includes('## When the app is ready'),
+                'the whole text is the notice and the paste delivery, with how the file comes back');
+            const full = await json('/v1/prompts/build-app');
+            assert(full.body.data.retired === true && /^atelier-/.test(full.body.data.spec_token), `the envelope says retired and carries the Atelier token: ${full.body.data.spec_token}`);
         });
 
-        await test('17. a section that does not exist is an error that lists the ones that do, on both doors', async () => {
-            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app/no-such-section' } }, 402);
+        await test('17. a Classic id with no Atelier place is an error that lists the ids there are, on both doors', async () => {
+            // `shape` was the Classic section where a builder chose T1/T2/T3.
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app/shape' } }, 402);
             assert(body.result?.isError === true, 'MCP: isError');
-            assert(toolText(body).includes('group') && toolText(body).includes('no-such-section'), `MCP names the id and the real ones: ${toolText(body).slice(0, 160)}`);
-            const rest = await json('/v1/prompts/build-app/sections/no-such-section');
+            assert(toolText(body).includes('retired') && toolText(body).includes('platform'), `MCP says retired and names the real ids: ${toolText(body).slice(0, 200)}`);
+            const rest = await json('/v1/prompts/build-app/sections/shape');
             assert(rest.status === 404, `REST 404, got ${rest.status}`);
-            assert(String(rest.body.error?.message).includes('group'), 'REST lists the real ids');
+            assert(String(rest.body.error?.message).includes('from-classic'), 'REST lists the real ids');
         });
 
         // The ATELIER specification had no MCP door until 2026-09-19. It is the track a new app is
@@ -587,6 +586,33 @@ async function main() {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');
             assert(/start, genre, libraries, book, patterns, look, motion/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
+        });
+
+        // The platform sections (services/builder/atelier-platform.ts): what only some apps need, once
+        // only in the Classic specification. Part `start` names the index, the index names each
+        // section with its situation, and MCP and REST answer the same text.
+        await test('17p. the Atelier platform index and a platform section arrive the same over MCP and REST', async () => {
+            const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier' } }, 480)).body);
+            assert(start.includes('- `platform` —'), 'part start names the platform index');
+            const index = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/platform' } }, 481)).body);
+            assert(index.includes('- `group` —') && index.includes('- `server-side` —'), `the index names its sections: ${index.slice(0, 200)}`);
+            const group = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/group' } }, 482)).body);
+            const rest = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/group?format=txt`).then(r => r.text());
+            assert(group === rest && group.startsWith('## '), `section group equals REST: ${group.slice(0, 120)}`);
+            assert(!/\bT[123]\b|shell-pure-client|onSession/.test(group), 'the section teaches no Classic tier or shell');
+            const one = await json('/v1/prompts/build-app-atelier/sections/server-side');
+            assert(one.body.data.kind === 'section' && /aimeat-extension-builder/.test(one.body.data.prompt), 'server-side is a section that names the extension skill');
+            const list = await json('/v1/prompts/build-app-atelier/sections');
+            const sections = list.body.data.sections as Array<{ id: string; when: string }>;
+            assert(sections.some(s => s.id === 'public-intake' && s.when.length > 0), 'the list carries each section with its situation');
+            const full = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(r => r.text());
+            assert(!full.includes('## Server-side work'), 'the platform sections are not in the whole text');
+            const missing = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/no-such-section`);
+            assert(missing.status === 404, `an unknown section is 404, got ${missing.status}`);
+            // An AI that cannot connect gets the same text with a preface and the way the file comes back.
+            const paste = await fetch(`${BASE}/v1/prompts/build-app-atelier?delivery=paste&format=txt`).then(r => r.text());
+            assert(paste.startsWith('## Before you start: you are not connected') && paste.includes('## When the app is ready') && paste.includes(full),
+                'the paste delivery wraps the whole text with the preface and the publish-by-hand section');
         });
 
         // The feature map (guided journey P6): what this node can do, in parts an AI can read once it
@@ -675,31 +701,31 @@ async function main() {
             assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND' && /start, admin/.test(r.body.error?.message ?? ''), `REST: ${r.status}`);
         });
 
-        await test('17e. the Classic first part says it is Classic and where a new app is built', async () => {
+        await test('17e. the retired Classic first part names the Atelier specification and section from-classic', async () => {
             const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app' } }, 407)).body);
-            assert(start.startsWith('### Which track this is'), `it opens with the track: ${start.slice(0, 80)}`);
-            assert(start.includes('build-app-atelier') && start.includes('node:aimeat-app-builder-atelier'), 'it names the Atelier specification and skill');
+            assert(start.startsWith('## This address now serves the Atelier specification'), `it opens with the notice: ${start.slice(0, 80)}`);
+            assert(start.includes('build-app-atelier') && start.includes('from-classic'), 'it names the Atelier specification and section from-classic');
         });
 
-        await test('17f. the template list opens with the genres and the Atelier shells, before the Classic shell', async () => {
+        await test('17f. the template list opens with the genres and the Atelier shells, and ships no Classic shell', async () => {
             const list = await json('/v1/app-templates');
             const ids = (list.body.data.templates as any[]).map(t => t.id);
             assert(ids[0].startsWith('genre-'), `the list opens with a genre, got ${ids[0]}`);
-            assert(ids.indexOf('shell-atelier') < ids.indexOf('shell-pure-client'), 'the Atelier shell comes before the Classic one');
+            assert(!ids.some(id => /^shell-(pure-client|cortex|extension)$/.test(id)), 'no retired Classic shell is shipped');
             assert(ids.indexOf('genre-living') < ids.indexOf('shell-atelier'), 'every genre comes before the shells');
         });
 
         // Every build text says "start from the shell", and the template tools read agent
         // proposals only, so over MCP the shell did not exist.
         await test('18. aimeat_app_template_get returns a shell the node ships, with its file; the list names it', async () => {
-            const got = await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'shell-pure-client' } }, 420);
+            const got = await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'shell-atelier' } }, 420);
             assert(!got.body.result?.isError, `not an error: ${toolText(got.body).slice(0, 160)}`);
             const shell = JSON.parse(toolText(got.body));
             assert(shell.source === 'node' && String(shell.content).includes('<html'), 'the shell comes with its starting file');
-            const rest = await json('/v1/app-templates/shell-pure-client');
+            const rest = await json('/v1/app-templates/shell-atelier');
             assert(rest.body.data.template.content === shell.content, 'the same file GET /v1/app-templates/:id serves');
             const listed = JSON.parse(toolText((await v1('tools/call', { name: 'aimeat_app_template_list', arguments: {} }, 421)).body));
-            assert(listed.node_templates.some((t: any) => t.id === 'shell-pure-client'), 'the list names the shell');
+            assert(listed.node_templates.some((t: any) => t.id === 'shell-atelier'), 'the list names the shell');
         });
 
         await test('18b. a shipped template too large for one answer comes in parts that join into the file', async () => {
@@ -722,7 +748,7 @@ async function main() {
         await test('19. a template nobody ships or proposed is an error that names the shells', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'no-such-template' } }, 422);
             assert(body.result?.isError === true, 'isError');
-            assert(toolText(body).includes('shell-pure-client'), `names a real shell: ${toolText(body).slice(0, 200)}`);
+            assert(toolText(body).includes('shell-atelier'), `names a real shell: ${toolText(body).slice(0, 200)}`);
         });
 
         console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

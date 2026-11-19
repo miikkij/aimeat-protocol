@@ -1148,7 +1148,7 @@
   },
   "test/e2e-extension-fetch-gunzip.ts": {
    "ownHarness": 1,
-   "looseRefusal": 3
+   "looseRefusal": 2
   },
   "test/e2e-extension-rows.ts": {
    "ownHarness": 1,

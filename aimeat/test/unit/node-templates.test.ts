@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The templates the node ships, as the template tools answer for them.
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The shell read is shell-atelier; the retired shell-pure-client answers null.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -15,7 +16,7 @@ import { MAX_PART_CHARS } from '../../src/services/builder/app-layers.js';
 
 describe('node templates', () => {
   it('returns the shell every build text names, with its file and how to start from it', () => {
-    const shell = nodeTemplateAnswer('shell-pure-client');
+    const shell = nodeTemplateAnswer('shell-atelier');
     expect(shell?.source).toBe('node');
     expect(String(shell?.content)).toContain('<html');
     expect(String(shell?.how_to_start)).toContain('content');
@@ -25,7 +26,9 @@ describe('node templates', () => {
     expect(nodeTemplateAnswer('no-such-template')).toBeNull();
     const message = unknownTemplateMessage('no-such-template');
     expect(message).toContain('no-such-template');
-    expect(message).toContain('shell-pure-client');
+    expect(message).toContain('shell-atelier');
+    // The Classic shells were retired on 2026-11-19 and are no longer shipped.
+    expect(nodeTemplateAnswer('shell-pure-client')).toBeNull();
   });
 
   it('lists every shipped template, short enough to arrive beside the proposals', () => {

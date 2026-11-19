@@ -6,7 +6,11 @@
  *   the llms.txt flow pointer, and the bootstrap app_building research/flow pointers.
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-flow).
- * @version-history v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 7).
+ * @version-history
+ *   v1.1.0 — 2026-11-19 — Discovery offers no classic_build_prompt and its note names no tier; the
+ *     research step is the Atelier platform section `research`, and the retired build-app address
+ *     serves no T1/T2/T3 decision tree.
+ *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 7).
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -54,30 +58,25 @@ await test('?format=txt returns text/plain', async () => {
     assert(/research-first flow/.test(text), 'txt body wrong');
 });
 
-await test('build-app prompt gained Step 0 Research + skip clause', async () => {
-    const res = await fetch(`${BASE}/v1/prompts/build-app?format=txt`);
+// The research-first step is the Atelier platform section `research` since the Classic
+// specification was retired (2026-11-19); the T1/T2/T3 decision tree went with Classic.
+await test('the Atelier platform section `research` carries the research step and the skip clause', async () => {
+    const res = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/research?format=txt`);
     const p = await res.text();
-    assert(/## Step 0 — Research first/.test(p), 'Step 0 missing');
-    assert(/aimeat_appdev_overview/.test(p), 'overview call missing from Step 0');
+    assert(res.status === 200, `research section ${res.status}`);
+    assert(/aimeat_appdev_overview/.test(p), 'overview call missing from the research step');
+    assert(/aimeat-app-builder-atelier/.test(p), 'the research step names the Atelier skill');
     assert(/just build it the usual way/.test(p), 'skip clause missing');
-    // Step 0 comes before Step 1
-    assert(p.indexOf('Step 0') < p.indexOf('Step 1'), 'Step 0 not before Step 1');
-});
-
-await test('build-app prompt gained the T1/T2/T3 decision tree + aimeat-iam guidance', async () => {
-    const res = await fetch(`${BASE}/v1/prompts/build-app?format=txt`);
-    const p = await res.text();
-    assert(/Choose the app's shape \(T1\/T2\/T3\)/.test(p), 'decision tree missing');
-    assert(/T1 — pure client/.test(p) && /T3 — \+extension/.test(p), 'tier lines missing');
     assert(/aimeat-iam/.test(p), 'aimeat-iam guidance missing');
-    assert(/FINISH \(after a successful publish/.test(p), 'finish checklist missing from MCP section');
+    assert(!/\bT[123]\b|tier/.test(p), 'the research step still frames by tier');
 });
 
-await test('improve mode keeps the decision tree but no Step 0 interview header', async () => {
-    const res = await fetch(`${BASE}/v1/prompts/build-app?format=txt&mode=improve`);
-    const p = await res.text();
-    assert(/Choose the app's shape/.test(p), 'decision tree missing in improve mode');
-    assert(!/## Step 0 — Research first/.test(p), 'Step 0 leaked into improve mode');
+await test('the retired build-app address carries no T1/T2/T3 decision tree, in either mode', async () => {
+    for (const q of ['', '&mode=improve']) {
+        const p = await fetch(`${BASE}/v1/prompts/build-app?format=txt${q}`).then(r => r.text());
+        assert(!/Choose the app's shape|T1 — pure client|T3 — \+extension/.test(p), `the decision tree is still served (${q || 'new'})`);
+        assert(p.startsWith('## This address now serves the Atelier specification'), `the retired notice leads (${q || 'new'})`);
+    }
 });
 
 await test('llms-full.txt points at the flow prompt + overview', async () => {
@@ -96,7 +95,10 @@ await test('bootstrap app_building carries research_overview + flow_prompt + bui
     assert(/appdev-flow/.test(app?.flow_prompt ?? ''), 'flow_prompt missing');
     assert(/aimeat-app-builder-atelier/.test(app?.builder_skill ?? ''), 'builder_skill does not name the Atelier skill');
     assert(/\/v1\/prompts\/build-app-atelier$/.test(app?.build_prompt ?? ''), `build_prompt does not name the Atelier spec: ${app?.build_prompt}`);
-    assert(/\/v1\/prompts\/build-app$/.test(app?.classic_build_prompt ?? ''), `classic_build_prompt missing: ${app?.classic_build_prompt}`);
+    // The Classic track is retired (2026-11-19): discovery names one specification and no tier.
+    assert(app?.classic_build_prompt === undefined, `classic_build_prompt is still offered: ${app?.classic_build_prompt}`);
+    assert(!/T1\/T2\/T3|\bT1\b/.test(app?.note ?? ''), 'the note still names the Classic tiers');
+    assert(/from-classic/.test(app?.note ?? '') && /delivery=paste/.test(app?.note ?? ''), 'the note names section from-classic and the paste delivery');
     assert(/appdev\/pitfalls/.test(app?.pitfalls_endpoint ?? ''), 'pitfalls_endpoint missing');
 });
 

@@ -8,18 +8,22 @@
  *   2 "Describe your app" (the description takes the focus; "Improving: {name}" above it when
  *   improving an app). 3 "Give the prompt to your AI": the short connected prompt
  *   (generate-prompt.js connectedPrompt) and "Copy Prompt" ("✔ Copied!" for 1.4 s; the dialog stays
- *   open). A new app is always Atelier; an app being improved keeps its own track.
+ *   open). Every app is built and changed with the Atelier specification; an app built on the
+ *   retired Classic track is moved with its section `from-classic`.
  *   Under the steps, folded shut, the road for an AI that cannot connect (Microsoft 365 Copilot, for
- *   one): the long prompt (buildPrompt) on the Classic track for a new app, or on the app's own track
- *   when improving, with the capability packs the idea names and their usage docs, its preview and
- *   copy, and "Add your app", which signs the person in when needed and opens Add on its Paste tab.
- *   Opening the fold reads the packs and the node's two build guides.
+ *   one): the long prompt (buildPrompt), which is the Atelier specification for pasting with how the
+ *   person publishes the file by hand, its preview and copy, and "Add your app", which signs the
+ *   person in when needed and opens Add on its Paste tab. Opening the fold reads the specification.
  * @structure default GenerateDialog({ app }) · OtherAi
  * @usage openDialog('generate')  — new app.
  *        openDialog('generate', { app: { name, filename, owner, own, track, html } })  — improve that
  *        app (html: its source as text; track: the manifest's track, 'atelier' or anything else for
- *        Classic; owner and filename: where it is on the node; own: false for somebody else's app).
+ *        an app built on the Classic track; owner and filename: where it is on the node; own: false
+ *        for somebody else's app).
  * @version-history
+ *   v3.0.0 — 2026-11-19 — Atelier is the only build guide: the long prompt is the Atelier
+ *     specification for pasting (?delivery=paste) for every app, plus section `from-classic` for an
+ *     app built on the Classic track. The capability packs and the Classic guide are gone from it.
  *   v2.1.0 — 2026-10-25 — No "Connect your AI" step for a person whose AI has connected (the node's
  *     journey stage `connect`); the steps then start from the description (Jouni). On the prompt road
  *     the "Your AI cannot connect?" fold starts open.
@@ -50,90 +54,45 @@ import { useAiConnected } from '/views/home/journey-steps.js';
 
 const html = htm.bind(h);
 
-/** The pack categories the long prompt carries (the old PB_PACK_CATEGORIES). */
-const CATEGORIES = ['visualization', 'diagrams', 'canvas', 'game', '3d', 'realtime'];
-/** Pack docs by id, read once (GET /v1/library-packs/{id}). */
-const docs = {};
-
-/** Whether a pack's interview triggers match the idea at a word start (suffixes allowed). */
-function matches(pack, text) {
-  return (pack.interviewTriggers || []).some((t) => {
-    const esc = String(t).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp('(^|[^a-zà-öø-ÿ])' + esc).test(text);
-  });
-}
-
 async function getJson(path) {
   const resp = await fetch(path);
   return resp.json();
 }
 
 /**
- * The road for an AI that cannot connect: the long prompt with everything the AI cannot fetch
- * itself, and the Add dialog for the file it hands back. Mounted only while the fold is open, so
- * the dialog reads the packs and the build guides only for the person who needs them.
+ * The road for an AI that cannot connect: the Atelier specification for pasting (with how the person
+ * publishes the file by hand), and the Add dialog for the file it hands back. An app built on the
+ * retired Classic track also gets the section that moves it. Mounted only while the fold is open, so
+ * the dialog reads the specification only for the person who needs it.
  */
 function OtherAi({ app, description, l }) {
-  const track = app && app.track === 'atelier' ? 'atelier' : 'classic';
-  const [packs, setPacks] = useState([]);
-  const [core, setCore] = useState({ new: null, improve: null });
-  const [coreAtelier, setCoreAtelier] = useState({ new: null, improve: null });
-  const [, setDocTick] = useState(0);
+  const improve = !!app;
+  const fromClassic = improve && app.track !== 'atelier';
+  const [core, setCore] = useState(null);
+  const [move, setMove] = useState('');
   const [copied, flashCopied] = useFlash(1400);
 
   useEffect(() => {
     let live = true;
-    if (track === 'classic') {
-      getJson('/v1/library-packs?lang=' + encodeURIComponent(l)).then((d) => {
-        const all = (d.data && d.data.packs) || [];
-        const list = all.filter((p) => {
-          if (p.status === 'deprecated') return false;
-          if (p.kind === 'vendored' || p.kind === 'bundle') return CATEGORIES.includes(p.category);
-          if (p.kind === 'cortex') return CATEGORIES.includes(p.category) && p.id !== 'aimeat-charts';
-          return false;
-        });
-        if (live) setPacks(list);
-      }).catch((e) => console.warn('[appcat] capability packs not read (an older node)', e));
-    }
-    for (const mode of ['new', 'improve']) {
-      if (track === 'classic') {
-        getJson('/v1/prompts/build-app?mode=' + mode + '&lang=' + encodeURIComponent(l)).then((d) => {
-          const body = d && d.data && d.data.body;
-          if (live && body && typeof body === 'string') setCore((c) => ({ ...c, [mode]: body }));
-        }).catch((e) => console.warn('[appcat] the Classic build guide not read; the inline text is used', e));
-      } else {
-        getJson('/v1/prompts/build-app-atelier?mode=' + mode + '&lang=' + encodeURIComponent(l)).then((d) => {
-          const full = d && d.data && d.data.prompt;
-          if (live && full && typeof full === 'string') setCoreAtelier((c) => ({ ...c, [mode]: full }));
-        }).catch((e) => console.warn('[appcat] the Atelier build guide not read', e));
-      }
+    setCore(null);
+    getJson('/v1/prompts/build-app-atelier?mode=' + (improve ? 'improve' : 'new') + '&delivery=paste&lang=' + encodeURIComponent(l)).then((d) => {
+      const full = d && d.data && d.data.prompt;
+      if (live && full && typeof full === 'string') setCore(full);
+    }).catch((e) => console.warn('[appcat] the Atelier build guide not read', e));
+    if (fromClassic) {
+      fetch('/v1/prompts/build-app-atelier/sections/from-classic?format=txt')
+        .then((r) => (r.ok ? r.text() : ''))
+        .then((text) => { if (live) setMove(text); })
+        .catch((e) => console.warn('[appcat] the section that moves a Classic app not read', e));
     }
     return () => { live = false; };
-  }, [l, track]);
+  }, [l, improve, fromClassic]);
 
-  // The packs the idea names travel with their usage docs: a chat AI cannot fetch them itself.
-  const lower = String(description || '').toLowerCase();
-  const picked = packs.filter((p) => matches(p, lower));
-  useEffect(() => {
-    for (const p of picked) {
-      if (docs[p.id]) continue;
-      getJson('/v1/library-packs/' + encodeURIComponent(p.id))
-        .then((d) => { const pack = d.data && d.data.pack; if (pack) { docs[p.id] = pack; setDocTick((n) => n + 1); } })
-        .catch((e) => console.warn('[appcat] pack doc not read; the core text still names the packs', e));
-    }
-    // picked is derived; the ids are what matter, so this runs when they change and not on every key.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picked.map((p) => p.id).join(',')]);
-
-  const prompt = buildPrompt({
-    track, app: app || null, description, lang: l, core, coreAtelier, template: null,
-    packs: picked.map((p) => docs[p.id]), atelierLoading: x('pb.atelierLoading'),
-  });
+  const prompt = buildPrompt({ app: app || null, description, core, move, atelierLoading: x('pb.atelierLoading') });
   const addApp = () => signInThen(() => openDialog('add', { tab: 'paste' }));
 
   return html`<${Stack} gap="small">
-    <${Note} kind="hint">${x('pb.otherHint')}${app ? '' : ' ' + x('pb.otherClassic')}<//>
-    ${picked.length ? html`<${Note} kind="hint">${x('pb.otherPacks')}: ${picked.map((p) => p.title || p.id).join(' · ')}<//>` : null}
+    <${Note} kind="hint">${x('pb.otherHint')}<//>
     <${Label} ruled>${x('pb.promptPreview')}<//>
     <${Code} block scroll>${prompt}<//>
     <div><${Action} onClick=${async () => { await copyToClipboard(prompt); flashCopied(); }}>${copied ? '✔ ' + x('pb.copied') : x('pb.otherCopy')}<//></div>

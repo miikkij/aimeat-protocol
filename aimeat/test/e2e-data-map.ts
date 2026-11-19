@@ -345,7 +345,7 @@ async function publish(o: Owner, filename: string, htmlText: string = APP_HTML):
         // missing (2026-09-19) and had to find the shape somewhere else.
         const msg = String(w.body.error?.message ?? '');
         assert(msg.includes('"spec": "aimeat.datamap/2"') && msg.includes('"held"'), `the refusal shows the whole object: ${msg.slice(0, 200)}`);
-        assert(msg.includes('REPLACES') && msg.includes('build-app/data-map'), 'it says why the spec is required and where the fields are');
+        assert(msg.includes('REPLACES') && msg.includes('build-app-atelier/data-map'), 'it says why the spec is required and where the fields are');
         // And the good map is still there, untouched.
         const r = await json(`/v1/datamap/apps/${o.name}/probe-good.html`, { headers: auth(o.token) });
         assert(r.body.data.data_map?.what === GOOD_MAP.what, 'a refused write changes nothing');

@@ -8,7 +8,9 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
- *   2026-11-12 — GET / serves the language version of the operator's template that fits the reader
+ *   2026-11-19 — app_building names one specification, its platform part, ?delivery=paste and section
+ *     from-classic; classic_build_prompt and the T1/T2/T3 shells are gone (the Classic track is retired).
+ *   2026-11-12 — GET / serves the language version ofthe operator's template that fits the reader
  *     (SiteService.getTemplatePage), with its own canonical address and the hreflang links.
  *   2026-11-12 — GET / stamps the operator's portal template with the node head metadata
  *     (injectTemplatePageHead): it was sent as stored, with no canonical link, og:* or JSON-LD.
@@ -436,9 +438,8 @@ export function bootstrapRouter(
               },
             } : {}),
             app_building: {
-              note: 'A new app is built on the Atelier track, forked from a genre. FIRST fetch its build spec: GET /v1/prompts/build-app-atelier (?format=txt for raw text, ?idea=<what to build>), or over MCP aimeat_handbook_get { tier: "build-app-atelier" }, in parts. MCP-equipped agents: load the paved-path skill node:aimeat-app-builder-atelier via aimeat_skill_get. GET /v1/prompts/build-app and the T1/T2/T3 shells at GET /v1/app-templates are the Classic track, for an app already on it or when the owner asks for it. Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms-full.txt for the full SDK documentation.',
+              note: 'A new app is built on the Atelier track, forked from a genre. FIRST fetch its build spec: GET /v1/prompts/build-app-atelier (?format=txt for raw text, ?idea=<what to build>), or over MCP aimeat_handbook_get { tier: "build-app-atelier" }, in parts. MCP-equipped agents: load the paved-path skill node:aimeat-app-builder-atelier via aimeat_skill_get. Its part "platform" lists what only some apps need; an AI that cannot connect reads ?delivery=paste. Every app is built and changed with this one specification; an app built on the retired Classic track is moved with its section "from-classic". Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms-full.txt for the full SDK documentation.',
               build_prompt: `${base}/v1/prompts/build-app-atelier`,
-              classic_build_prompt: `${base}/v1/prompts/build-app`,
               builder_skill: 'node:aimeat-app-builder-atelier (aimeat_skill_get) — the paved-path workflow skill',
               starter_templates_endpoint: `${base}/v1/app-templates`,
               pitfalls_endpoint: `${base}/v1/appdev/pitfalls`,

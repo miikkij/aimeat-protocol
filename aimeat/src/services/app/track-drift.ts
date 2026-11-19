@@ -22,6 +22,11 @@
  * @usage
  *   const drift = trackDriftFindings({ isUpdate, track, loadsAtelier, carriedAtelierToken });
  * @version-history
+ *   v2.0.0 — 2026-11-19 — One track (decision-atelier-is-the-only-app-build-guide-classic-and-t1-t2-t3-are):
+ *     a NEW app that is not an Atelier app is warned that every app is built with the Atelier
+ *     specification, and a page of its own goes inside the shell as `custom:<name>`; an update of a
+ *     Classic app says nothing. The "began on Atelier, changed to Classic" warning is gone, because
+ *     the retired Classic address now hands out the Atelier token as well.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import type { AppArtifactFinding } from './artifact-lint.js';
@@ -31,7 +36,11 @@ export interface TrackDriftInput {
   /** What the head declares, or what the previous version stored; undefined reads as Classic. */
   track: 'classic' | 'atelier' | undefined;
   loadsAtelier: boolean;
-  /** The publish carried the current Atelier specification's token. */
+  /**
+   * The publish carried the current Atelier specification's token. Read until 2026-11-19, when the
+   * retired Classic address began handing out this token too, so it no longer says which guide a
+   * build read; kept so the caller's shape does not change.
+   */
   carriedAtelierToken: boolean;
 }
 
@@ -40,23 +49,15 @@ const finding = (message: string): AppArtifactFinding => ({ pitfall: PITFALL, se
 
 export function trackDriftFindings(input: TrackDriftInput): AppArtifactFinding[] {
   if (input.track === 'atelier' || input.loadsAtelier) return [];
-
-  if (input.carriedAtelierToken) {
-    return [finding(
-      'You carried the Atelier specification\'s token, and this is not an Atelier app: it loads no Atelier kit and does not '
-      + 'declare the track. So this build began on Atelier and changed to Classic on the way. The two guides do not describe '
-      + 'each other, and the header, the sign-in and the loading, empty and error states that the Atelier shell carries were '
-      + 'written by hand here. If the owner asked for Classic, tell them that is what they got. If they did not, tell them '
-      + 'what happened before you hand this over, and go back to the genre you started from.')];
-  }
-
-  if (!input.isUpdate) {
-    return [finding(
-      'This is a new app on the Classic track. A new app is built on the Atelier track: forked from a genre, with the served '
-      + 'component kit carrying the header, the sign-in and the states (`aimeat_handbook_get { tier: "build-app-atelier" }`, '
-      + 'skill `node:aimeat-app-builder-atelier`). Classic is for improving an app that is already Classic, or when the '
-      + 'owner asks for it by name. If that is the case here, say so to the owner; if it is not, the app they were promised '
-      + 'is the Atelier one.')];
-  }
-  return [];
+  // An update of an app built before the Classic track was retired says nothing: it is changed with
+  // the Atelier specification and moved when its owner chooses (section from-classic), and such
+  // apps are updated every week.
+  if (input.isUpdate) return [];
+  return [finding(
+    'This is a new app that is not an Atelier app: it loads no Atelier kit and does not declare the track. Every app is '
+    + 'built with the Atelier specification (`aimeat_handbook_get { tier: "build-app-atelier" }`, skill '
+    + '`node:aimeat-app-builder-atelier`): forked from a genre, or started from `shell-atelier`, with the served component '
+    + 'kit carrying the header, the sign-in and the loading, empty and error states. A page with a look or an engine of its '
+    + 'own goes inside the Atelier shell and names its register as `custom:<name>`. The Classic track that built pages like '
+    + 'this one was retired on 2026-11-19. Tell the owner, and move the page to the shell before you hand it over.')];
 }

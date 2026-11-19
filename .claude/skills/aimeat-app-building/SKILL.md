@@ -1,6 +1,6 @@
 ---
 name: aimeat-app-building
-description: The research-first precondition for building any app on AIMEAT, and the repo-side rules for the app-building prompt system and the served browser SDK libs. Use when the task is to build, make, publish or fork an AIMEAT application (game or tool), or when editing src/services/builder/app-prompt.ts or /v1/app-templates. Authoring a served SDK lib is skill aimeat-library-authoring.
+description: The research-first precondition for building any app on AIMEAT, and the repo-side rules for the app-building prompt system and the served browser SDK libs. Use when the task is to build, make, publish or fork an AIMEAT application (game or tool), or when editing src/services/builder/atelier-prompt.ts, its platform sections or /v1/app-templates. Authoring a served SDK lib is skill aimeat-library-authoring.
 ---
 
 # Building an AIMEAT application
@@ -9,9 +9,9 @@ description: The research-first precondition for building any app on AIMEAT, and
 
 The moment the task is "build / make / publish an app on AIMEAT":
 
-> You have `aimeat_*` MCP tools. Follow the research-first flow: load the skill of the app's track and call `aimeat_appdev_overview` first. A NEW app goes on the **Atelier track**: load `node:aimeat-app-builder-atelier` and read its specification (`aimeat_handbook_get { tier: "build-app-atelier" }`, in parts, or `GET /v1/prompts/build-app-atelier`). The owner chooses the level first: on `fine` (and when no level is stated) the build forks a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`); a `proto` or `plain` page starts from the shell `shell-atelier` with no genre and no register. `node:aimeat-app-builder`, `GET /v1/prompts/build-app` and the Classic shells are for improving an app that is already Classic, or when Jouni asks for Classic by name.
+> You have `aimeat_*` MCP tools. Follow the research-first flow: load `node:aimeat-app-builder-atelier` and call `aimeat_appdev_overview` first. Every app, new or changed, is built with the **Atelier specification** (`aimeat_handbook_get { tier: "build-app-atelier" }`, in parts, or `GET /v1/prompts/build-app-atelier`); its part `platform` lists the sections only some apps need. The owner chooses the level first: on `fine` (and when no level is stated) the build forks a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`); a `proto` or `plain` page starts from the shell `shell-atelier` with no genre and no register. The Classic track (its spec, skill and T1/T2/T3 shells) was retired on 2026-11-19; an app built on it is moved with the section `from-classic`.
 
-**The track is not changed in the middle of a build.** On 2026-09-19 a model began on Atelier, judged the Classic shell quicker to start from, changed over, and handed Jouni an app with a hand-built header and a broken sign-in bar; it had accepted that because its own tests passed. "Quicker to start" is not a reason. If the Atelier road stops you, say what stopped you and wait. The publish names a build that left the track (`app_hints`, pitfall `track-drift`), and a finished app is compared with the genre it was forked from before it is shown.
+**One guide, the whole build.** On 2026-09-19 a model began on Atelier, judged the Classic shell quicker to start from, changed over, and handed Jouni an app with a hand-built header and a broken sign-in bar; it had accepted that because its own tests passed. That road is closed now. If the Atelier road stops you, say what stopped you and wait. The publish names a new page that is not an Atelier app (`app_hints`, pitfall `track-drift`), and a finished app is compared with the genre it was forked from before it is shown.
 
 This is a hard precondition of the build, not an optional preamble, and it comes **before** reading repo source: existing published apps and the KB show which libs and patterns are already proven, so reuse beats re-deriving from lib sources. Skipping it once produced non-theming (hardcoded colours), meta-less, duplicate, low-polish apps.
 
@@ -35,7 +35,7 @@ Where a new lesson goes depends on who needs it, and the three are not interchan
 
 Non-negotiables that flow enforces:
 
-- Never hardcode theme colours in an app that follows the person's theme. An Atelier genre that keeps its own palette (`<meta name="aimeat-light" content="fixed">`) is the exception the Atelier spec names ("Fixed colours or following their theme?"), and the owner chooses it. On Classic: light default plus `:root[data-theme="dark"]` CSS variables, or the styling stack every node serves itself: vendored Tailwind `/lib/tailwindcss@4.js` + daisyUI `/lib/daisyui@5.css` + `/lib/aimeat-daisyui-bridge.css`. The bridge loads after daisyUI and gives it the person's chosen theme in both modes, so the app hardcodes no colour.
+- Never hardcode theme colours in an app that follows the person's theme: the kit's `--ak-*` tokens are the look. An Atelier genre that keeps its own palette (`<meta name="aimeat-light" content="fixed">`) is the exception the Atelier spec names ("Fixed colours or following their theme?"), and the owner chooses it.
 - Include `<meta name="aimeat-scopes">`, and use only scopes that exist in the node's vocabulary. An invented scope means `INVALID_SCOPE` and nobody can log in.
 - AIMEAT SDK libs load from `/v1/libs/`; vendored styling from `/lib/`. Do not mix the two.
 - **Touch input goes through `aimeat-input`, never a hand-rolled `touchstart` listener.** `AIMEAT.input.tappable(el, fn)` for every button, card and row (built on `click`, so tap, mouse and Enter/Space each arrive once and a screen reader announces it); `AIMEAT.input.on(el, handlers, { axis })` when a click is not enough, declaring `axis` on anything that also scrolls. A hand-rolled touch listener fires twice, triggers mid-scroll, and locks out the keyboard. The mobile rules in the build-app prompt cover LAYOUT; this is the other half.
@@ -68,14 +68,11 @@ Three habits keep them from being forgotten:
 
 ## The app-building prompt system
 
-There are two specifications, one per track, and both are **node-served**. Each one is canonical for its own track only.
+There is one specification, **node-served**: `GET /v1/prompts/build-app-atelier` (over MCP `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts). Source of truth: `src/services/builder/atelier-prompt.ts` and its siblings `atelier-*.ts`. Its platform sections (`atelier-platform.ts`) are cut from the text `src/services/builder/app-prompt.ts` builds, which is served whole to nobody since the Classic track was retired on 2026-11-19; the old addresses (`/v1/prompts/build-app`, tier `build-app`) answer with the Atelier text (`classic-retired.ts`). `?delivery=paste` is the text for an AI that cannot connect.
 
-- **Atelier**, the track every new app is built on: `GET /v1/prompts/build-app-atelier` (over MCP `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts). Source of truth: `src/services/builder/atelier-prompt.ts` and its siblings `build-atelier-*.ts`.
-- **Classic**, for an app already on Classic or when the owner asks for it by name: `GET /v1/prompts/build-app`. Source of truth: `src/services/builder/app-prompt.ts`.
+Consumers: the App Catalog's "Create" dialog (`public/views/appcat/dialogs/generate-prompt.js`) sends a connected AI to Atelier and folds the paste delivery for an AI that cannot connect; the front page's builder (`public/views/landing-builder.js`) does the same; the OpenHands app-builder (`tools/aimeat-openhands/`) fetches the spec at runtime. Agent-facing discovery is `/llms.txt` plus the bootstrap `app_building` block.
 
-Consumers: the App Catalog's "Create" dialog (`public/views/appcat/dialogs/generate-prompt.js`) sends a connected AI to Atelier and keeps the long Classic prompt folded for an AI that cannot connect; the old `/app-catalog.html` (`src/static/app-catalog/js/cortex.js`, an offline fallback) takes the track of the app it improves and Atelier for a new one; the OpenHands app-builder (`tools/aimeat-openhands/`, via its `aimeat-app-builder` skill) fetches the spec of the track at runtime. Agent-facing discovery is `/llms.txt` plus the bootstrap `app_building` block.
-
-**Improve app-building guidance in the node services (`build-atelier-*.ts`, `build-app-prompt.ts`), never in the catalog fallback.**
+**Improve app-building guidance in the node services (`atelier-*.ts`, and `app-prompt.ts` for a platform section cut from it), never in a client.**
 
 When editing that prompt or any app-building guidance, verify every API claim against the served browser SDK sources under `src/static/sdk-libs/<name>/` and `public/cortex-bundled/*.js`:
 
@@ -87,12 +84,11 @@ When editing that prompt or any app-building guidance, verify every API claim ag
 
 A **group application** is one where several people work on the same thing, somebody owns it, a
 person may belong to more than one of them, and not everyone may do everything. The full guidance is
-in the node-served spec of the app's track: on Atelier, `GET /v1/prompts/build-app-atelier` (the
-interview's data map questions and "How the data map answers steer the build"); on Classic,
-`GET /v1/prompts/build-app`, section "If several people share it". Two things belong here as well,
+in the node-served spec, `GET /v1/prompts/build-app-atelier` (the interview's data map questions,
+"How the data map answers steer the build", and the platform section `group`). Two things belong here as well,
 because they decide the work before any code is written.
 
-**Both build interviews ask the data map step, and nothing is built before a yes.** Three questions (who opens the app: just me, my organisation, anyone; for each kind of data, is it personal, shared by the team or public; who may change the shared data), then a two- or three-sentence scenario from the person's own idea with named people, which they confirm. Team data goes to one organism workspace (`AIMEAT.organism`, `workspacePicker`), never to per-user memory, which gives every person an empty copy (pitfall `team-data-in-personal-memory`; TaskGrid on orgnode.example was asked for one shared talent database and kept one per person). Who opens it is the app's `open_to` setting. The text is in `aimeat/src/services/builder/data-map-step.ts`, included by both `build-app-prompt.ts` and `build-atelier-prompt.ts`; change it there, once.
+**The build interview asks the data map step, and nothing is built before a yes.** Three questions (who opens the app: just me, my organisation, anyone; for each kind of data, is it personal, shared by the team or public; who may change the shared data), then a two- or three-sentence scenario from the person's own idea with named people, which they confirm. Team data goes to one organism workspace (`AIMEAT.organism`, `workspacePicker`), never to per-user memory, which gives every person an empty copy (pitfall `team-data-in-personal-memory`; TaskGrid on orgnode.example was asked for one shared talent database and kept one per person). Who opens it is the app's `open_to` setting. The text is in `aimeat/src/services/builder/data-map-step.ts`, included by `atelier-prompt.ts`; change it there, once.
 
 **The data map is a deliverable, and the owner approves it before the first `set()`.** Columns: what
 · where it lives · who owns it · who can read it · what happens when a member leaves · is it

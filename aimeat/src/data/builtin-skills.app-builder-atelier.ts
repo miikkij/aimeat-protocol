@@ -13,6 +13,17 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-19 — A genre grown out of an app open to some people only is listed and given only to
+ *     those people (services/node/templates.ts, the app's read gate); the line moved here from the
+ *     retired Classic skill.
+ *   2026-11-19 — The one build guide: the description and "This is the only build guide" say the
+ *     Classic track is retired and name section from-classic; the sections that lived only in the
+ *     Classic skill (the model, saying it in their words, the publish checks, what a finished build
+ *     leaves, the AI label and capabilities, dates and numbers, the workstation) come in from
+ *     builtin-skills.app-builder-common.ts.
+ *   2026-11-19 — Names part `platform` (the sections only some apps need, services/builder/
+ *     atelier-platform.ts) and section `server-side`, which points at node:aimeat-extension-builder
+ *     and its Microservices Central section. Until now this skill named neither.
  *   2026-11-15 — A component is customised "in the four ways above", not "through the four doors".
  *   2026-11-11 — Step 7 names the two checks the specification's Finishing gained: the console read
  *     with the browser's own warnings while the app works, and an app that computes every frame run
@@ -170,6 +181,7 @@
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074).
  */
 import type { BuiltinSkill } from './builtin-skills.js';
+import { APP_BUILDER_COMMON } from './builtin-skills.app-builder-common.js';
 
 export const APP_BUILDER_ATELIER_SKILL_ENTRY: BuiltinSkill =
 {
@@ -177,7 +189,7 @@ export const APP_BUILDER_ATELIER_SKILL_ENTRY: BuiltinSkill =
     visibility: 'public',
     skillMd: `---
 name: aimeat-app-builder-atelier
-description: Build and publish apps on the ATELIER track — the component-kit way (AIMEAT.atelier, look presets, generated imagery, structural mobile and accessibility guarantees). Use for EVERY new app, game or tool, because this is the track a new app is built on. The skill aimeat-app-builder covers the Classic track, which is for improving an app that is already Classic or when the owner asks for it by name. The two guides never mix.
+description: Build and publish apps on the ATELIER track — the component-kit way (AIMEAT.atelier, look presets, generated imagery, structural mobile and accessibility guarantees). Use for EVERY app, game or tool, new or changed, because this is the one build guide on the node. An app built on the retired Classic track is moved with the specification's section from-classic.
 license: MIT
 metadata:
   audience: agent
@@ -213,6 +225,22 @@ because one tool result cannot carry all of it. The genres: \`aimeat_designbook_
 returns the page to fork; a genre is larger than one result, so it says how many parts it has and
 you ask for each with \`part\`. Pitfalls: \`aimeat_appdev_pitfall_list\`.
 
+A genre grown out of an app that is open only to some people (one organism, for instance) is listed
+and given only to the people that app admits. Fork only a genre the list gives you.
+
+**What only some apps need is a section of its own.** Part \`platform\` (\`aimeat_handbook_get {
+tier: "build-app-atelier/platform" }\`, over HTTP \`GET /v1/prompts/build-app-atelier/sections/platform\`)
+lists them, each with the situation it covers: a team sharing data, an audit log, people without an
+account, anonymous intake, files, AI in the app or in the person's own chat, the AI label, spending,
+legal pages, live presence, an agent face, a phone install, and publishing by hand when you cannot
+connect. Read the ones this app is in before you write that part of it, and leave the others.
+Three are read by every build: \`publish-checks\` before the publish, \`after-publish\` after it, and
+\`dates-numbers\` whenever the app shows a date, a time or a number.
+**Server-side work** (an outside service with a key, a rule the browser cannot break, work on a
+schedule) is section \`server-side\`: it is a server extension, built with skill
+\`node:aimeat-extension-builder\`, and when an extension is not enough, a service on a Microservices
+Central (that skill's section 11; \`aimeat_appdev_overview\` answers \`microservices\`).
+
 **A new app asks for its style kit before it picks a genre.** \`aimeat_designbook_kit\` (with
 \`organism\` when the app is built for one) answers the kit the person or their organism chose: the
 genre to fork, the head stylesheet, the app() line and the ornament line. Build in it unless the
@@ -220,11 +248,17 @@ person asks for something else. When they say they want this app's look for thei
 as a kit (\`aimeat_designbook_propose\`, kind \`kit\`) and make it their default
 (\`aimeat_designbook_kit_default\`).
 
-**Never fetch or follow /v1/prompts/build-app on this track.** Its vocabulary (daisyUI classes,
-hand-written boilerplate, the theme-restore snippet) does not apply here, and mixing the two
-guides produces an app that belongs to neither. The shell's
-\`<meta name="aimeat-track" content="atelier">\` records which guide built the file, and the
-publish path stores it, so a later session loads the right one.
+**First, is it an app at all?** A page to SHOW (slides, a report, a one-off presentation) that
+needs no sign-in and no data of the person's is an HTML page in a workspace: skill
+\`node:aimeat-html-page\`. An app with a look or an engine of its own (a game on its own canvas, a
+kiosk panel, a simulator) is still built here: inside the Atelier shell, with its register named
+\`custom:<name>\`. An app past about 300 kB is built on a workstation (section \`after-publish\`).
+
+**This is the only build guide.** The Classic one (daisyUI classes, hand-written boilerplate, the
+theme-restore snippet, the T1/T2/T3 shells) was retired on 2026-11-19, and its old address
+/v1/prompts/build-app now serves this specification. An app built on Classic is changed with this
+guide and moved with the specification's section \`from-classic\`. The shell's
+\`<meta name="aimeat-track" content="atelier">\` records which guide built the file.
 
 **Every Atelier app on the level \`fine\` names its register** (a \`proto\` or \`plain\` page forks no
 genre, declares none, and the publish asks it for none). \`<meta name="aimeat-register" content="genre-<id>">\`
@@ -548,7 +582,7 @@ moved under you says so.
    know how it works; the publish answer's \`design_book\` line names the styles this app made for
    itself. Improve a part that is already there as a new version of it, never as a copy beside it.
 
-## Never, on this track
+${APP_BUILDER_COMMON}## Never, on this track
 
 - daisyUI/Tailwind classes outside a \`section\` body.
 - A field for an API key. A key for an outside service is NAMED, in an extension's header or in
@@ -588,7 +622,8 @@ moved under you says so.
   distort, glitch, vhs, ripple, kaleidoscope), declared with bounds, refused where they would
   bend or recolour words, proven by the contrast matrix where they sit under them, and never
   living on content: a loop belongs behind the words, on the ambient layer.
-- The Classic build spec.
+- The retired Classic build spec or its T1/T2/T3 shells. An app built on Classic is moved with the
+  specification's section \`from-classic\`.
 
 When something will not complete or a decision needs a human, say so to the owner in their
 words, or send it to \`support@operators\` with what you were doing and what happened instead.

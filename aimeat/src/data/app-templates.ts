@@ -8,11 +8,14 @@
  *   no code change. Served as JSON at GET /v1/app-templates and consumed by both prompt surfaces.
  *
  *   kinds (layered — see docs/internal/authoring-templates/):
- *     - app-shell  : a full app skeleton (boot + auth + layout + theme). Tiers T1/T2/T3.
+ *     - app-shell  : a full app skeleton (boot + auth + layout + theme): the Atelier shells.
  *     - component  : a reusable block + its lib deps (future).
  *     - use-case   : composes an app-shell + components (+ optional package) (future).
  * @structure AppTemplate · getAppTemplates() · getAppTemplateIndex()
  * @version-history
+ *   v2.0.0 — 2026-11-19 — The Classic track is retired: shell-pure-client, shell-cortex and
+ *     shell-extension (T1/T2/T3) are gone, and with them the `tier` field and the tier in the
+ *     prompt menu line. The use cases and the workstation project are on the Atelier shell.
  *   v1.16.0 — 2026-09-19 — The index opens with the Atelier track (genres, then its shells), and
  *     shell-pure-client says it is the Classic track's shell. It said "the 80% case", which is a
  *     recommendation, and it stood first in a list whose genres came thirty rows later.
@@ -43,7 +46,7 @@
  *     menu — it applies to a minority of apps and the prompt is charged to every session.
  */
 
-import { SHELL_PURE_CLIENT, SHELL_CORTEX, SHELL_EXTENSION, SHELL_ATELIER } from './app-templates/shells.js';
+import { SHELL_ATELIER } from './app-templates/shells.js';
 import { SHELL_PHASER_GAME } from './app-templates/game-shell.js';
 import {
   COMP_AUTH_GATED,
@@ -73,7 +76,7 @@ import { PROJECT_WORKSTATION } from './app-templates/workstation.js';
 import { GENRE_BODIES, GENRE_INDEX } from './app-templates/genres.js';
 
 export interface AppTemplate {
-  /** Stable id, e.g. "shell-pure-client". */
+  /** Stable id, e.g. "shell-atelier". */
   id: string;
   /**
    * `project` is the odd one and deliberately so: it is not something the AI copies INTO an app,
@@ -87,8 +90,6 @@ export interface AppTemplate {
    * one, swap the words and sources, keep the physics. Atelier-only in the prompts.
    */
   kind: 'app-shell' | 'component' | 'use-case' | 'project' | 'genre';
-  /** Capability tier for app-shells: T1 pure client · T2 +cortex · T3 +extension. */
-  tier?: 'T1' | 'T2' | 'T3';
   /** The build track a template belongs to; absent means both. Genres are Atelier's. */
   track?: 'classic' | 'atelier';
   /**
@@ -111,33 +112,6 @@ export interface AppTemplate {
 }
 
 const TEMPLATES: AppTemplate[] = [
-  {
-    id: 'shell-pure-client',
-    kind: 'app-shell',
-    tier: 'T1',
-    title: 'Standard app — login + saves your data',
-    description: 'The CLASSIC track\'s shell. Single-file HTML app: login + private/shared memory, self-hosted Tailwind + daisyUI, light/dark theme. For improving an app that is already Classic, or when the owner asks for this track; a NEW app starts from a genre on the Atelier track.',
-    libs: ['aimeat-auth', 'aimeat-data'],
-    content: SHELL_PURE_CLIENT,
-  },
-  {
-    id: 'shell-cortex',
-    kind: 'app-shell',
-    tier: 'T2',
-    title: 'Data app — built-in tables, forms & charts',
-    description: 'Standard app plus the bundled cortex UI libraries (DataTable, forms, KPI tiles, skeletons) for richer structured UIs without hand-rolling components.',
-    libs: ['aimeat-auth', 'aimeat-data', 'aimeat-ui-viewers', 'aimeat-ui-forms', 'aimeat-ui-motion'],
-    content: SHELL_CORTEX,
-  },
-  {
-    id: 'shell-extension',
-    kind: 'app-shell',
-    tier: 'T3',
-    title: 'Connected app — fetches outside data / runs on a schedule (advanced)',
-    description: 'For apps needing server-side work (external API fetch, scheduled jobs): the client calls a sandboxed extension. Build the extension separately or ship it in a package.',
-    libs: ['aimeat-auth', 'aimeat-data'],
-    content: SHELL_EXTENSION,
-  },
   {
     // The ATELIER TRACK's shell (TARGET-074) — deliberately carries no tier: Atelier is the other
     // build track, not a capability rung on the Classic ladder. Its guide is its own prompt and
@@ -248,9 +222,6 @@ const TEMPLATES: AppTemplate[] = [
 // here, keyed by id. Only the picker-visible templates (shells + use-cases) need it.
 const TRANSLATIONS: Record<string, Record<string, { title: string; description?: string }>> = {
   fi: {
-    'shell-pure-client': { title: 'Vakiosovellus — kirjautuminen + tallentaa tietosi' },
-    'shell-cortex': { title: 'Datasovellus — valmiit taulukot, lomakkeet & kaaviot' },
-    'shell-extension': { title: 'Yhdistetty sovellus — hakee ulkoista dataa / ajastetut tehtävät (edistynyt)' },
     'shell-atelier': { title: 'Atelier-sovellus — komponenttikitin rata (vibrantti oletuksena)', description: 'Atelier-rakennusrata: kahdeksan rivin head, servattu komponenttikitti (shell, hero, listat, lomakkeet, taulukot, seitsemän ulkoasupresettiä) ja rakenteelliset mobiili- ja saavutettavuustakuut. Ohjeena GET /v1/prompts/build-app-atelier ja node:aimeat-app-builder-atelier, ei vakiorakennusohje.' },
     'shell-phaser-game': { title: 'Phaser-peli (Atelier-kuori + aimeat-phaser)', description: 'Valmis pieni peli haarautettavaksi: Atelier-kuori ja kirjautuminen, alkuruutu (Pelaa / Asetukset / Tulostaulu), pelattava kenttä ASCII-kartasta, ohjaus näppäimistöltä, ohjaimelta ja kosketusnäytöltä, HUD, kolikko- ja voittoäänet, taukovalikko, yksi tallennustietue pelaajaa kohden ja kenttäkohtaiset ennätykset, asetukset sivupaneelissa sekä julkinen tulostaulu. Vaihda kartta, sanat ja ulkoasu, fysiikka on jo kunnossa.' },
     'usecase-realtime-social': { title: 'Reaaliaikainen yhteisöhuone', description: 'Live-huone: kirjautuneet käyttäjät saavat live-läsnäolon + chatin pysyvällä historialla. Chatit, läsnäolotaulut, moninpeliaulat.' },
@@ -274,16 +245,16 @@ export function genreLight(content: string): 'fixed' | 'follows' {
   return /<meta\b[^>]*name\s*=\s*["']aimeat-light["'][^>]*content\s*=\s*["']follows["']/i.test(content.slice(0, 4096)) ? 'follows' : 'fixed';
 }
 
-export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id' | 'kind' | 'tier' | 'track' | 'title' | 'description' | 'libs' | 'light'>> {
+export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id' | 'kind' | 'track' | 'title' | 'description' | 'libs' | 'light'>> {
   const tr = (lang && TRANSLATIONS[lang]) || null;
   // The Atelier track first: the genres, then its two shells, then everything else in registry
   // order. A list is read from the top, and until 2026-09-19 this one opened with the Classic
   // shell and ended, thirty rows later, with the genres a build is meant to start from.
   const rank = (t: AppTemplate): number => (t.kind === 'genre' ? 0 : t.id === 'shell-atelier' || t.track === 'atelier' ? 1 : 2);
   const ordered = TEMPLATES.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i).map(x => x.t);
-  return ordered.map(({ id, kind, tier, track, title, description, libs, content }) => {
+  return ordered.map(({ id, kind, track, title, description, libs, content }) => {
     const o = tr && tr[id];
-    return { id, kind, tier, track, title: (o && o.title) || title, description: (o && o.description) || description, libs, ...(kind === 'genre' ? { light: genreLight(content) } : {}) };
+    return { id, kind, track, title: (o && o.title) || title, description: (o && o.description) || description, libs, ...(kind === 'genre' ? { light: genreLight(content) } : {}) };
   });
 }
 
@@ -296,10 +267,9 @@ export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id'
 export function buildPromptTemplateSections(nodeUrl: string, lang?: string): string {
   const idx = getAppTemplateIndex(lang);
   const byKind = (k: AppTemplate['kind']) => idx.filter(t => t.kind === k);
-  const line = (t: { id: string; tier?: string; title: string; description: string; libs?: string[] }) => {
-    const tier = t.tier ? ` [${t.tier}]` : '';
+  const line = (t: { id: string; title: string; description: string; libs?: string[] }) => {
     const libs = (t.libs && t.libs.length) ? ` — libs: ${t.libs.join(', ')}` : '';
-    return `- ${t.id}${tier} — ${t.title}: ${t.description}${libs}`;
+    return `- ${t.id} — ${t.title}: ${t.description}${libs}`;
   };
   let s = '### Ready-made templates (compose from these — do NOT start from a blank file)\n';
   s += 'Fetch any template\'s full content with GET ' + nodeUrl + '/v1/app-templates/<id>; the index is GET ' + nodeUrl + '/v1/app-templates.\n\n';

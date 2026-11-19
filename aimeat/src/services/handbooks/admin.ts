@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.40.0 -- 2026-11-19 -- Anti-money-laundering: the setting AIMEAT_AML_MODE, section 13 of the report,
+ *     the part `aml` and the concept explanations with their official sources (services/aml/).
  *   v1.39.0 -- 2026-11-19 -- The node's own front page per language: aimeat_site_template.
  *   v1.38.0 -- 2026-11-19 -- Moderation review: aimeat_admin_flags, _flag_review, aimeat_flag_appeal, aimeat_appeals, aimeat_appeal_review.
  *   v1.37.0 -- 2026-11-19 -- Outside apps: aimeat_ecosystem_app_list and aimeat_ecosystem_app_revoke.
@@ -322,6 +324,20 @@ the findings, each a proposal with its reason and article, and the Article 12 ro
 evidence. Record the provider's notification and a person's decision on a finding with
 \`aimeat_compliance_register_write\` (\`part: "intermediation"\`, items of \`type\` notification or
 review). Say that it is a reading of the regulation, not a legal opinion.
+
+**Anti-money-laundering (operator).** The setting AIMEAT_AML_MODE (Config, compliance) says whether
+this node or its organisms do the work the EU anti-money-laundering regulation (2024/1624) gives an
+obliged entity: \`report\` (the default: nothing refused, the findings listed), \`none\` (an organism's
+new declaration that it is an obliged entity is refused with AML_NOT_OFFERED), \`owners\` (a declared
+organism does that work here; the node holds no funds) or \`node\` (the operator is an obliged entity
+itself). \`aimeat_compliance_report\` carries it as \`aml\`, section 13: the declarations, the findings
+(each a proposal with its reason and article, the mode proposal for the operator alone to make) and
+the obligations, where \`missing\` names what this node does not do yet. An obliged entity's
+declaration and a person's decision on a finding go through \`aimeat_compliance_register_write\`
+(\`part: "aml"\`, items of \`type\` declaration or review). When a person asks what AML, KYC, PEP,
+sanctions or a beneficial owner mean, read the settings explanations concept.aml, concept.kyc,
+concept.pep, concept.sanctions, concept.obliged-entity and concept.beneficial-owner: they carry the
+official sources to point to. Say that it is a reading of the regulation, not legal advice.
 
 **Data processing agreements (operator).** When the operator processes a customer's personal data
 (hosting, care, remote access), GDPR article 28 asks for a written agreement, and the node makes it:

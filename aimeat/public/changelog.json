@@ -2,6 +2,48 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-11-19",
+      "kind": "feature",
+      "id": "2026-11-19-an-on-this-page-menu-beside-every-admin-page",
+      "highlight": false,
+      "audience": [
+        "operator"
+      ],
+      "title": {
+        "en": "An On this page menu beside every admin page",
+        "fi": "Tällä sivulla -valikko admin-sivuille"
+      },
+      "body": {
+        "en": "An admin page with two or more sections now has the On this page menu that the Settings & Controls pages have. It lists the page's numbered sections, stays in sight while you scroll, and brings a section to the top with one press. On a narrow screen it is a closed row at the top of the page. The Config page keeps its own index.",
+        "fi": "Admin-sivulla, jolla on vähintään kaksi osiota, on nyt Tällä sivulla -valikko, kuten Asetukset ja hallinta -sivuilla. Valikko luettelee sivun numeroidut osiot ja pysyy näkyvissä, kun vierität. Yksi painallus tuo osion esiin. Kapealla näytöllä valikko on suljettu rivi sivun yläosassa. Operaattorin Asetukset-sivu pitää oman valikkonsa."
+      },
+      "summary": {
+        "en": "Admin pages now have the On this page menu, so you reach a section with one press.",
+        "fi": "Admin-sivuilla on nyt Tällä sivulla -valikko, josta pääset osioon yhdellä painalluksella."
+      }
+    },
+    {
+      "date": "2026-11-19",
+      "kind": "feature",
+      "id": "2026-11-19-anti-money-laundering-on-the-compliance-page",
+      "highlight": false,
+      "audience": [
+        "operator"
+      ],
+      "title": {
+        "en": "Anti-money-laundering on the Compliance page",
+        "fi": "Rahanpesun estäminen Compliance-sivulla"
+      },
+      "body": {
+        "en": "The anti-money-laundering law makes some businesses know their customers: payment firms, accounting offices, estate agents and law firms. You now decide in Config whether such an obliged entity works on your server: nobody, organisms may be, or you as the operator are. Section 13 of the Compliance page shows the declarations, what the server found that could make someone an obliged entity, and what it can show for each duty. The explanations say what AML, KYC and PEP mean, with links to the authorities. Most servers need nothing, and then the section only watches.",
+        "fi": "Rahanpesulaki velvoittaa osan yrityksistä tuntemaan asiakkaansa: maksulaitokset, tilitoimistot, kiinteistönvälittäjät ja lakitoimistot. Päätät nyt Asetukset-sivulla, onko palvelimellasi tällainen ilmoitusvelvollinen: ei ketään, organismit voivat olla, tai sinä operaattorina olet. Compliance-sivun osio 13 näyttää ilmoitukset, havainnot siitä, mikä voisi tehdä jostakusta ilmoitusvelvollisen, ja sen, mitä palvelin voi näyttää kunkin velvoitteen kohdalla. Selitykset kertovat, mitä AML, KYC ja PEP tarkoittavat, ja linkittävät viranomaisten sivuille. Useimmat palvelimet eivät tarvitse mitään, ja silloin osio vain seuraa."
+      },
+      "summary": {
+        "en": "Decide in Config who on your server is an anti-money-laundering obliged entity; section 13 tracks it.",
+        "fi": "Päätät, onko palvelimellasi rahanpesulain ilmoitusvelvollisia, ja Compliance-sivun osio 13 seuraa niitä."
+      }
+    },
+    {
       "date": "2026-11-18",
       "kind": "feature",
       "id": "2026-11-18-odps-4-2-product-descriptions",

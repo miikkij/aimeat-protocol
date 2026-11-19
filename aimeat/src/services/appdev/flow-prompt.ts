@@ -10,6 +10,9 @@
  * @structure buildAppdevFlowPrompt(config) → string
  * @usage import { buildAppdevFlowPrompt } from './flow-prompt.js';
  * @version-history
+ *   (2026-11-19) Atelier is the only build guide: the flow names the Atelier skill and spec for every
+ *     app, the level and the genre or shell in the frame, the platform sections, and section
+ *     from-classic for a Classic app. No tier, no Classic spec.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 7).
  */
@@ -27,13 +30,13 @@ export function buildAppdevFlowPrompt(config: AimeatConfig): string {
     p += '## 0. Self-identify\n';
     p += 'Every model field in this flow is YOUR OWN model id (e.g. claude-fable-5, kimi-k2.7-code) — you know which model you are running as; take it from your own system configuration. NEVER ask the user for it, and never invent someone else\'s. It is indicative attribution, so your best self-knowledge is enough. The node URL is wherever your aimeat_* tools are connected — you never need the user to supply it either.\n\n';
     p += '## 1. Research (before any code)\n';
-    p += `- Load the paved-path skill: \`${FLOW_TOOLS.skillGet}\` ref \`${FLOW_TOOLS.atelierSkill}\`. For an app already on the Classic track, the ref is \`${FLOW_TOOLS.skill}\`.\n`;
-    p += `- Get the big picture in ONE call: \`${FLOW_TOOLS.overview}\` (pass your own model id). It returns my existing apps and template proposals (often the fastest correct starting point — fork or copy patterns), library packs with per-model proofs, the Classic T1/T2/T3 templates, and the pitfalls (curated + learned) for the areas you will touch.\n`;
-    p += `- Fetch the build spec for a new app and treat it as law: \`GET ${nodeUrl}/v1/prompts/build-app-atelier\` (over MCP, \`aimeat_handbook_get { tier: "build-app-atelier" }\`, in parts) — it always wins on any conflict. An app already on the Classic track uses \`GET ${nodeUrl}/v1/prompts/build-app\` instead; the two guides never mix.\n\n`;
+    p += `- Load the paved-path skill: \`${FLOW_TOOLS.skillGet}\` ref \`${FLOW_TOOLS.atelierSkill}\`, for a new app and for changing one.\n`;
+    p += `- Get the big picture in ONE call: \`${FLOW_TOOLS.overview}\` (pass your own model id). It returns my existing apps and template proposals (often the fastest correct starting point — fork or copy patterns), library packs with per-model proofs, the Atelier shells and genres a build starts from, and the pitfalls (curated + learned) for the areas you will touch.\n`;
+    p += `- Fetch the build spec and treat it as law: \`GET ${nodeUrl}/v1/prompts/build-app-atelier\` (over MCP, \`aimeat_handbook_get { tier: "build-app-atelier" }\`, in parts) — it always wins on any conflict. Its part \`platform\` lists the sections only some apps need (a team, files, AI, intake, server-side work); read the ones this app is in. An app built on the retired Classic track is moved with its section \`from-classic\`.\n\n`;
     p += '## 2. Frame\n';
-    p += 'A new app forks a genre, as the spec says; an app already on the Classic track keeps its tier (T1 pure client / T2 +cortex / T3 +extension). Pick the capability packs, the starting point (fork a prior app / a template proposal / a genre), and whether the app needs its OWN users: the aimeat-iam pack for the gate plus AIMEAT.iam for the panel, decided NOW, not retrofitted. A role belongs to the PERSON, so the agents of a member inherit it.\n\n';
+    p += 'Ask me the level first (a quick prototype, an ordinary page or the finest). On the finest a new app forks a genre; on the other two it starts from shell-atelier. Pick the platform sections the app needs, the capability packs, the starting point (fork a prior app / a template proposal / a genre), and whether the app needs its OWN users: the aimeat-iam pack for the gate plus AIMEAT.iam for the panel, decided NOW, not retrofitted. A role belongs to the PERSON, so the agents of a member inherit it.\n\n';
     p += '## 3. Propose\n';
-    p += 'Give me the frame in 3-5 lines (genre or tier, packs, start point, iam yes/no, anything you will reuse) and wait for my go-ahead or corrections.\n\n';
+    p += 'Give me the frame in 3-5 lines (level, genre or shell, packs, start point, iam yes/no, anything you will reuse) and wait for my go-ahead or corrections.\n\n';
     p += '## 4. Build\n';
     p += 'Build within the frame but stay flexible — building teaches; when reality disagrees with the frame, say so and adapt. Verify locally before publishing; publish over MCP (presigned upload for anything over ~1 KB).\n\n';
     p += '## 5. Finish (this is where the acceleration compounds)\n';

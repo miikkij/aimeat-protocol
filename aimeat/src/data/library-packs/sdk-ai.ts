@@ -53,7 +53,6 @@ export const AI_PACKS: LibraryPack[] = [
       'AIMEAT.ai.declare(item, provenance) stores the BARE record under item.aiProvenance (plus aiProvenanceUrl), not the { id, record, recordUrl } wrapper complete() returns, so keep the bare shape on your item from the start. AIMEAT.ai.disclose(provenance, { target }) REPLACES the target\'s content and draws nothing when no label is owed: give it an element of its own, and write your own origin line beside it if readers should always see where a text came from.',
     ].join(' '),
     changelog: [],
-    tierHint: 'T1',
     interviewTriggers: ['ai', 'llm', 'summary', 'suggestion', 'generate', 'tekoäly'],
     sizeEstimate: '~4KB',
     status: 'stable',

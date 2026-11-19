@@ -20,6 +20,8 @@
  * @structure fixture · ROUTES · the audience loop · the frame token · public again · no account
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-source-access
  * @version-history
+ *   v1.2.0 — 2026-11-19 — Part `book` on the retired Classic address and both MCP handbook tiers:
+ *     the Classic routes retired the same day answer with the Atelier part and carry the same map.
  *   v1.1.0 — 2026-11-19 — The signed-in outsider's refusal of the app read and the fork is held to
  *     403 ACCESS_DENIED in its own test, beside the anonymous 401.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, 1.1 and 1.2).
@@ -133,6 +135,18 @@ const ROUTES: Array<{ name: string; refuses?: string; run: (who: Who) => Promise
     { name: 'GET /v1/prompts/build-app-atelier/sections/book (the build spec\'s map)', run: async (who) => {
         const r = await json('/v1/prompts/build-app-atelier/sections/book', { headers: auth(who.owner.token) });
         return { saw: String(r.body?.data?.prompt ?? '').includes('`' + GENRE + '`'), detail: `${r.status}` };
+    } },
+    { name: 'GET /v1/prompts/build-app/sections/book (the retired Classic address, now the Atelier part)', run: async (who) => {
+        const r = await json('/v1/prompts/build-app/sections/book', { headers: auth(who.owner.token) });
+        return { saw: String(r.body?.data?.prompt ?? '').includes('`' + GENRE + '`'), detail: `${r.status}` };
+    } },
+    { name: 'MCP aimeat_handbook_get { tier: "build-app-atelier/book" }', run: async (who) => {
+        const r = await callTool(who.mcp, 'aimeat_handbook_get', { tier: 'build-app-atelier/book' });
+        return { saw: !r.isError && r.text.includes('`' + GENRE + '`'), detail: r.text.slice(0, 80) };
+    } },
+    { name: 'MCP aimeat_handbook_get { tier: "build-app/book" } (the retired Classic tier)', run: async (who) => {
+        const r = await callTool(who.mcp, 'aimeat_handbook_get', { tier: 'build-app/book' });
+        return { saw: !r.isError && r.text.includes('`' + GENRE + '`'), detail: r.text.slice(0, 80) };
     } },
 ];
 

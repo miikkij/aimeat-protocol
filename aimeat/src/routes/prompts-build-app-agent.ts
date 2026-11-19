@@ -3,14 +3,16 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The app build instructions for an app that shows the work of ONE of the caller's
- *   agents: the agent section (services/builder/app-agent-context.ts) in front of the build
- *   specification (services/builder/app-prompt.ts), as one text a person hands to an AI.
+ *   agents: the agent section (services/builder/app-agent-context.ts) in front of the Atelier build
+ *   specification in its paste delivery, as one text a person hands to an AI.
  *
  *   The specification itself is public. This route is not, because the agent section is read from
  *   the caller's own account: the agent's purpose and the structure of its latest result.
  * @structure registerBuildAppAgentPrompt(router, config, storage)
  * @usage registered in routes/prompts.ts, before /v1/prompts/:tier
  * @version-history
+ *   (2026-11-19) The whole text is the Atelier specification with ?delivery=paste, and its token;
+ *     the Classic specification it carried is retired.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.1 — 2026-10-13 — Both `?format=txt` answers go through sendPlainText, which adds
  *     `X-Content-Type-Options: nosniff` to the same content type (code scanning alerts 1731, 1732).
@@ -23,7 +25,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { readerFor } from '../services/classification/reader.js';
 import { success, error } from '../middleware/envelope.js';
 import { sendPlainText } from '../middleware/plain-text.js';
-import { buildAppPrompt, buildAppSpecToken } from '../services/builder/app-prompt.js';
+import { buildAtelierPrompt, buildAtelierSpecToken } from '../services/builder/atelier-prompt.js';
 import { buildAppAgentContext } from '../services/builder/app-agent-context.js';
 
 export function registerBuildAppAgentPrompt(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -55,7 +57,9 @@ export function registerBuildAppAgentPrompt(router: Router, config: AimeatConfig
     }
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
-    const { full } = buildAppPrompt(config, { lang, mode: 'new', idea });
+    // The whole text a person copies to an AI that cannot ask for more: the Atelier specification in
+    // its paste delivery (the Classic one this route served until 2026-11-19 is retired).
+    const { full } = buildAtelierPrompt(config, { lang, mode: 'new', idea, delivery: 'paste' });
     const prompt = `${ctx.text}\n---\n\n${full}`;
     if (req.query.format === 'txt') {
       sendPlainText(res, prompt);
@@ -69,9 +73,9 @@ export function registerBuildAppAgentPrompt(router: Router, config: AimeatConfig
       has_result: ctx.has_result,
       context: ctx.text,
       prompt,
-      spec_token: buildAppSpecToken(config),
+      spec_token: buildAtelierSpecToken(config),
     }, [
-      { description: 'The build specification alone', method: 'GET', url: '/v1/prompts/build-app' },
+      { description: 'The build specification alone', method: 'GET', url: '/v1/prompts/build-app-atelier' },
       { description: 'The agent with its apps', method: 'GET', url: `/v1/home/agents?agent=${encodeURIComponent(ctx.agent.name)}` },
       { description: 'Publish the finished app (pass spec_token)', method: 'POST', url: '/v1/apps' },
     ]));

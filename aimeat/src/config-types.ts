@@ -22,6 +22,7 @@
  *   v1.28.0 — 2026-11-02 — partyPurchasesPerHour (AIMEAT_PARTY_PURCHASES_PER_HOUR; secaudit2026nov02d round 13).
  *   v1.27.0 — 2026-11-01 — DataspaceConfig mixed in (config-dataspace.ts; plan doc-mvwxcas3dom3, D8).
  *   v1.26.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION; plan doc-mvwxcas3dom3, D4.3).
+ *   v1.26.0 — 2026-11-19 — amlMode (AIMEAT_AML_MODE; services/aml/).
  *   v1.25.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION; plan doc-mvwxcas3dom3, D7.1).
  *   v1.24.0 — 2026-11-01 — shareMaxDays and partyReadsPerMinute: the named share's longest life and an
  *     outside party's read rate (plan doc-mvwxcas3dom3, D2.9, D3.1).
@@ -144,7 +145,7 @@ import type { AccountSecurityConfig } from './config/types-account-security.js';
 import type { CapabilitiesConfig } from './config/types-capabilities.js';
 import type { ThemesConfig } from './config/themes.js';
 import type { PackagesConfig } from './config/types-packages.js';
-import type { BalancingTestMode, ClassificationConfig, DataIntermediationMode, PartySelfRegistration } from './config/data-access.js';
+import type { AmlMode, BalancingTestMode, ClassificationConfig, DataIntermediationMode, PartySelfRegistration } from './config/data-access.js';
 import type { UpdateCheckConfig } from './config/update-check.js';
 import type { AppAuditConfig } from './config/app-audit.js';
 import type { AgentAccessConfig } from './config/types-agent-access.js';
@@ -515,6 +516,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   dataIntermediation: DataIntermediationMode;
   /** Whether the node asks for the balancing test of an app on legitimate interests (services/compliance/lia-need.ts). */
   balancingTest: BalancingTestMode;
+  /** Whether this node or its owners do anti-money-laundering obliged work, and who (services/aml/). */
+  amlMode: AmlMode;
   /** Whether an app's users may register as outside parties of its owner (services/app-parties/). */
   partySelfRegistration: PartySelfRegistration;
   /** Signups to apps one network address may make in an hour (routes/app-parties.ts); 0 = no limit. */

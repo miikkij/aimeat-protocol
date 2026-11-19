@@ -35,7 +35,6 @@ export const PROMPT_PACKS: LibraryPack[] = [
       'Example: AIMEAT.prompt.card("#plan", { label: "Plan my week", prompt: () => "Here are my tasks: " + JSON.stringify(tasks) + ". Spread them over next week. Answer with JSON only: {\\"days\\": [{\\"date\\": \\"YYYY-MM-DD\\", \\"tasks\\": [string]}]}", expect: "json", validate: (v) => Array.isArray(v && v.days) ? null : "The answer has no days list. Paste the whole answer.", onResult: async (plan) => { await AIMEAT.data.set("myapp.plan", plan, { visibility: "private" }); showPlan(plan); } });',
     ].join('\n'),
     changelog: [{ version: '1.0.0', date: '2026-09-18', summary: 'card() with copy, paste-back, text or JSON answers and validation; extractJson().' }],
-    tierHint: 'T1',
     interviewTriggers: ['prompt', 'copy prompt', 'paste the answer', 'without an api key', 'own ai', 'chatgpt', 'gemini', 'copilot', 'free ai'],
     sizeEstimate: '~8KB',
     status: 'preview',

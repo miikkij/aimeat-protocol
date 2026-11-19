@@ -3,10 +3,18 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Full working-scaffold use-case template bodies for the authoring-template registry.
- *   Pure data — each composes app-shells + components into a complete, customisable app.
- *   {{app}} = memory namespace; {{owner-ghii}} = the owner's GHII. Consumed by ../app-templates.ts.
- * @structure USECASE_REALTIME_SOCIAL · USECASE_MARKETPLACE · USECASE_HOMEPAGE · USECASE_APP_IAM
+ *   Pure data — each is a complete, customisable app on the Atelier shell (SHELL_ATELIER in
+ *   shells.ts): the kit's components in a.main, the session from the shell's onReady, every string
+ *   through AIMEAT.atelier.i18n in en and fi, and the level "proto" (the kit as it comes, no genre,
+ *   no register owed). {{app}} = memory namespace; {{owner-ghii}} = the owner's GHII. Consumed by
+ *   ../app-templates.ts.
+ * @structure USECASE_REALTIME_SOCIAL · USECASE_MARKETPLACE · USECASE_HOMEPAGE (re-exported from
+ *   use-cases-homepage.ts) · USECASE_APP_IAM
  * @version-history
+ *   v2.0.0 — 2026-11-19 — The four templates are on the Atelier shell since the Classic track was
+ *     retired: kit components instead of Classic class markup, the session from the shell instead of a
+ *     hand-mounted sign-in, en and fi dictionaries. Data keys, visibility and roles are unchanged.
+ *     USECASE_HOMEPAGE moved to use-cases-homepage.ts (pure extraction, 800-line limit).
  *   v1.3.0 — 2026-10-09 — USECASE_REALTIME_SOCIAL opens the room socket with a single-use ticket
  *     (POST /v1/ws/ticket) instead of the session JWT in the URL (secrets audit 2026-10-09, d3).
  *   v1.2.0 — 2026-10-01 — USECASE_APP_IAM: roles as a map of role to capabilities, so an approved
@@ -19,10 +27,10 @@
  */
 
 // ── Use-case: realtime-social (full working scaffold) ────────────────
-// A live room: logged-in users join the realtime room for live presence + chat, with durable
-// history persisted to public memory (loaded after login; anon sees the login prompt). Composes
-// realtime-room + shared-feed + auth-gated. Models the proven Presence Board pattern.
-// {{app}} = memory namespace; customise the {{SLOTS}}.
+// A live room: signed-in users join the realtime room for live presence + chat, with durable
+// history persisted to public memory (loaded after sign-in; a signed-out visitor sees the shell's
+// sign-in card). The kit's crew stack shows who is online and its thread is the conversation.
+// Models the proven Presence Board pattern. {{app}} = memory namespace; customise the {{SLOTS}}.
 
 export const USECASE_REALTIME_SOCIAL = `<!DOCTYPE html>
 <!-- AIMEAT App Manifest
@@ -31,104 +39,155 @@ version: 1.0.0
 description: {{one-line description — REQUIRED for publishing}}
 entry: index.html
 -->
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="aimeat-track" content="atelier" />
+  <!-- A quick prototype: the kit's components as they come. Make it "fine" by forking a genre. -->
+  <meta name="aimeat-level" content="proto" />
+  <meta name="aimeat-register" content="REPLACE-ME: fork a genre from the Design Book (GET /v1/designbook?kind=genre) or name your own register" />
+  <meta name="aimeat-locales" content="en fi" />
+  <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
+  <meta name="aimeat-app" content="{{app}}.html" />
+  <!-- EVERY scope the app uses; sign-in asks the person to approve these. -->
+  <meta name="aimeat-scopes" content="memory:read memory:write social:write" />
   <title>{{App Title}}</title>
-  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
-  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
-  <script src="/lib/tailwindcss@4.js"></script>
+  <link href="/lib/aimeat-atelier.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/aimeat-boot.js"></script>
 </head>
-<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
-  <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
-    <div class="flex-1"><span class="text-lg font-bold">{{App Title}}</span></div>
-    <div class="flex-none"><span id="login"></span></div>
-  </nav>
-
-  <main id="app" class="flex-1 w-full max-w-2xl mx-auto p-4 flex flex-col gap-4">
-    <div class="flex items-center gap-2 flex-wrap">
-      <span class="text-sm opacity-70">Online:</span>
-      <span id="presence" class="flex gap-1 flex-wrap"></span>
-    </div>
-    <div id="feed" class="flex-1 flex flex-col gap-2 overflow-y-auto" style="min-height:50vh"></div>
-    <form id="composer" class="join w-full" hidden>
-      <input id="msg" class="input input-bordered join-item flex-1" placeholder="Say something…" autocomplete="off" />
-      <button class="btn-primary join-item px-6" type="submit">Send</button>
-    </form>
-    <div id="login-hint" class="alert">Log in to join the live room and post.</div>
-  </main>
-
+<body>
   <script src="/v1/libs/aimeat-auth.js"></script>
   <script src="/v1/libs/aimeat-data.js"></script>
+  <script src="/v1/libs/aimeat-atelier.js"></script>
   <script>
     // Realtime protocol (server-defined): connect ws with ?room=&ticket=&nick=, send { type:'chat',
     // payload }, receive { type:'chat', sender, payload } broadcast to all (incl. sender). Presence
     // via { type:'joined', peers:[{nick}] } + { type:'participant', action:'join'|'leave', name }.
-    var FEED_KEY = '{{app}}.feed.';     // durable history (loaded after login — memory search needs auth)
+    var K = AIMEAT.atelier, i18n = K.i18n, t = i18n.t;
+    var FEED_KEY = '{{app}}.feed.';     // durable history (loaded after sign-in: memory search needs auth)
     var ROOM = '{{app}}-lobby';
     var session = null, ws = null, me = null;
     var online = {};                    // name -> true
-    var feedEl = document.getElementById('feed');
-    var presEl = document.getElementById('presence');
+    var messages = [];                  // the thread's rows: { id, who, label, text, at, mine }
+    var people = null, talk = null;     // the two kit components on the screen
 
-    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
-    function addMessage(by, text) {
-      var row = document.createElement('div');
-      row.className = 'chat ' + (by === me ? 'chat-end' : 'chat-start');
-      row.innerHTML = '<div class="chat-header text-xs opacity-60">' + esc(by) + '</div>' +
-        '<div class="chat-bubble">' + esc(text) + '</div>';
-      feedEl.appendChild(row);
-      feedEl.scrollTop = feedEl.scrollHeight;
-    }
-    function renderPresence() {
+    i18n.use({
+      en: {
+        title: '{{App Title}}',
+        tagline: 'A live room: see who is here and talk.',
+        online: 'Here now',
+        nobody: 'Nobody else is here yet',
+        room: 'The room',
+        say: 'Say something…',
+        empty: 'No messages yet',
+        emptyHint: 'Write the first one.',
+        notLive: 'Not connected to the live room yet.',
+        closed: 'The live room closed. Reload the page to join again.',
+        failed: 'Could not join the live room'
+      },
+      fi: {
+        title: '{{App Title}}',
+        tagline: 'Live-huone: näet, kuka on paikalla, ja voit jutella.',
+        online: 'Paikalla nyt',
+        nobody: 'Muita ei ole vielä paikalla',
+        room: 'Huone',
+        say: 'Kirjoita jotain…',
+        empty: 'Ei vielä viestejä',
+        emptyHint: 'Kirjoita ensimmäinen.',
+        notLive: 'Yhteys live-huoneeseen ei ole vielä auki.',
+        closed: 'Live-huone sulkeutui. Lataa sivu uudelleen, niin pääset takaisin.',
+        failed: 'Live-huoneeseen liittyminen ei onnistunut'
+      }
+    });
+
+    // The shell: bar, sign-in pill, language and theme controls, designed states. Sign-in is on by
+    // default, so onReady runs with a session and a signed-out visitor sees the sign-in card.
+    var a = K.app({
+      title: t('title'),
+      tagline: t('tagline'),
+      look: 'vivid',
+      onReady: function (s) { session = s; me = s.owner; render(); joinLive(); },
+      onLogout: function () { if (ws) ws.close(); session = null; }
+    });
+
+    function crewData() {
       var names = Object.keys(online);
-      presEl.innerHTML = names.length ? names.map(function (n) { return '<span class="badge badge-success badge-sm">' + esc(n) + '</span>'; }).join('') : '<span class="opacity-50 text-sm">—</span>';
+      return { people: names.map(function (n) { return { id: n, label: n }; }), live: names.length };
     }
+
+    function render() {
+      if (people) people.destroy();
+      if (talk) talk.destroy();
+      people = K.crew({ target: a.main, title: t('online'), data: crewData(), empty: { title: t('nobody') } });
+      talk = K.thread({
+        target: a.main,
+        title: t('room'),
+        placeholder: t('say'),
+        data: { messages: messages },
+        onSend: send,
+        empty: { title: t('empty'), hint: t('emptyHint') }
+      });
+    }
+
+    function addMessage(by, text, at) {
+      messages.push({
+        id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        who: by, label: by, text: text, at: at || new Date().toISOString(), mine: by === me
+      });
+      if (talk) talk.set({ data: { messages: messages } });
+    }
+    function renderPresence() { if (people) people.set({ data: crewData() }); }
 
     async function loadHistory() {
       try {
-        var hits = await AIMEAT.data.search(FEED_KEY);   // search needs auth -> history loads after login
-        hits.sort(function (a, b) { return (a.at || '').localeCompare(b.at || ''); });
-        feedEl.innerHTML = '';
-        hits.forEach(function (m) { addMessage(m.by, m.text); });
-      } catch (e) { /* empty feed is fine */ }
+        var hits = await AIMEAT.data.search(FEED_KEY);   // search needs auth -> history loads after sign-in
+        hits.sort(function (x, y) { return (x.at || '').localeCompare(y.at || ''); });
+        var earlier = hits.map(function (m, i) {
+          return { id: 'h' + i, who: m.by, label: m.by, text: m.text, at: m.at, mine: m.by === me };
+        });
+        messages = earlier.concat(messages);   // live lines that arrived meanwhile stay after the history
+        if (talk) talk.set({ data: { messages: messages } });
+      } catch (e) { /* an empty history is fine */ }
     }
 
-    async function joinLive(s) {
-      session = s; me = s.owner;
-      document.getElementById('login-hint').style.display = 'none';
-      document.getElementById('composer').hidden = false;
+    async function joinLive() {
       loadHistory();   // durable history (needs auth)
-      var room = (await session.fetch('/v1/realtime/rooms', { method: 'POST', body: JSON.stringify({ name: ROOM }) })).data;
-      // ws_url already has ?room=ID. A browser WebSocket can't set headers, and a JWT in the URL ends up
-      // in proxy logs, so trade it for a single-use 60-second ticket and pass that + nick as query.
-      var ticket = (await session.fetch('/v1/ws/ticket', { method: 'POST', body: JSON.stringify({ socket: 'realtime' }) })).data.ticket;
-      var wsUrl = location.origin.replace(/^http/, 'ws') + room.ws_url + '&ticket=' + encodeURIComponent(ticket) + '&nick=' + encodeURIComponent(me);
-      ws = new WebSocket(wsUrl);
+      try {
+        var room = (await session.fetch('/v1/realtime/rooms', { method: 'POST', body: JSON.stringify({ name: ROOM }) })).data;
+        // ws_url already has ?room=ID. A browser WebSocket can't set headers, and a JWT in the URL ends up
+        // in proxy logs, so trade it for a single-use 60-second ticket and pass that + nick as query.
+        var ticket = (await session.fetch('/v1/ws/ticket', { method: 'POST', body: JSON.stringify({ socket: 'realtime' }) })).data.ticket;
+        var wsUrl = location.origin.replace(/^http/, 'ws') + room.ws_url + '&ticket=' + encodeURIComponent(ticket) + '&nick=' + encodeURIComponent(me);
+        ws = new WebSocket(wsUrl);
+      } catch (e) {
+        a.status('error', { title: t('failed'), hint: String((e && e.message) || e), onRetry: function () { a.status('none'); joinLive(); } });
+        return;
+      }
       ws.onmessage = function (e) {
         var d = JSON.parse(e.data);
         if (d.type === 'joined') { (d.peers || []).forEach(function (p) { online[p.nick] = true; }); online[me] = true; renderPresence(); }
         else if (d.type === 'participant') { if (d.action === 'join') online[d.name] = true; else if (d.action === 'leave') delete online[d.name]; renderPresence(); }
         else if (d.type === 'chat') { addMessage(d.sender, d.payload); }   // server echoes to all incl. sender
       };
-      ws.onclose = function () { online = {}; renderPresence(); };
+      ws.onclose = function () {
+        online = {}; renderPresence();
+        if (session) K.toast({ title: t('closed'), tone: 'warn' });
+      };
     }
 
-    document.getElementById('composer').addEventListener('submit', function (ev) {
-      ev.preventDefault();
-      var input = document.getElementById('msg'), text = input.value.trim();
-      if (!text || !ws || ws.readyState !== 1) return;
-      input.value = '';
-      ws.send(JSON.stringify({ type: 'chat', payload: text }));   // live — server echoes back, then we render
+    // The thread's composer calls this; Enter sends.
+    function send(text) {
+      text = String(text || '').trim();
+      if (!text) return;
+      if (!ws || ws.readyState !== 1) { K.toast({ title: t('notLive'), tone: 'warn' }); return; }
+      ws.send(JSON.stringify({ type: 'chat', payload: text }));   // live: the server echoes back, then we render
       var id = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
       AIMEAT.data.set(FEED_KEY + id, { by: me, text: text, at: new Date().toISOString() }, { visibility: 'public' });  // durable
-    });
+    }
 
-    AIMEAT.auth.mountLoginButton('#login', {
-      onSession: function (s) { joinLive(s); },   // history + live load once a session arrives, restored or signed in (anon sees the login prompt)
-      onLogout: function () { location.reload(); }
-    });
+    // The bar's language switch: new words, same conversation.
+    i18n.onChange(function () { a.set({ title: t('title') }); if (session) render(); });
   </script>
 </body>
 </html>`;
@@ -138,8 +197,8 @@ entry: index.html
 // (OWNER) posts listings with an uploaded image. All listings live in ONE public key
 // ({{app}}.listings) under the owner's GHII, so anon can read them via getPublic (the only
 // anon-accessible memory read — there is no anon search). For a MULTI-seller marketplace use a
-// server extension for the shared store. Composes list+detail + image-upload + search +
-// auth-gated. Models the Sales-Board / owner-curated storefront. {{app}} = memory namespace.
+// server extension for the shared store. The kit's hero, searchBar and cardGrid are the browsing
+// screen; a dialog holds the detail and the post form. {{app}} = memory namespace.
 
 export const USECASE_MARKETPLACE = `<!DOCTYPE html>
 <!-- AIMEAT App Manifest
@@ -148,349 +207,237 @@ version: 1.0.0
 description: {{one-line description — REQUIRED for publishing}}
 entry: index.html
 -->
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="aimeat-track" content="atelier" />
+  <!-- A quick prototype: the kit's components as they come. Make it "fine" by forking a genre. -->
+  <meta name="aimeat-level" content="proto" />
+  <meta name="aimeat-register" content="REPLACE-ME: fork a genre from the Design Book (GET /v1/designbook?kind=genre) or name your own register" />
+  <meta name="aimeat-locales" content="en fi" />
+  <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
+  <meta name="aimeat-app" content="{{app}}.html" />
+  <!-- EVERY scope the app uses; sign-in asks the person to approve these. -->
+  <meta name="aimeat-scopes" content="memory:read memory:write storage:read storage:write" />
   <title>{{App Title}}</title>
-  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
-  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
-  <script src="/lib/tailwindcss@4.js"></script>
+  <link href="/lib/aimeat-atelier.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/aimeat-boot.js"></script>
 </head>
-<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
-  <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50 gap-2">
-    <div class="flex-1 min-w-0"><span class="text-lg font-bold">{{App Title}}</span></div>
-    <input id="search" class="input input-bordered input-sm w-40 sm:w-64" placeholder="Search…" />
-    <button id="post-btn" class="btn-primary px-4" hidden>+ Post</button>
-    <span id="login"></span>
-  </nav>
-
-  <main class="flex-1 w-full max-w-5xl mx-auto p-4">
-    <div id="status" class="alert mb-4" hidden></div>
-    <div id="grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
-    <div id="empty" class="text-center opacity-60 py-16" hidden>No listings yet.</div>
-  </main>
-
-  <!-- Detail overlay -->
-  <div id="detail" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4" style="display:none">
-    <div class="card bg-base-200 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-      <div id="detail-body" class="card-body"></div>
-    </div>
-  </div>
-
-  <!-- Post overlay (logged-in) -->
-  <div id="post" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4" style="display:none">
-    <form id="post-form" class="card bg-base-200 max-w-md w-full">
-      <div class="card-body gap-3">
-        <h3 class="text-lg font-bold">Post a listing</h3>
-        <input id="f-title" class="input input-bordered" placeholder="Title" required />
-        <input id="f-price" class="input input-bordered" placeholder="Price (e.g. 20 €)" />
-        <textarea id="f-desc" class="textarea textarea-bordered" placeholder="Description" rows="3"></textarea>
-        <input id="f-image" type="file" accept="image/*" class="file-input file-input-bordered" />
-        <div class="flex gap-2 justify-end">
-          <button type="button" id="post-cancel" class="btn-ghost px-4">Cancel</button>
-          <button type="submit" id="post-submit" class="btn-primary px-6">Publish</button>
-        </div>
-      </div>
-    </form>
-  </div>
-
+<body>
   <script src="/v1/libs/aimeat-auth.js"></script>
   <script src="/v1/libs/aimeat-data.js"></script>
   <script src="/v1/libs/aimeat-storage.js"></script>
+  <script src="/v1/libs/aimeat-atelier.js"></script>
   <script>
+    var K = AIMEAT.atelier, i18n = K.i18n, t = i18n.t;
     var OWNER = '{{owner-ghii}}';        // the seller's GHII (owner@node-id) — anyone reads listings from here
     var LISTINGS_KEY = '{{app}}.listings';
-    var session = null, all = [];
-    var gridEl = document.getElementById('grid'), emptyEl = document.getElementById('empty');
+    var session = null, all = [], query = '';
+    var parts = [], grid = null;         // the components on the screen, destroyed before a repaint
+    var gridEmpty = '';                  // which empty state the grid was built with
 
-    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    i18n.use({
+      en: {
+        title: '{{App Title}}',
+        tagline: '{{What is for sale, in one line}}',
+        post: 'Post a listing',
+        search: 'Search listings',
+        empty: 'No listings yet',
+        emptyHint: 'Come back soon.',
+        emptySeller: 'Post the first one with the button above.',
+        noMatch: 'Nothing matched',
+        noMatchHint: 'Try another word.',
+        seller: 'Seller: {who}',
+        close: 'Close',
+        fTitle: 'Title',
+        fPrice: 'Price',
+        fPriceHint: 'For example 20 €',
+        fDesc: 'Description',
+        fImage: 'Picture',
+        fImageHint: 'Drop an image here, or press to pick one.',
+        cancel: 'Cancel',
+        publish: 'Publish',
+        published: 'The listing is published.',
+        failed: 'Could not publish'
+      },
+      fi: {
+        title: '{{App Title}}',
+        tagline: '{{Mitä myydään, yhdellä rivillä}}',
+        post: 'Lisää ilmoitus',
+        search: 'Hae ilmoituksista',
+        empty: 'Ei vielä ilmoituksia',
+        emptyHint: 'Tule pian uudelleen.',
+        emptySeller: 'Lisää ensimmäinen yllä olevalla painikkeella.',
+        noMatch: 'Mikään ei osunut',
+        noMatchHint: 'Kokeile toista sanaa.',
+        seller: 'Myyjä: {who}',
+        close: 'Sulje',
+        fTitle: 'Otsikko',
+        fPrice: 'Hinta',
+        fPriceHint: 'Esimerkiksi 20 €',
+        fDesc: 'Kuvaus',
+        fImage: 'Kuva',
+        fImageHint: 'Pudota kuva tähän tai valitse se painamalla.',
+        cancel: 'Peru',
+        publish: 'Julkaise',
+        published: 'Ilmoitus on julkaistu.',
+        failed: 'Julkaisu ei onnistunut'
+      }
+    });
+
+    // Everyone browses, so sign-in is off: onReady runs at once (session or null), and a session
+    // that arrives later (a restore that finished late, a sign-in from the bar) reaches onSession.
+    var a = K.app({
+      title: t('title'),
+      tagline: t('tagline'),
+      look: 'vivid',
+      requireLogin: false,
+      onReady: function (s) { if (s) maybeEnablePosting(s); render(); load(); },
+      onSession: function (s) { maybeEnablePosting(s); render(); load(); },   // sets OWNER for the owner's own preview, then loads again as them
+      onLogout: function () { session = null; render(); }
+    });
+
+    function isSeller() { return !!session && session.ghii === OWNER; }
     function filtered() {
-      var q = document.getElementById('search').value.toLowerCase().trim();
+      var q = query.toLowerCase().trim();
       if (!q) return all;
       return all.filter(function (it) { return ((it.title || '') + ' ' + (it.desc || '')).toLowerCase().indexOf(q) !== -1; });
     }
+
     function render() {
-      var items = filtered();
-      emptyEl.hidden = items.length > 0;
-      gridEl.innerHTML = '';
-      items.forEach(function (it) {
-        var card = document.createElement('div');
-        card.className = 'card bg-base-200 shadow cursor-pointer hover:ring-2 hover:ring-primary transition';
-        card.innerHTML =
-          (it.imageUrl ? '<figure class="aspect-square overflow-hidden"><img src="' + esc(it.imageUrl) + '" class="w-full h-full object-cover" /></figure>'
-                       : '<figure class="aspect-square bg-base-300 flex items-center justify-center text-4xl opacity-40">🖼️</figure>') +
-          '<div class="card-body p-3 gap-1"><h3 class="font-semibold text-sm truncate">' + esc(it.title) + '</h3>' +
-          '<div class="text-primary font-bold text-sm">' + esc(it.price || '') + '</div></div>';
-        card.onclick = function () { openDetail(it); };
-        gridEl.appendChild(card);
+      parts.forEach(function (p) { p.destroy(); });
+      parts = [];
+      parts.push(K.hero({
+        target: a.main, title: t('title'), sub: t('tagline'), variant: 'compact',
+        actions: isSeller() ? [{ id: 'post', label: t('post'), kind: 'primary', onClick: openPost }] : []
+      }));
+      parts.push(K.searchBar({ target: a.main, value: query, placeholder: t('search'), label: t('search'), onChange: function (q) { query = q; paint(); } }));
+      grid = null;
+      paint();
+    }
+
+    // The grid shows the filtered listings through set(), so a search moves the cards rather than
+    // rebuilding them. It is built again only when its empty state has to say something else:
+    // "nothing matched" while searching, "no listings yet" otherwise.
+    function paint() {
+      var items = filtered().map(function (it) { return { id: it.id, title: it.title, sub: it.price || '', image: it.imageUrl || undefined }; });
+      var empty = query ? 'search' : 'none';
+      if (grid && empty === gridEmpty) { grid.set({ items: items }); return; }
+      if (grid) { grid.destroy(); parts.splice(parts.indexOf(grid), 1); }
+      gridEmpty = empty;
+      grid = K.cardGrid({
+        target: a.main,
+        items: items,
+        onPick: function (card) { openDetail(card.id); },
+        empty: query
+          ? { title: t('noMatch'), hint: t('noMatchHint') }
+          : { title: t('empty'), hint: isSeller() ? t('emptySeller') : t('emptyHint') }
+      });
+      parts.push(grid);
+    }
+
+    function openDetail(id) {
+      var it = all.filter(function (x) { return x.id === id; })[0];
+      if (!it) return;
+      var d = K.dialog({
+        title: it.title,
+        size: 'roomy',
+        body: function (host) {
+          K.mediaCard({ target: host, item: { id: it.id, title: it.price || it.title, sub: t('seller', { who: it.by || '' }), image: it.imageUrl || undefined } });
+          if (it.desc) host.appendChild(K.el('p', { class: 'ak-section__hint', text: it.desc }));
+        },
+        actions: [{ id: 'close', label: t('close'), run: function () { d.close(); } }]
       });
     }
-    function openDetail(it) {
-      document.getElementById('detail-body').innerHTML =
-        (it.imageUrl ? '<img src="' + esc(it.imageUrl) + '" class="rounded-lg w-full object-contain max-h-80 mb-3" />' : '') +
-        '<h2 class="text-xl font-bold">' + esc(it.title) + '</h2>' +
-        '<div class="text-primary font-bold text-lg my-1">' + esc(it.price || '') + '</div>' +
-        '<p class="whitespace-pre-wrap opacity-90">' + esc(it.desc || '') + '</p>' +
-        '<div class="text-xs opacity-60 mt-3">Seller: ' + esc(it.by || '') + '</div>' +
-        '<div class="text-right mt-4"><button class="btn-ghost px-4" onclick="closeDetail()">Close</button></div>';
-      show('detail');
-    }
-    window.closeDetail = function () { hide('detail'); };
-    function show(id) { var e = document.getElementById(id); e.style.display = 'flex'; }
-    function hide(id) { var e = document.getElementById(id); e.style.display = 'none'; }
 
     async function load() {
       try {
         var arr = await AIMEAT.data.getPublic(OWNER, LISTINGS_KEY);   // anon-readable single public key
         all = Array.isArray(arr) ? arr.slice() : [];
-        all.sort(function (a, b) { return (b.at || '').localeCompare(a.at || ''); });
+        all.sort(function (x, y) { return (y.at || '').localeCompare(x.at || ''); });
       } catch (e) { all = []; }
-      render();
+      paint();
     }
-    document.getElementById('search').addEventListener('input', render);
 
     // ── posting (only the seller = OWNER can post; writes go to OWNER's own public key) ──
     function maybeEnablePosting(s) {
       session = s;
       if (OWNER.indexOf('{{') === 0 && s.ghii) OWNER = s.ghii;   // owner-preview convenience before the GHII is baked in
-      if (s.ghii === OWNER) document.getElementById('post-btn').hidden = false;
     }
-    document.getElementById('post-btn').onclick = function () { show('post'); };
-    document.getElementById('post-cancel').onclick = function () { hide('post'); };
-    document.getElementById('post-form').addEventListener('submit', async function (ev) {
-      ev.preventDefault();
-      var btn = document.getElementById('post-submit'); btn.disabled = true; btn.textContent = 'Publishing…';
-      try {
-        var imageUrl = '';
-        var fileInput = document.getElementById('f-image');
-        if (fileInput.files[0]) {
-          var up = await AIMEAT.storage.upload(fileInput.files[0], { visibility: 'public' });
-          imageUrl = '/v1/pub/' + encodeURIComponent(session.ghii) + '/' + encodeURIComponent(up.key);
-        }
-        var listing = {
-          id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-          title: document.getElementById('f-title').value.trim(),
-          price: document.getElementById('f-price').value.trim(),
-          desc: document.getElementById('f-desc').value.trim(),
-          imageUrl: imageUrl, by: session.ghii, at: new Date().toISOString()
-        };
-        all.unshift(listing);
-        await AIMEAT.data.set(LISTINGS_KEY, all, { visibility: 'public' });   // one public key holds all listings
-        document.getElementById('post-form').reset();
-        hide('post'); render();
-      } catch (e) { alert('Could not publish: ' + (e.message || e)); }
-      btn.disabled = false; btn.textContent = 'Publish';
-    });
 
-    AIMEAT.auth.mountLoginButton('#login', {
-      onSession: function (s) { maybeEnablePosting(s); load(); },   // sets OWNER for the owner's own preview, then loads again as them
-      onLogout: function () { location.reload(); }
-    });
-    load();   // everyone browses
-  </script>
-</body>
-</html>`;
-
-// ── Use-case: homepage / personal site (full working scaffold) ───────
-// A single-writer public site: anyone views the owner's profile + blog/feed; the OWNER edits the
-// profile and publishes posts (markdown body, optional image, optional AI-written draft). Profile
-// + posts live in public keys read via getPublic (anon-readable). Composes markdown + image-upload
-// + ai-action + auth-gated. {{app}} = memory namespace; {{owner-ghii}} = the owner's GHII.
-
-export const USECASE_HOMEPAGE = `<!DOCTYPE html>
-<!-- AIMEAT App Manifest
-name: {{app-name}}
-version: 1.0.0
-description: {{one-line description — REQUIRED for publishing}}
-entry: index.html
--->
-<html lang="en" data-theme="dark">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="aimeat-scopes" content="ai:use" />   <!-- lets the owner's "Write with AI" button spend their AI budget -->
-  <!-- What this app does with a model. The catalogue reads it, and it is what makes the app
-       EU-transparency-ready without its author reading Article 50. -->
-  <meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no" />
-  <title>{{App Title}}</title>
-  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
-  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
-  <script src="/lib/tailwindcss@4.js"></script>
-</head>
-<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
-  <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50 gap-2">
-    <div class="flex-1 min-w-0"><span class="text-lg font-bold">{{App Title}}</span></div>
-    <span id="owner-actions" hidden class="flex gap-2">
-      <button id="edit-btn" class="btn-outline px-3">Edit profile</button>
-      <button id="post-btn" class="btn-primary px-3">+ Post</button>
-    </span>
-    <span id="login"></span>
-  </nav>
-
-  <main class="flex-1 w-full max-w-3xl mx-auto p-4 flex flex-col gap-8">
-    <section id="hero" class="text-center pt-4"></section>
-    <section id="posts" class="flex flex-col gap-6"></section>
-  </main>
-
-  <!-- Profile edit overlay (owner) -->
-  <div id="profile-modal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4" style="display:none">
-    <form id="profile-form" class="card bg-base-200 max-w-md w-full">
-      <div class="card-body gap-3">
-        <h3 class="text-lg font-bold">Edit profile</h3>
-        <input id="p-name" class="input input-bordered" placeholder="Your name" />
-        <textarea id="p-bio" class="textarea textarea-bordered" placeholder="Bio (markdown supported)" rows="4"></textarea>
-        <input id="p-avatar" type="file" accept="image/*" class="file-input file-input-bordered" />
-        <div class="flex gap-2 justify-end">
-          <button type="button" class="btn-ghost px-4" onclick="document.getElementById('profile-modal').style.display='none'">Cancel</button>
-          <button type="submit" class="btn-primary px-6">Save</button>
-        </div>
-      </div>
-    </form>
-  </div>
-
-  <!-- New post overlay (owner) -->
-  <div id="post-modal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4" style="display:none">
-    <form id="post-form" class="card bg-base-200 max-w-lg w-full max-h-[92vh] overflow-y-auto">
-      <div class="card-body gap-3">
-        <h3 class="text-lg font-bold">New post</h3>
-        <input id="f-title" class="input input-bordered" placeholder="Title" required />
-        <div class="flex gap-2 items-center">
-          <input id="f-idea" class="input input-bordered input-sm flex-1" placeholder="Idea for AI (optional)" />
-          <button type="button" id="ai-btn" class="btn-info px-3" hidden>✨ Write with AI</button>
-        </div>
-        <textarea id="f-body" class="textarea textarea-bordered font-mono text-sm" placeholder="Write in markdown… (## heading, **bold**, - lists, links, images)" rows="8"></textarea>
-        <!-- The AI label lands here. Empty until the model writes something. -->
-        <div id="ai-label"></div>
-        <input id="f-image" type="file" accept="image/*" class="file-input file-input-bordered" />
-        <div class="flex gap-2 justify-end">
-          <button type="button" class="btn-ghost px-4" onclick="document.getElementById('post-modal').style.display='none'">Cancel</button>
-          <button type="submit" id="post-submit" class="btn-primary px-6">Publish</button>
-        </div>
-      </div>
-    </form>
-  </div>
-
-  <script src="/v1/libs/aimeat-auth.js"></script>
-  <script src="/v1/libs/aimeat-data.js"></script>
-  <script src="/v1/libs/aimeat-storage.js"></script>
-  <script src="/v1/libs/aimeat-ai.js"></script>
-  <script src="/v1/libs/aimeat-markdown.js"></script>
-  <script>
-    var OWNER = '{{owner-ghii}}';        // the site owner's GHII (owner@node-id) — content is read from here
-    var PROFILE_KEY = '{{app}}.profile';
-    var POSTS_KEY = '{{app}}.posts';
-    var draftProvenance = null;   // set when the model writes the draft; attached to the saved post
-    var session = null, profile = {}, posts = [];
-
-    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
-    function show(id) { document.getElementById(id).style.display = 'flex'; }
-    function hide(id) { document.getElementById(id).style.display = 'none'; }
-    function isOwner() { return !!session && session.ghii === OWNER; }
-
-    function renderHero() {
-      var h = document.getElementById('hero'); h.innerHTML = '';
-      if (profile.avatarUrl) { var img = document.createElement('img'); img.src = profile.avatarUrl; img.className = 'w-24 h-24 rounded-full object-cover mx-auto'; h.appendChild(img); }
-      var name = document.createElement('h1'); name.className = 'text-3xl font-bold mt-3'; name.textContent = profile.name || '{{Your name}}'; h.appendChild(name);
-      if (profile.bio) { var bio = document.createElement('div'); bio.className = 'max-w-2xl mx-auto mt-2 text-left'; AIMEAT.md.render(profile.bio, bio); h.appendChild(bio); }
-    }
-    function renderPosts() {
-      var c = document.getElementById('posts'); c.innerHTML = '';
-      if (!posts.length) { c.innerHTML = '<div class="text-center opacity-50 py-8">No posts yet.</div>'; return; }
-      posts.forEach(function (p) {
-        var card = document.createElement('article'); card.className = 'card bg-base-200 shadow';
-        card.innerHTML = '<div class="card-body"><h2 class="text-xl font-bold">' + esc(p.title) + '</h2>' +
-          '<div class="text-xs opacity-60">' + esc((p.at || '').slice(0, 10)) + '</div></div>';
-        var body = card.querySelector('.card-body');
-        if (p.imageUrl) { var im = document.createElement('img'); im.src = p.imageUrl; im.className = 'rounded-lg w-full object-cover max-h-96 my-2'; body.appendChild(im); }
-        var md = document.createElement('div'); AIMEAT.md.render(p.body || '', md); body.appendChild(md);
-        c.appendChild(card);
+    function openPost() {
+      var form = null, picked = null, saving = false;
+      var d = K.dialog({
+        title: t('post'),
+        size: 'roomy',
+        body: function (host) {
+          form = K.form({
+            target: host,
+            submit: false,   // the dialog's own Publish button sends it
+            fields: [
+              { name: 'title', label: t('fTitle'), required: true },
+              { name: 'price', label: t('fPrice'), hint: t('fPriceHint'), width: 'short' },
+              { name: 'desc', label: t('fDesc'), type: 'textarea' }
+            ]
+          });
+          // The kit's drop zone picks the file; it is uploaded on Publish, never before.
+          K.dropzone({ target: host, accept: ['image/*'], label: t('fImage'), hint: t('fImageHint'), onFiles: function (files) { picked = files[0] || null; } });
+        },
+        actions: [
+          { id: 'cancel', label: t('cancel'), run: function () { d.close(); } },
+          { id: 'publish', label: t('publish'), tone: 'primary', run: publish }
+        ]
       });
+      // Publish stays held, with the missing fields named, until the form is right.
+      form.gate(d.el.querySelector('[data-ak-action="publish"]'));
+
+      async function publish() {
+        if (saving || !form.ready()) return;
+        saving = true;
+        try {
+          var imageUrl = '';
+          if (picked) {
+            var up = await AIMEAT.storage.upload(picked, { visibility: 'public' });
+            imageUrl = '/v1/pub/' + encodeURIComponent(session.ghii) + '/' + encodeURIComponent(up.key);
+          }
+          var v = form.values();
+          var listing = {
+            id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+            title: String(v.title || '').trim(),
+            price: String(v.price || '').trim(),
+            desc: String(v.desc || '').trim(),
+            imageUrl: imageUrl, by: session.ghii, at: new Date().toISOString()
+          };
+          var next = [listing].concat(all);
+          await AIMEAT.data.set(LISTINGS_KEY, next, { visibility: 'public' });   // one public key holds all listings
+          all = next;
+          d.close();
+          paint();
+          K.toast({ title: t('published'), tone: 'ok' });
+        } catch (e) {
+          K.toast({ title: t('failed'), sub: String((e && e.message) || e), tone: 'err' });
+        }
+        saving = false;
+      }
     }
 
-    async function load() {
-      try { profile = (await AIMEAT.data.getPublic(OWNER, PROFILE_KEY)) || {}; } catch (e) { profile = {}; }
-      try { var pp = await AIMEAT.data.getPublic(OWNER, POSTS_KEY); posts = Array.isArray(pp) ? pp.slice() : []; } catch (e) { posts = []; }
-      posts.sort(function (a, b) { return (b.at || '').localeCompare(a.at || ''); });
-      renderHero(); renderPosts();
-    }
-
-    // ── owner editing ──
-    function applyOwnerUi() {
-      if (OWNER.indexOf('{{') === 0 && session && session.ghii) OWNER = session.ghii; // owner-preview before the GHII is baked in
-      document.getElementById('owner-actions').hidden = !isOwner();
-      document.getElementById('ai-btn').hidden = true;
-      if (isOwner()) AIMEAT.ai.isAvailable().then(function (ok) { if (ok) document.getElementById('ai-btn').hidden = false; });
-    }
-
-    document.getElementById('edit-btn').onclick = function () {
-      document.getElementById('p-name').value = profile.name || '';
-      document.getElementById('p-bio').value = profile.bio || '';
-      show('profile-modal');
-    };
-    document.getElementById('post-btn').onclick = function () { show('post-modal'); };
-
-    document.getElementById('ai-btn').onclick = async function () {
-      var idea = document.getElementById('f-idea').value.trim() || document.getElementById('f-title').value.trim();
-      if (!idea) { alert('Type a title or an idea first.'); return; }
-      this.disabled = true; this.textContent = '✨ Writing…';
-      try {
-        var r = await AIMEAT.ai.complete({ prompt: 'Write a short, engaging blog post in markdown about: ' + idea, app_id: '{{app}}' });
-        document.getElementById('f-body').value = r.content;
-        // The reader is entitled to know a model wrote this. One call; it draws nothing when no
-        // label is owed, and it follows this app's own theme.
-        draftProvenance = r.provenance;
-        AIMEAT.ai.disclose(r.provenance, { target: '#ai-label' });
-      } catch (e) { alert('AI error: ' + (e.message || e)); }
-      this.disabled = false; this.textContent = '✨ Write with AI';
-    };
-
-    document.getElementById('profile-form').addEventListener('submit', async function (ev) {
-      ev.preventDefault();
-      try {
-        var avatarUrl = profile.avatarUrl || '';
-        var af = document.getElementById('p-avatar');
-        if (af.files[0]) { var up = await AIMEAT.storage.upload(af.files[0], { visibility: 'public' }); avatarUrl = '/v1/pub/' + encodeURIComponent(session.ghii) + '/' + encodeURIComponent(up.key); }
-        profile = { name: document.getElementById('p-name').value.trim(), bio: document.getElementById('p-bio').value, avatarUrl: avatarUrl };
-        await AIMEAT.data.set(PROFILE_KEY, profile, { visibility: 'public' });
-        hide('profile-modal'); renderHero();
-      } catch (e) { alert('Could not save: ' + (e.message || e)); }
-    });
-
-    document.getElementById('post-form').addEventListener('submit', async function (ev) {
-      ev.preventDefault();
-      var btn = document.getElementById('post-submit'); btn.disabled = true; btn.textContent = 'Publishing…';
-      try {
-        var imageUrl = '';
-        var fi = document.getElementById('f-image');
-        if (fi.files[0]) { var up = await AIMEAT.storage.upload(fi.files[0], { visibility: 'public' }); imageUrl = '/v1/pub/' + encodeURIComponent(session.ghii) + '/' + encodeURIComponent(up.key); }
-        var post = { id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), title: document.getElementById('f-title').value.trim(), body: document.getElementById('f-body').value, imageUrl: imageUrl, at: new Date().toISOString() };
-        // The record travels WITH the post, so a reader of the stored data still knows how it was
-        // made. declare() returns a copy; it leaves the original alone.
-        if (draftProvenance) post = AIMEAT.ai.declare(post, draftProvenance);
-        posts.unshift(post);
-        await AIMEAT.data.set(POSTS_KEY, posts, { visibility: 'public' });
-        document.getElementById('post-form').reset(); draftProvenance = null;
-        document.getElementById('ai-label').textContent = '';
-        hide('post-modal'); renderPosts();
-      } catch (e) { alert('Could not publish: ' + (e.message || e)); }
-      btn.disabled = false; btn.textContent = 'Publish';
-    });
-
-    AIMEAT.auth.mountLoginButton('#login', {
-      onSession: function (s) { session = s; applyOwnerUi(); load(); },   // restored or signed in
-      onLogout: function () { location.reload(); }
-    });
-    load();   // everyone views
+    // The bar's language switch: new words, same listings and the same search.
+    i18n.onChange(function () { a.set({ title: t('title') }); if (grid) render(); });
   </script>
 </body>
 </html>`;
+
+// ── Use-case: homepage / personal site ── in use-cases-homepage.ts (moved by pure extraction
+// when this file passed the 800-line limit), re-exported here so the registry's import is unchanged.
+export { USECASE_HOMEPAGE } from './use-cases-homepage.js';
 
 // ── Use-case: app-iam (members, roles and an owner panel) ────────────
 // An app with its OWN member community. The NODE keeps who is a member — it notifies them, keeps the
 // list private, and moves their free access with their role — and this app keeps what a role may do.
 // Six apps on this node each built this by hand before the platform had it, and disagreed six ways;
-// this is that work done once. {{app}} = memory namespace.
+// this is that work done once. The kit draws it over AIMEAT.iam: accessState is the members-only
+// area (with the ask for everybody else), members is the owner's roster. {{app}} = memory namespace.
 
 export const USECASE_APP_IAM = `<!DOCTYPE html>
 <!-- AIMEAT App Manifest
@@ -499,89 +446,131 @@ version: 1.0.0
 description: {{one-line description — REQUIRED for publishing}}
 entry: index.html
 -->
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="aimeat-track" content="atelier" />
+  <!-- A quick prototype: the kit's components as they come. Make it "fine" by forking a genre. -->
+  <meta name="aimeat-level" content="proto" />
+  <meta name="aimeat-register" content="REPLACE-ME: fork a genre from the Design Book (GET /v1/designbook?kind=genre) or name your own register" />
+  <meta name="aimeat-locales" content="en fi" />
+  <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
+  <meta name="aimeat-app" content="{{app}}.html" />
+  <!-- EVERY scope the app uses; sign-in asks the person to approve these. -->
   <meta name="aimeat-scopes" content="memory:read memory:write" />
   <title>{{App Title}}</title>
-  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
-  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
-  <script src="/lib/tailwindcss@4.js"></script>
+  <link href="/lib/aimeat-atelier.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/aimeat-boot.js"></script>
 </head>
-<body class="bg-base-100 text-base-content min-h-screen">
-  <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
-    <div class="flex-1"><span class="text-lg font-bold">{{App Title}}</span></div>
-    <div class="flex-none"><span id="login"></span></div>
-  </nav>
-
-  <main class="max-w-3xl mx-auto p-4 flex flex-col gap-4">
-    <!-- What everyone sees. Keep something here: an app that shows a stranger nothing but a refusal
-         gives them no way to judge whether it is worth asking for. -->
-    <section class="card bg-base-200 shadow"><div class="card-body">
-      <h2 class="card-title">{{What this app is}}</h2>
-      <p class="text-sm opacity-70">{{One paragraph anyone may read, member or not.}}</p>
-    </div></section>
-
-    <!-- Members only. can() decides what to PAINT; the extension decides what is allowed. -->
-    <section id="members-only" hidden class="card bg-base-200 shadow"><div class="card-body">
-      <h2 class="card-title">{{The paid or private surface}}</h2>
-      <button id="do-it" class="btn btn-primary self-start">{{Do the thing}}</button>
-      <pre id="out" class="text-xs mt-2"></pre>
-    </div></section>
-
-    <!-- Shown to anyone who is not yet a member. The OWNER is notified, with Approve and Decline
-         on their bell, so a request does not depend on them opening this page. -->
-    <div id="join"></div>
-
-    <!-- Owner only: roster, approvals, free access, and this app's own settings in one place. -->
-    <div id="members"></div>
-  </main>
-
+<body>
   <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/v1/libs/aimeat-data.js"></script>
   <script src="/v1/libs/aimeat-iam.js"></script>
+  <script src="/v1/libs/aimeat-atelier.js"></script>
   <script>
+    var K = AIMEAT.atelier, i18n = K.i18n, t = i18n.t;
     var APP = '{{owner}}/{{app}}.html';        // the app whose roster the node keeps
-    var session = null;
+    // The node keeps the roster; ROLES is this app's own vocabulary, which the node does not own:
+    // each role and what it may do. One click on Approve in the owner's panel grants the role with
+    // the least power, here member.
+    var ROLES = { member: ['use'], admin: ['use', 'manage'] };
+    var session = null, parts = [], round = 0;
+
+    i18n.use({
+      en: {
+        title: '{{App Title}}',
+        aboutTitle: '{{What this app is}}',
+        aboutText: '{{One paragraph anyone may read, member or not.}}',
+        lockedTitle: '{{The paid or private surface}}',
+        privateTitle: '{{The paid or private surface}}',
+        privateHint: '{{What a member does here}}',
+        doIt: '{{Do the thing}}',
+        result: 'Result',
+        denied: 'You do not have access to that.'
+      },
+      fi: {
+        title: '{{App Title}}',
+        aboutTitle: '{{Mikä tämä sovellus on}}',
+        aboutText: '{{Kappale, jonka kuka tahansa saa lukea, jäsen tai ei.}}',
+        lockedTitle: '{{Maksullinen tai yksityinen osa}}',
+        privateTitle: '{{Maksullinen tai yksityinen osa}}',
+        privateHint: '{{Mitä jäsen tekee täällä}}',
+        doIt: '{{Tee se}}',
+        result: 'Tulos',
+        denied: 'Sinulla ei ole pääsyä tähän.'
+      }
+    });
+
+    // What everyone sees comes first, so sign-in is off: an app that shows a stranger nothing but a
+    // refusal gives them no way to judge whether it is worth asking for. onReady runs at once
+    // (session or null); a session that arrives later reaches onSession.
+    var a = K.app({
+      title: t('title'),
+      tagline: t('aboutText'),
+      look: 'calm-card',
+      requireLogin: false,
+      onReady: function (s) { boot(s); },
+      onSession: function (s) { boot(s); },
+      onLogout: function () { boot(null); }
+    });
 
     async function boot(s) {
       session = s;
-      // The node keeps the roster; \`roles\` is this app's own vocabulary, which the node does not own:
-      // each role and what it may do. One click on Approve in the owner's panel grants the role with
-      // the least power, here member.
-      var me = await AIMEAT.iam.init({ app: APP, roles: { member: ['use'], admin: ['use', 'manage'] } });
+      var mine = ++round;   // a later boot wins over one still waiting for the node
+      parts.forEach(function (p) { p.destroy(); });
+      parts = [];
 
-      // A HINT for painting. The gate is server-side: enforce in the action that mutates data.
-      AIMEAT.iam.gate('#members-only', 'use');
-      document.getElementById('join').hidden = me.member || me.isOwner;
-      if (!me.member && !me.isOwner) AIMEAT.iam.JoinPanel({ target: '#join' });
+      // What everyone sees.
+      parts.push(K.section({ target: a.main, title: t('aboutTitle'), hint: t('aboutText') }));
 
-      if (me.isOwner) {
-        AIMEAT.iam.MemberAdmin({
-          target: '#members',
-          appId: APP,
+      var me = null;
+      if (s) me = await AIMEAT.iam.init({ app: APP, roles: ROLES });
+      if (mine !== round) return;
+
+      // Members only. accessState decides what to PAINT: for a role that holds "use" (and for the
+      // owner) it draws render(); for everybody else it draws the ask, and the OWNER is notified,
+      // with Approve and Decline on their bell, so a request does not depend on them opening this
+      // page. The extension decides what is allowed.
+      parts.push(K.accessState({
+        target: a.main, app: APP, roles: ROLES, cap: 'use', title: t('lockedTitle'),
+        render: function (host) {
+          var out = null;
+          K.mediaCard({
+            target: host,
+            item: { id: 'private', title: t('privateTitle'), sub: t('privateHint') },
+            actions: [{ id: 'do', label: t('doIt'), kind: 'primary', onClick: function () { doIt(out); } }]
+          });
+          out = K.section({ target: host, title: t('result') });
+        }
+      }));
+
+      // Owner only: roster, approvals, free access, and this app's own settings in one place.
+      if (me && me.isOwner) {
+        parts.push(K.members({
+          target: a.main,
+          app: APP,
+          roles: ROLES,
           // Your own settings belong in the panel owners already open, not a second admin screen.
           sections: [
-            // { id: 'x', type: 'toggle', label: '{{A setting}}', value: true, onChange: function (v) { AIMEAT.data.set('{{app}}.settings.x', v); } },
-          ],
-        });
+            // { id: 'x', type: 'toggle', label: t('aSetting'), value: true, onChange: function (v) { AIMEAT.data.set('{{app}}.settings.x', v); } },
+          ]
+        }));
       }
     }
 
-    document.getElementById('do-it').addEventListener('click', async function () {
+    async function doIt(out) {
       // guard() asks the SERVER before running, so a role revoked while this page was open refuses
       // instead of proceeding on a stale answer.
       var ran = await AIMEAT.iam.guard('use', async function () {
         return await AIMEAT.data.get('{{app}}.something');
       });
-      document.getElementById('out').textContent = ran === undefined
-        ? 'You do not have access to that.'
-        : JSON.stringify(ran, null, 2);
-    });
+      K.clear(out.body);
+      out.body.appendChild(K.el('pre', { text: ran === undefined ? t('denied') : JSON.stringify(ran, null, 2) }));
+    }
 
-    // onSession runs for a restored session, the silent one on an app address and a sign-in, once each.
-    AIMEAT.auth.mountLoginButton('#login', { onSession: function (s) { boot(s); }, onLogout: function () { location.reload(); } });
+    // The bar's language switch: the page is drawn again in the new words.
+    i18n.onChange(function () { a.set({ title: t('title') }); boot(session); });
   </script>
 </body>
 </html>`;
-

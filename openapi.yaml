@@ -16609,17 +16609,14 @@ paths:
   /v1/prompts/build-app:
     get:
       operationId: getBuildAppPrompt
-      summary: Canonical "build an AIMEAT app" prompt
+      summary: The retired Classic build prompt's address, serving the Atelier specification
       description: >-
-        The node-served, single-source-of-truth app-building prompt — the SAME text the
-        app-catalog's "Create new app" button copies. Intended for agentic coders (Claude Code,
-        Cursor, any HTTP client) and AI chats alike: complete client-library catalog, the correct
-        login-bar auth pattern, data-visibility patterns, AI usage, realtime, theming, and the
-        publish walkthrough. data.prompt is the complete copy-paste prompt; data.body is the
-        platform-instructions core the app-catalog composes its dynamic header around.
-        data.spec_token is the digest of the spec as served here: pass it back as `spec_token` when
-        publishing (POST /v1/apps, aimeat_app_publish) and the publish response reports whether the
-        app was built against the spec currently in force. Public.
+        The Classic build specification that lived at this address was retired on 2026-11-19. The
+        address stays, because prompts and models carry it, and answers with the Atelier
+        specification for an AI that cannot connect (the same text as GET
+        /v1/prompts/build-app-atelier?delivery=paste) behind a notice that says so; `retired` is
+        true and `replaced_by` names the Atelier route. data.spec_token is the Atelier token: pass
+        it back as `spec_token` when publishing. Public.
       tags:
         - Discovery
       parameters:
@@ -16667,16 +16664,11 @@ paths:
   /v1/prompts/build-app/core:
     get:
       operationId: getBuildAppPromptCore
-      summary: The build specification, the part every app needs
+      summary: The retired Classic core's address, serving the Atelier first part
       description: >-
-        The same specification as GET /v1/prompts/build-app, without the sections only some apps
-        need (a group application, files, AI calls, selling, realtime and others). Those are listed
-        in data.sections with the situation each covers and are read one at a time from
-        /v1/prompts/build-app/sections/{id}. The text is cut at the specification's own headings and
-        never rewritten, and it carries the same spec_token. For a reader over HTTP who does not
-        want the whole specification. A reader over MCP gets the same core in four parts
-        (start, libraries, data, look) from /v1/prompts/build-app/sections/{id}, because one tool
-        result does not carry 66 000 characters. Public.
+        The Classic specification is retired (2026-11-19). This address answers with the first part
+        of the Atelier specification behind a notice that says so; data.sections lists the Atelier
+        platform sections with the situation each covers. Public.
       tags:
         - Discovery
       parameters:
@@ -16722,11 +16714,11 @@ paths:
   /v1/prompts/build-app/sections:
     get:
       operationId: listBuildAppPromptSections
-      summary: The parts and sections of the build specification
+      summary: The retired Classic list's address, listing the Atelier parts and sections
       description: >-
-        The four parts of the core (start, libraries, data, look), each small enough for one MCP
-        tool result, and every section by id with its layer (core or on-demand), its part and its
-        size. Public.
+        The Classic specification is retired (2026-11-19). This address lists the Atelier
+        specification's parts and its platform sections, as GET /v1/prompts/build-app-atelier/sections
+        does, with `retired` true. Public.
       tags:
         - Discovery
       parameters:
@@ -16824,12 +16816,13 @@ paths:
   /v1/prompts/build-app/sections/{id}:
     get:
       operationId: getBuildAppPromptSection
-      summary: One part or one section of the build specification
+      summary: The retired Classic section's address, serving its Atelier place
       description: >-
-        A part of the core (start, libraries, data, look) or a single section, byte for byte as the
-        full specification carries it; part `start` also carries the index of the rest. The MCP
-        tool aimeat_handbook_get serves `start` for tier "build-app" and this route for
-        "build-app/{id}". Public.
+        The Classic specification is retired (2026-11-19). A Classic part or section id answers
+        with the Atelier part or platform section it now has (`data` is `data-storage`; `start` comes
+        behind the retired notice), and an id with no Atelier place (the tier shapes, the
+        hand-written sign-in, the daisyUI design sections) is 404 naming the ids there are. The MCP
+        tool aimeat_handbook_get serves the same for tier "build-app" and "build-app/{id}". Public.
       tags:
         - Discovery
       parameters:
@@ -16875,7 +16868,9 @@ paths:
       description: >-
         The parts of the Atelier specification (start, genre, libraries, book, patterns, look, motion) with what each
         covers and its size. The whole text is larger than one MCP tool result can carry, so a chat
-        reads it part by part. Public.
+        reads it part by part. `sections` lists the platform sections only some apps need (a team,
+        files, AI, intake, server-side work), each with the situation in which it is read; they are
+        not in the whole text. Public.
       tags:
         - Discovery
       parameters:
@@ -16903,6 +16898,13 @@ paths:
                                 id: { type: string, example: genre }
                                 what: { type: string }
                                 chars: { type: integer }
+                          sections:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string, example: group }
+                                when: { type: string }
                           spec_token: { type: string }
 
   /v1/prompts/build-app-atelier/sections/{id}:
@@ -16911,16 +16913,18 @@ paths:
       summary: One part of the Atelier build specification
       description: >-
         One of start, genre, libraries, book, patterns, look or motion, byte for byte as the whole specification
-        carries it; part `start` also names the others and says which are read before any code. The MCP
-        tool aimeat_handbook_get serves `start` for tier "build-app-atelier" and this route for
-        "build-app-atelier/{id}". Public.
+        carries it; part `start` also names the others and says which are read before any code. Also
+        `platform`, the index of the platform sections, and each platform section by its id (`kind`
+        section). The MCP tool aimeat_handbook_get serves `start` for tier "build-app-atelier" and this
+        route for "build-app-atelier/{id}". Public.
       tags:
         - Discovery
       parameters:
         - name: id
           in: path
           required: true
-          schema: { type: string, enum: [start, genre, libraries, book, patterns, look, motion] }
+          schema: { type: string, example: genre }
+          description: A part (start, genre, libraries, book, patterns, look, motion), `platform`, or a platform section id
         - name: mode
           in: query
           schema: { type: string, enum: [new, improve], default: new }
@@ -16930,7 +16934,7 @@ paths:
           description: txt returns the part as text/plain instead of the JSON envelope
       responses:
         '200':
-          description: The part
+          description: The part or section
           content:
             application/json:
               schema:
@@ -16942,7 +16946,7 @@ paths:
                         type: object
                         properties:
                           id: { type: string, example: build-app-atelier/genre }
-                          kind: { type: string, enum: [part] }
+                          kind: { type: string, enum: [part, section] }
                           prompt: { type: string }
                           spec_token: { type: string }
         '404':
@@ -17183,9 +17187,9 @@ paths:
       operationId: getBuildAppAtelierPrompt
       summary: The Atelier track's "build an AIMEAT app" prompt
       description: >-
-        The Atelier build track's canonical spec (TARGET-074), served beside — and deliberately
-        separate from — /v1/prompts/build-app: two build tracks, two guides that never teach each
-        other's mechanics. Carries the served component-kit catalogue (AIMEAT.atelier), the seven
+        The one build specification on the node (TARGET-074; the Classic one at /v1/prompts/build-app
+        was retired on 2026-11-19 and that address now serves this text). Its platform sections,
+        listed at /v1/prompts/build-app-atelier/sections, cover what only some apps need. Carries the served component-kit catalogue (AIMEAT.atelier), the seven
         look presets with their imagery style words, the generated-imagery pipeline and cost rule,
         and the track rules. data.spec_token is this spec's own digest (an `atelier-` prefixed
         value): pass it back as `spec_token` when publishing and the publish response reports
@@ -17205,6 +17209,13 @@ paths:
           in: query
           schema: { type: string, maxLength: 500 }
           description: The app idea to embed into the prompt header (mode=new)
+        - name: delivery
+          in: query
+          schema: { type: string, enum: [mcp, paste], default: mcp }
+          description: >-
+            paste returns the text for an AI that cannot connect to the node: a preface that skips
+            the steps calling aimeat_* tools, and at the end how the person publishes the HTML file
+            the AI hands back
         - name: format
           in: query
           schema: { type: string, enum: [txt] }
@@ -17307,7 +17318,7 @@ paths:
         The paste-able flow prompt a user gives an MCP-connected coding agent (Claude Code,
         OpenHands, Cursor) so every AIMEAT app build follows research → frame → propose →
         build → finish instead of coding cold: load node:aimeat-app-builder-atelier, call
-        aimeat_appdev_overview, frame the tier/packs/iam decision, propose, build, then finish
+        aimeat_appdev_overview, frame the level, the genre or shell, the platform sections, packs and iam, propose, build, then finish
         with agent face + template proposal + pitfall report. The user can always skip. Public.
       tags:
         - Discovery
@@ -18958,7 +18969,7 @@ paths:
         SDK wrappers (/v1/libs), node-bundled cortex libs (/v1/cortex/<n>/libs) and vendored
         third-party capability packs (/lib). Compact index (no ai_doc/changelog): id, kind,
         category, description, rendered include line(s), requires, version, license, apiSurface,
-        demoTemplateId, tierHint, interviewTriggers, sizeEstimate, status, scope, and (node packs)
+        demoTemplateId, interviewTriggers, sizeEstimate, status, scope, and (node packs)
         the optional AI-acceleration fields modelTier ("any" | "frontier" | "needs-doc" — the
         model strength a pack is reliably-and-accelerated on), proofs[] (the per-model AEB proof
         ledger: {model, verdict, testSet, evidence, tokens?, date}) and apiCaveat (for frontier
@@ -19369,7 +19380,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [id, title, description, derived_from, tier, reuse_notes, model]
+              required: [id, title, description, derived_from, reuse_notes, model]
               properties:
                 id: { type: string, minLength: 1, maxLength: 64, description: Kebab-case template id. }
                 title: { type: string, minLength: 3, maxLength: 160 }
@@ -19380,7 +19391,7 @@ paths:
                   properties:
                     owner: { type: string, description: The caller's own owner name. }
                     filename: { type: string }
-                tier: { type: string, enum: [T1, T2, T3] }
+                tier: { type: string, enum: [T1, T2, T3], deprecated: true, description: The retired Classic track's tier. Leave it out; kept only on proposals written before 2026-11-19. }
                 reuse_notes: { type: string, minLength: 10, maxLength: 40000 }
                 model: { type: string, minLength: 1, maxLength: 64, description: The model that built the source app (indicative). }
                 tags: { type: array, maxItems: 12, items: { type: string, maxLength: 30 } }
@@ -24602,7 +24613,22 @@ paths:
         and reports what is in one and not the other.
 
         Response `data`: `{ scope, not_covered, derived, register, gaps, unlabelled_detail,
-        data_intermediation }`.
+        data_intermediation, aml }`.
+
+        `aml` is section 13 (anti-money-laundering, Regulation (EU) 2024/1624): `{ section, mode,
+        mode_code, mode_text, declarations, findings, totals, obligations, regulation, edit, note }`.
+        `mode` is AIMEAT_AML_MODE (report, none, owners, node). `declarations` holds `{ scope,
+        organism_id, organism, legal_name, business_id, sector, compliance_officer,
+        compliance_manager, deputy, supervisor_registered_at, fiu_registered_at, risk_assessment_at }`
+        from the compliance document `aml`. `findings` has the shape of section 12's: organisms that
+        declared themselves obliged entities (with the proposal to set mode owners), a missing
+        declaration, incomplete roles, missing registrations, a stale risk assessment (one finding
+        per declaration, named after a colon), revenue splits that pay others, stablecoin payouts to
+        beneficiaries, agents that may spend money, sellers nobody screened against sanctions, agent
+        work sold for money and accounts selling to everyone. `obligations` holds `{ code, ref,
+        status: evidence | check | missing | not_applicable, evidence, text }`; a missing row names
+        what this server does not do yet. The owner's slice holds only that account's own findings
+        and the declarations of the organisms it manages.
 
         `data_intermediation` is section 12 (Data Governance Act 2022/868): `{ section, mode,
         mode_code, mode_text, notification, providers, findings, totals, art12, regulation, edit,
@@ -25142,9 +25168,16 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks, intermediation, lias, trial, contact] }
+        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks, intermediation, aml, lias, trial, contact] }
         description: >-
-          `lias` (app) holds the app's balancing tests, the legitimate interests assessment of GDPR
+          `aml` (node and organism) holds an anti-money-laundering obliged entity's declaration, an
+          item `{ id, type: declaration, legalName, businessId, sector, complianceOfficer,
+          complianceManager?, deputy?, supervisorRegisteredAt?, supervisorRef?, fiuRegisteredAt?,
+          riskAssessmentAt?, riskAssessmentRef?, scope }`, and reviews of the report's aml findings
+          `{ id: <the finding's id>, type: review, decision: accepted | dismissed, note? }`. When
+          AIMEAT_AML_MODE is `none`, a write that adds a declaration to an organism's document is
+          403 AML_NOT_OFFERED before anything is written; a write that keeps the stored ones is
+          accepted. `lias` (app) holds the app's balancing tests, the legitimate interests assessment of GDPR
           art. 6(1)(f): an item `{ id, registerId, status: draft | approved, language?, facts,
           answers: { <question id>: yes | no }, notes: { <section or question id>: text },
           outcome?: { result: suitable | not-suitable, summary }, approvedBy?,

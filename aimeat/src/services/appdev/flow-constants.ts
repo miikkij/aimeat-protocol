@@ -5,11 +5,13 @@
  * @description Shared vocabulary of the research-first appdev flow — imported by the build-app
  *   prompt, the appdev-flow prompt, and the appdev handbook so the step names, the skip phrase,
  *   and the tool list can never drift between surfaces. The flow itself: RESEARCH (what exists)
- *   → FRAME (tier, packs, iam) → PROPOSE (to the user) → BUILD → FINISH (face, skill, template,
+ *   → FRAME (level, genre or shell, platform sections, packs, iam) → PROPOSE (to the user) → BUILD → FINISH (face, skill, template,
  *   learnings). The user can always skip straight to building.
  * @structure FLOW_* string constants + buildResearchStep()/buildFinishChecklist() fragments
  * @usage import { FLOW_SKIP_PHRASE, buildResearchStep } from './flow-constants.js';
  * @version-history
+ *   (2026-11-19) The research step loads the Atelier skill and frames by level, genre or shell and
+ *     platform sections; no tier. It is served as the Atelier platform section `research`.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 7).
  */
@@ -38,10 +40,10 @@ export const FLOW_TOOLS = {
 export function buildResearchStep(): string {
     let s = '## Step 0 — Research first (agents with AIMEAT MCP tools)\n';
     s += `If you have \`aimeat_*\` MCP tools, follow the ${FLOW_PHASES} flow — it is the promise an MCP connection makes: a better result than building cold.\n`;
-    s += `1. RESEARCH: load \`${FLOW_TOOLS.skill}\` (\`${FLOW_TOOLS.skillGet}\`), then call \`${FLOW_TOOLS.overview}\` (pass your OWN model id — self-identify from your own configuration, never ask the user) — the owner's existing apps and template proposals are usually the fastest correct starting point; read the pitfalls for the areas you will touch.\n`;
-    s += '2. FRAME: pick the tier (decision tree in Step 2), the capability packs, and whether the app needs its OWN users (the aimeat-iam pack for the gate + AIMEAT.iam for the panel) — decide this NOW, not after the data model exists.\n';
-    s += '3. PROPOSE the frame to the user in 3-5 lines (tier, packs, start point: fork/template/scratch, iam yes/no) and adjust to their answer.\n';
-    s += `SKIP CLAUSE: if the user says "${FLOW_SKIP_PHRASE}" (or equivalent), skip Steps 0-1 and build directly — the flow is a default, never a gate. Without MCP tools, go straight to Step 1.\n\n`;
+    s += `1. RESEARCH: load \`${FLOW_TOOLS.atelierSkill}\` (\`${FLOW_TOOLS.skillGet}\`), then call \`${FLOW_TOOLS.overview}\` (pass your OWN model id — self-identify from your own configuration, never ask the user) — the owner's existing apps and template proposals are usually the fastest correct starting point; read the pitfalls for the areas you will touch.\n`;
+    s += '2. FRAME: the level first (a quick prototype, an ordinary page or the finest), then the genre or the shell, the platform sections the app needs, the capability packs, and whether the app needs its OWN users (the aimeat-iam pack for the gate + AIMEAT.iam for the panel) — decide this NOW, not after the data model exists.\n';
+    s += '3. PROPOSE the frame to the user in 3-5 lines, in their words (level, design, start point: fork/template/scratch, who signs in) and adjust to their answer.\n';
+    s += `SKIP CLAUSE: if the user says "${FLOW_SKIP_PHRASE}" (or equivalent), skip the research and the framing and build directly — the flow is a default, never a gate. Without MCP tools, go straight to the interview.\n\n`;
     return s;
 }
 

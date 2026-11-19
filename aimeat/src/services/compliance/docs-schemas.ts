@@ -17,6 +17,8 @@
  *   BreachSchema · DpiaSchema · FrameworkAnswersSchema · DOC_SCHEMAS · the inferred types
  * @usage const parsed = DOC_SCHEMAS.registers.safeParse(body);
  * @version-history
+ *   v1.6.0 — 2026-11-19 — The document `aml` (Regulation (EU) 2024/1624): an obliged entity's declaration
+ *     and a person's review of each anti-money-laundering finding (services/aml/).
  *   v1.5.0 — 2026-11-13 — Three documents from lia-schemas.ts: an app's balancing tests (`lias`), an
  *     app's trial mark (`trial`) and an organism's privacy contact (`contact`); SINGLE_DOC_KINDS names
  *     the kinds that are one object.
@@ -40,7 +42,7 @@ import {
 } from './lia-schemas.js';
 
 /** The documents, in the order the surfaces list them. */
-export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'breaches', 'dpias', 'frameworks', 'intermediation', 'lias', 'trial', 'contact'] as const;
+export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'breaches', 'dpias', 'frameworks', 'intermediation', 'aml', 'lias', 'trial', 'contact'] as const;
 export type ComplianceDocKind = typeof COMPLIANCE_DOC_KINDS[number];
 
 /** The kinds that are one object and no list of entries: nothing in them is changed entry by entry. */
@@ -233,6 +235,49 @@ export const IntermediationReviewSchema = z.object({
 
 export const IntermediationItemSchema = z.discriminatedUnion('type', [IntermediationNotificationSchema, IntermediationReviewSchema]);
 
+/**
+ * The sectors of Regulation (EU) 2024/1624 art. 3 an obliged entity works in, as one word each. A
+ * reading of the article for a person to pick from, not a legal classification.
+ */
+export const AML_SECTORS = [
+  'credit-institution', 'payment-or-emoney', 'crypto-assets', 'investment', 'insurance', 'accounting', 'audit',
+  'tax-advice', 'legal', 'trust-or-company-service', 'real-estate', 'high-value-goods', 'gambling', 'crowdfunding', 'other',
+] as const;
+
+/**
+ * An obliged entity's declaration (Regulation (EU) 2024/1624): the legal person, its business id, the
+ * sector it works in, the compliance officer and compliance manager it named (art. 11), when it
+ * registered with the supervisor and with the FIU's reporting service (goAML in Finland), and when its
+ * business-wide risk assessment (art. 10) was last updated. An organism keeps its own; in mode `node`
+ * the operator keeps the node's. Setting AIMEAT_AML_MODE decides whether an organism may store one
+ * (services/aml/gate.ts).
+ */
+export const AmlDeclarationSchema = z.object({
+  id, type: z.literal('declaration'),
+  legalName: z.string().min(1).max(300),
+  businessId: z.string().min(1).max(60),
+  sector: z.enum(AML_SECTORS),
+  /** The person who does the compliance work, by name or account name (art. 11(2)). */
+  complianceOfficer: z.string().min(1).max(200),
+  /** The member of the management who answers for it (art. 11(1)). */
+  complianceManager: z.string().max(200).optional(),
+  /** Who stands in when the officer is away. */
+  deputy: z.string().max(200).optional(),
+  supervisorRegisteredAt: iso.optional(),
+  supervisorRef: z.string().max(200).optional(),
+  fiuRegisteredAt: iso.optional(),
+  riskAssessmentAt: iso.optional(),
+  /** Where the business-wide risk assessment is: a document address. */
+  riskAssessmentRef: z.string().max(500).optional(),
+  /** What the obliged work covers, in the entity's own words. */
+  scope: text(2000),
+  answerSources: sources,
+  ...stamp,
+});
+
+/** The `aml` document: the declaration and a person's review of each finding of section 13. */
+export const AmlItemSchema = z.discriminatedUnion('type', [AmlDeclarationSchema, IntermediationReviewSchema]);
+
 /** A list document: { items: [...] }, ids unique. */
 function listDoc<T extends z.ZodTypeAny>(item: T, max: number) {
   return z.object({ items: z.array(item).max(max) }).superRefine((v, ctx) => {
@@ -252,6 +297,7 @@ export const DOC_SCHEMAS = {
   dpias: listDoc(DpiaSchema, 500),
   frameworks: FrameworkAnswersSchema,
   intermediation: listDoc(IntermediationItemSchema, 500),
+  aml: listDoc(AmlItemSchema, 500),
   lias: listDoc(LiaSchema, 100),
   trial: TrialSchema,
   contact: ContactSchema,
@@ -266,6 +312,8 @@ export type ComplianceFrameworkAnswers = z.infer<typeof FrameworkAnswersSchema>;
 export type IntermediationNotification = z.infer<typeof IntermediationNotificationSchema>;
 export type IntermediationReview = z.infer<typeof IntermediationReviewSchema>;
 export type IntermediationItem = z.infer<typeof IntermediationItemSchema>;
+export type AmlDeclaration = z.infer<typeof AmlDeclarationSchema>;
+export type AmlItem = z.infer<typeof AmlItemSchema>;
 
 /** The document each kind stores. */
 export interface ComplianceDocs {
@@ -276,6 +324,7 @@ export interface ComplianceDocs {
   dpias: { items: ComplianceDpia[] };
   frameworks: ComplianceFrameworkAnswers;
   intermediation: { items: IntermediationItem[] };
+  aml: { items: AmlItem[] };
   lias: { items: ComplianceLia[] };
   trial: ComplianceTrial;
   contact: ComplianceContact;

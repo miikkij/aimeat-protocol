@@ -73,7 +73,6 @@ export const MOTION_PACKS: LibraryPack[] = [
       { version: '13.1.1', date: '2026-09-02', summary: 'Initial vendoring of motion 13.1.1 UMD at /lib/motion@13.min.js. The vanilla core of Framer Motion, so apps get springs, scroll-linked progress and enter-on-view without a framework. The @13 filename is the compatibility contract: a future Motion 14 ships as a NEW motion@14.min.js file and this one is never touched again.' },
       { version: '13.5.1', date: '2026-10-25', summary: 'motion 13.1.1 -> 13.5.1 in place at /lib/motion@13.min.js. Nothing is removed from window.Motion and sixteen names are added; the seven documented here (animate, scroll, inView, stagger, spring, press, hover) behave as before. New: animate.addEffect for a custom animated value, a negative spring bounce that undershoots instead of overshooting, and a smaller, faster animate and scroll. Motion 14 (drag, animateLayout, grid stagger) is not on this node; it would ship as motion@14.min.js.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['liike', 'animaatio', 'animation', 'motion', 'spring', 'jousi', 'scroll', 'vieritys', 'parallax', 'transition', 'siirtymä'],
     sizeEstimate: '~141KB',
     status: 'preview',
@@ -137,7 +136,6 @@ export const MOTION_PACKS: LibraryPack[] = [
     changelog: [
       { version: '4.5.0', date: '2026-09-02', summary: 'Initial vendoring of animejs 4.5.0 UMD at /lib/anime@4.min.js. v4 is a full rewrite: window.anime is a namespace (anime.animate, anime.createTimeline, anime.stagger, anime.utils) and the v3 anime({ targets }) callable is gone, so the pack doc carries the v4 idioms. The @4 filename is the compatibility contract: a future v5 ships as a NEW anime@5.min.js file.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['animaatio', 'animation', 'timeline', 'aikajana', 'stagger', 'porrastus', 'sequence', 'liike', 'svg', 'carousel', 'karuselli'],
     sizeEstimate: '~115KB',
     status: 'preview',
@@ -205,7 +203,6 @@ export const MOTION_PACKS: LibraryPack[] = [
       { version: '1.3.26', date: '2026-09-02', summary: 'Initial vendoring of lenis 1.3.26 at /lib/lenis@1.min.js plus the required /lib/lenis@1.css. The @1 filenames are the compatibility contract: a future Lenis 2 ships as new files beside these. The one thing to know against older examples is that 1.x has autoRaf, so the hand-written requestAnimationFrame loop is not only unnecessary but harmful.' },
       { version: '1.3.27', date: '2026-10-25', summary: 'lenis 1.3.26 -> 1.3.27 in place, same files and options. destroy() now removes the lenis class from <html> for good (it used to come back), and scrollTo() accepts an SVG element as its target.' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['scroll', 'vieritys', 'smooth scroll', 'pehmeä vieritys', 'parallax', 'liike', 'motion', 'storytelling', 'landing'],
     sizeEstimate: '~18KB + 1KB CSS',
     status: 'preview',

@@ -30,6 +30,8 @@
  * @usage
  *   import { GLOSSARY, findTerm } from '../data/glossary.js';
  * @version-history
+ *   v1.4.0 — 2026-11-19 — The area Compliance: Obliged entity, KYC, PEP, Beneficial owner and Sanctions
+ *     (services/aml/; the concept explanations explain.concept.aml and the others list them).
  *   v1.3.0 — 2026-10-31 — Agent, Computer, App tool and Agent offer; Offering says it is app tools and
  *     agent offers, paid or free (Jouni, 2026-10-31; the overview's help dialogs read them).
  *   v1.2.0 — 2026-10-03 — glossaryTermId(): the id the plain sentence and the page anchor share.
@@ -46,6 +48,7 @@ export const GLOSSARY_AREAS = [
   { id: 'extensibility', title: 'Extensibility' },
   { id: 'action', title: 'Action' },
   { id: 'federation', title: 'Federation' },
+  { id: 'compliance', title: 'Compliance' },
 ] as const;
 
 export type GlossaryArea = typeof GLOSSARY_AREAS[number]['id'];
@@ -311,6 +314,33 @@ export const GLOSSARY: GlossaryTerm[] = [
     term: 'Peer', area: 'federation',
     definition: 'Another node this one has approved. Every federated request is verified against the peer\'s Ed25519 signature without exception, so an approved peer is a known key rather than a trusted address.',
     seeAlso: ['Federation', 'Node'],
+  },
+
+  // ── Compliance ───────────────────────────────────────────────────────────────────────────
+  {
+    term: 'Obliged entity', area: 'compliance', aka: ['AML', 'anti-money-laundering'],
+    definition: 'A business that the EU anti-money-laundering regulation (2024/1624) makes know its customers and report suspicious transactions to the Financial Intelligence Unit. The setting AIMEAT_AML_MODE decides whether this node or its organisms do that work, and an organism records its declaration in the compliance document aml.',
+    seeAlso: ['KYC', 'PEP', 'Beneficial owner', 'Sanctions'],
+  },
+  {
+    term: 'KYC', area: 'compliance', aka: ['know your customer', 'customer due diligence'],
+    definition: 'Know your customer: an obliged entity identifies a customer and verifies the identity, finds the beneficial owner, learns the purpose of the relationship, screens against sanctions and PEP lists, gives a risk rating, and reviews it on a schedule. The records are kept five years after the relationship ends.',
+    seeAlso: ['Obliged entity', 'Beneficial owner'],
+  },
+  {
+    term: 'PEP', area: 'compliance', aka: ['politically exposed person'],
+    definition: 'A person who holds or held a prominent public function, and their family members and close associates. Not a suspicion: it asks for enhanced due diligence, for at least twelve months after the function ends.',
+    seeAlso: ['KYC', 'Sanctions'],
+  },
+  {
+    term: 'Beneficial owner', area: 'compliance', aka: ['UBO', 'ultimate beneficial owner'],
+    definition: 'The person who in the end owns 25 % or more of a company or controls it in another way. Always a natural person; when none is found, the senior managers count as one.',
+    seeAlso: ['KYC'],
+  },
+  {
+    term: 'Sanctions', area: 'compliance', aka: ['restrictive measures', 'sanctions screening'],
+    definition: 'EU and UN lists of persons, companies and countries to whom no funds or economic resources may be made available. They bind every business in the EU, not only obliged entities; screening compares a name with the lists, and a person decides each match.',
+    seeAlso: ['Obliged entity', 'PEP'],
   },
 ];
 

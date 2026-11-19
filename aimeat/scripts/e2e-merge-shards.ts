@@ -14,12 +14,13 @@
  *   therefore names every expected shard that has no file, and the job fails.
  * @usage tsx scripts/e2e-merge-shards.ts --dir=<folder with results-*.json> --db=<backend> --shards=<N> [--times-out=<file>]
  * @version-history
+ *   v1.1.0 -- 2026-11-19 -- A suite that a shard ran again alone and found green is printed with the [e2e-flaky] mark.
  *   v1.0.0 -- 2026-11-15 -- Initial: the nightly sweep runs in four shards per backend.
  */
 import { appendFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { githubAnnotations, githubSummary } from './lib/e2e-github-report.js';
-import { readRunResults, type RunSuite } from './lib/e2e-run-results.js';
+import { flakyLine, readRunResults, type RunSuite } from './lib/e2e-run-results.js';
 
 function arg(name: string): string | undefined {
     return process.argv.find(a => a.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -50,6 +51,9 @@ const failed = suites.reduce((a, s) => a + s.failed, 0);
 const total = suites.reduce((a, s) => a + s.total, 0);
 console.log(`E2E on ${db}: ${suites.length} suites from ${seen.size} of ${expected} shards; ${passed} passed, ${failed} failed out of ${total}; ${red.length} red suite(s).`);
 for (const s of red) console.log(`  ✗ ${s.name}  ${s.passed}/${s.total}${s.note ? `  ${s.note}` : ''}`);
+// A suite that was red in its shard and green alone (--retry-red): not red, and named, so pnpm ready
+// can list it and somebody fixes its timing.
+for (const s of suites) if (s.flaky) console.log(`  ${flakyLine(db, s.name, s.flaky)}`);
 
 // A shard with no file is reported as one red row per shard, in the same shapes, so the issue and
 // Lifecycle Central name it rather than read a part of the sweep as all of it.

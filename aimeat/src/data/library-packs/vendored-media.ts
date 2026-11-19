@@ -64,7 +64,6 @@ export const MEDIA_PACKS: LibraryPack[] = [
     changelog: [
       { version: '1.7.3', date: '2026-10-09', summary: 'Initial vendoring: dist/hls.min.js under /lib/hls@1/. First consumer: the TV guide app (in-browser playback of free HLS streams beside Open in VLC).' },
     ],
-    tierHint: 'T1',
     interviewTriggers: ['hls', 'm3u8', 'stream', 'striimi', 'live tv', 'iptv', 'video player', 'soitin', 'suoratoisto', 'radio stream'],
     sizeEstimate: '~605KB',
     status: 'preview',   // policy: new packs start preview; flip stable with an AEB result

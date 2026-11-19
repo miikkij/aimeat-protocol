@@ -16,11 +16,13 @@
  *   FIRST FAIL: against the tree before this change `responseType` is ignored, so `base64` is
  *   absent and `arraybuffer` is accepted without a word.
  * @version-history
+ *   2026-11-19 — The far side listens on a port the OS picks (FAR_PORT was the node's port + 241, which met another suite's far side on the next CI lane).
  *   v1.0.0 — 2026-10-24 — Initial (jussil riistakartta, support thread 1ac0a199).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-fetch-base64
 
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { gzipSync } from 'node:zlib';
 import { ownerSignIn } from './helpers/owner-login.js';
 
@@ -53,8 +55,9 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 console.log('\n=== Extension ctx.fetch responseType base64 E2E ===\n');
 
 // ─── A far side for ctx.fetch: a binary map file, the same gzipped, and one too large ───
-// Far from the node's port, as e2e-extension-fetch-gunzip keeps its far side.
-const FAR_PORT = Number(new URL(BASE).port || '40251') + 241;
+// The OS picks a free port: a fixed offset from the node's port met another suite's offset on the
+// next lane (CI lanes take neighbouring ports: 20002 + 241 and 20003 + 240 are both 20243).
+let FAR_PORT = 0;
 /** Every byte value, many times over: invalid UTF-8 at almost every position. */
 const IMG = Buffer.from(Array.from({ length: 48_128 }, (_, i) => (i * 7 + (i >> 8)) & 0xff));
 const IMG_GZ = gzipSync(IMG);
@@ -65,7 +68,8 @@ const far = http.createServer((req, res) => {
     if (req.url === '/huge.img') { res.writeHead(200, { 'Content-Type': 'application/octet-stream' }); res.end(HUGE); return; }
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('not here');
 });
-await new Promise<void>(r => far.listen(FAR_PORT, () => r()));
+await new Promise<void>(r => far.listen(0, () => r()));
+FAR_PORT = (far.address() as AddressInfo).port;
 
 const EXT = `exb64${Date.now()}`;
 const SCRIPTS = {

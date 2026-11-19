@@ -24,6 +24,7 @@
  * @structure SuiteResult · suiteTimeLimitMs() · NO_RUNNER_NODE_BASE · runLane() · runTest() · endTree()
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.3.0 -- 2026-11-19 -- SuiteResult.flaky, set by --retry-red (test/run-e2e-retry.ts).
  *   v1.2.0 -- 2026-11-15 -- A suite on RUNNER_NODE_FREE gets its database emptied and no node started,
  *     and its E2E_BASE points at a port nothing listens on (NO_RUNNER_NODE_BASE). With two targets a
  *     lane boots the next suite's node on the second one while the current suite runs (`--preboot`);
@@ -57,6 +58,8 @@ export interface SuiteResult {
     nodeDied?: string;
     /** A red suite's first lines that report a failed test (empty for a green one). */
     failures?: string[];
+    /** Set by `--retry-red` (test/run-e2e-retry.ts) when the suite was red in the run and green alone. */
+    flaky?: { passed: number; total: number; note: string; failures: string[] };
 }
 
 /** A suite's source, or nothing when it cannot be read: such a suite has no port to lock. */

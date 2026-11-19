@@ -41,11 +41,11 @@ load and use it correctly at all) but MUST NOT be used for stable/preview verdic
 
 Each pack has ONE fixed task (below). Run it twice in separate fresh sessions:
 
-- **Run A (control):** give the session the build-app prompt with the pack HIDDEN —
-  fetch `GET /v1/prompts/build-app?format=txt`, delete the pack's line from the
-  "Optional capability packs" index (and its Ready-made UI line if it is a cortex pack),
-  and paste the result as the instruction. The model may solve the task any way it likes
-  (hand-rolled code, other packs).
+- **Run A (control):** give the session the Atelier build prompt without the pack's own
+  block — `pnpm aeb:prove <pack>` writes it as `prompt-A-packs-hidden.md` (the Atelier
+  specification with `?delivery=paste`; since 2026-11-19, when the Classic build prompt this
+  step read was retired) — and paste it as the instruction. The model may solve the task any
+  way it likes (hand-rolled code, other packs).
 - **Run B (treatment):** the unmodified prompt, PLUS the line "the <id> capability pack
   looks relevant — fetch GET /v1/library-packs/<id> before coding" if the session does
   not fetch it on its own (record whether the nudge was needed).

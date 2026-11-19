@@ -35,6 +35,8 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.6.0 — 2026-11-19 — `aml`, section 13 (Regulation (EU) 2024/1624): the setting, the declarations,
+ *     the findings and the obligations, in both rings (services/aml/report.ts).
  *   v1.5.1 — 2026-11-05 — Moved unchanged from src/services/compliance-report.ts to src/services/compliance/report.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.5.0 — 2026-11-01 — `data_intermediation`, section 12 (Data Governance Act 2022/868): the setting,
  *     the notification record, the findings and the Article 12 checklist, in both rings
@@ -68,6 +70,7 @@ import { buildProcessingSummary, type ProcessingSummary } from './processing.js'
 import { appAiGaps } from './app-ai-gaps.js';
 import type { ScopeGap } from './scope-gaps.js';
 import { buildDataIntermediationSection, type DataIntermediationSection } from '../data-intermediation/report.js';
+import { buildAmlSection, type AmlSection } from '../aml/report.js';
 
 /** How far back the rollup's hot window reaches before rows move to the archive. */
 const USAGE_HOT_WINDOW_DAYS = 90;
@@ -167,6 +170,11 @@ export interface ComplianceReport {
    * only the owner's own (services/data-intermediation/report.ts).
    */
   data_intermediation: DataIntermediationSection;
+  /**
+   * Section 13, anti-money-laundering (Regulation (EU) 2024/1624): the setting, the obliged entities'
+   * declarations, the findings and the obligations. Both rings (services/aml/report.ts).
+   */
+  aml: AmlSection;
 }
 
 export interface ComplianceReportOptions {
@@ -494,6 +502,8 @@ export async function buildComplianceReport(
 
   // Section 12, data intermediation (plan doc-mvwxcas3dom3, D7): both rings, the owner's own in a slice.
   const dataIntermediation = await buildDataIntermediationSection({ storage, config }, owner ? { ownerGhii: owner } : {});
+  // Section 13, anti-money-laundering (services/aml/): both rings, the owner's own in a slice.
+  const aml = await buildAmlSection({ storage, config }, owner ? { ownerGhii: owner } : {});
 
   return {
     scope: {
@@ -512,6 +522,7 @@ export async function buildComplianceReport(
     ...(processing ? { processing: { ...processing.summary, gaps: processing.gaps } } : {}),
     gaps: [...findGaps(usecases, usage, transparency), ...appGaps, ...fontGaps],
     data_intermediation: dataIntermediation,
+    aml,
   };
 }
 
