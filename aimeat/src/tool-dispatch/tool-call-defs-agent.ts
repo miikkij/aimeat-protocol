@@ -5,6 +5,7 @@
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
  *   2026-11-19 -- aimeat_handbook_get's tier text: the Atelier specification and its platform sections, no Classic tier.
+ *   2026-11-19 -- aimeat_agent_task_start_set sends task_start only when it is given, so a call with neither field reaches the route, which refuses it.
  *   2026-11-19 -- aimeat_agent_task_start_set forwards task_start_app_waits, and sends task_start only when given with it.
  *   2026-11-13 -- aimeat_agents_list forwards run_mode (unit 3b).
  *   2026-11-13 -- aimeat_message_history forwards direction (unit 3b).
@@ -621,7 +622,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.patch(
             `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/task-start`,
             {
-                ...(input.task_start === undefined && input.task_start_app_waits !== undefined ? {}
+                ...(input.task_start === undefined ? {}
                     : { task_start: input.task_start === null ? null : requiredString(input, 'task_start') }),
                 ...(input.task_start_app_waits === undefined ? {}
                     : { task_start_app_waits: input.task_start_app_waits === null ? null : optionalBoolean(input, 'task_start_app_waits') ?? null }),
