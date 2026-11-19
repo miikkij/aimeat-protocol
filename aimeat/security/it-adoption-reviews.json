@@ -98,7 +98,7 @@
         "aimeat/src/services/sd-jwt.ts",
         "aimeat/src/services/eudiw.ts"
       ],
-      "digest": "sha256:29e0e373f66650210f0f98b5"
+      "digest": "sha256:a72e1abf13b769566dba9a4d"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-19",
@@ -189,7 +189,7 @@
         "aimeat/src/services/sd-jwt.ts",
         "aimeat/src/services/eudiw.ts"
       ],
-      "digest": "sha256:b98317421ef3deaf2f8c2031"
+      "digest": "sha256:ac8596d42e5071f88a7c698a"
     },
     "17-exit-plan.md": {
       "reviewedOn": "2026-11-15",
@@ -346,7 +346,7 @@
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
       "aimeat/src/services/sign-in-policy.ts": "abdf689f004d2cac",
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec",
-      "aimeat/src/services/sd-jwt.ts": "1e1fe714561f17a0",
+      "aimeat/src/services/sd-jwt.ts": "7c866bc79ebd9e48",
       "aimeat/src/services/eudiw.ts": "b6f5af6030b3bcd3"
     },
     "08-threat-model.md": {
@@ -401,7 +401,7 @@
       "docs/security/threat-model.md": "10cf3cf1952417f9",
       "aimeat/src/services/operator/access-audit.ts": "0706dd521e11a994",
       "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580",
-      "aimeat/src/services/sd-jwt.ts": "1e1fe714561f17a0",
+      "aimeat/src/services/sd-jwt.ts": "7c866bc79ebd9e48",
       "aimeat/src/services/eudiw.ts": "b6f5af6030b3bcd3"
     },
     "17-exit-plan.md": {
