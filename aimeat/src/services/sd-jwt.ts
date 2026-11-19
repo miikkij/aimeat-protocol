@@ -16,6 +16,8 @@
  *   expected values belong to the verifier's own request (services/eudiw.ts compares them and spends
  *   the nonce).
  * @version-history
+ *   v1.2.1 — 2026-11-19 — The issuer signature's algorithm is held to the asymmetric list and to the
+ *     trusted key's own `alg`; the token header no longer chooses it (finding f-2026aug-crypto-secrets-3).
  *   v1.2.0 — 2026-11-19 — Key Binding JWT verified against `cnf.jwk` (typ, iat window, nonce, aud,
  *     sd_hash); `requireKeyBinding` option; `keyBinding` is true only for a verified KB-JWT and the
  *     result carries its nonce, aud and iat. Disclosures must be referenced by a digest in the signed
@@ -164,7 +166,13 @@ export function createSdJwtVerifier(): SdJwtVerifier {
         }
 
         // 4. Verify the issuer signature on the JWT portion
-        const alg = (header.alg as string) ?? 'ES256';
+        //    The header names the algorithm, so it is held to the asymmetric list, and to the one the
+        //    trusted key names when it names one: a token never picks HMAC or `none` for itself.
+        const alg = typeof header.alg === 'string' ? header.alg : '';
+        const keyAlg = (issuerJwk as { alg?: unknown }).alg;
+        if (!KB_JWT_ALGORITHMS.includes(alg) || (typeof keyAlg === 'string' && keyAlg !== alg)) {
+          return { valid: false, error: `Issuer signature algorithm not accepted: ${alg || 'none'}` };
+        }
         try {
           const publicKey = await jose.importJWK(issuerJwk, alg);
           const jwtPart = sdJwtToken.split('~')[0];
