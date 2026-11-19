@@ -4432,12 +4432,14 @@ components:
           description: >-
             open: it already opens for the caller. none: nothing was asked (with `requestable`
             false: nothing can be asked here). pending: a request waits for a decision. declined:
-            the last request was declined and the wait still runs. invited: an invitation waits in
-            the caller's notifications.
+            the last request was declined and the wait still runs. invited: an invitation waits for
+            the caller, named (in the notifications) or by e-mail to the caller's verified address
+            (then `invite_url` opens it).
         asked_at:
           type: string
           format: date-time
           nullable: true
+          description: With `pending` or `declined`, when the request was filed; with an e-mail invitation, when it was sent.
         ask_again_at:
           type: string
           format: date-time
@@ -4446,6 +4448,12 @@ components:
         retry_days:
           type: integer
           description: How many days a declined person waits (30).
+        invite_url:
+          type: string
+          nullable: true
+          description: >-
+            With `invited` from an e-mail invitation, the node-relative address that opens it for
+            the caller signed in (/v1/invite?token=<invitation id>). Null otherwise.
 
     # === Phase 2.4: Appeals ===
     AppealRecord:
