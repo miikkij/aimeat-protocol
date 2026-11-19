@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.75.0 -- 2026-11-19 -- Organisms: what waits for a person, and aimeat_organism_approval_request and _approvals.
  *   v1.74.0 -- 2026-11-19 -- Moderation: aimeat_flag_appeal, aimeat_appeals and aimeat_appeal_review.
  *   v1.73.0 -- 2026-11-19 -- Outside apps: aimeat_ecosystem_app_list and aimeat_ecosystem_app_revoke.
  *   v1.72.0 -- 2026-11-19 -- Workspaces: aimeat_workspace_share makes a space's calendar feed address (ics_key).
@@ -409,6 +410,10 @@ the author. Your owner's account may then install it (\`aimeat_package_install\`
 version; \`purchases\` lists what they bought. Tell your owner the price before you buy.
 
 **Organisms — collaborate.** \`aimeat_organism_list\` · \`_get\` · \`_members\` · \`_join\` · \`_leave\`.
+What waits for a person: \`aimeat_organism_join_requests\` and \`_join_request_review\` (who asks to
+join), \`aimeat_organism_invitations\` and \`_invitation_respond\` (invitations to your owner), and the
+approval inbox \`aimeat_organism_approvals\`. Before an action the organism's policy may hold, ask with
+\`aimeat_organism_approval_request\`: it waits for a person, who resolves it on the workspace page.
 
 **Teams.** When the person asks for a team, or many ("set up a team for us", a list, a table, an org chart), call \`aimeat_team_setup\` with what they gave you and nothing invented: a dry run first, show them what would be made, then the same call with \`dry_run: false\` after their yes. Write each team's name in fi, en and es under \`names\`, and its description under \`descriptions\`. Give a new team the \`type\` its work matches (sales, software, ai-strategy, board and the others the tool lists), which adds the spaces that work needs; leave it out when none fits. A team is an organism with three workspaces, a team context and a team skill; \`aimeat_team_status\` reads a team before you answer about it, and says whose own AI is connected. "What waits for me?" is \`aimeat_team_waiting\`. "Pekka leaves", a temporary member's last day (\`until\`), a project's last day (\`ends_on\`) and the teams it needs something from (\`depends_on\`) are one more \`aimeat_team_setup\` on the team's \`organism_id\`, with \`remove\` for people who leave. "Tell the sales team about this decision" is \`aimeat_team_decision_share\`: a dry run first, then the copy goes into the Decisions of each team the person is in; for a team they are not in, they ask one of its members. In a team with its approval gate on (the default, \`approval_gate\` in the team's status), a delete you ask for in its workspaces, and a send or a payment by an agent that works for the team, answers \`TEAM_APPROVAL_REQUIRED\`: tell the person it waits for a lead, and after the lead approves make the same call again with the same input. \`TEAM_APPROVAL_DECLINED\` means a lead said no; do not try again. When \`ai_onboarding.you\` in the team's status is empty, the team skill's onboarding section is yours to go through with the person once; after they confirm in their own words, \`aimeat_team_onboarding_done\` records it (EU AI Act article 4).
 

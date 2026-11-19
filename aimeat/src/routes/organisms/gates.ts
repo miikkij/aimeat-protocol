@@ -6,6 +6,10 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-11-19 — POST and GET /v1/organisms/:id/approvals run services/organism/approvals.ts
+ *     (requestApprovalOp, listApprovalsOp, with mergeWorkspaceGatePolicy), which the MCP tools
+ *     aimeat_organism_approval_request and aimeat_organism_approvals run too; moved there unchanged
+ *     (feature audit 2026-11-19, 4.4 item 1).
  *   v1.9.1 — 2026-11-15 — The member-change refusal says "member change routes", not doors.
  *   v1.9.0 — 2026-11-15 — The team gate's actions (team:delete, team:send, team:pay) are filed by the
  *     node only, and are approved or declined as asked, never edited (services/team/action-gate.ts, T7).
@@ -63,17 +67,16 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, PendingApprovalRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
-import { resolveIdentity, isOwnerInPerson } from '../../utils/gaii.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { shouldGate, gatePolicyFromManifest, approverRoleFor, DEFAULT_ALWAYS_GATE, type GatePolicy, type Risk } from '../../services/gate-policy.js';
-import { readWorkspaceMetaRecord } from '../../services/workspace/meta.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
+import { requestApprovalOp, listApprovalsOp } from '../../services/organism/approvals.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { updateOrganismStructure } from '../../services/structure/snapshot.js';
 import { canReadWorkspace } from '../../services/workspace/access.js';
 import { readPublishSpace, resolveSpaceNamespace, type UndeclaredSpaceRefusal } from '../../services/workspace/write-items.js';
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
-import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../services/workspace/suggestions.js';
+import { decideSuggestion, isMemberChangeAction } from '../../services/workspace/suggestions.js';
 import { logger } from '../../utils/logger.js';
 import { callerOf } from '../../middleware/caller.js';
 import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspace/tool-ops.js';
@@ -83,23 +86,8 @@ import { checkOrganismNamespaceAccess } from '../../services/organism/namespace-
 import { isTeamGateAction } from '../../services/team/action-gate.js';
 import { siemEmit } from '../../services/node-admin/siem-export.js';
 
-/**
- * The policy for an action in a workspace: the workspace manifest's autonomy when it sets one, else the
- * organism's. The always-gate list is the UNION of the organism's floor (its own list, or the default
- * when it declares none) and the workspace's list, so a workspace can add classes to the floor and can
- * never remove one, an empty `alwaysGate: []` included. A workspace that declares no list leaves the
- * organism's value as it is.
- */
-function mergeWorkspaceGatePolicy(org: GatePolicy, ws: GatePolicy): GatePolicy {
-  const autonomy = ws.autonomy ?? org.autonomy;
-  const alwaysGate = ws.alwaysGate === undefined
-    ? org.alwaysGate
-    : [...new Set([...(org.alwaysGate ?? DEFAULT_ALWAYS_GATE), ...ws.alwaysGate])];
-  return { ...(autonomy ? { autonomy } : {}), ...(alwaysGate ? { alwaysGate } : {}) };
-}
-
 export function registerOrganismGateRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
-  const { memberRole, requireMember, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, revertToDraft } = H;
+  const { memberRole, requireMember, writeDecision, readConfig, canWriteNamespace, publishDraft, revertToDraft } = H;
   /** The session as the suggestion service takes it: its full identity, owner and roles. */
   const suggestionCaller = (req: Request) => ({
     principal: resolveIdentity(req.auth!, config.nodeId), owner: (req.auth!.owner as string) ?? '', roles: req.auth!.roles ?? [],
@@ -146,126 +134,30 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   // POST /v1/organisms/:id/approvals — request approval for an action (gate or auto-run).
   router.post('/v1/organisms/:id/approvals', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    // Membership, the actions filed elsewhere, the organism's and the workspace's policy, and the
+    // record: services/organism/approvals.ts requestApprovalOp, which aimeat_organism_approval_request
+    // runs too.
+    const out = await requestApprovalOp({ storage, config }, req.auth!, id, req.body ?? {});
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-    if (!(await memberRole(req, organism, id))) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
-      return;
-    }
-
-    // `arguments` is reserved in ESM strict mode — destructure it under a new name.
-    const { action, arguments: actionArgs, risk, rule, stageId, flowGateId, approverRole, prompt, deadline } = req.body ?? {};
-    if (!action || typeof action !== 'string') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'action is required'));
-      return;
-    }
-    // A member's suggested workspace change is filed by the member change doors and nowhere else:
-    // approving one RUNS the change it carries, so one filed here with arguments of the caller's
-    // choosing would be a change nobody's rule allowed.
-    if (isMemberChangeAction(action)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `${action} is filed by the workspace's member change routes: POST /v1/organisms/${id}/workspace/spaces or PUT /v1/organisms/${id}/workspace/sections/{space}.`));
-      return;
-    }
-    // The same for a publish: approving one publishes the draft its arguments name, and the publish
-    // route asks first whether the caller may write that draft, the space fence and the namespace
-    // rule, and takes the approver from the organism's publish gate. Filed here, with arguments and
-    // an approver of the caller's choosing, it skipped all of that (register finding
-    // f-2026-11-13-generic-approval-action-publish-runs-a-publish). The resolve step below keeps its
-    // publish branch for the approvals that route files.
-    if (action === 'publish') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `A publish approval is filed by POST /v1/organisms/${id}/publish, which asks the publish checks and the organism's publish gate first.`));
-      return;
-    }
-    // A team gate approval is filed by the node when an AI asks for the held action itself
-    // (services/team/action-gate.ts, T7), with the node's own words of what it is. Filed here, its
-    // fingerprint and its words would be the caller's, and a lead would approve one thing while
-    // reading another.
-    if (isTeamGateAction(action)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `${action} is filed by the node when the action itself is asked for: make the call, and it waits for a lead.`));
-      return;
-    }
-    const riskVal: Risk = ['low', 'medium', 'high'].includes(risk) ? risk : 'medium';
-
-    const orgManifest = await readManifest(id);
-    const orgPolicy = gatePolicyFromManifest(orgManifest);
-    // An action names its workspace in `arguments.ws`, the field the publish approval below stores.
-    // The workspace manifest's policy (the autonomy level the workspace settings save) applies only
-    // when the caller may read that workspace: a workspace the caller cannot read lends it no policy,
-    // so naming another workspace's L5 cannot loosen the gate. The manifest is the copy that counts
-    // (readWorkspaceMetaRecord), the same one the workspace read takes.
-    const wsArg = (actionArgs as { ws?: unknown } | null | undefined)?.ws;
-    let policy = orgPolicy;
-    const manifests: unknown[] = [];
-    if (typeof wsArg === 'string' && wsArg
-      && await canReadWorkspace(storage, config, organism, req.auth!.sub, req.auth!.owner, resolveIdentity(req.auth!, config.nodeId), wsArg)) {
-      const wsManifest = await readWorkspaceMetaRecord(storage, id, wsArg, 'meta.manifest', config.nodeId);
-      if (wsManifest) {
-        policy = mergeWorkspaceGatePolicy(orgPolicy, gatePolicyFromManifest(wsManifest.value));
-        manifests.push(wsManifest.value);
-      }
-    }
-    manifests.push(orgManifest);
-    // Whose word `risk` is. A human member describing what they are about to do is the party the
-    // policy protects; an agent, an app grant or an ecosystem token describing its OWN action is the
-    // party it constrains, and its word cannot lower the gate below the default. Same test the rest
-    // of this codebase uses for "a person in person": isOwnerInPerson (utils/gaii.ts).
-    const selfDeclaredRisk = !isOwnerInPerson(req.auth);
-    const decision = shouldGate({ action, risk: riskVal, rule, policy, selfDeclaredRisk });
-    // The same rule for `approverRole`, the field beside `risk`: a caller not in person does not
-    // choose a laxer approver than the default, except where a manifest flow gate it names says so
-    // (services/gate-policy.ts approverRoleFor; structure programme 2026-11, unit 7).
-    const approverRoleVal = approverRoleFor({ declared: approverRole, selfDeclared: selfDeclaredRisk, flowGateId, manifests });
-
-    const actor = resolveIdentity(req.auth!, config.nodeId);
-    const now = new Date().toISOString();
-    const aid = uuidv4();
-    const record: PendingApprovalRecord = {
-      id: aid, organismId: id, actor, action,
-      ...(actionArgs !== undefined ? { arguments: actionArgs } : {}),
-      risk: riskVal, approverRole: approverRoleVal,
-      ...(typeof prompt === 'string' ? { prompt } : {}),
-      ...(typeof stageId === 'string' ? { stageId } : {}),
-      ...(typeof flowGateId === 'string' ? { flowGateId } : {}),
-      ...(typeof deadline === 'string' ? { deadline } : {}),
-      status: decision.gate ? 'pending' : 'approved',
-      ...(decision.gate ? {} : { decidedBy: 'system', decidedAt: now, resolutionNote: `auto: ${decision.reason}` }),
-      createdAt: now, updatedAt: now,
-    };
-    await storage.createPendingApproval(record);
-    if (!decision.gate) {
-      await writeDecision(id, actor, `auto-approved action: ${action}`, [aid]);
-    }
-
-    res.status(201).json(success(config.nodeId, { approval: record, gated: decision.gate, reason: decision.reason }, [
+    const aid = out.approval.id;
+    res.status(201).json(success(config.nodeId, { approval: out.approval, gated: out.gated, reason: out.reason }, [
       { description: 'List pending approvals', method: 'GET', url: `/v1/organisms/${id}/approvals?status=pending` },
-      ...(decision.gate ? [{ description: 'Resolve this approval', method: 'POST', url: `/v1/organisms/${id}/approvals/${aid}` }] : []),
+      ...(out.gated ? [{ description: 'Resolve this approval', method: 'POST', url: `/v1/organisms/${id}/approvals/${aid}` }] : []),
     ]));
-    emitChange('organisms');
   });
 
-  // GET /v1/organisms/:id/approvals — the approval inbox (members).
+  // GET /v1/organisms/:id/approvals — the approval inbox (members): services/organism/approvals.ts
+  // listApprovalsOp, which aimeat_organism_approvals runs too.
   router.get('/v1/organisms/:id/approvals', requireAuth(), requireScope('organism:read'), async (req, res) => {
-    const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    const out = await listApprovalsOp({ storage, config }, req.auth!, req.params.id as string, req.query.status as string | undefined);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-    if (!(await memberRole(req, organism, id))) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
-      return;
-    }
-    // Durable pause: lazily abort any overdue pending approvals before listing.
-    await expireOverdueApprovals(storage, new Date().toISOString());
-    const status = req.query.status as string | undefined;
-    // A member's suggestion carries the structure it would add to a workspace, so it is listed only
-    // to someone who may read that workspace, or who made it (services/workspace/suggestions.ts).
-    const approvals = await visibleApprovals({ storage, config }, suggestionCaller(req), id,
-      await storage.listPendingApprovals(id, status ? { status } : undefined));
-    res.json(success(config.nodeId, { approvals, total: approvals.length }));
+    res.json(success(config.nodeId, { approvals: out.approvals, total: out.total }));
   });
 
   // POST /v1/organisms/:id/publish — snapshot a draft into a new version + latest (or gate it).

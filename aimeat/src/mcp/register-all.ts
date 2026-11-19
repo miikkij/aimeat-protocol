@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-11-19 — registerOrganismApprovalTools (an organism's approval requests, mcp/organism-approvals.ts).
  *   2026-11-19 — registerModerationReviewTools (the moderation review: flags and appeals, mcp/flags.ts).
  *   2026-11-19 — registerEcosystemAppTools (aimeat_ecosystem_app_list and _revoke, mcp/ecosystem-apps.ts).
  *   2026-11-14 — registerHelpTools (aimeat_help_*: Ask someone who knows, mcp/help.ts).
@@ -206,6 +207,7 @@ import { registerBuildWithYouTools } from './build-with-you.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerEcosystemAppTools } from './ecosystem-apps.js';
+import { registerOrganismApprovalTools } from './organism-approvals.js';
 import { registerSecretTools } from './secrets.js';
 import { registerSecretShareTools } from './secret-shares.js';
 import { registerHelpTools } from './help.js';
@@ -257,6 +259,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerCoreTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
     registerBoardsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
+    registerOrganismApprovalTools(mcp, storage, config, caller);
     registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
     registerConnectionFileTools(mcp, storage, config, agentGaii, scopes, caller);

@@ -119,11 +119,13 @@
         "aimeat/src/services/calendar-feed.ts",
         "aimeat/src/services/workspace/share.ts",
         "aimeat/src/services/workspace/share-input.ts",
+        "aimeat/src/services/organism/approvals.ts",
+        "aimeat/src/tool-catalog/definitions/organism-approvals.ts",
         "aimeat/src/services/workspace-rows",
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:60782b8fe616dd8f92dfb281"
+      "digest": "sha256:064904ac9e097cc71cb6be08"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-19",
@@ -642,6 +644,8 @@
       "aimeat/src/services/calendar-feed.ts": "8f7f8a44603aefc9",
       "aimeat/src/services/workspace/share.ts": "bad7652d74e4b1e9",
       "aimeat/src/services/workspace/share-input.ts": "704c313c49d49621",
+      "aimeat/src/services/organism/approvals.ts": "54f87adf9ea74925",
+      "aimeat/src/tool-catalog/definitions/organism-approvals.ts": "5644a92e75ef5b49",
       "aimeat/src/services/workspace-rows/row-revisions.ts": "2f605de731f5cceb",
       "aimeat/src/services/workspace-rows/row-schema.ts": "31e80cbaff854066",
       "aimeat/src/services/workspace-rows/row-service.ts": "49298be1c9a26910",
