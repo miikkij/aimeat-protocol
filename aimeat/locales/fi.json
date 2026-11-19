@@ -35704,5 +35704,6 @@
   "explain.concept.kyc_identify.ex2": "”Keille yrityksille olen antanut henkilöllisyyteni?”",
   "explain.concept.kyc_identify.tipLabel": "Ennen kuin annat",
   "explain.concept.kyc_identify.tip": "Anna henkilöllisyytesi vain yritykselle, jonka asiakkaaksi olet tulossa. Yrityksen pitää säilyttää antamasi tiedot viisi vuotta asiakassuhteen päättymisen jälkeen, joten et voi ottaa niitä takaisin.",
-  "kyc.shared.account": "tilisi osoite tällä palvelimella"
+  "kyc.shared.account": "tilisi osoite tällä palvelimella",
+  "kyc.part.reasons": "Mikä nostaa riskiä"
 }

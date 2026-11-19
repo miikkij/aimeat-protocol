@@ -34962,5 +34962,6 @@
   "explain.concept.kyc_identify.ex2": "\"Which firms have I given my identity to?\"",
   "explain.concept.kyc_identify.tipLabel": "Before you give it",
   "explain.concept.kyc_identify.tip": "Give it only to a firm you are becoming a customer of. The firm must keep what you gave for five years after the customer relationship ends, so you cannot take it back.",
-  "kyc.shared.account": "your account address on this server"
+  "kyc.shared.account": "your account address on this server",
+  "kyc.part.reasons": "What raises the risk"
 }

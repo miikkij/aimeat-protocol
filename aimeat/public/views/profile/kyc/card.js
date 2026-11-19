@@ -172,6 +172,7 @@ function riskPart(c) {
         action: canApprove ? html`<${Action} small onClick=${() => c.setDlg({ kind: 'approve', note: '' })}>${x('act.approve')}<//>` : null,
       },
     ]} />
+    ${part(x('part.reasons'))}
     <${List} cols="name-n-desc" keepCols dense apart head=${[x('col.reason'), { label: x('col.points'), num: true }, x('col.ref')]} empty=${x('risk.noReasons')}>
       ${r.reasons.map((rs, i) => html`
         <${Row} key=${i}>

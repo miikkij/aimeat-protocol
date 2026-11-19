@@ -150,7 +150,7 @@ export default function AmlAdminTab({ switchPage }) {
     <${Section} id="adm-aml-02" num="02" title=${X('lists.title')}
       doors=${html`<${Loud} control disabled=${busy || !sources.length} onClick=${refresh}>${X(busy ? 'refresh.busy' : 'refresh.action')}<//>`}>
       <${Note} kind="lead">${X('lists.lead')}<//>
-      <${List} cols="name-desc-code-n" head=${[X('col.source'), X('col.fetched'), X('col.version'), { label: X('col.entries'), num: true }]}
+      <${List} cols="name-desc-code-n" labels head=${[X('col.source'), X('col.fetched'), X('col.version'), { label: X('col.entries'), num: true }]}
         empty=${X('lists.none')}>
         ${sources.map((s) => {
           const meta = lists.find((l) => l.source === s);

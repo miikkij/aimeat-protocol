@@ -33328,5 +33328,6 @@
   "explain.concept.kyc_identify.ex2": "\"¿A qué empresas les he dado mi identidad?\"",
   "explain.concept.kyc_identify.tipLabel": "Antes de darla",
   "explain.concept.kyc_identify.tip": "Dala solo a una empresa de la que te estás volviendo cliente. La empresa debe conservar lo que diste cinco años después del fin de la relación con el cliente, así que no puedes recuperarlo.",
-  "kyc.shared.account": "la dirección de tu cuenta en este servidor"
+  "kyc.shared.account": "la dirección de tu cuenta en este servidor",
+  "kyc.part.reasons": "Qué eleva el riesgo"
 }
