@@ -17,6 +17,8 @@
  *     (secaudit 2026-10, M8).
  *   v1.2.0 — 2026-10-12 — A consent's reach is read through consentReachOf: a row holding the older
  *     `private` or `dmz` is answered as `local` (Core 2026-11 AUTHZ-18).
+ *   v1.3.0 — 2026-11-19 — listConsentAudit takes several identities, read in one IN query (feature
+ *     audit 2026-11-19, 1.4).
  */
 import type { ConsentRecord, ConsentAuditEntry, ConsentFacet, ConsentFacetQuery } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -173,13 +175,16 @@ export const consentMethods = {
     return result.changes;
   },
 
-  async listConsentAudit(this: SqliteStorage, ownerGaii: string, opts?: {
+  async listConsentAudit(this: SqliteStorage, ownerGaii: string | readonly string[], opts?: {
     days?: number;
     consentId?: string;
     accessorGaii?: string;
   }): Promise<ConsentAuditEntry[]> {
-    let sql = 'SELECT * FROM consent_audit WHERE ownerGaii = ?';
-    const params: unknown[] = [ownerGaii];
+    // One identity, or several in one IN query (the account and its agents).
+    const owners = typeof ownerGaii === 'string' ? [ownerGaii] : [...ownerGaii];
+    if (owners.length === 0) return [];
+    let sql = `SELECT * FROM consent_audit WHERE ownerGaii IN (${owners.map(() => '?').join(',')})`;
+    const params: unknown[] = [...owners];
 
     if (opts?.days) {
       const cutoff = new Date(Date.now() - opts.days * 86400000).toISOString();

@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- e2e-data-wallet-agent-consents.ts joins the list (not the guard tier): the Data Wallet lists and revokes the consents the person's agents gave (feature audit 2026-11-19, 1.4).
  *   2026-11-19 -- e2e-app-source-access.ts joins the list (not the guard tier): every route that hands an app's source to another person asks the app's audience (feature audit 2026-11-19, 1.1 and 1.2).
  *   2026-11-15 -- test/e2e-federation-peer-proofs.ts joins ALL_SUITES (audit 2026-11 M130, L056).
  *   2026-11-15 -- e2e-app-icon-upload.ts joins the list (not the guard tier): aimeat_app_manage icon_upload and the install block.
@@ -1345,6 +1346,8 @@ const ALL_SUITES = [
     'test/e2e-write-guards.ts',
     'test/e2e-wallet-page.ts',
     'test/e2e-data-wallet-page.ts',
+    // The Data Wallet lists and revokes the consents the person's agents gave (feature audit 2026-11-19, 1.4).
+    'test/e2e-data-wallet-agent-consents.ts',
     'test/e2e-memory-tab-summary.ts',
     'test/e2e-query-budget.ts',
     'test/e2e-live-catchup.ts',

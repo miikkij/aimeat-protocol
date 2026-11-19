@@ -28,6 +28,8 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-19 — accountConsentHolders(): the account and its agents, the identities its consents are
+ *     filed under, read once for the consents and the trail of the Data Wallet (feature audit 1.4).
  *   2026-11-09 — listAccountConsents reads the account's and every agent's consents in one IN query
  *     (listConsentsForAgents), in the same order: one query per agent was 81 at 79 agents.
  *   2026-11-08 — A grant takes an explicit `role`, read (the default) or write, and the purpose text
@@ -120,17 +122,31 @@ export function accountHoldsConsent(account: string, consentOwner: string): bool
     return consentOwner === account || (!account.includes('#') && isSameOwner(consentOwner, account));
 }
 
-/** The account's consents: those filed under it and under any of its agents, oldest rows included. */
-export async function listAccountConsents(
-    storage: Storage, account: string, opts: { status?: 'active' | 'revoked' | 'expired'; recipient?: string } = {},
-): Promise<ConsentRecord[]> {
+/**
+ * The identities a consent of the account is filed under: the account itself and, for a person's
+ * GHII, every agent of theirs (one query, whatever the number of agents). An agent's GAII names
+ * itself only.
+ */
+export async function accountConsentHolders(storage: Storage, account: string): Promise<string[]> {
     const name = localAccountName(account);
     const agents = name && !account.includes('#') ? await loadOwnerAgents(storage, name) : [];
-    if (!agents.length) return storage.listConsents(account, opts);
+    return [account, ...agents.map(a => a.gaii)];
+}
+
+/**
+ * The account's consents: those filed under it and under any of its agents, oldest rows included.
+ * `holders` is accountConsentHolders(account) when the caller has read it already.
+ */
+export async function listAccountConsents(
+    storage: Storage, account: string, opts: { status?: 'active' | 'revoked' | 'expired'; recipient?: string } = {},
+    holders?: string[],
+): Promise<ConsentRecord[]> {
+    const all = holders ?? await accountConsentHolders(storage, account);
+    if (all.length <= 1) return storage.listConsents(account, opts);
     // One IN query for the account and every agent (one per agent was 81 at 79 agents); each list is
     // newest first as listConsents orders it, the account's own first.
-    const byOwner = await storage.listConsentsForAgents([account, ...agents.map(a => a.gaii)], opts);
-    return [account, ...agents.map(a => a.gaii)].flatMap(g => byOwner[g] ?? []);
+    const byOwner = await storage.listConsentsForAgents(all, opts);
+    return all.flatMap(g => byOwner[g] ?? []);
 }
 
 export interface ConsentCaller {

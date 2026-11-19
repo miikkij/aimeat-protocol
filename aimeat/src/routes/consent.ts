@@ -13,6 +13,9 @@
  *   - GET /v1/consent/audit: pending consent-audit buffer entries
  *
  * @version-history
+ *   2026-11-19 — GET /v1/data-wallet and GET /v1/consent/audit read the consents and the trail of the
+ *     holder GET /v1/consent lists (consentHolderOf): the person in person sees the ones their agents
+ *     gave too, and revokes them from the page (feature audit 2026-11-19, 1.4).
  *   2026-11-14 — GET /v1/consent and /v1/consent/:id show an agent holding consent:read-as-owner the
  *     account's consents, through listConsentsFor and consentRecordFor (services/consent/consent-read.ts).
  *   2026-11-14 — GET /v1/consent/:id reads through consentRecordFor (services/consent/consent-read.ts),
@@ -41,9 +44,8 @@ import type { StatsCollector } from '../services/stats.js';
 import { emitChange } from '../services/event-bus.js';
 import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { grantConsent, revokeConsent } from '../services/consent/write.js';
-import { consentRecordFor, listConsentsFor } from '../services/consent/consent-read.js';
-import { getPendingConsentAudit } from '../services/consent/audit-buffer.js';
+import { accountConsentHolders, grantConsent, revokeConsent } from '../services/consent/write.js';
+import { consentAuditOf, consentHolderOf, consentRecordFor, listConsentsFor } from '../services/consent/consent-read.js';
 import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
 import { callerOf } from '../middleware/caller.js';
 import { consentCollectionMethod } from '../services/mydata-receipt.js';
@@ -131,7 +133,10 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
         const groupLimit = req.query.group_limit !== undefined ? Math.max(0, Math.min(1000, parseInt(req.query.group_limit as string, 10) || 0)) : undefined;
         const todayFrom = isoParam(req.query.today_from);
         const yesterdayFrom = isoParam(req.query.yesterday_from);
-        const data = await dataWalletDb.overview(resolve(req), days, entryLimit, { groupLimit, todayFrom, yesterdayFrom });
+        // The consents and the trail are those GET /v1/consent lists for this caller (consentHolderOf):
+        // the person in person sees the ones their agents gave too (feature audit 2026-11-19, 1.4).
+        const consentHolder = consentHolderOf(callerOf(req, config.nodeId, storage));
+        const data = await dataWalletDb.overview(resolve(req), days, entryLimit, { consentHolder, groupLimit, todayFrom, yesterdayFrom });
         res.json(success(config.nodeId, data));
     });
 
@@ -169,7 +174,9 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
 
     // GET /v1/consent/audit — Audit report (MUST be before /:id)
     router.get('/v1/consent/audit', requireAuth(), requireScope('consent:manage'), async (req, res) => {
-        const ownerGaii = resolve(req);
+        // The trail of the consents GET /v1/consent lists for this caller: the account's and its
+        // agents' for the person in person (consentHolderOf, accountConsentHolders).
+        const holders = await accountConsentHolders(storage, consentHolderOf(callerOf(req, config.nodeId, storage)));
         const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
         const opts: { days?: number; accessorGaii?: string; consentId?: string } = { days };
 
@@ -182,11 +189,8 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
 
         // Merge not-yet-flushed buffer entries (newest first) ahead of the persisted rows so
         // a just-made denial/mutation is visible immediately (writes are batched off the
-        // request path — see consent-audit-buffer.ts).
-        const pending = getPendingConsentAudit(ownerGaii, opts)
-            .sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
-        const stored = await storage.listConsentAudit(ownerGaii, opts);
-        let entries = [...pending, ...stored];
+        // request path — see consent-audit-buffer.ts). consentAuditOf does both, for every holder.
+        let entries = await consentAuditOf(storage, holders, opts);
 
         // The rows of ONE group of the Data Wallet page (who × what): the accessor filter above plus
         // the key's prefix, and a page of them. The composite (GET /v1/data-wallet) serves the groups.
