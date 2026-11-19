@@ -26,6 +26,8 @@
  *   account. The rest of the kept stores are kept for the same reasons (STORES says each one).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-erasure-apps
  * @version-history
+ *   v1.1.0 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); another owner is refused
+ *     the erasure of this account (403 ACCESS_DENIED) and its apps stay.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, part 1 of agent F).
  */
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
@@ -37,15 +39,9 @@ import {
     json as httpJson, auth, show, setupOwner as registerSweepOwner, attachApp, attachAiSettings,
 } from './helpers/app-sweep-fixture.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+import { BASE, assert, expectRefusal, finish, test } from './helpers/harness.js';
 
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (e) { failed++; console.log(`  ❌ ${name}: ${(e as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 const json = (path: string, opts: RequestInit = {}) => httpJson(BASE, path, opts);
 const setupOwner = (label: string) => registerSweepOwner(BASE, NODE_ID, label);
@@ -107,6 +103,13 @@ await test('before the erasure, every store of the fixture holds all three apps'
     }
 });
 
+await test('another owner is refused the erasure of this account, and its apps stay', async () => {
+    const del = await json(`/v1/owners/${OWNER.name}`, { method: 'DELETE', headers: auth(OTHER.token) });
+    expectRefusal(del, 403, 'ACCESS_DENIED');
+    const open = await fetch(`${BASE}/v1/apps/${OWNER.name}/${A.file}`, { headers: auth(OWNER.token) });
+    assert(open.status === 200, `A still opens: ${open.status}`);
+});
+
 await test('the owner erases the account', async () => {
     const del = await json(`/v1/owners/${OWNER.name}`, { method: 'DELETE', headers: auth(OWNER.token) });
     assert(del.status === 200 && del.body?.data?.deleted === true, `erase ${show(del)}`);
@@ -160,5 +163,4 @@ await test('a second erasure of the same name answers 404', async () => {
 });
 
 try { await (storage as unknown as { close?: () => unknown })?.close?.(); } catch { /* the process ends next */ }
-console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
-if (failed > 0) process.exit(1);
+finish();

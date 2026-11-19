@@ -11,25 +11,15 @@
  *   account that is not an operator cannot set it.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=security-txt
  * @version-history
+ *   v1.0.1 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); every test as it was.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, report 4.7).
  */
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { BASE, assert, finish, json as request, test } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (e) { failed++; console.log(`  ❌ ${name}: ${(e as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-
-async function json(path: string, token: string, opts: RequestInit = {}) {
-    const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts.headers } });
-    const text = await res.text();
-    let body: any = { _raw: text };
-    try { body = JSON.parse(text); } catch { /* not JSON */ }
-    return { status: res.status, body };
+/** The harness request, signed in with `token`. */
+function json(path: string, token: string, opts: RequestInit = {}) {
+    return request(path, { ...opts, headers: { Authorization: `Bearer ${token}`, ...(opts.headers as Record<string, string> | undefined) } });
 }
 const setting = (token: string, changes: Array<{ path: string; value: unknown }>) =>
     json('/v1/admin/config', token, { method: 'PUT', body: JSON.stringify({ changes }) });
@@ -106,5 +96,4 @@ await test('the contact cleared, the address answers 404 again', async () => {
     assert((await fetchTxt()).status === 404, 'no file once the contact is empty');
 });
 
-console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
-if (failed > 0) process.exit(1);
+finish();

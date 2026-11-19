@@ -14,30 +14,18 @@
  *     3. an agent without ai:use is not offered the tool and REST refuses it.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=living-author-mcp
  * @version-history
+ *   v1.0.1 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); every test as it was.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, 4.4 item 5).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, toolNames, type McpAgent } from './helpers/mcp-session.js';
 import { startFakeAiProvider, chatJson, type FakeAiProvider } from './helpers/fake-ai-provider.js';
+import { BASE, assert, finish, json as request, test } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0;
-let failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-  try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit & { token?: string } = {}): Promise<{ status: number; body: any }> {
+/** The harness request, with the caller's token as a bearer header. */
+function json(path: string, opts: RequestInit & { token?: string } = {}): Promise<{ status: number; body: any }> {
   const { token, ...rest } = opts;
-  const res = await fetch(`${BASE}${path}`, {
-    ...rest,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(rest.headers ?? {}) },
-  });
-  const text = await res.text();
-  try { return { status: res.status, body: JSON.parse(text) }; } catch { return { status: res.status, body: { _raw: text } }; }
+  return request(path, { ...rest, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(rest.headers as Record<string, string> | undefined) } });
 }
 const short = (v: unknown) => String(JSON.stringify(v)).slice(0, 240);
 const stamp = Date.now().toString(36).slice(-5);
@@ -117,5 +105,4 @@ await test('3a. An agent without ai:use is not offered the tool, and REST refuse
 });
 
 await provider?.close();
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+finish();

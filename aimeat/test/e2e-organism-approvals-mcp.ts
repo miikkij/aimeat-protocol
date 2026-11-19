@@ -13,31 +13,17 @@
  *        (INVALID_INPUT), and an agent without organism:write is refused the request (SCOPE_DENIED).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-approvals-mcp
  * @version-history
+ *   v1.0.1 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); every test as it was.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, 4.4 item 1).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, toolNames, type McpAgent } from './helpers/mcp-session.js';
+import { BASE, assert, finish, json as request, test } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0;
-let failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-  try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit & { token?: string } = {}): Promise<{ status: number; body: any }> {
+/** The harness request, with the caller's token as a bearer header. */
+function json(path: string, opts: RequestInit & { token?: string } = {}): Promise<{ status: number; body: any }> {
   const { token, ...rest } = opts;
-  const res = await fetch(`${BASE}${path}`, {
-    ...rest,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(rest.headers ?? {}) },
-  });
-  const text = await res.text();
-  let body: any;
-  try { body = JSON.parse(text); } catch { body = { _raw: text }; }
-  return { status: res.status, body };
+  return request(path, { ...rest, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(rest.headers as Record<string, string> | undefined) } });
 }
 const short = (v: unknown) => JSON.stringify(v).slice(0, 240);
 const stamp = Date.now().toString(36).slice(-5);
@@ -120,5 +106,4 @@ await test('3c. An agent without organism:write is refused the request with SCOP
   assert(inbox.status === 200 && inbox.body.data.total === 1, `still one request: ${short(inbox.body.data)}`);
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+finish();

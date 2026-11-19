@@ -9,25 +9,11 @@
  *   them. The sections the export had before stay as e2e-owner-export.ts holds them.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-export-records
  * @version-history
+ *   v1.0.1 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); every test as it was.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 4.2).
  */
 import { registerOwner } from './helpers/owner-login.js';
-
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0;
-let failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-  try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-  const ct = res.headers.get('content-type') ?? '';
-  return { status: res.status, body: ct.includes('json') ? await res.json() : { _raw: await res.text() } };
-}
+import { BASE, assert, finish, json, test } from './helpers/harness.js';
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 const post = (token: string, path: string, body: unknown) => json(path, { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
 const tag = Date.now().toString(36).slice(-5);
@@ -186,5 +172,4 @@ await test('9. Bob cannot export alice', async () => {
   assert(r.status === 403, `bob exporting alice: ${r.status}`);
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+finish();

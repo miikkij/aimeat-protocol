@@ -18,6 +18,7 @@
  *   agent's refusal for its own over MCP, and the app's refusal to turn it off.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-task-start
  * @version-history
+ *   v1.1.1 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); every test as it was.
  *   v1.1.0 — 2026-11-19 — Section 3: the setting over MCP, the agent's own over MCP, the app's off.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 2.1).
  */
@@ -25,27 +26,14 @@ import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
 import { openSession, callTool } from './helpers/mcp-session.js';
+import { BASE, assert, finish, json, test } from './helpers/harness.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const FILENAME = 'task-starter.html';
 const APP_NAME = 'Task Starter';
 const REDIRECT = 'http://localhost:9922/callback';
 
-let passed = 0;
-let failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-  try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-  const ct = res.headers.get('content-type') ?? '';
-  return { status: res.status, body: ct.includes('json') ? await res.json() : { _raw: await res.text() } };
-}
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
@@ -268,5 +256,4 @@ await test('3c. The app cannot turn it off: refused, and the setting stays on', 
   assert(s.status === 403 && s.body.error?.code === 'OWNER_MUST_START', `the app still waits: ${s.status} ${s.body.error?.code}`);
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+finish();

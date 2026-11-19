@@ -10,38 +10,24 @@
  *   owner.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-settings-trail
  * @version-history
+ *   v1.1.0 — 2026-11-19 — On the shared harness and test/helpers/agent-device.ts; an agent without
+ *     memory:write-reserved is refused the change (403 SCOPE_DENIED) and no row is written.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, report 2.3).
  */
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { BASE, assert, expectRefusal, finish, json as request, test } from './helpers/harness.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (e) { failed++; console.log(`  ❌ ${name}: ${(e as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-
-async function json(path: string, token: string, opts: RequestInit = {}) {
-    const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts.headers } });
-    const text = await res.text();
-    let body: any = { _raw: text };
-    try { body = JSON.parse(text); } catch { /* not JSON */ }
-    return { status: res.status, body };
+/** The harness request, signed in with `token`. */
+function json(path: string, token: string, opts: RequestInit = {}) {
+    return request(path, { ...opts, headers: { Authorization: `Bearer ${token}`, ...(opts.headers as Record<string, string> | undefined) } });
 }
 const show = (r: { status: number; body: any }) => `${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data ?? r.body).slice(0, 300)}`;
 
 async function connectAgent(ownerName: string, ownerToken: string, agentName: string, scopes: string[]): Promise<string> {
-    const post = (path: string, body: unknown) => fetch(`${BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async r => ({ status: r.status, body: await r.json() as any }));
-    const da = await post('/v1/agents/device-authorize', { agent_name: agentName, owner: ownerName });
-    assert(da.status === 200, `device-authorize ${da.status}`);
-    const v = await post('/v1/agents/verify', { user_code: da.body.data.user_code, action: 'approve', scopes, owner_token: ownerToken });
-    assert(v.status === 200, `verify ${v.status}: ${JSON.stringify(v.body?.error)}`);
-    const t = await post('/v1/agents/device-token', { device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' });
-    assert(t.status === 200, `device-token ${t.status}`);
-    return t.body.token as string;
+    return (await connectAgentByDevice(BASE, { owner: ownerName, ownerToken, name: agentName, scopes })).token;
 }
 
 /** The four settings, each with its route, its body key and a change any account can make. */
@@ -98,5 +84,12 @@ await test('the owner\'s own change names the owner, with no `by`', async () => 
     assert(newest?.data?.changed === 'routing' && newest.actorGaii === ownerGhii && !newest.data.by, `newest: ${JSON.stringify(newest)}`);
 });
 
-console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
-if (failed > 0) process.exit(1);
+await test('an agent of the owner without memory:write-reserved is refused the change, and no row is written', async () => {
+    const reader = await connectAgent(ownerName, owner, `trailread${stamp}`, ['ai:use', 'memory:read']);
+    const before = (await events()).length;
+    const r = await json('/v1/ai/routing', reader, { method: 'PUT', body: JSON.stringify({ routing: { rules: { maxAttempts: 4 } } }) });
+    expectRefusal(r, 403, 'SCOPE_DENIED');
+    assert((await events()).length === before, 'a refused change writes no row');
+});
+
+finish();

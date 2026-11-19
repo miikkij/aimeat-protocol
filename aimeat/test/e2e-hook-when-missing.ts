@@ -14,31 +14,22 @@
  *   - A published action behaves as today: its answer decides.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=hook-when-missing
  * @version-history
+ *   v1.1.0 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); a refused registration is
+ *     held to 403 HOOK_REJECTED and the non-operator to 403 ACCESS_DENIED, not to any 4xx.
  *   v1.0.0 — 2026-11-19 — Initial.
  */
 import * as http from 'node:http';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
+import { BASE, assert, expectRefusal, finish, json as request, test } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (e) { failed++; console.log(`  ❌ ${name}: ${(e as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: { method?: string; token?: string; body?: unknown } = {}) {
-    const res = await fetch(`${BASE}${path}`, {
+/** The harness request: GET without a body, POST with one, signed in with `token`. */
+function json(path: string, opts: { method?: string; token?: string; body?: unknown } = {}) {
+    return request(path, {
         method: opts.method ?? (opts.body === undefined ? 'GET' : 'POST'),
-        headers: { 'Content-Type': 'application/json', ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}) },
+        headers: opts.token ? { Authorization: `Bearer ${opts.token}` } : {},
         ...(opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }),
     });
-    const text = await res.text();
-    let body: any = { _raw: text };
-    try { body = JSON.parse(text); } catch { /* not JSON */ }
-    return { status: res.status, body };
 }
 const show = (r: { status: number; body: any }) => `${r.status} ${JSON.stringify(r.body?.error ?? r.body).slice(0, 300)}`;
 
@@ -90,7 +81,7 @@ await test('a published action behaves as today: its yes lets the registration t
     assert(calls === 1, `the action was asked once, got ${calls}`);
     answerAllowed = false;
     const no = await register();
-    assert(no.status >= 400 && no.status < 500, `registration with a no: ${show(no)}`);
+    expectRefusal(no, 403, 'HOOK_REJECTED');
     answerAllowed = true;
     const r = await row('pre_owner_registration');
     assert(r.missing === false && r.when_missing === 'pass', `row: ${JSON.stringify({ missing: r.missing, when_missing: r.when_missing })}`);
@@ -119,7 +110,7 @@ await test('default: registrations go through, and the operator is told once, no
 
 await test('another owner is refused the setting, and a notify hook has none', async () => {
     const other = await json('/v1/admin/hooks/pre_owner_registration', { method: 'PUT', token: OTHER.token, body: { when_missing: 'refuse' } });
-    assert(other.status === 403, `a non-operator: ${show(other)}`);
+    expectRefusal(other, 403, 'ACCESS_DENIED');
     const notify = await json('/v1/admin/hooks/post_owner_registration', { method: 'PUT', token: OP.token, body: { when_missing: 'refuse' } });
     assert(notify.status === 400 && notify.body?.error?.code === 'INVALID_INPUT', `a notify hook: ${show(notify)}`);
     const bad = await json('/v1/admin/hooks/pre_owner_registration', { method: 'PUT', token: OP.token, body: { when_missing: 'maybe' } });
@@ -133,7 +124,7 @@ await test('with "refuse" set over REST, the registration is refused and the log
     const set = await json('/v1/admin/hooks/pre_owner_registration', { method: 'PUT', token: OP.token, body: { when_missing: 'refuse' } });
     assert(set.status === 200 && set.body.data.when_missing === 'refuse', `set ${show(set)}`);
     const r = await register();
-    assert(r.status >= 400 && r.status < 500, `the registration is refused: ${show(r)}`);
+    expectRefusal(r, 403, 'HOOK_REJECTED');
     const hooks = (await json('/v1/admin/hooks', { token: OP.token })).body.data;
     const last = hooks.runs[0];
     assert(last.hook === 'pre_owner_registration' && last.answer === 'missing' && last.allowed === false, `the run: ${JSON.stringify(last)}`);
@@ -159,5 +150,4 @@ await test('cleanup: the operator clears the hook', async () => {
 });
 
 server.close();
-console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
-if (failed > 0) process.exit(1);
+finish();

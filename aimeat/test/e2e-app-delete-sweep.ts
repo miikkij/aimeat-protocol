@@ -19,6 +19,8 @@
  *   delete, and the delete reads the same rows whichever way they were written.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-delete-sweep
  * @version-history
+ *   v1.2.0 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); another account that is
+ *     not the operator is refused the admin delete (403 ACCESS_DENIED) and the app stays.
  *   v1.1.0 — 2026-11-19 — The list, the fixture and the database read moved to
  *     test/helpers/app-sweep-fixture.ts unchanged, so the owner erasure suite reads the same ones.
  *     Every test and assertion here is as it was.
@@ -33,15 +35,9 @@ import {
     json as httpJson, auth, show, setupOwner as registerSweepOwner, attachApp, attachAiSettings,
 } from './helpers/app-sweep-fixture.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+import { BASE, assert, expectRefusal, finish, test } from './helpers/harness.js';
 
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (e) { failed++; console.log(`  ❌ ${name}: ${(e as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 const json = (path: string, opts: RequestInit = {}) => httpJson(BASE, path, opts);
 const setupOwner = (label: string) => registerSweepOwner(BASE, NODE_ID, label);
@@ -137,6 +133,13 @@ await test('deleting an app that is not there answers 404 and leaves B alone', a
     assert(hits.some(h => storeOf(h, B)?.name === 'the design spec'), 'B keeps its design spec');
 });
 
+await test('another account that is not the operator is refused the admin delete of B, and B stays', async () => {
+    const del = await json(`/v1/admin/apps/${OWNER.name}/${B.file}`, { method: 'DELETE', headers: auth(OTHER.token) });
+    expectRefusal(del, 403, 'ACCESS_DENIED');
+    const open = await fetch(`${BASE}/v1/apps/${OWNER.name}/${B.file}`, { headers: auth(OWNER.token) });
+    assert(open.status === 200, `B still opens: ${open.status}`);
+});
+
 await test('the operator deletes app B through the admin route, and nothing of B is left either', async () => {
     // The suite's first account is the node's operator (a fresh database per suite).
     const del = await json(`/v1/admin/apps/${OWNER.name}/${B.file}`, { method: 'DELETE', headers: auth(OWNER.token) });
@@ -147,5 +150,4 @@ await test('the operator deletes app B through the admin route, and nothing of B
 });
 
 try { await (storage as unknown as { close?: () => unknown })?.close?.(); } catch { /* the process ends next */ }
-console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
-if (failed > 0) process.exit(1);
+finish();

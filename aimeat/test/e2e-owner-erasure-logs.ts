@@ -16,32 +16,19 @@
  *   The account name is released for reuse, which is why the name cannot stay (storage/erased-logs.ts).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-erasure-logs
  * @version-history
+ *   v1.1.0 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); 1c: an owner who is not
+ *     the operator is refused the change log and the flag list (403 ACCESS_DENIED).
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, part 2 of agent G).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
+import { BASE, assert, expectRefusal, finish, json as request, test } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
-let passed = 0;
-let failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-  try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit & { token?: string } = {}): Promise<{ status: number; body: any }> {
+/** The harness request, with the caller's token as a bearer header. */
+function json(path: string, opts: RequestInit & { token?: string } = {}): Promise<{ status: number; body: any }> {
   const { token, ...rest } = opts;
-  for (let attempt = 0; ; attempt++) {
-    const res = await fetch(`${BASE}${path}`, {
-      ...rest,
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(rest.headers ?? {}) },
-    });
-    if (res.status === 429 && attempt < 5) { await new Promise((r) => setTimeout(r, 1500)); continue; }
-    const text = await res.text();
-    try { return { status: res.status, body: JSON.parse(text) }; } catch { return { status: res.status, body: { _raw: text } }; }
-  }
+  return request(path, { ...rest, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(rest.headers as Record<string, string> | undefined) } });
 }
 const short = (v: unknown) => String(JSON.stringify(v)).slice(0, 300);
 const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64');
@@ -134,6 +121,11 @@ await test('1b. Bob\'s own line about his own app is unchanged', async () => {
   assert(after && after.changedBy === bobLineBefore.changedBy && after.summary === bobLineBefore.summary, `Bob's line: ${short(after)} was ${short(bobLineBefore)}`);
 });
 
+await test('1c. Bob, who is not the operator, is refused the site change log and the flag list', async () => {
+  expectRefusal(await json('/v1/site/changelog?limit=100', { token: bob.token }), 403, 'ACCESS_DENIED');
+  expectRefusal(await json('/v1/flags?per_page=100', { token: bob.token }), 403, 'ACCESS_DENIED');
+});
+
 console.log('\n2. The public activity feed');
 await test('2a. No event names Alice or links to her apps; Bob\'s fork event names the pseudonym', async () => {
   const r = await json('/v1/public/activity-feed?category=apps&limit=199');
@@ -159,5 +151,4 @@ await test('3a. The flag on Alice\'s record and her appeal are gone; Bob\'s flag
   assert(!(appeals.body.data.appeals as any[]).some(a => a.flagId === aliceFlag), `Alice's appeal is gone: ${short(appeals.body.data.appeals)}`);
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+finish();

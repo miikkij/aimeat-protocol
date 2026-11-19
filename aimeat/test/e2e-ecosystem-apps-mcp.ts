@@ -12,28 +12,15 @@
  *     5. the owner in person lists and removes over REST as before.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-apps-mcp
  * @version-history
+ *   v1.0.1 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); every test as it was.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, 4.4 item 2).
  */
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, toolNames } from './helpers/mcp-session.js';
 import { generateKeyPair } from '../src/auth/keypair.js';
+import { BASE, assert, finish, json, test } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
-
-let passed = 0;
-let failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-  try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-  const ct = res.headers.get('content-type') ?? '';
-  return { status: res.status, body: ct.includes('json') ? await res.json() : { _raw: await res.text() } };
-}
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 /** Connect the outside app `app` to `owner` (hello → approve → token) and return its token. */
@@ -124,5 +111,4 @@ await test('5. The owner in person still lists and removes over REST', async () 
   assert(del.status === 200 && del.body.data.deleted === true, `owner delete ${del.status}`);
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+finish();

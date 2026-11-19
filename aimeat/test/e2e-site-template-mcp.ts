@@ -12,20 +12,12 @@
  *        without operator:admin and another owner's agent are refused.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=site-template-mcp
  * @version-history
+ *   v1.0.1 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); every test as it was.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, 4.4 item 5).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, toolNames, type McpAgent, type McpSession } from './helpers/mcp-session.js';
-
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0;
-let failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-  try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
+import { BASE, assert, finish, test } from './helpers/harness.js';
 
 const stamp = Date.now().toString(36).slice(-5);
 const page = (lang: string, h1: string) => `<!doctype html><html lang="${lang}"><head><title>${h1}</title></head><body><h1>${h1}</h1></body></html>`;
@@ -109,5 +101,4 @@ await test('3c. The whole front page is deleted from the chat and the built-in o
   assert(html.includes('<div id="app"') && !html.includes('Uusi etusivu'), 'the SPA shell is back at /');
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+finish();
