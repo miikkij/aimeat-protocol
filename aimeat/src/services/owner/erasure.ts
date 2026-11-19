@@ -20,9 +20,15 @@
  *   NOT COVERED BY THE ROLLBACK: `evictAgentTelemetry` drops an in-process cache. If the transaction
  *   rolls back, that cache stays dropped; it refills from storage, so the cost is a cold read.
  *
- * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
- * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
+ * @structure eraseOwner(storage, nodeId, name, config) → { agentsDeleted, deletionLog }
+ * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name, config);
  * @version-history
+ *   2026-11-19 — Step apps removes each app as the owner's delete does (services/app/lifecycle.ts
+ *     removeWholeApp, which runs services/app/delete-sweep.ts): other people's grants to the app,
+ *     their push devices and AI settings naming it, the internet opening, the scope allowance, the
+ *     draft, the dependency edges and the content label stayed. Every app of the account, past the
+ *     first 50 the list used to return. Step app_addresses holds the app addresses for nobody. The
+ *     design specs, roadmaps and plans go for good, not to the bin. The config is a parameter.
  *   2026-11-14 — The visibility and behaviour counters hold the account for the length of the erasure
  *     (holdVisibilityForErasure, holdBehaviourForErasure): a merge that had read the owner before the
  *     cascade wrote its record back after it (register finding f-2026-11-13-write-buffers-and-erasure).
@@ -158,6 +164,9 @@ import { holdBehaviourForErasure } from '../visibility/behaviour-counter.js';
 import { purgeExceptions } from '../classification/exceptions.js';
 import { eraseAppMembership } from '../app/member-erasure.js';
 import { eraseAppDesignSpecsOf } from '../app/design-spec.js';
+import { removeWholeApp } from '../app/lifecycle.js';
+import { holdAppLabelsOfErasedAccount } from '../held-app-labels.js';
+import type { AimeatConfig } from '../../config.js';
 import { eraseAppPlansOf } from '../app/plan.js';
 import { eraseAppRoadmapsOf } from '../app/roadmap.js';
 import { revokeEntitlementsOfAccount } from '../entitlement/erasure.js';
@@ -250,7 +259,7 @@ async function removeAccountFromOrganism(
  * Erase an owner: everything the storage cascade cannot see, then the cascade itself, in one
  * transaction. Returns what was cleared so the caller can report it.
  */
-export async function eraseOwner(storage: Storage, nodeId: string, name: string): Promise<OwnerErasureResult> {
+export async function eraseOwner(storage: Storage, nodeId: string, name: string, config: AimeatConfig): Promise<OwnerErasureResult> {
   const agents = await storage.getAgentsByOwner(name);
   const ghii = `${name}@${nodeId}`;
   const deletionLog: string[] = [];
@@ -462,10 +471,33 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       return n ? `provider_clients:${n}` : null;
     }, deletionLog, storage);
 
+    // Each app goes the way the owner's own delete removes it (services/app/lifecycle.ts
+    // removeWholeApp): every version in every bucket, and everything the app alone used, including
+    // the stores outside this person's namespace that the cascade never sees: other people's grants
+    // to the app, their push devices on its origin and their AI settings that name it, the internet
+    // opening, the scope allowance, the content label. One app that fails is logged and the next one
+    // runs, each in its own savepoint. The list is read again until it is empty, because it comes a
+    // page at a time and a delete moves the page.
     await step('apps', async () => {
-      const { apps } = await storage.listApps({ ownerGaii: ghii });
-      for (const a of apps) await storage.deleteApp(ghii, a.filename);
-      return apps.length ? `apps:${apps.length}` : null;
+      const done = new Set<string>();
+      for (;;) {
+        const { apps } = await storage.listApps({ ownerGaii: ghii, viewerGhii: ghii, limit: 500 });
+        const next = [...new Set(apps.map(a => a.filename))].filter(f => !done.has(f));
+        if (!next.length) break;
+        for (const filename of next) {
+          done.add(filename);
+          await inSavepoint(storage, () => removeWholeApp(storage, config, { ownerName: name, ownerGhii: ghii, filename }))
+            .catch(err => logger.warn('eraseOwner: an app was not removed whole; the cascade takes its rows', { filename, error: String(err) }));
+        }
+      }
+      return done.size ? `apps:${done.size}` : null;
+    }, deletionLog, storage);
+
+    // The held addresses of those apps: held for nobody, so the next holder of the released name does
+    // not get an erased person's app origin back (services/held-app-labels.ts).
+    await step('app_addresses', async () => {
+      const n = await holdAppLabelsOfErasedAccount(storage, name, erasedPartyPseudonym());
+      return n ? `app_addresses:${n}` : null;
     }, deletionLog, storage);
 
     // The people who registered to this person's apps without an account, and what they kept in

@@ -2,6 +2,7 @@
  * @file src/services/app/record-keys.ts
  * @description Collision-free app record identities and verified legacy migration.
  * @version-history
+ *   2026-11-19 - eraseAppRecordsOfAuthor: an erasure deletes the author's records for good, not to the bin.
  *   2026-11-19 - legacyAppSegment: the app delete reaches a record still under the lossy segment.
  *   2026-11-04 - No guard for a storage without createMemoryIfAbsent: it is required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 - readAuthorAppRecord and appRecordsOfAuthor: an author's records (the design spec, the roadmap) do not pass to the next holder of an erased name (secaudit2026oct26).
@@ -75,6 +76,19 @@ export async function appRecordsOfAuthor(storage: Storage, ns: string, prefix: s
     const id = canonicalAppId(String((r.value as { appId?: unknown } | null)?.appId ?? ''));
     return id.startsWith(`${who}/`);
   });
+}
+
+/**
+ * Delete for good the records of a namespace whose app id names `account` as the app's author, and
+ * their stored versions. For an erasure: a record in the bin would still hold the erased person's
+ * text until the sweeper's grace period ends, and the bin can give it back. Returns how many went.
+ */
+export async function eraseAppRecordsOfAuthor(storage: Storage, ns: string, prefix: string, account: string): Promise<number> {
+  const refs = (await appRecordsOfAuthor(storage, ns, prefix, account)).map(r => ({ ownerGaii: ns, key: r.key }));
+  if (!refs.length) return 0;
+  await storage.bulkDeleteMemory(refs);
+  for (const r of refs) await storage.pruneMemoryHistory(r.ownerGaii, r.key, 0);
+  return refs.length;
 }
 
 /** Complete, namespace-pinned scans. Canonical rows take precedence over legacy duplicates. */

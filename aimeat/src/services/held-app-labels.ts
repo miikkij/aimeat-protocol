@@ -20,11 +20,14 @@
  *     releasing the one held longest first, so deleting apps does not hoard addresses.
  *   The operator releases a held label at any time with the ordinary delete on the Subdomains page
  *   (DELETE /v1/admin/subdomains/:subdomain, MCP aimeat_app_manage subdomain_delete).
- * @structure holdAppLabels(storage, ownerBare, filename, config?) · sweepHeldAppLabels(storage, config, now?)
+ * @structure holdAppLabels(storage, ownerBare, filename, config?) · holdAppLabelsOfErasedAccount(storage, ownerBare, pseudonym)
+ *   · sweepHeldAppLabels(storage, config, now?)
  * @usage
  *   await holdAppLabels(storage, ownerName, filename, config);       // when an app goes away
  *   scheduler.registerCoreHandler('held-label-release', () => sweepHeldAppLabels(storage, config));
  * @version-history
+ *   v1.1.0 — 2026-11-19 — holdAppLabelsOfErasedAccount: an erased account's labels are held for nobody,
+ *     so the next holder of the released name does not get them back (services/owner/erasure.ts).
  *   v1.0.1 — 2026-10-25 — The mappings are read a page at a time (listSubdomainSitesPage), and whether
  *     an app is there is asked of storage here: a service does not import a route (check:deps).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, app-label-recycled-after-delete).
@@ -101,6 +104,28 @@ export async function holdAppLabels(storage: Storage, ownerBare: string, filenam
   if (!config) return [];
   const held = sites.filter(s => s.kind === 'app' && s.heldSince && ownerOfTarget(s.target) === ownerBare);
   return releaseOverLimit(storage, config, held);
+}
+
+/**
+ * The held labels of an erased account's apps are held for nobody. Their target named the account by
+ * its name, which is released for reuse, so the next holder of the name who published an app of the
+ * same file name got the label back, and with it what the erased person's visitors kept in their
+ * browsers on that origin. The target becomes `<pseudonym>/<filename>`: no account can be the
+ * pseudonym (storage/erased-party.ts), so the label serves nobody, and the daily sweep releases it
+ * after apps.held_label_days as it does every held label. Returns how many labels were changed.
+ */
+export async function holdAppLabelsOfErasedAccount(storage: Storage, ownerBare: string, pseudonym: string): Promise<number> {
+  const now = new Date().toISOString();
+  const who = ownerBare.toLowerCase();
+  let n = 0;
+  for (const s of await allSites(storage)) {
+    if (s.kind !== 'app') continue;
+    const owner = ownerOfTarget(s.target);
+    if (!owner || localAccountName(owner).toLowerCase() !== who) continue;
+    await storage.updateSubdomainSite(s.subdomain, { target: `${pseudonym}${s.target.slice(owner.length)}`, heldSince: s.heldSince ?? now });
+    n++;
+  }
+  return n;
 }
 
 /** The daily sweep: the marks follow the apps, then age and the per-owner limit release labels. */

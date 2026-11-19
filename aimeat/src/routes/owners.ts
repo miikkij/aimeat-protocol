@@ -11,6 +11,7 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   2026-11-19 — eraseOwner takes the config: the erasure removes each app as the owner's delete does.
  *   2026-10-27 — The operator claim reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   2026-10-27 — The operator claim reads requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-23 — The operator claim reads the request's socket address: a loopback base URL waives the
@@ -341,7 +342,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
 
     // The whole erasure lives in one service function, in one transaction, so a failure between
     // steps cannot leave the account half-deleted and a second door can reach it. GAP-001.
-    const { agentsDeleted, deletionLog } = await eraseOwner(storage, config.nodeId, name);
+    const { agentsDeleted, deletionLog } = await eraseOwner(storage, config.nodeId, name, config);
 
     res.json(success(config.nodeId, {
       deleted: true,

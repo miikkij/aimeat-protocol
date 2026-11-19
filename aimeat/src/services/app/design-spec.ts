@@ -38,6 +38,7 @@
  *   const spec = await readAppDesignSpec(storage, 'alice/paja.html');
  *   const out = await writeAppDesignSpec(storage, { appId, markdown, by, principal, appVersion });
  * @version-history
+ *   2026-11-19 — eraseAppDesignSpecsOf deletes for good, not to the bin (record-keys.ts eraseAppRecordsOfAuthor).
  *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-10-27 — A spec older than the account that now holds the author name is an earlier
@@ -45,7 +46,7 @@
  *   v1.0.0 — 2026-10-02 — Initial (wish-sovelluksen-design-speksi-sovelluksen-l-helle-settings-contr).
  */
 import type { Storage } from '../../storage/interface.js';
-import { appKeySegment, readAuthorAppRecord, appRecordsOfAuthor, equalAppId } from './record-keys.js';
+import { appKeySegment, readAuthorAppRecord, eraseAppRecordsOfAuthor, equalAppId } from './record-keys.js';
 
 export const APP_DESIGN_SPEC_SPEC = 'aimeat.appdesignspec/1' as const;
 
@@ -194,9 +195,7 @@ export async function deleteAppDesignSpec(storage: Storage, appId: string): Prom
  * Returns how many went.
  */
 export async function eraseAppDesignSpecsOf(storage: Storage, account: string): Promise<number> {
-  const rows = await appRecordsOfAuthor(storage, NS_SPEC, 'appdesignspec.', account);
-  for (const r of rows) await storage.deleteMemory(NS_SPEC, r.key);
-  return rows.length;
+  return eraseAppRecordsOfAuthor(storage, NS_SPEC, 'appdesignspec.', account);
 }
 
 function emptySpec(appId: string): AppDesignSpec {

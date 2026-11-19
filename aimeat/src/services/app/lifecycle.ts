@@ -41,6 +41,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.15.0 — 2026-11-19 — removeWholeApp: the whole-app half of deleteOwnedApp, extracted unchanged,
+ *     so the account erasure removes each app the way the owner's delete does.
  *   v1.14.0 — 2026-11-19 — A whole-app delete runs removeAppLeftovers (services/app/delete-sweep.ts):
  *     the five removals it made move there, and the settings, checkpoints, roster, icon, draft, bound
  *     skills, internet opening, grants and the rest go too. The input carries the config.
@@ -685,6 +687,42 @@ export interface DeletedApp {
 }
 
 /**
+ * Remove every version of an app in every bucket, and everything the app alone used. The whole-app
+ * half of deleteOwnedApp, which the account erasure calls for each app as well (services/owner/erasure.ts).
+ * Writes no site change log line and sends no change event: the caller decides those, and an erasure
+ * must not write the erased name into a log that stays. Returns false when there was no such app.
+ */
+export async function removeWholeApp(
+  storage: Storage, config: AimeatConfig, t: { ownerName: string; ownerGhii: string; filename: string },
+): Promise<boolean> {
+  const { ownerName, ownerGhii, filename } = t;
+  let sweepCount = 0;
+  const buckets: string[] = [];
+  for (;;) {
+    const app = await storage.getAppByOwnerName(ownerName, filename);
+    if (!app) break;
+    // Authorization sanity check: ownerName MUST match the caller's owner. (It always will,
+    // because getAppByOwnerName takes ownerName as the key — but defense in depth.)
+    if (app.ownerName !== ownerName) break;
+    await storage.deleteApp(app.ownerGaii, filename);
+    buckets.push(app.ownerGaii);
+    await forgetDependencies(storage, 'app', depAppRef(ownerName, filename))
+      .catch(err => logger.warn('deleteOwnedApp: dependency map not cleared', { filename, error: String(err) }));
+    await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`)
+      .catch(err => { logger.warn('deleteOwnedApp: continuing after a suppressed failure', { error: String(err) }); });
+    sweepCount++;
+    if (sweepCount > 10) break; // safety cap, no real owner has >10 buckets
+  }
+  if (sweepCount === 0) return false;
+  // The whole app went, so everything it alone used goes too: its compliance documents, plan,
+  // registered people, Design Book reasons, settings, roster, grants and the rest, each named in
+  // services/app/delete-sweep.ts, which also says what stays and why (the design spec and the
+  // roadmap, which a republish finds again). Its address is held for this owner.
+  await removeAppLeftovers(storage, config, { ownerName, ownerGhii, filename, buckets });
+  return true;
+}
+
+/**
  * Remove an app the caller owns, with or without a version.
  *
  * The no-version case sweeps EVERY bucket this owner has for the filename. Old publish paths wrote
@@ -700,24 +738,7 @@ export async function deleteOwnedApp(
   const { ownerName, ownerGhii, callerGaii, filename, version } = input;
 
   if (!version) {
-    let sweepCount = 0;
-    const buckets: string[] = [];
-    for (;;) {
-      const app = await storage.getAppByOwnerName(ownerName, filename);
-      if (!app) break;
-      // Authorization sanity check: ownerName MUST match the caller's owner. (It always will,
-      // because getAppByOwnerName takes ownerName as the key — but defense in depth.)
-      if (app.ownerName !== ownerName) break;
-      await storage.deleteApp(app.ownerGaii, filename);
-      buckets.push(app.ownerGaii);
-      await forgetDependencies(storage, 'app', depAppRef(ownerName, filename))
-        .catch(err => logger.warn('deleteOwnedApp: dependency map not cleared', { filename, error: String(err) }));
-      await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`)
-        .catch(err => { logger.warn('deleteOwnedApp: continuing after a suppressed failure', { error: String(err) }); });
-      sweepCount++;
-      if (sweepCount > 10) break; // safety cap, no real owner has >10 buckets
-    }
-    if (sweepCount === 0) {
+    if (!(await removeWholeApp(storage, input.config, { ownerName, ownerGhii, filename }))) {
       return {
         refusal: {
           status: 404, code: 'NOT_FOUND',
@@ -725,11 +746,6 @@ export async function deleteOwnedApp(
         },
       };
     }
-    // The whole app went, so everything it alone used goes too: its compliance documents, plan,
-    // registered people, Design Book reasons, settings, roster, grants and the rest, each named in
-    // services/app/delete-sweep.ts, which also says what stays and why (the design spec and the
-    // roadmap, which a republish finds again). Its address is held for this owner.
-    await removeAppLeftovers(storage, input.config, { ownerName, ownerGhii, filename, buckets });
   } else {
     // Single-version case: try the buckets in order, delete from the one that has it.
     let app = await storage.getApp(ownerGhii, filename, version);

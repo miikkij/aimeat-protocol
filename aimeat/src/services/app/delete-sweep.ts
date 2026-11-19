@@ -3,8 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Everything a whole-app delete removes besides the app's own rows: one list of steps,
- *   so the owner's delete (services/app/lifecycle.ts deleteOwnedApp, REST and MCP) and the operator's
- *   delete (DELETE /v1/admin/apps/:owner/:filename) remove the same things.
+ *   so the owner's delete (services/app/lifecycle.ts deleteOwnedApp, REST and MCP), the operator's
+ *   delete (DELETE /v1/admin/apps/:owner/:filename) and the erasure of the account that owns the app
+ *   (services/owner/erasure.ts, which calls deleteOwnedApp per app) remove the same things.
  *
  *   WHY IT EXISTS. Deleting an app removed its rows, screenshot, dependencies, compliance documents,
  *   plan and registered people, and left the rest: the settings values, the App Catalog checkpoints
@@ -56,12 +57,15 @@
  * @usage
  *   await removeAppLeftovers(storage, config, { ownerName, ownerGhii, filename, buckets: [app.ownerGaii] });
  * @version-history
+ *   v1.1.0 — 2026-11-19 — Each step runs in its own savepoint, so the account erasure, which runs this
+ *     inside its transaction for every app the account owns, keeps going past a refused statement.
  *   v1.0.0 — 2026-11-19 — Initial: the delete completeness fix (feature audit 2026-11-19, 4.3). The
  *     first five steps moved here from deleteOwnedApp; the plan now goes for good instead of to the bin.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { inSavepoint } from '../tolerant-step.js';
 import { appSlug } from '../../utils/gaii.js';
 import { removeComplianceDocs } from '../compliance/docs.js';
 import { holdAppLabels } from '../held-app-labels.js';
@@ -342,7 +346,10 @@ export async function removeAppLeftovers(storage: Storage, config: AimeatConfig,
   const failed: string[] = [];
   for (const step of APP_SWEEP_STEPS) {
     try {
-      await step.run(c);
+      // Its own savepoint inside an open transaction (the account erasure runs this in one): on
+      // PostgreSQL a statement the database refuses would otherwise fail every step after it. Outside
+      // a transaction (the owner's and the operator's delete) the savepoint is no savepoint.
+      await inSavepoint(storage, () => step.run(c));
     } catch (err) {
       failed.push(step.name);
       logger.warn('removeAppLeftovers: a store was not cleared; the next one runs', { step: step.name, filename: t.filename, error: String(err) });

@@ -6,6 +6,7 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — eraseOwner takes the config: the erasure removes each app as the owner's delete does.
  *   2026-11-02 — The sign-in policy (services/sign-in-policy.ts). POST /v1/ghii/login answers 403
  *     PASSWORD_SIGN_IN_OFF before the password is read when password sign-in is off (a federated
  *     sign-in also under `operators`), and after it for a non-operator under `operators`; a covered
@@ -202,7 +203,7 @@ export function registerRegisterLoginRoutes(
                 // Test mode: wipe old account entirely and re-create (E2E test isolation)
                 preservedRoles = existingOwner.roles;
                 // The one account deletion (services/owner/erasure.ts; secaudit 2026-10, C7).
-                await eraseOwner(storage, config.nodeId, username);
+                await eraseOwner(storage, config.nodeId, username, config);
             } else if (config.devMode) {
                 // Dev mode: reset credentials only, preserve all data (agents, memory, etc.)
                 preservedRoles = existingOwner.roles;

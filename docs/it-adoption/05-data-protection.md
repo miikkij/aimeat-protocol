@@ -117,6 +117,8 @@ flowchart LR
   C --> F[Outside file store objects: removed later by the daily sweep]
 ```
 
+Each app the person owns is removed the way the person's own delete of that app removes it: every version, and what only the app used, also outside the person's own records (other people's grants to the app are revoked, their push devices on its origin and their AI settings naming it are removed, and so are the app's internet opening and its permission allowance). The app's own web address is held for nobody, so the next account with the released name does not get it back; the daily sweep releases it after `AIMEAT_APP_HELD_LABEL_DAYS`. The app's design spec, roadmap and plan are deleted for good, not moved to the bin (`aimeat/src/services/app/delete-sweep.ts`, `aimeat/src/services/held-app-labels.ts`).
+
 Sources: `aimeat/src/services/owner/erasure.ts`, `aimeat/src/storage/erased-account-records.ts`, `aimeat/src/storage/providers/postgres-kysely/methods/owner-cascade.ts`, `aimeat/src/storage/providers/postgres-kysely/methods/identity-erasure.ts`.
 
 ## Where the data is, and what leaves
