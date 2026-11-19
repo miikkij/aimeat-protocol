@@ -19,6 +19,8 @@
  * @structure markSuspicion · listSuspicions · readSuspicion · updateSuspicion · submitSuspicion ·
  *   closeSuspicion · assistNarrative
  * @version-history
+ *   v1.0.1 — 2026-11-20 — A draft update keeps the fields it does not send (sentFields): a new
+ *     narrative emptied the indicators and transactions through the zod partial defaults.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import { logger } from '../../utils/logger.js';
@@ -28,7 +30,7 @@ import { completeForOwner } from '../ai/completion.js';
 import { notify } from '../notify.js';
 import { emitChange } from '../event-bus.js';
 import { KycError, kycContext, requireCards, requireOfficer, type KycDeps } from './access.js';
-import { SuspicionReportSchema, type SuspicionReport } from './contract.js';
+import { SuspicionReportSchema, sentFields, type SuspicionReport } from './contract.js';
 import { retentionUntil } from './risk.js';
 import { UNCHANGED } from '../record-cas.js';
 import { listReports, readHead, readReport, readVersions, writeReport } from './store.js';
@@ -85,7 +87,8 @@ export async function updateSuspicion(deps: KycDeps, caller: CallerContext, org:
   const out = await writeReport(deps.storage, deps.config.nodeId, org, id, (cur) => {
     if (!cur) throw new KycError(404, 'REPORT_NOT_FOUND', 'No such suspicion in this organism.');
     if (cur.status === 'submitted' || cur.status === 'not-reported') throw new KycError(409, 'REPORT_CLOSED', 'This case is decided and does not change.');
-    const d = Object.fromEntries(Object.entries(parsed.data).filter(([, v]) => v !== undefined));
+    // Only what the caller sent: a new narrative must not empty the indicators or the transactions.
+    const d = sentFields(patch, parsed.data);
     return { ...cur, ...d, status: 'draft', updatedAt: now(), updatedBy: ctx.by };
   });
   return out!;

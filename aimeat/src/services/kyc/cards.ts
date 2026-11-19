@@ -17,6 +17,8 @@
  * @structure openCustomer · updateCustomer · recordIdentity · screenCustomer · decideHit · approveCustomer ·
  *   reviewCustomer · endCustomer · extendHold · readCustomer · customerAsOf · listCustomers · rescreenAll
  * @version-history
+ *   v1.0.2 — 2026-11-20 — A settings update keeps the fields it does not send too (sentFields): one
+ *     staff change emptied the officers and the country list.
  *   v1.0.1 — 2026-11-19 — An update keeps the fields it does not send: zod 4 fills a field's default
  *     inside .partial(), so a PATCH without pep set it to 'unknown' and one without owners to [].
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
@@ -25,7 +27,7 @@ import { randomUUID } from 'node:crypto';
 import type { CallerContext } from '../caller-context.js';
 import { KycError, kycContext, requireCards, requireInPerson, requireOfficer, requireSettings, type KycContext, type KycDeps } from './access.js';
 import {
-  CustomerInputSchema, IdentitySchema, KycSettingsSchema,
+  CustomerInputSchema, IdentitySchema, KycSettingsSchema, sentFields,
   type CustomerHead, type CustomerInput, type CustomerVersion, type Identity, type Screening, type ScreeningHit,
 } from './contract.js';
 import { rateRisk, retentionUntil, type RiskFacts } from './risk.js';
@@ -130,10 +132,8 @@ async function cardsContext(deps: KycDeps, caller: CallerContext, org: string): 
 function parseInput(input: unknown): CustomerInput {
   const parsed = CustomerInputSchema.safeParse(input ?? {});
   if (!parsed.success) throw new KycError(400, 'INVALID_INPUT', parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
-  // A field's .default() still fires inside .partial() (zod 4): an update that leaves out pep or
-  // beneficialOwners would reset them to 'unknown' and []. Only the fields the caller sent count.
-  const sent = new Set(Object.keys((input ?? {}) as Record<string, unknown>));
-  return Object.fromEntries(Object.entries(parsed.data).filter(([k]) => sent.has(k))) as CustomerInput;
+  // An update that leaves out pep or beneficialOwners must not reset them to 'unknown' and [].
+  return sentFields(input, parsed.data) as CustomerInput;
 }
 
 async function current(deps: KycDeps, org: string, id: string): Promise<CustomerVersion> {
@@ -299,8 +299,10 @@ export async function updateSettings(deps: KycDeps, caller: CallerContext, org: 
   // Validated before the write, so a wrong value answers 400 with the field, not a failure inside the write.
   const parsed = KycSettingsSchema.partial().safeParse(stripUndefined((patch ?? {}) as Record<string, unknown>));
   if (!parsed.success) throw new KycError(400, 'INVALID_INPUT', parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
+  // Only what the caller sent: adding one staff member must not empty the officers or the country list.
+  const sent = sentFields(patch, parsed.data as Record<string, unknown>);
   return writeSettings(deps.storage, deps.config.nodeId, org, (cur) => ({
-    ...cur, ...stripUndefined(parsed.data as Record<string, unknown>), updatedAt: now(), updatedBy: ctx.by,
+    ...cur, ...sent, updatedAt: now(), updatedBy: ctx.by,
   }) as KycSettings);
 }
 

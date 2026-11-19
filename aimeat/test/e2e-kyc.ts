@@ -99,6 +99,9 @@ await test('Settings: the admin names the officer and the staff; a plain member 
   expectRefusal(await call(K('/settings'), C.token, { method: 'PUT', body: { staff: [C.ghii] } }), 403, 'KYC_NOT_MANAGER');
   const w = await call(K('/settings'), A.token, { method: 'PUT', body: { officers: [A.ghii], staff: [B.ghii] } });
   assert(w.status === 200 && w.body.data.officers[0] === A.ghii && w.body.data.staff[0] === B.ghii, `settings: ${show(w)}`);
+  // A settings update changes only what it sends: naming the staff again keeps the officers.
+  const w2 = await call(K('/settings'), A.token, { method: 'PUT', body: { staff: [B.ghii] } });
+  assert(w2.status === 200 && w2.body.data.officers?.[0] === A.ghii, `officers stay: ${JSON.stringify(w2.body.data?.officers)}`);
   expectRefusal(await call(K('/settings'), agentA, { method: 'PUT', body: { staff: [] } }), 403, 'KYC_DECISION_IN_PERSON');
 });
 
@@ -208,6 +211,9 @@ await test('A suspicion: the agent marks it and learns only that it was received
 await test('The officer drafts, records the goAML submission; the case then does not change', async () => {
   const d = await call(K(`/suspicions/${rid}`), A.token, { method: 'PATCH', body: { reportType: 'STR', indicators: ['structuring'], narrative: 'Three cash deposits under the threshold.' } });
   assert(d.status === 200 && d.body.data.status === 'draft', `draft: ${show(d)}`);
+  // A draft update changes only what it sends: a new narrative keeps the indicators.
+  const d2 = await call(K(`/suspicions/${rid}`), A.token, { method: 'PATCH', body: { narrative: 'Three cash deposits under the threshold, in one week.' } });
+  assert(d2.status === 200 && (d2.body.data.indicators as string[])?.[0] === 'structuring', `indicators stay: ${JSON.stringify(d2.body.data?.indicators)}`);
   // The contract requires goaml_ref, so the request check answers before the route (VALIDATION_ERROR).
   expectRefusal(await call(K(`/suspicions/${rid}/submit`), A.token, { body: {} }), 400, 'VALIDATION_ERROR');
   const s = await call(K(`/suspicions/${rid}/submit`), A.token, { body: { goaml_ref: 'GOAML-2026-0001' } });

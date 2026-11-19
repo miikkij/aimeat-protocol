@@ -20,6 +20,7 @@
  *   does, after AMLR art. 77's five years.
  * @structure CustomerVersion · CustomerHead · KycSettings · SuspicionReport · PurgeReceipt · the zod schemas
  * @version-history
+ *   v1.0.1 — 2026-11-20 — sentFields: a partial update keeps only the fields the caller sent.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import { z } from 'zod';
@@ -210,6 +211,18 @@ export const SuspicionReportSchema = z.object({
   retainUntil: iso.optional(),
 });
 export type SuspicionReport = z.infer<typeof SuspicionReportSchema>;
+
+/**
+ * The fields of a partial update that the caller actually sent, from the parsed data. Under zod 4 a
+ * field's .default() still fires inside .partial(), so a parsed update carries every defaulted field
+ * the caller left out (pep 'unknown', officers [], reviewMonths 60/36/12) and a merge onto the stored
+ * record would reset them. Dropping `undefined` does not help: the defaults are real values.
+ * Every partial update in services/kyc/ goes through this (docs/pitfalls.md §127).
+ */
+export function sentFields<T extends Record<string, unknown>>(input: unknown, parsed: T): Partial<T> {
+  const sent = new Set(Object.keys(input && typeof input === 'object' ? input as Record<string, unknown> : {}));
+  return Object.fromEntries(Object.entries(parsed).filter(([k, v]) => sent.has(k) && v !== undefined)) as Partial<T>;
+}
 
 /** What stays when a card is purged: no personal data, only that it existed and why it went. */
 export interface PurgeReceipt { id: string; organism: string; openedAt: string; endedAt: string | null; purgedAt: string; versions: number; basis: string }
