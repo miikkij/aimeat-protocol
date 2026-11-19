@@ -8,6 +8,7 @@
  *   the person is told theirs seems too weak.
  * @usage cd aimeat && pnpm exec vitest run test/unit/handbook-model-advice.test.ts
  * @version-history
+ *   v2.1.0 — 2026-11-19 — The appdev step is "0. THE GUIDE", and the skill that carries the rule is the Atelier one (the Classic skill is retired).
  *   v2.0.0 — 2026-11-08 — The rule by quality (MODEL_QUALITY_ADVICE), no model named anywhere it is said.
  *   v1.0.0 — 2026-10-01 — Initial.
  */
@@ -16,7 +17,7 @@ import { FULL_HANDBOOK } from '../../src/services/handbooks/full.js';
 import { APPDEV_HANDBOOK } from '../../src/services/handbooks/appdev.js';
 import { MODEL_QUALITY_ADVICE } from '../../src/services/model-recommendation.js';
 import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
-import { APP_BUILDER_SKILL_ENTRY } from '../../src/data/builtin-skills.app-builder.js';
+import { APP_BUILDER_ATELIER_SKILL_ENTRY } from '../../src/data/builtin-skills.app-builder-atelier.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const NAMED = /Claude Opus|Claude Fable|\bSonnet\b|\bHaiku\b/;
@@ -41,11 +42,13 @@ describe('the model rule, wherever a builder reads it', () => {
         expect(flow).not.toMatch(NAMED);
     });
 
-    it('the Atelier specification and the Classic skill carry it, and name no model', () => {
+    // The Classic skill carried it until 2026-11-19; its "Which model builds it" moved to the Atelier
+    // skill (builtin-skills.app-builder-common.ts) when the Classic track was retired.
+    it('the Atelier specification and the Atelier skill carry it, and name no model', () => {
         const spec = buildAtelierPrompt({ baseUrl: 'https://node.example', nodeId: 'n' } as unknown as AimeatConfig, { mode: 'new', lang: 'en' }).full;
         expect(spec).toContain(MODEL_QUALITY_ADVICE);
         expect(spec).not.toMatch(/Claude Opus or Claude Fable/);
-        expect(APP_BUILDER_SKILL_ENTRY.skillMd).toContain(MODEL_QUALITY_ADVICE);
-        expect(APP_BUILDER_SKILL_ENTRY.skillMd).not.toMatch(/Claude Opus or Claude Fable/);
+        expect(APP_BUILDER_ATELIER_SKILL_ENTRY.skillMd).toContain(MODEL_QUALITY_ADVICE);
+        expect(APP_BUILDER_ATELIER_SKILL_ENTRY.skillMd).not.toMatch(/Claude Opus or Claude Fable/);
     });
 });

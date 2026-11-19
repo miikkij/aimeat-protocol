@@ -21,6 +21,8 @@
  * @usage import { getLibraryPacks, buildPromptLibrarySections } from '../data/library-packs.js';
  * @version-history
  *   v1.4.0 — 2026-11-19 — The index carries no tierHint: the Classic track's T1/T2/T3 are retired.
+ *     buildCapabilityPackLines: the capability-pack block of buildPromptLibrarySections, extracted
+ *     unchanged, for the Atelier platform section `engines`.
  *   v1.3.0 — 2026-11-10 — The Classic specification's library list leaves out a pack marked
  *     promptTrack 'atelier': that list is one part under a size limit and was full.
  *   v1.2.0 — 2026-10-09 — PackChange, PackProof and LibraryPack come from ./library-packs/types.ts
@@ -137,8 +139,18 @@ export function buildPromptLibrarySections(nodeUrl: string): string {
     if (p.promptLine && p.status !== 'deprecated') s += p.promptLine + '\n';
   }
   s += 'Example: <script src="' + nodeUrl + '/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></' + 'script>\n\n';
+  return s + buildCapabilityPackLines(nodeUrl);
+}
 
-  const capability = VENDORED_PACKS.filter(p => p.status !== 'deprecated');
+/**
+ * The vendored third-party engines (capability packs) with their include lines, reliability tags and
+ * the one load-bearing caveat of a frontier pack. Moved out of buildPromptLibrarySections unchanged on
+ * 2026-11-19 so the Atelier platform section `engines` (services/builder/atelier-platform.ts) serves
+ * the same lines; `except` leaves packs out, which the Atelier section uses for the Classic styling pack.
+ */
+export function buildCapabilityPackLines(nodeUrl: string, except: string[] = []): string {
+  let s = '';
+  const capability = VENDORED_PACKS.filter(p => p.status !== 'deprecated' && !except.includes(p.id));
   if (capability.length > 0) {
     s += 'Optional capability packs (vendored third-party libraries, self-hosted on this node — NEVER load these from an external CDN):\n';
     s += 'Each pack carries a reliability tag from AEB testing: [any] a mid-tier model codes it correctly from memory · [frontier] the pinned API BREAKS vs the version you likely know — you MUST fetch its ai_doc, and heed the ⚠ line · [needs-doc] AIMEAT-authored, no priors — fetch its ai_doc or you cannot use it.\n';

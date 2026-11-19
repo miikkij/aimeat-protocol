@@ -12,8 +12,9 @@
  *   what the connector's two doors call, so the three cannot answer differently.
  * @structure nodeTemplateAnswer(id) · nodeTemplateIndex() · templateAnswer(storage, config, id) ·
  *   templateIndex(storage, config) · unknownTemplateMessage(id)
- * @usage const t = await templateAnswer(storage, config, 'shell-pure-client');   // null when nothing answers to that id
+ * @usage const t = await templateAnswer(storage, config, 'shell-atelier');   // null when nothing answers to that id
  * @version-history
+ *   v1.3.0 — 2026-11-19 — No `tier` in the index: the Classic tiered shells are retired.
  *   v1.2.0 — 2026-09-20 — templateAnswer() and templateIndex(): the doors also answer a genre that
  *     grew out of an app (design-book/grown-genre.ts), so a builder forks it the way it forks a
  *     shipped one. The cutting into parts is one helper for both.
@@ -105,7 +106,7 @@ export async function templateAnswer(storage: Storage, config: AimeatConfig, id:
 }
 
 /** The shipped index, and after it the genres that grew out of apps and still stand. */
-export async function templateIndex(storage: Storage, config: AimeatConfig): Promise<Array<{ id: string; kind: string; tier?: string; track?: string; title: string; source?: string }>> {
+export async function templateIndex(storage: Storage, config: AimeatConfig): Promise<Array<{ id: string; kind: string; track?: string; title: string; source?: string }>> {
   const grown = await new DesignBookService(storage, config).grownGenres();
   return [...nodeTemplateIndex(), ...grown.map(g => ({ id: g.id, kind: 'genre', title: g.title, source: 'design-book' }))];
 }
@@ -115,9 +116,9 @@ export async function templateIndex(storage: Storage, config: AimeatConfig): Pro
  * serves (no description, no library list): with those it is 21 000 characters for 54 templates,
  * which beside the owner's own proposals is more than one tool result reliably carries.
  */
-export function nodeTemplateIndex(): Array<{ id: string; kind: string; tier?: string; track?: string; title: string }> {
-  return getAppTemplateIndex().map(({ id, kind, tier, track, title }) => ({
-    id, kind, ...(tier ? { tier } : {}), ...(track ? { track } : {}), title,
+export function nodeTemplateIndex(): Array<{ id: string; kind: string; track?: string; title: string }> {
+  return getAppTemplateIndex().map(({ id, kind, track, title }) => ({
+    id, kind, ...(track ? { track } : {}), title,
   }));
 }
 

@@ -23,6 +23,9 @@
  * @structure PROJECT_WORKSTATION — the multi-file scaffold, files separated by `=== file: <path> ===`
  * @usage import { PROJECT_WORKSTATION } from './app-templates/workstation.js';
  * @version-history
+ *   v1.1.0 — 2026-11-19 — src/index.html and the src/*.js files are on the Atelier shell since the
+ *     Classic track was retired; the project layout and the build, publish and verify scripts are
+ *     unchanged.
  *   v1.0.1 — 2026-11-15 — The publish script names the presigned upload, not a door.
  *   v1.0.0 — 2026-08-25 — Initial.
  */
@@ -73,22 +76,24 @@ entry: index.html
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="aimeat-track" content="atelier" />
+  <!-- A quick prototype: the kit's components as they come. Make it "fine" by forking a genre. -->
+  <meta name="aimeat-level" content="proto" />
+  <meta name="aimeat-register" content="REPLACE-ME: fork a genre from the Design Book (GET /v1/designbook?kind=genre) or name your own register" />
+  <meta name="aimeat-locales" content="en fi" />
+  <!-- Your published filename, exactly as you publish it: the "filename" in app.json. -->
+  <meta name="aimeat-app" content="myapp.html" />
+  <!-- EVERY scope the app uses; sign-in asks the person to approve these. -->
+  <meta name="aimeat-scopes" content="memory:read memory:write" />
   <title>My App</title>
-  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
-  <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
-  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
-  <script src="/lib/tailwindcss@4.js"></script>
+  <link href="/lib/aimeat-atelier.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/aimeat-boot.js"></script>
   <style>/*__APP_CSS__*/</style>
 </head>
-<body class="bg-base-100 text-base-content min-h-screen flex flex-col overflow-x-clip">
-  <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
-    <div class="flex-1"><span class="text-lg font-bold">My App</span></div>
-    <div class="flex-none"><span id="login"></span></div>
-  </nav>
-  <main id="app" class="flex-1 w-full max-w-3xl mx-auto p-4 flex flex-col gap-4"></main>
-
+<body>
   <script src="/v1/libs/aimeat-auth.js"></script>
   <script src="/v1/libs/aimeat-data.js"></script>
+  <script src="/v1/libs/aimeat-atelier.js"></script>
   <script>
 /*__APP_JS__*/
   </script>
@@ -96,27 +101,43 @@ entry: index.html
 </html>
 
 === file: src/app.css ===
-/* Your styles. Theme tokens and daisyUI classes first; a hardcoded colour is a bug in two themes. */
+/* Your own styles, for markup you put inside a kit section body and nothing else. Colours only
+   through the kit's --ak-* tokens: a hardcoded colour is a bug in two themes. Empty is normal. */
 
 === file: src/00-state.js ===
 // One concern per file, and the ORDER array in build.mjs decides how they are concatenated.
 // These are NOT modules: no import, no export. They share one scope, which is why build.mjs
 // refuses two top-level declarations of the same name.
+var K = AIMEAT.atelier;
 var state = { session: null, items: [] };
 
+// Every word the app shows, in both languages. The bar's switch changes the language.
+K.i18n.use({
+  en: { title: 'My App', signedIn: 'Signed in as {who}.' },
+  fi: { title: 'Oma sovellus', signedIn: 'Kirjautunut: {who}.' }
+});
+
 === file: src/10-boot.js ===
-async function boot() {
-  state.session = await AIMEAT.auth.mount('#login');
-  render();
-}
+// The Atelier shell: bar, sign-in pill, language and theme controls, designed states. Sign-in is
+// on by default, so onReady runs with the session once the person is signed in.
+var shell = K.app({
+  title: K.i18n.t('title'),
+  look: 'vivid',
+  onReady: function (session) { state.session = session; render(); }
+});
 
 === file: src/90-render.js ===
+var view = null;
+
 function render() {
-  var app = document.getElementById('app');
-  app.textContent = state.session ? 'Signed in.' : 'Signed out.';
+  if (view) view.destroy();
+  view = K.hero({ target: shell.main, title: K.i18n.t('title'), sub: K.i18n.t('signedIn', { who: state.session.owner }) });
 }
 
-document.addEventListener('DOMContentLoaded', boot);
+K.i18n.onChange(function () {
+  shell.set({ title: K.i18n.t('title') });
+  if (state.session) render();
+});
 
 === file: build.mjs ===
 /**

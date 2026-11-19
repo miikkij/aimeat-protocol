@@ -212,9 +212,9 @@ export async function buildAppdevOverview(
         // THE SHELLS FIRST, and the cap is why: the index carries every genre and component, and a
         // cap of 25 in its own order once returned no shell at all (e2e-appdev-overview, 2026-09-19).
         // Since 2026-11-19 the shells are the Atelier ones: the Classic track's three tiered shells
-        // (T1/T2/T3) are retired and never offered here (decision-atelier-is-the-only-app-build-
+        // (T1/T2/T3) are retired and gone from the registry (decision-atelier-is-the-only-app-build-
         // guide-classic-and-t1-t2-t3-are), so a builder is never handed a tier to choose.
-        const idx = getAppTemplateIndex().filter(t => !('tier' in t && t.tier));
+        const idx = getAppTemplateIndex();
         const rank = (t: { kind: string }) => (t.kind === 'app-shell' ? 0 : t.kind === 'genre' ? 1 : 2);
         const ordered = [...idx].sort((a, b) => rank(a) - rank(b));
         out.app_templates = {

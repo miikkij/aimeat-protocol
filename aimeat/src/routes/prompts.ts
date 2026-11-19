@@ -6,6 +6,8 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   (2026-11-19) GET /v1/prompts/build-app answers with the Atelier specification in its paste
+ *     delivery, behind a notice that the Classic one is retired (services/builder/classic-retired.ts).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-25 -- GET /v1/portal/prompts/:promptId names only the cortexes the caller may see (visibleCortexes;
  *     secaudit2026oct22).
@@ -60,7 +62,7 @@ import { handbookForRole } from '../services/handbooks/index.js';
 import { isV2Role, V2_ROLES } from '../tool-catalog/surfaces.js';
 import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
-import { buildAppPrompt, buildAppSpecToken } from '../services/builder/app-prompt.js';
+import { retiredBuildAppText } from '../services/builder/classic-retired.js';
 import { PLAYBOOKS } from '../services/home/playbooks.js';
 import { buildExtensionPrompt } from '../services/builder/extension-prompt.js';
 import { registerBuildCortexPrompt } from './prompts-cortex.js';
@@ -220,7 +222,9 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     const mode = req.query.mode === 'improve' ? 'improve' as const : 'new' as const;
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
-    const { full, body } = buildAppPrompt(config, { lang, mode, idea });
+    // The Classic specification is retired (2026-11-19): this address answers with the Atelier one,
+    // in its paste delivery, behind a notice that says so (services/builder/classic-retired.ts).
+    const { full, body, specToken } = retiredBuildAppText(config, { lang, mode, idea });
     if (req.query.format === 'txt') {
       sendPlainText(res, full);
       return;
@@ -228,18 +232,18 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, {
       id: 'build-app',
       name: 'Build an AIMEAT app',
-      description: 'Canonical guided prompt for building a single-file HTML app on this node — identical to the app-catalog Create-new-app prompt.',
+      description: 'The Classic build specification that lived at this address is retired; this is the Atelier specification that replaced it, for an AI that cannot connect. Over MCP read it in parts: aimeat_handbook_get { tier: "build-app-atelier" }.',
+      retired: true,
+      replaced_by: '/v1/prompts/build-app-atelier',
       mode,
       lang,
       prompt: full,
       system_prompt: full,
       body,
-      // The digest of the spec above. Pass it back as `spec_token` when publishing and the node can
-      // tell whether the app was built against what it currently says. It is named in the prompt
-      // text as well, for the `?format=txt` reader who never sees this envelope.
-      spec_token: buildAppSpecToken(config),
+      // The digest of the Atelier spec above. Pass it back as `spec_token` when publishing.
+      spec_token: specToken,
     }, [
-      { description: 'Starter templates (use-case scaffolds + app shells)', method: 'GET', url: '/v1/app-templates' },
+      { description: 'The Atelier specification', method: 'GET', url: '/v1/prompts/build-app-atelier' },
       { description: 'Publish the finished app (pass spec_token)', method: 'POST', url: '/v1/apps' },
     ]));
   });
@@ -312,7 +316,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
 
   registerOpenItemsPrompt(router, config, storage);
   registerHelloIntegrationPrompt(router, config);
-  registerBuildAppLayerPrompts(router, config);
+  registerBuildAppLayerPrompts(router, config, storage);
   // The agent section in front of the specification, for an app that shows one agent's work.
   registerBuildAppAgentPrompt(router, config, storage);
 

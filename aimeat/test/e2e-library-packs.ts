@@ -10,6 +10,8 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=library-packs).
  * @version-history
+ *   2026-11-19 - The Classic specification is retired: the pack ids are looked for in the Atelier text
+ *     and its platform sections, the frontier caveats in its section `engines`.
  *   2026-11-15 - Audit M160, L067: each frontier pack's caveat is looked for in its own prompt
  *     entry, pixi must be listed, and the demoTemplateId check has a floor.
  *   v1.4.0 - 2026-10-05 - aimeat-validate: served, discoverable, a wrong check digit refused in Finnish.
@@ -176,11 +178,20 @@ await test('/v1/libs catalogue names ⊆ registry sdk pack ids (no drift)', asyn
   assert(body.packs_index === '/v1/library-packs', 'packs_index pointer missing');
 });
 
-await test('build-app prompt contains every stable pack id (no drift)', async () => {
-  const res = await fetch(`${BASE}/v1/prompts/build-app?format=txt`);
-  assert(res.status === 200, `Expected 200 from build-app prompt, got ${res.status}`);
-  const prompt = await res.text();
-  const misses = packs.filter(p => p.status === 'stable' && !prompt.includes(p.id));
+// The Classic build specification carried the pack list until it was retired on 2026-11-19; the
+// Atelier specification names the SDK libraries in its own list and the vendored engines in its
+// platform section `engines`. The Classic styling pack (daisyUI) is in neither by design.
+await test('the Atelier specification names every stable pack id (no drift)', async () => {
+  const res = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/engines?format=txt`);
+  assert(res.status === 200, `Expected 200 from the engines section, got ${res.status}`);
+  // The whole text and every platform section: a library may be named where its use is taught
+  // (aimeat-social in data-storage, beside the boards).
+  let prompt = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(r => r.text());
+  const listed = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections`).then(r => r.json()) as any;
+  for (const s of listed.data.sections) {
+    prompt += '\n' + await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/${s.id}?format=txt`).then(r => r.text());
+  }
+  const misses = packs.filter(p => p.status === 'stable' && p.id !== 'styling' && p.kind !== 'cortex' && !prompt.includes(p.id));
   assert(misses.length === 0, `Stable packs missing from the build prompt: ${misses.map(p => p.id).join(', ')}`);
   // Capability-pack plumbing present:
   assert(prompt.includes('/v1/library-packs'), 'prompt does not point AIs at the pack docs endpoint');
@@ -247,8 +258,8 @@ await test('detail endpoint exposes modelTier/proofs/apiCaveat for a proven pack
   assert(Array.isArray(pack?.proofs) && pack.proofs.some((pr: any) => pr.model && pr.verdict), 'pixi proofs missing');
 });
 
-await test('build-app prompt inlines the apiCaveat for frontier packs', async () => {
-  const res = await fetch(`${BASE}/v1/prompts/build-app?format=txt`);
+await test('the engines section inlines the apiCaveat for frontier packs', async () => {
+  const res = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/engines?format=txt`);
   const prompt = await res.text();
   const frontier = packs.filter(p => p.modelTier === 'frontier' && p.apiCaveat);
   // The prompt lists each capability pack as a line '- <id> [tier] — ...', followed by its '⚠ <caveat>'

@@ -19,6 +19,7 @@
  *   is about a destination and nothing short of a listening socket proves it.
  * @usage cd aimeat && pnpm test -- app-artifact-lint
  * @version-history
+ *   v1.8.1 — 2026-11-19 — The shipped-shells check reads every app shell in the registry; the three Classic ones are retired.
  *   v1.8.0 — 2026-10-31 — A page that calls AIMEAT.atelier with no kit script is refused
  *     (atelier-kit-not-loaded); a loaded or guarded call is not (v28 #13).
  *   v1.7.0 — 2026-10-02 — Classic with kit blocks: a Classic page that loads the kit and calls a
@@ -235,7 +236,8 @@ describe('lintAppArtifact — the head declarations', () => {
     expect(meta[0]?.message).toContain('placeholder');
 
     const { getAppTemplates } = await import('../../src/data/app-templates.js');
-    for (const id of ['shell-pure-client', 'shell-cortex', 'shell-extension']) {
+    // The Classic shells this loop read until 2026-11-19 are retired; the shipped shells are Atelier's.
+    for (const id of getAppTemplates().filter(t => t.kind === 'app-shell').map(t => t.id)) {
       const shell = getAppTemplates().find(t => t.id === id)!;
       const filled = shell.content.replace('REPLACE-WITH-YOUR-FILENAME.html', 'my-app.html');
       const about = (await lintAppArtifact(filled, config)).warnings.filter(f => f.pitfall === 'app-meta-declarations');

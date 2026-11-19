@@ -19,7 +19,9 @@ const config = { baseUrl: LONG, nodeId: 'node-example' } as never;
 const full = buildAtelierPrompt(config, { mode: 'new' }).full;
 
 /** What a platform section must never teach: the Classic track, its tiers, its shells, its hand-written sign-in. */
-const CLASSIC = /\bT[123]\b|shell-pure-client|shell-cortex|shell-extension|\bclassic\b|onSession|daisy/i;
+// "classic" alone is a word the engines use in its own sense (three.js's classic script, Mermaid's
+// look "classic"), so the track is looked for by how it is named.
+const CLASSIC = /\bT[123]\b|shell-pure-client|shell-cortex|shell-extension|Classic (track|spec)|content="classic"|onSession|daisy/i;
 
 describe('Atelier platform sections', () => {
   it('serves every section the index names, under one heading each', () => {

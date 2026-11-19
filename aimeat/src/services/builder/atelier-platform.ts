@@ -24,10 +24,20 @@
  *   atelierPlatformIds() · ATELIER_PLATFORM_PART_LINE
  * @usage const piece = atelierPlatformPiece('group', config.baseUrl);   // null for an unknown id
  * @version-history
- *   v1.0.0 — 2026-11-19 — Initial.
+ *   v1.0.0 — 2026-11-19 — Initial, with `server-side`, `from-classic`, the paste delivery, and three
+ *     sections from the retired Classic skill (`dates-numbers`, `publish-checks`, `after-publish`).
  */
 import { buildAppPrompt } from './app-prompt.js';
 import { splitBuildAppSpec } from './app-layers.js';
+import { AFTER_PUBLISH_SECTION, DATES_NUMBERS_SECTION, PUBLISH_CHECKS_SECTION } from '../../data/builtin-skills.app-builder-common.js';
+import { buildCapabilityPackLines } from '../../data/library-packs.js';
+
+/** The sections that lived in the retired Classic skill and hold on any track (builtin-skills.app-builder-common.ts). */
+const MOVED_FROM_CLASSIC_SKILL: Record<string, string> = {
+  'dates-numbers': DATES_NUMBERS_SECTION,
+  'publish-checks': PUBLISH_CHECKS_SECTION,
+  'after-publish': AFTER_PUBLISH_SECTION,
+};
 
 /**
  * The platform sections in the order the index lists them. `from` is the section's id in the build
@@ -36,6 +46,8 @@ import { splitBuildAppSpec } from './app-layers.js';
  * fail, so nothing goes missing quietly.
  */
 export const ATELIER_PLATFORM: Array<{ id: string; from?: string; when: string }> = [
+  { id: 'research', when: 'Connected over MCP, before you frame the build: what already exists on this node to start from, and when to skip straight to building.' },
+  { id: 'engines', when: 'The app needs a third-party engine: charts, maps, 3D, a game engine, PDF, video, a database in the browser. Each is hosted on this node, with how to load it and what breaks.' },
   { id: 'calling-the-node', when: 'The app calls the node itself (`session.fetch`) for something the kit\'s blocks and `AIMEAT.data` do not cover. Every answer is read `ok` first.' },
   { id: 'scopes', when: 'The app needs more than reading and writing its own records: deleting keys, files, AI, organisms, agents or extensions.' },
   { id: 'data-storage', when: 'The app keeps more than one record per person: entries other people read, a shared feed, comments, a journal, a public profile.' },
@@ -57,6 +69,9 @@ export const ATELIER_PLATFORM: Array<{ id: string; from?: string; when: string }
   { id: 'realtime', when: 'People see each other live: presence, a shared board, a two-player game.' },
   { id: 'agent-face', when: 'Other AI agents should be able to read or operate the published app.' },
   { id: 'install', when: 'The app is installed on a phone: the home-screen icon.' },
+  { id: 'dates-numbers', when: 'The app shows a date, a time, a number, money or morsels: they follow the person\'s own format and clock, never the app\'s language.' },
+  { id: 'publish-checks', when: 'Before you publish: check the script so a parse error is not what the node refuses, and send a file over about 1 KB by presigned upload.' },
+  { id: 'after-publish', when: 'After the publish: the template and the pitfall the next build starts from, the bound skill\'s reader, and the workstation for an app past about 300 kB.' },
   { id: 'publish-by-hand', from: 'publish', when: 'You cannot publish over MCP: you hand the person one HTML file and tell them how to put it on the node.' },
   { id: 'from-classic', when: 'The app you change was built on the retired Classic track: it loads daisyUI, writes its own sign-in, or declares `aimeat-track` `classic`.' },
 ];
@@ -138,6 +153,11 @@ export function atelierPlatformPiece(id: string, baseUrl: string): { id: string;
   if (id === 'platform') return { id, text: platformIndex(nodeUrl) };
   if (id === 'server-side') return { id, text: SERVER_SIDE_SECTION };
   if (id === 'from-classic') return { id, text: FROM_CLASSIC_SECTION };
+  const moved = MOVED_FROM_CLASSIC_SKILL[id];
+  if (moved) return { id, text: moved };
+  // The engines the Classic library list carried and the Atelier one only pointed at, without the
+  // Classic styling pack (daisyUI), which an Atelier page uses inside a section at most.
+  if (id === 'engines') return { id, text: '## Third-party engines this node hosts\n' + buildCapabilityPackLines(nodeUrl, ['styling']) };
   const entry = ATELIER_PLATFORM.find(s => s.id === id);
   if (!entry) return null;
   const text = cutSection(entry.from ?? entry.id, nodeUrl);

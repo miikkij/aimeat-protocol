@@ -41,6 +41,9 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   (2026-11-19) The Classic guide is retired: a Classic page that draws the Atelier shell is told the
+ *     Atelier guide is the one guide (section from-classic), and a dead script URL is answered from
+ *     the Atelier spec and its section engines.
  *   (2026-11-08) A straight genre fork publishes quietly: hardcoded-theme-colors stands down for an
  *     Atelier page drawn in `--ak-*` tokens or declaring `aimeat-light`, and names the Atelier fix
  *     when it does speak; the daisyUI half of track-mixing ignores a class the page defines in its
@@ -225,9 +228,9 @@ function checkTrackMixing(html: string): AppArtifactFinding[] {
     out.push(finding('track-mixing', 'warn',
       'The head declares the Classic track and the page draws the Atelier app shell '
       + '(`AIMEAT.atelier.app(...)`). A Classic page may load the kit for the library blocks it uses, '
-      + 'but the shell makes this an Atelier app, and the next edit session will load the Classic guide '
-      + 'and not know what half this file is. Declare `<meta name="aimeat-track" content="atelier">` '
-      + 'with its `aimeat-register`, and build with the Atelier guide.'));
+      + 'but the shell makes this an Atelier app, and the head says otherwise. Declare '
+      + '`<meta name="aimeat-track" content="atelier">` with its `aimeat-register`: the Atelier guide is the one '
+      + 'build guide, and its section from-classic says how an app built on Classic moves.'));
   } else if (track === 'classic' && loadsAtelier && !callsAtelierKit(html)) {
     out.push(finding('track-mixing', 'warn',
       'The head declares the Classic track and the page loads the Atelier kit without calling anything '
@@ -612,7 +615,7 @@ async function probeNodeAssets(paths: string[], config: AimeatConfig): Promise<A
     `This node answers 404 for ${dead.length === 1 ? 'an asset this app loads' : 'assets this app loads'}: `
     + `${dead.join(', ')}. The app would throw before it drew anything. The SDK libraries live under `
     + '/v1/libs/ (aimeat-auth.js, aimeat-data.js, …) and the vendored packs under /lib/ — take the exact '
-    + 'URLs from the build spec (GET /v1/prompts/build-app-atelier, or /v1/prompts/build-app for an app on the Classic track) rather than guessing one that looks right.'
+    + 'URLs from the build spec (GET /v1/prompts/build-app-atelier, with its platform section engines) rather than guessing one that looks right.'
     + (dead.some(p => p.startsWith('/v1/cortex/'))
       ? ' A cortex installed under its owner\'s name (`full_name` in the install answer) loads from '
         + '/v1/cortex/<owner>/<name>/libs/<file>; the install answer lists its exact addresses.'

@@ -10,15 +10,18 @@
  *   that model, verify in a browser, fill the stub, append a `proofs` row. No node/bench needed to
  *   scaffold — this only reads the registry + the prompt builder.
  * @usage cd aimeat && pnpm aeb:prove pixi --model claude-haiku-4-5
- * @structure parseArgs() · stripPackBlocks() · main() — writes tools/aeb/runs/<pack>/{prompt-A,prompt-B,results-stub}.md
+ * @structure parseArgs() · packBlock() · main() — writes tools/aeb/runs/<pack>/{prompt-A,prompt-B,results-stub}.md
  * @version-history
+ *   v2.0.0 — 2026-11-19 — The arms are built on the Atelier specification (paste delivery): A is the
+ *     specification, B adds the pack's include lines and usage doc. The Classic specification they
+ *     were cut from is retired, so a proof recorded before this date compared a different A and B.
  *   v1.0.0 — 2026-07-17 — initial scaffolder (Library Acceleration Program, tier proof ledger).
  */
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../src/config.js';
-import { buildAppPrompt } from '../src/services/builder/app-prompt.js';
+import { buildAtelierPrompt } from '../src/services/builder/atelier-prompt.js';
 import { getLibraryPack } from '../src/data/library-packs.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,15 +37,17 @@ function parseArgs(argv: string[]) {
   return { pack: pos[0], model: flags.model || 'MODEL-ID', url: flags.url || 'http://localhost:40050' };
 }
 
-/** Remove the two accelerator-pack blocks (Ready-made UI cortex + Optional capability packs) → the A control. */
-function stripPackBlocks(prompt: string): string {
-  const lines = prompt.split('\n');
-  const start = lines.findIndex(l => l.startsWith('Ready-made UI (node-bundled'));
-  const end = lines.findIndex((l, i) => i > start && l.startsWith('The live index may also list COMMUNITY'));
-  if (start !== -1 && end !== -1) lines.splice(start, end - start + 1);
-  return lines.join('\n')
-    .replace(/6\. Does it need any special capabilities\?.*$/m, '6. What is the core outcome the app must deliver, and what must the user see and do on first load?')
-    .replace(/For rich UIs use the self-hosted styling stack.*?plain CSS variables are fine\./s, 'Style the app with your own CSS: use the AIMEAT theme CSS variables (light/dark) for colours, spacing and typography.');
+/**
+ * The pack's own block, the treatment: its include lines and its usage doc, in the shape the front
+ * page's long prompt gives a chosen pack (landing-builder.js). The control is the specification
+ * without it.
+ */
+function packBlock(reg: ReturnType<typeof getLibraryPack>): string {
+  if (!reg) return '';
+  return '\n## Selected capability pack (self-hosted on my node: use it, never a CDN)\n'
+    + '### Pack: ' + reg.id + ' — ' + reg.title + '\n'
+    + 'Include (in order):\n' + reg.include.join('\n') + '\n'
+    + 'Usage:\n' + reg.aiDoc + '\n';
 }
 
 function readSpec(pack: string): { spec: string; checklist: string; testSet: string } {
@@ -67,9 +72,10 @@ function main() {
   if (!reg) console.warn(`⚠ "${pack}" is not a node-scope registry pack — scaffolding anyway (community/new pack).`);
 
   const config = { baseUrl: url } as AimeatConfig;
-  const full = buildAppPrompt(config, { mode: 'new' }).full;
-  const promptB = full;
-  const promptA = stripPackBlocks(full);
+  // The Atelier specification in its paste delivery: a fresh builder in a chat cannot connect.
+  const full = buildAtelierPrompt(config, { mode: 'new', delivery: 'paste' }).full;
+  const promptB = full + packBlock(reg);
+  const promptA = full;
   const { spec, checklist, testSet } = readSpec(pack);
 
   const outDir = resolve(AEB, `runs/${pack}`);
@@ -86,8 +92,8 @@ Test set: \`${testSet}\`${tier}
 Node: ${url}
 
 ## Arms (same spec, one variable = the build prompt)
-- A (control): \`prompt-A-packs-hidden.md\` — capability packs stripped, core SDK stays.
-- B (treatment): \`prompt-B-packs-shown.md\` — full prompt.
+- A (control): \`prompt-A-packs-hidden.md\` — the Atelier specification (paste delivery), without the pack's own block.
+- B (treatment): \`prompt-B-packs-shown.md\` — the same, with the pack's include lines and usage doc.
 Hand each to a FRESH one-shot builder on ${model}. Publish both to ${url}, sign in, load demo data,
 then verify in a browser (Playwright MCP) against \`checklist.md\`.
 
