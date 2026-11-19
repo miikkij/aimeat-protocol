@@ -145,7 +145,7 @@
       "digest": "sha256:f295b5e86ff61802b1cde501"
     },
     "13-apps-agents-endpoints.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/cli/connect/command-trust.ts",
         "aimeat/src/routes/connect-install.ts",
@@ -159,7 +159,7 @@
         "aimeat/src/static/sdk-libs/auth/last-identity.js",
         "aimeat/src/static/sdk-libs/offline/store.js"
       ],
-      "digest": "sha256:ffaee4ce1607f90ca88a25e2"
+      "digest": "sha256:84b1bd8345c09365c309a3ef"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-19",
@@ -377,7 +377,7 @@
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec",
       "aimeat/src/services/receivers/receive.ts": "3495190b1619b057",
       "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87",
-      "aimeat/src/services/organism-join-requests/requests.ts": "67a2eb271e9fb2a9",
+      "aimeat/src/services/organism-join-requests/requests.ts": "c4fb930994ce6968",
       "aimeat/src/static/app-sw-offline.js": "a2d64d1dd7bfa006",
       "aimeat/src/static/sdk-libs/auth/last-identity.js": "5bf2640a302bc906",
       "aimeat/src/static/sdk-libs/offline/store.js": "ba14118fe69ad407"

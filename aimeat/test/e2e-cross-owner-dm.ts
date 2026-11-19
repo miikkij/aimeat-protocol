@@ -15,23 +15,9 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { BASE, test, assert, json, expectRefusal, finish } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit = {}) {
-    const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-    const ct = res.headers.get('content-type') ?? '';
-    const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
-    return { status: res.status, body };
-}
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -77,7 +63,7 @@ async function organism(owner: Owner, name: string, joinPolicy: string, extra: R
 }
 async function addMember(owner: Owner, orgId: string, who: Owner) {
     const r = await json(`/v1/organisms/${orgId}/members`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ ghii: who.name }) });
-    assert(r.status === 200 || r.status === 201, `member add ${who.name} ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(r.status === 201, `member add ${who.name} ${r.status}: ${JSON.stringify(r.body.error)}`);
 }
 
 const send = (token: string, to: string, body: string) =>
@@ -89,25 +75,25 @@ const stateIn = async (owner: Owner, contact: string, qs = '') => {
 };
 async function expectRequest(token: string, to: Owner, from: string, label: string) {
     const r = await send(token, to.ghii, `hello, ${label}`);
-    assert(r.status === 200 || r.status === 201, `send ${label} ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(r.status === 201, `send ${label} ${r.status}: ${JSON.stringify(r.body.error)}`);
     assert(r.body.data?.awaiting_approval === true, `${label} waits for approval: ${JSON.stringify(r.body.data).slice(0, 200)}`);
     assert(await stateIn(to, from) === 'pending', `${to.name} holds ${from} as pending`);
 }
 async function expectDelivered(token: string, to: Owner, from: string, label: string) {
     const r = await send(token, to.ghii, `hello, ${label}`);
-    assert(r.status === 200 || r.status === 201, `send ${label} ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(r.status === 201, `send ${label} ${r.status}: ${JSON.stringify(r.body.error)}`);
     assert(r.body.data?.awaiting_approval !== true, `${label} is delivered, not a request: ${JSON.stringify(r.body.data).slice(0, 200)}`);
     assert(await stateIn(to, from) === 'accepted', `${to.name} holds ${from} as accepted`);
 }
 
 console.log('\n=== AIMEAT co-members of a closed organism: the first-contact gate E2E ===\n');
 
-let OP: Owner, A: Owner, B: Owner, C: Owner, D: Owner, E: Owner, F: Owner, G: Owner;
+let A: Owner, B: Owner, C: Owner, D: Owner, E: Owner, F: Owner, G: Owner;
 let closedOrg = '', listedOrg = '';
 
 await test('Setup: people who are strangers to each other', async () => {
     // The first owner of a fresh node is the operator; its welcome gives everyone a row with it.
-    OP = await setupOwner('op');
+    await setupOwner('op');
     A = await setupOwner('a'); B = await setupOwner('b'); C = await setupOwner('c'); D = await setupOwner('d');
     E = await setupOwner('e'); F = await setupOwner('f'); G = await setupOwner('g');
 });
@@ -131,7 +117,7 @@ await test('3. A co-member of an approval_required organism: C\'s first message 
 await test('4. A co-member of an OPEN organism only: E\'s first message to F stays a request', async () => {
     const org = await organism(F, `Open ${Date.now()}`, 'open');
     const join = await json(`/v1/organisms/${org}/join`, { method: 'POST', headers: auth(E.token), body: '{}' });
-    assert(join.status === 200 || join.status === 201, `E joins the open organism: ${join.status} ${JSON.stringify(join.body.error)}`);
+    assert(join.status === 201, `E joins the open organism: ${join.status} ${JSON.stringify(join.body.error)}`);
     await expectRequest(E.token, F, E.ghii, 'open co-member E');
 });
 
@@ -175,5 +161,10 @@ await test('9. An archived organism no longer introduces: E and A share only an 
     await expectRequest(E.token, A, E.ghii, 'co-member of an archived organism');
 });
 
-console.log(`\n${passed} passed, ${failed} failed\n`);
-process.exit(failed > 0 ? 1 : 0);
+await test('10. A co-member\'s agent without messages:send is refused (403), organism or not', async () => {
+    const reader = await agentOf(B, 'xodmreader', ['contacts:read']);
+    const refused = await send(reader.token, D.ghii, 'no permission to send');
+    expectRefusal(refused, 403);
+});
+
+finish();

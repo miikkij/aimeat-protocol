@@ -61,12 +61,16 @@ await h.test('2. aimeat_organism_members answers the same flags', async () => {
 
 await h.test('3. a caller who is not a member is told no agent at all', async () => {
     const r = await membersOf(outsider.token);
-    assert(r.status === 404 || agentsOfMember(r.body) === null, `outsider sees agents: ${r.status} ${String(JSON.stringify(r.body?.data)).slice(0, 300)}`);
+    // A private organism's roster is for its members: an outsider gets 404, which names no member at all.
+    assert(r.status === 404, `outsider sees agents: ${r.status} ${String(JSON.stringify(r.body?.data)).slice(0, 300)}`);
 });
 
 await h.test('4. with agent_access listed, an agent not on the list is not named, flag or no flag', async () => {
     const put = await json(`/v1/organisms/${orgId}`, { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ agent_access: 'listed' }) });
     assert(put.status === 200, `agent_access ${put.status} ${JSON.stringify(put.body?.error)}`);
+    // A member of another account may not list an agent where only listed agents are admitted.
+    const byMember = await json(`/v1/organisms/${orgId}/agents`, { method: 'POST', headers: auth(member.token), body: JSON.stringify({ agent_gaii: direct.gaii }) });
+    assert(byMember.status === 403, `a member listed its own agent: ${byMember.status} ${JSON.stringify(byMember.body?.error)}`);
     const attach = await json(`/v1/organisms/${orgId}/agents`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ agent_gaii: plain.gaii }) });
     assert(attach.status === 201, `attach ${attach.status} ${JSON.stringify(attach.body?.error)}`);
     const agents = agentsOfMember((await membersOf(owner.token)).body) ?? [];
