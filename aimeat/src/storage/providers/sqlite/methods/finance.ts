@@ -12,13 +12,15 @@
  * @structure financeMethods — invoices · vouchers · vat codes · fiscal years · counters
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   2026-11-19 — finance_vouchers.paymentMethod written and read; listVouchersByPaymentMethod and
+ *     countVouchersWithPaymentMethod (node-wide, for the AML cash finding; migration 0133).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
 import type { FinanceRepository, InvoiceStatusPatch } from '../../../repositories/finance.repository.js';
 import type {
   InvoiceRecord, InvoiceQuery, InvoiceStatus, InvoiceType, InvoiceParty, InvoiceLine,
   InvoiceDeliveryMethod, InvoiceDeliveryStatus, VatBreakdownEntry,
-  VoucherRecord, VoucherQuery, VoucherSource, VoucherDirection,
+  VoucherRecord, VoucherQuery, VoucherSource, VoucherDirection, VoucherPaymentMethod,
   VatCodeRecord, VatCategory, FiscalYearRecord,
 } from '../../../../models/finance-schemas.js';
 import type { SqliteStorage } from '../index.js';
@@ -82,6 +84,7 @@ function toVoucher(r: Row): VoucherRecord {
     externalRef: (r.externalRef as string | null) ?? null,
     attachments: JSON.parse((r.attachments as string) || '[]') as string[],
     reversesVoucherId: (r.reversesVoucherId as string | null) ?? null,
+    paymentMethod: (r.paymentMethod as VoucherPaymentMethod | null) ?? null,
     createdAt: r.createdAt as string,
     updatedAt: r.updatedAt as string,
   };
@@ -242,14 +245,14 @@ export const financeMethods: FinanceRepository & ThisType<SqliteStorage> = {
       INSERT INTO finance_vouchers (
         id, ownerGhii, organismId, fiscalYearId, voucherNumber, date, description, direction,
         source, amountMinor, currency, vatBreakdown, counterparty, invoiceId, trackingCode,
-        externalRef, attachments, reversesVoucherId, createdAt, updatedAt
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        externalRef, attachments, reversesVoucherId, paymentMethod, createdAt, updatedAt
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
       row.id, row.ownerGhii, row.organismId, row.fiscalYearId, row.voucherNumber, row.date,
       row.description, row.direction, row.source, row.amountMinor, row.currency,
       JSON.stringify(row.vatBreakdown), row.counterparty, row.invoiceId, row.trackingCode,
       row.externalRef, JSON.stringify(row.attachments), row.reversesVoucherId,
-      row.createdAt, row.updatedAt,
+      row.paymentMethod ?? null, row.createdAt, row.updatedAt,
     );
   },
 
@@ -282,6 +285,17 @@ export const financeMethods: FinanceRepository & ThisType<SqliteStorage> = {
     const r = this.db.prepare('SELECT * FROM finance_vouchers WHERE ownerGhii = ? AND externalRef = ?')
       .get(ownerGhii, externalRef) as Row | undefined;
     return r ? toVoucher(r) : undefined;
+  },
+
+  async listVouchersByPaymentMethod(this: SqliteStorage, paymentMethod: VoucherPaymentMethod, opts: { since: string; limit: number }): Promise<VoucherRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM finance_vouchers WHERE paymentMethod = ? AND date >= ? ORDER BY date ASC, id ASC LIMIT ?')
+      .all(paymentMethod, opts.since, Math.max(1, Math.min(opts.limit, 10_000))) as Row[];
+    return rows.map(toVoucher);
+  },
+
+  async countVouchersWithPaymentMethod(this: SqliteStorage): Promise<number> {
+    const r = this.db.prepare('SELECT COUNT(*) AS n FROM finance_vouchers WHERE paymentMethod IS NOT NULL').get() as { n: number };
+    return Number(r.n);
   },
 
   // ── VAT codes ─────────────────────────────────────────────────────────────

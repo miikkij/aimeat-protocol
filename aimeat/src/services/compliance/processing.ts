@@ -13,6 +13,8 @@
  * @structure ProcessingSummary · PROCESSING_LIMITS · buildProcessingSummary()
  * @usage const p = await buildProcessingSummary({ storage, config });   // { summary, gaps, limits }
  * @version-history
+ *   v1.3.1 — 2026-11-19 — The draft count has an `organism` column: an anti-money-laundering obliged
+ *     organism's customer due diligence register is a draft (register-drafts.ts).
  *   v1.3.0 — 2026-11-13 — `lias` (the balancing tests written and approved) and `trials` (the apps
  *     marked as a trial, running or ended with no decision).
  *   v1.2.1 — 2026-11-05 — Moved unchanged from src/services/compliance-processing.ts to src/services/compliance/processing.ts (codebase analysis 2026-11-03, item D-h).
@@ -104,7 +106,7 @@ export async function buildProcessingSummary(deps: { storage: Storage; config: A
     }
   }
   const draftPlaces = await registerDrafts(deps, regDocs);
-  const drafts = { total: 0, node: 0, app: 0, apps: 0 };
+  const drafts = { total: 0, node: 0, organism: 0, app: 0, apps: 0 };
   for (const d of draftPlaces) {
     drafts.total += d.items.length;
     drafts[d.scope.kind] += d.items.length;

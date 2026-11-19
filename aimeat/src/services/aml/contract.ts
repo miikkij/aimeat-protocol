@@ -19,6 +19,7 @@
  *   AmlObligationRow
  * @usage import { AMLR_REFS, type AmlFinding } from './contract.js';
  * @version-history
+ *   2026-11-19 — Finding kind cash_over_limit (art. 80, services/aml/cash.ts).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design, stage A).
  */
 
@@ -35,7 +36,7 @@ export const AMLR_REFS = {
   pep: { act: '2024/1624', ref: 'art. 42–46', text: 'A politically exposed person, their family members and close associates get enhanced due diligence, for at least twelve months after the public function ends.' },
   reporting: { act: '2024/1624', ref: 'art. 69, 73', text: 'A suspicious transaction is reported to the Financial Intelligence Unit, and the customer is not told of the report.' },
   retention: { act: '2024/1624', ref: 'art. 77', text: 'The due diligence records are kept five years after the business relationship ends, and then deleted.' },
-  cash: { act: '2024/1624', ref: 'art. 80', text: 'A trader in goods or services does not accept a cash payment of more than EUR 10 000.' },
+  cash: { act: '2024/1624', ref: 'art. 80', text: 'A trader in goods or services neither accepts nor makes a cash payment of more than EUR 10 000.' },
   sanctions: { act: 'TFEU', ref: 'art. 215', text: 'No funds or economic resources are made available to a person or entity on an EU sanctions list. This applies to everyone in the EU, not only to obliged entities.' },
   dsaTraders: { act: '2022/2065', ref: 'art. 30', text: 'An online marketplace where consumers buy from traders collects and checks the traders\' details; a micro or small enterprise is exempt (art. 19).' },
   dac7: { act: '2021/514', ref: 'Annex V', text: 'A digital platform operator reports the sellers of personal services, goods, property rental and transport rental to the tax authority.' },
@@ -45,7 +46,7 @@ export const AMLR_REFS = {
 export const AML_FINDING_KINDS = [
   'org_declares_obliged', 'declaration_missing', 'roles_incomplete', 'registration_missing', 'risk_assessment_stale',
   'payouts_for_others', 'crypto_for_others', 'agent_spends_money', 'payers_not_screened', 'personal_services_sold',
-  'marketplace_traders',
+  'marketplace_traders', 'cash_over_limit',
 ] as const;
 export type AmlFindingKind = typeof AML_FINDING_KINDS[number];
 

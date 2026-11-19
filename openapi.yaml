@@ -8665,6 +8665,64 @@ components:
                     asOf: { type: string, description: The moment read; a bare date means the end of that day. }
                     card: { oneOf: [{ $ref: '#/components/schemas/KycCustomerVersion' }, { type: 'null' }] }
                     newer: { type: integer, description: How many versions were written after it. }
+    KycRiskAssessmentDraft:
+      type: object
+      description: The draft of an obliged organism's business-wide risk assessment (services/kyc/assessment.ts).
+      required: [organism, facts, sections, lastRecordedAt, ref, due, note]
+      properties:
+        organism: { type: string }
+        facts:
+          type: object
+          description: The organism's own numbers, from its open customer cards. Suspicions are not counted.
+          properties:
+            asOf: { type: string, description: YYYY-MM-DD }
+            customers:
+              type: object
+              properties:
+                open: { type: integer }
+                ended: { type: integer }
+                byKind: { type: object, additionalProperties: { type: integer }, description: person, entity }
+                byStatus: { type: object, additionalProperties: { type: integer }, description: open, active, blocked }
+                byRisk: { type: object, additionalProperties: { type: integer }, description: low, medium, high, prohibited, unrated }
+                byDueDiligence: { type: object, additionalProperties: { type: integer }, description: simplified, standard, enhanced, unrated }
+            countries:
+              type: array
+              items:
+                type: object
+                properties:
+                  country: { type: string }
+                  customers: { type: integer }
+                  highRisk: { type: boolean, description: On the firm's list of high-risk third countries. }
+            highRiskCountryCustomers: { type: integer }
+            highRiskCountriesListed: { type: integer }
+            pep: { type: object, properties: { customers: { type: integer }, unknown: { type: integer } } }
+            identity:
+              type: object
+              properties:
+                notIdentified: { type: integer }
+                faceToFace: { type: integer }
+                remote: { type: integer }
+                remoteBelowSubstantial: { type: integer }
+            cashIntensive: { type: integer }
+            complexOwnership: { type: integer, description: Entities with more than two ownership layers or nominee or bearer shares. }
+            productRisk: { type: object, additionalProperties: { type: integer }, description: low, medium, high, unset }
+            purposeUnknown: { type: integer }
+            sourceOfFundsUnknown: { type: integer }
+            openSanctionsHits: { type: integer }
+            reviewsOverdue: { type: integer }
+        sections:
+          type: array
+          items:
+            type: object
+            required: [id, title, text]
+            properties:
+              id: { type: string, enum: [customers, countries, products, channels, transactions] }
+              title: { type: string }
+              text: { type: string, description: The numbers and the questions the firm answers itself. }
+        lastRecordedAt: { type: string, nullable: true }
+        ref: { type: string, nullable: true }
+        due: { type: boolean, description: True when never recorded or older than 12 months. }
+        note: { type: string }
     KycSettingsEnvelope:
       allOf:
         - $ref: '#/components/schemas/AimeatEnvelope'
@@ -27102,6 +27160,174 @@ paths:
                         properties:
                           narrative: { type: string }
                           model: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/kyc/{org}/risk-assessment:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+    get:
+      operationId: getKycRiskAssessmentDraft
+      summary: A draft of the business-wide risk assessment from the organism's own records
+      tags: [Compliance]
+      description: >
+        AMLR 2024/1624 art. 10. Built from the organism's own open customer cards, never a template:
+        the numbers per risk area and the questions the firm answers itself. Suspicions are not counted
+        (art. 73). Stored nowhere. lastRecordedAt is the declaration's riskAssessmentAt; due is true when
+        it is missing or older than 12 months. The organism's compliance officers and admins, and their
+        agents. Refusals: the KYC context codes above; 403 KYC_NOT_MANAGER.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The draft.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/KycRiskAssessmentDraft' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/kyc/{org}/risk-assessment/recorded:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+    post:
+      operationId: recordKycRiskAssessment
+      summary: Record that the risk assessment was updated today (officers and admins, in person)
+      tags: [Compliance]
+      description: >
+        Sets riskAssessmentAt to today, and riskAssessmentRef to ref when sent, on the organism's
+        obliged-entity declaration (the compliance document aml), validated as the compliance write
+        validates it. An officer or an admin of the organism in person: an agent is refused. Refusals:
+        the KYC context codes above; 403 KYC_NOT_MANAGER, KYC_DECISION_IN_PERSON.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ref: { type: string, maxLength: 500, description: Where the finished assessment is kept (a document address). }
+      responses:
+        '200':
+          description: The declaration as stored.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [declaration]
+                        properties:
+                          declaration:
+                            type: object
+                            additionalProperties: true
+                            description: The aml declaration entry, with riskAssessmentAt and riskAssessmentRef.
+                            properties:
+                              id: { type: string }
+                              riskAssessmentAt: { type: string }
+                              riskAssessmentRef: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/kyc/{org}/dpia-draft:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+    get:
+      operationId: getKycDpiaDraft
+      summary: A draft impact assessment of customer due diligence and sanctions screening
+      tags: [Compliance]
+      description: >
+        GDPR art. 35. One entry shaped and validated as a compliance dpias entry, with the measures this
+        server enforces. Stored nowhere: the officer or an admin stores it with POST
+        /v1/kyc/{org}/dpia-draft/stored (store says how). The organism's compliance officers and admins, and their agents.
+        Refusals: the KYC context codes above; 403 KYC_NOT_MANAGER.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The draft and how to store it.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [organism, role, item, stored, store, note]
+                        properties:
+                          organism: { type: string }
+                          role: { type: string, enum: [officer, manager] }
+                          item:
+                            type: object
+                            additionalProperties: true
+                            description: One dpias entry (id, registerId, description, necessity, risks, measures, answerSources).
+                          stored: { type: boolean }
+                          store:
+                            type: object
+                            properties:
+                              read: { type: object, properties: { method: { type: string }, path: { type: string } } }
+                              write: { type: object, properties: { method: { type: string }, path: { type: string }, body: { type: string } } }
+                              mcp: { type: string }
+                              who: { type: string }
+                          note: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/kyc/{org}/dpia-draft/stored:
+    parameters:
+      - { name: org, in: path, required: true, schema: { type: string }, description: The obliged organism's id. }
+    post:
+      operationId: storeKycDpiaDraft
+      summary: Store the impact assessment draft in the organism's records
+      tags: [Compliance]
+      description: >
+        Puts the draft of GET /v1/kyc/{org}/dpia-draft into the organism's compliance document dpias,
+        replacing an entry with the same id and keeping every other. The compliance officer or an admin
+        of the organism, in person. Refusals: the KYC context codes; 403 KYC_NOT_MANAGER; 403
+        KYC_DECISION_IN_PERSON for an agent.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: The stored entry and how many entries the document now holds.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [item, items]
+                        properties:
+                          item: { type: object, additionalProperties: true }
+                          items: { type: integer }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -87436,6 +87662,11 @@ paths:
                 counterparty: { type: string, nullable: true }
                 invoice_id: { type: string, nullable: true }
                 attachments: { type: array, items: { type: string } }
+                payment_method:
+                  type: string
+                  nullable: true
+                  enum: [cash, card, transfer, other, null]
+                  description: 'How the money moved. Optional; omitted or null when not recorded. A cash voucher of more than EUR 10 000, alone or linked to the same counterparty within 30 days, is a finding in the compliance report section 13 (AMLR 2024/1624 art. 80). A reversal carries the original voucher''s value.'
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }

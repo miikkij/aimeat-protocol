@@ -12,6 +12,7 @@
  * @structure KycTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'kyc'
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The risk assessment and DPIA drafts (kyc/assessment.js), for officers and admins.
  *   v1.0.1 — 2026-11-19 — Suspicions and settings stay unread while the cards answer KYC_NOT_STAFF.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
@@ -25,6 +26,7 @@ import { useCard } from './kyc/card.js';
 import { useSuspicions } from './kyc/suspicions.js';
 import { useSettings } from './kyc/settings.js';
 import { useMine } from './kyc/mine.js';
+import { useAssessment } from './kyc/assessment.js';
 
 const PICKED = 'aimeat.kyc.organism';
 
@@ -60,6 +62,7 @@ export default function KycTab({ showToast }) {
   const enabled = active && cu.code !== 'KYC_NOT_ENABLED' && cu.code !== 'KYC_NOT_STAFF';
   const su = useSuspicions({ org, role, active: enabled });
   const st = useSettings({ org, role: enabled ? role : 'none' });
+  const ra = useAssessment({ org, role, active: enabled });
   const me = useMine();
 
   const setOrg = (id) => {
@@ -70,10 +73,10 @@ export default function KycTab({ showToast }) {
 
   // Every part reads again when the server says something changed (frontend.md: no polling).
   const reload = useRef(null);
-  reload.current = () => { loadOrgs(); cu.load(); card.load(); su.load(); st.load(); me.load(); };
+  reload.current = () => { loadOrgs(); cu.load(); card.load(); su.load(); st.load(); ra.load(); me.load(); };
   // Only the domains this page shows: the server's `kyc` notice (a card, a suspicion or the lists
   // changed, sent to the organism's KYC people), organisms and the bell's own.
   useEffect(() => onLiveUpdate(['kyc', 'organisms', 'notifications'], () => reload.current?.()), []);
 
-  return renderPage({ orgs, orgsErr, org, setOrg, cu, card, su, st, me });
+  return renderPage({ orgs, orgsErr, org, setOrg, cu, card, su, st, ra, me });
 }

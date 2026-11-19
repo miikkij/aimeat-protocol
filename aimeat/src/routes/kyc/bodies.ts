@@ -6,8 +6,9 @@
  *   bounded schema checked before the service runs: a wrong field answers 400 with that field, and the
  *   services' own schemas (services/kyc/contract.ts) then check what they keep.
  * @structure EmptyBody · NoteBody · CustomerBody · IdentityBody · HitBody · EndBody · HoldBody · SettingsBody ·
- *   MarkBody · SuspicionDraftBody · SubmitBody · CloseBody
+ *   MarkBody · SuspicionDraftBody · SubmitBody · CloseBody · RiskAssessmentRecordedBody
  * @version-history
+ *   v1.1.0 — 2026-11-19 — RiskAssessmentRecordedBody (POST /v1/kyc/:org/risk-assessment/recorded).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import { z } from 'zod';
@@ -36,6 +37,8 @@ export const MarkBody = z.object({ customer_id: z.string().max(64).optional(), o
 export const SuspicionDraftBody = SuspicionReportSchema.pick({ reportType: true, indicators: true, transactions: true, narrative: true }).partial();
 export const SubmitBody = z.object({ goaml_ref: z.string().min(1).max(120), submitted_at: date.optional(), decision: z.string().max(2000).optional() });
 export const CloseBody = z.object({ decision: z.string().min(1).max(2000) });
+/** Recording the business-wide risk assessment: where the document is, optionally. */
+export const RiskAssessmentRecordedBody = z.object({ ref: z.string().max(500).optional() }).optional();
 
 /** Kept for the readers of the limits: an id is at most this long. */
 export const KYC_ID_MAX = INPUT_LIMITS.id;

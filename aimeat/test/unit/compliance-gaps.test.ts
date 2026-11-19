@@ -17,6 +17,8 @@
  *   already covered.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-gaps.test.ts
  * @version-history
+ *   2026-11-19 — The stub answers the cash voucher reads (none): section 13 reads them for AMLR art. 80. The
+ *     setup no longer matched the report's reads; the source was right.
  *   2026-11-19 — The stub lists no memory: section 13 now reads the customer due diligence state.
  *   v1.4.1 — 2026-11-15 — The storage answers countAppParties (none): an app's registered people are
  *     AppParty rows, which the records of processing count. The setup no longer matched the report's reads.
@@ -95,6 +97,9 @@ function storageWith(opts: {
     countAppParties: async () => 0,
     // Section 13 reads the customer due diligence state (services/kyc/): no lists and no cards here.
     listMemory: async () => [],
+    // Section 13 reads the cash vouchers across the node (services/aml/cash.ts): none here.
+    listVouchersByPaymentMethod: async () => [],
+    countVouchersWithPaymentMethod: async () => 0,
   } as unknown as Storage;
 }
 

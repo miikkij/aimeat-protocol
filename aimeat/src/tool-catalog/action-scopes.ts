@@ -15,6 +15,8 @@
  * @usage
  *   const word = requiredScopeForAction('aimeat_app_manage', 'settings'); // 'app:write'
  * @version-history
+ *   2026-11-19 — aimeat_kyc_settings: risk_assessment and dpia_draft need compliance:read (GET routes), from
+ *     the same table.
  *   2026-11-19 — aimeat_kyc_customer and aimeat_kyc_settings: their reads need compliance:read, the rest
  *     compliance:write, as routes/kyc/routes.ts asks (definitions/kyc.ts KYC_CUSTOMER_ACTIONS, KYC_SETTINGS_ACTIONS).
  *   2026-11-07 — aimeat_receiver: its reads and propose need receivers:read, the rest receivers:manage

@@ -11,6 +11,7 @@
  *   parameter is filed there as unmeasured, not as forwarded. Measured here, one case per action.
  * @usage cd aimeat && pnpm exec vitest run test/unit/kyc-dispatch.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-19 — aimeat_kyc_settings risk_assessment and dpia_draft.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import { describe, it, expect } from 'vitest';
@@ -106,5 +107,11 @@ describe('aimeat_kyc_suspicion_mark and aimeat_kyc_settings', () => {
       staff: ['alice@node'], officers: ['bob@node'], highRiskCountries: ['KP'], reviewMonths: { low: 60, medium: 36, high: 12 },
     } }]);
     expect((await run('aimeat_kyc_settings', { organism: ORG, action: 'update', officers: ['carol@node'] })).sent[0].body).toEqual({ officers: ['carol@node'] });
+  });
+
+  it('the two drafts are GETs of their own routes; recording the assessment is not offered', async () => {
+    expect((await run('aimeat_kyc_settings', { organism: ORG, action: 'risk_assessment' })).sent).toEqual([{ method: 'GET', path: `/v1/kyc/${ORG}/risk-assessment`, body: undefined }]);
+    expect((await run('aimeat_kyc_settings', { organism: ORG, action: 'dpia_draft' })).sent).toEqual([{ method: 'GET', path: `/v1/kyc/${ORG}/dpia-draft`, body: undefined }]);
+    await expect(run('aimeat_kyc_settings', { organism: ORG, action: 'record_risk_assessment' })).rejects.toThrow(/action is one of/);
   });
 });

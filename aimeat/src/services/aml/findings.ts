@@ -15,8 +15,11 @@
  *     agent_spends_money      agents whose owner let them spend money (commerce.agent-limits);
  *     payers_not_screened     sellers with a money rail, which pay the platform fee: sanctions apply to everyone;
  *     personal_services_sold  agent work listed for money (a DAC7 question);
- *     marketplace_traders     accounts that list offerings for money to everyone (DSA art. 30).
+ *     marketplace_traders     accounts that list offerings for money to everyone (DSA art. 30);
+ *     cash_over_limit         cash payments of more than EUR 10 000, alone or linked (AMLR art. 80, every business).
  *   Every kind is present, with count 0 when nothing matches, so a reader sees what was looked at;
+ *   cash_over_limit is the one exception: it reads the vouchers of every account, so it is on the
+ *   node's view only and an owner's slice leaves it out;
  *   the per-declaration kinds name the organism after a colon. Every finding is a proposal (source
  *   `proposed`) until a person reviews it in the compliance document `aml`.
  *
@@ -25,6 +28,7 @@
  * @structure ITEM_CAP · AmlFacts · gatherAmlFacts · buildAmlFindings
  * @usage const facts = await gatherAmlFacts(deps, { owner }); const findings = buildAmlFindings(facts);
  * @version-history
+ *   2026-11-19 — cash_over_limit: the cash vouchers across the node, read on the node's view only (cash.ts).
  *   2026-11-19 — The facts carry the customer due diligence state (lists, cards, due, not screened) for section 13's duties.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design, stage A).
  */
@@ -43,6 +47,7 @@ import { LIMITS_KEY, type PurchaseLimits } from '../../commerce/agent-purchase-l
 import { isMoneyCurrency } from '../../commerce/money.js';
 import { AMLR_REFS, type AmlFinding } from './contract.js';
 import { readAmlDeclarations, type AmlDeclarationAt } from './gate.js';
+import { CASH_LINK_DAYS, cashOverLimit, type CashOverLimitItem } from './cash.js';
 
 /** Items a finding lists; the count is the whole. */
 export const ITEM_CAP = 50;
@@ -64,6 +69,12 @@ export interface AmlFacts {
   traders: Array<{ provider: string; offerings: number }>;
   /** Customer due diligence on this server (services/kyc/): the lists fetched, and the cards kept. */
   kyc: { lists: Array<{ source: string; entries: number; fetchedAt: string }>; cards: number; due: number; notScreened: number };
+  /**
+   * Cash payments (art. 80, services/aml/cash.ts), on the node's view only; null in an owner's slice.
+   * `recorded` is how many vouchers on the node record any payment method, `cash` how many say cash,
+   * `otherCurrency` how many cash vouchers are not in EUR and so not summed.
+   */
+  cash: { recorded: number; cash: number; otherCurrency: number; overLimit: CashOverLimitItem[] } | null;
 }
 
 const isLocalAccount = (ghii: string, nodeId: string): boolean => ghii.endsWith(`@${nodeId}`) && !ghii.includes('#');
@@ -169,8 +180,22 @@ export async function gatherAmlFacts(deps: { storage: Storage; config: AimeatCon
     }
   }
 
+  // Cash payments at or over the art. 80 limit: every business on the node, on the node's view only.
+  let cash: AmlFacts['cash'] = null;
+  if (!owner) {
+    // The last 400 days (a year and the 30 days that link payments), at most 5 000 cash vouchers node-wide.
+    const since = new Date(Date.parse(opts.now ?? new Date().toISOString()) - 400 * 86_400_000).toISOString().slice(0, 10);
+    const vouchers = await storage.listVouchersByPaymentMethod('cash', { since, limit: 5000 });
+    cash = {
+      recorded: await storage.countVouchersWithPaymentMethod(),
+      cash: vouchers.length,
+      otherCurrency: vouchers.filter(v => v.currency.toUpperCase() !== 'EUR').length,
+      overLimit: cashOverLimit(vouchers),
+    };
+  }
+
   return {
-    mode: config.amlMode, owner, now: opts.now ?? new Date().toISOString(), declarations, reviews, kyc,
+    mode: config.amlMode, owner, now: opts.now ?? new Date().toISOString(), declarations, reviews, kyc, cash,
     splitsForOthers, cryptoPayouts: [...payoutCounts.values()], agentLimits, sellers, personalServices,
     traders: [...byProvider.entries()].map(([provider, offerings]) => ({ provider, offerings })),
   };
@@ -287,5 +312,25 @@ export function buildAmlFindings(f: AmlFacts): AmlFinding[] {
       : 'No account lists an offering for money.',
     regulation: [AMLR_REFS.dsaTraders],
   });
+  // Node view only: an owner's slice reads no vouchers, so it carries no cash finding at all.
+  if (f.cash) {
+    const c = f.cash;
+    const n = c.overLimit.length;
+    const eurOnly = c.otherCurrency
+      ? ` Only vouchers in EUR are summed: ${c.otherCurrency} cash voucher(s) in another currency are not.`
+      : ' Only vouchers in EUR are summed.';
+    add({
+      id: 'cash_over_limit', kind: 'cash_over_limit', code: 'aml-cash-over-limit',
+      count: n, items: cap(c.overLimit.map(i => ({ ...i }))),
+      reason: (n
+        ? `${n} cash payment(s) of more than EUR 10 000 are booked, alone or as linked payments to the same counterparty within ${CASH_LINK_DAYS} days. A business may accept or make a cash payment only up to EUR 10 000, and this applies to every business on this server, not only to obliged entities.`
+        : c.recorded
+          ? `No cash payment of more than EUR 10 000 is booked, alone or as linked payments to the same counterparty within ${CASH_LINK_DAYS} days. The limit applies to every business on this server, not only to obliged entities.`
+          : 'No voucher on this server records how it was paid, so a cash payment cannot be told apart. The limit applies to every business, not only to obliged entities.')
+        + (c.recorded ? eurOnly : ''),
+      regulation: [AMLR_REFS.cash],
+      ...(n ? { proposal: { action: 'review_cash_payments', text: 'Check each payment with the business that booked it. A payment booked as cash by mistake is corrected by reversing the voucher and booking it again with the right payment method.' } } : {}),
+    });
+  }
   return out;
 }

@@ -13,8 +13,13 @@
  *   node: the missing node declaration is a finding with its proposal; only the operator writes it.
  *   A review makes a finding the person's. Slices: B's own report holds none of A's organisms, A's
  *   holds them; B cannot read the node report; C cannot write A's organism's document.
+ *   cash (AMLR art. 80): A books a cash voucher of EUR 10 000,01, a card voucher of the same amount and a
+ *   cash voucher of exactly EUR 10 000 through POST /v1/finance/vouchers; the node report has
+ *   cash_over_limit with count 1 and the row aml-ob-cash at check; an unknown payment method is refused;
+ *   A's own slice carries neither.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=aml-mode
  * @version-history
+ *   2026-11-19 — Cash payments over the art. 80 limit (services/aml/cash.ts).
  *   v1.1.0 — 2026-11-19 — On the shared harness (test/helpers/harness.ts); every refusal holds its code.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design, stage A).
  */
@@ -143,6 +148,35 @@ await test('B\'s own report holds none of A\'s organisms; A\'s holds them; B can
   const byC = await call(orgDoc(org1), C.token, { method: 'PUT', body: { items: [] } });
   // C is no member of A's organism, so the organism is not shown to C at all: 404.
   expectRefusal(byC, 404, 'NOT_FOUND');
+});
+
+console.log('\ncash (AMLR art. 80)');
+
+const book = (paymentMethod: string, amount: number, counterparty: string) => call('/v1/finance/vouchers', A.token, {
+  body: { date: '2026-03-02', description: `Sale ${stamp}`, direction: 'income', source: 'manual', amount_minor: amount, currency: 'EUR', counterparty, payment_method: paymentMethod },
+});
+
+await test('cash: a cash voucher of more than EUR 10 000 is the finding cash_over_limit with count 1; card, and cash of exactly EUR 10 000, are not', async () => {
+  const before = await nodeAml();
+  assert(finding(before, 'cash_over_limit')?.count === 0, `nothing booked yet: ${JSON.stringify(finding(before, 'cash_over_limit'))}`);
+  assert((before.obligations as Body[]).find(r => r.code === 'aml-ob-cash')?.status === 'not_applicable', 'no payment method recorded: not applicable');
+  const cash = await book('cash', 1_000_001, `Carol ${stamp}`);
+  assert(cash.status === 201 && cash.body.data.voucher.paymentMethod === 'cash', `cash voucher: ${show(cash)}`);
+  const card = await book('card', 1_000_001, `Dave ${stamp}`);
+  assert(card.status === 201 && card.body.data.voucher.paymentMethod === 'card', `card voucher: ${show(card)}`);
+  const exact = await book('cash', 1_000_000, `Erin ${stamp}`);
+  assert(exact.status === 201, `exact voucher: ${show(exact)}`);
+  const s = await nodeAml();
+  const f = finding(s, 'cash_over_limit');
+  assert(f?.count === 1 && f.kind === 'cash_over_limit' && f.regulation.some((r: Body) => r.ref === 'art. 80'), `finding: ${JSON.stringify(f)}`);
+  assert(f.items[0].owner === A.name && f.items[0].total === 1_000_001 && f.items[0].voucherIds[0] === cash.body.data.voucher.id, `item: ${JSON.stringify(f.items)}`);
+  assert(!JSON.stringify(f).includes(`Sale ${stamp}`), 'the finding carries no voucher text');
+  assert((s.obligations as Body[]).find(r => r.code === 'aml-ob-cash')?.status === 'check', 'the obligation row asks for a check');
+  const bad = await call('/v1/finance/vouchers', A.token, { body: { date: '2026-03-02', description: 'x', direction: 'income', source: 'manual', amount_minor: 100, payment_method: 'cheque' } });
+  // The contract's enum refuses it before the route's own schema does.
+  expectRefusal(bad, 400, 'VALIDATION_ERROR');
+  const slice = (await call('/v1/compliance/report/mine', A.token)).body.data.aml as Body;
+  assert(!finding(slice, 'cash_over_limit') && !(slice.obligations as Body[]).some(r => r.code === 'aml-ob-cash'), 'an owner\'s slice carries no cash finding');
 });
 
 await test('Cleanup: the mode back to report', async () => {

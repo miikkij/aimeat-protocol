@@ -11,6 +11,7 @@
  * @structure registerKycTools(mcp, storage, config, caller)
  * @usage registerKycTools(mcp, storage, config, caller);   // mcp/register-all.ts
  * @version-history
+ *   v1.1.0 — 2026-11-19 — aimeat_kyc_settings: risk_assessment and dpia_draft (services/kyc/assessment.ts).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -21,7 +22,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { requiredScopeForAction } from '../tool-catalog/action-scopes.js';
-import { KYC_CUSTOMER_ACTION_NAMES } from '../tool-catalog/definitions/kyc.js';
+import { KYC_CUSTOMER_ACTION_NAMES, KYC_SETTINGS_ACTION_NAMES } from '../tool-catalog/definitions/kyc.js';
 import { COMPLIANCE_WRITE_SCOPE } from '../utils/scope-coverage.js';
 import { toolError } from './tool-error.js';
 import { withCaughtError } from './tool-fault.js';
@@ -33,6 +34,7 @@ import {
 } from '../services/kyc/cards.js';
 import { createLink } from '../services/kyc/identify.js';
 import { markSuspicion } from '../services/kyc/reports.js';
+import { dpiaDraft, riskAssessmentDraft } from '../services/kyc/assessment.js';
 
 const ok = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -115,13 +117,18 @@ export function registerKycTools(mcp: McpServer, storage: Storage, config: Aimea
   }, async (args) => {
     const a = args as Record<string, unknown>;
     const action = str(a.action);
-    if (action !== 'read' && action !== 'update') return toolError('INVALID_INPUT', 'action is one of read, update.');
+    if (!(KYC_SETTINGS_ACTION_NAMES as readonly string[]).includes(action)) {
+      return toolError('INVALID_INPUT', `action is one of ${KYC_SETTINGS_ACTION_NAMES.join(', ')}.`);
+    }
     const c = caller();
     const refusal = denied('aimeat_kyc_settings', c, requiredScopeForAction('aimeat_kyc_settings', action));
     if (refusal) return refusal;
     const org = str(a.organism);
     try {
       if (action === 'read') return ok(await readSettingsFor(deps, c, org));
+      // GET /v1/kyc/:org/risk-assessment and GET /v1/kyc/:org/dpia-draft. Recording the assessment is in person, so not here.
+      if (action === 'risk_assessment') return ok(await riskAssessmentDraft(deps, c, org));
+      if (action === 'dpia_draft') return ok(await dpiaDraft(deps, c, org));
       // The same body PUT /v1/kyc/:org/settings takes: only the fields given; the service keeps the rest.
       const patch: Record<string, unknown> = {};
       for (const key of ['staff', 'officers', 'highRiskCountries', 'reviewMonths'] as const) if (a[key] !== undefined) patch[key] = a[key];

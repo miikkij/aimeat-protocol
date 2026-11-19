@@ -9,11 +9,12 @@
  * @structure kycCliTools — the three definitions
  * @usage import { kycCliTools } from './tool-call-defs-kyc.js';   // tool-dispatch/index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-19 — aimeat_kyc_settings: risk_assessment and dpia_draft (GET routes).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { requiredString, optionalString, optionalBoolean, optionalRecord, optionalArray, query } from './tool-call-helpers.js';
-import { KYC_CUSTOMER_ACTION_NAMES } from '../tool-catalog/definitions/kyc.js';
+import { KYC_CUSTOMER_ACTION_NAMES, KYC_SETTINGS_ACTION_NAMES } from '../tool-catalog/definitions/kyc.js';
 
 /** The organism's KYC base path; the id is caller text landing in a path segment, so it is encoded. */
 const base = (org: string): string => `/v1/kyc/${encodeURIComponent(org)}`;
@@ -59,12 +60,16 @@ export const kycCliTools: ConnectCliToolDefinition[] = [
     },
     {
         // → GET or PUT /v1/kyc/:org/settings; the PUT carries only the fields given (the service keeps the rest).
+        // → GET /v1/kyc/:org/risk-assessment and GET /v1/kyc/:org/dpia-draft for the two drafts.
         name: 'aimeat_kyc_settings',
         handler: ({ client }, input) => {
             const action = requiredString(input, 'action');
-            const at = `${base(requiredString(input, 'organism'))}/settings`;
+            const org = base(requiredString(input, 'organism'));
+            const at = `${org}/settings`;
             if (action === 'read') return client.get(at);
-            if (action !== 'update') throw new Error('action is one of read, update.');
+            if (action === 'risk_assessment') return client.get(`${org}/risk-assessment`);
+            if (action === 'dpia_draft') return client.get(`${org}/dpia-draft`);
+            if (action !== 'update') throw new Error(`action is one of ${KYC_SETTINGS_ACTION_NAMES.join(', ')}.`);
             const body: Record<string, unknown> = {};
             for (const key of ['staff', 'officers', 'highRiskCountries'] as const) {
                 const list = optionalArray(input, key);

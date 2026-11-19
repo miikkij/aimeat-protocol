@@ -792,6 +792,10 @@
     "src/utils/version.ts": {
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/kyc/fill.js": {
+      "count": 1,
+      "reason": "Read 2026-11-19: JSON.parse of the answer a person pasted from their own AI. A text that is not JSON tries the next form (a fenced block, then the first {...}); when none parses, the page tells the person in a sentence and keeps the text. The failure is the expected answer, not a fault to trace."
     }
   }
 }

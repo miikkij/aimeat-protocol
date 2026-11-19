@@ -20,6 +20,7 @@
  *   The operator (the suite's first account) turns classification on for every owner and off at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-compliance-records
  * @version-history
+ *   2026-11-19 — The catalog also lists the anti-money-laundering framework `amlr`.
  *   2026-10-30 — Setup no longer matched production after 162b2c687 (Jouni, 2026-10-29): the node's
  *     draft holds five registers (node-user-content), and an app whose data only its owner reads gets
  *     no register of its own. The two app maps name readers other than the owner (named people, a
@@ -108,7 +109,7 @@ await test('CATALOG: the data domains, the frameworks with their questions, and 
     const domains = (r.body.data.domains as Body[]).map(d => d.id);
     for (const d of ['health', 'defence-classified', 'export-controlled', 'children']) assert(domains.includes(d), `domain ${d}: ${domains}`);
     const fw = (r.body.data.frameworks as Body[]).map(f => f.id);
-    for (const f of ['gdpr', 'nis2', 'dora', 'cra', 'eaa', 'dsa', 'hipaa', 'export-control']) assert(fw.includes(f), `framework ${f}: ${fw}`);
+    for (const f of ['gdpr', 'nis2', 'dora', 'cra', 'eaa', 'dsa', 'hipaa', 'export-control', 'amlr']) assert(fw.includes(f), `framework ${f}: ${fw}`);
     assert((r.body.data.packs as Body[]).map(p => p.id).join() === 'tl,nato', `packs: ${JSON.stringify(r.body.data.packs)}`);
 });
 

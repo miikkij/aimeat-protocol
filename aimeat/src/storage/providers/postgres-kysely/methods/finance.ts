@@ -16,6 +16,8 @@
  * @structure financeMethods — invoices · vouchers · vat codes · fiscal years · counters
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   2026-11-19 — FinanceVoucher.paymentMethod written and read; listVouchersByPaymentMethod and
+ *     countVouchersWithPaymentMethod (node-wide, for the AML cash finding; migration 0133).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
 import { sql, type Selectable } from 'kysely';
@@ -23,7 +25,7 @@ import type { FinanceRepository, InvoiceStatusPatch } from '../../../repositorie
 import type {
   InvoiceRecord, InvoiceQuery, InvoiceStatus, InvoiceType, InvoiceParty, InvoiceLine,
   InvoiceDeliveryMethod, InvoiceDeliveryStatus, VatBreakdownEntry,
-  VoucherRecord, VoucherQuery, VoucherSource, VoucherDirection,
+  VoucherRecord, VoucherQuery, VoucherSource, VoucherDirection, VoucherPaymentMethod,
   VatCodeRecord, VatCategory, FiscalYearRecord,
 } from '../../../../models/finance-schemas.js';
 import type {
@@ -93,6 +95,7 @@ function toVoucher(r: Selectable<VoucherRow>): VoucherRecord {
     externalRef: r.externalRef ?? null,
     attachments: (r.attachments as unknown as string[] | null) ?? [],
     reversesVoucherId: r.reversesVoucherId ?? null,
+    paymentMethod: (r.paymentMethod as VoucherPaymentMethod | null) ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -280,6 +283,7 @@ export const financeMethods: FinanceRepository & ThisType<PostgresKyselyStorage>
       externalRef: row.externalRef,
       attachments: jsonb(row.attachments) as unknown as Json,
       reversesVoucherId: row.reversesVoucherId,
+      paymentMethod: row.paymentMethod ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }).execute();
@@ -332,6 +336,24 @@ export const financeMethods: FinanceRepository & ThisType<PostgresKyselyStorage>
       .where('externalRef', '=', externalRef)
       .executeTakeFirst();
     return r ? toVoucher(r) : undefined;
+  },
+
+  async listVouchersByPaymentMethod(this: PostgresKyselyStorage, paymentMethod: VoucherPaymentMethod, opts: { since: string; limit: number }): Promise<VoucherRecord[]> {
+    const rows = await this.db.selectFrom('FinanceVoucher').selectAll()
+      .where('paymentMethod', '=', paymentMethod)
+      .where('date', '>=', opts.since)
+      .orderBy('date', 'asc').orderBy('id', 'asc')
+      .limit(Math.max(1, Math.min(opts.limit, 10_000)))
+      .execute();
+    return rows.map(toVoucher);
+  },
+
+  async countVouchersWithPaymentMethod(this: PostgresKyselyStorage): Promise<number> {
+    const r = await this.db.selectFrom('FinanceVoucher')
+      .select(sql<number>`count(*)`.as('n'))
+      .where('paymentMethod', 'is not', null)
+      .executeTakeFirst();
+    return Number(r?.n ?? 0);
   },
 
   // ── VAT codes ─────────────────────────────────────────────────────────────

@@ -17,6 +17,8 @@
  * @structure openCustomer · updateCustomer · recordIdentity · screenCustomer · decideHit · approveCustomer ·
  *   reviewCustomer · endCustomer · extendHold · readCustomer · customerAsOf · listCustomers · rescreenAll
  * @version-history
+ *   v1.0.1 — 2026-11-19 — An update keeps the fields it does not send: zod 4 fills a field's default
+ *     inside .partial(), so a PATCH without pep set it to 'unknown' and one without owners to [].
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import { randomUUID } from 'node:crypto';
@@ -128,7 +130,10 @@ async function cardsContext(deps: KycDeps, caller: CallerContext, org: string): 
 function parseInput(input: unknown): CustomerInput {
   const parsed = CustomerInputSchema.safeParse(input ?? {});
   if (!parsed.success) throw new KycError(400, 'INVALID_INPUT', parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
-  return parsed.data;
+  // A field's .default() still fires inside .partial() (zod 4): an update that leaves out pep or
+  // beneficialOwners would reset them to 'unknown' and []. Only the fields the caller sent count.
+  const sent = new Set(Object.keys((input ?? {}) as Record<string, unknown>));
+  return Object.fromEntries(Object.entries(parsed.data).filter(([k]) => sent.has(k))) as CustomerInput;
 }
 
 async function current(deps: KycDeps, org: string, id: string): Promise<CustomerVersion> {

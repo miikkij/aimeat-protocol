@@ -18,6 +18,7 @@
  * @structure AmlSection · MODE_TEXT · amlObligations · buildAmlSection
  * @usage const aml = await buildAmlSection({ storage, config }, { ownerGhii });
  * @version-history
+ *   2026-11-19 — Obligation aml-ob-cash (art. 80): evidence, check or not applicable from the cash vouchers, on the node's view.
  *   2026-11-19 — The duties read what customer due diligence now does (services/kyc/): screening, cards, the review calendar and the retention hold.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design, stage A).
  */
@@ -75,6 +76,20 @@ export function amlObligations(f: AmlFacts, config: Pick<AimeatConfig, 'ftnEnabl
         : f.sellers.length ? 'Sellers take money here and nobody is screened against the sanctions lists: no list is fetched yet (Admin › Customer due diligence › Fetch the lists now).' : 'No account takes money here, so there is nobody to screen.',
     },
   ];
+  // Art. 80 binds every business, obliged or not, so this row does not wait for `applies`. Node view only.
+  if (f.cash) {
+    const over = f.cash.overLimit.length;
+    rows.push({
+      code: 'aml-ob-cash', ref: AMLR_REFS.cash,
+      status: !f.cash.recorded ? 'not_applicable' : over ? 'check' : 'evidence',
+      evidence: { vouchers_with_payment_method: f.cash.recorded, cash_vouchers: f.cash.cash, over_limit: over, other_currency: f.cash.otherCurrency },
+      text: !f.cash.recorded
+        ? 'No voucher records how it was paid, so cash payments cannot be told apart. A person records it when booking a voucher (payment method).'
+        : over
+          ? `${over} cash payment(s) of more than EUR 10 000 are booked, alone or linked within 30 days. Each one is checked with the business that booked it.`
+          : 'Vouchers record how they were paid, and no cash payment of more than EUR 10 000 is booked, alone or linked within 30 days. Only vouchers in EUR are summed.',
+    });
+  }
   if (!applies) {
     rows.push(
       na('aml-ob-risk-assessment', AMLR_REFS.riskAssessment, 'No obliged entity works here, so no business-wide risk assessment is asked for.'),
@@ -152,7 +167,7 @@ export async function buildAmlSection(
       reviewed: findings.filter(f => f.source === 'human').length,
     },
     obligations: amlObligations(facts, deps.config),
-    regulation: [AMLR_REFS.obliged, AMLR_REFS.compliance, AMLR_REFS.cdd, AMLR_REFS.reporting, AMLR_REFS.retention, AMLR_REFS.sanctions],
+    regulation: [AMLR_REFS.obliged, AMLR_REFS.compliance, AMLR_REFS.cdd, AMLR_REFS.reporting, AMLR_REFS.retention, AMLR_REFS.sanctions, AMLR_REFS.cash],
     edit: owner
       ? { method: 'PUT', url: '/v1/compliance/docs/aml?scope=organism&organism_id=<id>', note: 'An organism you manage keeps its own declaration and reviews. On a server set to none the declaration is refused.' }
       : { method: 'PUT', url: '/v1/compliance/docs/aml', note: 'The node\'s declaration (an item of type declaration, mode node) and a review per finding (type review, the finding\'s id, accepted or dismissed). aimeat_compliance_register_write with part aml does the same.' },

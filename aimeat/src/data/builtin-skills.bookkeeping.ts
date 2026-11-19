@@ -27,6 +27,7 @@
  * @structure BOOKKEEPING_SKILL_ENTRY
  * @usage import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
  * @version-history
+ *   2026-11-19 — Section 3: a voucher takes payment_method, and a cash payment over 10 000 euros is named (AMLR art. 80).
  *   2026-11-01 — Section 5: a package offered to a data space over the Dataspace Protocol, the requests
  *     and agreements through aimeat_dataspace (plan D8; routes/odata.ts reads the transfer token).
  *   2026-11-01 — Section 5: a package sold on EXCHANGE, the feed metered against the buyer's contract (plan D5; routes/odata.ts).
@@ -120,8 +121,14 @@ stand.
 Every booking is a voucher: one gross amount, \`income\` or \`expense\`, with its VAT broken down by
 code. Paid invoices and Stripe payments book their own vouchers. The person's receipts are booked with
 \`POST /v1/finance/vouchers\` (\`source: "receipt"\` or \`"manual"\`, \`date\`, \`description\`,
-\`direction\`, \`amount_minor\`, \`vat_breakdown\`, \`counterparty\`); attach the receipt file with
-\`POST .../attachments\` and the stored file's key.
+\`direction\`, \`amount_minor\`, \`vat_breakdown\`, \`counterparty\`, and \`payment_method\`: \`cash\`,
+\`card\`, \`transfer\` or \`other\`); attach the receipt file with \`POST .../attachments\` and the stored
+file's key.
+
+- **Say when a payment was cash.** The EU anti-money-laundering regulation (2024/1624, art. 80) forbids
+  a business to take or make a cash payment of more than 10 000 euros, also in linked payments to one
+  party. A cash voucher over that is listed for the operator on the Compliance page (section 13); tell
+  the person before booking one.
 
 - **A voucher is never edited or deleted.** A mistake is corrected with
   \`POST /v1/finance/vouchers/{id}/reverse\` and a \`reason\`, which books the counter-voucher, and then

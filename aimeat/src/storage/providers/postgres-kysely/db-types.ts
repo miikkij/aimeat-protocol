@@ -967,6 +967,8 @@ export interface FinanceVoucher {
   invoiceId: string | null;
   organismId: string | null;
   ownerGhii: string;
+  /** 'cash' | 'card' | 'transfer' | 'other', or null when nobody recorded it (migration 0133). */
+  paymentMethod: string | null;
   reversesVoucherId: string | null;
   source: string;
   trackingCode: string | null;

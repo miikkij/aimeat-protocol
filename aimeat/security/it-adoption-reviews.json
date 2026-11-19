@@ -169,7 +169,7 @@
         "aimeat/src/services/compliance/derived.ts",
         "aimeat/src/tool-catalog/definitions/compliance.ts"
       ],
-      "digest": "sha256:f46ed8c6af59d4cd5ec5b4e4"
+      "digest": "sha256:38df3c1b99b83ed3bc0408dc"
     },
     "15-operations-runbook.md": {
       "reviewedOn": "2026-11-15",
@@ -260,11 +260,11 @@
       "digest": "sha256:0409da12c8aea42a41a80689"
     },
     "templates/processing-record.md": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/compliance/derived.ts"
       ],
-      "digest": "sha256:8ddee3b0981dd9025fd7655a"
+      "digest": "sha256:e9f68fd5e07fc56278bf567f"
     },
     "templates/regulated-sector-addendum.md": {
       "reviewedOn": "2026-11-01",
@@ -389,7 +389,7 @@
       "aimeat/src/static/sdk-libs/offline/store.js": "ba14118fe69ad407"
     },
     "14-compliance-mapping.md": {
-      "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",
+      "aimeat/src/services/compliance/derived.ts": "e169580bb1c4861e",
       "aimeat/src/tool-catalog/definitions/compliance.ts": "83ae759b2cda0f63"
     },
     "15-operations-runbook.md": {
@@ -423,7 +423,7 @@
       "aimeat/src/data/classification-packs.ts": "ffbb4b6a6349fce1"
     },
     "templates/processing-record.md": {
-      "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53"
+      "aimeat/src/services/compliance/derived.ts": "e169580bb1c4861e"
     },
     "templates/regulated-sector-addendum.md": {
       "aimeat/src/services/docsign/statement.ts": "65d24a2c3e04407e"

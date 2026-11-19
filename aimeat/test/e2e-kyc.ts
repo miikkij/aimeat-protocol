@@ -12,6 +12,7 @@
  *
  *   Each refusal is the one a second principal gets (security.md: cross-owner and cross-scope 403).
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The risk assessment draft and its record, the DPIA draft (services/kyc/assessment.ts).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-kyc
@@ -139,6 +140,13 @@ await test('A listed entity is a possible hit; the agent cannot decide it; the o
   assert(kept.verdict === 'false-positive' && kept.decidedBy === A.ghii, 'the decision stays with its ground');
 });
 
+await test('An update changes only the fields it sends: PEP status and owners stay', async () => {
+  const u = await call(K(`/customers/${dark}`), B.token, { method: 'PATCH', body: { purpose: 'Payroll and pensions', note: 'Filled from the contract' } });
+  assert(u.status === 200 && u.body.data.purpose === 'Payroll and pensions', `update: ${show(u)}`);
+  assert(u.body.data.pep === 'no', `pep stays no: ${u.body.data.pep}`);
+  assert(Array.isArray(u.body.data.beneficialOwners) && u.body.data.beneficialOwners.length === 1, `owners stay: ${JSON.stringify(u.body.data.beneficialOwners)}`);
+});
+
 await test('A PEP waits for senior approval: staff cannot give it, an agent cannot, the officer in person can', async () => {
   const u = await call(K(`/customers/${bob}`), B.token, { method: 'PATCH', body: { pep: 'yes', pepDetail: 'Member of a city council', note: 'Told us at the meeting' } });
   assert(u.status === 200 && u.body.data.risk.level === 'high' && u.body.data.risk.needsSeniorApproval && u.body.data.status === 'blocked', `pep: ${show(u)}`);
@@ -207,6 +215,56 @@ await test('The officer drafts, records the goAML submission; the case then does
   expectRefusal(await call(K(`/suspicions/${rid}`), A.token, { method: 'PATCH', body: { narrative: 'x' } }), 409, 'REPORT_CLOSED');
 });
 
+console.log('\nrisk assessment and impact assessment');
+
+await test('Risk assessment: the officer reads a draft from the organism\'s own cards, records it in person; an agent and the staff cannot; the DPIA draft fits its schema', async () => {
+  const r = await call(K('/risk-assessment'), A.token);
+  assert(r.status === 200, `draft: ${show(r)}`);
+  const f = r.body.data.facts as Body;
+  // The cards so far: Bob (PEP, high, approved), Darkwater (entity, hit decided), Frank (opened over MCP).
+  assert(f.pep.customers >= 1 && f.customers.byRisk.high >= 1 && f.customers.open >= 3 && f.customers.byKind.entity >= 1, `facts match the cards: ${JSON.stringify(f).slice(0, 600)}`);
+  assert(f.countries.some((c: Body) => c.country === 'FI' && c.customers >= 3), `countries: ${JSON.stringify(f.countries)}`);
+  assert(!/suspicion|Cash deposits/i.test(JSON.stringify(f)), 'suspicions are not counted');
+  const ids = (r.body.data.sections as Body[]).map(s => s.id).join(',');
+  assert(ids === 'customers,countries,products,channels,transactions', `sections: ${ids}`);
+  assert((r.body.data.sections as Body[]).every(s => /\?/.test(s.text) && /\d/.test(s.text)), 'each section states numbers and asks');
+  assert(r.body.data.due === true && r.body.data.lastRecordedAt === null, `never recorded, so due: ${show(r)}`);
+  // The agent reads the draft; it does not record it.
+  assert((await call(K('/risk-assessment'), agentA)).status === 200, 'the officer\'s agent reads the draft');
+  expectRefusal(await call(K('/risk-assessment/recorded'), agentA, { body: { ref: 'x' } }), 403, 'KYC_DECISION_IN_PERSON');
+  expectRefusal(await call(K('/risk-assessment'), B.token), 403, 'KYC_NOT_MANAGER');
+  expectRefusal(await call(K('/risk-assessment/recorded'), B.token, { body: {} }), 403, 'KYC_NOT_MANAGER');
+  expectRefusal(await call(K('/risk-assessment/recorded'), A.token, { body: { ref: 'x'.repeat(501) } }), 400, 'VALIDATION_ERROR');
+  const today = new Date().toISOString().slice(0, 10);
+  const rec = await call(K('/risk-assessment/recorded'), A.token, { body: { ref: 'https://docs.example/risk-2026' } });
+  assert(rec.status === 200 && rec.body.data.declaration.riskAssessmentAt === today && rec.body.data.declaration.riskAssessmentRef === 'https://docs.example/risk-2026', `recorded: ${show(rec)}`);
+  const doc = await call(`/v1/compliance/docs/aml?scope=organism&organism_id=${org}`, A.token);
+  const decl = (doc.body.data.items as Body[]).find(i => i.type === 'declaration');
+  assert(doc.status === 200 && decl.riskAssessmentAt === today && decl.legalName === 'Kyc Tilit Oy', `declaration read back: ${show(doc)}`);
+  const again = await call(K('/risk-assessment'), A.token);
+  assert(again.body.data.due === false && again.body.data.lastRecordedAt === today, `no longer due: ${show(again)}`);
+  const d = await call(K('/dpia-draft'), A.token);
+  assert(d.status === 200 && d.body.data.stored === false && d.body.data.item.id && /dpia-draft\/stored$/.test(d.body.data.store.write.path), `dpia: ${show(d)}`);
+  expectRefusal(await call(K('/dpia-draft'), B.token), 403, 'KYC_NOT_MANAGER');
+  // The officer stores it in person; storing again replaces the same entry; an agent may not store it.
+  const stored = await call(`/v1/kyc/${org}/dpia-draft/stored`, A.token, { body: {} });
+  assert(stored.status === 200 && stored.body.data.item.id === d.body.data.item.id, `stored: ${show(stored)}`);
+  const twice = await call(`/v1/kyc/${org}/dpia-draft/stored`, A.token, { body: {} });
+  assert(twice.status === 200 && twice.body.data.items === stored.body.data.items, `stored again, one entry: ${show(twice)}`);
+  const agentStore = await call(`/v1/kyc/${org}/dpia-draft/stored`, agentA, { body: {} });
+  assert(agentStore.status === 403 && agentStore.body.error.code === 'KYC_DECISION_IN_PERSON', `agent store: ${show(agentStore)}`);
+  const back = await call(`/v1/compliance/docs/dpias?scope=organism&organism_id=${org}`, A.token);
+  assert(back.status === 200 && (back.body.data.items as Body[]).some(i => i.id === d.body.data.item.id), `in the records: ${show(back)}`);
+  const storedNow = await call(K('/dpia-draft'), A.token);
+  assert(storedNow.status === 200 && storedNow.body.data.stored === true, `the draft now says it is stored: ${storedNow.body.data?.stored}`);
+  // Over MCP, the same reads.
+  const s = await openSession(BASE, agentA, 'e2e-kyc-assessment');
+  const m = await callTool(s, 'aimeat_kyc_settings', { organism: org, action: 'risk_assessment' });
+  assert(!m.isError && m.data?.facts?.customers?.open === f.customers.open, `risk_assessment over MCP: ${m.text.slice(0, 300)}`);
+  const md = await callTool(s, 'aimeat_kyc_settings', { organism: org, action: 'dpia_draft' });
+  assert(!md.isError && md.data?.item?.id === d.body.data.item.id, `dpia_draft over MCP: ${md.text.slice(0, 300)}`);
+});
+
 console.log('\nretention');
 
 await test('Ending: the card stops changing and is held five years; memory delete and organism delete are refused', async () => {
@@ -270,6 +328,10 @@ await test('Every door refuses a second principal: an outside owner on the organ
     ['POST', `/v1/kyc/${org}/suspicions/${rid}/submit`, { goaml_ref: 'x' }],
     ['POST', `/v1/kyc/${org}/suspicions/${rid}/close`, { decision: 'x' }],
     ['POST', `/v1/kyc/${org}/suspicions/${rid}/assist`, {}],
+    ['GET', `/v1/kyc/${org}/risk-assessment`, undefined],
+    ['POST', `/v1/kyc/${org}/risk-assessment/recorded`, { ref: 'x' }],
+    ['GET', `/v1/kyc/${org}/dpia-draft`, undefined],
+    ['POST', `/v1/kyc/${org}/dpia-draft/stored`, {}],
   ];
   for (const [method, path, body] of doors) {
     const r = await call(path, D.token, { method, body });

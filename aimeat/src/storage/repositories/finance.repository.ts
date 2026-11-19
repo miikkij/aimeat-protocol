@@ -18,6 +18,8 @@
  * @usage Storage interface composes this; providers implement in methods/finance*.ts.
  *
  * @version-history
+ *   2026-11-19 — listVouchersByPaymentMethod and countVouchersWithPaymentMethod, node-wide reads for the
+ *     AML cash finding (migration 0133).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1: initial finance repository.
  */
 
@@ -27,6 +29,7 @@ import type {
   InvoiceStatus,
   VoucherRecord,
   VoucherQuery,
+  VoucherPaymentMethod,
   VatCodeRecord,
   FiscalYearRecord,
 } from '../../models/finance-schemas.js';
@@ -73,6 +76,13 @@ export interface FinanceRepository {
   setVoucherAttachments(id: string, attachments: string[]): Promise<void>;
   /** Webhook idempotency: has this external event already been booked for this owner? */
   findVoucherByExternalRef(ownerGhii: string, externalRef: string): Promise<VoucherRecord | undefined>;
+  /**
+   * NODE-WIDE, every owner: the vouchers booked with this payment method, oldest date first. For the
+   * operator's compliance report only (services/aml/findings.ts); never behind an owner's route.
+   */
+  listVouchersByPaymentMethod(paymentMethod: VoucherPaymentMethod, opts: { since: string; limit: number }): Promise<VoucherRecord[]>;
+  /** NODE-WIDE: how many vouchers record any payment method at all. */
+  countVouchersWithPaymentMethod(): Promise<number>;
 
   // ── VAT codes (node-global registry) ──────────────────────────────────────
   upsertVatCode(row: VatCodeRecord): Promise<void>;

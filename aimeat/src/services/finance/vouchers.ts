@@ -9,13 +9,15 @@
  * @structure bookVoucher · reverseVoucher · attachEvidence
  * @usage await bookVoucher(storage, ownerGhii, { date, description, direction, ... });
  * @version-history
+ *   2026-11-19 — VoucherInput.paymentMethod (cash, card, transfer, other), checked and stored; a reversal
+ *     carries the original's, so the AML cash rule (services/aml/cash.ts) can pair the two and drop both.
  *   2026-11-13 — fiscalYearForDate comes from fiscal-years.ts, not from invoice-service.ts, which imports
  *     this file (structure programme 2026-11, unit 4).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
-import type { VoucherRecord, VoucherSource, VoucherDirection, VatBreakdownEntry } from '../../models/finance-schemas.js';
+import { VOUCHER_PAYMENT_METHODS, type VoucherRecord, type VoucherSource, type VoucherDirection, type VatBreakdownEntry, type VoucherPaymentMethod } from '../../models/finance-schemas.js';
 import { FinanceError } from './errors.js';
 import { fiscalYearForDate } from './fiscal-years.js';
 
@@ -36,6 +38,8 @@ export interface VoucherInput {
   externalRef?: string | null;
   attachments?: string[];
   reversesVoucherId?: string | null;
+  /** How the money moved, as the person recorded it. Automatic bookings (Stripe, checkout, invoice) leave it out. */
+  paymentMethod?: VoucherPaymentMethod | null;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -54,6 +58,9 @@ export async function bookVoucher(storage: Storage, ownerGhii: string, input: Vo
   }
   if (input.direction === 'transfer' && (input.vatBreakdown?.length ?? 0) > 0) {
     throw new FinanceError('INVALID_VOUCHER', 400, 'A transfer voucher carries no VAT breakdown');
+  }
+  if (input.paymentMethod != null && !(VOUCHER_PAYMENT_METHODS as readonly string[]).includes(input.paymentMethod)) {
+    throw new FinanceError('INVALID_VOUCHER', 400, `paymentMethod must be one of ${VOUCHER_PAYMENT_METHODS.join(', ')}`);
   }
 
   // Idempotency for external events: a Stripe webhook retry must not double-book.
@@ -81,6 +88,7 @@ export async function bookVoucher(storage: Storage, ownerGhii: string, input: Vo
     externalRef: input.externalRef ?? null,
     attachments: input.attachments ?? [],
     reversesVoucherId: input.reversesVoucherId ?? null,
+    paymentMethod: input.paymentMethod ?? null,
     createdAt: now, updatedAt: now,
   };
   await storage.createVoucher(record);
@@ -108,6 +116,7 @@ export async function reverseVoucher(storage: Storage, ownerGhii: string, vouche
     invoiceId: original.invoiceId,
     trackingCode: original.trackingCode,
     reversesVoucherId: original.id,
+    paymentMethod: original.paymentMethod ?? null,
   });
 }
 

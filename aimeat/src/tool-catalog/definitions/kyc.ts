@@ -19,6 +19,7 @@
  * @structure KYC_CUSTOMER_ACTIONS · KYC_SETTINGS_ACTIONS · kycTools
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.1.0 — 2026-11-19 — aimeat_kyc_settings: actions risk_assessment and dpia_draft (reads; services/kyc/assessment.ts).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import { z } from 'zod';
@@ -37,11 +38,17 @@ export const KYC_CUSTOMER_ACTIONS: Record<KycCustomerAction, string> = {
     screen: WRITE, review: WRITE, end: WRITE, link: WRITE,
 };
 
-/** The actions of aimeat_kyc_settings. */
-export const KYC_SETTINGS_ACTION_NAMES = ['read', 'update'] as const;
+/**
+ * The actions of aimeat_kyc_settings. `update` stays last: the parameter-forwarding probe
+ * (test/unit/cli-tool-param-forwarding.test.ts) holds `action` at the last enum value, and only
+ * `update` carries the other parameters.
+ */
+export const KYC_SETTINGS_ACTION_NAMES = ['read', 'risk_assessment', 'dpia_draft', 'update'] as const;
 
 /** aimeat_kyc_settings: action → the permission word its route asks. */
-export const KYC_SETTINGS_ACTIONS: Record<typeof KYC_SETTINGS_ACTION_NAMES[number], string> = { read: READ, update: WRITE };
+export const KYC_SETTINGS_ACTIONS: Record<typeof KYC_SETTINGS_ACTION_NAMES[number], string> = {
+    read: READ, update: WRITE, risk_assessment: READ, dpia_draft: READ,
+};
 
 /** The customer card statuses, as services/kyc/contract.ts CUSTOMER_STATUSES (the catalog imports nothing above utils/). */
 const CUSTOMER_STATUSES = ['open', 'active', 'blocked', 'ended'] as const;
@@ -86,7 +93,7 @@ export const kycTools = [
     },
     {
         name: 'aimeat_kyc_settings',
-        description: 'The customer due diligence settings of an obliged organism: who does the due diligence (staff, account names name@node), who the compliance officers are (officers: the officer and the deputy, who alone read suspicion reports), the firm\'s list of high-risk third countries (highRiskCountries, ISO2 codes) and how often a customer is reviewed per risk level (reviewMonths { low, medium, high }). action="read" answers the settings and your role in the organism (officer, staff, manager). action="update" changes the fields you send and keeps the rest; it is made by an admin of the organism or its compliance officer in person, so an agent\'s update is refused with KYC_DECISION_IN_PERSON: tell the person to change it in Settings & Controls. Reading needs "compliance:read", updating "compliance:write".',
+        description: 'The customer due diligence settings of an obliged organism: who does the due diligence (staff, account names name@node), who the compliance officers are (officers: the officer and the deputy, who alone read suspicion reports), the firm\'s list of high-risk third countries (highRiskCountries, ISO2 codes) and how often a customer is reviewed per risk level (reviewMonths { low, medium, high }). action="read" answers the settings and your role in the organism (officer, staff, manager). action="update" changes the fields you send and keeps the rest; it is made by an admin of the organism or its compliance officer in person, so an agent\'s update is refused with KYC_DECISION_IN_PERSON: tell the person to change it in Settings & Controls. action="risk_assessment" answers a draft of the firm\'s business-wide risk assessment (AMLR art. 10) built from the organism\'s own customer cards: `facts` (open customers by kind, status, risk and due diligence; the countries that appear, each with how many customers and whether it is on the firm\'s high-risk list; PEP customers; remote identification below substantial; cash-intensive customers; complex ownership; open sanctions hits; overdue reviews), `sections` (customers, countries, products, channels, transactions: each a paragraph with the numbers and the questions the firm answers itself), `lastRecordedAt` and `due` (true when never recorded or older than 12 months). It is a draft for the person to complete, not the assessment: show it, do not present it as finished. Recording that the assessment was updated is done by an officer or admin in person (POST /v1/kyc/{org}/risk-assessment/recorded), not here. action="dpia_draft" answers a draft data protection impact assessment of the due diligence (`item`, shaped as a compliance "dpias" entry, and `store`: how the person stores it with aimeat_compliance_register_write part "dpias", scope "organism"). Both drafts: the organism\'s compliance officers and admins and their agents; staff are refused with KYC_NOT_MANAGER. Reading and both drafts need "compliance:read", updating "compliance:write".',
         caller: 'owner',
         visibility: agentEverywhere,
         annotations: { title: 'KYC: Settings', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -94,7 +101,7 @@ export const kycTools = [
         surfaces: ['agent', 'admin'],
         input: {
             organism: ORGANISM,
-            action: { type: 'string', required: true, enum: KYC_SETTINGS_ACTION_NAMES, description: 'What to do. "read" first.' },
+            action: { type: 'string', required: true, enum: KYC_SETTINGS_ACTION_NAMES, description: 'What to do. "read" first; "risk_assessment" and "dpia_draft" read the two drafts.' },
             staff: { type: 'array', description: 'For "update": the members (name@node) who do customer due diligence. Replaces the list.', zod: z.array(z.string().max(200)).max(200) },
             officers: { type: 'array', description: 'For "update": the compliance officer and the deputy (name@node). Replaces the list.', zod: z.array(z.string().max(200)).max(10) },
             highRiskCountries: { type: 'array', description: 'For "update": the firm\'s high-risk third countries as ISO2 codes (e.g. ["KP", "IR"]). Replaces the list.', zod: z.array(z.string().max(2).regex(/^[A-Z]{2}$/)).max(100) },

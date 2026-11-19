@@ -27,6 +27,8 @@
  *   AmlSection (default) · AmlPrint
  * @usage html`<${AmlSection} aml=${report.aml} switchPage=${switchPage} onChanged=${reload} onMessage=${msg} />`
  * @version-history
+ *   2026-11-19 — The obligation row aml-ob-cash (AMLR art. 80) has its own sentence in each state; the
+ *     generic "no obliged entity" line no longer covers it, since the limit binds every business.
  *   v1.1.0 — 2026-11-19 — The head's second action opens the admin page Customer due diligence (aml).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design, stage A).
  */
@@ -90,8 +92,13 @@ export function findingText(f) {
 
 /** One obligation row's sentence in the page's language; the node's English otherwise. */
 export function obligationText(row) {
-  if (row.status === 'not_applicable' && row.code !== 'aml-ob-sanctions') return A('ob.notApplicable');
   const e = row.evidence || {};
+  // The cash limit binds every business, so its rows have their own words, not "no obliged entity works here".
+  if (row.code === 'aml-ob-cash') {
+    const cashVariant = row.status === 'not_applicable' ? 'textNone' : row.status === 'check' ? 'textCheck' : 'text';
+    return AOr(`ob.aml-ob-cash.${cashVariant}`, row.text, { n: String(e.over_limit ?? 0) });
+  }
+  if (row.status === 'not_applicable' && row.code !== 'aml-ob-sanctions') return A('ob.notApplicable');
   const screened = Array.isArray(e.lists) && e.lists.length > 0 && row.status !== 'missing' && row.status !== 'not_applicable';
   const variant = row.code === 'aml-ob-sanctions' ? (screened ? (e.cards_not_screened ? 'textScreenedSome' : 'textScreened') : row.status === 'missing' ? 'textMissing' : 'textNone')
     : row.code === 'aml-ob-cdd' ? (e.bank_identification ? 'textOn' : 'textOff')

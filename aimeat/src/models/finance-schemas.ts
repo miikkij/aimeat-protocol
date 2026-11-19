@@ -29,6 +29,8 @@
  * @usage import type { InvoiceRecord, ... } from '../models/finance-schemas.js';
  *
  * @version-history
+ *   2026-11-19 — VoucherRecord.paymentMethod (cash, card, transfer, other): the bookkeeping can tell a cash
+ *     payment from others, which AMLR 2024/1624 art. 80 limits (migration 0133).
  *   v1.1.0 — 2026-10-11 — VoucherSource drops 'morsel': a morsel is pacing, never a booking.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1: initial finance domain.
  */
@@ -174,6 +176,14 @@ export type VoucherSource = 'stripe' | 'checkout' | 'invoice' | 'receipt' | 'man
 export type VoucherDirection = 'income' | 'expense' | 'transfer';
 
 /**
+ * How the money moved, as the person who booked the voucher recorded it. Only a person's own
+ * booking (POST /v1/finance/vouchers) sets it; the Stripe, checkout and invoice paths leave it null
+ * because none of them is ever cash. 'cash' is what AMLR 2024/1624 art. 80 limits.
+ */
+export const VOUCHER_PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'] as const;
+export type VoucherPaymentMethod = typeof VOUCHER_PAYMENT_METHODS[number];
+
+/**
  * An accounting voucher (tosite). Append-only: once created it is never edited or
  * deleted; a mistake is corrected with a new voucher whose reversesVoucherId points
  * back. Attachments (receipt images) may be added after creation — that augments the
@@ -206,6 +216,8 @@ export interface VoucherRecord {
   attachments: string[];
   /** Set when this voucher reverses an earlier one. */
   reversesVoucherId: string | null;
+  /** How the money moved, when the person recorded it; null on every automatic booking. */
+  paymentMethod?: VoucherPaymentMethod | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -14,6 +14,7 @@
  * @structure renderPage · head · noOrganism · notEnabled · numbered
  * @usage import { renderPage } from './kyc/page.js';
  * @version-history
+ *   v1.2.0 — 2026-11-19 — The section "Risk assessment" (assessment.js) before Settings, for officers and admins.
  *   v1.1.0 — 2026-11-19 — Browser check: a person named in the settings who is not an active member
  *     (KYC_NOT_STAFF) is told that only active members do this work and that an admin adds them as a
  *     member first; the empty state says the same; every section's small figure is a count or empty,
@@ -38,6 +39,7 @@ import { cardDialog } from './card-dialogs.js';
 import { secSuspicions } from './suspicions.js';
 import { secSettings } from './settings.js';
 import { secMine } from './mine.js';
+import { secAssessment } from './assessment.js';
 
 const html = htm.bind(h);
 
@@ -102,6 +104,7 @@ function numbered(ctx) {
     add('kyc-customers', x('secCustomers'), (n) => secCustomers(ctx.cu, ctx.card, n));
     if (ctx.card.id) add('kyc-card', x('card.title'), (n) => secCard(ctx.card, n));
     add('kyc-suspicions', x('secSuspicions'), (n) => secSuspicions(ctx.su, ctx.cu, n));
+    if (ctx.ra.may) add('kyc-assessment', x('secAssessment'), (n) => secAssessment(ctx.ra, n));
     if (ctx.st.reader) add('kyc-settings', x('secSettings'), (n) => secSettings(ctx.st, n));
   }
   add('kyc-mine', x('secMine'), (n) => secMine(ctx.me, n));

@@ -96,7 +96,7 @@ export function requireOfficer(ctx: KycContext): void {
 
 /** A decision a person makes in person: an agent may prepare it, not make it. */
 export function requireInPerson(ctx: KycContext, what: string): void {
-  if (ctx.agent) throw new KycError(403, 'KYC_DECISION_IN_PERSON', `${what} is a person's decision: make it in person on the customer card, or ask the person to.`);
+  if (ctx.agent) throw new KycError(403, 'KYC_DECISION_IN_PERSON', `${what} is a person's decision: the person makes it signed in themselves, on the Knowing the customer page, or you ask them to.`);
 }
 
 /** The settings: an admin of the organism, or an officer, in person. */

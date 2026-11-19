@@ -12,6 +12,9 @@
  * @structure useCard · secCard · cardFacts
  * @usage const card = useCard({ org, role, toast, onChanged }); ... secCard(card, num)
  * @version-history
+ *   v1.3.0 — 2026-11-19 — After the actions, "Fill the card with your own AI" (fill.js): a prompt with
+ *     the card's facts for an AI that cannot connect, and a paste box whose answer the person checks
+ *     before it is saved.
  *   v1.2.0 — 2026-11-19 — Second browser check: the hits and the versions stack on a phone (no
  *     keepCols, each cell says its column), the risk facts take the wide cut with air before the
  *     reasons, the hit's score is named as the match strength and its subject as who was screened, and
@@ -33,6 +36,7 @@ import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { TextField } from '/components/TextField.js';
 import { SubHeading } from '/components/SubHeading.js';
+import { useFill, fillPart } from './fill.js';
 import { x, word, tone, reasonWords, reasonDetail, hitReasonWords, errWords, dateWord, endOfLocalDay, timeWord, today, kycApi } from './frame.js';
 
 const html = htm.bind(h);
@@ -111,7 +115,10 @@ export function useCard({ org, role, toast, onChanged }) {
     setBusy('');
   };
 
-  return { org, role, id, read, err, day, setDay, asOf, setAsOf, loadAsOf, dlg, setDlg, busy, msg, open, close, load, act, makeLink };
+  // The prompt path: the person's own AI fills the card from their documents (fill.js).
+  const fill = useFill({ org, id, card: read?.card, reload: async () => { await load(id); onChanged(); } });
+
+  return { org, role, id, read, err, day, setDay, asOf, setAsOf, loadAsOf, dlg, setDlg, busy, msg, open, close, load, act, makeLink, fill };
 }
 
 /** A status mark for a code of a group. */
@@ -276,6 +283,7 @@ export function secCard(c, num) {
         ${riskPart(c)}
         ${hitsPart(c)}
         ${actionsPart(c)}
+        ${fillPart(c.fill)}
         ${part(x('part.versions'))}
         <${Note} kind="lead">${x('card.timelineLead')}<//>
         ${timelinePart(c)}
