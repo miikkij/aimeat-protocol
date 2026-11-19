@@ -17,6 +17,8 @@
  * @structure StepAgent({ state, onChanged }) — the open step 2.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   2026-11-19: The waiting state reads the pending requests on the live domains `agents` and
+ *     `agent-onboarding` only, and no longer every 4 s (feature audit 2026-11-19, 4.6).
  *   2026-10-25: An approval of a new device taking over an existing agent sends end_other_sessions when
  *     the owner chose it on the card (secaudit2026oct22).
  *   2026-09-27: The step writes no class: its buttons are Loud, `quiet` while it is not their turn,
@@ -50,7 +52,8 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 4).
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -71,9 +74,6 @@ import { swallowed } from '/js/swallowed.js';
 import { useSession } from '/js/use-session.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-
-/** How often to look for a knock while the person is in their chat window. */
-const POLL_MS = 4000;
 
 /**
  * The prompt the person pastes into their AI chat. Node-served (/v1/prompts/agent-connect) so it
@@ -102,7 +102,6 @@ export function StepAgent({ onChanged, showToast }) {
   const [busyCode, setBusyCode] = useState(null);
   const [waiting, setWaiting] = useState(false);
   const { prompt, steps } = useConnectPrompt(named ? agentName : '');
-  const timer = useRef(null);
 
   const loadPending = useCallback(async () => {
     try {
@@ -111,20 +110,15 @@ export function StepAgent({ onChanged, showToast }) {
     } catch (e) { swallowed('home/step-agent: pending', e); }
   }, []);
 
-  // Poll only while the person is actually waiting for a knock — the request is short-lived and
-  // the alternative is a screen that never changes while they sit in another window.
+  // Read once when the person starts waiting for a knock. The knock itself arrives as an event: an
+  // agent's device authorization request is the live domain `agents` (routes/agents/device-auth.ts),
+  // and an approval or a denial elsewhere `agents` or `agent-onboarding`; the home shell relays them
+  // as the window event, so the card appears while the person is still in their chat window.
   useEffect(() => {
-    if (!waiting) return undefined;
-    loadPending();
-    timer.current = setInterval(loadPending, POLL_MS);
-    return () => clearInterval(timer.current);
+    if (waiting) loadPending();
   }, [waiting, loadPending]);
 
-  useEffect(() => {
-    const handler = () => loadPending();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [loadPending]);
+  useEffect(() => onLiveUpdate(['agents', 'agent-onboarding'], () => loadPending()), [loadPending]);
 
   const approve = useCallback(async (userCode, scopes, opts) => {
     setBusyCode(userCode);
