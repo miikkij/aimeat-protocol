@@ -28,13 +28,17 @@
  *   The refusal is 403 APP_ORIGIN_SIGN_IN with the sentence an app author needs. The CORS middleware
  *   has already run, so an app can read it.
  *
- *   ROLLOUT. config.appOriginSignInRefuse (AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE) is off by default:
- *   every request that would be refused is logged and let through. aimeat-commercial's store signed
- *   its buyers in with a password on its app origin and asked for the refusal to wait until it had
- *   moved to AIMEAT.auth.signIn() (2026-10-04). The default turns on once the log is quiet.
+ *   OFF BY DEFAULT, BY RULING. config.appOriginSignInRefuse (AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE) is
+ *   off by default: every request that would be refused is logged and let through. The default
+ *   stays off (decision-app-origin-sign-in-refusal-stays-off-by-default, 2026-11-19): the served
+ *   SDK's sign-in modal (sdk-libs/auth/session.js, loginWithPassword) posts /v1/ghii/login from the
+ *   app origin, so turning the refusal on stops password sign-in in every app. The setting is kept
+ *   for a node that wants that trade.
  * @structure SIGN_IN_ROUTES · isSignInRoute() · requestFromApp() · appOriginSignIn(config)
  * @usage app.use(appOriginSignIn(config));   // after corsMiddleware
  * @version-history
+ *   v1.1.1 — 2026-11-19 — Comment only: the default stays off by ruling, and why; the earlier
+ *     "turns on once the log is quiet" promised a change that will not come.
  *   v1.1.0 — 2026-10-27 — Portfolio pages and company front pages count as apps: they serve author
  *     script same-site with the apex too (req.portfolioOrigin, req.coOrigin, and an Origin in either
  *     host family). A sign-in route is recognised whatever the case of its path, as Express routes it
