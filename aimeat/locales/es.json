@@ -18060,6 +18060,7 @@
       "aiSpendDaily": "La IA te costó {amount} el {day}.",
       "aiKeyChanged": "Configuraste tu clave de IA.",
       "aiSettingsChanged": "Cambiaste tus ajustes de IA: {changed}.",
+      "aiSettingsChangedBy": "{who} cambió tus ajustes de IA con tu confirmación: {changed}.",
       "consentGranted": "Diste acceso a {who}: {what}.",
       "consentRevoked": "Quitaste el acceso a {who}: {what}.",
       "seeAll": "Ver todo lo que ha pasado"

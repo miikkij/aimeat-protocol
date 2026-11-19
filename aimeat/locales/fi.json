@@ -19932,6 +19932,7 @@
       "aiSpendDaily": "AI maksoi {amount} päivänä {day}.",
       "aiKeyChanged": "Asetit AI-avaimesi.",
       "aiSettingsChanged": "Muutit AI-asetuksiasi: {changed}.",
+      "aiSettingsChangedBy": "{who} muutti AI-asetuksiasi, kun olit hyväksynyt muutoksen: {changed}.",
       "consentGranted": "Annoit pääsyn: {who} – {what}.",
       "consentRevoked": "Poistit pääsyn: {who} – {what}.",
       "seeAll": "Katso kaikki mitä on tapahtunut"

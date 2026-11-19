@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- e2e-ai-settings-trail.ts joins the list (not the guard tier): an agent's confirmed change to the routing, the model rules, the roles or the image rules writes an account event naming the agent (feature audit 2026-11-19, 2.3).
  *   2026-11-19 -- e2e-security-txt.ts joins the list (not the guard tier): /.well-known/security.txt answers 404 until the operator sets a contact, then RFC 9116 lines; an invalid contact is refused (feature audit 2026-11-19, 4.7).
  *   2026-11-19 -- e2e-owner-erasure-apps.ts joins the list (not the guard tier): erasing an account that owns apps removes what deleting each app removes, and another owner's app keeps everything (feature audit 2026-11-19, agent F part 1).
  *   2026-11-19 -- e2e-hook-when-missing.ts joins the list (not the guard tier): a blocking hook whose action is missing lets the event through and tells the operators once a day, or refuses it when set to (feature audit 2026-11-19, 2.4).
@@ -712,6 +713,7 @@ const ALL_SUITES = [
     'test/e2e-app-delete-sweep.ts',
     'test/e2e-owner-erasure-apps.ts',
     'test/e2e-security-txt.ts',
+    'test/e2e-ai-settings-trail.ts',
     'test/e2e-app-silent.ts',
     // Self-spawns with the portfolio origin ON (28461): the owner's welcome page reads their memory only
     // when its writer may read memory or the owner allowed it (audit H-9).

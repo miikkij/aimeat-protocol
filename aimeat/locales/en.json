@@ -19165,6 +19165,7 @@
       "aiSpendDaily": "AI cost you {amount} on {day}.",
       "aiKeyChanged": "You set your AI key.",
       "aiSettingsChanged": "You changed your AI settings: {changed}.",
+      "aiSettingsChangedBy": "{who} changed your AI settings with your confirmation: {changed}.",
       "consentGranted": "You gave {who} access to {what}.",
       "consentRevoked": "You took away {who}'s access to {what}.",
       "seeAll": "See everything that has happened"

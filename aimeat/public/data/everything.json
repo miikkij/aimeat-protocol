@@ -914,10 +914,10 @@
      "slug": "g-4-account-event-log",
      "cells": [
       "<strong>Account event log</strong>",
-      "Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it. A password reset or change, a sign-in ended because its token was used twice, and an operator turning your account off or on or giving you the operator role show here too.",
+      "Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it. A password reset or change, a sign-in ended because its token was used twice, and an operator turning your account off or on or giving you the operator role show here too. So does every change to your AI settings (the routing, the model rules, the roles, the image rules and the budget), with the agent that applied it after you confirmed its proposal in the chat.",
       "<code>/v1/account/events</code>"
      ],
-     "plain": "Account event log Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it. A password reset or change, a sign-in ended because its token was used twice, and an operator turning your account off or on or giving you the operator role show here too. /v1/account/events"
+     "plain": "Account event log Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it. A password reset or change, a sign-in ended because its token was used twice, and an operator turning your account off or on or giving you the operator role show here too. So does every change to your AI settings (the routing, the model rules, the roles, the image rules and the budget), with the agent that applied it after you confirmed its proposal in the chat. /v1/account/events"
     }
    ]
   },

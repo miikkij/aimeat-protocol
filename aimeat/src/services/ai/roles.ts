@@ -26,6 +26,8 @@
  *   ROLES_KEY · ROLES_USED_KEY · OwnerRole · RoleBinding · RolesRecord · readRoles · rolesWithLegacy ·
  *   normaliseRolesInput · setRoles · resolveRole · noteRoleUsed · bindingKey
  * @version-history
+ *   v1.2.0 — 2026-11-19 — An applied change writes the ai_settings_changed account event, naming the
+ *     agent that applied it with its confirm token (settings-trail.ts; feature audit 2026-11-19, 2.3).
  *   v1.1.0 — 2026-09-28 — A binding the owner's role cannot meet (a capability the app's role needs and
  *     the role has no provider for) is refused; a binding set to null also dismisses the app's request.
  *   v1.0.0 — 2026-09-28 — Initial.
@@ -37,6 +39,7 @@ import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../oper
 import { isObj } from './provider-common.js';
 import { logger } from '../../utils/logger.js';
 import { AiCompletionError } from './errors.js';
+import { recordAiSettingsApplied } from './settings-trail.js';
 import type { AiCapability } from './types.js';
 import type { AiProvider } from './providers.js';
 import type { AppAiRole } from '../app/ai-roles.js';
@@ -295,7 +298,11 @@ export async function setRoles(
   if ('problems' in r) throw new AiCompletionError('AI_ROLES_INVALID', 400, `The roles were not saved: ${r.problems.join(' ')}`, { problems: r.problems });
   const unmet = await unmetBindings(storage, gaii, r.value, current);
   if (unmet.length) throw new AiCompletionError('AI_ROLES_INVALID', 400, `The roles were not saved: ${unmet.join(' ')}`, { problems: unmet });
-  if (actor.kind === 'owner') return { mode: 'applied', roles: await writeRoles(storage, gaii, r.value) };
+  if (actor.kind === 'owner') {
+    const roles = await writeRoles(storage, gaii, r.value);
+    await recordAiSettingsApplied(storage, gaii, null, 'roles');
+    return { mode: 'applied', roles };
+  }
   if (!actor.confirmToken) {
     return {
       mode: 'proposal', current, proposed: r.value,
@@ -310,7 +317,10 @@ export async function setRoles(
     if (e instanceof ConfirmTokenError) throw new AiCompletionError(e.code, 403, e.message);
     throw e;
   }
-  return { mode: 'applied', roles: await writeRoles(storage, gaii, r.value) };
+  const roles = await writeRoles(storage, gaii, r.value);
+  // The owner confirmed in the chat, outside the node: the row is the person's record of who applied it.
+  await recordAiSettingsApplied(storage, gaii, actor.principal, 'roles');
+  return { mode: 'applied', roles };
 }
 
 /** What a call's role resolves to: the owner's role, and the app's declaration when an app asked. */
