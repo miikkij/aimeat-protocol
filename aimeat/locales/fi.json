@@ -20973,7 +20973,7 @@
     "genGiveStep": "Anna kehote tekoälyllesi",
     "genGiveHint": "Kopioi kehote ja liitä se kytkettyyn tekoälyysi. Tekoäly kysyy, mitä sen pitää tietää, näyttää, mitä se aikoo rakentaa, ja odottaa lupaasi. Valmiin sovelluksen se julkaisee itse ja antaa sinulle sen osoitteen.",
     "genOtherTitle": "Eikö tekoälysi voi kytkeytyä?",
-    "genOtherHint": "Esimerkiksi Microsoft 365 Copilot ei voi kytkeytyä. Kopioi silloin tämä pidempi kehote: rakennusohjeet kulkevat sen mukana. Tekoäly antaa sinulle yhden HTML-tiedoston, ja sinä lisäät sen tänne itse. Tällä kehotteella sovellus rakennetaan perinteisellä tavalla, ei Atelierilla.",
+    "genOtherHint": "Esimerkiksi Microsoft 365 Copilot ei voi kytkeytyä. Kopioi silloin tämä pidempi kehote: rakennusohjeet kulkevat sen mukana. Tekoäly antaa sinulle yhden HTML-tiedoston, ja sinä lisäät sen tänne itse.",
     "genOtherPacks": "Ideaasi varten mukana",
     "genOtherCopy": "Kopioi pitkä kehote",
     "inviteSubConnected": "Klikkaa tästä ja aloita. Oma tekoälysi rakentaa sovelluksen ja julkaisee sen tänne.",

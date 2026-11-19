@@ -20206,7 +20206,7 @@
     "genGiveStep": "Give the prompt to your AI",
     "genGiveHint": "Copy the prompt and paste it into your connected AI. It asks what it needs to know, shows you what it will build and waits for your yes. It publishes the finished app itself and gives you its address.",
     "genOtherTitle": "Your AI cannot connect?",
-    "genOtherHint": "Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself. This prompt builds the app on the Classic track, not on Atelier.",
+    "genOtherHint": "Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself.",
     "genOtherPacks": "Included for your idea",
     "genOtherCopy": "Copy the long prompt",
     "inviteSubConnected": "Click here and start. Your own AI builds the app and publishes it here.",

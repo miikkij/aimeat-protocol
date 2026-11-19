@@ -373,7 +373,7 @@ function composeBody(config: AimeatConfig): string {
   body += '## The Atelier track\n\n';
   body += 'You are building on the ATELIER track, the one build guide on this node: THIS document and the '
     + '`node:aimeat-app-builder-atelier` skill. The Classic guide it replaced (daisyUI classes, '
-    + 'hand-written boilerplate, the T1/T2/T3 shells) was retired on 2026-11-19; an app built on it is '
+    + 'hand-written boilerplate, its own shells) was retired on 2026-11-19; an app built on it is '
     + 'moved with the platform section `from-classic`. The app declares `<meta name="aimeat-track" content="atelier">`.\n\n';
   body += 'ON THE LEVEL `fine`, THE FIRST MOVE OF THE BUILD IS THE GENRE FORK. A `fine` app (and a '
     + 'page that states no level, which is held to `fine`) starts from a committed '

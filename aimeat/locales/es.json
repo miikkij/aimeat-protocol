@@ -19091,7 +19091,7 @@
     "genGiveStep": "Dale el prompt a tu IA",
     "genGiveHint": "Copia el prompt y pégalo en tu IA conectada. Te pregunta lo que necesita saber, te muestra lo que va a construir y espera tu sí. Publica ella misma la aplicación terminada y te da su dirección.",
     "genOtherTitle": "¿Tu IA no puede conectarse?",
-    "genOtherHint": "Microsoft 365 Copilot, por ejemplo, no puede conectarse. Entonces copia este prompt más largo: lleva consigo las instrucciones de construcción. La IA te entrega un archivo HTML y tú lo añades aquí. Con este prompt, la aplicación se construye en la vía Clásica, no en Atelier.",
+    "genOtherHint": "Microsoft 365 Copilot, por ejemplo, no puede conectarse. Entonces copia este prompt más largo: lleva consigo las instrucciones de construcción. La IA te entrega un archivo HTML y tú lo añades aquí.",
     "genOtherPacks": "Incluido para tu idea",
     "genOtherCopy": "Copia el prompt largo",
     "inviteSubConnected": "Haz clic aquí y empieza. Tu propia IA crea la aplicación y la publica aquí.",
