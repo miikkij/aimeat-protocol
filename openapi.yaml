@@ -13639,8 +13639,9 @@ paths:
         owner in person (the floor, a plan's declared effect, a paused or stalled task), and the
         owner gets a trail entry (`task.started_by_app`) and a notification each time.
         `task_start_app_waits: true` makes such a task wait for the owner also when an app starts
-        it; `false` or `null` goes back to letting the app start it. An app may switch it on, never
-        off. Send `task_start`, `task_start_app_waits` or both; a body with neither is refused.
+        it; `false` or `null` goes back to letting the app start it. An app cannot change it,
+        because the route asks `agent:write`, which no app grant carries. Send `task_start`,
+        `task_start_app_waits` or both; a body with neither is refused.
 
         `agent:write` and same-owner, like `run-mode`, and never the agent itself.
         Also `aimeat_agent_task_start_set`.

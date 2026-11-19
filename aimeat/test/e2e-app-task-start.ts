@@ -13,14 +13,18 @@
  *        and the task stays queued, while the owner in person still starts it;
  *     3. the app cannot switch the setting off, the agent cannot set its own, and another owner's
  *        notifications never carry the notice.
- *   The app's start without the setting stays as e2e-app-grants-tasks.ts holds it.
+ *   The app's start without the setting stays as e2e-app-grants-tasks.ts holds it. Section 3 holds the
+ *   same setting on MCP (aimeat_agent_task_start_set sets it and aimeat_agents_list reads it), the
+ *   agent's refusal for its own over MCP, and the app's refusal to turn it off.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-task-start
  * @version-history
+ *   v1.1.0 — 2026-11-19 — Section 3: the setting over MCP, the agent's own over MCP, the app's off.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 2.1).
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+import { openSession, callTool } from './helpers/mcp-session.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -223,6 +227,45 @@ await test('2f. Another owner cannot change it', async () => {
   assert(x.status === 403, `cross-owner ${x.status}`);
   const { body } = await json('/v1/agents', { headers: auth(owner.token) });
   assert((body?.data?.agents ?? []).find((a: any) => a.name === 'buyer')?.task_start_app_waits === true, 'unchanged');
+});
+
+console.log('\n3. The same setting from the chat, and who may not change it');
+let ai!: Agent;
+/** buyer's task_start_app_waits as aimeat_agents_list reads it on `session`. */
+async function appWaitsOverMcp(session: Awaited<ReturnType<typeof openSession>>): Promise<unknown> {
+  const list = await callTool(session, 'aimeat_agents_list', {});
+  assert(!list.isError, `aimeat_agents_list: ${list.text.slice(0, 200)}`);
+  const agents = list.data?.agents ?? list.data?.structuredContent?.agents ?? [];
+  return agents.find((a: any) => a.name === 'buyer')?.task_start_app_waits;
+}
+
+await test('3a. The owner\'s AI turns it off and on over MCP, and its agent list reads each value', async () => {
+  ai = await newAgent(owner, 'mcpai', ['agent:read', 'agent:write']);
+  const s = await openSession(BASE, ai.token, 'e2e-app-task-start');
+  const off = await callTool(s, 'aimeat_agent_task_start_set', { target_agent_name: 'buyer', task_start_app_waits: false });
+  assert(!off.isError && off.data.task_start_app_waits === false, `off ${off.text.slice(0, 300)}`);
+  assert(await appWaitsOverMcp(s) === false, 'the list reads false');
+  const on = await callTool(s, 'aimeat_agent_task_start_set', { target_agent_name: 'buyer', task_start_app_waits: true });
+  assert(!on.isError && on.data.task_start_app_waits === true, `on ${on.text.slice(0, 300)}`);
+  assert(await appWaitsOverMcp(s) === true, 'the list reads true');
+  // task_start is left as it was: only the field the call named changes.
+  assert(on.data.task_start === null, `task_start untouched: ${on.data.task_start}`);
+});
+
+await test('3b. An agent cannot set its own over MCP: ACCESS_DENIED, and its value stays unset', async () => {
+  const s = await openSession(BASE, ai.token, 'e2e-app-task-start-self');
+  const self = await callTool(s, 'aimeat_agent_task_start_set', { target_agent_name: 'mcpai', task_start_app_waits: true });
+  assert(self.isError && self.offered && /^ACCESS_DENIED: /.test(self.text), `self ${self.text.slice(0, 300)}`);
+  const { body } = await json('/v1/agents', { headers: auth(owner.token) });
+  assert((body?.data?.agents ?? []).find((a: any) => a.name === 'mcpai')?.task_start_app_waits === false, 'mcpai unchanged');
+});
+
+await test('3c. The app cannot turn it off: refused, and the setting stays on', async () => {
+  const off = await setAppWaits(appToken, 'buyer', false);
+  assert(off.status === 403, `app off ${off.status} ${JSON.stringify(off.body?.error)}`);  const { body } = await json('/v1/agents', { headers: auth(owner.token) });
+  assert((body?.data?.agents ?? []).find((a: any) => a.name === 'buyer')?.task_start_app_waits === true, 'still on');
+  const s = await startTask(appToken, 'buyer', (await createTask(appToken, 'buyer', 'Buy the ink')).body.data.task.id);
+  assert(s.status === 403 && s.body.error?.code === 'OWNER_MUST_START', `the app still waits: ${s.status} ${s.body.error?.code}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
