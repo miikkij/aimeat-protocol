@@ -23876,6 +23876,10 @@
         "notConnected": "Yhdistimesi ei ole käynnissä",
         "notConnectedHint": "Asenna yhdistin parissa minuutissa. Sen jälkeen tämä nappi toimii:",
         "whatYouGet": "Mitä saat",
+        "reaches": "Yltää:",
+        "actsAlone": "aloittaa itse",
+        "actsAloneWhy": "Tälle agentille lähetetty työ alkaa kysymättä sinulta ensin.",
+        "actsAloneNotice": "{names} aloittavat työn heti kun sitä tulee, kysymättä sinulta joka kerta. Voit muuttaa tämän myöhemmin kenelle tahansa agentille.",
         "actsAloneNoticeOne": "{names} aloittaa työn heti kun sitä tulee, kysymättä sinulta joka kerta. Voit muuttaa tämän myöhemmin kenelle tahansa agentille."
       },
       "taskRunner": {
@@ -28711,57 +28715,72 @@
       },
       "home": {
         "nameplate": {
-          "label": "Nimi ja kuva"
+          "label": "Nimi ja kuva",
+          "summary": "Kuka henkilö on: kuva, nimi ja pääsy asetuksiin."
         },
         "mcp-connect": {
-          "label": "Tekoälyn kytkentä, kun yhtään ei ole kiinni"
+          "label": "Tekoälyn kytkentä, kun yhtään ei ole kiinni",
+          "summary": "Linkit ja asetustiedostot, joilla tekoäly kytketään tähän tiliin yhdellä painalluksella. Osa katoaa, kun yksi tekoäly on kytketty."
         },
         "mat": {
-          "label": "Linkki omaan sivuun"
+          "label": "Linkki omaan sivuun",
+          "summary": "Yksi rivi, joka vie sivulle, jonka henkilön tekoäly teki hänelle. Osa ei näy ennen kuin sivu on olemassa."
         },
         "mailbox": {
-          "label": "Lukematon posti"
+          "label": "Lukematon posti",
+          "summary": "Odottaako lukematonta postia, ja kuinka paljon."
         },
         "chat-door": {
-          "label": "Pääsy keskusteluun"
+          "label": "Pääsy keskusteluun",
+          "summary": "Valitse kytketylle tekoälylle hyödyllinen työ, kopioi sen kehote ja katso tulos. Toimii myös ilman sivuston omaa keskustelua."
         },
         "fleet": {
-          "label": "Miten agentit voivat"
+          "label": "Miten agentit voivat",
+          "summary": "Montako henkilön agenteista on paikalla, ja onko jollakin ongelmia."
         },
         "agents": {
-          "label": "Tee agentti, ja töissä olevat agentit"
+          "label": "Tee agentti, ja töissä olevat agentit",
+          "summary": "Kenttä, joka tekee uuden agentin yhdestä lauseesta, odottavat ehdotukset, työssä olevat agentit ja tietokoneet, joilla ne toimivat."
         },
         "overview": {
           "label": "Kokonaiskuva yhdellä silmäyksellä",
           "summary": "Tilin viisi lukua (tietokoneet, agentit, sovellukset, tieto ja tarjoama), mikä on hiljentynyt, ja linkki Kokonaiskuva-sivulle."
         },
         "things": {
-          "label": "Mitä on tehty"
+          "label": "Mitä on tehty",
+          "summary": "Mitä henkilö on tehnyt: määrät, hänen jakamansa tilat, tietopaketit ja sovellukset."
         },
         "playbooks": {
-          "label": "Mitä voisi ottaa käyttöön"
+          "label": "Mitä voisi ottaa käyttöön",
+          "summary": "Nimetyt lopputulokset, jotka henkilö voi perustaa. Jokaisessa on askeleet ja kehote, joka vie ne läpi."
         },
         "achievements": {
-          "label": "Mitä on kokeiltu"
+          "label": "Mitä on kokeiltu",
+          "summary": "Mitä henkilö on täällä tähän mennessä kokeillut, rivinä pieniä merkkejä."
         },
         "feed": {
-          "label": "Mitä on tapahtunut"
+          "label": "Mitä on tapahtunut",
+          "summary": "Mitä tällä tilillä on viime aikoina tapahtunut, uusin ensin."
         },
         "open-items": {
-          "label": "Kesken jääneet"
+          "label": "Kesken jääneet",
+          "summary": "Mitä henkilö aikoi tehdä täällä eikä ole vielä saanut valmiiksi."
         },
         "install-cta": {
-          "label": "Asenna sovelluksena"
+          "label": "Asenna sovelluksena",
+          "summary": "Tarjous asentaa tämä sovellukseksi laitteelle. Näkyy vain, kun selain tarjoaa asennusta."
         },
         "own-aimeat": {
           "label": "Hanki oma AIMEAT (demosivustot)",
           "summary": "Kertoo, että sivusto on demo, ja ohjaa kauppaan, josta saa oman AIMEATin. Osa ei ole sivulla ennen kuin lisäät sen, ja se on tarjolla vain, jos sivustolle on asetettu kauppa."
         },
         "trust": {
-          "label": "Tekoälymerkintä ja tietojen omistajuus"
+          "label": "Tekoälymerkintä ja tietojen omistajuus",
+          "summary": "Miten sivusto merkitsee mallin kirjoittaman tekstin, ja kenelle data kuuluu. Kun poistat osan, tämä ilmoitus poistuu sivulta."
         },
         "steps": {
-          "label": "Aloittajan polku"
+          "label": "Aloittajan polku",
+          "summary": "Käyttöönoton polku, jonka uusi henkilö kulkee ennen kuin tili tekee mitään. Polun omaa järjestystä ei voi muuttaa."
         },
         "your-turn": {
           "label": "Odottavat vastausta",
@@ -34731,30 +34750,36 @@
   "explain.overview.model.ex3": "Sovellus: verkkosivu, jossa työ näkyy ja jota ihminen käyttää.",
   "explain.overview.model.ex4": "Tieto: organismit ja niiden työtilat eli paikat, joissa tieto säilyy ja jaetaan. Tieto on sinun.",
   "explain.overview.model.ex5": "Tarjoama: mitä agenttisi ja sovelluksesi tarjoavat muille.",
+  "explain.overview.model.terms": "Agent,App,Organism,Workspace,Offering",
   "explain.overview.computers.title": "Tietokoneet",
   "explain.overview.computers.short": "Missä agenttisi toimivat.",
   "explain.overview.computers.what": "Tietokone on paikka, jossa agentti toimii. Agentti voi käyttää vain sitä, mitä sen tietokone osaa ja mitä sinä olet sallinut. Tietokoneella on käynnissä ohjelma aimeat connect serve, ja se näkyy nimellä, jonka annat sille. Tekoälysovellus, kuten Claude tai Codex, on yhteydessä MCP:n kautta ja tuo oman agenttinsa mukanaan.",
   "explain.overview.computers.ex1": "Vihreä merkki tarkoittaa, että tietokone on juuri nyt yhteydessä AIMEATiisi.",
   "explain.overview.computers.ex2": "Uusi agentti pyytää pääsyä, ja sinä hyväksyt sen ruudulla. Samalla valitset, mitä se saa tehdä.",
+  "explain.overview.computers.terms": "Computer,MCP,Device authorization",
   "explain.overview.agents.title": "Agentit",
   "explain.overview.agents.short": "Tekoälyt, jotka tekevät työtä sinun nimissäsi.",
   "explain.overview.agents.what": "Agentti on tekoäly, joka tekee työtä sinun nimissäsi. Sinä hyväksyt jokaisen agentin ja päätät, mihin se pääsee käsiksi. Jokaisella agentilla on oma tunnus, joten näet aina, kuka teki mitäkin. Voit pysäyttää tai poistaa agentin milloin tahansa.",
   "explain.overview.agents.ex1": "Tehtävä on yksi työ, jonka agentti tekee, esimerkiksi uutisen kirjoitus tai asiakkaan seuranta.",
   "explain.overview.agents.ex2": "Kortin luku kertoo, montako kutsua agentti teki valitulla aikavälillä.",
+  "explain.overview.agents.terms": "Agent,Task,Scope,Fleet",
   "explain.overview.apps.title": "Sovellukset",
   "explain.overview.apps.short": "Verkkosivut, joissa työ näkyy.",
   "explain.overview.apps.what": "Sovellus on verkkosivu, joka on julkaistu AIMEATissasi. Ihminen käyttää sitä selaimella, ja agentti voi kirjoittaa siihen. Kortin luku kertoo, montako kertaa sovellus avattiin tai sen työkaluja kutsuttiin valitulla aikavälillä.",
   "explain.overview.apps.ex1": "Datakartta on sovelluksen oma kuvaus siitä, mihin se tallentaa tietonsa. Viiva sovelluksesta tietoon tulee siitä.",
   "explain.overview.apps.ex2": "Sovellus voi tarjota työkaluja, joita tekoäly tai ohjelma kutsuu. Ne näkyvät Tarjoama-sarakkeessa.",
+  "explain.overview.apps.terms": "App,App tool",
   "explain.overview.knowledge.title": "Tieto",
   "explain.overview.knowledge.short": "Organismit ja niiden työtilat, joissa tieto säilyy ja jaetaan.",
   "explain.overview.knowledge.what": "Tieto on se, minkä sinä toit ja omistat. Organismi on yhteinen paikka, ja sen työtiloissa ovat sen dokumentit ja tietueet. Sinä päätät, kuka on jäsen. Kortin luku kertoo, montako tietuetta ja dokumenttia kirjoitettiin valitulla aikavälillä.",
   "explain.overview.knowledge.ex1": "Työtilassa on tietueita ja dokumentteja, esimerkiksi toivelista tai asiakasrekisteri.",
   "explain.overview.knowledge.ex2": "Viiva agentista työtilaan tarkoittaa, että agentti kirjoitti sinne valitulla aikavälillä.",
+  "explain.overview.knowledge.terms": "Organism,Workspace,Memory,Record,Document",
   "explain.overview.offerings.title": "Tarjoama",
   "explain.overview.offerings.short": "Mitä agenttisi ja sovelluksesi tarjoavat muille.",
   "explain.overview.offerings.what": "Tarjoama on se, mitä agenttisi ja sovelluksesi tarjoavat muille. Se voi olla maksullinen tai ilmainen, ja omistajalleen se on yleensä ilmainen. Jokainen sovelluksen työkalu on kyvykkyys, ja niin on agentin julkinen tarjouskin: tekoäly löytää sen nimellä ja voi käyttää sitä. Hinnoiteltu työkalu, joka on merkitty myyntiin, on lisäksi EXCHANGEssa, jossa muut tekevät siitä sopimuksen.",
   "explain.overview.offerings.ex1": "Jokainen käyttö vie muutaman murusen käyttäjän saldosta. Murunen ei ole rahaa. Se tahdistaa käyttöä.",
+  "explain.overview.offerings.terms": "Offering,Agent offer,App tool,Capability,EXCHANGE,Morsel",
   "explain.overview.quiet.title": "Hiljainen",
   "explain.overview.quiet.short": "Ei käyttöä 30 päivään.",
   "explain.overview.quiet.what": "Hiljainen tarkoittaa, että mikään ei ole käyttänyt asiaa 30 päivään. Tieto, jota kukaan ei käytä, vanhenee. Siksi kokonaiskuva näyttää sen, ja sinä päätät, mitä teet.",

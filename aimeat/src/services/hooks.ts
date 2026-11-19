@@ -5,9 +5,10 @@
  * @description The thirteen moments in this node's life where it stops and calls an address somebody
  *   named, and what it does with the answer.
  *
- *   FOUR OF THEM DECIDE. A hook whose name starts with `pre_` runs BEFORE the thing happens and its
- *   answer settles it: a registration, a work request, a board post or a new federation peer can be
- *   refused outright. The other nine are told once the thing has happened and cannot stop
+ *   FIVE OF THEM DECIDE. A hook whose name starts with `pre_` runs BEFORE the thing happens and its
+ *   answer settles it: an owner's or an agent's registration, a work request, a board post or a new
+ *   federation peer can be refused outright. The other eight are told once the thing has happened
+ *   (owner_recovery is listed but nothing fires it) and cannot stop
  *   anything. That difference is the whole of this file's risk, and it is why `hookKind` exists:
  *   every surface that shows a hook to a person has to say which of the two it is.
  *
@@ -44,6 +45,7 @@
  *   const r = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });
  *   if (!r.allowed) return refuse(r.reason);
  * @version-history
+ *   2026-11-19 — Header counts corrected: five hooks decide and eight are told (comment only).
  *   2026-11-14 — post_help_question and post_help_solved: told after a question of Ask someone who
  *     knows went to a helper and after one was solved. Thirteen moments.
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).

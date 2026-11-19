@@ -77,7 +77,7 @@
         "aimeat/src/services/schedule/write.ts",
         "aimeat/src/tool-catalog/definitions/extensions-cortex.ts"
       ],
-      "digest": "sha256:62ccb5371d46773fc6f08294"
+      "digest": "sha256:0aa63a14b962b98b126d2b44"
     },
     "9. AI on the node": {
       "reviewedOn": "2026-11-19",
@@ -345,7 +345,7 @@
       "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "bea146b336f139f0"
     },
     "8. Automation: schedules, workflows and extensions": {
-      "aimeat/src/services/hooks.ts": "6046e16123954e14",
+      "aimeat/src/services/hooks.ts": "60779a210c48ef47",
       "aimeat/src/mcp/agent-schedules.ts": "7ab9f9ab149a0628",
       "aimeat/src/services/schedule/write.ts": "e964d8ddc942e30d",
       "aimeat/src/tool-catalog/definitions/extensions-cortex.ts": "56744c1e7a48cd80"
