@@ -10,6 +10,8 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   2026-11-19 — A member's row names the agents that may write the apps' protected data past the
+ *     apps' own tools (writes_past_app_rules: the agent's grant covers organism:direct).
  *   2026-11-14 — Each active member's row says whether their own AI is connected (an agent of theirs
  *     with mcp_last_seen), where the roster names agents (team setup T13). The agents line loses its
  *     emoji (no emoji in the interface).
@@ -318,6 +320,12 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
               ? (t('organisms.memberAiConnected') || 'Own AI connected')
               : (t('organisms.memberAiNotYet') || 'No AI connected yet'))
             : null;
+          // The member's agents whose owner let them write an app's protected spaces directly, past
+          // the app's own tools (writes_past_app_rules, organism:direct). Every member sees who they are.
+          const direct = sortAgents((m.agents || []).filter(a => a.writes_past_app_rules));
+          const directLine = direct.length
+            ? html`<span title=${t('organisms.memberAgentsDirectHint') || "Its owner let this agent write the apps' protected data directly, without the app's own tools. The apps' rules do not stop it."}>${t('organisms.memberAgentsDirect') || 'Writes past the apps\' rules'}: ${direct.map(agentLabel).join(', ')}</span>`
+            : null;
           const accessOpen = canManage && accessEditFor === bare;
           return html`
             <${ListRow} key=${m.ghii} open=${accessOpen} panel=${accessOpen ? html`
@@ -328,7 +336,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
                    the badge says what it means: owner. Two rows both reading "creator" asks
                    the viewer which one really made the organism. -->
               <${Name} after=${html` <${PresenceDot} ghii=${toGhii(m.ghii)} /> <${Mark} tone=${isOwnerRow ? 'fine' : undefined}>${isOwnerRow ? (t('organisms.roleOwner') || 'owner') : (m.role || 'member')}<//>`}
-                meta=${line || agentsLine || aiLine ? html`${line}${line && (agentsLine || aiLine) ? html`<br />` : null}${aiLine}${aiLine && agentsLine ? ' · ' : null}${agentsLine}` : null}>${(m.ghii)}<//>
+                meta=${line || agentsLine || aiLine ? html`${line}${line && (agentsLine || aiLine) ? html`<br />` : null}${aiLine}${aiLine && agentsLine ? ' · ' : null}${agentsLine}${directLine ? html`<br />${directLine}` : null}` : null}>${(m.ghii)}<//>
               <${Doors} menu=${menuItems.length ? menuItems : null} menuLabel=${t('organisms.moreActions') || 'More actions'} />
             <//>`;
         })}

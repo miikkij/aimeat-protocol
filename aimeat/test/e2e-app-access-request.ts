@@ -15,11 +15,14 @@
  *   The designed use itself (ask, approve, the app opens) is test/e2e-purpose-access-request.ts.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-access-request
  * @version-history
+ *   v1.1.0 — 2026-11-19 — An e-mail invitation to the person's verified address is told (`invited`
+ *     with `invite_url`), not to another address, and not after a cancel; accepting it opens the app.
  *   v1.0.0 — 2026-11-12 — Initial.
  */
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 import { BASE, assert, auth, harness, json } from './helpers/purpose-kit.js';
+import { markEmailVerified } from './helpers/verified-email.js';
 
 const h = harness('Asking for access to an app opened to an organism');
 const STAMP = Date.now().toString(36);
@@ -236,6 +239,53 @@ await h.test('13. joining by the organism\'s id keeps one open request per perso
     const waiting = await json('/v1/organisms/waiting', { headers: auth(owner.token) });
     const item = (waiting.body.data.items ?? []).find((i: any) => i.kind === 'join' && i.orgId === id);
     assert(item?.n === 1, `waiting list: ${JSON.stringify(item)}`);
+});
+
+// An e-mail invitation leaves no membership row, so until 2026-11-19 the refusal offered the person
+// it was sent to the access request, and the invitation sat in their mail.
+const emailed = await registerOwner(BASE, `arqmail${STAMP}`);    // invited by e-mail, address verified
+const lookalike = await registerOwner(BASE, `arqlook${STAMP}`);  // a different verified address
+const EMAILED_ADDRESS = `arqmail${STAMP}@example.test`;
+let emailInvitation = '';
+
+await h.test('14. an e-mail invitation to the verified address: the state is `invited` with the address that opens it, naming no organism', async () => {
+    await markEmailVerified(emailed.name, EMAILED_ADDRESS);
+    await markEmailVerified(lookalike.name, `arqlook${STAMP}@example.test`);
+    const before = await state(emailed.token);
+    assert(before.body.data.state === 'none' && before.body.data.requestable === true && before.body.data.invite_url === null, `before the invitation: ${JSON.stringify(before.body.data)}`);
+    const inv = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email: EMAILED_ADDRESS }) });
+    assert(inv.status === 201 || inv.status === 200, `invite ${inv.status} ${JSON.stringify(inv.body?.error)}`);
+    emailInvitation = inv.body.data.invitation?.id ?? inv.body.data.id;
+    assert(typeof emailInvitation === 'string' && emailInvitation.length > 0, `invitation id: ${JSON.stringify(inv.body.data)}`);
+    const s = await state(emailed.token);
+    assert(s.body.data.state === 'invited' && s.body.data.requestable === false, `state: ${JSON.stringify(s.body.data)}`);
+    assert(s.body.data.invite_url === `/v1/invite?token=${emailInvitation}` && typeof s.body.data.asked_at === 'string', `invite_url: ${JSON.stringify(s.body.data)}`);
+    assert(namesNoOrganism(s.body), `the state names the organism: ${JSON.stringify(s.body)}`);
+});
+
+await h.test('15. another verified address is not told the invitation, and an access request still works for it', async () => {
+    const s = await state(lookalike.token);
+    assert(s.body.data.state === 'none' && s.body.data.requestable === true && s.body.data.invite_url === null, `lookalike: ${JSON.stringify(s.body.data)}`);
+});
+
+await h.test('16. the invited person accepts by the id, and the app opens; the state then says open', async () => {
+    const a = await json(`/v1/invitations/${emailInvitation}/accept`, { method: 'POST', headers: auth(emailed.token), body: '{}' });
+    assert(a.status === 200 || a.status === 201, `accept ${a.status} ${JSON.stringify(a.body?.error)}`);
+    assert((await openApp(emailed.token)).status === 200, 'the app does not open after the accept');
+    assert((await state(emailed.token)).body.data.state === 'open', 'the state after the accept');
+});
+
+await h.test('17. a cancelled e-mail invitation is no longer told', async () => {
+    const other = await registerOwner(BASE, `arqcanc${STAMP}`);
+    const address = `arqcanc${STAMP}@example.test`;
+    await markEmailVerified(other.name, address);
+    const inv = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email: address }) });
+    const id = inv.body.data.invitation?.id ?? inv.body.data.id;
+    assert((await state(other.token)).body.data.state === 'invited', 'the invitation is told before the cancel');
+    const c = await json(`/v1/organisms/${orgId}/invitations/email/${id}/cancel`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+    assert(c.status === 200, `cancel ${c.status} ${JSON.stringify(c.body?.error)}`);
+    const s = await state(other.token);
+    assert(s.body.data.state === 'none' && s.body.data.invite_url === null, `after the cancel: ${JSON.stringify(s.body.data)}`);
 });
 
 h.finish();

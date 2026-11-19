@@ -32,6 +32,10 @@
  *   const r = await requestAccess({ storage, config }, req.auth, { access, ownerName, via }, message);
  *   const d = await reviewJoinRequest({ storage, config }, organism, requestId, 'approved', { owner, principal });
  * @version-history
+ *   v1.2.0 — 2026-11-19 — The access-request state knows an e-mail invitation: a pending one into the
+ *     organism, addressed to the caller's verified address, answers `invited` with `invite_url`, the
+ *     in-app address that opens it. An invitation of either kind is told even where the organism
+ *     takes no access requests.
  *   v1.1.0 — 2026-11-15 — The approvers' notice opens the organism, whose home lists the requests, and
  *     an approved join opens the organism the person joined; both linked the list of organisms.
  *   v1.0.0 — 2026-11-12 — Initial. The approval branch of joinOrganism and the review route's body
@@ -43,6 +47,7 @@ import type { AimeatConfig } from '../../config.js';
 import type {
   Storage, OrganismRecord, OrganismMembershipRecord, JoinRequestRecord, JoinRequestVia,
 } from '../../storage/interface.js';
+import type { InvitationRecord } from '../../storage/repositories/invitation.repository.js';
 import { emitChange } from '../event-bus.js';
 import { notify } from '../notify.js';
 import { organismLink } from '../notifications/links.js';
@@ -459,21 +464,46 @@ export interface AccessRequestState {
   ask_again_at: string | null;
   /** How many days a declined person waits (JOIN_REQUEST_RETRY_DAYS). */
   retry_days: number;
+  /**
+   * With state `invited` from an e-mail invitation: the in-app address that opens it for this person
+   * signed in (`/v1/invite?token=<invitation id>`, routes/invite-accept.ts), the one the invitation's
+   * notification links. Null for a named invitation, which is accepted from the notifications.
+   */
+  invite_url: string | null;
+}
+
+/**
+ * The pending, unexpired e-mail invitation into `organismId` addressed to the caller's verified
+ * address, or null. An e-mail invitation leaves no membership row, so until 2026-11-19 the refusal
+ * page offered a person invited this way the access request, which the node then answered with
+ * nothing useful, and the invitation sat in their mail. Matched on the account's verified address
+ * hash only, the same hash the invitation's own notification was sent by (services/invitations.ts).
+ */
+async function pendingEmailInvitation(storage: Storage, nodeId: string, account: string, organismId: string): Promise<InvitationRecord | null> {
+  const person = await storage.getGHII(`${account}@${nodeId}`);
+  if (!person?.emailHash) return null;
+  const now = Date.now();
+  const open = await storage.listInvitationsByEmailHash(person.emailHash, { status: 'pending' });
+  return open.find(i => i.organismId === organismId && Date.parse(i.expiresAt) > now) ?? null;
 }
 
 /** What the refusal page shows this person: whether to offer the request, and what they already asked. */
 export async function accessRequestState(
   deps: JoinRequestDeps, auth: AudienceAuth | null | undefined, target: AccessRequestTarget,
 ): Promise<AccessRequestState> {
-  const none: AccessRequestState = { requestable: false, state: 'none', asked_at: null, ask_again_at: null, retry_days: JOIN_REQUEST_RETRY_DAYS };
+  const none: AccessRequestState = { requestable: false, state: 'none', asked_at: null, ask_again_at: null, retry_days: JOIN_REQUEST_RETRY_DAYS, invite_url: null };
   if (!isNodeAccount(auth)) return none;
   if (await alreadyOpens(deps, auth!, target)) return { ...none, state: 'open' };
   const organismId = organismOfAccess(target.access);
   const organism = organismId ? await deps.storage.getOrganism(organismId) : null;
-  if (!organism || organism.archived || accessRequestsOf(organism) === 'off') return none;
+  if (!organism || organism.archived) return none;
   const requester = auth!.owner as string;
+  // An invitation is told whether or not the organism takes access requests: it is the way in.
   const refused = await membershipRefusal(deps.storage, organism, requester);
   if (refused) return refused.code === 'ALREADY_INVITED' ? { ...none, state: 'invited' } : none;
+  const emailInvite = await pendingEmailInvitation(deps.storage, deps.config.nodeId, requester, organism.id);
+  if (emailInvite) return { ...none, state: 'invited', asked_at: emailInvite.createdAt, invite_url: `/v1/invite?token=${encodeURIComponent(emailInvite.id)}` };
+  if (accessRequestsOf(organism) === 'off') return none;
   const standing = await standingOf(deps.storage, organism.id, requester, Date.now());
   if (standing.pending) return { ...none, state: 'pending', asked_at: standing.pending.createdAt };
   if (standing.declined) return { ...none, state: 'declined', asked_at: standing.declined.createdAt, ask_again_at: standing.askAgainAt };

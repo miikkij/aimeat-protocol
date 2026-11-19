@@ -33,6 +33,11 @@
  * @structure EVENTS_FIRST_DOMAINS · atelierEventsFirst() · classicLiveUpdatesSection()
  * @usage import { atelierEventsFirst, classicLiveUpdatesSection } from './events-first.js';
  * @version-history
+ *   v1.3.0 — 2026-11-19 — The list names the workspace domain for data other accounts write. A shared
+ *     app listened to `memory`, which never reaches another account, and its second user saw no
+ *     update. One short sentence, because the Atelier part `patterns` that carries this list sits
+ *     within a hundred characters of MAX_PART_CHARS; the full rule, with the extension domain, is
+ *     the platform section `other-owners` (atelier-other-owners.ts).
  *   v1.2.0 — 2026-10-22 — `realtime-rooms` (social:read) joins the list: a lobby follows the
  *     realtime rooms through AIMEAT.live (Band Jam needed a Refresh to see a new room).
  *   v1.1.0 — 2026-10-11 — Both specifications say a delete emits its domain as a write does. The
@@ -48,7 +53,7 @@ export const EVENTS_FIRST_DOMAINS =
   + '(organism:read), `workflows` and `scheduler` (workflow:read), `messages` (messages:read), '
   + '`boards` and `realtime-rooms` (social:read), `wallet` (wallet:read), `knowledge` and `packages` '
   + '(knowledge:read). `realtime-rooms` says the realtime room list moved: a room opened or closed, a '
-  + 'player came or went';
+  + 'player came or went. Data other accounts write: `workspace:<org>/<ws>` (organism:read), never `memory`';
 
 /** The three places a timer belongs, the same words in both specifications. */
 const TIMER_CASES =

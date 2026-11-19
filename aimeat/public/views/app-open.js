@@ -18,6 +18,8 @@
  * @structure targetOf() · AppOpen()
  * @usage '/v1/app-open': () => import('/views/app-open.js' + B)   // spa.html ROUTES
  * @version-history
+ *   v1.4.0 — 2026-11-19 — An e-mail invitation into the shared place is told too: the state carries
+ *     `invite_url`, and the button opens the invitation instead of the notifications.
  *   v1.3.0 — 2026-11-12 — A person the target refuses because it is opened to one shared place's
  *     members asks for access here (GET and POST …/access-request, beside each open route): a
  *     message and a button when a request can be made, the day it was asked while it waits, the day
@@ -221,6 +223,17 @@ export default function AppOpen() {
             'Your request for access was declined. You can ask again after {date}.',
             'Your request for access was declined. You can ask again after {date}.',
             { date: fmtDate(request.ask_again_at) })}<//>
+        <//>`;
+    }
+    if (request.state === 'invited' && request.invite_url) {
+      // An e-mail invitation: the node knows its in-app address, so the button opens it.
+      return html`
+        <${AskPage} title=${deniedTitle}
+          doors=${html`<${Loud} onClick=${() => { window.location.href = request.invite_url; }}>${tr('appOpen.invitedEmailCta', 'Open the invitation')}<//>${back}`}>
+          <${Note} kind="lead">${w('invitedEmailBody',
+            'You were invited by e-mail on {date}. Open the invitation and accept it, and this app opens for you.',
+            'You were invited by e-mail on {date}. Open the invitation and accept it, and this page opens for you.',
+            { date: fmtDate(request.asked_at) })}<//>
         <//>`;
     }
     if (request.state === 'invited') {

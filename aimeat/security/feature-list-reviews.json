@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:06f60ddcc8a7d2b278b26604"
+      "digest": "sha256:ec7c8b5abc5f6c0cb9ef197a"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-19",
@@ -641,8 +641,8 @@
       "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "f1b48df2e1da166a",
       "aimeat/src/tool-catalog/definitions/workspace-spaces.ts": "a1a3d7cca99de61a",
       "aimeat/src/services/organism-join-requests/access-targets.ts": "e65a66f0ad193e20",
-      "aimeat/src/services/organism-join-requests/requests.ts": "67a2eb271e9fb2a9",
-      "aimeat/src/routes/organisms/membership.ts": "5f5a151a2bfe6b44",
+      "aimeat/src/services/organism-join-requests/requests.ts": "c4fb930994ce6968",
+      "aimeat/src/routes/organisms/membership.ts": "4638defe37b16721",
       "aimeat/src/routes/organisms/workspace-rows.ts": "0a0a6460a401e495",
       "aimeat/src/routes/organisms/intake.ts": "41f852495869d7e8",
       "aimeat/src/routes/organisms/workspace-transfer.ts": "be3053921b467bd0",

@@ -12,11 +12,13 @@
  *   (the "who can touch this organism must be enumerable" audit principle, kept for the people
  *   who govern it). This is ROSTER privacy only: content attribution (comments, versions,
  *   activity) is deliberately out of scope — writers are visible; read-only members are not.
- * @structure memberVisibilityOf, canSeeMembers, rosterAgentsFor, redactOrganism
+ * @structure memberVisibilityOf, canSeeMembers, rosterAgentsFor, writesPastAppRules, redactOrganism
  * @usage
  *   const canSee = await canSeeMembers(storage, organism, await rosterCallerFromAuth(storage, req.auth));
  *   res.json({ organism: redactOrganism(organism, canSee), members_hidden: !canSee });
  * @version-history
+ *   v1.3.0 — 2026-11-19 — writesPastAppRules: whether an admitted agent's grant covers organism:direct,
+ *     shown beside it on the member list.
  *   v1.2.0 — 2026-11-13 — rosterAgentsFor: the agents a roster names, for the members route and
  *     aimeat_organism_members alike; a hidden roster names none (structure programme 2026-11, unit 7).
  *   v1.1.1 — 2026-10-21 — rosterCallerFromAuth asks isAnonymousPrincipal, so the minted anonymous token
@@ -27,6 +29,8 @@
 import type { Storage, OrganismRecord, AgentRecord } from '../../storage/interface.js';
 import { isOrganismOwner } from './ownership.js';
 import { agentBarred } from './agent-access.js';
+import { DIRECT_WRITE_SCOPE } from '../fenced-space.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { isOperatorCaller, type OperatorAuth } from '../operator/override.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 
@@ -101,6 +105,18 @@ export async function rosterAgentsFor(
   const names = [...new Set(ownerNames)];
   const batched = await storage.getAgentsByOwners(names);
   return new Map(names.map(n => [n, (batched[n] ?? []).filter(a => !agentBarred(organism, a.gaii))]));
+}
+
+/**
+ * Does this admitted agent's grant let it write an app's fenced spaces directly, past the app's own
+ * tools (`organism:direct`, or a wider word that covers it: `organism:*`, `*`)? Shown beside each
+ * agent on the member list (`writes_past_app_rules`), REST and MCP alike. A shared app on 2026-11-13
+ * fenced its spaces, one member's agent still wrote past the fence, and nobody could see why: its
+ * owner had given it that permission. The grant is read (AgentRecord.defaultScopes, what a token is
+ * minted from); a session narrowed below it is fenced, so the answer says what the agent MAY do.
+ */
+export function writesPastAppRules(agent: Pick<AgentRecord, 'defaultScopes'>): boolean {
+  return scopeIsCovered(agent.defaultScopes ?? [], DIRECT_WRITE_SCOPE);
 }
 
 /** The organism record with the roster fields redacted when the caller may not see them.

@@ -138,7 +138,7 @@ import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { provenanceForWrite } from '../services/ai/provenance.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism } from '../services/organism/lifecycle.js';
-import { canSeeMembers, rosterAgentsFor, type RosterCaller } from '../services/organism/privacy.js';
+import { canSeeMembers, rosterAgentsFor, writesPastAppRules, type RosterCaller } from '../services/organism/privacy.js';
 import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
@@ -435,8 +435,8 @@ export function registerOrganismsTools(
             // names none (structure programme 2026-11, unit 7).
             const admitted = await rosterAgentsFor(storage, organism, caller, canSeeRoster, members.map(m => localAccountName(m.ghii)));
             const canSeeAgents = admitted !== null;
-            const agentsByOwner = new Map<string, { gaii: string; name: string; mcp_last_seen: string | null }[]>();
-            for (const [name, agents] of admitted ?? []) agentsByOwner.set(name, agents.map(a => ({ gaii: a.gaii, name: a.name, mcp_last_seen: a.mcpLastSeen ?? null })));
+            const agentsByOwner = new Map<string, { gaii: string; name: string; mcp_last_seen: string | null; writes_past_app_rules: boolean }[]>();
+            for (const [name, agents] of admitted ?? []) agentsByOwner.set(name, agents.map(a => ({ gaii: a.gaii, name: a.name, mcp_last_seen: a.mcpLastSeen ?? null, writes_past_app_rules: writesPastAppRules(a) })));
 
             return {
                 content: [{
