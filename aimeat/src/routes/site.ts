@@ -7,6 +7,9 @@
  *              the operator-authored portal template).
  * @usage Mounted in server.ts via siteRouter(config, storage).
  * @version-history
+ *   v1.10.0 — 2026-11-19 — GET, POST and DELETE /v1/site/template run services/site/template-ops.ts,
+ *            the code the MCP tool aimeat_site_template runs, on the node's one SiteService
+ *            (nodeSiteService). Answers and codes unchanged.
  *   v1.9.0 — 2026-11-12 — The template routes take `lang`: GET, POST and DELETE /v1/site/template
  *            reach a language version, GET lists the versions, POST /v1/site/import takes
  *            `templates`, and GET /v1/site/sync carries the versions to a copy.
@@ -33,7 +36,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { SiteService, SiteError } from '../services/site.js';
+import { SiteError, nodeSiteService, type SiteService } from '../services/site.js';
+import { readTemplateOp, storeTemplateOp, removeTemplateOp, type TemplateOpRefusal } from '../services/site/template-ops.js';
 import { siteLayoutRouter } from './site-layout.js';
 import { themesRouter } from './themes.js';
 import type { ConfigProvenance } from '../services/config/provenance.js';
@@ -47,7 +51,7 @@ let storeTiersCache: { store: string; at: number; body: { store: string | null; 
 
 export function siteRouter(config: AimeatConfig, storage: Storage, siteService?: SiteService, provenance?: ConfigProvenance): Router {
     const router = Router();
-    const site = siteService ?? new SiteService(config, storage);
+    const site = siteService ?? nodeSiteService(config, storage);
 
     // LB write guard — blocks portal modifications when in load-balancer mode
     const requireNotLb: RequestHandler = (_req, res, next) => {
@@ -59,15 +63,9 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         next();
     };
 
-    /** The language a request names: a code, undefined when it names none, false when the value is no code. */
-    const namedLanguage = (value: unknown): string | undefined | false => {
-        if (value === undefined || value === null || value === '') return undefined;
-        const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
-        return /^[a-z]{2}$/.test(text) ? text : false;
-    };
-    const refuseLanguage = (res: Response): void => {
-        res.status(422).json(error(config.nodeId, 'TEMPLATE_LANG_INVALID',
-            'Write the language as a two-letter code, such as "fi" or "en", then send it again. Leave it out for the default page.'));
+    /** A template operation's refusal, in the status and code it carries (services/site/template-ops.ts). */
+    const refuse = (res: Response, out: TemplateOpRefusal): void => {
+        res.status(out.status).json(error(config.nodeId, out.code, out.message));
     };
 
     // The surface layouts live in their own file but on this router, so they inherit the LB guard
@@ -94,60 +92,27 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     // default page. A value that is not a language code is refused, never read as "no language":
     // a mistyped code on DELETE would otherwise delete the whole front page.
     router.get('/v1/site/template', requireAuth(), requireOperator(storage), async (req, res) => {
-        const lang = namedLanguage(req.query.lang);
-        if (lang === false) { refuseLanguage(res); return; }
-        const [result, pages] = await Promise.all([site.getTemplate(lang), site.listTemplates()]);
-        const languages = pages.filter(p => p.lang !== null)
-            .map(p => ({ lang: p.lang, size_bytes: p.sizeBytes, updated_at: p.updatedAt }));
-        res.json(success(config.nodeId, {
-            template: result?.template ?? null,
-            lang: lang ?? null,
-            size_bytes: result?.sizeBytes ?? 0,
-            updated_at: result?.updatedAt ?? null,
-            tags_found: result?.tagsFound ?? [],
-            languages,
-        }));
+        const out = await readTemplateOp(site, req.query.lang);
+        if (!out.ok) { refuse(res, out); return; }
+        res.json(success(config.nodeId, out.data));
     });
 
     // POST /v1/site/template — Upload the default page, or with `lang` a language version (operator)
     router.post('/v1/site/template', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
-        const { template } = req.body ?? {};
-        if (!template || typeof template !== 'string') {
-            res.status(422).json(error(config.nodeId, 'TEMPLATE_INVALID', 'Name the template you want to use, then send it again.'));
-            return;
-        }
-        const lang = namedLanguage(req.body?.lang ?? req.query.lang);
-        if (lang === false) { refuseLanguage(res); return; }
-        try {
-            const result = await site.uploadTemplate(template, req.auth!.sub, lang);
-            res.json(success(config.nodeId, {
-                stored: true,
-                lang: lang ?? null,
-                size_bytes: Buffer.byteLength(template, 'utf-8'),
-                tags_found: result.tagsFound,
-                unresolvable_tags: result.unresolvableTags,
-            }));
-            emitChange('site');
-        } catch (err) {
-            if (err instanceof SiteError) {
-                res.status(err.httpStatus).json(error(config.nodeId, err.code, err.message));
-                return;
-            }
-            throw err;
-        }
+        const out = await storeTemplateOp(site, config, {
+            template: req.body?.template, lang: req.body?.lang ?? req.query.lang, changedBy: req.auth!.sub,
+        });
+        if (!out.ok) { refuse(res, out); return; }
+        res.json(success(config.nodeId, out.data));
+        emitChange('site');
     });
 
     // DELETE /v1/site/template — Revert to default: the default page and its language versions.
     // With `lang`, that language version only (operator)
     router.delete('/v1/site/template', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
-        const lang = namedLanguage(req.query.lang);
-        if (lang === false) { refuseLanguage(res); return; }
-        const deleted = await site.deleteTemplate(req.auth!.sub, lang);
-        if (lang && !deleted) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `The front page has no ${lang} version.`));
-            return;
-        }
-        res.json(success(config.nodeId, lang ? { deleted: true, lang } : { deleted: true, reverted_to: 'default' }));
+        const out = await removeTemplateOp(site, config, { lang: req.query.lang, changedBy: req.auth!.sub });
+        if (!out.ok) { refuse(res, out); return; }
+        res.json(success(config.nodeId, out.data));
         emitChange('site');
     });
 

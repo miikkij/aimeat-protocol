@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-19 — The SiteService built here is registered as the node's one (registerNodeSiteService),
+ *     which the MCP tool aimeat_site_template uses.
  *   2026-11-19 — /.well-known/did.json is registered at mount time and waits for the node key; it
  *     was registered after the key loaded, behind the 404 fallthrough, and answered 404 everywhere.
  *   2026-11-19 — securityTxtRouter mounted: /.well-known/security.txt (RFC 9116).
@@ -300,7 +302,7 @@ import { createDidDocumentService } from '../services/did-document.js';
 import { createVcIssuerService } from '../services/vc-issuer.js';
 import { createMyDataReceiptService } from '../services/mydata-receipt.js';
 import { createEmailService } from '../services/email.js';
-import { SiteService } from '../services/site.js';
+import { SiteService, registerNodeSiteService } from '../services/site.js';
 import { startSiteSyncJob, triggerSiteSync } from '../services/site-sync.js';
 import { createGenesisPeeringService } from '../services/genesis/peering.js';
 import { startBackgroundJobs } from './background-jobs.js';
@@ -374,7 +376,10 @@ export async function mountRoutes(
   // SiteService is created early so the bootstrap GET / handler can serve a
   // custom portal template (set via the admin Template Editor) instead of
   // always redirecting human visitors to the SPA. Reused by siteRouter below.
+  // Registered as the node's one instance, so the MCP tool aimeat_site_template stores through the
+  // same cache GET / serves from (services/site.ts nodeSiteService).
   const siteService = new SiteService(config, storage);
+  registerNodeSiteService(siteService);
   // RFC 8288 discovery Link headers (api-catalog + service-desc) on every GET/HEAD —
   // must precede bootstrapRouter so the root response carries them too.
   app.use(discoveryLinkHeaders());

@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- test/e2e-site-template-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 5).
  *   2026-11-19 -- test/e2e-organism-approvals-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 1).
  *   2026-11-19 -- test/e2e-moderation-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 3).
  *   2026-11-19 -- test/e2e-ecosystem-apps-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 2).
@@ -1734,6 +1735,9 @@ const ALL_SUITES = [
     'test/e2e-moderation-mcp.ts',
     // An organism's approval requests from the chat: filed by an agent, read in the inbox.
     'test/e2e-organism-approvals-mcp.ts',
+    // The node's own front page per language from the chat (aimeat_site_template), served at once
+    // because the tool and the routes share one SiteService and its cache.
+    'test/e2e-site-template-mcp.ts',
     // The owner stops an agent and starts it again: new work waits and nobody can start it, a
     // scheduled run is skipped, the runtime is not woken, and a start releases what waited.
     'test/e2e-agent-stop.ts',

@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.39.0 -- 2026-11-19 -- The node's own front page per language: aimeat_site_template.
  *   v1.38.0 -- 2026-11-19 -- Moderation review: aimeat_admin_flags, _flag_review, aimeat_flag_appeal, aimeat_appeals, aimeat_appeal_review.
  *   v1.37.0 -- 2026-11-19 -- Outside apps: aimeat_ecosystem_app_list and aimeat_ecosystem_app_revoke.
  *   v1.36.6 -- 2026-11-15 -- The SSO and offboarding paragraphs say connection, sign-in and action, not door.
@@ -138,6 +139,17 @@ not have yet). Tell the operator the version, the date and the new things in pla
 \`prompt\` is a ready update prompt for an AI with a shell on the node's machine (Claude Code, Codex):
 offer it, and let the operator decide when, because the update restarts the node. After an update,
 call it with \`refresh: true\` and check that \`current\` is the new version.
+
+**The node's own front page, per language (operator).** \`aimeat_site_template\` reads, stores and
+deletes a whole HTML page the operator wrote, which / serves instead of the built-in front page, and
+its language versions, one whole page per language beside it. \`action: "get"\` first: it answers
+the page and \`languages\`, the versions there are. \`"set"\` with \`template\` stores the default page,
+and with \`lang\` (such as "en") the version for that language, which needs the default page first and
+whose own \`<html lang>\` names that language. A reader whose language has a version gets it, and
+everyone else the default page. \`"delete"\` with \`lang\` removes that version; without it the whole
+front page goes and the built-in one comes back, so say that to the operator before you do it. The
+page changes at / at once. The order of the built-in front page's blocks is a different thing:
+\`aimeat_surface_layout_set\`.
 
 **Faces for the themes (operator).** \`aimeat_theme_font_save\` adds a face (a font) to this node, so
 its themes and the Design Book can use it at once, with no update: give \`family\`, the woff2

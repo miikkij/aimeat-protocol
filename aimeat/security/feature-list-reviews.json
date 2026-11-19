@@ -313,9 +313,10 @@
         "aimeat/src/services/seo",
         "aimeat/src/services/site",
         "aimeat/src/services/portfolio",
-        "aimeat/src/routes/admin/seo.ts"
+        "aimeat/src/routes/admin/seo.ts",
+        "aimeat/src/tool-catalog/definitions/site-template.ts"
       ],
-      "digest": "sha256:409fa5e763d2de59f0d24d2a"
+      "digest": "sha256:f5b19d329d4d9a6013a89455"
     },
     "17. AI transparency and compliance": {
       "reviewedOn": "2026-11-19",
@@ -890,12 +891,13 @@
     },
     "16. Public presence and discovery": {
       "aimeat/src/routes/sitemaps.ts": "a8968f6091f1ac28",
-      "aimeat/src/routes/site.ts": "f4bf4abb57b81c5f",
+      "aimeat/src/routes/site.ts": "ad086217b43740ad",
       "aimeat/src/routes/site-layout.ts": "4c36c62c38626493",
       "aimeat/src/routes/portfolio.ts": "03f972de922c4f0f",
       "aimeat/src/routes/markdown-mirrors.ts": "7f3e3fbe90805fbb",
       "aimeat/src/services/seo/seo-status.ts": "466c5f387f91be3f",
       "aimeat/src/services/site/template-languages.ts": "c914cf3fc48b3761",
+      "aimeat/src/services/site/template-ops.ts": "4e97773ce8230240",
       "aimeat/src/services/portfolio/config.ts": "8fe987bc95410b8e",
       "aimeat/src/services/portfolio/members.ts": "d3242771d531e917",
       "aimeat/src/services/portfolio/memory-gate.ts": "d17d3eeef232e9bf",
@@ -906,7 +908,8 @@
       "aimeat/src/services/portfolio/read-hold.ts": "49398e31902f72f3",
       "aimeat/src/services/portfolio/seo.ts": "a9000fb22a913bfd",
       "aimeat/src/services/portfolio/standalone-url.ts": "b3231b02f2558a6b",
-      "aimeat/src/routes/admin/seo.ts": "5cbb8d02d0fe28d9"
+      "aimeat/src/routes/admin/seo.ts": "5cbb8d02d0fe28d9",
+      "aimeat/src/tool-catalog/definitions/site-template.ts": "a93389ae61e054b8"
     },
     "17. AI transparency and compliance": {
       "aimeat/src/data/compliance-domains.ts": "3671999359e598ed",

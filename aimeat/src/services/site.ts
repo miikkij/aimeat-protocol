@@ -13,8 +13,12 @@
  *   - uploadTemplate / getTemplate / deleteTemplate take an optional language; listTemplates()
  *   - HeaderNavConfig / PUBLIC_NAV_LINK_IDS: operator-configurable public header link order/visibility
  *   - validateTemplate(): the refusals an uploaded template must survive, script-tag rule included
+ *   - registerNodeSiteService() / nodeSiteService(): the node's one instance, for one cache
  *
  * @version-history
+ *   v1.7.0 — 2026-11-19 — registerNodeSiteService and nodeSiteService: the routes and the MCP tool
+ *     aimeat_site_template use one instance, so a page stored from the chat drops the cache GET /
+ *     serves from (feature audit 2026-11-19, 4.4 item 5).
  *   v1.6.0 — 2026-11-12 — The template has language versions: one whole page per language, stored
  *     beside the default page under `__site_template__.<code>`. getTemplatePage picks the reader's
  *     page (site/template-languages.ts); the resolved HTML is cached per page. Deleting the default
@@ -683,4 +687,24 @@ export class SiteError extends Error {
         super(message);
         this.name = 'SiteError';
     }
+}
+
+/**
+ * The node's one SiteService. The service caches the resolved front page per language, and a
+ * store or a delete drops only its own instance's cache, so a second instance would serve a page
+ * that was replaced until its time ran out. The routes and the MCP tool groups take this one:
+ * mountRoutes registers the instance it builds, and a caller that runs before that (or a test
+ * harness without routes) gets one built and kept here.
+ */
+let nodeSite: SiteService | null = null;
+
+/** Make `site` the node's one SiteService (server-bootstrap/routes-loader.ts, at mount). */
+export function registerNodeSiteService(site: SiteService): void {
+    nodeSite = site;
+}
+
+/** The node's one SiteService; built and kept on the first call when none was registered. */
+export function nodeSiteService(config: AimeatConfig, storage: Storage): SiteService {
+    nodeSite ??= new SiteService(config, storage);
+    return nodeSite;
 }
