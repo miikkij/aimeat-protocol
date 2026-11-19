@@ -189,7 +189,7 @@ export function buildAmlFindings(f: AmlFacts): AmlFinding[] {
     id: 'declaration_missing', kind: 'declaration_missing', code: 'aml-declaration-missing', count: missing ? 1 : 0, items: [],
     reason: !missing ? 'Every mode that expects a declaration has one, or the mode expects none.'
       : f.mode === 'node' ? 'This server is set as an obliged entity itself, and the operator has stored no declaration.'
-        : 'This server lets owners do obliged work, and no organism has declared itself an obliged entity.',
+        : 'This server lets organisms be obliged entities, and no organism has declared itself one.',
     regulation: [AMLR_REFS.obliged, AMLR_REFS.compliance],
     ...(missing && f.mode === 'node' ? { proposal: { action: 'record_declaration', text: 'Record the declaration: the legal person, its business id, the sector, the compliance officer and manager.', request: { method: 'PUT', url: '/v1/compliance/docs/aml' } } } : {}),
   });

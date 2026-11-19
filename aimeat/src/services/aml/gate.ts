@@ -63,7 +63,7 @@ export async function amlDocRefusal(
   if (wanted.every(id => stored.includes(id))) return null;
   return {
     status: 403, code: AML_NOT_OFFERED,
-    message: 'This server does no anti-money-laundering obliged work, so an organism cannot declare itself an obliged entity here. '
-      + 'Ask the operator (support@operators): the setting AIMEAT_AML_MODE decides it, and "owners" lets a declared organism do that work. Declarations made before stay.',
+    message: 'The operator has set that no one on this server is an anti-money-laundering obliged entity, so an organism cannot declare itself one here. '
+      + 'Ask the operator (support@operators): the setting AIMEAT_AML_MODE decides it, and "owners" lets an organism be an obliged entity here. Declarations made before stay.',
   };
 }

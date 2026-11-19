@@ -51,7 +51,7 @@ export interface AmlSection {
 
 const MODE_TEXT: Record<AimeatConfig['amlMode'], string> = {
   report: 'Nothing is refused. This section lists what could make this server or an owner an obliged entity, for a person to decide.',
-  none: 'Neither this server nor its owners do anti-money-laundering obliged work. An organism cannot declare itself an obliged entity here.',
+  none: 'Neither the operator nor the organisms here are obliged entities under the anti-money-laundering law. An organism cannot declare itself an obliged entity here.',
   owners: 'An organism that declared itself an obliged entity and named its compliance officer does that work here. This server holds no funds.',
   node: 'The operator is an obliged entity itself and keeps its own declaration. Owners\' declarations are accepted too.',
 };
