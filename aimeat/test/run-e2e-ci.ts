@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- e2e-hook-when-missing.ts joins the list (not the guard tier): a blocking hook whose action is missing lets the event through and tells the operators once a day, or refuses it when set to (feature audit 2026-11-19, 2.4).
  *   2026-11-19 -- e2e-app-delete-sweep.ts joins the list (not the guard tier): a deleted app leaves nothing in a store the delete removes, and the owner's other app keeps everything (feature audit 2026-11-19, 4.3).
  *   2026-11-19 -- e2e-data-wallet-agent-consents.ts joins the list (not the guard tier): the Data Wallet lists and revokes the consents the person's agents gave (feature audit 2026-11-19, 1.4).
  *   2026-11-19 -- e2e-app-source-access.ts joins the list (not the guard tier): every route that hands an app's source to another person asks the app's audience (feature audit 2026-11-19, 1.1 and 1.2).
@@ -1263,6 +1264,7 @@ const ALL_SUITES = [
     'test/e2e-catalogue-classification.ts',
     'test/e2e-notifications.ts',
     'test/e2e-hooks.ts',
+    'test/e2e-hook-when-missing.ts',
     'test/e2e-knowledge.ts',
     // A link row belongs to the namespace of its source package; owner erasure takes the person's rows (secaudit 2026-10, v78, v79).
     'test/e2e-knowledge-link-owner.ts',

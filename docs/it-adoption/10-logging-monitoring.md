@@ -73,7 +73,7 @@ Other sources to collect from:
 | Statistics | `GET /v1/stats` JSON | `AIMEAT_STATS_ACCESS=operator` |
 | Operator and usage trail | poll `GET /v1/admin/usage/calls` with an operator token | No push; polling interval is the export delay |
 | Refusals | poll `GET /v1/admin/auth-refusals` | Same data as the file |
-| Lifecycle hooks | `aimeat_admin_hook_set` binds a published action's webhook to one of ten live moments: owner and agent registration (before and after), agent rekey, work request, work delivery, settlement, board post, federation peer request. `owner_recovery` is still listed, but nothing fires it | These are lifecycle moments, not security events. A `pre_` hook is a gate: if its address stops answering it refuses everything it guards (`aimeat/src/services/hooks.ts`) |
+| Lifecycle hooks | `aimeat_admin_hook_set` binds a published action's webhook to one of ten live moments: owner and agent registration (before and after), agent rekey, work request, work delivery, settlement, board post, federation peer request. `owner_recovery` is still listed, but nothing fires it | These are lifecycle moments, not security events. A `pre_` hook is a gate: if its address stops answering it refuses everything it guards (`aimeat/src/services/hooks.ts`). If its bound action is missing (unpublished or without an address), it lets the event through by default, or refuses it when its `when_missing` is `refuse`, and every operator gets one notification per hook and action a day (`aimeat/src/services/hook-when-missing.ts`) |
 
 ## Health and metrics endpoints
 
@@ -104,6 +104,7 @@ Other sources to collect from:
 | Security incident opened | admin Security page open count | any |
 | Federation peer offline or relay refused | federation heartbeat log lines | per [Federation](../operations/federation.md) |
 | Failing hook gate | `failing` in `aimeat_admin_hooks` | any |
+| Hook gate with a missing action | `missing` in `aimeat_admin_hooks`; the operator notification `hook_action_missing_pass` or `hook_action_missing_refuse` | any |
 
 ## Compliance reports and monthly snapshots
 

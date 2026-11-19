@@ -697,6 +697,14 @@ components:
         failing:
           type: boolean
           description: A gate with something bound whose newest call did not get through
+        missing:
+          type: boolean
+          description: A gate with a bound action that is missing (not published here, or published without an address). It calls nobody for that action, and `when_missing` says what it does with the event.
+        when_missing:
+          type: string
+          nullable: true
+          enum: [pass, refuse, null]
+          description: A gate's choice when its bound action is missing. `pass` (the default) lets the event through, `refuse` refuses it. Null for a notify hook.
     HookRun:
       type: object
       description: One call a hook made, as the node recorded it
@@ -38522,6 +38530,10 @@ paths:
                             type: array
                             description: Gates whose newest call did not get through; each is refusing everything it guards
                             items: { type: string }
+                          missing:
+                            type: array
+                            description: Gates with a bound action that is missing (not published here, or published without an address). Each lets the event through, or refuses it when its `when_missing` is `refuse`.
+                            items: { type: string }
                           bindable_actions:
                             type: array
                             description: The actions published here, which is what a binding names
@@ -38596,6 +38608,13 @@ paths:
 
         When the published actions cannot be read, nothing is bound and the answer is 500. An empty
         list clears the moment, the same as DELETE, and reads nothing.
+
+        `when_missing` is for a blocking hook only: what it does when an action bound to it is
+        missing, that is no longer published here or published without an address. `pass` (the
+        default) lets the event through; `refuse` refuses it. Either way every operator gets one
+        notification per hook and action per day. Send it with or without `actions`; without
+        `actions` only the setting changes. Both are checked before either is written. For a hook
+        that is told afterwards it is refused with 400.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -38611,12 +38630,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [actions]
               properties:
                 actions:
                   type: array
+                  description: Required unless `when_missing` is sent.
                   items:
                     type: string
+                when_missing:
+                  type: string
+                  enum: [pass, refuse]
+                  description: A blocking hook only. What it does when its bound action is missing.
       responses:
         '200':
           description: What is bound now
@@ -38638,6 +38661,8 @@ paths:
                             description: Always empty. Kept for the clients that read it; a reference that no published action answers to is refused with 400.
                             items: { type: string }
                           note: { type: string, description: What this binding now means, in the operator's terms }
+                          when_missing: { type: string, enum: [pass, refuse], description: Present when the request set it }
+                          when_missing_note: { type: string, description: What the setting now means }
                           updated: { type: boolean }
         '400':
           $ref: '#/components/responses/BadRequest'

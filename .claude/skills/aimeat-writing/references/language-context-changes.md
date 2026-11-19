@@ -241,3 +241,7 @@ newest at the top.
   tekoälyn kuville ja videoille"). The exception and its reason take the classification words
   (*poikkeus*, *perustelu*; *excepción*, *motivo*). *Syväväärennös* and *ultrasuplantación* are the
   words the Finnish and Spanish texts of the AI Act use.
+- **2026-11-19**: what a blocking hook does when its action is missing, with the admin Hooks page
+  (feature audit 2026-11-19, 2.4). The words follow the page's own: *estävä koukku* / *gancho
+  bloqueante* and *toiminto* / *acción*, as the held-name notice already says them; the choice names
+  the event (*tapahtuma* / *evento*) the hook checks.

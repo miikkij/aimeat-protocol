@@ -13,6 +13,7 @@
  * @structure registerAdminHooksTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminHooksTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-11-19 — aimeat_admin_hook_set takes `when_missing` and calls setHookBinding, the PUT route's write.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -28,7 +29,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
-import { buildHooksOverview, setHookActions } from '../services/hooks-overview.js';
+import { buildHooksOverview, setHookBinding } from '../services/hooks-overview.js';
 import { emitChange } from '../services/event-bus.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
@@ -56,9 +57,9 @@ export function registerAdminHooksTools(
   mcp.registerTool('aimeat_admin_hook_set', { description: descriptionFor('aimeat_admin_hook_set'),
     inputSchema: zodShapeFor('aimeat_admin_hook_set'),
     annotations: annotationsFor('aimeat_admin_hook_set') },
-    async ({ hook, actions }) => {
+    async ({ hook, actions, when_missing }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
-      const out = await setHookActions(config, storage, hook, actions);
+      const out = await setHookBinding(config, storage, hook, { actions, when_missing });
       if (!out.ok) return refuse(`${out.code}: ${out.message}`);
       emitChange('config');
       return text(out);

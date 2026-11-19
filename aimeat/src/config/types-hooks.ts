@@ -5,9 +5,10 @@
  * @description The extension hook names an operator can attach extensions to. PURE EXTRACTION from
  *   config-types.ts on 2026-10-09 to keep that file under the 800-line ceiling; config-types.ts
  *   re-exports both names, so no consumer import changes.
- * @structure ExtensionHooks · HookName
+ * @structure ExtensionHooks · HookName · HookWhenMissing
  * @usage import type { ExtensionHooks, HookName } from '../config-types.js';
  * @version-history
+ *   v1.2.0 — 2026-11-19 — HookWhenMissing: a blocking hook's choice when its bound action is missing.
  *   v1.1.0 — 2026-11-14 — post_help_question and post_help_solved (Ask someone who knows).
  *   v1.0.0 — 2026-10-09 — Moved from config-types.ts unchanged.
  */
@@ -31,3 +32,6 @@ export interface ExtensionHooks {
 }
 
 export type HookName = keyof ExtensionHooks;
+
+/** What a blocking hook does when its bound action is missing: let the event through, or refuse it. */
+export type HookWhenMissing = 'pass' | 'refuse';

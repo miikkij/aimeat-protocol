@@ -12,6 +12,7 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   2026-11-19 — A stored `hooks.<name>.when_missing` row loads into the running config (services/hook-when-missing.ts).
  *   2026-11-05 — A purchase plan the Consul watch applies gives the store place's default to the agents that have
  *     not had it (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — installRequestMemo prepares the storage for the request memo (services/request-memo.ts),
@@ -69,6 +70,7 @@ import type { ConsulConfigService } from '../services/consul-config.js';
 import { initRevocationStorage } from '../auth/jwt.js';
 import { initSessionAuth } from '../auth/middleware.js';
 import { settleStoredHookBindings, moveAccountNameHookBindings } from '../services/hooks-overview.js';
+import { applyStoredWhenMissing } from '../services/hook-when-missing.js';
 import { openHeldNamesIncident, settleInstallsAtStart, settleCredentialsAtStart } from '../services/held-account-names.js';
 import { settleWorkspaceSchemasAtStart } from '../services/workspace/schema-relock.js';
 import { settleRefreshCookieWindowAtStart } from '../services/owner/session.js';
@@ -196,6 +198,8 @@ export async function initializeConfig(
     let hooksLoaded = 0;
     for (const [key, value] of Object.entries(allValues)) {
       if (key.startsWith('hooks.')) {
+        // A blocking hook's choice for a missing action sits beside its binding (services/hook-when-missing.ts).
+        if (applyStoredWhenMissing(config, key, value)) continue;
         const hookName = key.slice(6) as HookName;
         if (hookName in config.extensionHooks) {
           try {

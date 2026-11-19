@@ -13,6 +13,7 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   2026-11-19 — setHookWhenMissing (PUT /v1/admin/hooks/:hook with when_missing).
  *   2026-11-15 — getAdminDisputes, getAdminDispute and ruleDispute (GET /v1/admin/disputes, /:id, POST /:id/rule).
  *   2026-10-29 — getPossiblePayouts and markPossiblePayoutArrived (secaudit2026oct26 round 8c).
  *   2026-10-15 — unsubscribePush(endpoint) removes that one device; it sent no endpoint and the route
@@ -157,6 +158,9 @@ export const getHooks        = ()       => apiGet('/v1/admin/hooks');
 export const setHook         = (name, actions) =>
   apiPut(`/v1/admin/hooks/${encodeURIComponent(name)}`, { actions });
 export const deleteHook      = (name)   => apiDelete(`/v1/admin/hooks/${encodeURIComponent(name)}`);
+// A blocking hook's choice when its bound action is missing: 'pass' (the default) or 'refuse'.
+export const setHookWhenMissing = (name, whenMissing) =>
+  apiPut(`/v1/admin/hooks/${encodeURIComponent(name)}`, { when_missing: whenMissing });
 
 // ── Economy ──
 export const mintMorsels     = (gaii, amount) => apiPost('/v1/admin/mint', { gaii, amount });

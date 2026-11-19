@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-19 — aimeat_admin_hook_set takes `when_missing` (pass | refuse), and `actions` may be left out to change only it.
  *   2026-11-15 — aimeat_admin_hooks and aimeat_admin_hook_set call a pre_ hook a blocking hook (kind gate).
  *   2026-11-14 — aimeat_discover and aimeat_invoke name route capabilities: every REST route of the
  *     contract, found by type capability and run with `{ path, query, body }`.
@@ -773,7 +774,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_admin_hook_set',
-        description: 'Operator-only. Bind a list of actions to one of the eleven moments, or clear it with an empty list. The actions are called in the order given, each after the last has answered. A blocking hook (any hook whose name starts with pre_, kind gate) WAITS for them and refuses the thing when one answers no, returns a non-2xx, or does not answer within ten seconds, so binding an address that is not reachable stops everything that moment checks; the other seven are told afterwards and stop nothing. A hook binds only an action that is already published: publish the action first (POST /v1/actions, with its webhook_url), then bind it. An action reference is a published action\'s id, or its id with its provider (id#provider). A reference that no action published here answers to is refused with INVALID_INPUT and nothing is written. A bare id that more than one provider publishes is refused, with the id#provider of each: bind the one you mean with its provider. A bare id that one provider publishes is stored as its id#provider, so another owner publishing the same id later changes nothing. Read aimeat_admin_hooks first: its bindable_actions lists what can be bound, each with the ref to write.',
+        description: 'Operator-only. Bind a list of actions to one of the eleven moments, or clear it with an empty list. The actions are called in the order given, each after the last has answered. A blocking hook (any hook whose name starts with pre_, kind gate) WAITS for them and refuses the thing when one answers no, returns a non-2xx, or does not answer within ten seconds, so binding an address that is not reachable stops everything that moment checks; the other seven are told afterwards and stop nothing. A hook binds only an action that is already published: publish the action first (POST /v1/actions, with its webhook_url), then bind it. An action reference is a published action\'s id, or its id with its provider (id#provider). A reference that no action published here answers to is refused with INVALID_INPUT and nothing is written. A bare id that more than one provider publishes is refused, with the id#provider of each: bind the one you mean with its provider. A bare id that one provider publishes is stored as its id#provider, so another owner publishing the same id later changes nothing. Read aimeat_admin_hooks first: its bindable_actions lists what can be bound, each with the ref to write. A blocking hook whose bound action is missing (no longer published, or published without an address) calls nobody and lets the event through, unless its when_missing is "refuse"; aimeat_admin_hooks names such hooks in `missing`.',
         caller: 'operator',
         visibility: agentEverywhere,
         // Not destructive: binding replaces a list the operator can read first and set back.
@@ -782,7 +783,8 @@ export const discoveryWorkBoardsTools = [
         surfaces: ['admin'],
         input: {
             hook: { type: 'string', required: true, description: 'The moment, e.g. "pre_owner_registration".' },
-            actions: { type: 'array', required: true, description: 'Action references to call, in order, each naming an action already published here. An empty list clears the moment.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
+            actions: { type: 'array', required: false, description: 'Action references to call, in order, each naming an action already published here. An empty list clears the moment. Leave it out to change only when_missing.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
+            when_missing: { type: 'string', required: false, description: 'A blocking hook only (pre_): what it does when its bound action is missing, that is not published here or published without an address. "pass" lets the event through (the default); "refuse" refuses it. Either way every operator is told once a day for each hook and action. Refused with INVALID_INPUT for a hook that is told afterwards.', zod: z.enum(['pass', 'refuse']) },
         },
     },
     {
