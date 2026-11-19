@@ -25,15 +25,24 @@
  *   or closed for forking answers null, and the map, the template doors and the preview drop it
  *   without anybody retiring the part.
  *
+ *   IT IS OFFERED TO THE PEOPLE WHO MAY OPEN THE APP. An app opened only to one organism (or to
+ *   signed-in people, or on a node with signed-in content access) offers its genre to the readers
+ *   its audience admits, asked with the read gate's own decision (genreAudienceAdmits), and to
+ *   nobody else; the shelf listing and the part's own read leave it out for them too. Apps that
+ *   already started from the genre keep what they copied.
+ *
  *   ITS PAGE IS NEVER SERVED FROM THE NODE'S OWN ORIGIN. A shipped genre is the node's own HTML;
  *   this one is a stranger's page with script in it, so the preview is a redirect to the app's
  *   own address (routes/designbook.ts) and the bench does not run it. Inside a frame, where the
  *   app's address refuses to stand, the preview is the node's own script-free card of it
  *   (grownGenreFramePage).
  * @structure GrownGenreBody · isGrownGenreBody · validateGrownGenreBody · grownGenrePublishing ·
- *   grownGenrePage · grownGenreFramePage
- * @usage const page = await grownGenrePage(storage, config, body);   // null when it no longer stands
+ *   GenreReader · genreReaderOf · genreAudienceAdmits · grownGenreAdmits · grownGenrePage · grownGenreFramePage
+ * @usage const page = await grownGenrePage(storage, config, ownerGhii, body, await genreReaderOf(storage, config, reader));   // null when it does not stand for this reader
  * @version-history
+ *   v1.2.0 — 2026-11-19 — A grown genre is offered only to the readers the app's audience admits
+ *     (genreAudienceAdmits, the read gate's signInGateOf): an app opened to one organism handed its
+ *     source to every builder on the node through the template routes (feature audit 2026-11-19, 1.2).
  *   v1.0.0 — 2026-09-20 — Initial.
  *   v1.0.1 — 2026-09-26 — The proposer's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-10-24 — grownGenreFramePage: what the preview shows INSIDE A FRAME. The redirect to
@@ -42,9 +51,12 @@
  *     own with no script at all: the app's screenshot, its name and a link to open it.
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, AppRecord } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { escapeHtml } from '../../utils/html-escape.js';
+import { resolveAppOwnerScope } from '../app/owner-scope.js';
+import { signInGateOf, accountAppReader } from '../app/read-gate.js';
+import type { AudienceAuth } from '../audience.js';
 import { DesignBookError } from './errors.js';
 import { DesignBookReasons } from './reasons.js';
 
@@ -103,11 +115,58 @@ export interface GrownGenrePage {
 }
 
 /**
- * The page a grown genre stands on, or null with the reason when it does not stand: the first
- * thing that is no longer true, in words its owner can act on.
+ * Who asks for a grown genre: the caller's credential and account name, or null for a caller with
+ * no account on this node. 'admitted' is the app's owner asking about their own proposal, or a
+ * preview frame holding the token a reader's listing handed out.
+ */
+export type GenreReader = { auth: AudienceAuth; owner: string } | null | 'admitted';
+
+/**
+ * A Design Book reader (the caller's identity, a GHII or a GAII, as DesignBookService takes it; null
+ * signed out) as a GenreReader. An identity that names no account of this node reads as null.
+ */
+export async function genreReaderOf(storage: Storage, config: AimeatConfig, reader: string | null | undefined): Promise<GenreReader> {
+  if (!reader) return null;
+  const ownerGhii = reader.includes('#') ? (await resolveAppOwnerScope(storage, config, reader))?.ownerGhii ?? null : reader;
+  if (!ownerGhii) return null;
+  const owner = localAccountName(ownerGhii);
+  // localAccountName keeps another node's identity whole: a visitor is no account here.
+  if (owner.includes('@')) return null;
+  return { auth: { sub: reader, owner }, owner };
+}
+
+/**
+ * Whether the app's audience lets this reader see the genre that grew out of it: the read gate's own
+ * question (signInGateOf), so an app opened only to one organism offers its page to that organism's
+ * members and its owner, and to nobody else. A genre hands over the app's whole source, so it is
+ * offered to exactly the people who may open the app (feature audit 2026-11-19, 1.2).
+ */
+export async function genreAudienceAdmits(
+  storage: Storage, config: AimeatConfig, live: AppRecord, reader: GenreReader,
+): Promise<boolean> {
+  if (reader === 'admitted') return true;
+  return !(await signInGateOf(storage, config, live, live, accountAppReader(reader?.auth, reader?.owner ?? '')));
+}
+
+/**
+ * The same question for a part on the shelf, when the app it names is still published. A part whose
+ * app is gone has nothing to hand over, so the audience does not hide it (its standing does).
+ */
+export async function grownGenreAdmits(
+  storage: Storage, config: AimeatConfig, ownerGhii: string, body: GrownGenreBody, reader: GenreReader,
+): Promise<boolean> {
+  if (reader === 'admitted') return true;
+  const live = await storage.getApp(ownerGhii, body.app.filename);
+  return !live || genreAudienceAdmits(storage, config, live, reader);
+}
+
+/**
+ * The page a grown genre stands on for this reader, or null with the reason when it does not stand:
+ * the first thing that is no longer true, in words its owner can act on.
  */
 export async function grownGenreStanding(
-  storage: Storage, config: AimeatConfig, ownerGhii: string, body: GrownGenreBody,
+  // A caller that names no reader is a stranger: the app's audience decides as for one signed out.
+  storage: Storage, config: AimeatConfig, ownerGhii: string, body: GrownGenreBody, reader: GenreReader = null,
 ): Promise<{ page: GrownGenrePage; why?: undefined } | { page: null; why: string }> {
   // `ownerGhii` is the part's proposer, the canonical bucket the app and its owner's notes live
   // under (propose refused any other owner's app), never an address composed from the name.
@@ -117,6 +176,9 @@ export async function grownGenreStanding(
   if (!live) return { page: null, why: `There is no published app ${name} under ${owner}.` };
   if (live.parked || live.operatorHidden || live.accessCode) {
     return { page: null, why: `${name} is parked, hidden or behind an access code, so nobody else can open it. A genre is a page every builder can look at.` };
+  }
+  if (!(await genreAudienceAdmits(storage, config, live, reader))) {
+    return { page: null, why: `${name} opens only for the people its owner chose, and this reader is not among them.` };
   }
   const state = await new DesignBookReasons(storage, config).keptState(ownerGhii, filename);
   if (!state.kept || state.version === null) {
@@ -159,8 +221,10 @@ export function grownGenreFramePage(o: { title: string; summary?: string; appUrl
     + '</body></html>';
 }
 
-export async function grownGenrePage(storage: Storage, config: AimeatConfig, ownerGhii: string, body: GrownGenreBody): Promise<GrownGenrePage | null> {
-  return (await grownGenreStanding(storage, config, ownerGhii, body)).page;
+export async function grownGenrePage(
+  storage: Storage, config: AimeatConfig, ownerGhii: string, body: GrownGenreBody, reader: GenreReader,
+): Promise<GrownGenrePage | null> {
+  return (await grownGenreStanding(storage, config, ownerGhii, body, reader)).page;
 }
 
 /**
@@ -179,7 +243,8 @@ export async function grownGenrePublishing(
   if (body.judgement.reach !== 'general') {
     return { earned: false, why: 'Its builder judged the look special to one app, so it stays proposed: listed, and not offered to other builders as a place to start.' };
   }
-  const standing = await grownGenreStanding(storage, config, proposerGhii, body);
+  // The proposer is the app's owner: the app's audience never hides it from them.
+  const standing = await grownGenreStanding(storage, config, proposerGhii, body, 'admitted');
   if (!standing.page) return { earned: false, why: `${standing.why} It stays proposed until that changes; propose it again then.` };
   return { earned: true, why: `Published: the page has a look of its own (${standing.page.register}), its builder judged it general, its owner said version ${standing.page.version} turned out well, and its owner opened it for forking. It stops being offered if any of that stops being true.` };
 }

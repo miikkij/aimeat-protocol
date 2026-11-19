@@ -9,11 +9,15 @@
  * @structure appTemplatesRouter(config, storage) → Router
  * @usage app.use(appTemplatesRouter(config, storage)) from the server setup.
  * @version-history
+ *   v1.2.0 — 2026-11-19 — A genre grown out of an app opened to some people only is listed and handed
+ *     over to those people alone: the signed-in caller is the reader (feature audit 2026-11-19, 1.2).
  *   v1.1.0 — 2026-09-20 — Both routes also answer for a genre that grew out of an app, while that
  *     app stands (services/design-book/grown-genre.ts).
  *   v1.0.0 — 2026-06-26 — initial: index + by-id endpoints over the app-templates registry.
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -22,6 +26,9 @@ import { DesignBookService } from '../services/design-book/service.js';
 
 export function appTemplatesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  // Who asks for a grown genre: the signed-in caller, else nobody (design-book/grown-genre.ts).
+  const readerOf = (req: Request): string | null =>
+    req.auth && !isAnonymousPrincipal(req.auth) ? resolveIdentity(req.auth, config.nodeId) : null;
 
   // GET /v1/app-templates[?kind=app-shell] — index (no content) for a picker / prompt menu.
   router.get('/v1/app-templates', async (req, res) => {
@@ -31,7 +38,7 @@ export function appTemplatesRouter(config: AimeatConfig, storage: Storage): Rout
     let index: Array<Record<string, unknown> & { kind: string }> = getAppTemplateIndex(lang);
     // The genres that grew out of an app and still stand (services/design-book/grown-genre.ts).
     if (!kind || kind === 'genre') {
-      const grown = await new DesignBookService(storage, config).grownGenres();
+      const grown = await new DesignBookService(storage, config).grownGenres(readerOf(req));
       index = [...index, ...grown.map(g => ({ id: g.id, kind: 'genre', title: g.title, description: g.summary, libs: [], light: g.page.light, source: 'design-book' }))];
     }
     if (kind) index = index.filter(t => t.kind === kind);
@@ -49,7 +56,7 @@ export function appTemplatesRouter(config: AimeatConfig, storage: Storage): Rout
     }
     // A genre that grew out of an app: a public page its owner opened for forking, whole, as a
     // shipped template is here. The tool doors cut it into parts (services/node/templates.ts).
-    const grown = await new DesignBookService(storage, config).grownGenre(id);
+    const grown = await new DesignBookService(storage, config).grownGenre(id, readerOf(req));
     if (!grown) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No app template "${id}"`));
       return;

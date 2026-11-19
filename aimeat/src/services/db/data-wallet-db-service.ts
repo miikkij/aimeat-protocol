@@ -19,6 +19,9 @@
  * @structure DataWalletService.overview(ownerGaii, auditDays?, entryLimit?, opts?) → { consents, audit, permSummary, names }
  * @usage const ov = await createDataWalletService(storage).overview(resolve(req), 30);
  * @version-history
+ *   2026-11-19 — The consents and the trail are the account's, its agents' included, read through
+ *     listAccountConsents and consentAuditOf for `opts.consentHolder`: the page neither showed nor let
+ *     the person revoke a consent their agent gave, and the active count was short (feature audit 1.4).
  *   2026-11-15 — Comment only: the example organism name is an invented one.
  *   2026-11-09 — Additive: `group_limit` sends only the biggest groups (the page sends 0 and reads the
  *     day buckets instead, 1.23 MB of 1.27 MB at a heavy account's size), `today_from` and
@@ -36,9 +39,9 @@
 import { countConsentRecipients } from '../../storage/consent-recipient.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
-import { getPendingConsentAudit } from '../consent/audit-buffer.js';
 import { groupConsentAudit, bucketConsentAudit, organismIdsIn, type AuditGroup, type AuditBucket } from '../consent/audit-groups.js';
-import { CONSENT_QUOTA } from '../consent/write.js';
+import { CONSENT_QUOTA, accountConsentHolders, listAccountConsents } from '../consent/write.js';
+import { consentAuditOf } from '../consent/consent-read.js';
 
 export interface DataWalletOverview {
   consents: { consents: Array<Record<string, unknown>>; total: number };
@@ -73,6 +76,11 @@ export interface DataWalletOverview {
 
 /** What the page asks beyond the window: how many groups to send, and the reader's own midnights. */
 export interface OverviewOptions {
+  /**
+   * Whose consents and trail the page shows (consentHolderOf: the account for the person in person,
+   * the agent itself for an agent without consent:read-as-owner). Absent: `ownerGaii`.
+   */
+  consentHolder?: string;
   groupLimit?: number;
   todayFrom?: string;
   yesterdayFrom?: string;
@@ -96,16 +104,17 @@ export class DataWalletService {
       // The two totals are counted, not listed: listing 17 782 keys and 1 275 files to take their
       // length cost about 75 ms on PostgreSQL at a heavy account's size (2026-11-09). The same rows:
       // live keys that are not archived or in the bin, and every stored file.
-      const [consents, storedAudit, memoryKeys, fileTotals] = await Promise.all([
-        this.storage.listConsents(ownerGaii),
-        this.storage.listConsentAudit(ownerGaii, { days: auditDays }),
+      // The consents and the trail are the account's, the ones its agents gave included, as GET
+      // /v1/consent lists them: `consentHolder` is the route's consentHolderOf(caller), and its
+      // holders (the account and every agent) are read once for both, in one query each.
+      const holder = opts.consentHolder ?? ownerGaii;
+      const holders = await accountConsentHolders(this.storage, holder);
+      const [consents, auditEntries, memoryKeys, fileTotals] = await Promise.all([
+        listAccountConsents(this.storage, holder, {}, holders),
+        consentAuditOf(this.storage, holders, { days: auditDays }),
         this.storage.countMemory([ownerGaii], { excludeExpired: true }),
         this.storage.sumStorageBytesForOwners([ownerGaii]),
       ]);
-
-      const pending = getPendingConsentAudit(ownerGaii, { days: auditDays })
-        .sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
-      const auditEntries = [...pending, ...storedAudit];
 
       // Permission summary — derived from the active subset of the SAME consent list (no re-read).
       const active = consents.filter(c => c.status === 'active');

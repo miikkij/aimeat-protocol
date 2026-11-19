@@ -9,6 +9,8 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   2026-11-19 — GET /v1/appdev/templates and /:id name the caller as the reader of a genre grown out
+ *     of an app, which reaches only the people the app's audience admits (feature audit 1.2).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-20 — SECURITY: GET /v1/appdev/overview hands the overview the caller's view (principal and
  *     readsAsOwner), so an agent without memory:read-as-owner no longer reads its owner's or its
@@ -81,7 +83,7 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     const templates = await listTemplateProposals(storage, config, identity);
     // `node_templates`: what the node ships, without content, beside the owner's proposals, so
     // the tool that lists templates can name the shell a build starts from.
-    res.json(success(config.nodeId, { templates, total: templates.length, node_templates: await templateIndex(storage, config) }));
+    res.json(success(config.nodeId, { templates, total: templates.length, node_templates: await templateIndex(storage, config, identity) }));
   });
 
   // POST /v1/appdev/templates — propose or update one template (same id replaces).
@@ -110,7 +112,7 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
       // what the connector's aimeat_app_template_get calls (services/node/templates.ts).
       // ?part=N: a shipped file too large for one tool result comes one part at a time.
       const rawPart = typeof req.query.part === 'string' ? Number(req.query.part) : undefined;
-      const shipped = await templateAnswer(storage, config, req.params.id as string, rawPart);
+      const shipped = await templateAnswer(storage, config, req.params.id as string, identity, rawPart);
       if (shipped && typeof shipped.part_error === 'string') {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', shipped.part_error));
         return;

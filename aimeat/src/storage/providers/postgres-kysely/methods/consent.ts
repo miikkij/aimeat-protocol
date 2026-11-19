@@ -7,6 +7,8 @@
  *   recipient/pattern matchers (services/consent + pattern-utils + gaii) so access decisions are
  *   identical across backends. Translated 1:1 from the Prisma implementation.
  * @version-history
+ *   v1.4.0 — 2026-11-19 — listConsentAudit takes several identities, read in one IN query (feature
+ *     audit 2026-11-19, 1.4).
  *   v1.3.0 — 2026-10-12 — A consent's reach is read through consentReachOf: a row holding the older
  *     `private` or `dmz` is answered as `local` (Core 2026-11 AUTHZ-18).
  *   v1.2.0 — 2026-08-23 — consentFacets(), the node-wide SQL roll-up the compliance report reads
@@ -140,8 +142,11 @@ export const consentMethods = {
     const r = await this.db.deleteFrom('ConsentAudit').where('timestamp', '<', new Date(beforeIso)).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0);
   },
-  async listConsentAudit(this: PostgresKyselyStorage, ownerGaii: string, opts?: { days?: number; consentId?: string; accessorGaii?: string }): Promise<ConsentAuditEntry[]> {
-    let q = this.db.selectFrom('ConsentAudit').selectAll().where('ownerGaii', '=', ownerGaii);
+  async listConsentAudit(this: PostgresKyselyStorage, ownerGaii: string | readonly string[], opts?: { days?: number; consentId?: string; accessorGaii?: string }): Promise<ConsentAuditEntry[]> {
+    // One identity, or several in one IN query (the account and its agents).
+    const owners = typeof ownerGaii === 'string' ? [ownerGaii] : [...ownerGaii];
+    if (owners.length === 0) return [];
+    let q = this.db.selectFrom('ConsentAudit').selectAll().where('ownerGaii', 'in', owners);
     if (opts?.days) q = q.where('timestamp', '>=', new Date(Date.now() - opts.days * 86400000));
     if (opts?.consentId) q = q.where('consentId', '=', opts.consentId);
     if (opts?.accessorGaii) q = q.where('accessorGaii', '=', opts.accessorGaii);

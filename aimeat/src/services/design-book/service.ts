@@ -34,6 +34,10 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.15.0 — 2026-11-19 — grownGenre(), grownGenres() and map() take the reader, and list() and get()
+ *     leave out a grown genre whose app's audience does not admit the reader (grown-genre.ts
+ *     genreAudienceAdmits): an app opened to one organism offered its source to every builder on the
+ *     node (feature audit 2026-11-19, 1.2).
  *   2026-11-04 — No single-key delete for a storage without deleteMemorySubtree: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.14.1 — 2026-10-30 — A kit's list row says its reach (and organism), for the gallery's chips.
@@ -114,7 +118,7 @@ import { getAppTemplateIndex } from '../../data/app-templates.js';
 import { buildDesignBookMap } from './map.js';
 import { DesignBookReasons } from './reasons.js';
 import { componentAsRead, componentBench, componentSnippet, type ComponentBenchRead, type ComponentBody } from './component.js';
-import { grownGenrePage, grownGenrePublishing, isGrownGenreBody, type GrownGenrePage } from './grown-genre.js';
+import { genreReaderOf, grownGenreAdmits, grownGenrePage, grownGenrePublishing, isGrownGenreBody, type GrownGenrePage, type GenreReader } from './grown-genre.js';
 import { componentPublishing, kitPublishing, proposeChecksFor } from './propose-checks.js';
 import { ornamentSnippet, type OrnamentBody } from './ornament.js';
 import { kitReach, kitReadable, kitSnippet, kitStatusOnPropose, kitVisibility, type KitBody } from './kit.js';
@@ -243,7 +247,7 @@ export class DesignBookService {
       }
     }
     const publishing = input.kind === 'component' ? await componentPublishing(this.storage, this.config, ownerGhii, input.body as unknown as ComponentBody)
-      : input.kind === 'kit' ? await kitPublishing(this.storage, this.config, ownerGhii, input.body as unknown as KitBody, (g) => this.grownGenre(g))
+      : input.kind === 'kit' ? await kitPublishing(this.storage, this.config, ownerGhii, input.body as unknown as KitBody, (g) => this.grownGenre(g, callerGaii))
         : grown ? await grownGenrePublishing(this.storage, this.config, ownerGhii, grown) : undefined;
 
     const existing = await this.findRecord(input.id);
@@ -347,6 +351,10 @@ export class DesignBookService {
     if (!(await kitReadable(this.storage, this.config.nodeId, part, reader === null ? null : await this.ownerOrNull(reader)))) {
       throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
     }
+    // A genre that grew out of an app opened to some people only answers to those people.
+    if (!(await this.genreShown(part, await genreReaderOf(this.storage, this.config, reader)))) {
+      throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
+    }
     let bench: ComponentBenchRead | undefined;
     if (part.kind === 'component') {
       const now = componentBench(part.body);
@@ -384,6 +392,7 @@ export class DesignBookService {
   ): Promise<PartSummaryRow[]> {
     const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
     const readerOwner = reader === null ? null : await this.ownerOrNull(reader);
+    const genreReader = withFailing ? 'admitted' as const : await genreReaderOf(this.storage, this.config, reader);
     // Newest first, before the limit: the seeded shelf alone is past the default page, and
     // storage order differs per provider, so a part just proposed could fall off the first page.
     const items = (await this.storage.listMemory(this.bookOwner(), { prefix: PART_KEY_PREFIX, tags: ['designbook'] }))
@@ -408,6 +417,7 @@ export class DesignBookService {
       }
       if (part.kind === 'component' && !withFailing && !componentBench(part.body).passes) continue;
       if (!withFailing && !(await kitReadable(this.storage, this.config.nodeId, part, readerOwner))) continue;
+      if (!(await this.genreShown(part, genreReader))) continue;
       rows.push({
         id: part.id, kind: part.kind, title: part.title, summary: part.summary, tags: part.tags,
         status: part.status, proposed_by: part.proposed_by, updated_at: part.updated_at,
@@ -425,14 +435,15 @@ export class DesignBookService {
    * The published shelf as ONE page of text: every part on a line, grouped by kind. What a
    * builder reads before it composes anything, and what a search with no word answers (map.ts).
    */
-  async map(): Promise<{ map: string; count: number }> {
+  async map(reader: string | null = null): Promise<{ map: string; count: number }> {
     const shelf = await this.list({ status: 'published', limit: 200 });
     // THE GENRES COME FROM THE SERVED TEMPLATES, which is what a fork reads. A genre part in the
     // Book only names a template, and the shelf lags the templates: production held 19 of 23 on
     // 2026-09-19 and a fresh node holds none, so a map of the shelf alone hid genres that fork.
     const genres = getAppTemplateIndex().filter(t => t.kind === 'genre');
     // AND THE ONES THAT GREW OUT OF AN APP, while the app still stands (grown-genre.ts).
-    const grown = await this.grownGenres();
+    // Only the ones whose app's audience admits this reader (grown-genre.ts genreAudienceAdmits).
+    const grown = await this.grownGenres(reader);
     const rows = [
       ...genres.map(g => ({ id: g.id, kind: 'genre', summary: g.description })),
       ...grown.map(g => ({ id: g.id, kind: 'genre', summary: g.summary })),
@@ -448,11 +459,15 @@ export class DesignBookService {
     return { map, count: rows.length };
   }
 
-  /** Every published genre that grew out of an app and still stands, with the page a fork starts from. */
-  async grownGenres(): Promise<Array<{ id: string; title: string; summary: string; page: GrownGenrePage }>> {
+  /**
+   * Every published genre that grew out of an app and still stands for `reader` (the caller's
+   * identity, null signed out), with the page a fork starts from.
+   */
+  async grownGenres(reader: string | null): Promise<Array<{ id: string; title: string; summary: string; page: GrownGenrePage }>> {
     const out: Array<{ id: string; title: string; summary: string; page: GrownGenrePage }> = [];
-    for (const row of await this.list({ kind: 'genre', status: 'published', limit: 200 })) {
-      const found = await this.grownGenre(row.id);
+    const asker = await genreReaderOf(this.storage, this.config, reader);
+    for (const row of await this.list({ kind: 'genre', status: 'published', limit: 200 }, { reader })) {
+      const found = await this.grownGenreFor(row.id, asker);
       if (found) out.push(found);
     }
     return out;
@@ -460,16 +475,27 @@ export class DesignBookService {
 
   /**
    * One genre that grew out of an app, or null: no such part, a genre the node ships, a part not
-   * on the shelf, or an app that no longer stands. What the template doors and the preview ask.
+   * on the shelf, an app that no longer stands, or an app whose audience does not admit `reader`.
+   * What the template doors and the preview ask.
    */
-  async grownGenre(id: string): Promise<{ id: string; title: string; summary: string; page: GrownGenrePage } | null> {
+  async grownGenre(id: string, reader: string | null): Promise<{ id: string; title: string; summary: string; page: GrownGenrePage } | null> {
+    return this.grownGenreFor(id, await genreReaderOf(this.storage, this.config, reader));
+  }
+
+  private async grownGenreFor(id: string, reader: GenreReader): Promise<{ id: string; title: string; summary: string; page: GrownGenrePage } | null> {
     const record = await this.findRecord(id);
     if (!record) return null;
     const part = this.parsePart(record);
     if (part.kind !== 'genre' || !isGrownGenreBody(part.body)) return null;
     if (part.status !== 'published' && part.status !== 'aging') return null;
-    const page = await grownGenrePage(this.storage, this.config, part.proposed_by_owner, part.body);
+    const page = await grownGenrePage(this.storage, this.config, part.proposed_by_owner, part.body, reader);
     return page ? { id: part.id, title: part.title, summary: part.summary, page } : null;
+  }
+
+  /** False for a genre grown out of an app whose audience does not admit this reader; true for every other part. */
+  private async genreShown(part: DesignBookPart, reader: GenreReader): Promise<boolean> {
+    if (part.kind !== 'genre' || !isGrownGenreBody(part.body)) return true;
+    return grownGenreAdmits(this.storage, this.config, part.proposed_by_owner, part.body, reader);
   }
 
   /**
@@ -495,7 +521,8 @@ export class DesignBookService {
     if (!record) throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
     const part = this.parsePart(record);
     const ownerGhii = await this.ownerOf(callerGaii);
-    if (!(await kitReadable(this.storage, this.config.nodeId, part, ownerGhii))) {
+    if (!(await kitReadable(this.storage, this.config.nodeId, part, ownerGhii))
+      || !(await this.genreShown(part, await genreReaderOf(this.storage, this.config, callerGaii)))) {
       throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
     }
     if (part.status !== 'published' && part.status !== 'aging' && part.proposed_by_owner !== ownerGhii) {

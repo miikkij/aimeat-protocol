@@ -14,6 +14,8 @@
  * @version-history
  *   2026-11-19 -- test/e2e-owner-export-records.ts joins ALL_SUITES (feature audit 2026-11-19, item 4.2).
  *   2026-11-19 -- test/e2e-app-task-start.ts joins ALL_SUITES (feature audit 2026-11-19, item 2.1).
+ *   2026-11-19 -- e2e-data-wallet-agent-consents.ts joins the list (not the guard tier): the Data Wallet lists and revokes the consents the person's agents gave (feature audit 2026-11-19, 1.4).
+ *   2026-11-19 -- e2e-app-source-access.ts joins the list (not the guard tier): every route that hands an app's source to another person asks the app's audience (feature audit 2026-11-19, 1.1 and 1.2).
  *   2026-11-15 -- test/e2e-federation-peer-proofs.ts joins ALL_SUITES (audit 2026-11 M130, L056).
  *   2026-11-15 -- e2e-app-icon-upload.ts joins the list (not the guard tier): aimeat_app_manage icon_upload and the install block.
  *   2026-11-15 -- The plan moves to test/run-e2e-plan.ts (E2E report of 2026-11-15, section 4):
@@ -639,6 +641,8 @@ const ALL_SUITES = [
     'test/e2e-themes.ts',
     'test/e2e-theme-fonts.ts',
     'test/e2e-app-fork.ts',
+    // Every route that hands an app's source to another person asks the app's audience (feature audit 2026-11-19, 1.1 and 1.2).
+    'test/e2e-app-source-access.ts',
     'test/e2e-app-marks.ts',
     'test/e2e-app-ai-use.ts',
     'test/e2e-app-news.ts',
@@ -1346,6 +1350,8 @@ const ALL_SUITES = [
     'test/e2e-write-guards.ts',
     'test/e2e-wallet-page.ts',
     'test/e2e-data-wallet-page.ts',
+    // The Data Wallet lists and revokes the consents the person's agents gave (feature audit 2026-11-19, 1.4).
+    'test/e2e-data-wallet-agent-consents.ts',
     'test/e2e-memory-tab-summary.ts',
     'test/e2e-query-budget.ts',
     'test/e2e-live-catchup.ts',

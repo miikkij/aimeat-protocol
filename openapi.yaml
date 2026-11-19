@@ -19067,7 +19067,9 @@ paths:
         ships come the genres that grew out of a published app (`source: design-book`), each listed
         only while its app stands: kept by its owner, open for forking, not parked or hidden.
         GET /v1/app-templates/{id} answers one of those with the version its owner kept and
-        `grew_from` naming the app.
+        `grew_from` naming the app. A genre whose app opens for some people only (one organism, or
+        signed-in accounts) is listed and handed over to those people alone, read from the caller's
+        session; to anyone else it is absent (404 on the id).
       tags:
         - Discovery
       parameters:
@@ -44056,6 +44058,11 @@ paths:
         opening it does: `access_code` in the body, or `?code=` / `X-Access-Code` as on the read route
         (else `403 ACCESS_DENIED`).
 
+        A source whose audience does not admit the caller (an app opened to one organism, and the
+        caller not in it) refuses everyone but its owner and an operator with the answer the app's own
+        read gives: `403 ACCESS_DENIED`, or `401 SIGN_IN_REQUIRED` for a caller with no account on this
+        node. A fork copies the page, so it asks who may open the app, as the read does.
+
         The fork is created free (source price/license terms are dropped) and not itself forkable by
         default. This is the sanctioned, provenance-recording path — prefer it over reading the bytes
         and re-publishing them, which leaves no lineage.
@@ -46203,7 +46210,8 @@ paths:
       operationId: consentAuditLog
       summary: View consent audit log
       description: |
-        Retrieve the consent audit log for the authenticated owner. To keep the log bounded
+        Retrieve the consent audit log for the authenticated owner, with the rows of the consents
+        the owner's agents gave, as GET /v1/consent lists the account's consents. To keep the log bounded
         and off the read hot path, only ACCESS DENIALS (`allowed: false`) and consent
         MUTATIONS (`grant`/`revoke`) are recorded; allowed reads are not audited. Entries are
         written via a batched buffer, but just-made entries appear here immediately. Old
@@ -83441,7 +83449,9 @@ paths:
       tags: [Consent]
       summary: Data Wallet overview (consents + audit + permission summary + names)
       description: |
-        Fold the Data Wallet tab into one call: every consent (active and revoked), the audit
+        Fold the Data Wallet tab into one call: every consent (active and revoked) of the account,
+        the ones its agents gave included, as GET /v1/consent lists them (an agent caller sees its
+        own unless it holds `consent:read-as-owner`), the audit
         report of the window GROUPED by accessor × target × outcome with only the newest rows
         verbatim (the rows of one group come from GET /v1/consent/audit with `key_prefix`), a
         permission summary with the consent quota, and the names of every organism and workspace

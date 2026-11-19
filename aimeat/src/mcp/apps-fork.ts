@@ -8,6 +8,9 @@
  * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged, caller)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   2026-11-19 — An app whose audience does not admit the caller (an app opened to one organism, and
+ *     the caller not in it) is refused with the app read's own ACCESS_DENIED (forkSourceFor gate
+ *     `audience`, feature audit 2026-11-19, 1.1).
  *   2026-11-15 — Takes `access_code`: another person's fork of an app behind an access code needs the
  *     code (forkSourceFor gate `access-code`), refused with ACCESS_DENIED without it (E2E audit M093).
  *   2026-11-14 — The source read and its gates are forkSourceFor (services/app/fork-gate.ts), as on
@@ -43,6 +46,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { forkApp, resolveAppOwnerScope } from '../services/app/lifecycle.js';
 import { logger } from '../utils/logger.js';
 import { forkSourceFor } from '../services/app/fork-gate.js';
+import { SIGN_IN_REFUSAL } from '../services/app/read-gate.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { publishAskOf } from '../services/publish-requests/ask.js';
@@ -83,6 +87,11 @@ export function registerAppForkTool(
                 // code the REST door answers; the older refusals keep their sentence.
                 if (refusal.gate === 'access-code') {
                     return toolError('ACCESS_DENIED', 'This app is protected by an access code. Pass the code as access_code to fork it; the app\'s owner can give it to you.');
+                }
+                // The app's audience does not admit this caller: the refusal the app's own read sends.
+                if (refusal.gate === 'audience') {
+                    const r = refusal.account ? SIGN_IN_REFUSAL.account : SIGN_IN_REFUSAL.none;
+                    return toolError(r.code, r.message);
                 }
                 const text = refusal.gate === 'missing' || refusal.gate === 'hidden'
                     ? `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`

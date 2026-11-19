@@ -10,6 +10,8 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-11-19 — aimeat_app_template_get and _list name the session's agent as the reader, so a genre
+ *     grown out of an app opened to some people only reaches those people alone (feature audit 1.2).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-11 — _get's source_app carries `toll_morsels` (the app's pacing amount; a morsel is pacing,
@@ -80,7 +82,7 @@ export function registerAppTemplateProposalTools(
             return text({
                 // What the node ships, without content: aimeat_app_template_get { id } returns one
                 // with its file. The same index GET /v1/app-templates serves.
-                node_templates: await templateIndex(storage, config),
+                node_templates: await templateIndex(storage, config, agentGaii),
                 templates: proposals.map(p => ({
                     id: p.id, title: p.title, tier: p.tier, tags: p.tags,
                     model: p.model, start_mode: p.startMode,
@@ -108,7 +110,8 @@ export function registerAppTemplateProposalTools(
                 // tool for `shell-pure-client` and was told it did not exist (2026-09-18). Same
                 // registry and same fields as GET /v1/app-templates/:id (services/node/templates.ts).
                 // And a genre that grew out of an app, while that app stands (design-book/grown-genre.ts).
-                const shipped = await templateAnswer(storage, config, id, part);
+                // Such a genre is handed to the people the app's audience admits, and to nobody else.
+                const shipped = await templateAnswer(storage, config, id, agentGaii, part);
                 if (!shipped) return toolError('NOT_FOUND', unknownTemplateMessage(id));
                 return typeof shipped.part_error === 'string' ? toolError('INVALID_INPUT', shipped.part_error) : text(shipped);
             }

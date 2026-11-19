@@ -21,11 +21,13 @@
  *   GET /v1/consent, GET /v1/consent/:id, aimeat_consent_list and the consent-record resource all ask
  *   it. aimeat_consent_list listed the account's consents for every agent until 2026-11-14.
  * @structure ConsentRead · consentHolderOf(caller) · listConsentsFor(storage, caller, opts) ·
- *   consentRecordFor(storage, config, caller, id)
+ *   consentRecordFor(storage, config, caller, id) · consentAuditOf(storage, holders, opts)
  * @usage
  *   const consents = await listConsentsFor(storage, callerOf(req, config.nodeId, storage), { status });
  *   const read = await consentRecordFor(storage, config, callerOf(req, config.nodeId, storage), id);
  * @version-history
+ *   v1.3.0 — 2026-11-19 — consentAuditOf(): the trail of the account and its agents in one query, for
+ *     GET /v1/consent/audit and the Data Wallet, which read the person's own rows only (feature audit 1.4).
  *   v1.2.0 — 2026-11-14 — consentHolderOf and listConsentsFor: an agent holding consent:read-as-owner
  *     sees the account's consents on the list and the read, on REST and MCP alike.
  *   v1.1.0 — 2026-11-14 — One holder for both surfaces, the session's principal (B13b).
@@ -33,7 +35,8 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import type { ConsentRecord } from '../../storage/types/auth.js';
+import type { ConsentRecord, ConsentAuditEntry } from '../../storage/types/auth.js';
+import { getPendingConsentAudit } from './audit-buffer.js';
 import type { CallerContext } from '../caller-context.js';
 import { accountHoldsConsent, listAccountConsents } from './write.js';
 import { operatorOverride } from '../operator/override.js';
@@ -85,4 +88,18 @@ export async function consentRecordFor(
     const admitted = await operatorOverride(storage, config, caller.auth,
         { ownerOf: record.ownerGaii, area: 'consent', action: 'read', subject: record.id });
     return admitted ? { status: 'ok', record } : { status: 'refused' };
+}
+
+/**
+ * The audit trail of the consents filed under `holders` (accountConsentHolders: the account and its
+ * agents, or one agent), newest first: the not-yet-flushed buffer ahead of the stored rows, which one
+ * query reads whatever the number of holders. What GET /v1/consent/audit and the Data Wallet answer.
+ */
+export async function consentAuditOf(
+    storage: Storage, holders: readonly string[], opts: { days?: number; consentId?: string; accessorGaii?: string } = {},
+): Promise<ConsentAuditEntry[]> {
+    const pending = holders.flatMap(h => getPendingConsentAudit(h, opts))
+        .sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
+    const stored = await storage.listConsentAudit(holders.length === 1 ? holders[0] : holders, opts);
+    return [...pending, ...stored];
 }

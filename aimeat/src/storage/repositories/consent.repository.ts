@@ -13,6 +13,8 @@
  *   - Audit: addConsentAuditEntry, listConsentAudit, pruneConsentAudit
  *
  * @version-history
+ *   v1.3.0 — 2026-11-19 — listConsentAudit takes several identities too, so the Data Wallet reads the
+ *     trail of the account and its agents in one query (feature audit 2026-11-19, 1.4).
  *   v1.2.0 — 2026-08-23 — consentFacets(): the consent half of the operator's compliance report
  *     (BR-02). Every read here was ownerGaii-keyed, so a node-wide answer could only be assembled
  *     by listing owners and fanning out — a cost that grows with how long the node has existed
@@ -58,7 +60,11 @@ export interface ConsentRepository {
    */
   consentFacets(query?: ConsentFacetQuery): Promise<ConsentFacet[]>;
   addConsentAuditEntry(entry: ConsentAuditEntry): Promise<ConsentAuditEntry>;
-  listConsentAudit(ownerGaii: string, opts?: {
+  /**
+   * The audit rows of one identity, or of several in one query (the account and its agents, for the
+   * Data Wallet), newest first.
+   */
+  listConsentAudit(ownerGaii: string | readonly string[], opts?: {
     days?: number;
     consentId?: string;
     accessorGaii?: string;

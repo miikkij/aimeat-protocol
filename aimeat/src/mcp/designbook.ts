@@ -10,6 +10,8 @@
  *   import { registerDesignbookTools } from './designbook.js';
  *   registerDesignbookTools(mcp, storage, config, () => agentGaii, caller);
  * @version-history
+ *   2026-11-19 — The map names the caller, so a genre grown out of an app opened to some people only
+ *     is on it for those people alone (feature audit 2026-11-19, 1.2).
  *   2026-10-31 — search and get answer the shared anonymous principal as GET /v1/designbook and
  *     GET /v1/designbook/:id answer a caller that is not signed in: the published shelf only, and
  *     NOT_FOUND for a part not published (secaudit2026oct31w2 round 10, W2-3).
@@ -117,7 +119,7 @@ export function registerDesignbookTools(
             // No word, no kind: the caller does not know yet what the Book holds, so it gets the
             // whole shelf on one page as plain text, and not the first fifty rows of JSON.
             if (view === 'map' || (!kind && !status && !q && limit == null)) {
-                const out = await book.map();
+                const out = await book.map(isAnonymousPrincipal({ sub: getAgentGaii() }) ? null : getAgentGaii());
                 return text(`${out.map}${MAP_NOTE}`);
             }
             return answer(async () => {

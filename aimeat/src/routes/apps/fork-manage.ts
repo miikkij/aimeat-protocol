@@ -6,6 +6,9 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — POST .../fork answers the app read's own 403 ACCESS_DENIED (401 SIGN_IN_REQUIRED
+ *     without an account) when the app's audience does not admit the caller (forkSourceFor gate
+ *     `audience`): an app opened to one organism gave its source to any account (feature audit 1.1).
  *   2026-11-15 — POST .../fork takes `access_code` (or ?code= / X-Access-Code, as the read gate) and
  *     answers 403 ACCESS_DENIED when another person forks an app behind an access code without it
  *     (forkSourceFor gate `access-code`, E2E audit M093).
@@ -97,6 +100,7 @@ import { recordAppAudit, type AppAuditAction } from '../../services/app/audit.js
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { forkSourceFor } from '../../services/app/fork-gate.js';
+import { SIGN_IN_REFUSAL } from '../../services/app/read-gate.js';
 import { callerOf } from '../../middleware/caller.js';
 import { fileAppPublishAsk, appAskedNote, publishAskedFields, askedStatus } from '../../services/app/publish-gate.js';
 import { appSettingsGate, appSettingsCapRefusal } from '../../services/app/settings-gate.js';
@@ -218,6 +222,10 @@ export function registerForkManageRoutes(
                 // A missing source names the version asked for; a hidden one answers as the read gate does.
                 const suffix = refusal.gate === 'missing' && version ? ` (version ${version})` : '';
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${sourceFilename}" not found for owner "${sourceOwner}"${suffix}`));
+            } else if (refusal.gate === 'audience') {
+                // The refusal the app's own read sends this caller (services/app/read-gate.ts).
+                const r = refusal.account ? SIGN_IN_REFUSAL.account : SIGN_IN_REFUSAL.none;
+                res.status(r.status).json(error(config.nodeId, r.code, r.message));
             } else if (refusal.gate === 'not-forkable') {
                 res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This app is not open for forking by others. Ask the owner to enable forking.'));
             } else if (refusal.gate === 'access-code') {
