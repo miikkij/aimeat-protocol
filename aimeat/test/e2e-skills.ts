@@ -1134,11 +1134,9 @@ await test('27b2b. a fresh node carries the six conversation skills, and the fir
     assert((await res.text()).includes('aimeat_portfolio_publish'), 'and it is the welcome-page skill');
 });
 
-// The paved-path workflow is the Atelier skill's since the Classic track was retired (2026-11-19);
-// the Classic aimeat-app-builder stays public and sends a reader there.
+// The paved path is the Atelier skill's since 2026-11-19; the retired Classic skill points to it.
 await test('27b3. seeded aimeat-app-builder-atelier is public and serves the paved-path workflow; the retired Classic one points to it', async () => {
-    const idxRes = await rawFetch('/.well-known/agent-skills/index.json');
-    const idx = await idxRes.json() as any;
+    const idx = await (await rawFetch('/.well-known/agent-skills/index.json')).json() as any;
     const entry = idx.skills.find((s: any) => s.name === 'aimeat-app-builder-atelier');
     assert(entry, `aimeat-app-builder-atelier missing from index: ${JSON.stringify(idx.skills.map((s: any) => s.name))}`);
     const res = await rawFetch('/.well-known/agent-skills/aimeat-app-builder-atelier/SKILL.md');
@@ -1146,13 +1144,8 @@ await test('27b3. seeded aimeat-app-builder-atelier is public and serves the pav
     const body = await res.text();
     const actual = `sha256:${createHash('sha256').update(body, 'utf8').digest('hex')}`;
     assert(actual === entry.digest, `served bytes hash ${actual} != index digest ${entry.digest}`);
-    assert(body.includes('/v1/prompts/build-app-atelier'), 'skill misses the spec-first rule');
-    assert(body.includes('/v1/appdev/pitfalls'), 'skill misses the pitfall registry');
-    assert(body.includes('Say it in their words'), 'skill misses the plain-words proposal');
-    assert(body.includes('aimeat_app_publish'), 'skill misses the MCP publish path');
-    const classic = await rawFetch('/.well-known/agent-skills/aimeat-app-builder/SKILL.md');
-    assert(classic.status === 200, `the retired skill still answers: ${classic.status}`);
-    const retired = await classic.text();
+    for (const [s, what] of [['/v1/prompts/build-app-atelier', 'the spec-first rule'], ['/v1/appdev/pitfalls', 'the pitfall registry'], ['Say it in their words', 'the plain-words proposal'], ['aimeat_app_publish', 'the MCP publish path']]) assert(body.includes(s), `skill misses ${what}`);
+    const retired = await (await rawFetch('/.well-known/agent-skills/aimeat-app-builder/SKILL.md')).text();
     assert(retired.includes('node:aimeat-app-builder-atelier') && retired.includes('from-classic'), 'the retired skill sends the reader to the Atelier skill and section from-classic');
 });
 

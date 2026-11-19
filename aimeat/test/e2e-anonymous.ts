@@ -706,8 +706,7 @@ await test('Get share prompt', async () => {
     assert(body.data.gaii === ANON_GAII, `Expected gaii ${ANON_GAII}`);
 });
 
-// (2026-11-19) The Classic build specification was retired; its address serves the Atelier one
-// for an AI that cannot connect, behind a notice (services/builder/classic-retired.ts).
+// (2026-11-19) The Classic spec is retired; its address serves the Atelier one behind a notice (classic-retired.ts).
 await test('Get build-app prompt (public): the Atelier specification behind the retired notice', async () => {
     const { status, body } = await json('/v1/prompts/build-app');
     assert(status === 200, `Expected 200, got ${status}`);

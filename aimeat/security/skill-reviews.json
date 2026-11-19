@@ -79,14 +79,14 @@
       "digest": "sha256:a63ab3aed359325610ac7a46"
     },
     "node:aimeat-find-my-app": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/mcp/apps.ts",
         "aimeat/src/tool-catalog/definitions/apps-publish.ts",
         "aimeat/src/services/usage/usage-read.ts",
         "aimeat/public/views/appcat.js"
       ],
-      "digest": "sha256:46cf6e730e9cde449b9521a6"
+      "digest": "sha256:93ec24325c35cac48ea2ae04"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-15",
@@ -190,24 +190,24 @@
       "digest": "sha256:46b3d6dd85c2f17dca15284b"
     },
     "node:aimeat-app-builder": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/services/node/templates.ts",
         "aimeat/src/services/app/spec-gate.ts"
       ],
-      "digest": "sha256:787331da5b382aa7332bbf04",
+      "digest": "sha256:ef0277c79cad5e335e295c90",
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/builder/atelier-prompt.ts",
         "aimeat/src/services/builder/atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:1e44f2aa1048995baaa2b81a"
+      "digest": "sha256:234fc3f8f4c19ea43ff32759"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -318,12 +318,12 @@
       "digest": "sha256:ea57b1e0ef07d535dda87497"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:56cabc85671cef3160428b6d"
+      "digest": "sha256:8c8a81a3e864ab6cd612ff78"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -523,15 +523,15 @@
       "digest": "sha256:b752d84f845e25c9cf8998e7"
     },
     "node:aimeat-game-apps": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/data/library-packs/vendored-creative.ts",
         "aimeat/src/static/sdk-libs/phaser/index.js"
       ],
-      "digest": "sha256:28c44ab5d5b30609821c175c"
+      "digest": "sha256:af522d4510b0ead7d3a76046"
     },
     "project:aimeat-app-building": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/routes/app-templates.ts",
@@ -543,7 +543,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:d4edf4380bd736ae009c1623",
+      "digest": "sha256:45267f99f406c92b9e5d2c16",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -560,14 +560,14 @@
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/scripts/sandbox.ts",
         "aimeat/scripts/sandbox-machines.ts",
         "aimeat/scripts/ui-compare.ts",
         "aimeat/src/services/builder/app-prompt.ts"
       ],
-      "digest": "sha256:b05fec4350e1df82e497c6d8",
+      "digest": "sha256:09a1b85c4a42f3f5f8209297",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -713,12 +713,12 @@
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
-      "aimeat/src/services/node/templates.ts": "720c48b4fbca194e",
-      "aimeat/src/services/app/spec-gate.ts": "b0a76f7baec1c192"
+      "aimeat/src/services/node/templates.ts": "1a52b087a45b1de7",
+      "aimeat/src/services/app/spec-gate.ts": "b414412b238a5b98"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/builder/atelier-prompt.ts": "f22da130ddf9dcb3",
-      "aimeat/src/services/builder/atelier-layers.ts": "97b5f864705f517c",
+      "aimeat/src/services/builder/atelier-prompt.ts": "5006bb9ae1a9d192",
+      "aimeat/src/services/builder/atelier-layers.ts": "eed956574db1cdc3",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "7cca5c1ee7fc64f9",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
@@ -790,7 +790,7 @@
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "70605320b76c2a13",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "bdc50dac9676dad9"
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "8c99708b3d7fede8"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "de90c22e1cf64e0a"
@@ -824,14 +824,14 @@
       "aimeat/src/services/ai/route-plan.ts": "95f735f72eac78b4"
     },
     "node:aimeat-game-apps": {
-      "aimeat/src/data/library-packs/vendored-creative.ts": "7b36a75cea8da2f1",
+      "aimeat/src/data/library-packs/vendored-creative.ts": "d441ba5b6ac9c4d4",
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
     },
     "project:aimeat-app-building": {
       "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
       "aimeat/src/routes/app-templates.ts": "c04b6dda6dd9ed2f",
-      "aimeat/src/services/builder/atelier-prompt.ts": "f22da130ddf9dcb3",
-      "aimeat/src/services/builder/app-prompt.ts": "9d4157a7b44929b6",
+      "aimeat/src/services/builder/atelier-prompt.ts": "5006bb9ae1a9d192",
+      "aimeat/src/services/builder/app-prompt.ts": "785fc0f78cc3040f",
       "aimeat/src/services/app/publish.ts": "5187be36e9d0aed7",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
@@ -850,7 +850,7 @@
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
       "aimeat/scripts/ui-compare.ts": "a9f4b0a0d091a9ee",
-      "aimeat/src/services/builder/app-prompt.ts": "9d4157a7b44929b6"
+      "aimeat/src/services/builder/app-prompt.ts": "785fc0f78cc3040f"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3",
@@ -1033,7 +1033,7 @@
     },
     "node:aimeat-find-my-app": {
       "aimeat/src/mcp/apps.ts": "093f6afaa82a75c1",
-      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "3e6fffbf576765ea",
+      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "82e0985e955951b0",
       "aimeat/src/services/usage/usage-read.ts": "7e2062c63eacffc3",
       "aimeat/public/views/appcat.js": "325750f08208eb54"
     },

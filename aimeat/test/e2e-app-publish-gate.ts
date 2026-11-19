@@ -144,8 +144,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
     await test('GET /v1/prompts/build-app hands out a spec token, and the prompt itself names it', async () => {
         const r = await json('/v1/prompts/build-app');
         assert(r.status === 200, `build-app ${r.status}`);
-        specToken = r.body.data.spec_token;
-        // The retired Classic address serves the Atelier specification since 2026-11-19, and its token.
+        specToken = r.body.data.spec_token; // the retired Classic address serves the Atelier spec and its token (2026-11-19)
         assert(typeof specToken === 'string' && specToken.startsWith('atelier-'),
             `no usable spec_token: ${JSON.stringify(specToken)}`);
         // The plain-text reader never sees the envelope, so the token has to be IN the prompt too.
@@ -211,8 +210,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
         atelierToken = r.body.data.spec_token;
         assert(typeof atelierToken === 'string' && atelierToken.startsWith('atelier-'),
             `the Atelier token must be recognisable as the Atelier one: ${JSON.stringify(atelierToken)}`);
-        // One specification since 2026-11-19: the retired Classic address hands out this same token.
-        assert(atelierToken === specToken, `the retired address and the Atelier route must hand out one token: ${specToken} vs ${atelierToken}`);
+        assert(atelierToken === specToken, `one specification since 2026-11-19, so one token: ${specToken} vs ${atelierToken}`);
         const prompt = r.body.data.prompt as string;
         // The spec is self-contained for its track: it names its shell and its token, and it
         // never sends the builder to the Classic spec.
@@ -292,8 +290,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
     const drift = (r: any) => ((r.body.data.app_hints ?? []) as any[]).filter(h => h.pitfall === 'track-drift');
     const driftName = `gatedrift${Date.now()}.html`;
 
-    // One track since 2026-11-19: a NEW page that is not an Atelier app is warned, whichever token it
-    // carried; an update of an app built on Classic stays quiet (track-drift.ts v2.0.0).
+    // One track since 2026-11-19: a NEW non-Atelier page is warned, an update of a Classic app is quiet (track-drift.ts v2.0.0).
     await test('a NEW app that is not an Atelier app is published, and the hint names the Atelier specification', async () => {
         const r = await publish(o.token, {
             filename: driftName, mime_type: 'text/html', content: b64(app(driftName)),
