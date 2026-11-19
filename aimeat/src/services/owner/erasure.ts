@@ -23,6 +23,11 @@
  * @structure eraseOwner(storage, nodeId, name, config) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name, config);
  * @version-history
+ *   2026-11-19 — Steps site_change_log, moderation and public_activity: the site change log named the
+ *     erased person by the bare account name on their app deletes, which the next holder of the name
+ *     would read as theirs. It names the pseudonym the held app addresses take, which the erasure now
+ *     draws once; flags on the person's content and their appeals go, their reviews name the
+ *     pseudonym; the activity feed drops the person's app events (storage/erased-logs.ts).
  *   2026-11-19 — Step apps removes each app as the owner's delete does (services/app/lifecycle.ts
  *     removeWholeApp, which runs services/app/delete-sweep.ts): other people's grants to the app,
  *     their push devices and AI settings naming it, the internet opening, the scope allowance, the
@@ -166,6 +171,7 @@ import { eraseAppMembership } from '../app/member-erasure.js';
 import { eraseAppDesignSpecsOf } from '../app/design-spec.js';
 import { removeWholeApp } from '../app/lifecycle.js';
 import { holdAppLabelsOfErasedAccount } from '../held-app-labels.js';
+import { erasePublicActivityOf } from '../public-activity.js';
 import type { AimeatConfig } from '../../config.js';
 import { eraseAppPlansOf } from '../app/plan.js';
 import { eraseAppRoadmapsOf } from '../app/roadmap.js';
@@ -263,6 +269,8 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string,
   const agents = await storage.getAgentsByOwner(name);
   const ghii = `${name}@${nodeId}`;
   const deletionLog: string[] = [];
+  // One pseudonym for the held app addresses and the logs that name the person, so they name one party.
+  const logPseudonym = erasedPartyPseudonym();
   const cascade = (): Promise<void> => storage.transaction(async () => {
     // 1. The agents' cached telemetry. Their work is settled inside storage.deleteOwner(), on every
     // door that deletes an account: open work is cancelled and the requester's held morsels go back
@@ -496,8 +504,30 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string,
     // The held addresses of those apps: held for nobody, so the next holder of the released name does
     // not get an erased person's app origin back (services/held-app-labels.ts).
     await step('app_addresses', async () => {
-      const n = await holdAppLabelsOfErasedAccount(storage, name, erasedPartyPseudonym());
+      const n = await holdAppLabelsOfErasedAccount(storage, name, logPseudonym);
       return n ? `app_addresses:${n}` : null;
+    }, deletionLog, storage);
+
+    // The node's logs that name the person, under the pseudonym the held addresses took
+    // (storage/erased-logs.ts): the site change log keeps its lines and names the pseudonym; the
+    // flags on the person's own content go with their appeals, and so do the person's appeals,
+    // while a review the person made names the pseudonym; the public activity feed drops the events
+    // about the person's apps and names the pseudonym where an event that stays named them.
+    // Bell notifications in other people's inboxes are kept: each is the recipient's own copy of a
+    // message they received, as the other side's direct messages are, and expires within 90 days
+    // (services/notify.ts).
+    const identities = [name, ghii, ...agents.map(a => a.gaii)];    await step('site_change_log', async () => {
+      const n = await storage.pseudonymiseSiteChangeLog(name, identities, logPseudonym);
+      return n ? `site_change_log:${n}` : null;
+    }, deletionLog, storage);
+    await step('moderation', async () => {
+      const r = await storage.eraseModerationParty(identities, logPseudonym);
+      const n = r.flagsRemoved + r.appealsRemoved + r.reviewsRenamed;
+      return n ? `moderation:${n}` : null;
+    }, deletionLog, storage);
+    await step('public_activity', async () => {
+      const r = await erasePublicActivityOf(storage, config, name, logPseudonym);
+      return r.removed + r.renamed ? `public_activity:${r.removed + r.renamed}` : null;
     }, deletionLog, storage);
 
     // The people who registered to this person's apps without an account, and what they kept in

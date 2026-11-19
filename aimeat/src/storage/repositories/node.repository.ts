@@ -12,6 +12,8 @@
  *   - extension and cortex-extension/lib-file CRUD
  *
  * @version-history
+ *   v1.6.0 — 2026-11-19 — pseudonymiseSiteChangeLog: an erased account's lines name the erasure's
+ *     pseudonym (storage/erased-logs.ts).
  *   v1.5.0 — 2026-10-09 — getNodeKey reports `sealed` and throws when a sealed row does not open
  *     (secrets audit 2026-10-09, S4a).
  *   v1.4.0 — 2026-10-09 — deleteVerificationNonce answers whether this call removed the row, so a
@@ -82,6 +84,12 @@ export interface NodeRepository {
   deleteRealtimeRoom(id: string): Promise<boolean>;
   addSiteChangeLog(entry: SiteChangeLogEntry): Promise<SiteChangeLogEntry>;
   listSiteChangeLog(limit: number, cursor?: string): Promise<SiteChangeLogEntry[]>;
+  /**
+   * An account erasure: every line whose `changedBy` is one of `identities` names `pseudonym`
+   * instead, and so do the summary forms that name the account `name` (storage/erased-logs.ts).
+   * Returns the lines changed.
+   */
+  pseudonymiseSiteChangeLog(name: string, identities: string[], pseudonym: string): Promise<number>;
   createExtension(record: ExtensionRecord): Promise<ExtensionRecord>;
   getExtension(name: string): Promise<ExtensionRecord | null>;
   /**

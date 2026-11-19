@@ -8,6 +8,8 @@
  * @structure moderationMethods
  * @usage Object.assign(SqliteStorage.prototype, moderationMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-19 — eraseModerationParty: an account erasure removes the flags on the person's
+ *     content with their appeals and the person's appeals, and renames their reviews.
  *   v1.0.0 — 2026-10-05 — createFlag, getFlag, getFlagsByTarget, getFlagByUser, getFlagSummary, updateFlag,
  *     listFlags, deserializeFlag moved here from governance.ts; createAppeal, getAppeal, getAppealByFlagId,
  *     listAppeals, updateAppeal, deserializeAppeal moved here from community.ts so the file mirrors
@@ -15,6 +17,7 @@
  */
 import type { FlagRecord, FlagSummary, AppealRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { moderationTargets } from '../../../erased-logs.js';
 
 export const moderationMethods = {
 
@@ -187,5 +190,29 @@ export const moderationMethods = {
     if (row.reviewNote) record.reviewNote = row.reviewNote as string;
     if (row.reviewedAt) record.reviewedAt = row.reviewedAt as string;
     return record;
+  },
+
+  // An account erasure (../../../erased-logs.ts says what each step is for). The twin is
+  // postgres-kysely/methods/moderation.ts eraseModerationParty.
+  async eraseModerationParty(this: SqliteStorage, identities: string[], pseudonym: string): Promise<{ flagsRemoved: number; appealsRemoved: number; reviewsRenamed: number }> {
+    const { exact, prefixes } = moderationTargets(identities);
+    let flagsRemoved = 0, appealsRemoved = 0, reviewsRenamed = 0;
+    const flagIds = new Set<string>();
+    for (const id of exact) {
+      for (const r of this.db.prepare('SELECT id FROM flags WHERE targetId = ?').all(id) as Array<{ id: string }>) flagIds.add(r.id);
+    }
+    for (const p of prefixes) {
+      for (const r of this.db.prepare("SELECT id FROM flags WHERE targetId LIKE ? ESCAPE '\\'").all(p) as Array<{ id: string }>) flagIds.add(r.id);
+    }
+    for (const flagId of flagIds) {
+      appealsRemoved += this.db.prepare('DELETE FROM appeals WHERE flagId = ?').run(flagId).changes;
+      flagsRemoved += this.db.prepare('DELETE FROM flags WHERE id = ?').run(flagId).changes;
+    }
+    for (const id of identities) {
+      appealsRemoved += this.db.prepare('DELETE FROM appeals WHERE appealedBy = ?').run(id).changes;
+      reviewsRenamed += this.db.prepare('UPDATE appeals SET reviewedBy = ? WHERE reviewedBy = ?').run(pseudonym, id).changes;
+      reviewsRenamed += this.db.prepare('UPDATE flags SET reviewedBy = ? WHERE reviewedBy = ?').run(pseudonym, id).changes;
+    }
+    return { flagsRemoved, appealsRemoved, reviewsRenamed };
   },
 };

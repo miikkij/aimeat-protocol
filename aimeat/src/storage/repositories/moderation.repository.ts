@@ -10,6 +10,7 @@
  *     appeal ops (createAppeal/getAppealByFlagId/...)
  *
  * @version-history
+ *   v1.1.0 — 2026-11-19 — eraseModerationParty: what an account erasure does to flags and appeals.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { FlagRecord, FlagSummary, AppealRecord } from '../interface.js';
@@ -27,4 +28,9 @@ export interface ModerationRepository {
   getAppealByFlagId(flagId: string): Promise<AppealRecord | null>;
   listAppeals(opts?: { status?: string; page?: number; perPage?: number }): Promise<AppealRecord[]>;
   updateAppeal(id: string, updates: Partial<AppealRecord>): Promise<AppealRecord | null>;
+  /**
+   * An account erasure (storage/erased-logs.ts): the flags on the person's own content go with their
+   * appeals, the person's own appeals go, and a review the person made names `pseudonym`.
+   */
+  eraseModerationParty(identities: string[], pseudonym: string): Promise<{ flagsRemoved: number; appealsRemoved: number; reviewsRenamed: number }>;
 }

@@ -7,9 +7,12 @@
  *   against the same tables. Covers flag CRUD + per-target summary aggregation, the appeal ledger, and
  *   the match lifecycle (create/get/list/update + expiry cleanup + per-profile cleanup).
  * @version-history
+ *   v1.1.0 — 2026-11-19 — eraseModerationParty: an account erasure removes the flags on the person's
+ *     content with their appeals and the person's appeals, and renames their reviews.
  *   v1.0.0 — 2026-07-15 — Phase 5: moderation (flags/appeals/matches) on Postgres+Kysely.
  */
-import type { Selectable } from 'kysely';
+import { sql, type Selectable } from 'kysely';
+import { moderationTargets } from '../../../erased-logs.js';
 import type { AppealRecord, FlagRecord, FlagSummary } from '../../../interface.js';
 import type { Appeal, Flag } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -115,5 +118,28 @@ export const moderationMethods = {
     return rows[0] ? toAppeal(rows[0]) : null;
   },
 
-
+  // An account erasure (../../../erased-logs.ts says what each step is for). The twin is
+  // sqlite/methods/moderation.ts eraseModerationParty.
+  async eraseModerationParty(this: PostgresKyselyStorage, identities: string[], pseudonym: string): Promise<{ flagsRemoved: number; appealsRemoved: number; reviewsRenamed: number }> {
+    const { exact, prefixes } = moderationTargets(identities);
+    let flagsRemoved = 0, appealsRemoved = 0, reviewsRenamed = 0;
+    const flagIds = new Set<string>();
+    if (exact.length) {
+      for (const r of await this.db.selectFrom('Flag').select('id').where('targetId', 'in', exact).execute()) flagIds.add(r.id);
+    }
+    for (const p of prefixes) {
+      for (const r of await sql<{ id: string }>`SELECT id FROM "Flag" WHERE "targetId" LIKE ${p} ESCAPE '\\'`.execute(this.db).then(x => x.rows)) flagIds.add(r.id);
+    }
+    if (flagIds.size) {
+      const ids = [...flagIds];
+      appealsRemoved += Number((await this.db.deleteFrom('Appeal').where('flagId', 'in', ids).executeTakeFirst()).numDeletedRows ?? 0);
+      flagsRemoved += Number((await this.db.deleteFrom('Flag').where('id', 'in', ids).executeTakeFirst()).numDeletedRows ?? 0);
+    }
+    if (identities.length) {
+      appealsRemoved += Number((await this.db.deleteFrom('Appeal').where('appealedBy', 'in', identities).executeTakeFirst()).numDeletedRows ?? 0);
+      reviewsRenamed += Number((await this.db.updateTable('Appeal').set({ reviewedBy: pseudonym }).where('reviewedBy', 'in', identities).executeTakeFirst()).numUpdatedRows ?? 0);
+      reviewsRenamed += Number((await this.db.updateTable('Flag').set({ reviewedBy: pseudonym }).where('reviewedBy', 'in', identities).executeTakeFirst()).numUpdatedRows ?? 0);
+    }
+    return { flagsRemoved, appealsRemoved, reviewsRenamed };
+  },
 };

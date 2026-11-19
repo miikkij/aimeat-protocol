@@ -11,6 +11,7 @@
  *   - nodeInfraMethods: push-subscription upsert+CRUD, trusted-issuer create/list, nonce CRUD + expiry
  *     sweep, realtime-room create/get/update/delete, site-change-log append + cursor-paginated list
  * @version-history
+ *   v1.4.0 — 2026-11-19 — pseudonymiseSiteChangeLog: an erased account's lines name the erasure's pseudonym.
  *   v1.3.1 — 2026-10-23 — The freshest push subscription read takes LIMIT 1 (check:unbounded-lists).
  *   v1.3.0 — 2026-10-09 — deleteVerificationNonce returns whether it removed the row.
  *   v1.2.0 — 2026-09-09 — getTrustedIssuer, getTrustedIssuerByUrl, deleteTrustedIssuer and
@@ -26,6 +27,7 @@ import type {
 import type { PushSubscription, RealtimeRoom, SiteChangeLog, TrustedIssuer, VerificationNonce } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
+import { siteChangeLogNamings } from '../../../erased-logs.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 
@@ -190,5 +192,19 @@ export const nodeInfraMethods = {
       if (idx >= 0) entries = entries.slice(idx + 1);
     }
     return entries.slice(0, limit);
+  },
+
+  // An account erasure (../../../erased-logs.ts). The twin is sqlite/methods/node-infra.ts.
+  async pseudonymiseSiteChangeLog(this: PostgresKyselyStorage, name: string, identities: string[], pseudonym: string): Promise<number> {
+    const changed = new Set<string>();
+    if (identities.length) {
+      const rows = await this.db.updateTable('SiteChangeLog').set({ changedBy: pseudonym }).where('changedBy', 'in', identities).returning('id').execute();
+      for (const r of rows) changed.add(r.id);
+    }
+    for (const { from, to } of siteChangeLogNamings(name, pseudonym)) {
+      const r = await sql<{ id: string }>`UPDATE "SiteChangeLog" SET summary = replace(summary, ${from}, ${to}) WHERE strpos(summary, ${from}) > 0 RETURNING id`.execute(this.db);
+      for (const row of r.rows) changed.add(row.id);
+    }
+    return changed.size;
   },
 };

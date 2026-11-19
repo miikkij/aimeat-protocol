@@ -8,6 +8,7 @@
  * @structure nodeInfraMethods
  * @usage Object.assign(SqliteStorage.prototype, nodeInfraMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-11-19 — pseudonymiseSiteChangeLog: an erased account's lines name the erasure's pseudonym.
  *   v1.1.0 — 2026-10-09 — deleteVerificationNonce returns whether it removed the row.
  *   v1.0.0 — 2026-10-05 — 18 methods (createPushSubscription, markPushSubscriptionDelivered,
  *     getPushSubscription, …) moved here from community.ts; addSiteChangeLog, listSiteChangeLog moved here
@@ -19,6 +20,7 @@ import type {
   SiteChangeLogEntry,
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { siteChangeLogNamings } from '../../../erased-logs.js';
 
 /** One push_subscriptions row → the record. Shared by the three readers so they cannot drift. */
 function toPushSubscription(row: Record<string, unknown>): PushSubscriptionRecord {
@@ -252,5 +254,19 @@ export const nodeInfraMethods = {
       if (idx >= 0) entries = entries.slice(idx + 1);
     }
     return entries.slice(0, limit);
+  },
+
+  // An account erasure (../../../erased-logs.ts). The twin is postgres-kysely/methods/node-infra.ts.
+  async pseudonymiseSiteChangeLog(this: SqliteStorage, name: string, identities: string[], pseudonym: string): Promise<number> {
+    const changed = new Set<string>();
+    for (const id of identities) {
+      for (const r of this.db.prepare('SELECT id FROM site_changelog WHERE changedBy = ?').all(id) as Array<{ id: string }>) changed.add(r.id);
+      this.db.prepare('UPDATE site_changelog SET changedBy = ? WHERE changedBy = ?').run(pseudonym, id);
+    }
+    for (const { from, to } of siteChangeLogNamings(name, pseudonym)) {
+      for (const r of this.db.prepare('SELECT id FROM site_changelog WHERE instr(summary, ?) > 0').all(from) as Array<{ id: string }>) changed.add(r.id);
+      this.db.prepare('UPDATE site_changelog SET summary = replace(summary, ?, ?) WHERE instr(summary, ?) > 0').run(from, to, from);
+    }
+    return changed.size;
   },
 };

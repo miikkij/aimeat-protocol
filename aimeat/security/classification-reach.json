@@ -2812,9 +2812,9 @@
     },
     "src/services/public-activity.ts": {
       "reads": {
-        "listAllMemory": 2
+        "listAllMemory": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's own public activity events."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's own public activity events. 2026-11-19: the third read is erasePublicActivityOf, which reads the same public events at an account erasure to remove or rename the ones naming the person; nothing is served to anyone."
     },
     "src/services/publish-requests/apply-company.ts": {
       "reads": {

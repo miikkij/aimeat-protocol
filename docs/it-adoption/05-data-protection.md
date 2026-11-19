@@ -119,6 +119,8 @@ flowchart LR
 
 Each app the person owns is removed the way the person's own delete of that app removes it: every version, and what only the app used, also outside the person's own records (other people's grants to the app are revoked, their push devices on its origin and their AI settings naming it are removed, and so are the app's internet opening and its permission allowance). The app's own web address is held for nobody, so the next account with the released name does not get it back; the daily sweep releases it after `AIMEAT_APP_HELD_LABEL_DAYS`. The app's design spec, roadmap and plan are deleted for good, not moved to the bin (`aimeat/src/services/app/delete-sweep.ts`, `aimeat/src/services/held-app-labels.ts`).
 
+The node's logs that name the person keep their entries under the same pseudonym the held app addresses take: the site change log (who changed what, and the account an app delete or a fork was about), and a moderation decision the person made. The flags on the person's own content and their appeals are deleted, and so are the public activity feed's events about the person's apps; an event that stays names the pseudonym. Notifications in other people's inboxes are kept as the recipients received them, because each is that person's own copy, and they expire within 90 days (`aimeat/src/storage/erased-logs.ts`, `aimeat/src/services/public-activity.ts`).
+
 Sources: `aimeat/src/services/owner/erasure.ts`, `aimeat/src/storage/erased-account-records.ts`, `aimeat/src/storage/providers/postgres-kysely/methods/owner-cascade.ts`, `aimeat/src/storage/providers/postgres-kysely/methods/identity-erasure.ts`.
 
 ## Where the data is, and what leaves

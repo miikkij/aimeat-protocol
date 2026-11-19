@@ -28,6 +28,8 @@
  *   v1.0.0 — 2026-06-16 — Initial: public landing activity feed (events + SSE).
  *   v1.0.2 — 2026-10-20 — The header states the test a caller applies before it emits, after two
  *     callers read the contract as a flag edge (secaudit 2026-10). No code change.
+ *   v1.1.0 — 2026-11-19 — erasePublicActivityOf: an account erasure removes the events about the
+ *     person's apps and names the erasure's pseudonym where an event that stays named the person.
  *   v1.0.1 — 2026-09-26 — nameSegment takes an owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';
@@ -37,6 +39,7 @@ import { emitPublicActivity } from './event-bus.js';
 import type { PublicActivityEvent } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import { updateMemoryRecord, UNCHANGED } from './record-cas.js';
 
 export type PublicActivityCategory = PublicActivityEvent['category'];
 
@@ -148,6 +151,53 @@ export async function readPublicActivity(
     .filter(v => v && v.at && v.category)
     .sort((a, b) => String(b.at).localeCompare(String(a.at)))
     .slice(0, Math.min(opts.limit ?? 50, 200));
+}
+
+/**
+ * An account erasure (services/owner/erasure.ts). The feed is public and names an account by its
+ * bare name, which is released for reuse, so after the erasure no event names the person:
+ *   - an event about one of the person's apps goes: the app went with the account, and its link
+ *     (`/v1/apps/<name>/<file>`) would open the next holder's app of the same file name;
+ *   - an event the person made about something that stays (an organism, a workspace, a knowledge
+ *     package) keeps standing and names `pseudonym` as its actor;
+ *   - another person's fork of the person's app names `pseudonym` as the source owner.
+ * An agent's event names the agent alone (nameSegment), never its owner, and is left as it is
+ * unless it is about one of the person's apps. Returns the events removed and renamed.
+ */
+export async function erasePublicActivityOf(
+  storage: Storage, config: AimeatConfig, name: string, pseudonym: string,
+): Promise<{ removed: number; renamed: number }> {
+  const systemGhii = systemGhiiFor(config.nodeId);
+  const { items } = await storage.listAllMemory({ prefix: KEY_PREFIX, ownerPrefix: systemGhii, visibility: 'public', limit: 1000 });
+  const appLink = `/v1/apps/${encodeURIComponent(name)}/`;
+  const forkedFrom = ` forked from ${name}/`;
+  let removed = 0, renamed = 0;
+  for (const m of items) {
+    if (!m.key.startsWith(KEY_PREFIX) || m.ownerGaii !== systemGhii) continue;
+    const evt = m.value as Partial<PublicActivityEvent> | null;
+    if (!evt || typeof evt !== 'object') continue;
+    if (typeof evt.link === 'string' && evt.link.startsWith(appLink)) {
+      await storage.deleteMemory(systemGhii, m.key);
+      removed++;
+      continue;
+    }
+    const names = evt.actor === name || (typeof evt.summary === 'string' && evt.summary.includes(forkedFrom));
+    if (!names) continue;
+    // On the version read, so a prune or a second erasure at the same moment is not overwritten.
+    const written = await updateMemoryRecord(storage, systemGhii, m.key, (rec) => {
+      const cur = rec?.value as Partial<PublicActivityEvent> | undefined;
+      if (!cur) return UNCHANGED;
+      return {
+        value: {
+          ...cur,
+          ...(cur.actor === name ? { actor: pseudonym } : {}),
+          ...(typeof cur.summary === 'string' ? { summary: cur.summary.split(forkedFrom).join(` forked from ${pseudonym}/`) } : {}),
+        },
+      };
+    });
+    if (written) renamed++;
+  }
+  return { removed, renamed };
 }
 
 /** Exposed so the existing public ticker/stats can exclude these synthetic entries. */
