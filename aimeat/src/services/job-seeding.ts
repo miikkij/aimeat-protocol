@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-11-19 — Seed core:kyc-lists (05:10) and core:kyc-daily (06:20): customer due diligence.
  *   2026-11-14 — Seed core:team-weekly (Fridays 14:05): the team's week to its leads.
  *   2026-11-14 — Seed core:help-sweep (hourly at :23) and core:help-report (daily 04:30): Ask someone who knows.
  *   2026-11-04 — Seed core:outbox-sweep (every minute): stored webhook and mail retries resumed (codebase analysis 2026-11-03, HA 1.5).
@@ -71,6 +72,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     // Decision records past AIMEAT_DECIDE_RETENTION_DAYS (TARGET-080). 03:20, after the two above.
     { id: 'core:ai-decision-prune', name: 'AI Decision Prune', coreHandler: 'ai-decision-prune', cron: '20 3 * * *' },
     { id: 'core:designbook-aging', name: 'Design Book Aging', coreHandler: 'designbook-aging', cron: '0 5 * * *' },
+    // Customer due diligence (services/kyc/jobs.ts): the sanctions lists at 05:10, reviews and purge at 06:20.
+    { id: 'core:kyc-lists', name: 'KYC Sanctions Lists', coreHandler: 'kyc-lists', cron: '10 5 * * *' },
+    { id: 'core:kyc-daily', name: 'KYC Reviews and Retention', coreHandler: 'kyc-daily', cron: '20 6 * * *' },
     // Daily at 04:17; the handler refreshes only when AIMEAT_AI_CATALOG_REFRESH says it is due.
     { id: 'core:ai-catalog-refresh', name: 'AI Model Catalogue Refresh', coreHandler: 'ai-catalog-refresh', cron: '17 4 * * *' },
     // Installed packages brought up to what their source node serves now (package-upstream-refresh.ts).

@@ -12,6 +12,8 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   2026-11-19 — The operator's confirmation of a person's level is also kept in their verification
+ *     history, under the operator's resolved identity (resolveIdentity), not the bare `sub`.
  *   2026-11-10 — The operator's test push uses the same calm words as /v1/push/test, in their language.
  *   v1.7.0 — 2026-11-07 — GET /v1/admin/csm carries each CSM's visibility and version (the operator sees
  *     every CSM whatever its visibility), and DELETE /v1/admin/csm/:name goes through
@@ -61,6 +63,7 @@ import { recordOperatorAction } from '../../services/operator/access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { deleteCsmAs } from '../../services/csm-service.js';
 import { callerOf } from '../../middleware/caller.js';
+import { recordVerification } from '../../services/account/verification-history.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -153,6 +156,7 @@ export function adminFeaturesRouter(
         }
 
         await identityTrail(req, ghii, 'verification-level', { level: String(verificationLevel) });
+        await recordVerification(storage, ghii, { level: verificationLevel as 0 | 1 | 2, method: 'operator', by: resolveIdentity(req.auth!, config.nodeId) });
         res.json(success(config.nodeId, { ghii_user: adminGhiiRow(updated) }));
         emitChange('features');
     }));

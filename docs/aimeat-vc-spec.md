@@ -89,5 +89,5 @@ operator-specific legal assessment.
 ## Limits
 
 Credential revocation lists, selective-disclosure issuance and Data Integrity proofs
-are not implemented here. EUDIW verification is separately blocked at startup:
-see [the identity wallet status](aimeat-eudiw-integration.md).
+are not implemented here. EUDIW verification is a separate capability, off by default
+and not yet tested with a production wallet: see [the identity wallet status](aimeat-eudiw-integration.md).

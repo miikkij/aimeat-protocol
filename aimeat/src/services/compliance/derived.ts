@@ -14,7 +14,7 @@
  *     marked `unstated` that others can read is named, because silence is not a considered no.
  *   - The content people keep in their own account, through apps only they see: one node record.
  *   - An organism's register (C1.4): its member list is a personal data register on every organism.
- *     Its workspaces are listed as containers for the person or their AI to sort into registers.
+ *     An anti-money-laundering obliged organism also keeps its customer due diligence. Its workspaces are listed as containers for the person or their AI to sort into registers.
  *   - The processors (C4.1): the AI providers whose prompts leave this machine, the mail server and
  *     the hosting, from the configuration, merged with what the operator wrote about each.
  *   - The transfers (C4.2): every processor whose country is outside the EU and the EEA, or unknown.
@@ -23,6 +23,8 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.6.0 — 2026-11-19 — An organism that declared itself an anti-money-laundering obliged entity
+ *     gets the draft register `org-kyc` of its customer due diligence (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  *   v1.5.3 — 2026-11-05 — Moved unchanged from src/services/compliance-derived.ts to src/services/compliance/derived.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.5.2 — 2026-11-01 — The note also names the model that reads pictures, when it is another one.
  *   v1.5.1 — 2026-11-01 — A region row's note names the node's default model (Jouni, 2026-11-01 02.54).
@@ -61,6 +63,7 @@ import { appAiSignals } from './app-signals.js';
 import { appReach, type AppReachReading } from './app-reach.js';
 import { classifyUseCase, type ComplianceRiskVerdict } from './register.js';
 import { COMPLIANCE_FRAMEWORKS } from '../../data/compliance-frameworks.js';
+import { readDoc } from './docs.js';
 import type { ComplianceFrameworkAnswers, ComplianceProcessor, ComplianceRegister } from './docs-schemas.js';
 import type { DataMapRow } from '../data-map/data-map-types.js';
 
@@ -193,10 +196,53 @@ export async function appRegisterDraft(
   };
 }
 
-/** C1.4: an organism's member register, and its workspaces as containers to sort. */
-export async function organismRegisterDraft(storage: Storage, organismId: string): Promise<ComplianceRegister[]> {
+/**
+ * The record of processing every anti-money-laundering obliged organism keeps for its customer due
+ * diligence (services/kyc/; AMLR art. 19–28, 77). The law is its legal basis, so a person reviews it
+ * rather than decides it.
+ */
+function kycRegisterDraft(organismId: string): ComplianceRegister {
+  return {
+    id: 'org-kyc', title: 'Customer due diligence (anti-money-laundering)', type: 'personal',
+    // The schema has no purpose value for a legal obligation; the customers are the subjects.
+    purpose: 'customer', role: 'controller',
+    purposeText: 'Knowing the customer as the anti-money-laundering regulation requires: identifying customers and their beneficial owners, screening them against sanctions, rating their risk and reporting suspicions (Regulation (EU) 2024/1624, art. 19–28, 69).',
+    legalBasis: ['legal-obligation'],
+    subjects: ['customers', 'beneficial owners of customers', 'representatives'],
+    dataCategories: [
+      'name, birth date, nationality, address',
+      'identity document or bank identification (method, level, time)',
+      'beneficial ownership',
+      'purpose of the relationship and source of funds',
+      'PEP status',
+      'sanctions screening results',
+      'risk rating and its grounds',
+      'suspicions and reports to the FIU (officers only)',
+    ],
+    retentionMonths: 60,
+    retentionText: 'Five years after the relationship ends (AMLR art. 77), longer only with the compliance officer\'s recorded ground (at most ten years); then purged by the server.',
+    source: 'The customer, public registers, the EU and UN sanctions lists.',
+    recipients: ['Financial Intelligence Unit (Rahanpesun selvittelykeskus), when a suspicion is reported'],
+    containers: [{ kind: 'organism', organism_id: organismId }], reviewEveryMonths: 12,
+    answerSources: src(['type', 'purpose', 'purposeText', 'role', 'legalBasis', 'subjects', 'dataCategories', 'retentionMonths', 'retentionText', 'source', 'recipients', 'containers']),
+  };
+}
+
+/**
+ * C1.4: an organism's member register, and its workspaces as containers to sort. An organism that
+ * declared itself an anti-money-laundering obliged entity (a `declaration` in its compliance document
+ * `aml`) also gets its customer due diligence register. `obliged` says so when the caller already
+ * knows; otherwise, given `nodeId`, the organism's `aml` document is read. With neither, the organism
+ * counts as not obliged, as before.
+ */
+export async function organismRegisterDraft(
+  storage: Storage, organismId: string, opts: { obliged?: boolean; nodeId?: string } = {},
+): Promise<ComplianceRegister[]> {
   const organism = await storage.getOrganism(organismId);
   if (!organism) return [];
+  const obliged = opts.obliged ?? (opts.nodeId
+    ? (await readDoc(storage, opts.nodeId, 'aml', { kind: 'organism', organismId })).items.some(i => i.type === 'declaration')
+    : false);
   return [{
     id: 'org-members', title: `Members of ${organism.name}`.slice(0, 300), type: 'personal', purpose: 'member', role: 'controller',
     legalBasis: ['contract'], subjects: ['members', 'invited people'],
@@ -204,7 +250,7 @@ export async function organismRegisterDraft(storage: Storage, organismId: string
     retentionText: 'While the membership lasts, and until the organism is deleted.',
     containers: [{ kind: 'organism', organism_id: organismId }], reviewEveryMonths: 12,
     answerSources: src(['type', 'purpose', 'role', 'subjects', 'dataCategories', 'retentionText', 'containers']),
-  }];
+  }, ...(obliged ? [kycRegisterDraft(organismId)] : [])];
 }
 
 /** The host of a provider's base URL, or '' when it has none or it does not parse. */

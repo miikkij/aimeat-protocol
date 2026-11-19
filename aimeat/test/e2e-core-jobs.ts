@@ -45,6 +45,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-core-jobs.ts
  * @version-history
+ *   2026-11-19 -- Comment: EUDIW no longer refuses to boot; FTN stays the flow this suite turns on.
  *   2026-11-15 -- Audit M121: an archive prune before 2019 deletes none of today's archived rows.
  *   2026-10-25 -- core:held-label-release is seeded and fires (app-label-recycled-after-delete).
  *   2026-10-25 -- core:mcp-client-cleanup is seeded, fires, and keeps a registration made today
@@ -222,9 +223,8 @@ async function startNode(): Promise<void> {
             // side effect, so the job no-ops on a default node however hard a test fires it.
             AIMEAT_INACTIVITY_NUDGE: 'true',
             // core:nonce-cleanup was seeded only with a wallet-verification flow on until 2026-10-09;
-            // it is seeded on every node now. FTN stays on here for the verification doors it opens,
-            // and it is FTN and not EUDIW because src/config/eudiw-guard.ts refuses to BOOT with
-            // AIMEAT_EUDIW_ENABLED=true (holder binding is unfinished).
+            // it is seeded on every node now. FTN stays on here for the verification routes it opens;
+            // EUDIW is not needed, and its request route opens no round without a trusted issuer.
             AIMEAT_FTN_ENABLED: 'true',
             // Outbound connections, for the one door that mints a verification nonce without a live
             // identity provider behind it. No server is needed: only the authorize URL is built.

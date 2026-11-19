@@ -9,6 +9,8 @@
  * @usage html`<${PageSection} id="sec-files" num="02" title="Files" count=${12} doors=${html`<button class="og-door">Upload</button>`}>…<//>`
  *        html`<${PageSection} plain first=${!canEdit}>…<//>` (a section with no headline: the rule on top and the body)
  * @version-history
+ *   2026-11-19 — An empty count ("") says no ": " either, so a screen reader does not read "Risk
+ *     assessment:" with nothing after it; nothing changes on the screen.
  *   2026-11-01 — `step`: one numbered step of a procedure on the page, the number in the ink square
  *     before the bold title, the body under it (the share link page, board Vastaanottaja; WP9b); additive.
  *   2026-10-18 — A visually hidden ": " between the headline and its count, so a screen reader says
@@ -111,7 +113,7 @@ export function PageSection({ id, num, title, count, doors, first, plain, band, 
   return html`
     <section class=${`og-sec${first ? ' og-sec--first' : ''}${group ? ' og-sec--group' : ''}${ends ? ' og-sec--ends' : ''}`} id=${id}>
       <div class=${band || group ? 'og-sec-h og-sec-h--band' : 'og-sec-h'}>
-        <h2 class="poster-section-title">${title}${count !== null && count !== undefined ? html`<small>${saidApart()}${count}</small>` : html`<small>${num}</small>`}</h2>
+        <h2 class="poster-section-title">${title}${count !== null && count !== undefined ? html`<small>${count !== '' ? saidApart() : null}${count}</small>` : html`<small>${num}</small>`}</h2>
         ${doors ? html`<div class="og-doors">${doors}</div>` : null}
       </div>
       ${children}

@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   2026-11-19 — The EUDIW boot refusal (assertEudiwNotHalfBuilt) is no longer called: holder binding, nonce and audience checks exist (config/eudiw-guard.ts).
  *   2026-11-14 — helpDefaults(): the settings of Ask someone who knows (config/help.ts, AIMEAT_HELP_*).
  *   2026-11-08 — memoryMaxArchivedKeysPerAgent (AIMEAT_MEMORY_MAX_ARCHIVED_KEYS, default 10000): archived memory keys get a ceiling of their own (secaudit2026nov08b round 15b).
  *   v1.40.0 — 2026-11-07 — microservicesCentralUrl (AIMEAT_MSC_CENTRAL_URL, default none): a Microservices Central the app-building guidance names (services/appdev/microservices.ts).
@@ -160,7 +161,6 @@ import { defaultSecurityProfile } from './config/private-host.js';
 // Moved to config/posture.ts when this file hit the line limit. Re-exported so the dozen
 // modules that import it from here keep working; the move was not meant to be visible.
 export { securityPostureWarnings } from './config/posture.js';
-import { assertEudiwNotHalfBuilt } from './config/eudiw-guard.js';
 import { applyStartSettings, startSettingFallbacks, type StartSettingProblem } from './config/start-check.js';
 import { consulDefaults } from './config/consul.js';
 
@@ -221,10 +221,6 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   if (!['full', 'relay', 'mirror', 'personal'].includes(nodeType)) {
     throw new Error(`Invalid AIMEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', 'mirror', or 'personal'.`);
   }
-  // A flag whose feature is half built refuses rather than warns. The message is the specification
-  // of what has to be true before the guard is deleted — see src/config/eudiw-guard.ts.
-  assertEudiwNotHalfBuilt();
-
   const port = parseInt(process.env.AIMEAT_PORT ?? '40050', 10);
 
   // Rate limits — parse individual values, per-endpoint falls back to global

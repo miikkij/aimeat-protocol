@@ -1,6 +1,6 @@
 # 07 Security
 
-> Checked against AIMEAT node 4.3.1 (commit f46ea8b74) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit dd04ead96) on 2026-11-19. Maintained with the code: see the README for how.
 
 This page is for the security officer and the architect who must approve AIMEAT. It says how the node separates principals, which settings are safe as shipped and which are not, how sign-in, input, CORS, secrets and dependencies are handled, how to report a vulnerability, and what security work has been done. The live state of one node is on its admin Security page; this page says what to look for there. Threats and their residual risk are in [08 Threat model](08-threat-model.md); the production checklist is in [09 Hardening guide](09-hardening-guide.md).
 
@@ -206,7 +206,7 @@ What the repository records, without numbers it does not state:
 - Encryption at rest covers stored secrets, not the content of records and files. Disk or database encryption for content is the operator's job.
 - The node does not terminate TLS; the reverse proxy must.
 - The comparison of request bodies with `openapi.yaml` checks only a caller that is signed in, refuses nothing on the exempt routes of `aimeat/src/data/openapi-body-modes.ts`, and refuses nothing at all while `AIMEAT_REQUEST_BODY_CHECK` is `observe`. On those, writing routes without a schema of their own (listed in `aimeat/security/write-validation-baseline.json`) still accept a body the contract would not.
-- EUDIW verification is blocked at startup until holder binding and replay defences exist ([Threat model](../security/threat-model.md)).
+- EUDIW verification is off by default (`AIMEAT_EUDIW_ENABLED`). When it is on, the node accepts a wallet presentation only with a Key Binding JWT signed by the key named in the credential (`cnf.jwk`), the nonce of the node's own request, the node's verifier client id as audience, and disclosures the issuer signed; each request round and nonce is accepted once. The issuer's signature is checked with an asymmetric algorithm only, the one the trusted issuer key names when it names one; a token cannot choose HMAC or `none` for itself. A node with no trusted EUDIW issuer opens no wallet request. No test has run against a production EU wallet ([EUDIW status](../aimeat-eudiw-integration.md), `aimeat/src/services/sd-jwt.ts`, `aimeat/src/services/eudiw.ts`).
 - The audit reports with exploit detail are not public, so an outside reviewer can verify the fixes only through the tests and the code.
 - No commissioned outside penetration test is recorded. An adopting organisation's own security team has tested its production node; the organisation is not named and its report is not published ([verification matrix](../security/verification-matrix.md#what-the-probe-sessions-established)).
 

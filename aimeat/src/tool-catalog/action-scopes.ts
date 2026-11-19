@@ -17,6 +17,10 @@
  * @version-history
  *   2026-11-19 — aimeat_calibrator: its reads need memory:read-as-owner (the tool's own word), its
  *     changes memory:write-as-owner as well (definitions/calibrator.ts CALIBRATOR_ACTIONS).
+ *   2026-11-19 — aimeat_kyc_settings: risk_assessment and dpia_draft need compliance:read (GET routes), from
+ *     the same table.
+ *   2026-11-19 — aimeat_kyc_customer and aimeat_kyc_settings: their reads need compliance:read, the rest
+ *     compliance:write, as routes/kyc/routes.ts asks (definitions/kyc.ts KYC_CUSTOMER_ACTIONS, KYC_SETTINGS_ACTIONS).
  *   2026-11-07 — aimeat_receiver: its reads and propose need receivers:read, the rest receivers:manage
  *     (definitions/receivers.ts RECEIVER_ACTIONS).
  *   2026-11-07 — aimeat_csm: its reads need none, its writes csm:write (definitions/csm.ts CSM_ACTIONS).
@@ -27,6 +31,7 @@ import { APP_MANAGE_ACTIONS } from './definitions/app-manage.js';
 import { CSM_ACTIONS } from './definitions/csm.js';
 import { RECEIVER_ACTIONS } from './definitions/receivers.js';
 import { CALIBRATOR_ACTIONS } from './definitions/calibrator.js';
+import { KYC_CUSTOMER_ACTIONS, KYC_SETTINGS_ACTIONS } from './definitions/kyc.js';
 
 /** tool → action → permission word (null: the action needs none). Built from each tool's own table. */
 export const TOOL_ACTION_SCOPES: Record<string, Record<string, string | null>> = {
@@ -34,6 +39,8 @@ export const TOOL_ACTION_SCOPES: Record<string, Record<string, string | null>> =
     aimeat_csm: Object.fromEntries(Object.entries(CSM_ACTIONS).map(([a, spec]) => [a, spec.scope])),
     aimeat_receiver: Object.fromEntries(Object.entries(RECEIVER_ACTIONS).map(([a, spec]) => [a, spec.scope])),
     aimeat_calibrator: Object.fromEntries(Object.entries(CALIBRATOR_ACTIONS).map(([a, spec]) => [a, spec.scope])),
+    aimeat_kyc_customer: { ...KYC_CUSTOMER_ACTIONS },
+    aimeat_kyc_settings: { ...KYC_SETTINGS_ACTIONS },
 };
 
 /** The word an action needs; null when it needs none or the tool/action is not in the table. */

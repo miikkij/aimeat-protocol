@@ -14,6 +14,7 @@
  * @version-history
  *   2026-11-19 — auth.app_origin_sign_in_refuse no longer says to turn it on once the log is quiet:
  *     the default stays off, because the SDK's sign-in window signs in from the app's own address.
+ *   2026-11-19 — eudiw.enabled takes true or false: the boot and runtime refusals went with holder binding, nonce and audience checks (config/eudiw-guard.ts).
  *   2026-11-15 — The three login tarpit limits say "the node" and sso.enabled says "endpoints", not door.
  *   2026-11-15 — site.front_page calls "demo" the static demo page, not the static showroom.
  *   2026-11-15 — security.request_body_check says a body is refused after the route's own sign-in,
@@ -361,7 +362,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'vapidPrivateKey', dotPath: 'push.vapid_private_key', envVar: 'AIMEAT_VAPID_PRIVATE_KEY', type: 'string', validate: () => true, immutable: true, description: 'VAPID private key (secret)', adminDisplay: 'configured' },
 
   // ── EUDIW / Identity (Phase 3.3, mutable) ──
-  { key: 'eudiwEnabled', dotPath: 'eudiw.enabled', envVar: 'AIMEAT_EUDIW_ENABLED', type: 'boolean', validate: eudiwSettingAllowed, refusal: EUDIW_SETTING_REFUSAL, immutable: false, description: 'EUDIW identity verification. Cannot be switched on in this release: the node refuses to start with it on, and a change here to on is refused (config-eudiw-guard.ts)' },
+  { key: 'eudiwEnabled', dotPath: 'eudiw.enabled', envVar: 'AIMEAT_EUDIW_ENABLED', type: 'boolean', validate: eudiwSettingAllowed, refusal: EUDIW_SETTING_REFUSAL, immutable: false, description: 'EUDIW identity verification (OpenID4VP, SD-JWT VC with holder binding, nonce and audience checks)' },
   { key: 'ftnEnabled', dotPath: 'eudiw.ftn_enabled', envVar: 'AIMEAT_FTN_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Finnish Trust Network enabled' },
   ...DOCSIGN_CONFIG_FIELDS,
 

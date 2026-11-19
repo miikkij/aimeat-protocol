@@ -167,11 +167,11 @@
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:d4b83b04dfb87f4c68cab403"
+      "digest": "sha256:a23319625bd108691e8090a4"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-11-13",
@@ -451,7 +451,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:b4e48786738e20e090257d7c",
+      "digest": "sha256:4983cfbb6fac8871d58b9b0f",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -476,7 +476,7 @@
       "digest": "sha256:ef2c848d589fa64e6d6bd95e"
     },
     "node:aimeat-bookkeeping": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/routes/finance.ts",
         "aimeat/src/routes/finance-ledger.ts",
@@ -484,7 +484,7 @@
         "aimeat/src/services/finance/fiscal-years.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:43163fd060f6cd09be202062",
+      "digest": "sha256:6f55132982c763031c7c2fc9",
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
@@ -631,7 +631,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:0d8111e25e1a4e30ac3fe790",
+      "digest": "sha256:0e9afe718f3942fb05f1e6e0",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -648,7 +648,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:0d8111e25e1a4e30ac3fe790",
+      "digest": "sha256:0e9afe718f3942fb05f1e6e0",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -701,7 +701,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "2a088f6543fe6834"
+      "aimeat/src/services/ai/completion.ts": "f05cc450cdfe3b80"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "6f921f29104aea7d",
@@ -940,7 +940,7 @@
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "2df6f6444c486365",
       "aimeat/src/routes/memory/key.ts": "68aa87147c323b2f",
-      "aimeat/src/services/memory/bin.ts": "99a904bb4e2ce94d",
+      "aimeat/src/services/memory/bin.ts": "073bd69ddaab0c80",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
       "aimeat/src/routes/owners/export.ts": "c7913eda009f7f9a",
       "aimeat/src/services/owner/erasure.ts": "b0edd04ccd691275",
@@ -962,7 +962,7 @@
     },
     "node:aimeat-bookkeeping": {
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
-      "aimeat/src/routes/finance-ledger.ts": "92a2df61c5f84666",
+      "aimeat/src/routes/finance-ledger.ts": "d0242a27e002469d",
       "aimeat/src/services/finance/invoice-service.ts": "1551deaafe4f051c",
       "aimeat/src/services/finance/fiscal-years.ts": "5e6ee26e0883809b",
       "aimeat/src/routes/odata.ts": "adb0ec05fc647d8f"
@@ -1046,14 +1046,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "d0da5c6aa95d06ef"
+      "aimeat/test/run-e2e-ci.ts": "687d9e50f846852d"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "d0da5c6aa95d06ef"
+      "aimeat/test/run-e2e-ci.ts": "687d9e50f846852d"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"

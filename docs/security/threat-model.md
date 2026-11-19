@@ -38,8 +38,10 @@ owner's records.
 
 ## Current limitations
 
-EUDIW verification is blocked at startup until holder binding and replay defenses
-are implemented. See [its status](../aimeat-eudiw-integration.md).
+EUDIW verification is off by default. When on, it requires holder binding (a Key Binding
+JWT signed by the credential's `cnf.jwk`), the nonce and audience of the node's own request,
+and accepts each request round once. It is not yet tested with a production wallet. See
+[its status](../aimeat-eudiw-integration.md).
 
 [Known gaps](../known_gaps.md) records developer-approved deferred work.
 Historical measurements in the verification matrix apply to their stated date and

@@ -123,7 +123,7 @@ The dot path's first segment is the group. The configuration schema lists the cu
 | `federation` | Peering policy, relay hops, heartbeats, depeering grace, Web Bot Auth signing |
 | `connections` | Outbound accounts (Google, Microsoft) an owner can attach |
 | `email` | SMTP and whether address confirmation is required |
-| `eudiw` | Wallet verification settings; enabling EUDIW currently blocks startup |
+| `eudiw` | Wallet verification settings; off by default, not yet tested with a production wallet |
 | `realtime` | P2P rooms: how many, how big, how long idle |
 | `federation_sync` | What is replicated to peers, how often, how large a batch |
 | `node` | Id, port, type, base URL, sealed keys, and the dev, test and anonymous modes |

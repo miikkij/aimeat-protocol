@@ -31,6 +31,7 @@
  *     erased person afterwards: the site change log and reviews name a pseudonym, flags on their
  *     content and their appeals go, the activity feed drops their app events (services/owner/erasure.ts).
  *   2026-11-19 — The account export's row names the records it carries since 2026-11-19 (routes/owners/export-records.ts).
+ *   2026-11-19 — Section 4: customer due diligence records answer KYC_RETAINED on delete and restore, and the organism delete KYC_RECORDS_RETAINED (services/memory/bin.ts, routes/organisms/crud.ts).
  *   2026-11-15 — An imported agent's trust score is capped on import, not "on the way in".
  *   2026-11-15 — Section 4: an AI's delete in a team waits for a lead while the team's approval gate
  *     is on (services/team/action-gate.ts, team setup T7).
@@ -252,6 +253,11 @@ What an export leaves out, and why:
   are written only by the payment routes. The person, signed in themselves, may delete one of theirs to
   clear a finished hold away; an agent may not, and a deleted one does not come back from the bin
   (\`RESERVED_KEY\`).
+- An obliged organism's customer due diligence records (customer cards and suspicions, keys
+  \`kyc.org.*\` of the server) are kept by the anti-money-laundering law: a delete or a restore of one
+  answers \`KYC_RETAINED\` for everyone, the operator included, and deleting the organism answers
+  \`KYC_RECORDS_RETAINED\` while it keeps any. They go on their own five years after the relationship
+  ends (\`aimeat_kyc_customer\` action \`end\`); archive the organism meanwhile.
 - A record that went into the bin PUBLIC comes back out through the same visibility rules a write
   passes, so putting it back can be refused where deleting it was not. \`PUBLISH_NOT_ALLOWED\` means
   this node asks the person before anything of theirs goes public and you are not one of the

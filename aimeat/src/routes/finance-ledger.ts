@@ -10,6 +10,8 @@
  *   vat-report · exports)
  * @usage app.use(financeLedgerRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-11-19 — POST /v1/finance/vouchers takes payment_method (cash, card, transfer, other), so a cash
+ *     payment is told apart for AMLR art. 80 (services/aml/cash.ts).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-15 — POST /v1/finance/fiscal-years checks overlap within the same company (organism_id) only (feature-list audit #148).
  *   v1.1.0 — 2026-10-11 — The voucher list's source filter no longer names 'morsel': a morsel is
@@ -36,7 +38,7 @@ import {
   resolveFinanceOwner, grantAccountant, revokeAccountant, listAccountants, listClients,
 } from '../services/finance/accountant-access.js';
 import { resolveCompanyScope } from '../services/finance/company-scope.js';
-import type { VoucherSource } from '../models/finance-schemas.js';
+import { VOUCHER_PAYMENT_METHODS, type VoucherSource } from '../models/finance-schemas.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -60,6 +62,7 @@ const VoucherSchema = z.object({
   counterparty: z.string().max(200).nullish(),
   invoice_id: z.string().max(80).nullish(),
   attachments: z.array(z.string().min(1).max(300)).max(20).optional(),
+  payment_method: z.enum(VOUCHER_PAYMENT_METHODS).nullish(),
 }).strict();
 
 const FiscalYearSchema = z.object({
@@ -98,6 +101,7 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
         amountMinor: b.amount_minor, currency: b.currency,
         vatBreakdown: b.vat_breakdown, counterparty: b.counterparty ?? null,
         invoiceId: b.invoice_id ?? null, attachments: b.attachments,
+        paymentMethod: b.payment_method ?? null,
       });
       emitChange('finance', resolve(req));
       res.status(201).json(success(config.nodeId, { voucher }));

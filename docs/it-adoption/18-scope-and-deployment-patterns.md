@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.3.1 (commit f2cf8394c) on 2026-11-19. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit d1f2e81d7) on 2026-11-19. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -119,6 +119,7 @@ Several processes of one node can run against one PostgreSQL database with the s
 | The SIEM export: its syslog socket or connection and the OTLP events not yet sent (at most one second) | Each process sends the security events it saw itself, so the SIEM receives events from every process; a process that stops loses its last second of OTLP events | Set the same `AIMEAT_SIEM_SYSLOG` or `AIMEAT_SIEM_OTLP_URL` on every process, and let the SIEM name the sending host | `aimeat/src/services/node-admin/siem-export.ts` |
 | The node's front page as the operator stored it, kept per language for `AIMEAT_SITE_CACHE_TTL_SECONDS` (60 by default) | A front page stored or deleted through one process shows on that process at once and on the others when their copy runs out | Count on that time for a front page change to reach every process | `aimeat/src/services/site.ts` |
 | The watcher of the front page's public counters, which looks at them once a minute and after a write | Each process tells the open pages when it sees a counter change, so a page can hear one change twice and read the counters twice | Nothing; the counters are the same on every process | `aimeat/src/services/live/node-totals.ts` |
+| The sanctions lists prepared for customer due diligence screening (about 7 000 entries) | Each process reads the stored list once per version and keeps it in memory; every process screens against the same stored version, so a screening answers the same on every host | Nothing; count on a few megabytes of memory per process on a node that does customer due diligence | `aimeat/src/services/kyc/screening/store.ts`, `aimeat/src/services/kyc/screening/match.ts` |
 
 Where the code's own notes still say "a node runs one process", they describe one of the rows above: the AI key hold is "per process, like every limiter here: a node runs one process" (`aimeat/src/services/ai/node-key-hold.ts`).
 

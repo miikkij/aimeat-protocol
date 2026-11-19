@@ -13,21 +13,19 @@
  *   (trusted issuers, the W3C credential, the MyData consent receipt) and on the spawned node for
  *   FTN, which is `AIMEAT_FTN_ENABLED` at BOOT and off on the shared one.
  *
- *   THE FOUR EUDIW DOORS CANNOT BE DRIVEN AT ALL, and this suite proves why rather than assuming it.
- *   `src/config/eudiw-guard.ts` refuses to START a node with `AIMEAT_EUDIW_ENABLED=true`, because
- *   the SD-JWT verification behind those doors has no holder binding and never reads back its own
- *   nonce, so a presented credential is replayable. Test 14 spawns a node with the flag on and
- *   asserts the boot refusal; test 15 asserts that with the flag off all four doors answer 503. The
- *   INVALID_STATE, STATE_MISMATCH and presentation_submission branches inside them are unreachable
- *   on any node this repo can build, and are left for the day the guard is deleted.
+ *   THE EUDIW ROUTES. Until 2026-11-19 `src/config/eudiw-guard.ts` refused to start a node with
+ *   `AIMEAT_EUDIW_ENABLED=true`, because the SD-JWT check had no holder binding and never read back
+ *   its nonce. Those checks exist now, and their refusals (holder binding, nonce, audience, replay)
+ *   are proved with real keys in `test/unit/eudiw-presentation.test.ts`. Here, test 14 starts a node
+ *   with the flag on and drives the callback and the request route; test 15 asserts that with the
+ *   flag off every route answers 503; test 15b switches the flag on at run time and back off.
  *
  *   WHAT IS DELIBERATELY NOT DRIVEN. The real identity-provider exchanges — an actual wallet
  *   presenting a vp_token, and the FTN OIDC authorize/callback pair against tunnistautuminen.suomi.fi
  *   — are left alone. They need a credential signed by an issuer this node trusts and a live bank-ID
  *   session, neither of which a test may fabricate. What is asserted instead is every refusal on the
  *   way in, including POST /v1/ghii/verify/ftn, which took any callback_token and stamped level 3
- *   until 2026-10-15 and now refuses and names the checked flow (test 13), and the runtime setting
- *   that could switch EUDIW on past the boot refusal (test 15b).
+ *   until 2026-10-15 and now refuses and names the checked flow (test 13).
  *
  *   ONE SIDE EFFECT IS MANAGED. POST /v1/setup/init writes an .env into the package root when none
  *   is there. This suite creates a placeholder first and removes it afterwards, unless the developer
@@ -38,11 +36,16 @@
  *   - Phase 2: a spawned node, empty: every validation refusal, then the imported-key arm
  *   - Phase 3: a second spawned node: the generated-keypair arm
  *   - Phase 5: FTN on the spawned node, with the flag on
- *   - Phase 4: verification on the shared node — the EUDIW boot refusal, issuers, credential, receipt
+ *   - Phase 4: verification on the shared node — EUDIW on and off, issuers, credential, receipt
  * @usage
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-setup-verification.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-and-verification
  * @version-history
+ *   2026-11-19 — Tests 14 and 15b: the EUDIW boot refusal and the runtime refusal are gone (holder
+ *     binding, nonce and audience checks exist). Test 14 starts a node with the flag on and drives the
+ *     callback (400 INVALID_STATE) and the request route (401); test 15b switches the flag on, sees
+ *     503 EUDIW_NO_TRUSTED_ISSUER, and switches it off. Test 15 sends `state`, which the contract
+ *     now requires on POST /v1/ghii/verify/eudiw.
  *   2026-10-16 — The nodes this suite starts follow the run's backend (test/helpers/own-node-db.ts);
  *     they were SQLite on both runs (QA audit P1-02).
  *   2026-10-16 — Tests 4, 6 and 10: the status gives the running node type and port; an init whose
@@ -252,8 +255,7 @@ try {
     });
 
     // ─── Phase 2 and 5: a node of our own, empty, with FTN on ───
-    // EUDIW is NOT turned on here, and cannot be: src/config/eudiw-guard.ts refuses to start a node
-    // with AIMEAT_EUDIW_ENABLED=true. Phase 6 drives that refusal and the 503 it leaves behind.
+    // EUDIW is not turned on here; test 14 starts a node of its own with it on.
     const setupNode = await spawnNode(SETUP_PORT, { AIMEAT_FTN_ENABLED: 'true' });
     let setupOwnerToken = '';
     let setupGhii = '';
@@ -506,33 +508,23 @@ try {
     // ─── Phase 4: verification on the shared node ───
     console.log('\nPhase 4 — issuers, credentials and consent receipts');
 
-    await test('14. A node will not start at all with EUDIW switched on', async () => {
-        // src/config/eudiw-guard.ts, and the reason the four EUDIW doors below cannot be driven by
-        // this suite or by anybody: the SD-JWT verification behind them has no holder binding and
-        // never reads back its own nonce, so a presented credential is replayable. The flag refuses
-        // at boot rather than letting an operator turn on a replayable login. THIS is what makes
-        // those routes unreachable today, and it is asserted rather than assumed.
-        const dir = mkdtempSync(join(tmpdir(), 'aimeat-eudiw-'));
+    await test('14. A node starts with EUDIW switched on, and its wallet routes take requests', async () => {
+        // Until 2026-11-19 src/config/eudiw-guard.ts refused this boot: the SD-JWT check had no
+        // holder binding and never read back its nonce. Those checks exist now (services/sd-jwt.ts,
+        // services/eudiw.ts; proved in test/unit/eudiw-presentation.test.ts), so the flag means what
+        // it says. The callback answers an unknown round as INVALID_STATE, not 503, and the request
+        // route still wants the account holder.
+        const eudiwNode = await spawnNode(SECOND_PORT, { AIMEAT_EUDIW_ENABLED: 'true' });
         try {
-            const db = await ownNodeDb(`eudiw-${SECOND_PORT}`, { sqlitePath: join(dir, 'x.db') });
-            const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], {
-                env: {
-                    ...process.env,
-                    AIMEAT_PORT: SECOND_PORT, AIMEAT_BASE_URL: `http://localhost:${SECOND_PORT}`,
-                    AIMEAT_NODE_ID: NODE_ID, ...db.env,
-                    AIMEAT_EUDIW_ENABLED: 'true',
-                },
-                stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd(),
+            const callback = await call(eudiwNode.base, '/v1/ghii/verify/eudiw/callback', {
+                method: 'POST', body: JSON.stringify({ vp_token: 'x', state: 'no-such-round' }),
             });
-            let stderr = '';
-            child.stdout?.on('data', () => { /* drained */ });
-            child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
-            const [code] = await once(child, 'exit') as [number | null];
-            assert(code !== 0, `the node must refuse to start, exited ${code}`);
-            assert(stderr.includes('AIMEAT_EUDIW_ENABLED=true'), `the refusal names the flag: ${stderr.slice(0, 300)}`);
-            assert(stderr.includes('holder binding'), `and says what is missing: ${stderr.slice(0, 300)}`);
+            assert(callback.status === 400, `callback: expected 400, got ${callback.status}`);
+            assert(callback.body.error?.code === 'INVALID_STATE', `code: ${callback.body.error?.code}`);
+            const request = await call(eudiwNode.base, '/v1/ghii/verify/eudiw/request');
+            assert(request.status === 401, `request without a session: expected 401, got ${request.status}`);
         } finally {
-            rmSync(dir, { recursive: true, force: true });
+            await stopNode(eudiwNode);
         }
     });
 
@@ -541,10 +533,12 @@ try {
         assert(req.status === 503, `eudiw request: expected 503, got ${req.status}`);
         assert(req.body.error?.code === 'FEATURE_DISABLED', `code: ${req.body.error?.code}`);
 
+        // `state` is required by the contract since 2026-11-19, and the request-body check answers a
+        // body without it 400 before the route runs; this test is about the flag, so it sends one.
         const verify = await json('/v1/ghii/verify/eudiw', {
-            method: 'POST', headers: authed(opToken), body: JSON.stringify({ vp_token: 'x' }),
+            method: 'POST', headers: authed(opToken), body: JSON.stringify({ vp_token: 'x', state: 'y' }),
         });
-        assert(verify.status === 503, `eudiw verify: expected 503, got ${verify.status}`);
+        assert(verify.status === 503, `eudiw verify: expected 503, got ${verify.status} ${JSON.stringify(verify.body.error)}`);
 
         // The callback takes no credential by design (it is a wallet redirect), so the flag is the
         // only thing in front of it.
@@ -559,23 +553,25 @@ try {
         assert(ftn.status === 503, `ftn: expected 503, got ${ftn.status}`);
     });
 
-    // QA audit D6-01, F21b-01. The boot refusal of test 14 reads the environment; the same switch is a
-    // runtime setting, and PUT /v1/admin/config turned it on at once and stored it for every later
-    // start, past the boot refusal. The setting refuses `true` now, and nothing changes.
-    await test('15b. The operator cannot switch EUDIW on at run time: the config change is refused and nothing changes', async () => {
-        const put = await json('/v1/admin/config', {
-            method: 'PUT', headers: authed(opToken), body: JSON.stringify({ changes: [{ path: 'eudiw.enabled', value: true }] }),
+    // QA audit D6-01, F21b-01 made the runtime setting refuse `true` while the boot refusal stood.
+    // Since 2026-11-19 the switch works at run time; a node with no trusted EUDIW issuer still opens
+    // no wallet round, and the setting is switched back off whatever the assertions say.
+    await test('15b. The operator switches EUDIW on at run time; with no trusted issuer no round opens; off again', async () => {
+        const put = (value: unknown) => json('/v1/admin/config', {
+            method: 'PUT', headers: authed(opToken), body: JSON.stringify({ changes: [{ path: 'eudiw.enabled', value }] }),
         });
-        assert(put.status === 400, `the change must be refused, got ${put.status} ${JSON.stringify(put.body).slice(0, 300)}`);
-        const reasons = (put.body.error?.details?.errors ?? []) as Array<{ path: string; reason: string }>;
-        const mine = reasons.find(e => e.path === 'eudiw.enabled');
-        assert(!!mine && /cannot be switched on/.test(mine.reason), `the refusal says why: ${JSON.stringify(reasons)}`);
+        try {
+            const on = await put(true);
+            assert(on.status === 200, `the change is applied, got ${on.status} ${JSON.stringify(on.body).slice(0, 300)}`);
+            const req = await json('/v1/ghii/verify/eudiw/request', { headers: authed(opToken) });
+            assert(req.status === 503 && req.body.error?.code === 'EUDIW_NO_TRUSTED_ISSUER',
+                `no trusted issuer, no round: ${req.status} ${req.body.error?.code}`);
+        } finally {
+            const off = await put(false);
+            assert(off.status === 200, `switched back off: ${off.status}`);
+        }
         const still = await json('/v1/ghii/verify/eudiw/request', { headers: authed(opToken) });
-        assert(still.status === 503 && still.body.error?.code === 'FEATURE_DISABLED', `the wallet routes stay off: ${still.status} ${still.body.error?.code}`);
-        const cfg = await json('/v1/admin/config', { headers: authed(opToken) });
-        const row = cfg.body.data?.schema?.['eudiw.enabled'];
-        assert(cfg.status === 200 && row?.value === false && row?.source !== 'database',
-            `the setting reads off and nothing was stored: ${cfg.status} ${JSON.stringify(row)}`);
+        assert(still.status === 503 && still.body.error?.code === 'FEATURE_DISABLED', `the wallet routes are off again: ${still.status} ${still.body.error?.code}`);
     });
 
     await test('16. POST /v1/trusted-issuers refuses an incomplete issuer and an unknown type', async () => {

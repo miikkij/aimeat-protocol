@@ -11,7 +11,7 @@
  *   v1.12.0 — 2026-11-19 — countAgents: the total and the recently seen agents in one aggregate query.
  *   2026-11-08 — deleteOwner keeps the person's schema locks in force under the erasure's pseudonym
  *     (repos/schema-lock-erasure.ts; secaudit2026nov08 round 14).
- *   v1.11.0 — 2026-11-19 — taskStartAppWaits on create, update and read, 1 or NULL (migration 0133).
+ *   v1.11.0 — 2026-11-19 — taskStartAppWaits on create, update and read, 1 or NULL (migration 0134).
  *   v1.10.0 — 2026-11-02 — listOperatorNames: the active operator accounts' names, one filtered query with a limit.
  *   v1.9.0 — 2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
  *   v1.8.0 — 2026-10-25 — credentialsValidAfter on update and read (migration 0117; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).

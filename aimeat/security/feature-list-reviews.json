@@ -41,7 +41,7 @@
         "aimeat/src/services/adult-assurance.ts",
         "aimeat/src/services/vc-issuer.ts"
       ],
-      "digest": "sha256:f8c9aa39c9455e8f5b77373e"
+      "digest": "sha256:3922ecaa3f06685b3b074dcb"
     },
     "3. Agents and machine identity": {
       "reviewedOn": "2026-11-19",
@@ -303,7 +303,7 @@
         "aimeat/src/tool-catalog/definitions/dataproduct.ts",
         "aimeat/src/services/finance"
       ],
-      "digest": "sha256:97952e5f475797507c9f8994"
+      "digest": "sha256:0ccff1f189b57afc66808dd3"
     },
     "16. Public presence and discovery": {
       "reviewedOn": "2026-11-19",
@@ -552,7 +552,7 @@
       "aimeat/src/routes/ghii/login-link-second-factor.ts": "3d5ec4f392a1e2de",
       "aimeat/src/routes/ghii/login-two-step.ts": "6f891b378570d7b8",
       "aimeat/src/routes/registration-invites.ts": "b7f94fdc48f0c376",
-      "aimeat/src/routes/verification.ts": "51322edfefacdc3a",
+      "aimeat/src/routes/verification.ts": "d5b77370c0cd4113",
       "aimeat/src/routes/passkeys.ts": "2fd468bfd1baa71f",
       "aimeat/src/routes/totp.ts": "494d66ab99aa9bfb",
       "aimeat/src/routes/scim.ts": "2a7149ea1dc93d7c",
@@ -871,7 +871,7 @@
       "aimeat/src/routes/agents/purchase-limit.ts": "58f920ef92036e23"
     },
     "15. Bookkeeping and business": {
-      "aimeat/src/routes/finance-ledger.ts": "92a2df61c5f84666",
+      "aimeat/src/routes/finance-ledger.ts": "d0242a27e002469d",
       "aimeat/src/tool-catalog/definitions/companies.ts": "428b854c65bd689f",
       "aimeat/src/routes/csm.ts": "50e027af290213ea",
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
@@ -894,7 +894,7 @@
       "aimeat/src/services/finance/reference-number.ts": "81ee7d7149f1f52a",
       "aimeat/src/services/finance/vat-codes.ts": "388ce7ad98e2a48e",
       "aimeat/src/services/finance/vat-report.ts": "0a3cab7655e85bed",
-      "aimeat/src/services/finance/vouchers.ts": "c484581339ceab2f"
+      "aimeat/src/services/finance/vouchers.ts": "cd65fb24d7c2a658"
     },
     "16. Public presence and discovery": {
       "aimeat/src/routes/sitemaps.ts": "a8968f6091f1ac28",

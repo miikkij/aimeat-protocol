@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-11-19 — finance_vouchers.paymentMethod and its partial index (migration 0133).
  *   2026-11-12 — organisms.accessRequests and join_requests.via (migration 0129).
  *   2026-10-29 — One ledger row per federation settlement (schema-settlement-once.ts, migration 0122).
  *   2026-10-29 — storage_files.blobRef (migration 0121); the storage_files utf8Verified and
@@ -720,6 +721,9 @@ export function initializeSchema(db: Database.Database): void {
   // The AI-provenance record of delivered work and a settled v2 task. Mirrors Postgres 0098.
   safeAddColumn('work', 'aiProvenanceId', 'TEXT');
   safeAddColumn('agent_v2_tasks', 'aiProvenanceId', 'TEXT');
+  // How a voucher's money moved ('cash', 'card', 'transfer', 'other'); NULL when nobody recorded it. Mirrors Postgres 0133.
+  safeAddColumn('finance_vouchers', 'paymentMethod', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_finance_vouchers_payment_method ON finance_vouchers(paymentMethod, date) WHERE paymentMethod IS NOT NULL;');
   db.exec('CREATE INDEX IF NOT EXISTS idx_ai_decisions_provider ON ai_decisions(ownerGhii, provider, createdAt);');
 
   // ── Memory full-text search (Tier-1 librarian retrieval) ──

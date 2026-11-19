@@ -53,7 +53,7 @@ These parts of Core v4.0 are not in Core 2026-11, because a second implementatio
 
 | Topic | Where it is described |
 |---|---|
-| Identity assurance: the EU Digital Identity Wallet, verifiable credentials, the Finnish Trust Network | Feature list §2; [EUDIW status](aimeat-eudiw-integration.md), [credential format](aimeat-vc-spec.md). It may return to Core as an optional profile when the wallet path passes its own checks. |
+| Identity assurance: the EU Digital Identity Wallet, verifiable credentials, the Finnish Trust Network | Feature list §2; [EUDIW status](aimeat-eudiw-integration.md), [credential format](aimeat-vc-spec.md). It may return to Core as an optional profile once the wallet path has been tested with a production wallet. |
 | Knowledge packages and links; the librarian | Feature list §5 and §6 |
 | Catalogue, directory, discover and invoke | Feature list §14 and §16 |
 | Actions, the work queue, agent tasks, disputes, trust scoring and capability verification | Feature list §7 and §14 |

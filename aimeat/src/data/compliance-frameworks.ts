@@ -5,7 +5,7 @@
  * @description The regulatory frameworks a node or an organism answers as question sets (plan
  *   doc-mvlftkh9zmc9, C6, decision 10.3: Finland, the EU, HIPAA and ITAR): GDPR, NIS2, DORA, the
  *   Cyber Resilience Act, the Accessibility Act, the Digital Services Act, HIPAA and US and EU export
- *   control. The EU AI Act stays where it is, as the use-case register's own set
+ *   control, and the anti-money-laundering regulation (AMLR). The EU AI Act stays where it is, as the use-case register's own set
  *   (data/compliance-questionnaire.ts).
  *
  *   THE SAME CLASSIFIER. Each framework is a ComplianceQuestionnaire, and services/compliance/register.ts
@@ -23,6 +23,8 @@
  * @usage
  *   const verdict = classifyUseCase({ id: 'nis2', title: 'NIS2', answers }, frameworkById('nis2')!.questionnaire);
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The anti-money-laundering regulation (AMLR), at the node and organism
+ *     scopes: one yes makes the organisation an obliged entity (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C6.1–C6.8).
  */
 import type { ComplianceQuestionnaire } from '../services/compliance/register.js';
@@ -223,6 +225,43 @@ export const COMPLIANCE_FRAMEWORKS: readonly ComplianceFramework[] = [
     obligations: {
       'dual-use': ['A licence, or a licence exception, for each export and re-export.', 'Readers limited to the people and countries the licence allows.'],
       itar: ['Registration with DDTC and a licence or agreement for every foreign person access.', 'Readers limited to US persons unless licensed: the operator and administrators of this node included.', 'The server location and every processor checked against the licence; no outside AI model reads it.'],
+    },
+  },
+  {
+    // The obliged entities of AMLR art. 3, one question per group. The organism's own declaration in
+    // the compliance document `aml` (services/aml/gate.ts) is what turns the KYC tools on; this set
+    // only says whether the law asks for one.
+    id: 'amlr', name: { fi: 'Rahanpesun estäminen (AMLR)', en: 'Anti-money-laundering (AMLR)', es: 'Prevención del lavado de dinero (AMLR)' },
+    laws: ['Regulation (EU) 2024/1624', 'Directive (EU) 2024/1640'], jurisdictions: ['eu'], scopes: ['node', 'organism'],
+    questionnaire: {
+      version: '2026-11-19', updatedAt: '2026-11-19', note: 'Whether the organisation is an obliged entity under the anti-money-laundering regulation (art. 3).',
+      defaultClass: 'not-in-scope',
+      classes: [
+        { id: 'not-in-scope', label: 'Not in scope', severity: 0 },
+        { id: 'obliged-entity', label: 'Obliged entity', severity: 20 },
+      ],
+      questions: [
+        { id: 'q-financial', type: 'boolean', text: 'Is the organisation a credit or financial institution, a payment or e-money institution included?', implies: yes('obliged-entity') },
+        { id: 'q-accounting', type: 'boolean', text: 'Does it provide accounting, audit, bookkeeping or tax advice?', implies: yes('obliged-entity') },
+        { id: 'q-legal', type: 'boolean', text: 'Is it a lawyer or a notary who takes part in a financial or real estate transaction for a client?', implies: yes('obliged-entity') },
+        { id: 'q-estate-agent', type: 'boolean', text: 'Is it an estate agent, letting agents included when the monthly rent is €10 000 or more?', implies: yes('obliged-entity') },
+        { id: 'q-crypto', type: 'boolean', text: 'Is it a crypto-asset service provider?', implies: yes('obliged-entity') },
+        { id: 'q-trust-company', type: 'boolean', text: 'Does it provide trust or company services (forming companies, acting as a director or nominee, a registered office)?', implies: yes('obliged-entity') },
+        { id: 'q-high-value-cash', type: 'boolean', text: 'Does it trade in goods and accept or make cash payments of €10 000 or more?', implies: yes('obliged-entity') },
+        { id: 'q-gambling', type: 'boolean', text: 'Is it a gambling service?', implies: yes('obliged-entity') },
+      ],
+    },
+    obligations: {
+      'obliged-entity': [
+        'A business-wide risk assessment, documented and kept up to date (art. 10).',
+        'A member of the management who answers for compliance, and a compliance officer who does the work (art. 11).',
+        'Customer due diligence before the business relationship starts and while it lasts (art. 19–28).',
+        'Enhanced due diligence for high-risk customers, high-risk third countries and politically exposed persons (art. 29–46).',
+        'Customers and their beneficial owners screened against the EU and UN targeted financial sanctions.',
+        'Suspicions reported to the Financial Intelligence Unit through goAML (art. 69), and the customer is not told (art. 73).',
+        'Due diligence records kept five years after the business relationship ends (art. 77).',
+        'No cash payment above €10 000 for goods or services (art. 80).',
+      ],
     },
   },
 ];

@@ -21,8 +21,10 @@ See [the agent guide](../building-an-aimeat-compatible-agent.md) and
 [agents-v2.ts](../../aimeat/src/routes/agents-v2.ts). Read an agent's identity
 version before choosing its authentication or delivery path.
 
-The identity-wallet verification path is blocked at startup. Its earlier design
-is not a deployable verification feature. See [the current status](../aimeat-eudiw-integration.md).
+The identity-wallet verification path is off by default. A presentation must carry a
+Key Binding JWT from the credential's holder key, answer the node's own nonce and audience,
+and is accepted once. It is not yet tested with a production wallet. See
+[the current status](../aimeat-eudiw-integration.md).
 
 ### Identity Model: GHII, GAII, and Owners
 
@@ -142,7 +144,7 @@ The boundary test is *"would a second, different service also use this?"*. If ye
 | Domain | Routes | Purpose |
 |--------|--------|---------|
 | Identity (GHII/GAII/**GEAI**) | `owners.ts`, `agents.ts`, `ghii.ts`, `ecosystem-apps.ts` | Three principals; `resolveIdentity`; device authorization, owner OAuth and TOTP |
-| Verification | `verification.ts`, `totp.ts`, `oauth-login.ts` | DID, VC and FTN identity assurance. The EUDIW wallet path is blocked at startup (see above) |
+| Verification | `verification.ts`, `totp.ts`, `oauth-login.ts` | DID, VC, FTN and EUDIW identity assurance. The EUDIW wallet path is off by default (see above) |
 | Memory and storage | `memory.ts`, `storage-files.ts`, `schemas.ts` | Key-value records and files, visibility tiers (private/owner/group/members/public/workspace), schema lock |
 | Authorization | `consent.ts`, `sharing-groups.ts`, the access guard and IAM services | Consent, runtime read guard, capability model, scoped delegation |
 | Collaboration | `organisms.ts` (workspaces inside it), `knowledge.ts`, `librarian.ts` | Organisms and **workspaces** (the shared living surface), knowledge and links |

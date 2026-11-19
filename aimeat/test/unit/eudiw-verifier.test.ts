@@ -2,6 +2,8 @@
  * @file eudiw-verifier.test.ts
  * @description Unit tests for the EUDIW verification service
  * @version-history
+ *   v2.1.0 — 2026-11-19 — verifyPresentation takes the expected nonce and client id; a token without a
+ *     Key Binding JWT is refused with EUDIW_HOLDER_BINDING instead of accepted.
  *   v1.0.0 — 2026-03-01 — Initial test suite
  *   v2.0.0 — 2026-05-02 — Updated for real SD-JWT verification
  */
@@ -17,6 +19,9 @@ import { generateTestKeyPair, createTestSdJwt, type TestKeyPair } from '../helpe
 // ── Helpers ──────────────────────────────────────────────────
 
 let testKeyPair: TestKeyPair;
+
+/** The round a presentation answers: its nonce and this node's verifier client id. */
+const EXPECTED = { nonce: 'n-1', clientId: 'aimeat-verifier-001' };
 
 beforeAll(async () => {
     testKeyPair = await generateTestKeyPair('EdDSA');
@@ -127,7 +132,7 @@ describe('EUDIW Service', () => {
         it('rejects invalid SD-JWT format', async () => {
             const storage = makeMockStorage();
             service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
-            const result = await service.verifyPresentation('not-a-valid-token', {});
+            const result = await service.verifyPresentation('not-a-valid-token', {}, EXPECTED);
             expect(result.valid).toBe(false);
         });
 
@@ -139,7 +144,7 @@ describe('EUDIW Service', () => {
                 'https://unknown-issuer.com',
                 testKeyPair,
             );
-            const result = await service.verifyPresentation(token, {});
+            const result = await service.verifyPresentation(token, {}, EXPECTED);
             expect(result.valid).toBe(false);
             expect(result.error).toBe('Untrusted issuer');
         });
@@ -152,7 +157,7 @@ describe('EUDIW Service', () => {
             service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
 
             const token = await createTestSdJwt({ given_name: 'Eve' }, issuerUrl, testKeyPair);
-            const result = await service.verifyPresentation(token, {});
+            const result = await service.verifyPresentation(token, {}, EXPECTED);
             expect(result.valid).toBe(false);
         });
 
@@ -165,12 +170,15 @@ describe('EUDIW Service', () => {
             service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
 
             const token = await createTestSdJwt({ given_name: 'Eve' }, issuerUrl, wrongKeyPair);
-            const result = await service.verifyPresentation(token, {});
+            const result = await service.verifyPresentation(token, {}, EXPECTED);
             expect(result.valid).toBe(false);
             expect(result.error).toContain('Signature verification failed');
         });
 
-        it('accepts valid tokens with trusted issuer and extracts attributes', async () => {
+        // Until 2026-11-19 this token was accepted. It carries no Key Binding JWT, so nothing ties it
+        // to the wallet it was issued to or to this node's request, and the service now refuses it.
+        // The accepted path, with a KB-JWT over cnf.jwk, is test/unit/eudiw-presentation.test.ts.
+        it('refuses an issuer-valid token without a Key Binding JWT (EUDIW_HOLDER_BINDING)', async () => {
             const issuerUrl = 'https://trusted-issuer.example.com';
             const issuer = makeTrustedIssuer(issuerUrl, true);
             trustedIssuers.set(issuer.id, issuer);
@@ -182,13 +190,10 @@ describe('EUDIW Service', () => {
                 issuerUrl,
                 testKeyPair,
             );
-            const result = await service.verifyPresentation(token, {});
-            expect(result.valid).toBe(true);
-            expect(result.issuer).toBe(issuerUrl);
-            expect(result.attributes).toBeDefined();
-            expect(result.attributes!.given_name).toBe('Alice');
-            expect(result.attributes!.family_name).toBe('Smith');
-            expect(result.attributes!.birthdate).toBe('1990-01-01');
+            const result = await service.verifyPresentation(token, {}, EXPECTED);
+            expect(result.valid).toBe(false);
+            expect(result.code).toBe('EUDIW_HOLDER_BINDING');
+            expect(result.attributes).toBeUndefined();
         });
     });
 });

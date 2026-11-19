@@ -24,6 +24,7 @@
  * @version-history
  *   v1.17.0 — 2026-11-19 — `crew-try` → memory:read: a trial run of an agent's crew ended (feature audit
  *     2026-11-19, 4.6).
+ *   2026-11-19 — `kyc`: customer due diligence (services/kyc/store.ts), on compliance:read.
  *   v1.16.0 — 2026-11-14 — `help` → help:answer (Ask someone who knows).
  *   v1.15.0 — 2026-11-14 — `secret-shares` → secrets:share.
  *   v1.14.0 — 2026-11-09 — An extension's own domain (`ext:<installer>/<name>`, sent by its ctx.changed())
@@ -86,6 +87,9 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   schemas: 'organism:read',
   templates: 'organism:read',
   csm: 'organism:read',
+  // An obliged organism's customer cards or suspicions changed (services/kyc/store.ts), sent only to that
+  // organism's officers, staff and admins. The word the cards' own reads ask.
+  kyc: 'compliance:read',
   msm: 'organism:read',
 
   // Public discovery surfaces

@@ -8,7 +8,7 @@
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
  *   2026-11-19 — countAgents: the total and the recently seen agents in one aggregate query.
- *   2026-11-19 — taskStartAppWaits on create, update and read, TRUE or NULL (migration 0133).
+ *   2026-11-19 — taskStartAppWaits on create, update and read, TRUE or NULL (migration 0134).
  *   2026-11-02 — listOperatorNames: the active operator accounts' names, one filtered query with a limit.
  *   2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
  *   2026-10-25 — credentialsValidAfter on read (migration 0117); updateAgent passes it through

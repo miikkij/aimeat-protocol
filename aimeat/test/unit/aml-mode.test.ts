@@ -6,6 +6,8 @@
  *   organism, the mode proposal only where the mode does not already allow owners), and the obligation
  *   rows per mode.
  * @version-history
+ *   2026-11-19 — The facts carry the cash vouchers (AMLR art. 80): the finding cash_over_limit and the row
+ *     aml-ob-cash, both on the node's view only.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design, stage A).
  */
 import { describe, it, expect } from 'vitest';
@@ -24,8 +26,11 @@ const decl = (over: Partial<AmlDeclaration> = {}): AmlDeclaration => ({
 
 const facts = (over: Partial<AmlFacts> = {}): AmlFacts => ({
     mode: 'report', owner: null, now: NOW, declarations: [], reviews: new Map(),
-    splitsForOthers: [], cryptoPayouts: [], agentLimits: [], sellers: [], personalServices: [], traders: [], ...over,
+    splitsForOthers: [], cryptoPayouts: [], agentLimits: [], sellers: [], personalServices: [], traders: [],
+        kyc: { lists: [], cards: 0, due: 0, notScreened: 0 }, cash: { recorded: 0, cash: 0, otherCurrency: 0, overLimit: [] }, ...over,
 });
+
+const overItem = { owner: 'alice', direction: 'income' as const, counterparty: 'Bob', total: 1_000_001, currency: 'EUR' as const, count: 1, from: '2026-11-01', to: '2026-11-01', voucherIds: ['v1'] };
 
 const orgDecl = (d: AmlDeclaration, organismId = 'org-1') => ({ scope: { kind: 'organism' as const, organismId }, declaration: d, organismName: 'Alice Tilit' });
 
@@ -101,6 +106,19 @@ describe('buildAmlFindings', () => {
         expect(count('marketplace_traders')).toBe(1);
     });
 
+    it('reports cash payments over the art. 80 limit for every business, and leaves the finding out of an owner\'s slice', () => {
+        const none = buildAmlFindings(facts()).find(f => f.kind === 'cash_over_limit')!;
+        expect(none.count).toBe(0);
+        expect(none.regulation.map(r => r.ref)).toEqual(['art. 80']);
+        const hit = buildAmlFindings(facts({ cash: { recorded: 3, cash: 2, otherCurrency: 1, overLimit: [overItem] } })).find(f => f.kind === 'cash_over_limit')!;
+        expect(hit.count).toBe(1);
+        expect(hit.items[0]).toMatchObject({ owner: 'alice', total: 1_000_001, voucherIds: ['v1'] });
+        expect(hit.reason).toMatch(/every business/);
+        expect(hit.reason).toMatch(/Only vouchers in EUR/);
+        expect(hit.proposal?.action).toBe('review_cash_payments');
+        expect(buildAmlFindings(facts({ owner: 'alice', cash: null })).some(f => f.kind === 'cash_over_limit')).toBe(false);
+    });
+
     it('turns a reviewed finding human, with the decision', () => {
         const reviews = new Map([['payers_not_screened', { id: 'payers_not_screened', type: 'review' as const, decision: 'dismissed' as const, note: 'test node' }]]);
         const f = buildAmlFindings(facts({ reviews })).find(x => x.id === 'payers_not_screened')!;
@@ -119,12 +137,26 @@ describe('amlObligations', () => {
         }
     });
 
-    it('names what is not built yet as missing once obliged work is allowed', () => {
-        const rows = amlObligations(facts({ mode: 'owners', sellers: [{ owner: 'alice', rails: ['card'] }] }), { ftnEnabled: true });
-        expect(rows.find(r => r.code === 'aml-ob-sanctions')!.status).toBe('missing');
-        expect(rows.find(r => r.code === 'aml-ob-monitoring')!.status).toBe('missing');
-        expect(rows.find(r => r.code === 'aml-ob-retention')!.status).toBe('missing');
-        expect(rows.find(r => r.code === 'aml-ob-cdd')!.status).toBe('check');
-        expect(amlObligations(facts({ mode: 'owners' }), { ftnEnabled: false }).find(r => r.code === 'aml-ob-cdd')!.status).toBe('missing');
+    it('reads customer due diligence once obliged work is allowed: screening needs a fetched list, the hold and the calendar are there', () => {
+        const noList = amlObligations(facts({ mode: 'owners', sellers: [{ owner: 'alice', rails: ['card'] }] }), { ftnEnabled: true });
+        expect(noList.find(r => r.code === 'aml-ob-sanctions')!.status).toBe('missing');
+        expect(noList.find(r => r.code === 'aml-ob-retention')!.status).toBe('evidence');
+        expect(noList.find(r => r.code === 'aml-ob-monitoring')!.status).toBe('evidence');
+        expect(noList.find(r => r.code === 'aml-ob-cdd')!.status).toBe('evidence');
+        const lists = [{ source: 'eu-fsf', entries: 6000, fetchedAt: '2026-11-19T05:10:00.000Z' }, { source: 'un', entries: 1000, fetchedAt: '2026-11-19T05:10:00.000Z' }];
+        const withLists = amlObligations(facts({ mode: 'owners', kyc: { lists, cards: 3, due: 1, notScreened: 0 } }), { ftnEnabled: false });
+        expect(withLists.find(r => r.code === 'aml-ob-sanctions')!.status).toBe('evidence');
+        expect(withLists.find(r => r.code === 'aml-ob-monitoring')!.status).toBe('check');
+        expect(withLists.find(r => r.code === 'aml-ob-cdd')!.status).toBe('check');
+        const unscreened = amlObligations(facts({ mode: 'owners', kyc: { lists, cards: 3, due: 0, notScreened: 2 } }), { ftnEnabled: true });
+        expect(unscreened.find(r => r.code === 'aml-ob-sanctions')!.status).toBe('check');
+    });
+
+    it('reads the cash limit in every mode: not applicable with no payment method recorded, evidence, check; absent in a slice', () => {
+        const cash = (over: Partial<AmlFacts>) => amlObligations(facts(over), { ftnEnabled: false }).find(r => r.code === 'aml-ob-cash');
+        expect(cash({})!.status).toBe('not_applicable');
+        expect(cash({ cash: { recorded: 4, cash: 1, otherCurrency: 0, overLimit: [] } })!.status).toBe('evidence');
+        expect(cash({ mode: 'none', cash: { recorded: 4, cash: 2, otherCurrency: 0, overLimit: [overItem] } })!.status).toBe('check');
+        expect(cash({ owner: 'alice', cash: null })).toBeUndefined();
     });
 });

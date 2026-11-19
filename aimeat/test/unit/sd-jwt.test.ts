@@ -2,10 +2,12 @@
  * @file sd-jwt.test.ts
  * @description Unit tests for SD-JWT decode and cryptographic verification
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The issuer signature's algorithm: HS256 and a mismatch with the key's alg are refused.
  *   v1.0.0 — 2026-05-02 — Initial test suite
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
+import * as jose from 'jose';
 import { createSdJwtVerifier } from '../../src/services/sd-jwt.js';
 import { generateTestKeyPair, createTestSdJwt, type TestKeyPair } from '../helpers/test-sd-jwt.js';
 import type { SdJwtVerifier } from '../../src/services/sd-jwt.js';
@@ -63,6 +65,23 @@ describe('SD-JWT Verifier', () => {
     const result = await verifier.verify(token, keys);
     expect(result.valid).toBe(false);
     expect(result.error).toBe('Untrusted issuer');
+  });
+
+  it('refuses an issuer signature algorithm the token picks for itself (HS256 with the public key as secret)', async () => {
+    const keys = new Map<string, JsonWebKey>([[ISSUER, es256KeyPair.publicJwk]]);
+    const secret = new TextEncoder().encode(JSON.stringify(es256KeyPair.publicJwk));
+    const jwt = await new jose.SignJWT({ iss: ISSUER, given_name: 'Eve' }).setProtectedHeader({ alg: 'HS256', typ: 'vc+sd-jwt' }).sign(secret);
+    const result = await verifier.verify(`${jwt}~`, keys);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Issuer signature algorithm not accepted: HS256');
+  });
+
+  it('refuses a token whose algorithm differs from the one the trusted key names', async () => {
+    const keys = new Map<string, JsonWebKey>([[ISSUER, { ...eddsaKeyPair.publicJwk, alg: 'ES256' }]]);
+    const token = await createTestSdJwt({ given_name: 'Eve' }, ISSUER, eddsaKeyPair);
+    const result = await verifier.verify(token, keys);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Issuer signature algorithm not accepted: EdDSA');
   });
 
   it('rejects token with wrong key', async () => {

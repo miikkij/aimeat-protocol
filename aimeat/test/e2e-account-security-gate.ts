@@ -19,6 +19,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-account-security-gate
  * @version-history
+ *   2026-11-19 — POST /v1/ghii/verify/eudiw sends `state`, which the contract now requires; without it the
+ *     request-body check answered 400 before the route's own answer.
  *   2026-11-15 — Audit finding M049 asked for the account:security word to be bounded; that premise is
  *     replaced by the developer's ruling of 2026-11-15: an agent the owner gave the word does the
  *     account's security work, recovery address, second factor and signed credential included. Phase 3
@@ -147,7 +149,7 @@ const DOORS: Door[] = [
     { what: 'remove the second factor', method: 'DELETE', path: '/v1/ghii/totp', body: { code: '000000' } },
     { what: 'replace the backup codes', method: 'POST', path: '/v1/ghii/totp/backup-codes', body: { code: '000000' } },
     { what: 'decide which web origins may read the account', method: 'PUT', path: '/v1/ghii/cors', body: { allowed_origins: null } },
-    { what: 'stamp a wallet identity onto the person', method: 'POST', path: '/v1/ghii/verify/eudiw', body: { vp_token: 'x' } },
+    { what: 'stamp a wallet identity onto the person', method: 'POST', path: '/v1/ghii/verify/eudiw', body: { vp_token: 'x', state: 'x' } },
     { what: 'stamp a bank identity onto the person', method: 'POST', path: '/v1/ghii/verify/ftn', body: { callback_token: 'x' } },
     { what: 'export everything the account holds', method: 'GET', path: `/v1/owners/${ownerA}/export` },
     // Added 2026-09-04 by check:owner-principal, which found this door carrying requireAuth() and a

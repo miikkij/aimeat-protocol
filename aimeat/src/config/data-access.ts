@@ -22,6 +22,8 @@
  *   v1.8.0 — 2026-11-02 — secaudit2026nov02d round 13: appPartySignupsPerHour
  *     (AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR, 30) and appPartyPendingHours (AIMEAT_APP_PARTY_PENDING_HOURS,
  *     24); 0 is no limit for each.
+ *   v1.9.0 — 2026-11-19 — kycSanctionsSources (AIMEAT_KYC_SANCTIONS_SOURCES) and kycAi (AIMEAT_KYC_AI:
+ *     local, the code default | node | off) for customer due diligence (services/kyc/).
  *   v1.8.0 — 2026-11-19 — amlMode (AIMEAT_AML_MODE: report, the code default | none | owners | node):
  *     whether this node or its owners do work the EU anti-money-laundering regulation (2024/1624)
  *     makes an obliged entity's (services/aml/; decision-aml-velvoitteet-ovat-operaattorin-aktivoima-tila).
@@ -104,6 +106,12 @@ export function dataAccessDefaults() {
     // Whether this node or its owners do anti-money-laundering obliged work (EU 2024/1624), and who
     // (services/aml/). report, the code default, refuses nothing and lists what it finds.
     amlMode: parseAmlMode(process.env.AIMEAT_AML_MODE),
+    // Where the sanctions lists for customer due diligence come from (services/kyc/screening/store.ts):
+    // empty = the EU and UN official lists; `eu-fsf=<url>,un=<url>` names them; `none` fetches nothing.
+    kycSanctionsSources: (process.env.AIMEAT_KYC_SANCTIONS_SOURCES ?? '').trim(),
+    // Which AI models may read customer due diligence data on this server (services/kyc/ai.ts):
+    // local (the default) | node | off.
+    kycAi: parseKycAi(process.env.AIMEAT_KYC_AI),
     // Whether an app's own users may register as outside parties of its owner (services/app-parties/).
     // off, the default, refuses every signup; a node that shows its content to signed-in accounts only forces off.
     partySelfRegistration: parsePartySelfRegistration(process.env.AIMEAT_PARTY_SELF_REGISTRATION),
@@ -172,6 +180,15 @@ export type AmlMode = 'report' | 'none' | 'owners' | 'node';
 export const AML_MODES: readonly AmlMode[] = ['report', 'none', 'owners', 'node'];
 
 /** An unknown value is `report`, the one that refuses nothing. */
+/** Which AI models may read customer due diligence data: local (only a model on this machine), node (the
+ * node's allowed models), off (none). Anything else reads as local, the careful one. */
+export type KycAi = 'local' | 'node' | 'off';
+export const KYC_AI_VALUES: readonly KycAi[] = ['local', 'node', 'off'];
+export function parseKycAi(raw: string | undefined): KycAi {
+  const v = (raw ?? '').trim().toLowerCase();
+  return v === 'node' || v === 'off' ? v : 'local';
+}
+
 export function parseAmlMode(v: unknown): AmlMode {
   return AML_MODES.find(m => m === v) ?? 'report';
 }

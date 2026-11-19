@@ -30,6 +30,7 @@
  *   2026-11-19 — registerOrganismApprovalTools (an organism's approval requests, mcp/organism-approvals.ts).
  *   2026-11-19 — registerModerationReviewTools (the moderation review: flags and appeals, mcp/flags.ts).
  *   2026-11-19 — registerEcosystemAppTools (aimeat_ecosystem_app_list and _revoke, mcp/ecosystem-apps.ts).
+ *   2026-11-19 — registerKycTools (aimeat_kyc_customer, _suspicion_mark, _settings: customer due diligence, mcp/kyc.ts).
  *   2026-11-14 — registerHelpTools (aimeat_help_*: Ask someone who knows, mcp/help.ts).
  *   2026-11-14 — registerSecretShareTools (aimeat_secret_share_*: secret shares and requests, mcp/secret-shares.ts).
  *   2026-11-13 — registerAgentOnboardingTools, registerAgentCapabilityTools and registerAgentMessageTools receive the session's caller
@@ -205,6 +206,7 @@ import { registerRefineryTools } from './refinery.js';
 import { registerContentTools } from './content.js';
 import { registerDocsignTools } from './docsign.js';
 import { registerComplianceAgreementTools } from './compliance-agreements.js';
+import { registerKycTools } from './kyc.js';
 import { registerGoalTools } from './goals.js';
 import { registerBuildWithYouTools } from './build-with-you.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
@@ -273,6 +275,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerContentTools(mcp, storage, config, caller);
     registerDocsignTools(mcp, storage, config, caller);
     registerComplianceAgreementTools(mcp, storage, config, caller);
+    registerKycTools(mcp, storage, config, caller);
     registerGoalTools(mcp, storage, config, caller);
     registerBuildWithYouTools(mcp, storage, config, caller);
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);

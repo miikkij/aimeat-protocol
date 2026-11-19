@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — The account group lists Knowing the customer (kyc) after the data wallet.
  *   v1.34.0 -- 2026-11-14 -- "Vault" under Account, after Access: the secrets a person shares and receives (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   v1.33.0 -- 2026-11-08 -- "Contexts" under Information, after Memory: the things a person keeps working on with their AI, each one record their AI shapes in chat (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  *   v1.32.0 -- 2026-11-07 -- "Receivers" under Automation, after Workflows: the addresses and keys outside programs write into one place of the person's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
@@ -697,6 +698,7 @@ export const SIDEBAR_GROUPS = [
      * (WP11, board Jakamasi-data), beside the Data Wallet and What others can see. */
     { id: 'sharedData', labelKey: 'profile.tabs.sharedData' },
     { id: 'dataWallet', labelKey: 'profile.tabs.dataWallet' },
+    { id: 'kyc', labelKey: 'profile.tabs.kyc' },
     { id: 'storage', labelKey: 'profile.tabs.storage' },
     { id: 'access', labelKey: 'profile.tabs.access' },
     /* Secrets a person shares and receives: keys, passwords, configurations and files (design

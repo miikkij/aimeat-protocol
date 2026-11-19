@@ -87,24 +87,26 @@
       "digest": "sha256:f000d3fd757657f8134efc3a"
     },
     "07-security.md": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/config/posture.ts",
         "aimeat/src/middleware/cors.ts",
         "aimeat/src/utils/env-validator.ts",
         "docs/security/verification-matrix.md",
         "aimeat/src/services/sign-in-policy.ts",
-        "aimeat/src/services/mcp-client/capability-use-setting.ts"
+        "aimeat/src/services/mcp-client/capability-use-setting.ts",
+        "aimeat/src/services/sd-jwt.ts",
+        "aimeat/src/services/eudiw.ts"
       ],
-      "digest": "sha256:30b730b1528e2ec7e188011e"
+      "digest": "sha256:a72e1abf13b769566dba9a4d"
     },
     "08-threat-model.md": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "docs/security/threat-model.md",
         "aimeat/src/cli/connect/command-trust.ts"
       ],
-      "digest": "sha256:6cfffd43ecb828c8eb236fda"
+      "digest": "sha256:77e9ceaf0787ce2750b6a0cc"
     },
     "09-hardening-guide.md": {
       "reviewedOn": "2026-11-19",
@@ -169,7 +171,7 @@
         "aimeat/src/services/compliance/derived.ts",
         "aimeat/src/tool-catalog/definitions/compliance.ts"
       ],
-      "digest": "sha256:f46ed8c6af59d4cd5ec5b4e4"
+      "digest": "sha256:38df3c1b99b83ed3bc0408dc"
     },
     "15-operations-runbook.md": {
       "reviewedOn": "2026-11-15",
@@ -185,9 +187,11 @@
         "docs/known_gaps.md",
         "docs/security/threat-model.md",
         "aimeat/src/services/operator/access-audit.ts",
-        "aimeat/src/services/schedule/fire-claim.ts"
+        "aimeat/src/services/schedule/fire-claim.ts",
+        "aimeat/src/services/sd-jwt.ts",
+        "aimeat/src/services/eudiw.ts"
       ],
-      "digest": "sha256:8d0ba0942b8ed7bc4ab9add0"
+      "digest": "sha256:ac8596d42e5071f88a7c698a"
     },
     "17-exit-plan.md": {
       "reviewedOn": "2026-11-15",
@@ -226,7 +230,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:ce161ecc6fb18bbd69da0192"
+      "digest": "sha256:8498c40e2a27e126a0100e93"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -258,11 +262,11 @@
       "digest": "sha256:0409da12c8aea42a41a80689"
     },
     "templates/processing-record.md": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "aimeat/src/services/compliance/derived.ts"
       ],
-      "digest": "sha256:8ddee3b0981dd9025fd7655a"
+      "digest": "sha256:e9f68fd5e07fc56278bf567f"
     },
     "templates/regulated-sector-addendum.md": {
       "reviewedOn": "2026-11-01",
@@ -272,11 +276,11 @@
       "digest": "sha256:20bb1e6281cafcfa6822765b"
     },
     "templates/risk-assessment.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-19",
       "watches": [
         "docs/security/threat-model.md"
       ],
-      "digest": "sha256:db699b8ee97460824040043e"
+      "digest": "sha256:c7f6dc3ef23eba5885c20636"
     }
   },
   "fileDigests": {
@@ -348,10 +352,12 @@
       "aimeat/src/utils/env-validator.ts": "ccbc5f8f8169ffad",
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
       "aimeat/src/services/sign-in-policy.ts": "abdf689f004d2cac",
-      "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec"
+      "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec",
+      "aimeat/src/services/sd-jwt.ts": "7c866bc79ebd9e48",
+      "aimeat/src/services/eudiw.ts": "b6f5af6030b3bcd3"
     },
     "08-threat-model.md": {
-      "docs/security/threat-model.md": "211b04c0cc93e8fe",
+      "docs/security/threat-model.md": "10cf3cf1952417f9",
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce"
     },
     "09-hardening-guide.md": {
@@ -400,7 +406,7 @@
       "aimeat/src/static/sdk-libs/offline/store.js": "ba14118fe69ad407"
     },
     "14-compliance-mapping.md": {
-      "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",
+      "aimeat/src/services/compliance/derived.ts": "e169580bb1c4861e",
       "aimeat/src/tool-catalog/definitions/compliance.ts": "83ae759b2cda0f63"
     },
     "15-operations-runbook.md": {
@@ -409,9 +415,11 @@
     },
     "16-known-limitations.md": {
       "docs/known_gaps.md": "9b4977634dac65c3",
-      "docs/security/threat-model.md": "211b04c0cc93e8fe",
+      "docs/security/threat-model.md": "10cf3cf1952417f9",
       "aimeat/src/services/operator/access-audit.ts": "0706dd521e11a994",
-      "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580"
+      "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580",
+      "aimeat/src/services/sd-jwt.ts": "7c866bc79ebd9e48",
+      "aimeat/src/services/eudiw.ts": "b6f5af6030b3bcd3"
     },
     "17-exit-plan.md": {
       "docs/data-ownership.md": "46190f389def808b",
@@ -432,13 +440,13 @@
       "aimeat/src/data/classification-packs.ts": "ffbb4b6a6349fce1"
     },
     "templates/processing-record.md": {
-      "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53"
+      "aimeat/src/services/compliance/derived.ts": "e169580bb1c4861e"
     },
     "templates/regulated-sector-addendum.md": {
       "aimeat/src/services/docsign/statement.ts": "65d24a2c3e04407e"
     },
     "templates/risk-assessment.md": {
-      "docs/security/threat-model.md": "211b04c0cc93e8fe"
+      "docs/security/threat-model.md": "10cf3cf1952417f9"
     },
     "18-scope-and-deployment-patterns.md": {
       "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580",
@@ -454,7 +462,7 @@
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
-      "aimeat/security/process-local-baseline.json": "ba1feda9ff48b632",
+      "aimeat/security/process-local-baseline.json": "cea5bb0117fb8d27",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52",

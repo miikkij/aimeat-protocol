@@ -18,6 +18,8 @@
  * @structure AmlSection · MODE_TEXT · amlObligations · buildAmlSection
  * @usage const aml = await buildAmlSection({ storage, config }, { ownerGhii });
  * @version-history
+ *   2026-11-19 — Obligation aml-ob-cash (art. 80): evidence, check or not applicable from the cash vouchers, on the node's view.
+ *   2026-11-19 — The duties read what customer due diligence now does (services/kyc/): screening, cards, the review calendar and the retention hold.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design, stage A).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -66,10 +68,28 @@ export function amlObligations(f: AmlFacts, config: Pick<AimeatConfig, 'ftnEnabl
     { code: 'aml-ob-custody', ref: AMLR_REFS.obliged, status: 'evidence', evidence: { rails: ['card: the seller\'s own Stripe key', 'stablecoin: the seller\'s own address', 'invoice: billed by the seller'] },
       text: 'This server holds no funds and no payout key: every rail settles to the seller directly, and a beneficiary payout is signed by the provider.' },
     {
-      code: 'aml-ob-sanctions', ref: AMLR_REFS.sanctions, status: f.sellers.length ? 'missing' : 'not_applicable', evidence: { sellers: f.sellers.length, screened: 0 },
-      text: f.sellers.length ? 'Sellers take money here and nobody is screened against the EU sanctions lists yet.' : 'No account takes money here, so there is nobody to screen.',
+      code: 'aml-ob-sanctions', ref: AMLR_REFS.sanctions,
+      status: f.kyc.lists.length && applies ? (f.kyc.notScreened ? 'check' : 'evidence') : f.sellers.length ? 'missing' : 'not_applicable',
+      evidence: { sellers: f.sellers.length, lists: f.kyc.lists, cards_not_screened: f.kyc.notScreened },
+      text: f.kyc.lists.length && applies
+        ? `An obliged organism's customers and their beneficial owners are screened against the ${f.kyc.lists.map(l => l.source === 'un' ? 'UN' : 'EU').join(' and ')} sanctions lists, fetched daily; a possible hit waits for a person's decision.${f.kyc.notScreened ? ` ${f.kyc.notScreened} open card(s) are not screened yet.` : ''} Sellers who take money here are not customers of an obliged entity and are not screened.`
+        : f.sellers.length ? 'Sellers take money here and nobody is screened against the sanctions lists: no list is fetched yet (Admin › Customer due diligence › Fetch the lists now).' : 'No account takes money here, so there is nobody to screen.',
     },
   ];
+  // Art. 80 binds every business, obliged or not, so this row does not wait for `applies`. Node view only.
+  if (f.cash) {
+    const over = f.cash.overLimit.length;
+    rows.push({
+      code: 'aml-ob-cash', ref: AMLR_REFS.cash,
+      status: !f.cash.recorded ? 'not_applicable' : over ? 'check' : 'evidence',
+      evidence: { vouchers_with_payment_method: f.cash.recorded, cash_vouchers: f.cash.cash, over_limit: over, other_currency: f.cash.otherCurrency },
+      text: !f.cash.recorded
+        ? 'No voucher records how it was paid, so cash payments cannot be told apart. A person records it when booking a voucher (payment method).'
+        : over
+          ? `${over} cash payment(s) of more than EUR 10 000 are booked, alone or linked within 30 days. Each one is checked with the business that booked it.`
+          : 'Vouchers record how they were paid, and no cash payment of more than EUR 10 000 is booked, alone or linked within 30 days. Only vouchers in EUR are summed.',
+    });
+  }
   if (!applies) {
     rows.push(
       na('aml-ob-risk-assessment', AMLR_REFS.riskAssessment, 'No obliged entity works here, so no business-wide risk assessment is asked for.'),
@@ -97,21 +117,22 @@ export function amlObligations(f: AmlFacts, config: Pick<AimeatConfig, 'ftnEnabl
       text: 'Each declaration names the compliance officer, the compliance manager from the management and a deputy.',
     },
     {
-      code: 'aml-ob-cdd', ref: AMLR_REFS.cdd, status: config.ftnEnabled ? 'check' : 'missing', evidence: { bank_identification: config.ftnEnabled },
-      text: config.ftnEnabled
-        ? 'Bank identification is on, so a person can prove who they are here. Recording a customer\'s identification for an obliged entity is not built yet.'
-        : 'No strong identification is on: the operator turns on bank identification (FTN) before an obliged entity can identify a customer here.',
+      code: 'aml-ob-cdd', ref: AMLR_REFS.cdd, status: config.ftnEnabled ? 'evidence' : 'check', evidence: { bank_identification: config.ftnEnabled, cards: f.kyc.cards },
+      text: (config.ftnEnabled
+        ? 'Customer cards record each customer\'s identity, beneficial owners, purpose and source of funds, and a customer can give their own bank identification through an identify link.'
+        : 'Customer cards record each customer\'s identity, beneficial owners, purpose and source of funds; identity is recorded as seen (a document, a register extract), because bank identification (FTN) is off and a customer cannot give their own.')
+        + ` ${f.kyc.cards} card(s) on this server.`,
     },
-    { code: 'aml-ob-monitoring', ref: AMLR_REFS.monitoring, status: 'missing', evidence: {},
-      text: 'This server has no customer review calendar yet: an obliged entity keeps its review dates elsewhere.' },
+    { code: 'aml-ob-monitoring', ref: AMLR_REFS.monitoring, status: f.kyc.due ? 'check' : 'evidence', evidence: { cards: f.kyc.cards, due: f.kyc.due },
+      text: `Each customer card carries its next review from its risk (high within 12 months, at most 5 years), and the people doing the work get a notice when reviews fall due.${f.kyc.due ? ` ${f.kyc.due} card(s) are due now.` : ''}` },
     {
       code: 'aml-ob-reporting', ref: AMLR_REFS.reporting,
       status: all(d => !!d.fiuRegisteredAt) ? 'evidence' : decls.length ? 'check' : 'missing',
       evidence: { declarations: decls.length, fiu_registered: decls.filter(d => !!d.fiuRegisteredAt).length },
       text: 'Each obliged entity records its registration with the FIU\'s reporting service. Reports themselves are made there by a person, never by this server.',
     },
-    { code: 'aml-ob-retention', ref: AMLR_REFS.retention, status: 'missing', evidence: {},
-      text: 'This server has no legal retention hold yet: a deletion request would remove due diligence records before five years have passed.' },
+    { code: 'aml-ob-retention', ref: AMLR_REFS.retention, status: 'evidence', evidence: { cards: f.kyc.cards },
+      text: 'Customer cards and suspicions are kept five years after the relationship ends, longer when the officer extends the hold with its ground; no member, memory or organism delete removes them before, and the daily purge removes them after, leaving a receipt that names nobody.' },
   );
   return rows;
 }
@@ -146,7 +167,7 @@ export async function buildAmlSection(
       reviewed: findings.filter(f => f.source === 'human').length,
     },
     obligations: amlObligations(facts, deps.config),
-    regulation: [AMLR_REFS.obliged, AMLR_REFS.compliance, AMLR_REFS.cdd, AMLR_REFS.reporting, AMLR_REFS.retention, AMLR_REFS.sanctions],
+    regulation: [AMLR_REFS.obliged, AMLR_REFS.compliance, AMLR_REFS.cdd, AMLR_REFS.reporting, AMLR_REFS.retention, AMLR_REFS.sanctions, AMLR_REFS.cash],
     edit: owner
       ? { method: 'PUT', url: '/v1/compliance/docs/aml?scope=organism&organism_id=<id>', note: 'An organism you manage keeps its own declaration and reviews. On a server set to none the declaration is refused.' }
       : { method: 'PUT', url: '/v1/compliance/docs/aml', note: 'The node\'s declaration (an item of type declaration, mode node) and a review per finding (type review, the finding\'s id, accepted or dismissed). aimeat_compliance_register_write with part aml does the same.' },

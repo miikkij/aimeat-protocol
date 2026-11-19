@@ -2,7 +2,7 @@
 
 How an operator configures document signing on an AIMEAT node: AIMEAT signatures (passkey, key or session, sealed by the node), checks of signatures made elsewhere (PDF and CMS against the EU trusted lists), and signing a PDF with an EU Digital Identity Wallet. What each feature does for a person is in [AIMEAT-Feature-List.md](AIMEAT-Feature-List.md) (Document signing, Signature checks, Signing with an EU Digital Identity Wallet); the API is in [openapi.yaml](../openapi.yaml), tag "Document signing".
 
-**Do not confuse this with `AIMEAT_EUDIW_*`.** Those settings belong to identity verification with a wallet ([aimeat-eudiw-integration.md](aimeat-eudiw-integration.md)), which is blocked at startup: `AIMEAT_EUDIW_ENABLED=true` stops the node from starting. Signing with a wallet is a different feature with its own settings, all named `docsign.*` / `AIMEAT_DOCSIGN_*`, and it does not touch `AIMEAT_EUDIW_*`.
+**Do not confuse this with `AIMEAT_EUDIW_*`.** Those settings belong to identity verification with a wallet ([aimeat-eudiw-integration.md](aimeat-eudiw-integration.md)), which `AIMEAT_EUDIW_ENABLED` switches on and off. Signing with a wallet is a different feature with its own settings, all named `docsign.*` / `AIMEAT_DOCSIGN_*`, and it does not touch `AIMEAT_EUDIW_*`.
 
 ## Where the settings are
 

@@ -20,6 +20,8 @@
  * @usage
  *   const out = await writeDocOp(deps, caller, 'registers', { scope: 'organism', organism_id }, body, { dryRun });
  * @version-history
+ *   2026-11-19 — An organism's register draft carries `org-kyc` when the organism declared itself an
+ *     anti-money-laundering obliged entity (organismRegisterDraft reads its `aml` document).
  *   2026-11-19 — A write of the document `aml` asks services/aml/gate.ts first: AIMEAT_AML_MODE none
  *     refuses an organism's new obliged-entity declaration with 403 AML_NOT_OFFERED.
  *   2026-11-13 — An app's balancing tests and trial mark and an organism's privacy contact go through
@@ -265,7 +267,7 @@ export async function draftOp(deps: Deps, caller: OperatorCaller, input: ScopeIn
   const scope = scopeFrom(input, caller);
   await allowed(deps, caller, 'registers', scope, 'read');
   if (scope.kind === 'node') return { scope, items: nodeRegistersDraft(deps.config), stored: false };
-  if (scope.kind === 'organism') return { scope, items: await organismRegisterDraft(deps.storage, scope.organismId), stored: false };
+  if (scope.kind === 'organism') return { scope, items: await organismRegisterDraft(deps.storage, scope.organismId, { nodeId: deps.config.nodeId }), stored: false };
   const d = await appRegisterDraft(deps.storage, `${scope.ownerName}@${deps.config.nodeId}`, scope.app);
   return {
     scope, items: d.register ? [d.register] : [], stored: false, has_data_map: d.hasMap,

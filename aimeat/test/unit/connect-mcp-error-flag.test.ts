@@ -22,6 +22,7 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-11-19 — PROBE_SETUP for aimeat_kyc_suspicion_mark (an organism and an observation).
  *   2026-11-12 — PROBE_SETUP for aimeat_access_request (an app ref, <owner>/<filename>).
  *   2026-11-09 — PROBE_SETUP for aimeat_memory_write (a value), whose value is optional now that the
  *     tool also takes a patch.
@@ -89,6 +90,8 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   // The ceiling is a whole number, "none" or "node" on the catalog's pattern; 'probe' is none of them.
   aimeat_admin_federation_settlement_ceiling_set: { settlement_ceiling: 'node' },
   aimeat_dataproduct: { action: 'get', name: 'thing' },
+  // An observation of at least a sentence is required before the call reaches the node.
+  aimeat_kyc_suspicion_mark: { organism: 'org-probe', observation: 'A probe observation long enough.' },
   // Neither field is required, because clear: true takes the place of the kit, so the probe names one.
   aimeat_designbook_kit_default: { kit: 'kit-probe' },
   // value became optional (item_id + set change one entry instead), so the probe sends the document.

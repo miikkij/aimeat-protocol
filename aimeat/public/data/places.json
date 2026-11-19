@@ -216,6 +216,7 @@
           { "id": "dw-class", "num": "06", "labelKey": "dwpage.cls.title" },
           { "id": "dw-content", "num": "07", "labelKey": "dwpage.cc.title" }
         ] },
+        { "id": "kyc", "labelKey": "profile.tabs.kyc" },
         { "id": "storage", "labelKey": "profile.tabs.storage", "sections": [
           { "id": "fs-rule", "num": "01", "labelKey": "profile.storage.rule.title" },
           { "id": "fs-store", "num": "02", "labelKey": "profile.storage.store.title" },
@@ -264,6 +265,7 @@
         { "id": "internet-openings", "labelKey": "admin.internetOpenings.title" },
         { "id": "receivers", "labelKey": "receivers.admin.title" },
         { "id": "compliance", "labelKey": "admin.compliance.title" },
+        { "id": "aml", "labelKey": "admin.aml.title" },
         { "id": "help", "labelKey": "admin.help.title" },
         { "id": "cors", "labelKey": "dashboard.cors" },
         { "id": "maintenance", "labelKey": "dashboard.maintenance" },
