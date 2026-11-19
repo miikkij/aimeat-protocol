@@ -289,6 +289,9 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/live/node-totals.ts :: let :: watcher": { "count": 1, "reason": "nothing; each process keeps its own watcher, and a second start in the same process is a no-op" },
+    "src/services/live/node-totals.ts :: interval :: startNodeTotalsLive": { "count": 1, "reason": "every process sweeps the counters; with two processes each one tells the streams of a change it sees, so a page may hear one change twice and read the counters twice" },
+    "src/services/site.ts :: let :: nodeSite": { "count": 1, "reason": "the SiteService of this process; a second process has its own front-page cache, so a page stored there is served here until siteCacheTtlSeconds runs out" },
     "src/services/node-admin/siem-export.ts :: let :: bound": { "count": 1, "reason": "nothing; every process binds the same config at boot and sends its own events" },
     "src/services/node-admin/siem-export.ts :: set :: warned": { "count": 1, "reason": "nothing; each process warns once in its own log" },
     "src/services/node-admin/siem-export.ts :: let :: offTrail": { "count": 1, "reason": "nothing; each process listens to its own usage stream, which holds its own calls" },

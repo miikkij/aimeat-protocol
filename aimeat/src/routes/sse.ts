@@ -164,7 +164,7 @@ const visitorStreamsByIp = new Map<string, number>();
  * nothing the page would not show. Only the public counters of the front page (services/live/
  * node-totals.ts), which the page read on a 60-second timer before (feature audit 2026-11-19, 4.6).
  */
-const PUBLIC_STREAM_DOMAINS: ReadonlySet<string> = new Set([NODE_TOTALS_DOMAIN]);
+const PUBLIC_STREAM_DOMAINS: readonly string[] = [NODE_TOTALS_DOMAIN];
 
 /** A draft written in many small saves is told at most once a second, like the domain frames. */
 const DRAFT_COALESCE_MS = 1000;

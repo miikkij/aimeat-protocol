@@ -134,6 +134,7 @@ export function startNodeTotalsLive(storage: Storage, config: AimeatConfig): voi
     schedule();
   };
   onChangeEvent(onChange);
+  // process-local: every process sweeps the counters; with two processes each one tells the streams of a change it sees, so a page may hear one change twice and read the counters twice.
   const sweep = setInterval(run, SWEEP_MS);
   sweep.unref?.();
   run();

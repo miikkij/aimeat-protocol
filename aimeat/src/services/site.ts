@@ -696,6 +696,7 @@ export class SiteError extends Error {
  * mountRoutes registers the instance it builds, and a caller that runs before that (or a test
  * harness without routes) gets one built and kept here.
  */
+// process-local: the SiteService of this process; a second process has its own front-page cache, so a page stored there is served here until siteCacheTtlSeconds runs out.
 let nodeSite: SiteService | null = null;
 
 /** Make `site` the node's one SiteService (server-bootstrap/routes-loader.ts, at mount). */
