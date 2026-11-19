@@ -11,6 +11,7 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-19 — aimeat_app_delete passes the config to deleteOwnedApp, which now removes what the app leaves.
  *   2026-11-14 — aimeat_app_list reads its page through catalogueAppPage (services/app/catalogue-page.ts),
  *     as GET /v1/apps does: own and building are refused to the anonymous credential instead of
  *     answering it an empty list (structure programme 2026-11, unit 2b, B7).
@@ -775,6 +776,7 @@ export function registerAppsTools(
                     callerGaii: agentGaii,
                     filename,
                     version,
+                    config,
                 });
                 if ('refusal' in out) {
                     return { content: [{ type: 'text' as const, text: out.refusal.message }], isError: true };

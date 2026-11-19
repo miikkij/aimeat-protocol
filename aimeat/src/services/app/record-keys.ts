@@ -2,6 +2,7 @@
  * @file src/services/app/record-keys.ts
  * @description Collision-free app record identities and verified legacy migration.
  * @version-history
+ *   2026-11-19 - legacyAppSegment: the app delete reaches a record still under the lossy segment.
  *   2026-11-04 - No guard for a storage without createMemoryIfAbsent: it is required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 - readAuthorAppRecord and appRecordsOfAuthor: an author's records (the design spec, the roadmap) do not pass to the next holder of an erased name (secaudit2026oct26).
  *   2026-10-05 - tokenOfThisApp moved here from auth/app-own-gate.ts (which re-exports it), so the roster services ask it; aimeat_app_manage calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
@@ -17,6 +18,8 @@ export function canonicalAppId(appId: string): string {
 export const appKeySegment = (id: string): string => `v2-${Buffer.from(canonicalAppId(id)).toString('hex')}`;
 const legacySegment = (id: string): string => id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 export const equalAppId = (a: string, b: string): boolean => typeof a === 'string' && typeof b === 'string' && canonicalAppId(a) === canonicalAppId(b);
+/** The pre-v2 (lossy) segment, for a caller that must reach a record written before the v2 keys (services/app/delete-sweep.ts). */
+export const legacyAppSegment = legacySegment;
 
 /**
  * Was this token minted for the app `appId` ("owner/filename")? A role-'app' token carries the app

@@ -6,6 +6,7 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — DELETE /v1/apps/:filename passes the config to deleteOwnedApp, which now removes what the app leaves.
  *   2026-11-19 — POST .../fork answers the app read's own 403 ACCESS_DENIED (401 SIGN_IN_REQUIRED
  *     without an account) when the app's audience does not admit the caller (forkSourceFor gate
  *     `audience`): an app opened to one organism gave its source to any account (feature audit 1.1).
@@ -577,6 +578,7 @@ export function registerForkManageRoutes(
             callerGaii,
             filename,
             version,
+            config,
         });
         if ('refusal' in out) {
             res.status(out.refusal.status).json(error(

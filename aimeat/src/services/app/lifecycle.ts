@@ -35,11 +35,15 @@
  *   - discardAppDraft() — clear the draft slot
  *   - publishAppDraft() — draft manifest → publishApp → clear the slot (the slot survives a refusal)
  *   - forkApp() — validate, copy manifest + bytes + screenshot, record lineage, log, announce
- *   - deleteOwnedApp() — sweep every bucket (or one version), drop screenshots, log
+ *   - deleteOwnedApp() — sweep every bucket (or one version), drop screenshots, remove what the app
+ *     leaves (services/app/delete-sweep.ts), log
  * @usage
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.14.0 — 2026-11-19 — A whole-app delete runs removeAppLeftovers (services/app/delete-sweep.ts):
+ *     the five removals it made move there, and the settings, checkpoints, roster, icon, draft, bound
+ *     skills, internet opening, grants and the rest go too. The input carries the config.
  *   v1.13.0 — 2026-11-15 — deleteOwnedApp removes the app's own users with the whole app: their rows,
  *     what they kept, their roster rows and the signup setting (they stayed behind until now).
  *   v1.12.0 — 2026-11-13 — resolveAppTargetScope also answers `delegated`, so aimeat_app_publish
@@ -101,7 +105,6 @@ import type {
 } from '../../storage/interface.js';
 import { parseGAII, localAccountName } from '../../utils/gaii.js';
 import { resolveAppTarget, type AppDevAct } from './dev-grant.js';
-import { DesignBookReasons } from '../design-book/reasons.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange, emitAppChange } from '../event-bus.js';
 import { isAnnounceable, recordAppActivity } from './announce.js';
@@ -138,11 +141,8 @@ import type { AppOwnerScope } from './owner-scope.js';
 import { publishExposure } from './publish-exposure.js';
 import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './publish-gate.js';
 import type { PublishAsk } from '../publish-requests/ask.js';
-import { removeComplianceDocs } from '../compliance/docs.js';
-import { holdAppLabels } from '../held-app-labels.js';
-import { deleteAppPlan } from './plan.js';
+import { removeAppLeftovers } from './delete-sweep.js';
 import { managedIntakeForms } from './intake-forms.js';
-import { removeAppPartiesOfApp } from '../app-parties/app-removal.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './owner-scope.js';
 
 /**
@@ -675,6 +675,8 @@ export interface DeleteOwnedAppInput {
   filename: string;
   /** Omit to remove every version in every bucket. */
   version?: number;
+  /** The node's config: a whole-app delete reaches the bound skills and the internet openings with it. */
+  config: AimeatConfig;
 }
 
 export interface DeletedApp {
@@ -699,6 +701,7 @@ export async function deleteOwnedApp(
 
   if (!version) {
     let sweepCount = 0;
+    const buckets: string[] = [];
     for (;;) {
       const app = await storage.getAppByOwnerName(ownerName, filename);
       if (!app) break;
@@ -706,6 +709,7 @@ export async function deleteOwnedApp(
       // because getAppByOwnerName takes ownerName as the key — but defense in depth.)
       if (app.ownerName !== ownerName) break;
       await storage.deleteApp(app.ownerGaii, filename);
+      buckets.push(app.ownerGaii);
       await forgetDependencies(storage, 'app', depAppRef(ownerName, filename))
         .catch(err => logger.warn('deleteOwnedApp: dependency map not cleared', { filename, error: String(err) }));
       await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`)
@@ -721,21 +725,11 @@ export async function deleteOwnedApp(
         },
       };
     }
-    // The whole app went, so its compliance documents go (plan doc-mvlftkh9zmc9).
-    await removeComplianceDocs(storage, ownerGhii.slice(ownerGhii.indexOf('@') + 1), { kind: 'app', ownerName, app: filename })
-      .catch(err => logger.warn('deleteOwnedApp: compliance documents not removed', { filename, error: String(err) }));
-    // Its own address stays as a held name for this owner, and the hold's clock starts now
-    // (services/held-app-labels.ts; secaudit2026oct22). The daily sweep starts it if this fails.
-    await holdAppLabels(storage, ownerName, filename)
-      .catch(err => logger.warn('deleteOwnedApp: address not marked held', { filename, error: String(err) }));
-    // Its plan goes too, or the structure page would list a deleted app as one being built.
-    await deleteAppPlan(storage, `${ownerName}/${filename}`)
-      .catch(err => logger.warn('deleteOwnedApp: app plan not removed', { filename, error: String(err) }));
-    // The people who registered to it go with it: their rows and addresses, what they kept, their roster
-    // rows and the app's signup setting (services/app-parties/app-removal.ts). Their e-mail addresses are the
-    // owner's personal data about them, and a later app of the same name must not inherit them.
-    await removeAppPartiesOfApp(storage, ownerGhii.slice(ownerGhii.indexOf('@') + 1), ownerName, ownerGhii, filename)
-      .catch(err => logger.warn('deleteOwnedApp: the people registered to the app were not removed', { filename, error: String(err) }));
+    // The whole app went, so everything it alone used goes too: its compliance documents, plan,
+    // registered people, Design Book reasons, settings, roster, grants and the rest, each named in
+    // services/app/delete-sweep.ts, which also says what stays and why (the design spec and the
+    // roadmap, which a republish finds again). Its address is held for this owner.
+    await removeAppLeftovers(storage, input.config, { ownerName, ownerGhii, filename, buckets });
   } else {
     // Single-version case: try the buckets in order, delete from the one that has it.
     let app = await storage.getApp(ownerGhii, filename, version);
@@ -773,15 +767,6 @@ export async function deleteOwnedApp(
     emitAppChange({ appId: `${ownerName}/${filename}`, kind: 'version', version: latestLeft?.versionNumber ?? 0 });
   } catch (err) {
     logger.warn('deleteOwnedApp: open pages of the app were not told; they reload on their next visit', { filename, error: String(err) });
-  }
-
-  // A deleted app leaves the Design Book's reasons: a part must not look favoured by apps that no
-  // longer exist. Whole-app deletes only (one version gone is still an app), and best-effort:
-  // commentary about the Book never gets to fail a delete.
-  if (!version) {
-    // The node's id is the part of the owner's GHII after the "@"; this function holds no config.
-    await new DesignBookReasons(storage, { nodeId: ownerGhii.slice(ownerGhii.indexOf('@') + 1) }).forget(ownerGhii, ownerName, filename)
-      .catch(err => { logger.warn('deleteApp: forgetting the Design Book reasons is best-effort', { filename, error: String(err) }); });
   }
 
   return { filename, versionDeleted: version ?? 'all' };

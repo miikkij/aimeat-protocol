@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- e2e-app-delete-sweep.ts joins the list (not the guard tier): a deleted app leaves nothing in a store the delete removes, and the owner's other app keeps everything (feature audit 2026-11-19, 4.3).
  *   2026-11-19 -- e2e-data-wallet-agent-consents.ts joins the list (not the guard tier): the Data Wallet lists and revokes the consents the person's agents gave (feature audit 2026-11-19, 1.4).
  *   2026-11-19 -- e2e-app-source-access.ts joins the list (not the guard tier): every route that hands an app's source to another person asks the app's audience (feature audit 2026-11-19, 1.1 and 1.2).
  *   2026-11-15 -- test/e2e-federation-peer-proofs.ts joins ALL_SUITES (audit 2026-11 M130, L056).
@@ -705,6 +706,7 @@ const ALL_SUITES = [
     'test/e2e-app-roadmap.ts',
     'test/e2e-app-design-spec.ts',
     'test/e2e-app-structure.ts',
+    'test/e2e-app-delete-sweep.ts',
     'test/e2e-app-silent.ts',
     // Self-spawns with the portfolio origin ON (28461): the owner's welcome page reads their memory only
     // when its writer may read memory or the owner allowed it (audit H-9).
