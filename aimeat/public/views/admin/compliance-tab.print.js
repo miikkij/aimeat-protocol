@@ -50,6 +50,8 @@
  *     compliance-tab.print-tasks.js
  * @usage rendered unconditionally by compliance-tab.js; the print sheet shows it only on paper
  * @version-history
+ *   v4.2.0 — 2026-11-19 — Anti-money-laundering (section 13) prints after section 12: AmlPrint of
+ *     compliance-tab.aml.js (services/aml/).
  *   v4.1.0 — 2026-11-01 — Data intermediation (section 12) prints before the appendix:
  *     IntermediationPrint of compliance-tab.intermediation.js (WP9b, plan doc-mvwxcas3dom3 D7).
  *   v4.0.0 — 2026-10-29 — The state by law and by who sees each app's data, the tasks by person, a
@@ -86,6 +88,7 @@ import { Note } from '/components/Note.js';
 import { answersOf, questionsFor } from './compliance-tab.gaps.js';
 import { personTasks, fullDescriptions, stateCounts } from './compliance-tab.print-tasks.js';
 import { IntermediationPrint } from './compliance-tab.intermediation.js';
+import { AmlPrint } from './compliance-tab.aml.js';
 
 const C = (key, params) => t('admin.compliance.' + key, params);
 const P = (key, params) => t('admin.compliance.paper.' + key, params);
@@ -443,6 +446,7 @@ export default function PrintableReport({ report, questionnaire, registers = [],
     { id: 'cmp-p-limits', label: C('limitsTitle') },
     { id: 'cmp-p-records', label: t('admin.compliance.records.printTitle') },
     ...(report?.data_intermediation ? [{ id: 'cmp-p-di', label: t('admin.compliance.di.title') }] : []),
+    ...(report?.aml ? [{ id: 'cmp-p-aml', label: t('admin.compliance.aml.title') }] : []),
     { id: 'cmp-p-questions', label: P('appendixTitle') },
   ].map((p, i, list) => ({ ...p, num: i === list.length - 1 ? P('appendixNum') : String(i + 1) }));
   const part = (id) => parts.find(p => p.id === id);
@@ -548,6 +552,7 @@ export default function PrintableReport({ report, questionnaire, registers = [],
         : registers.map(r => html`<${PrintEntry} key=${r.id} ...${printableRegister(r)} />`)}
 
       ${report?.data_intermediation ? html`${heading('cmp-p-di')}<${IntermediationPrint} di=${report.data_intermediation} />` : null}
+      ${report?.aml ? html`${heading('cmp-p-aml')}<${AmlPrint} aml=${report.aml} />` : null}
 
       ${heading('cmp-p-questions', { newSheet: true })}
       <${Note} kind="quiet">${P('appendixLead')}<//>

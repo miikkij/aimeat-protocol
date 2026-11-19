@@ -24564,7 +24564,22 @@ paths:
         and reports what is in one and not the other.
 
         Response `data`: `{ scope, not_covered, derived, register, gaps, unlabelled_detail,
-        data_intermediation }`.
+        data_intermediation, aml }`.
+
+        `aml` is section 13 (anti-money-laundering, Regulation (EU) 2024/1624): `{ section, mode,
+        mode_code, mode_text, declarations, findings, totals, obligations, regulation, edit, note }`.
+        `mode` is AIMEAT_AML_MODE (report, none, owners, node). `declarations` holds `{ scope,
+        organism_id, organism, legal_name, business_id, sector, compliance_officer,
+        compliance_manager, deputy, supervisor_registered_at, fiu_registered_at, risk_assessment_at }`
+        from the compliance document `aml`. `findings` has the shape of section 12's: organisms that
+        declared themselves obliged entities (with the proposal to set mode owners), a missing
+        declaration, incomplete roles, missing registrations, a stale risk assessment (one finding
+        per declaration, named after a colon), revenue splits that pay others, stablecoin payouts to
+        beneficiaries, agents that may spend money, sellers nobody screened against sanctions, agent
+        work sold for money and accounts selling to everyone. `obligations` holds `{ code, ref,
+        status: evidence | check | missing | not_applicable, evidence, text }`; a missing row names
+        what this server does not do yet. The owner's slice holds only that account's own findings
+        and the declarations of the organisms it manages.
 
         `data_intermediation` is section 12 (Data Governance Act 2022/868): `{ section, mode,
         mode_code, mode_text, notification, providers, findings, totals, art12, regulation, edit,
@@ -25104,9 +25119,16 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks, intermediation, lias, trial, contact] }
+        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks, intermediation, aml, lias, trial, contact] }
         description: >-
-          `lias` (app) holds the app's balancing tests, the legitimate interests assessment of GDPR
+          `aml` (node and organism) holds an anti-money-laundering obliged entity's declaration, an
+          item `{ id, type: declaration, legalName, businessId, sector, complianceOfficer,
+          complianceManager?, deputy?, supervisorRegisteredAt?, supervisorRef?, fiuRegisteredAt?,
+          riskAssessmentAt?, riskAssessmentRef?, scope }`, and reviews of the report's aml findings
+          `{ id: <the finding's id>, type: review, decision: accepted | dismissed, note? }`. When
+          AIMEAT_AML_MODE is `none`, a write that adds a declaration to an organism's document is
+          403 AML_NOT_OFFERED before anything is written; a write that keeps the stored ones is
+          accepted. `lias` (app) holds the app's balancing tests, the legitimate interests assessment of GDPR
           art. 6(1)(f): an item `{ id, registerId, status: draft | approved, language?, facts,
           answers: { <question id>: yes | no }, notes: { <section or question id>: text },
           outcome?: { result: suitable | not-suitable, summary }, approvedBy?,

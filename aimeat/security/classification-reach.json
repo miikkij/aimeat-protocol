@@ -1482,6 +1482,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Source records pass reader.show before titles and refs become findings; the archived rows and the registry give ids only."
     },
+    "src/services/aml/findings.ts": {
+      "reads": {
+        "listAllMemoryPages": 4
+      },
+      "why": "Reviewed 2026-11-19, the node's own read: the revenue split records (bensplit.* in the beneficiary-split namespace), the beneficiary books (commerce.benefit.*), the agent purchase limits (commerce.agent-limits) and the payment settings (commerce.psp), counted for section 13 of the compliance report. Only counts, rails and account names leave it; no content and no key is shown to anyone."
+    },
     "src/services/data-intermediation/findings.ts": {
       "reads": {
         "getMemoryByKeysAnyOwner": 1,

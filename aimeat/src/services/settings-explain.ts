@@ -9,7 +9,7 @@
  *   SOURCE. Locale data under `explain.<term>.*` in locales/en.json, fi.json and es.json, read once
  *   at start through i18n.ts (resolveFlat), with the same fallback to English the page has. A term
  *   is every key path that has a `short`; its parts are title, short, what, range, low, high,
- *   lowLabel, highLabel, ex1 … ex6 and tip. The section words (`explain.range`, `explain.low`,
+ *   lowLabel, highLabel, ex1 … ex6, tip and src1 … src6. The section words (`explain.range`, `explain.low`,
  *   `explain.high`, `explain.examples`, `explain.when`) come from each locale, as on the page.
  *
  *   PARTS. `start` lists the terms by area (the first segment of the term id) with the English
@@ -21,6 +21,8 @@
  *   settingsExplainParts() · settingsExplainPiece(id)
  * @usage const piece = settingsExplainPiece('ai.temperature'); piece?.text
  * @version-history
+ *   v1.4.0 — 2026-11-19 — A term's official sources (`src1` … `src6`, "Label | https://address") are
+ *     listed under the section word `explain.sources`, as the dialog lists them.
  *   v1.3.0 — 2026-11-10 — The index continues in `start.2` … when it outgrows one tool result: the
  *     60 concepts and 265 settings made `start` 29 935 characters, over the 24 000 of one result.
  *   v1.2.0 — 2026-10-26 — The start part lists a setting by its title only (a concept keeps its short
@@ -140,6 +142,12 @@ function languageText(locale: Locale, term: string): string {
     const examples = EXAMPLE_PARTS.map(p).filter(Boolean);
     if (examples.length) lines.push('', `**${word(locale, 'examples')}**`, '', ...examples.map(e => `- ${e}`));
     if (p('tip')) lines.push('', `**${word(locale, 'when')}**: ${p('tip')}`);
+    // Official sources, "Label | https://address", as components/ExplainDialog.js sourcesOf reads them.
+    const sources = EXAMPLE_PARTS.map((_, i) => p(`src${i + 1}`)).filter(Boolean).map((s) => {
+        const at = s.lastIndexOf('|');
+        return at > 0 ? { label: s.slice(0, at).trim(), url: s.slice(at + 1).trim() } : null;
+    }).filter((s): s is { label: string; url: string } => !!s && s.url.startsWith('https://'));
+    if (sources.length) lines.push('', `**${word(locale, 'sources')}**`, '', ...sources.map(s => `- ${s.label}: ${s.url}`));
     return lines.join('\n');
 }
 

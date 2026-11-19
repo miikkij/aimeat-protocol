@@ -8,6 +8,7 @@
  *   the aside are the library's. Reads the theme's tokens only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-11-19 — The list of official sources ("Read more and ask").
  *   v1.1.0 — 2026-10-31 — The glossary terms, the person's own figures and "Ask your AI more".
  *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille").
  */
@@ -40,6 +41,17 @@
   line-height: 1.55;
 }
 .explain-examples li + li {
+  margin-top: .35rem;
+}
+.explain-sources {
+  margin-top: 1.2rem;
+}
+.explain-sources ul {
+  margin: .4rem 0 0;
+  padding-left: 1.2rem;
+  line-height: 1.55;
+}
+.explain-sources li + li {
   margin-top: .35rem;
 }
 .explain-when {

@@ -31,6 +31,8 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.9.0 — 2026-11-19 — Section 13, anti-money-laundering (compliance-tab.aml.js; services/aml/), and a
+ *     row in section 01 for its findings that wait for a person, counted in the verdict.
  *   v3.8.0 — 2026-11-09 — Section 01's verdict counts what the records of processing leave open and
  *     the register drafts waiting for a review, with a row that leads to section 08 or 09; it said
  *     CLEAR and "Nothing is waiting" above both (guidance audit 2026-11-09).
@@ -90,6 +92,7 @@ import { RegisterSection, QuestionnaireSection, classWord } from './compliance-t
 import { CompliancePromptSection } from './compliance-tab.prompt.js';
 import AgreementsSection from './compliance-agreements-section.js';
 import IntermediationSection from './compliance-tab.intermediation.js';
+import AmlSection from './compliance-tab.aml.js';
 import PrintableReport, { answerText } from './compliance-tab.print.js';
 import SavedReports, { readableId } from './compliance-tab.saved.js';
 import { RecordsSection, RecordsGapsSection, RecordsPromptSection } from './compliance-tab.records.js';
@@ -149,6 +152,7 @@ export function gapsLine(g, registerEmpty) {
   if (fonts.length > 0) parts.push(fonts.length === 1 ? C('line.fontsOne') : C('line.fonts', { n: num(fonts.length) }));
   if (g.records > 0) parts.push(g.records === 1 ? C('line.recordsOne') : C('line.records', { n: num(g.records) }));
   if (g.drafts > 0) parts.push(g.drafts === 1 ? C('line.draftsOne') : C('line.drafts', { n: num(g.drafts) }));
+  if (g.aml > 0) parts.push(g.aml === 1 ? C('line.amlOne') : C('line.aml', { n: num(g.aml) }));
   if (parts.length === 0) return C('gapsNone');
   const joined = parts.length === 1 ? parts[0]
     : parts.slice(0, -1).join(C('line.sep')) + C('line.last') + parts[parts.length - 1];
@@ -211,6 +215,9 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
           { key: 'records', name: C('gapRecords'), last: true,
             why: g.records + g.drafts === 0 ? C('gap.recordsClear') : C('gap.recordsWhy', { n: num(g.records), drafts: num(g.drafts) }),
             end: g.records + g.drafts === 0 ? clear : door(C('toRecords'), () => go(g.records > 0 ? 'adm-cmp-08' : 'adm-cmp-09')) },
+          // Section 13: the anti-money-laundering findings nobody has decided yet.
+          { key: 'aml', name: C('gapAml'), why: (g.aml || 0) === 0 ? C('gap.amlClear') : C('gap.amlWhy', { n: num(g.aml) }),
+            end: (g.aml || 0) === 0 ? clear : door(C('toAml'), () => go('adm-cmp-13')) },
         ]} />
       <//>
     <//>`;
@@ -488,7 +495,9 @@ export default function ComplianceTab(props) {
   const ai = groupGaps(report.gaps);
   const records = (report.processing?.gaps || []).length;
   const drafts = report.processing?.registers?.drafts?.total ?? 0;
-  const g = { ...ai, records, drafts, total: ai.total + records + drafts };
+  // Section 13's findings that wait for a person (services/aml/report.ts totals.proposed).
+  const aml = report.aml?.totals?.proposed ?? 0;
+  const g = { ...ai, records, drafts, aml, total: ai.total + records + drafts + aml };
   const stats = answerStats(usecases, questions);
   const classes = classCounts(usecases);
 
@@ -535,6 +544,7 @@ export default function ComplianceTab(props) {
           onChanged=${() => load(days)} />` : null}
         <${AgreementsSection} num="11" onMessage=${(kind, text) => (kind === 'error' ? showError(text) : showSuccess(text))} />
         <${IntermediationSection} di=${report.data_intermediation} switchPage=${switchPage} onChanged=${() => load(days)} onMessage=${(kind, text) => (kind === 'error' ? showError(text) : showSuccess(text))} />
+        <${AmlSection} aml=${report.aml} switchPage=${switchPage} onChanged=${() => load(days)} onMessage=${(kind, text) => (kind === 'error' ? showError(text) : showSuccess(text))} />
       <//>
       <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} found=${found} only=${printOnly} />
     <//>
