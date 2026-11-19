@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.78.0 -- 2026-11-19 -- Prompt calibration: aimeat_calibrator.
  *   v1.77.0 -- 2026-11-19 -- Living documents: aimeat_living_author designs a template.
  *   v1.76.0 -- 2026-11-19 -- Direct messages: aimeat_dm_broadcast_summary reads a broadcast's results.
  *   v1.75.0 -- 2026-11-19 -- Organisms: what waits for a person, and aimeat_organism_approval_request and _approvals.
@@ -306,6 +307,13 @@ refreshes on its own ("a weekly page of what changed in the project and who deci
 often, whether a refresh waits for their approval) and two to six sections. It runs on your owner's
 AI and counts as yours, with ai:use. Nothing is stored: show them the template, and they save and
 start it on the Document templates page (/v1/profile?tab=living).
+
+**Prompt calibration — one prompt tested on several models.** Your owner's Calibrator projects
+(the Calibrator page, /v1/profile?tab=calibrator) are \`aimeat_calibrator\`, one \`action\` per
+operation: "list", then "detail" of one project, reads the models under test, the prompt versions and
+each batch's scores; "version_create" adds a better prompt; "batch_update" records results you
+produced. Reading needs memory:read-as-owner and a change memory:write-as-owner, which your owner
+ticks for you; "Full access" does not give the first.
 
 **Goals — what the owner wants done, carried by their agents together.** \`aimeat_goal_get\` ·
 \`aimeat_goal_set\` · \`aimeat_goal_work\` · \`aimeat_goal_answer\`. When the person asks for an outcome

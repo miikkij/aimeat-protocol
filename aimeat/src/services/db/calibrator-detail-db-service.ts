@@ -11,9 +11,12 @@
  *   only. The individual endpoints stay for interactive re-fetches (post-version-create, live-update batch
  *   reload) and for the template-backfill write, which lives in the route where the default templates do.
  *
- * @structure CalibratorDetailService.overview(reader, projectId) → { project, dimensions, versions, currentVersion, batches } | null
- * @usage const detail = await createCalibratorDetailService(storage).overview(readerFor({ storage, config }, req.auth), id);
+ * @structure CalibratorDetailService.overview(reader, projectId, ownerGaii?) → { project, dimensions, versions, currentVersion, batches } | null
+ * @usage const detail = await createCalibratorDetailService(storage).overview(readerFor({ storage, config }, req.auth), id, ownerGhii);
  * @version-history
+ *   v1.2.0 — 2026-11-19 — overview takes the owner whose records it scans (default: the reader's
+ *     identity, as before), so the owner's agent reads the owner's calibration
+ *     (services/calibrator/projects.ts projectDetail).
  *   v1.1.0 — 2026-09-29 — TARGET-082 V4: takes the caller's ContentReader instead of an identity; every
  *     record of the scan passes presentMemories, so a record the reader may not see is left out (the
  *     project itself answers null, which the route maps to 404).
@@ -47,10 +50,10 @@ export class CalibratorDetailService {
    * key is absent (the route maps that to 404). The `project` value is returned as stored — the route
    * applies the lazy template backfill (it owns the default-template constants).
    */
-  overview(reader: ContentReader, projectId: string): Promise<CalibratorDetail | null> {
+  overview(reader: ContentReader, projectId: string, ownerGaii: string = reader.identity): Promise<CalibratorDetail | null> {
     return runInReadScope(async () => {
       const prefix = `calibrator.${projectId}.`;
-      const all = await presentMemories(reader, await this.storage.listMemory(reader.identity, { prefix }));
+      const all = await presentMemories(reader, await this.storage.listMemory(ownerGaii, { prefix }));
 
       const projectRec = all.find(m => m.key === `${prefix}project`);
       if (!projectRec) return null;

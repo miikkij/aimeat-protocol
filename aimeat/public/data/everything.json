@@ -2353,10 +2353,10 @@
      "slug": "g-9-prompt-calibrator",
      "cells": [
       "<strong>Prompt calibrator</strong>",
-      "A workbench for tuning a prompt through generate, analyse, reflect and synthesise batches.",
-      "<code>/v1/calibrator</code>"
+      "A workbench for tuning a prompt through generate, analyse, reflect and synthesise batches. Your own AI works on the same projects from a chat: it reads the scores, adds a better prompt version and records results, when you allow it to read your private records (and, for a change, to write them). &quot;Full access&quot; does not allow the first.",
+      "<code>/v1/calibrator</code>, <code>aimeat_calibrator</code>, Profile › Calibrator"
      ],
-     "plain": "Prompt calibrator A workbench for tuning a prompt through generate, analyse, reflect and synthesise batches. /v1/calibrator"
+     "plain": "Prompt calibrator A workbench for tuning a prompt through generate, analyse, reflect and synthesise batches. Your own AI works on the same projects from a chat: it reads the scores, adds a better prompt version and records results, when you allow it to read your private records (and, for a change, to write them). \"Full access\" does not allow the first. /v1/calibrator, aimeat_calibrator, Profile › Calibrator"
     },
     {
      "slug": "g-9-managed-prompts",

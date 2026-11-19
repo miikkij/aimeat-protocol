@@ -3,7 +3,15 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Prompt Calibrator API — CRUD for calibration projects, versions, and batches.
- *   V2 uses a batch-based 4-step flow: Generate → Analyze → Reflect → Synthesize.
+ *   V2 uses a batch-based 4-step flow: Generate → Analyze → Reflect → Synthesize. The work is in
+ *   services/calibrator/projects.ts, which the MCP tool aimeat_calibrator runs too; these routes
+ *   decide who may and answer in the envelope.
+ *
+ *   WHO. The owner in person, or the owner's agent holding memory:read-as-owner, which reads the
+ *   owner's private calibrations; a change also needs memory:write-as-owner. Both words are outside
+ *   the wildcard for reading (read-as-owner), so an agent holding only "*" stays refused, as audit
+ *   M190 wanted. The records are always the OWNER's (`calibrator.<id>.*` under the owner GHII), so
+ *   the page and the agent see the same projects.
  * @structure
  *   - GET  /v1/calibrator/templates — default prompt templates
  *   - POST /v1/calibrator — create project
@@ -20,6 +28,11 @@
  *   - PUT  /v1/calibrator/:id/batches/:batchId — update batch
  *   - DELETE /v1/calibrator/:id/batches/:batchId — delete batch
  * @version-history
+ *   v2.4.0 — 2026-11-19 — The handlers' work moved unchanged to services/calibrator/projects.ts and
+ *     the templates to services/calibrator/templates.ts, which the MCP tool aimeat_calibrator runs.
+ *     Each route admits the owner in person as before, and now also the owner's agent holding
+ *     memory:read-as-owner (a change: and memory:write-as-owner), working on the owner's records
+ *     (feature audit 2026-11-19, 4.4 item 5).
  *   2026-11-04 — Its writes are announced with emitRecordChangePriorUnknown: the same streams hear
  *     them, and the read cache drops as before (codebase analysis 2026-11-03, item C4).
  *   2026-10-19 — PUT /:id, POST /:id/versions, PUT /:id/batches/:batchId, the dimensions list and the
@@ -44,696 +57,136 @@
  */
 
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, Response, RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRoleOrScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
-// The calibrator writes its records as private over whatever the key held, so it does not know the
-// earlier visibility (services/event-bus.ts emitRecordChangePriorUnknown).
-import { emitRecordChangePriorUnknown } from '../services/event-bus.js';
-import { createCalibratorDetailService } from '../services/db/calibrator-detail-db-service.js';
+import { callerOf } from '../middleware/caller.js';
 import { readerFor } from '../services/classification/reader.js';
-import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
-import { updateMemoryRecord, UNCHANGED } from '../services/record-cas.js';
-
-const DEFAULT_ANALYSIS_TEMPLATE = `You are evaluating whether a candidate AI model's output is STRUCTURALLY CORRECT compared to a reference output.
-
-CRITICAL RULES:
-- Focus ONLY on structural correctness — does the output WORK, not whether it looks identical
-- Ignore ALL cosmetic differences: label text, descriptions, key ordering, naming style, whitespace
-- Limit to 5-8 dimensions maximum — only the ones that actually matter for correctness
-- A dimension PASSES if the candidate achieves the structural goal, even if the specific implementation differs
-- Be GENEROUS with passing — if the structure is functionally equivalent, it passes
-
-REFERENCE OUTPUT (the structurally correct target):
-{TARGET_OUTPUT}
-
-CANDIDATE OUTPUT (produced by {MODEL_NAME}):
-{CANDIDATE_OUTPUT}
-
-THE PROMPT that was given (for context):
-{PROMPT_USED}
-
-Evaluate ONLY these structural aspects (skip any that don't apply):
-1. TOP-LEVEL STRUCTURE: Does it have the required top-level keys/sections? (critical)
-2. COMPONENT COUNT: Does it have the right number and types of major elements? (critical)
-3. DATA PIPELINE: Do data flows form valid chains (producer → consumer)? (critical)
-4. REQUIRED SECTIONS: Are all mandatory sections present? (major)
-5. DATA MODEL: Are data structures defined with correct types? (major)
-6. NO UNNECESSARY EXTRAS: Did the candidate add things that shouldn't be there? (major)
-7. RELATIONSHIPS: Are cross-references and dependencies valid? (minor)
-8. CONFIGURATION: Are settings, schedules, and config correct? (minor)
-
-Output as JSON with 5-8 dimensions:
-{
-  "dimensions": [
-    {
-      "name": "short_snake_case_name",
-      "description": "What this measures",
-      "category": "structure|data_model|missing|extra|quality",
-      "severity": "critical|major|minor",
-      "expected": "brief: what reference has",
-      "actual": "brief: what candidate has",
-      "pass": true or false
-    }
-  ],
-  "analysis": "2-3 paragraph analysis. What works well? What's structurally broken? What's the most impactful fix?",
-  "proposals": [
-    "Concrete GENERIC prompt fix — what to add/change to prevent this structural error in any similar prompt"
-  ]
-}`;
-
-const DEFAULT_REFLECTION_TEMPLATE = `You are helping improve an AI prompt based on test results.
-
-THE PROMPT being calibrated:
-{PROMPT_USED}
-
-THE DESIRED OUTPUT (reference — what a perfect response looks like):
-{TARGET_OUTPUT}
-
-WHAT THE CANDIDATE MODEL ({MODEL_NAME}) ACTUALLY PRODUCED:
-{CANDIDATE_OUTPUT}
-
-ANALYSIS OF WHAT WENT WRONG:
-{ANALYSIS_TEXT}
-
-Based on this analysis, suggest concrete improvements to the prompt that would make the candidate model produce output closer to the reference.
-
-Rules:
-- Suggest GENERIC prompt modifications — do NOT reference project-specific names, APIs, or domain concepts
-- Each fix must work for ANY prompt calibration task, not just this one
-- Explain WHAT to add/change and WHERE in the prompt
-- Be specific — show the actual text to add or modify
-- Focus on the root causes identified in the analysis, not symptoms
-
-Output as JSON:
-{
-  "proposals": [
-    "1. Description of what to change and where — because [reason]",
-    "2. Description of what to change and where — because [reason]"
-  ],
-  "reasoning": "Multi-paragraph explanation of why these specific changes should help, what root causes they address, and how they relate to the analysis findings."
-}`;
-
-const DEFAULT_SELF_REFLECTION_TEMPLATE = `You are reviewing your own output to help improve the prompt that produced it.
-
-THE PROMPT you were given:
-{PROMPT_USED}
-
-THE DESIRED OUTPUT (reference — what a perfect response looks like):
-{TARGET_OUTPUT}
-
-YOUR OUTPUT (what you actually produced):
-{CANDIDATE_OUTPUT}
-
-ANALYSIS OF THE DIFFERENCES:
-{ANALYSIS_TEXT}
-
-You know your own tendencies better than any external reviewer. Based on this analysis, suggest concrete improvements to the prompt that would help YOU produce output closer to the reference next time.
-
-Think about:
-- What in the prompt was ambiguous or easy to misinterpret?
-- What assumptions did you make that turned out to be wrong?
-- What additional instructions or examples would have guided you better?
-
-Rules:
-- Suggest GENERIC prompt modifications — do NOT reference project-specific names, APIs, or domain concepts
-- Each fix must work for ANY prompt calibration task, not just this one
-- Explain WHAT to add/change and WHERE in the prompt
-- Be specific — show the actual text to add or modify
-
-Output as JSON:
-{
-  "proposals": [
-    "1. Description of what to change and where — because [reason]",
-    "2. Description of what to change and where — because [reason]"
-  ],
-  "reasoning": "Multi-paragraph explanation from your perspective as the model that produced this output — why these changes would help you specifically, what confused you about the original prompt, and how the proposed changes address that."
-}`;
-
-const DEFAULT_SYNTHESIS_TEMPLATE = `You are reviewing prompt improvement proposals from multiple AI models.
-
-THE PROMPT being calibrated:
-{PROMPT_USED}
-
-PROPOSALS FROM THE REASONING MODEL (the judge):
-{JUDGE_PROPOSALS}
-
-PROPOSALS FROM THE CANDIDATE MODELS (self-reflection):
-{CANDIDATE_PROPOSALS}
-
-Your task:
-1. GROUP overlapping proposals — if the judge and a candidate both suggest the same fix, note this overlap (overlapping proposals are more likely to be correct)
-2. SCORE each unique proposal: how much would it actually improve the prompt? (high/medium/low impact)
-3. Create 2-3 OPTION SETS:
-   - Option A (conservative): only high-impact, low-risk changes
-   - Option B (moderate): high + medium impact changes
-   - Option C (aggressive): all changes including experimental ones
-4. RECOMMEND which option to try first and explain why
-
-Output as JSON:
-{
-  "groupedProposals": [
-    {
-      "proposal": "Description of the fix",
-      "sources": ["judge:model1", "self:model2"],
-      "overlap": true,
-      "impact": "high",
-      "risk": "low",
-      "explanation": "Why this would help"
-    }
-  ],
-  "options": {
-    "A": {
-      "label": "Conservative — high-confidence fixes only",
-      "proposalIds": [0, 2],
-      "expectedImpact": "Should fix the most critical dimension failures"
-    },
-    "B": {
-      "label": "Moderate — likely improvements",
-      "proposalIds": [0, 1, 2, 4],
-      "expectedImpact": "Should address most gaps"
-    },
-    "C": {
-      "label": "Aggressive — all suggestions",
-      "proposalIds": [0, 1, 2, 3, 4, 5],
-      "expectedImpact": "Maximum change, might introduce new issues"
-    }
-  },
-  "recommendation": "Start with Option B because...",
-  "analysis": "Multi-paragraph synthesis of all proposals, what overlaps, what's unique to specific models, and what the overall calibration strategy should be."
-}`;
-
-/** Loosely-typed shapes for the dynamic calibrator JSON stored in memory records. */
-interface CalibratorDimension {
-  name?: string;
-  description?: unknown;
-  category?: unknown;
-  [key: string]: unknown;
-}
-
-interface CalibratorBatchModel {
-  modelId?: string;
-  modelLabel?: string;
-  step2_analysis?: { overallScore?: number | null; dimensions?: CalibratorDimension[] };
-  [key: string]: unknown;
-}
-
-interface CalibratorCandidateModel {
-  id: string;
-  label: string;
-  [key: string]: unknown;
-}
-
-const PROJECT_TAGS = ['calibrator', 'project'];
-
-/** Fill in a missing or outdated template field of a stored project. Answers whether one changed. */
-function fillTemplates(project: Record<string, unknown>): boolean {
-  let changed = false;
-  // Update analysis template if it contains old versions (line-by-line or verbose structural)
-  const analysisStr = (project.analysisPromptTemplate as string) || '';
-  if (!analysisStr || analysisStr.includes('For each difference between A and B') || analysisStr.includes('Do NOT create dimensions for')) {
-    project.analysisPromptTemplate = DEFAULT_ANALYSIS_TEMPLATE; changed = true;
-  }
-  if (!project.reflectionPromptTemplate) { project.reflectionPromptTemplate = DEFAULT_REFLECTION_TEMPLATE; changed = true; }
-  if (!project.selfReflectionPromptTemplate) { project.selfReflectionPromptTemplate = DEFAULT_SELF_REFLECTION_TEMPLATE; changed = true; }
-  if (!project.synthesisPromptTemplate) { project.synthesisPromptTemplate = DEFAULT_SYNTHESIS_TEMPLATE; changed = true; }
-  return changed;
-}
+import { READ_AS_OWNER_SCOPE, WRITE_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
+import {
+  calibratorTemplates, listProjects, createProject, getProject, projectDetail, updateProject, deleteProject,
+  createVersion, listVersions, getVersion, createBatch, listBatches, getBatch, updateBatch, deleteBatch,
+  type CalResult,
+} from '../services/calibrator/projects.js';
 
 export function calibratorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
+  const deps = { storage, config };
   const readerOf = (req: Request) => readerFor({ storage, config }, req.auth);
-  const detailDb = createCalibratorDetailService(storage);
+  // The owner in person; or the owner's agent with the word that reads the owner's private records,
+  // and for a change the word that writes them.
+  const read: RequestHandler[] = [requireAuth(), requireRoleOrScope('owner', READ_AS_OWNER_SCOPE)];
+  const write: RequestHandler[] = [...read, requireRoleOrScope('owner', WRITE_AS_OWNER_SCOPE)];
 
-  /** Helper: write a calibrator memory key with required MemoryRecord fields */
-  async function setCalMemory(gaii: string, key: string, value: unknown, tags: string[]) {
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key,
-      ownerGaii: gaii,
-      value,
-      visibility: 'private',
-      tags,
-      ttlHours: null,
-      version: 1,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-
-  /**
-   * Change a stored calibrator record on the version that was read (record-cas.ts), and again on a
-   * fresh read when another request wrote it meanwhile. `mutate` gets its own copy (null when the
-   * record is absent) and answers UNCHANGED to write nothing. Answers the value as written, or null.
-   */
-  async function changeCalMemory<T>(gaii: string, key: string, tags: string[], mutate: (cur: T | null) => T | typeof UNCHANGED): Promise<T | null> {
-    const written = await updateMemoryRecord(storage, gaii, key, (rec) => {
-      const next = mutate(rec ? structuredClone(rec.value) as T : null);
-      return next === UNCHANGED ? UNCHANGED : { value: next, visibility: 'private', tags };
-    });
-    return written ? written.value as T : null;
-  }
-
-  /** The lazy template backfill of a project read, written onto the stored project, not the copy read. */
-  async function saveFilledTemplates(gaii: string, id: string): Promise<void> {
-    await changeCalMemory<Record<string, unknown>>(gaii, `calibrator.${id}.project`, PROJECT_TAGS,
-      cur => (cur && fillTemplates(cur) ? cur : UNCHANGED));
-  }
+  /** The owner GHII whose calibrations the caller works on; null (and a 403 sent) for another node's session. */
+  const ownerOf = (req: Request, res: Response): string | null => {
+    const caller = callerOf(req, config.nodeId, storage);
+    if (caller.visitor) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'A session from another node has no calibrations here.'));
+      return null;
+    }
+    return caller.ownerGhii;
+  };
+  const send = <T>(res: Response, out: CalResult<T>) => {
+    if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
+    return res.status(out.status ?? 200).json(success(config.nodeId, out.data));
+  };
 
   // ── Template defaults (MUST be before /:id to avoid Express matching "templates" as :id) ──
-  router.get('/v1/calibrator/templates',
-    requireAuth(), requireRole('owner'),
-    async (_req: Request, res: Response) => {
-      res.json(success(config.nodeId, {
-        analysisPromptTemplate: DEFAULT_ANALYSIS_TEMPLATE,
-        reflectionPromptTemplate: DEFAULT_REFLECTION_TEMPLATE,
-        selfReflectionPromptTemplate: DEFAULT_SELF_REFLECTION_TEMPLATE,
-        synthesisPromptTemplate: DEFAULT_SYNTHESIS_TEMPLATE,
-      }));
-    }
-  );
+  router.get('/v1/calibrator/templates', ...read, async (_req: Request, res: Response) => {
+    res.json(success(config.nodeId, calibratorTemplates()));
+  });
 
   // ── List projects ──
-  router.get('/v1/calibrator',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const reader = readerOf(req);
-      const allMemory = await presentMemories(reader, await storage.listMemory(gaii, { prefix: 'calibrator.', tags: ['project'] }));
-      const projectRecords = allMemory
-        .filter(m => m.key.endsWith('.project'))
-        .sort((a, b) => new Date((b.value as Record<string, unknown>).createdAt as string).getTime() - new Date((a.value as Record<string, unknown>).createdAt as string).getTime());
-
-      const projects = [];
-      for (const m of projectRecords) {
-        const project = m.value as Record<string, unknown>;
-        const projectId = project.projectId as string;
-
-        // Count batches and compute latestAvgScore
-        const batchMemory = await presentMemories(reader, await storage.listMemory(gaii, { prefix: `calibrator.${projectId}.batch.` }));
-        const batchCount = batchMemory.length;
-        let latestAvgScore: number | null = null;
-
-        if (batchCount > 0) {
-          // The latest batch THAT HAS A SCORE, newest first: a batch created and never started
-          // carries no score and must not hide the last real result behind a null.
-          const batches = batchMemory
-            .map(bm => bm.value as Record<string, unknown>)
-            .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
-          for (const batch of batches) {
-            const models = (batch.models as CalibratorBatchModel[]) || [];
-            const scores = models
-              .map(m => m.step2_analysis?.overallScore)
-              .filter((s): s is number => s != null);
-            if (scores.length > 0) {
-              latestAvgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length;
-              break;
-            }
-          }
-        }
-
-        // How many models are under test, so the list can say it without opening the project.
-        const modelCount = ((project.candidateModels as CalibratorCandidateModel[]) || []).filter(m => m && (m as { modelId?: string }).modelId).length;
-        projects.push({ ...project, batchCount, latestAvgScore, modelCount });
-      }
-
-      res.json(success(config.nodeId, { projects }));
-    }
-  );
+  router.get('/v1/calibrator', ...read, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await listProjects(deps, gaii, readerOf(req)));
+  });
 
   // ── Create project ──
-  router.post('/v1/calibrator',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const { name } = req.body ?? {};
-      if (!name || typeof name !== 'string') {
-        return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'name is required.'));
-      }
-      const projectId = `cal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-      const project = {
-        projectId,
-        name: name.trim(),
-        createdAt: new Date().toISOString(),
-        status: 'active',
-        reasoningLlm: null,
-        analysisPromptTemplate: DEFAULT_ANALYSIS_TEMPLATE,
-        reflectionPromptTemplate: DEFAULT_REFLECTION_TEMPLATE,
-        selfReflectionPromptTemplate: DEFAULT_SELF_REFLECTION_TEMPLATE,
-        synthesisPromptTemplate: DEFAULT_SYNTHESIS_TEMPLATE,
-        candidateModels: [],
-        currentVersion: 0,
-      };
-      await setCalMemory(gaii, `calibrator.${projectId}.project`, project, ['calibrator', 'project']);
-      res.status(201).json(success(config.nodeId, { project }));
-      emitRecordChangePriorUnknown('memory', gaii, 'private');
-    }
-  );
+  router.post('/v1/calibrator', ...write, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await createProject(deps, gaii, req.body ?? {}));
+  });
 
   // ── Get project ──
-  router.get('/v1/calibrator/:id',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const reader = readerOf(req);
-      const stored = await storage.getMemory(gaii, `calibrator.${id}.project`);
-      const record = stored ? await presentMemory(reader, stored) : null;
-      if (!record) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
-      }
-      // Backfill missing or outdated template fields
-      const project = record.value as Record<string, unknown>;
-      if (fillTemplates(project)) await saveFilledTemplates(gaii, id);
-      const dimStored = await storage.getMemory(gaii, `calibrator.${id}.dimensions`);
-      const dimRecord = dimStored ? await presentMemory(reader, dimStored) : null;
-      res.json(success(config.nodeId, {
-        project,
-        dimensions: dimRecord?.value ?? [],
-      }));
-    }
-  );
+  router.get('/v1/calibrator/:id', ...read, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await getProject(deps, gaii, readerOf(req), req.params.id as string));
+  });
 
   // ── Project detail (composite mount) ──
   // GET /v1/calibrator/:id/detail — the whole project-detail view mount in ONE prefix scan: project +
   // dimensions + version summaries + current version + batch summaries. Folds the 4-request waterfall the
-  // detail view fired on open (getProject → listVersions → getVersion → listBatches). The lazy
-  // template-backfill (getProject's behavior) is applied here because the default-template constants and
-  // setCalMemory live in this module. The individual endpoints stay for interactive re-fetches. This is a
-  // 2-segment path (:id/detail) — no collision with /:id or the literal /:id/versions|/batches captures.
-  router.get('/v1/calibrator/:id/detail',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const data = await detailDb.overview(readerOf(req), id);
-      if (!data) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
-      }
-      // Lazy template backfill — identical to GET /v1/calibrator/:id, kept behavior-compatible.
-      if (fillTemplates(data.project)) await saveFilledTemplates(gaii, id);
-      res.json(success(config.nodeId, data));
-    }
-  );
+  // detail view fired on open (getProject → listVersions → getVersion → listBatches). The individual
+  // endpoints stay for interactive re-fetches. This is a 2-segment path (:id/detail), no collision with
+  // /:id or the literal /:id/versions|/batches captures.
+  router.get('/v1/calibrator/:id/detail', ...read, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await projectDetail(deps, gaii, readerOf(req), req.params.id as string));
+  });
 
   // ── Update project ──
-  router.put('/v1/calibrator/:id',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const {
-        name, reasoningLlm, analysisPromptTemplate, reflectionPromptTemplate,
-        selfReflectionPromptTemplate, synthesisPromptTemplate, candidateModels, status,
-      } = req.body ?? {};
-      // The fields this request names are set on the stored project, so another request's change
-      // to the others stays.
-      const project = await changeCalMemory<Record<string, unknown>>(gaii, `calibrator.${id}.project`, PROJECT_TAGS, (cur) => {
-        if (!cur) return UNCHANGED;
-        if (name !== undefined) cur.name = name;
-        if (reasoningLlm !== undefined) cur.reasoningLlm = reasoningLlm;
-        if (analysisPromptTemplate !== undefined) cur.analysisPromptTemplate = analysisPromptTemplate;
-        if (reflectionPromptTemplate !== undefined) cur.reflectionPromptTemplate = reflectionPromptTemplate;
-        if (selfReflectionPromptTemplate !== undefined) cur.selfReflectionPromptTemplate = selfReflectionPromptTemplate;
-        if (synthesisPromptTemplate !== undefined) cur.synthesisPromptTemplate = synthesisPromptTemplate;
-        if (candidateModels !== undefined) cur.candidateModels = candidateModels;
-        if (status !== undefined) cur.status = status;
-        return cur;
-      });
-      if (!project) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
-      }
-      res.json(success(config.nodeId, { project }));
-      emitRecordChangePriorUnknown('memory', gaii, 'private');
-    }
-  );
+  router.put('/v1/calibrator/:id', ...write, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await updateProject(deps, gaii, req.params.id as string, req.body ?? {}));
+  });
 
   // ── Delete project (cascade) ──
-  router.delete('/v1/calibrator/:id',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const allKeys = await storage.listMemory(gaii, { prefix: `calibrator.${id}.` });
-      for (const m of allKeys) {
-        await storage.deleteMemory(gaii, m.key);
-      }
-      res.json(success(config.nodeId, { deleted: allKeys.length }));
-      emitRecordChangePriorUnknown('memory', gaii, 'private');
-    }
-  );
+  router.delete('/v1/calibrator/:id', ...write, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await deleteProject(deps, gaii, req.params.id as string));
+  });
 
   // ── Create version ──
-  router.post('/v1/calibrator/:id/versions',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const { prompt, targetOutput, changelog } = req.body ?? {};
-      const validPrompt = !!prompt && typeof prompt === 'string';
-      // The version number is taken on the project's version first, so two requests at the same
-      // moment get two numbers and neither version record overwrites the other.
-      let found = false;
-      let newVersion = 0;
-      await changeCalMemory<Record<string, unknown>>(gaii, `calibrator.${id}.project`, PROJECT_TAGS, (cur) => {
-        found = !!cur;
-        if (!cur || !validPrompt) return UNCHANGED;
-        newVersion = ((cur.currentVersion as number) || 0) + 1;
-        cur.currentVersion = newVersion;
-        return cur;
-      });
-      if (!found) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
-      }
-      if (!validPrompt) {
-        return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'prompt is required.'));
-      }
-      const version = {
-        version: newVersion,
-        prompt,
-        targetOutput: targetOutput || '',
-        changelog: changelog || (newVersion === 1 ? 'Initial version' : ''),
-        createdAt: new Date().toISOString(),
-      };
-      await setCalMemory(gaii, `calibrator.${id}.version.${newVersion}`, version, ['calibrator', 'version']);
-      res.status(201).json(success(config.nodeId, { version }));
-      emitRecordChangePriorUnknown('memory', gaii, 'private');
-    }
-  );
+  router.post('/v1/calibrator/:id/versions', ...write, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await createVersion(deps, gaii, req.params.id as string, req.body ?? {}));
+  });
 
   // ── List versions ──
-  router.get('/v1/calibrator/:id/versions',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const allMemory = await presentMemories(readerOf(req), await storage.listMemory(gaii, { prefix: `calibrator.${id}.version.` }));
-      const versions = allMemory
-        .map(m => {
-          const v = m.value as Record<string, unknown>;
-          return { version: v.version, changelog: v.changelog, createdAt: v.createdAt };
-        })
-        .sort((a, b) => (a.version as number) - (b.version as number));
-      res.json(success(config.nodeId, { versions }));
-    }
-  );
+  router.get('/v1/calibrator/:id/versions', ...read, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await listVersions(deps, gaii, readerOf(req), req.params.id as string));
+  });
 
   // ── Get version ──
-  router.get('/v1/calibrator/:id/versions/:v',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const v = req.params.v as string;
-      const stored = await storage.getMemory(gaii, `calibrator.${id}.version.${v}`);
-      const record = stored ? await presentMemory(readerOf(req), stored) : null;
-      if (!record) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Version not found.'));
-      }
-      res.json(success(config.nodeId, { version: record.value }));
-    }
-  );
+  router.get('/v1/calibrator/:id/versions/:v', ...read, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await getVersion(deps, gaii, readerOf(req), req.params.id as string, req.params.v as string));
+  });
 
   // ── Create batch ──
-  router.post('/v1/calibrator/:id/batches',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const { promptVersion } = req.body ?? {};
-      if (!promptVersion || typeof promptVersion !== 'number' || promptVersion < 1) {
-        return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'promptVersion (positive integer) is required.'));
-      }
-
-      // Verify version exists
-      const versionRecord = await storage.getMemory(gaii, `calibrator.${id}.version.${promptVersion}`);
-      if (!versionRecord) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Version ${promptVersion} not found.`));
-      }
-
-      // Verify project exists and get candidate models
-      const projectRecord = await storage.getMemory(gaii, `calibrator.${id}.project`);
-      if (!projectRecord) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
-      }
-      const project = projectRecord.value as Record<string, unknown>;
-      const candidateModels = (project.candidateModels as CalibratorCandidateModel[]) || [];
-
-      const batchId = `batch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-      const models = candidateModels.map((m) => ({
-        modelId: m.id,
-        modelLabel: m.label,
-        step1_generation: { status: 'pending', output: null, durationMs: null, error: null, promptSent: null },
-        step2_analysis: { status: 'pending', dimensions: [], overallScore: null, analysis: null, error: null, promptSent: null, rawResponse: null },
-        step3_reflection: { status: 'pending', judgeProposals: null, selfProposals: null, error: null },
-      }));
-
-      const batch = {
-        batchId,
-        projectId: id,
-        promptVersion,
-        createdAt: new Date().toISOString(),
-        status: 'created',
-        models,
-        step4_synthesis: { status: 'pending', groupedProposals: [], options: null, recommendation: null, analysis: null, error: null, promptSent: null, rawResponse: null },
-      };
-
-      await setCalMemory(gaii, `calibrator.${id}.batch.${batchId}`, batch, ['calibrator', 'batch']);
-      res.status(201).json(success(config.nodeId, { batch }));
-      emitRecordChangePriorUnknown('memory', gaii, 'private');
-    }
-  );
+  router.post('/v1/calibrator/:id/batches', ...write, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await createBatch(deps, gaii, req.params.id as string, req.body ?? {}));
+  });
 
   // ── List batches (summary) ──
-  router.get('/v1/calibrator/:id/batches',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const allMemory = await presentMemories(readerOf(req), await storage.listMemory(gaii, { prefix: `calibrator.${id}.batch.` }));
-
-      let batches = allMemory
-        .map(m => {
-          const b = m.value as Record<string, unknown>;
-          const models = (b.models as CalibratorBatchModel[]) || [];
-          const scores = models.map((model) => ({
-            modelId: model.modelId,
-            modelLabel: model.modelLabel,
-            overallScore: model.step2_analysis?.overallScore ?? null,
-          }));
-          return {
-            batchId: b.batchId,
-            createdAt: b.createdAt,
-            promptVersion: b.promptVersion,
-            status: b.status,
-            modelCount: models.length,
-            scores,
-          };
-        })
-        .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
-
-      const versionFilter = req.query.version as string | undefined;
-      if (versionFilter) {
-        batches = batches.filter(b => String(b.promptVersion) === versionFilter);
-      }
-
-      res.json(success(config.nodeId, { batches }));
-    }
-  );
+  router.get('/v1/calibrator/:id/batches', ...read, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await listBatches(deps, gaii, readerOf(req), req.params.id as string, req.query.version as string | undefined));
+  });
 
   // ── Get batch detail ──
-  router.get('/v1/calibrator/:id/batches/:batchId',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const batchId = req.params.batchId as string;
-      const stored = await storage.getMemory(gaii, `calibrator.${id}.batch.${batchId}`);
-      const record = stored ? await presentMemory(readerOf(req), stored) : null;
-      if (!record) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Batch not found.'));
-      }
-      res.json(success(config.nodeId, { batch: record.value }));
-    }
-  );
+  router.get('/v1/calibrator/:id/batches/:batchId', ...read, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await getBatch(deps, gaii, readerOf(req), req.params.id as string, req.params.batchId as string));
+  });
 
   // ── Update batch ──
-  router.put('/v1/calibrator/:id/batches/:batchId',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const batchId = req.params.batchId as string;
-      const { models, status, step4_synthesis } = req.body ?? {};
-      // Set on the stored batch, so a concurrent update of its other fields stays.
-      const batch = await changeCalMemory<Record<string, unknown>>(gaii, `calibrator.${id}.batch.${batchId}`, ['calibrator', 'batch'], (cur) => {
-        if (!cur) return UNCHANGED;
-        if (models !== undefined) cur.models = models;
-        if (status !== undefined) cur.status = status;
-        if (step4_synthesis !== undefined) cur.step4_synthesis = step4_synthesis;
-        return cur;
-      });
-      if (!batch) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Batch not found.'));
-      }
-
-      // Auto-discover dimensions from Step 2 results
-      const batchModels = (batch.models as CalibratorBatchModel[]) || [];
-      const allDimensions: CalibratorDimension[] = [];
-      for (const model of batchModels) {
-        const dims = model.step2_analysis?.dimensions;
-        if (Array.isArray(dims)) {
-          allDimensions.push(...dims);
-        }
-      }
-
-      if (allDimensions.length > 0) {
-        // Appended to the stored list, so the dimensions a concurrent batch update added stay.
-        await changeCalMemory<CalibratorDimension[]>(gaii, `calibrator.${id}.dimensions`, ['calibrator', 'dimensions'], (cur) => {
-          const existingDims = cur || [];
-          const existingNames = new Set(existingDims.map((d) => d.name));
-          let added = false;
-          for (const dim of allDimensions) {
-            if (dim.name && !existingNames.has(dim.name)) {
-              existingDims.push({
-                name: dim.name,
-                description: dim.description,
-                category: dim.category,
-                discoveredInBatch: batchId,
-              });
-              existingNames.add(dim.name);
-              added = true;
-            }
-          }
-          return added ? existingDims : UNCHANGED;
-        });
-      }
-
-      res.json(success(config.nodeId, { batch }));
-      emitRecordChangePriorUnknown('memory', gaii, 'private');
-    }
-  );
+  router.put('/v1/calibrator/:id/batches/:batchId', ...write, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await updateBatch(deps, gaii, req.params.id as string, req.params.batchId as string, req.body ?? {}));
+  });
 
   // ── Delete batch ──
-  router.delete('/v1/calibrator/:id/batches/:batchId',
-    requireAuth(), requireRole('owner'),
-    async (req: Request, res: Response) => {
-      const gaii = resolve(req);
-      const id = req.params.id as string;
-      const batchId = req.params.batchId as string;
-      const record = await storage.getMemory(gaii, `calibrator.${id}.batch.${batchId}`);
-      if (!record) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Batch not found.'));
-      }
-      await storage.deleteMemory(gaii, `calibrator.${id}.batch.${batchId}`);
-      res.json(success(config.nodeId, { deleted: 1 }));
-      emitRecordChangePriorUnknown('memory', gaii, 'private');
-    }
-  );
+  router.delete('/v1/calibrator/:id/batches/:batchId', ...write, async (req: Request, res: Response) => {
+    const gaii = ownerOf(req, res); if (!gaii) return;
+    send(res, await deleteBatch(deps, gaii, req.params.id as string, req.params.batchId as string));
+  });
 
   return router;
 }

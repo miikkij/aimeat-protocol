@@ -289,13 +289,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published app screenshot, public by the owner's publish."
     },
-    "src/routes/calibrator.ts": {
-      "reads": {
-        "listMemory": 5,
-        "getMemory": 7
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Projects, dimensions, versions and batches pass presentMemories/presentMemory; the rest are read-to-update, delete cascades and existence checks."
-    },
     "src/routes/catalogue.ts": {
       "reads": {
         "listAllMemory": 1
@@ -1128,6 +1121,13 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Call-timing counters."
+    },
+    "src/services/calibrator/projects.ts": {
+      "reads": {
+        "listMemory": 5,
+        "getMemory": 7
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Projects, dimensions, versions and batches pass presentMemories/presentMemory; the rest are read-to-update, delete cascades and existence checks. 2026-11-19: moved unchanged from src/routes/calibrator.ts, so the MCP tool aimeat_calibrator runs the same reads with the caller's reader."
     },
     "src/services/capabilities/aggregator.ts": {
       "reads": {

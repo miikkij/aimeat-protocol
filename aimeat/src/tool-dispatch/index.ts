@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.32.0 -- 2026-11-19 -- calibratorCliTools: aimeat_calibrator.
  *   v1.31.0 -- 2026-11-19 -- livingCliTools: aimeat_living_author.
  *   v1.30.0 -- 2026-11-19 -- siteTemplateCliTools: aimeat_site_template.
  *   v1.29.0 -- 2026-11-19 -- broadcastSummaryCliTools: aimeat_dm_broadcast_summary.
@@ -110,6 +111,7 @@ import { organismApprovalCliTools } from './tool-call-defs-organism-approvals.js
 import { broadcastSummaryCliTools } from './tool-call-defs-broadcast-summary.js';
 import { siteTemplateCliTools } from './tool-call-defs-site-template.js';
 import { livingCliTools } from './tool-call-defs-living.js';
+import { calibratorCliTools } from './tool-call-defs-calibrator.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -180,6 +182,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...broadcastSummaryCliTools,
     ...siteTemplateCliTools,
     ...livingCliTools,
+    ...calibratorCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**

@@ -78596,7 +78596,8 @@ paths:
       summary: Default calibrator prompt templates
       description: |
         Returns the default analysis / reflection / self-reflection / synthesis prompt templates
-        used when creating a new calibration project. Owner-only.
+        used when creating a new calibration project. The owner, or their agent holding
+        memory:read-as-owner (the MCP tool aimeat_calibrator runs the same code).
       security:
         - BearerAuth: []
       responses:
@@ -78628,7 +78629,8 @@ paths:
       description: |
         Lists the owner's calibration projects (newest first), each augmented with `batchCount`,
         `latestAvgScore` (mean of the latest batch's per-model overall scores) and `modelCount`
-        (candidate models that name a model). Owner-only.
+        (candidate models that name a model). The owner, or their agent holding memory:read-as-owner,
+        which reads the owner's projects.
       security:
         - BearerAuth: []
       responses:
@@ -78665,7 +78667,7 @@ paths:
       operationId: createCalibratorProject
       tags: [Calibrator]
       summary: Create a calibration project
-      description: Creates a calibration project seeded with the default prompt templates. Owner-only.
+      description: Creates a calibration project seeded with the default prompt templates. The owner, or their agent holding memory:read-as-owner and memory:write-as-owner.
       security:
         - BearerAuth: []
       requestBody:
@@ -78711,7 +78713,7 @@ paths:
       summary: Get a calibration project
       description: |
         Returns the project (lazily backfilling any missing/outdated prompt templates) plus its
-        discovered dimensions. Owner-only.
+        discovered dimensions. The owner, or their agent holding memory:read-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -78747,7 +78749,8 @@ paths:
       tags: [Calibrator]
       summary: Update a calibration project
       description: |
-        Patches project fields (any subset of the request body is applied). Owner-only.
+        Patches project fields (any subset of the request body is applied). The owner, or their agent
+        holding memory:read-as-owner and memory:write-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -78800,7 +78803,7 @@ paths:
       operationId: deleteCalibratorProject
       tags: [Calibrator]
       summary: Delete a calibration project
-      description: Deletes the project and all of its versions, batches, and dimensions (cascade). Owner-only.
+      description: Deletes the project and all of its versions, batches, and dimensions (cascade). The owner, or their agent holding memory:read-as-owner and memory:write-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -78833,7 +78836,8 @@ paths:
       summary: Composite project detail
       description: |
         Returns the whole project-detail view in one prefix scan — project (with lazy template
-        backfill), dimensions, version summaries, the current version, and batch summaries. Owner-only.
+        backfill), dimensions, version summaries, the current version, and batch summaries. The owner,
+        or their agent holding memory:read-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -78876,7 +78880,7 @@ paths:
       operationId: listCalibratorVersions
       tags: [Calibrator]
       summary: List prompt versions
-      description: Lists the project's prompt versions (version, changelog, createdAt), ascending. Owner-only.
+      description: Lists the project's prompt versions (version, changelog, createdAt), ascending. The owner, or their agent holding memory:read-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -78915,7 +78919,8 @@ paths:
       summary: Create a prompt version
       description: |
         Creates a new prompt version (auto-incrementing `currentVersion`) with the given prompt,
-        optional target output, and changelog. Owner-only.
+        optional target output, and changelog. The owner, or their agent holding memory:read-as-owner
+        and memory:write-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -78968,7 +78973,7 @@ paths:
       operationId: getCalibratorVersion
       tags: [Calibrator]
       summary: Get a prompt version
-      description: Returns the full version record (prompt + target output). Owner-only.
+      description: Returns the full version record (prompt + target output). The owner, or their agent holding memory:read-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -79007,7 +79012,8 @@ paths:
       summary: List batches (summary)
       description: |
         Lists the project's batches (newest first) with per-model score summaries. Optionally filter
-        by prompt version via the `version` query param. Owner-only.
+        by prompt version via the `version` query param. The owner, or their agent holding
+        memory:read-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -79061,7 +79067,8 @@ paths:
       summary: Create a batch
       description: |
         Creates an empty batch for a given prompt version, pre-seeded with one pending slot per
-        candidate model (4-step Generate → Analyze → Reflect → Synthesize flow). Owner-only.
+        candidate model (4-step Generate → Analyze → Reflect → Synthesize flow). The owner, or their
+        agent holding memory:read-as-owner and memory:write-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -79105,7 +79112,7 @@ paths:
       operationId: getCalibratorBatch
       tags: [Calibrator]
       summary: Get batch detail
-      description: Returns the full batch record with all step results. Owner-only.
+      description: Returns the full batch record with all step results. The owner, or their agent holding memory:read-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -79143,7 +79150,8 @@ paths:
       summary: Update a batch
       description: |
         Updates batch models / status / synthesis results. As a side effect, auto-discovers new
-        dimensions from the models' Step 2 analysis and merges them into the project dimensions. Owner-only.
+        dimensions from the models' Step 2 analysis and merges them into the project dimensions. The
+        owner, or their agent holding memory:read-as-owner and memory:write-as-owner.
       security:
         - BearerAuth: []
       parameters:
@@ -79191,7 +79199,7 @@ paths:
       operationId: deleteCalibratorBatch
       tags: [Calibrator]
       summary: Delete a batch
-      description: Deletes a single batch record. Owner-only.
+      description: Deletes a single batch record. The owner, or their agent holding memory:read-as-owner and memory:write-as-owner.
       security:
         - BearerAuth: []
       parameters:
