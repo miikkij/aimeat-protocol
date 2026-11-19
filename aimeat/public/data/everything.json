@@ -707,10 +707,10 @@
      "slug": "g-4-consent",
      "cells": [
       "<strong>Consent</strong>",
-      "Grant, list and revoke access to a data pattern for anyone, an agent, an organism, a person, a domain or a node, with an audit log and a receipt. Each consent has a reach: <code>local</code> (read on this node), <code>federation</code> (as local, and matching public records may go to peers) or <code>auth</code> (another node may sign you in). A consent made without a reach is <code>local</code> from 4.0.0 (<code>federation</code> before it); <code>private</code> and <code>dmz</code> are older names for <code>local</code>. You see every consent of your account, the ones your agents gave included. An agent sees the consents it gave itself; give it <code>consent:read-as-owner</code>, which no wildcard carries, and it sees all of your account's consents as you do.",
+      "Grant, list and revoke access to a data pattern for anyone, an agent, an organism, a person, a domain or a node, with an audit log and a receipt. Each consent has a reach: <code>local</code> (read on this node), <code>federation</code> (as local, and matching public records may go to peers) or <code>auth</code> (another node may sign you in). A consent made without a reach is <code>local</code> from 4.0.0 (<code>federation</code> before it); <code>private</code> and <code>dmz</code> are older names for <code>local</code>. You see every consent of your account, the ones your agents gave included, in a chat and on the Data Wallet page, and you revoke any of them there. An agent sees the consents it gave itself; give it <code>consent:read-as-owner</code>, which no wildcard carries, and it sees all of your account's consents as you do.",
       "<code>/v1/consent*</code>, <code>aimeat_consent_*</code>"
      ],
-     "plain": "Consent Grant, list and revoke access to a data pattern for anyone, an agent, an organism, a person, a domain or a node, with an audit log and a receipt. Each consent has a reach: local (read on this node), federation (as local, and matching public records may go to peers) or auth (another node may sign you in). A consent made without a reach is local from 4.0.0 (federation before it); private and dmz are older names for local. You see every consent of your account, the ones your agents gave included. An agent sees the consents it gave itself; give it consent:read-as-owner, which no wildcard carries, and it sees all of your account's consents as you do. /v1/consent*, aimeat_consent_*"
+     "plain": "Consent Grant, list and revoke access to a data pattern for anyone, an agent, an organism, a person, a domain or a node, with an audit log and a receipt. Each consent has a reach: local (read on this node), federation (as local, and matching public records may go to peers) or auth (another node may sign you in). A consent made without a reach is local from 4.0.0 (federation before it); private and dmz are older names for local. You see every consent of your account, the ones your agents gave included, in a chat and on the Data Wallet page, and you revoke any of them there. An agent sees the consents it gave itself; give it consent:read-as-owner, which no wildcard carries, and it sees all of your account's consents as you do. /v1/consent*, aimeat_consent_*"
     },
     {
      "slug": "g-4-a-node-for-its-own-people-only",
@@ -2477,10 +2477,10 @@
      "slug": "g-10-fork-and-lineage",
      "cells": [
       "<strong>Fork and lineage</strong>",
-      "Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history.",
+      "Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history. A fork asks the same question as opening the app: an app open to one organism is forked only by its members, you and an operator, and the same holds for a look grown from it in the Design Book.",
       "<code>aimeat_app_fork</code>, <code>aimeat_app_manage</code> actions <code>settings</code> (forkable) and <code>lineage</code>, App Catalog &gt; fork permissions and lineage"
      ],
-     "plain": "Fork and lineage Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history. aimeat_app_fork, aimeat_app_manage actions settings (forkable) and lineage, App Catalog > fork permissions and lineage"
+     "plain": "Fork and lineage Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history. A fork asks the same question as opening the app: an app open to one organism is forked only by its members, you and an operator, and the same holds for a look grown from it in the Design Book. aimeat_app_fork, aimeat_app_manage actions settings (forkable) and lineage, App Catalog > fork permissions and lineage"
     },
     {
      "slug": "g-10-copy-protection-options",
