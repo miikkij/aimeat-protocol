@@ -24,6 +24,9 @@
  *   atelierPlatformIds() · ATELIER_PLATFORM_PART_LINE
  * @usage const piece = atelierPlatformPiece('group', config.baseUrl);   // null for an unknown id
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The section `other-owners` (atelier-other-owners.ts): an app whose shared
+ *     data other accounts' AI agents read and write. The served `group` and `row-spaces` end with a
+ *     line pointing at it.
  *   v1.0.0 — 2026-11-19 — Initial, with `server-side`, `from-classic`, the paste delivery, and three
  *     sections from the retired Classic skill (`dates-numbers`, `publish-checks`, `after-publish`).
  */
@@ -31,6 +34,10 @@ import { buildAppPrompt } from './app-prompt.js';
 import { splitBuildAppSpec } from './app-layers.js';
 import { AFTER_PUBLISH_SECTION, DATES_NUMBERS_SECTION, PUBLISH_CHECKS_SECTION } from '../../data/builtin-skills.app-builder-common.js';
 import { buildCapabilityPackLines } from '../../data/library-packs.js';
+import { OTHER_OWNERS_SECTION, OTHER_OWNERS_POINTER } from './atelier-other-owners.js';
+
+/** The cut sections that end with the pointer to `other-owners`: the two a shared app is built from. */
+const POINTS_TO_OTHER_OWNERS = new Set(['group', 'row-spaces']);
 
 /** The sections that lived in the retired Classic skill and hold on any track (builtin-skills.app-builder-common.ts). */
 const MOVED_FROM_CLASSIC_SKILL: Record<string, string> = {
@@ -54,6 +61,7 @@ export const ATELIER_PLATFORM: Array<{ id: string; from?: string; when: string }
   { id: 'data-map', when: 'Before you publish: how to write the data map, the record the next AI reads to find where this app keeps what.' },
   { id: 'group', when: 'Several people use the same data: a team, a club, a class, members with roles.' },
   { id: 'row-spaces', when: 'The app keeps a growing log, an audit trail or measurements for a group.' },
+  { id: 'other-owners', when: "People of other accounts, and their own AI agents, read and write the app's shared data: a situation room, a shared project floor. Read it before the first publish." },
   { id: 'agent-data', when: "The app shows data that the person's AI agents wrote. A plain list returns nothing for it." },
   { id: 'outside-users', when: 'The app is for people who have no account on this node: the buyers of a shop, the members of a club, a market place.' },
   { id: 'public-intake', when: 'People who are not signed in send something in: a form, a vote, feedback, a booking.' },
@@ -153,6 +161,7 @@ export function atelierPlatformPiece(id: string, baseUrl: string): { id: string;
   if (id === 'platform') return { id, text: platformIndex(nodeUrl) };
   if (id === 'server-side') return { id, text: SERVER_SIDE_SECTION };
   if (id === 'from-classic') return { id, text: FROM_CLASSIC_SECTION };
+  if (id === 'other-owners') return { id, text: OTHER_OWNERS_SECTION };
   const moved = MOVED_FROM_CLASSIC_SKILL[id];
   if (moved) return { id, text: moved };
   // The engines the Classic library list carried and the Atelier one only pointed at, without the
@@ -161,5 +170,7 @@ export function atelierPlatformPiece(id: string, baseUrl: string): { id: string;
   const entry = ATELIER_PLATFORM.find(s => s.id === id);
   if (!entry) return null;
   const text = cutSection(entry.from ?? entry.id, nodeUrl);
-  return text ? { id, text } : null;
+  if (!text) return null;
+  // Appended to the served copy only: the cut text stays as it was written (no prompt rewrite).
+  return { id, text: POINTS_TO_OTHER_OWNERS.has(id) ? text.replace(/\s*$/, '\n') + OTHER_OWNERS_POINTER : text };
 }

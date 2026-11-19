@@ -36,6 +36,8 @@
  *   markup an app would want to fill, so it carries no @parts declaration and describe() claims
  *   nothing for it. Adding it is the same three steps as the queue's.
  * @version-history
+ *   2026-11-19 — health and queue warn once in the console when the rows come as `items` (the
+ *     list's and the grid's shape) instead of `data.items`; they still read only `data.items`.
  *   v0.51.0 — 2026-09-05 — THE WALL AND THE QUEUE TAKE WHAT THE APP GIVES THEM: named parts on
  *     every element, `extra` and `aside` left empty on a job and on a watched thing, `parts.row`
  *     for the whole line, two variants each and four tokens (the lamp, the two row paddings, the
@@ -61,6 +63,25 @@ function svg(name, attrs) {
   const node = document.createElementNS(SVG_NS, name);
   for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
   return node;
+}
+
+/**
+ * Warn once per block when the rows arrive where the list and the grid take them (`items` at the
+ * top) instead of under `data`. Both shapes are valid elsewhere in the kit, so an app passing the
+ * wrong one got the empty state and no error: a shared app on 2026-11-13 showed "nothing yet" to
+ * every member for four versions while its rows were there. The rows are not read from the wrong
+ * place, because a block that guesses its input hides the next mistake as well.
+ * @param {string} block @param {any} spec @param {any} patch — the set() argument, or null for the spec
+ * @param {{ warned: boolean }} once
+ */
+function warnMisplacedItems(block, spec, patch, once) {
+  if (once.warned) return;
+  const source = patch || spec;
+  const misplaced = source && Array.isArray(source.items) && !(source.data && Array.isArray(source.data.items));
+  if (!misplaced) return;
+  once.warned = true;
+  console.warn('aimeat-atelier: ' + block + ' takes its rows as ' + (patch ? 'set({ data: { items } })' : '{ data: { items } }')
+    + ', not as `items`. It shows the empty state until they are passed that way.');
 }
 
 const TONES = ['ok', 'warn', 'err', 'plain'];
@@ -106,10 +127,12 @@ export function health(spec) {
     }
   }
 
+  const once = { warned: false };
+  warnMisplacedItems('health', spec, null, once);
   render(spec.data);
   return {
     el: root,
-    set(patch) { if (patch && 'data' in patch) render(patch.data); },
+    set(patch) { warnMisplacedItems('health', spec, patch, once); if (patch && 'data' in patch) render(patch.data); },
     destroy() { if (emptyCard) emptyCard.destroy(); root.remove(); },
   };
 }
@@ -198,10 +221,12 @@ export function queue(spec) {
     });
   }
 
+  const once = { warned: false };
+  warnMisplacedItems('queue', spec, null, once);
   render(spec.data);
   return {
     el: root,
-    set(patch) { if (patch && 'data' in patch) render(patch.data); },
+    set(patch) { warnMisplacedItems('queue', spec, patch, once); if (patch && 'data' in patch) render(patch.data); },
     destroy() { if (emptyCard) emptyCard.destroy(); root.remove(); },
   };
 }

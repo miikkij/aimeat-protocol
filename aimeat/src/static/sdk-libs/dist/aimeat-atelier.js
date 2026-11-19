@@ -9275,6 +9275,14 @@
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
+  function warnMisplacedItems(block, spec, patch, once) {
+    if (once.warned) return;
+    const source = patch || spec;
+    const misplaced = source && Array.isArray(source.items) && !(source.data && Array.isArray(source.data.items));
+    if (!misplaced) return;
+    once.warned = true;
+    console.warn("aimeat-atelier: " + block + " takes its rows as " + (patch ? "set({ data: { items } })" : "{ data: { items } }") + ", not as `items`. It shows the empty state until they are passed that way.");
+  }
   var TONES4 = ["ok", "warn", "err", "plain"];
   function toneOf2(value) {
     return TONES4.indexOf(value) >= 0 ? value : "plain";
@@ -9317,10 +9325,13 @@
         root.appendChild(row);
       }
     }
+    const once = { warned: false };
+    warnMisplacedItems("health", spec, null, once);
     render(spec.data);
     return {
       el: root,
       set(patch) {
+        warnMisplacedItems("health", spec, patch, once);
         if (patch && "data" in patch) render(patch.data);
       },
       destroy() {
@@ -9415,10 +9426,13 @@
         }
       });
     }
+    const once = { warned: false };
+    warnMisplacedItems("queue", spec, null, once);
     render(spec.data);
     return {
       el: root,
       set(patch) {
+        warnMisplacedItems("queue", spec, patch, once);
         if (patch && "data" in patch) render(patch.data);
       },
       destroy() {

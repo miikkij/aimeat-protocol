@@ -33,6 +33,9 @@
  * @structure EVENTS_FIRST_DOMAINS · atelierEventsFirst() · classicLiveUpdatesSection()
  * @usage import { atelierEventsFirst, classicLiveUpdatesSection } from './events-first.js';
  * @version-history
+ *   v1.3.0 — 2026-11-19 — The list names the workspace domain and the extension domain. A shared
+ *     app listened to `memory`, which never reaches another account, and its second user saw no
+ *     update; the build text named neither domain, only the aimeat-live library entry did.
  *   v1.2.0 — 2026-10-22 — `realtime-rooms` (social:read) joins the list: a lobby follows the
  *     realtime rooms through AIMEAT.live (Band Jam needed a Refresh to see a new room).
  *   v1.1.0 — 2026-10-11 — Both specifications say a delete emits its domain as a write does. The
@@ -48,7 +51,12 @@ export const EVENTS_FIRST_DOMAINS =
   + '(organism:read), `workflows` and `scheduler` (workflow:read), `messages` (messages:read), '
   + '`boards` and `realtime-rooms` (social:read), `wallet` (wallet:read), `knowledge` and `packages` '
   + '(knowledge:read). `realtime-rooms` says the realtime room list moved: a room opened or closed, a '
-  + 'player came or went';
+  + 'player came or went. Two more name one place each. `workspace:<organismId>/<workspaceId>` '
+  + '(an app grant needs organism:read) fires for every member of the organism when a record, a draft, '
+  + 'a row or a delete in that workspace changes: a view of data that people of other accounts, or their '
+  + 'agents, write listens to it, because `memory` never reaches another account. '
+  + '`ext:<installer>/<extension>` (ext:invoke) fires when that extension calls `ctx.changed()`, for the '
+  + 'accounts it names';
 
 /** The three places a timer belongs, the same words in both specifications. */
 const TIMER_CASES =

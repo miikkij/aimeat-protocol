@@ -9,6 +9,7 @@
  *   build-app-prompt.ts kept every sentence it had.
  * @usage cd aimeat && pnpm vitest run test/unit/build-events-first.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-19 — The list names the workspace and extension domains.
  *   v1.0.0 — 2026-10-11 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -54,6 +55,13 @@ describe('events first, a timer last', () => {
     }
     expect(pairs.length).toBe(12);
     for (const [domain, scope] of pairs) expect(DOMAIN_SCOPE[domain], domain).toBe(scope);
+  });
+
+  it('names the workspace domain for data other accounts write, and the extension domain', () => {
+    expect(EVENTS_FIRST_DOMAINS).toContain('`workspace:<organismId>/<workspaceId>`');
+    expect(EVENTS_FIRST_DOMAINS).toContain('`memory` never reaches another account');
+    expect(EVENTS_FIRST_DOMAINS).toContain('`ext:<installer>/<extension>` (ext:invoke)');
+    expect(DOMAIN_SCOPE['extension-data']).toBe('ext:invoke');
   });
 
   it('kept the firehose text of the section that moved', () => {

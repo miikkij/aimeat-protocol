@@ -7,6 +7,7 @@
  *   retired Classic track or its tiers, part `start` names the index, and the parts still rebuild
  *   the full text because the platform sections are not in it.
  * @version-history
+ *   v1.1.0 — 2026-11-19 — `other-owners` and the pointer the served `group` and `row-spaces` end with.
  *   v1.0.0 — 2026-11-19 — Initial, with `from-classic` and the paste delivery.
  */
 import { describe, it, expect } from 'vitest';
@@ -78,6 +79,18 @@ describe('Atelier platform sections', () => {
     expect(paste).toContain('## When the app is ready');
     expect(paste).toContain(full);
     expect(buildAtelierPrompt(config, { mode: 'new' }).full).toBe(full);
+  });
+
+  it('serves `other-owners` with the rules a two-account app meets, and group and row-spaces point at it', () => {
+    const text = atelierPlatformPiece('other-owners', LONG)!.text;
+    for (const needle of ['aimeat_organism_member_add', '"extensions": ["<installer>/<extension>"]', 'organism:direct',
+      '"apps": ["<owner>/<filename>"]', "'workspace:' + organismId", 'ctx.changed({ owners', 'writes_past_app_rules', 'two accounts, both agents']) {
+      expect(text, needle).toContain(needle);
+    }
+    expect(atelierPlatformPiece('platform', LONG)!.text).toContain('- `other-owners` —');
+    for (const id of ['group', 'row-spaces']) expect(atelierPlatformPiece(id, LONG)!.text, id).toContain('read the section `other-owners`');
+    expect(atelierPlatformPiece('files', LONG)!.text).not.toContain('`other-owners`');
+    expect(full).not.toContain("## Other people's accounts");
   });
 
   it('points server-side work at the extension skill and the Microservices Central', () => {
