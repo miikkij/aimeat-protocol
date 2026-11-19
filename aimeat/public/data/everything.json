@@ -2335,10 +2335,10 @@
      "slug": "g-9-living-document-authoring",
      "cells": [
       "<strong>Living document authoring</strong>",
-      "Your model drafts an interactive document template from a plain request. The route only returns the template and saves nothing; the Document templates page saves it as a record you can edit. Owner only.",
-      "<code>POST /v1/living/author</code>, Profile › Document templates"
+      "Your model drafts an interactive document template from a plain request. The route only returns the template and saves nothing; the Document templates page saves it as a record you can edit. Your own AI asks for one from a chat too, with your permission to use AI: the call counts as that agent's, so your model rules for it and its own daily limit apply. An app cannot ask for one.",
+      "<code>POST /v1/living/author</code>, <code>aimeat_living_author</code>, Profile › Document templates"
      ],
-     "plain": "Living document authoring Your model drafts an interactive document template from a plain request. The route only returns the template and saves nothing; the Document templates page saves it as a record you can edit. Owner only. POST /v1/living/author, Profile › Document templates"
+     "plain": "Living document authoring Your model drafts an interactive document template from a plain request. The route only returns the template and saves nothing; the Document templates page saves it as a record you can edit. Your own AI asks for one from a chat too, with your permission to use AI: the call counts as that agent's, so your model rules for it and its own daily limit apply. An app cannot ask for one. POST /v1/living/author, aimeat_living_author, Profile › Document templates"
     },
     {
      "slug": "g-9-a-living-document-asks-before-it-uses-your-ai",

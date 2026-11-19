@@ -8,9 +8,13 @@
  *   storage, deploy, and rendering are client-orchestrated over the generic memory/organism APIs
  *   (no-SSR); the background pulse arrives in a later phase. See
  *   docs/plans/2026-06-21-living-documents-plan.md.
- * @structure POST /v1/living/author — requireAuth + requireRole('owner'); returns { template, model }
+ * @structure POST /v1/living/author — the owner, or their agent holding ai:use; returns { template, model }
  * @usage app.use(livingRouter(config, storage))
  * @version-history
+ *   v1.3.0 — 2026-11-19 — POST /v1/living/author hands the caller to the service and admits the
+ *     owner's agent or ecosystem app holding ai:use, planned and capped as that agent (the MCP tool
+ *     aimeat_living_author runs the same service). An app grant stays refused (feature audit
+ *     2026-11-19, 4.4 item 5).
  *   v1.2.0 — 2026-09-29 — TARGET-082 V4: GET /v1/living-docs hands the caller's ContentReader to the
  *     Living Docs composite, which filters the templates and instances through it.
  *   v1.1.0 — 2026-07-16 — Add GET /v1/living-docs composite (templates + instances partitioned from one
@@ -20,7 +24,8 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope } from '../auth/middleware.js';
+import { callerOf } from '../middleware/caller.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { NotebookAiError } from '../services/notebook/ai.js';
@@ -42,9 +47,17 @@ export function livingRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, data));
   });
 
-  // POST /v1/living/author — design a living-document template from a description (owner-scoped: it
-  // decrypts the caller's own OpenRouter key). No writes happen here; the client saves the template.
-  router.post('/v1/living/author', requireAuth(), requireRole('owner'), async (req, res) => {
+  // POST /v1/living/author — design a living-document template from a description. The owner pays;
+  // the owner in person, or an agent or an ecosystem app of the owner holding ai:use, asks, and an
+  // agent's call is planned as that agent's (services/living/author.ts authorPayer). An app grant
+  // stays refused, as requireRole('owner') refused it before: its app is not on the caller, and the
+  // planner would read it as the owner in person. No writes happen here; the client saves the template.
+  router.post('/v1/living/author', requireAuth(), requireRoleOrScope('owner', 'ai:use'), async (req, res) => {
+    const caller = callerOf(req, config.nodeId, storage);
+    if (caller.kind === 'app' || caller.visitor) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the account holder, or their own AI with permission to use AI, designs a document template here.'));
+      return;
+    }
     const { need, catalogue } = req.body as { need?: string; catalogue?: unknown };
     if (!need || typeof need !== 'string' || !need.trim()) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'need is required'));
@@ -53,8 +66,7 @@ export function livingRouter(config: AimeatConfig, storage: Storage): Router {
     req.setTimeout(600_000);
     res.setTimeout(600_000);
     try {
-      const gaii = resolveIdentity(req.auth!, config.nodeId);
-      const result = await authorLivingTemplate(storage, config, { gaii, need, catalogue });
+      const result = await authorLivingTemplate(storage, config, { caller, need, catalogue });
       res.json(success(config.nodeId, result));
     } catch (e) {
       if (e instanceof NotebookAiError) {

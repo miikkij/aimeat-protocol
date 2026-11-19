@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-19 -- definitions/living.ts: aimeat_living_author.
  *   v1.x -- 2026-11-19 -- definitions/site-template.ts: aimeat_site_template.
  *   v1.x -- 2026-11-19 -- definitions/broadcast-summary.ts: aimeat_dm_broadcast_summary.
  *   v1.x -- 2026-11-19 -- definitions/organism-approvals.ts: aimeat_organism_approval_request and
@@ -140,6 +141,7 @@ import { moderationTools } from './definitions/moderation.js';
 import { organismApprovalTools } from './definitions/organism-approvals.js';
 import { broadcastSummaryTools } from './definitions/broadcast-summary.js';
 import { siteTemplateTools } from './definitions/site-template.js';
+import { livingTools } from './definitions/living.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
@@ -222,6 +224,7 @@ const CATALOG = [
     ...moderationTools,
     ...broadcastSummaryTools,
     ...siteTemplateTools,
+    ...livingTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;

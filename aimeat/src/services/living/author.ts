@@ -7,9 +7,14 @@
  *   own OpenRouter model (shared resolution in notebook-ai.ts) and grounded by a compact catalogue of
  *   the owner's agent offers so sections can be assigned to real agents. Returns a template in the
  *   exact shape the client editor (living.js) consumes; the user can edit everything by hand after.
- * @structure authorLivingTemplate() — resolve model → prompt(need + catalogue) → chokepoint → template
- * @usage const result = await authorLivingTemplate(storage, config, { gaii, need, catalogue });
+ * @structure authorPayer(caller) · authorLivingTemplate() — resolve model → prompt(need + catalogue) →
+ *   chokepoint → template
+ * @usage const result = await authorLivingTemplate(storage, config, { caller, need, catalogue });
  * @version-history
+ *   v1.2.0 — 2026-11-19 — Takes the caller (services/caller-context.ts) instead of an identity: the
+ *     owner pays, and an agent or an ecosystem app that asks is named, so the owner's AI policy for
+ *     that agent, the agent's cap and the owner's allowance apply to it. POST /v1/living/author and
+ *     the MCP tool aimeat_living_author both pass their caller (feature audit 2026-11-19, 4.4 item 5).
  *   v1.0.0 — 2026-06-21 — Phase 1: author a living-document template from a description.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: the completion runs through the chokepoint, minted and
  *     metered as `living:author`.
@@ -19,6 +24,8 @@ import type { AimeatConfig } from '../../config.js';
 import { stripCodeblock } from '../llm-strip.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from '../notebook/ai.js';
 import { LIVING_AUTHOR_SYSTEM, LIVING_AUTHOR_TEMPLATE } from './author-prompt.js';
+import { aiCallerFromCredential, type AiCallerContext } from '../ai/caller-context.js';
+import type { CallerContext } from '../caller-context.js';
 import { logger } from '../../utils/logger.js';
 
 export interface LivingSlot { section: string; desc: string; slot: string; kind: 'derived' | 'aggregate' | 'static'; rules: { max_words?: number }; agent: string | null }
@@ -85,15 +92,27 @@ function resolveSlots(raw: unknown, catalogue: Array<Record<string, unknown>>): 
   return out;
 }
 
+/**
+ * Who pays for the author call and who asks, from the caller: the owner GHII pays
+ * (caller-facts.ts payerOfPrincipal), and an agent or an ecosystem app is named as the asker, so the
+ * owner's allowance and budget, the owner's AI policy for that agent or app and the agent's own cap
+ * apply. The owner in person is the owner, as before. An app grant is not a caller here: the route
+ * refuses it, because its app name is not on the caller.
+ */
+export function authorPayer(caller: CallerContext): { gaii: string; who: AiCallerContext } {
+  return { gaii: caller.payer.payer, who: aiCallerFromCredential({ roles: caller.roles }, caller.principal) };
+}
+
 export async function authorLivingTemplate(
   storage: Storage,
   config: AimeatConfig,
-  opts: { gaii: string; need: string; catalogue?: unknown },
+  opts: { caller: CallerContext; need: string; catalogue?: unknown },
 ): Promise<AuthorResult> {
   const need = opts.need.trim();
   if (!need) throw new NotebookAiError('INVALID_INPUT', 'need is required');
 
-  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'living:author');
+  const { gaii, who } = authorPayer(opts.caller);
+  const owner = await resolveOwnerModel(storage, config, gaii, 'living:author', who);
   const catalogue = normaliseCatalogue(opts.catalogue);
   const prompt = (await loadTemplate(storage))
     .split('{{need}}').join(need)

@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.77.0 -- 2026-11-19 -- Living documents: aimeat_living_author designs a template.
  *   v1.76.0 -- 2026-11-19 -- Direct messages: aimeat_dm_broadcast_summary reads a broadcast's results.
  *   v1.75.0 -- 2026-11-19 -- Organisms: what waits for a person, and aimeat_organism_approval_request and _approvals.
  *   v1.74.0 -- 2026-11-19 -- Moderation: aimeat_flag_appeal, aimeat_appeals and aimeat_appeal_review.
@@ -298,6 +299,13 @@ the node narrows it at once and tells your owner.
 appending events + flipping TODO status → complete (with a summary) or fail (with a reason). A request
 you should not take (off your topic, against your rules): decline it with the reason. It ends as
 declined, which the owner reads as your answer, not as a failure.
+
+**Living documents — a page that keeps itself current.** When the person wants a document that
+refreshes on its own ("a weekly page of what changed in the project and who decided it"),
+\`aimeat_living_author\` with their \`need\` designs its template: the charter (what it tracks, how
+often, whether a refresh waits for their approval) and two to six sections. It runs on your owner's
+AI and counts as yours, with ai:use. Nothing is stored: show them the template, and they save and
+start it on the Document templates page (/v1/profile?tab=living).
 
 **Goals — what the owner wants done, carried by their agents together.** \`aimeat_goal_get\` ·
 \`aimeat_goal_set\` · \`aimeat_goal_work\` · \`aimeat_goal_answer\`. When the person asks for an outcome

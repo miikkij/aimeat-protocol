@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:064904ac9e097cc71cb6be08"
+      "digest": "sha256:06f60ddcc8a7d2b278b26604"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-19",
@@ -170,6 +170,7 @@
     "9. AI on the node": {
       "reviewedOn": "2026-11-19",
       "watches": [
+        "aimeat/src/tool-catalog/definitions/living.ts",
         "aimeat/src/services/ai/routing.ts",
         "aimeat/src/services/ai/roles.ts",
         "aimeat/src/services/ai/policy-store.ts",
@@ -191,7 +192,7 @@
         "aimeat/src/tool-catalog/definitions/ai-models.ts",
         "aimeat/src/tool-catalog/definitions/decide.ts"
       ],
-      "digest": "sha256:f5a886d9e6fc38d15d6d0771"
+      "digest": "sha256:d86c84b46e37a10f02be3422"
     },
     "10. Apps": {
       "reviewedOn": "2026-11-19",
@@ -663,7 +664,7 @@
       "aimeat/src/services/knowledge/shared.ts": "433d48b92f2d504d",
       "aimeat/src/services/knowledge/sharing.ts": "f1da5e0af19e63cf",
       "aimeat/src/services/living/author-prompt.ts": "bff6c29be56cd5fc",
-      "aimeat/src/services/living/author.ts": "61afff411fe222cf",
+      "aimeat/src/services/living/author.ts": "5b762b1d6a7c7009",
       "aimeat/src/services/living/config-publish.ts": "b4d529f25f59438c",
       "aimeat/src/services/living/pulse-spend.ts": "781fcc66e70d149f",
       "aimeat/src/services/living/pulse.ts": "7d8b4523bc0a245f",
@@ -726,6 +727,7 @@
       "aimeat/src/routes/commerce-acp.ts": "a46bc118f52567cf"
     },
     "9. AI on the node": {
+      "aimeat/src/tool-catalog/definitions/living.ts": "eede4baab0b73937",
       "aimeat/src/services/ai/routing.ts": "2233dd201cd0cd90",
       "aimeat/src/services/ai/roles.ts": "e2afb7ec8d3c1029",
       "aimeat/src/services/ai/policy-store.ts": "de2a453be234d432",
@@ -743,7 +745,7 @@
       "aimeat/src/routes/ai-decide-rules.ts": "98a8f991a7dd5a65",
       "aimeat/src/routes/ai-jobs.ts": "e63ac7114ec0946d",
       "aimeat/src/routes/calibrator.ts": "067cd083480b41db",
-      "aimeat/src/routes/living.ts": "523bec69b5527ed1",
+      "aimeat/src/routes/living.ts": "e1a23e862add5ae0",
       "aimeat/src/tool-catalog/definitions/ai-models.ts": "26305ed49ea809f8",
       "aimeat/src/tool-catalog/definitions/decide.ts": "5343615bf3f1d8b6"
     },

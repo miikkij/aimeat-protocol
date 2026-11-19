@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-11-19 — registerLivingTools (aimeat_living_author: a living document template, mcp/living.ts).
  *   2026-11-19 — registerSiteTemplateTools (aimeat_site_template: the front page per language, mcp/site-template.ts).
  *   2026-11-19 — registerOrganismApprovalTools (an organism's approval requests, mcp/organism-approvals.ts).
  *   2026-11-19 — registerModerationReviewTools (the moderation review: flags and appeals, mcp/flags.ts).
@@ -210,6 +211,7 @@ import { registerAccessTools } from './access.js';
 import { registerEcosystemAppTools } from './ecosystem-apps.js';
 import { registerOrganismApprovalTools } from './organism-approvals.js';
 import { registerSiteTemplateTools } from './site-template.js';
+import { registerLivingTools } from './living.js';
 import { registerSecretTools } from './secrets.js';
 import { registerSecretShareTools } from './secret-shares.js';
 import { registerHelpTools } from './help.js';
@@ -299,6 +301,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerFlagsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerModerationReviewTools(mcp, storage, config, caller);
     registerSiteTemplateTools(mcp, storage, config, caller);
+    registerLivingTools(mcp, storage, config, caller);
     registerPromptsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, deps.role ?? 'all', caller);
     registerCapabilitiesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, getToken, scopes, caller);
     // The second primitive, beside aimeat_discover: run what you found. Needs the session's
