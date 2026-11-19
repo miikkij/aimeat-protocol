@@ -1,5 +1,5 @@
 /**
- * @file src/services/hook-when-missing.ts
+ * @file src/services/hooks/when-missing.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a blocking hook does when the action bound to it is missing, and who hears of it.
@@ -27,14 +27,17 @@
  *   if (whenMissingOf(config, hookName) === 'refuse') return refuse();
  *   void tellOperatorsActionMissing(config, storage, hookName, ref, 'pass');
  * @version-history
+ *   v1.1.0 — 2026-11-19 — Moved from services/hook-when-missing.ts; the row is written through
+ *     storeConfigValue (services/config/apply.ts), the one place a setting row is written.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, 2.4).
  */
-import type { AimeatConfig, HookName, HookWhenMissing } from '../config-types.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { notify } from './notify.js';
-import { listOperatorGhiis } from './operators.js';
+import type { AimeatConfig, HookName, HookWhenMissing } from '../../config-types.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { notify } from '../notify.js';
+import { listOperatorGhiis } from '../operators.js';
+import { storeConfigValue } from '../config/apply.js';
 
 export const HOOK_WHEN_MISSING_VALUES: readonly HookWhenMissing[] = ['pass', 'refuse'];
 
@@ -89,7 +92,7 @@ export async function setHookWhenMissing(
   const mode = value as HookWhenMissing;
   // Written as a row in both cases: the reload on another process applies a changed row and ignores a
   // removed one (services/config/reload.ts), so a removal would not reach it.
-  await storage.setConfigValue(hookWhenMissingKey(name), mode);
+  await storeConfigValue(storage, config, hookWhenMissingKey(name), mode);
   config.extensionHookWhenMissing = { ...config.extensionHookWhenMissing, [name]: mode };
   return {
     ok: true, hook: name, when_missing: mode,

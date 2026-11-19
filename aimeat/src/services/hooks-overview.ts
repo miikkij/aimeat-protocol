@@ -70,7 +70,7 @@ import type { Storage } from '../storage/interface.js';
 import type { ActionRecord } from '../storage/types/commerce.js';
 import { HOOK_NAMES, hookKind, HOOK_TIMEOUT_MS, indexActionRefs, resolveHookRef, qualifiedRef, isBareRef, type HookKind } from './hooks.js';
 import { readHookRuns, recordHookRun, HOOK_RUNS_KEPT, type HookRun } from './hook-log.js';
-import { whenMissingOf, whenMissingRefusal, setHookWhenMissing } from './hook-when-missing.js';
+import { whenMissingOf, whenMissingRefusal, setHookWhenMissing } from './hooks/when-missing.js';
 import type { HookWhenMissing } from '../config-types.js';
 import { logger } from '../utils/logger.js';
 
@@ -124,7 +124,7 @@ export interface HookRow {
   /**
    * True when this is a gate and an action bound to it is missing: not published here, or published
    * without an address. Such a gate calls nobody for that action, and `when_missing` says what it
-   * does with the event (services/hook-when-missing.ts).
+   * does with the event (services/hooks/when-missing.ts).
    */
   missing: boolean;
   /** A gate's choice for a missing action, `pass` (the default) or `refuse`; null for a notify hook. */

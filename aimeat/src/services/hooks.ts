@@ -48,7 +48,7 @@
  *   2026-11-19 — Header counts corrected: five hooks decide and eight are told (comment only).
  *   2026-11-19 — A gate whose bound action is missing (not published, or no address) tells the
  *     operators once per binding per day, and refuses instead of letting the event through when its
- *     setting says so (services/hook-when-missing.ts). Letting through stays the default.
+ *     setting says so (services/hooks/when-missing.ts). Letting through stays the default.
  *   2026-11-14 — post_help_question and post_help_solved: told after a question of Ask someone who
  *     knows went to a helper and after one was solved. Thirteen moments.
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
@@ -79,7 +79,7 @@ import { readJson, readText } from '../utils/read-capped.js';
  *  action does not decide how much memory a request takes (secaudit 2026-10, C6). */
 const HOOK_ANSWER_MAX_BYTES = 256 * 1024;
 import { recordHookRun, type HookAnswer } from './hook-log.js';
-import { whenMissingOf, tellOperatorsActionMissing } from './hook-when-missing.js';
+import { whenMissingOf, tellOperatorsActionMissing } from './hooks/when-missing.js';
 
 /**
  * Every moment, in the order a person meets them. THE canonical list: config.ts seeds the same
@@ -271,7 +271,7 @@ export async function executeHooks(
             logger.warn(`Extension hook ${hookName}: action "${actionRef}" not found, skipping`);
             // A gate lets the event through by default, as it always has; the operator's setting can
             // make it refuse instead, and the operators are told once a day either way
-            // (services/hook-when-missing.ts).
+            // (services/hooks/when-missing.ts).
             const refuses = kind === 'gate' && whenMissingOf(config, hookName) === 'refuse';
             await record(storage, hookName, actionRef, undefined, 'missing', null, Date.now() - started, !refuses, subject,
                 refuses ? 'The bound action is not published on this node, and this hook refuses when its action is missing'

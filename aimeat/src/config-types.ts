@@ -422,7 +422,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   workQueueMaxPending: number;
   indexNowKey: string | null;
   extensionHooks: ExtensionHooks;
-  /** Per blocking hook: what happens when its bound action is missing (services/hook-when-missing.ts). Absent: 'pass'. */
+  /** Per blocking hook: what happens when its bound action is missing (services/hooks/when-missing.ts). Absent: 'pass'. */
   extensionHookWhenMissing?: Partial<Record<HookName, HookWhenMissing>>;
   rateLimits: RateLimitsConfig;
 

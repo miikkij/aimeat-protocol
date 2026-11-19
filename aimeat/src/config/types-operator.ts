@@ -75,7 +75,7 @@ export interface OperatorConfig {
   /**
    * Where a security researcher reports a vulnerability: one or more `mailto:` or `https:` addresses,
    * comma-separated, in the order to try them. Set, the node serves `/.well-known/security.txt`
-   * (RFC 9116, routes/security-txt.ts); empty, that address answers 404, because the node never
+   * (RFC 9116, routes/well-known/security-txt.ts); empty, that address answers 404, because the node never
    * invents a contact.
    */
   securityContact?: string;

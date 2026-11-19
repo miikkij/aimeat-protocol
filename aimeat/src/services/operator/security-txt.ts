@@ -1,11 +1,11 @@
 /**
- * @file src/services/security-txt.ts
+ * @file src/services/operator/security-txt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's security.txt (RFC 9116): where a security researcher reports a
  *   vulnerability in this node. The operator sets the contact (operator.security_contact) and,
  *   optionally, the disclosure policy page (operator.security_policy_url); the route
- *   routes/security-txt.ts serves the file at `/.well-known/security.txt`.
+ *   routes/well-known/security-txt.ts serves the file at `/.well-known/security.txt`.
  *
  *   THE NODE NEVER INVENTS A CONTACT. With no contact set there is no file: a scanner that reads a
  *   made-up address, or the upstream author's, sends a report to somebody who does not run this
@@ -23,9 +23,10 @@
  *   const body = buildSecurityTxt(config);
  *   if (body) res.type('text/plain; charset=utf-8').send(body);
  * @version-history
+ *   v1.0.1 — 2026-11-19 — Moved from services/security-txt.ts into services/operator/.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, report 4.7).
  */
-import type { AimeatConfig } from '../config.js';
+import type { AimeatConfig } from '../../config.js';
 
 /** How far ahead the Expires line points. RFC 9116 recommends less than a year. */
 export const SECURITY_TXT_DAYS = 180;

@@ -118,7 +118,7 @@ import { glossaryRouter } from '../routes/glossary.js';
 import { nsRouter } from '../routes/ns.js';
 import { markdownMirrorsRouter } from '../routes/markdown-mirrors.js';
 import { agentConventionsRouter } from '../routes/agent-conventions.js';
-import { securityTxtRouter } from '../routes/security-txt.js';
+import { securityTxtRouter } from '../routes/well-known/security-txt.js';
 import { nodeRobotsTxt } from './static-files.js';
 import { mountNodeRobots } from './robots-mount.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';

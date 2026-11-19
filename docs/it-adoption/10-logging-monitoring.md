@@ -1,6 +1,6 @@
 # 10 Logging and monitoring
 
-> Checked against AIMEAT node 4.3.1 (commit 9d084e308) on 2026-11-19. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 7f17ba327) on 2026-11-19. Maintained with the code: see the README for how.
 
 This page is for the sysadmin and the SOC that must watch a node. It lists what the node records, where each record lives and how long it is kept, what the process log looks like and what it masks, how to get the records into a SIEM, which health and metrics endpoints exist, what to alert on, and which compliance reports the node keeps. The operator's own monitoring guide is [aimeat/docs/observability-guide.md](../../aimeat/docs/observability-guide.md); health checks are in [Production deployment](../operations/production-deployment.md#health-checks).
 
@@ -73,7 +73,7 @@ Other sources to collect from:
 | Statistics | `GET /v1/stats` JSON | `AIMEAT_STATS_ACCESS=operator` |
 | Operator and usage trail | poll `GET /v1/admin/usage/calls` with an operator token | The history. As they happen, operator acts go out as the `operator` kind above, and the trail as the `trail` kind when it is named |
 | Refusals | poll `GET /v1/admin/auth-refusals` | Same data as the file |
-| Lifecycle hooks | `aimeat_admin_hook_set` binds a published action's webhook to one of twelve live moments: owner and agent registration (before and after), agent rekey, work request, work delivery, settlement, board post, federation peer request, a question sent to a helper, and a question solved or expired. `owner_recovery` is still listed, but nothing fires it | These are lifecycle moments, not security events. A `pre_` hook is a gate: if its address stops answering it refuses everything it guards (`aimeat/src/services/hooks.ts`). If its bound action is missing (unpublished or without an address), it lets the event through by default, or refuses it when its `when_missing` is `refuse`, and every operator gets one notification per hook and action a day (`aimeat/src/services/hook-when-missing.ts`) |
+| Lifecycle hooks | `aimeat_admin_hook_set` binds a published action's webhook to one of twelve live moments: owner and agent registration (before and after), agent rekey, work request, work delivery, settlement, board post, federation peer request, a question sent to a helper, and a question solved or expired. `owner_recovery` is still listed, but nothing fires it | These are lifecycle moments, not security events. A `pre_` hook is a gate: if its address stops answering it refuses everything it guards (`aimeat/src/services/hooks.ts`). If its bound action is missing (unpublished or without an address), it lets the event through by default, or refuses it when its `when_missing` is `refuse`, and every operator gets one notification per hook and action a day (`aimeat/src/services/hooks/when-missing.ts`) |
 
 ## Health and metrics endpoints
 

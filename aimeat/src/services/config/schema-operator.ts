@@ -10,7 +10,7 @@
  * @usage import { OPERATOR_CONFIG_FIELDS } from './schema-operator.js';
  * @version-history
  *   v1.3.0 — 2026-11-19 — operator.security_contact and operator.security_policy_url: the node's
- *     security.txt (RFC 9116, services/security-txt.ts).
+ *     security.txt (RFC 9116, services/operator/security-txt.ts).
  *   v1.2.0 — 2026-11-01 — operator.address says a private person's pages give the email only, not the address.
  *   v1.1.0 — 2026-10-27 — operator.email_footer: the node's own mail foot (aimeat-commercial, Jouni: a shop's buyer
  *     reads "Sent by AIMEAT Protocol" and "Manage your notification settings in your AIMEAT profile" they do not have).
@@ -20,7 +20,7 @@
 import type { OperatorConfig } from '../../config/types-operator.js';
 import type { ConfigFieldShape } from './field-def.js';
 import { oneOf } from './schema-validators.js';
-import { isSecurityContactSetting, isSecurityPolicySetting } from '../security-txt.js';
+import { isSecurityContactSetting, isSecurityPolicySetting } from '../operator/security-txt.js';
 
 /** The operator identity block, addressed the way config-schema.ts addresses it. */
 type OperatorFieldKey = `operator.${keyof OperatorConfig}`;
@@ -61,7 +61,7 @@ export const OPERATOR_CONFIG_FIELDS: ConfigFieldShape<OperatorFieldKey>[] = [
   { key: 'operator.securityEmail', dotPath: 'operator.security_email', envVar: 'AIMEAT_OPERATOR_SECURITY_EMAIL', type: 'string',
     validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
     description: 'Where security reports are sent. Empty falls back to the privacy address' },
-  // The node's security.txt (RFC 9116, services/security-txt.ts). The file exists only while a contact
+  // The node's security.txt (RFC 9116, services/operator/security-txt.ts). The file exists only while a contact
   // is set: the node never invents one, and the two e-mails above are not used in its place.
   { key: 'operator.securityContact', dotPath: 'operator.security_contact', envVar: 'AIMEAT_OPERATOR_SECURITY_CONTACT', type: 'string',
     validate: isSecurityContactSetting, immutable: false,

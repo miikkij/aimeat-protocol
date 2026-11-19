@@ -71,7 +71,7 @@ Marks used below:
 - [ ] **[default]** Metrics off; when on, `AIMEAT_METRICS_ACCESS=operator` (`aimeat/.env.example`).
 - [ ] **[default]** First operator through the one-time setup code printed in the start log (`aimeat/src/services/setup-code.ts`). **[decide]** `AIMEAT_SETUP_ALLOWED_IPS` to limit the wizard further.
 - [ ] **[default]** Admin setup closes after the first operator (`AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=false`).
-- [ ] **[change]** `AIMEAT_OPERATOR_SECURITY_CONTACT` to the address where your team takes vulnerability reports, so `/.well-known/security.txt` answers. Why: with no contact set it answers 404 (`aimeat/src/services/security-txt.ts`).
+- [ ] **[change]** `AIMEAT_OPERATOR_SECURITY_CONTACT` to the address where your team takes vulnerability reports, so `/.well-known/security.txt` answers. Why: with no contact set it answers 404 (`aimeat/src/services/operator/security-txt.ts`).
 - [ ] **[decide]** CORS: the default `*` is by design for Bearer routes. Narrow `AIMEAT_CORS_ALLOWED_ORIGINS` only together with the app origins and `null`, or apps break (`aimeat/.env.example`). Inspect with `aimeat_admin_cors_overview`.
 
 ## 7. Logging, backup and checks
