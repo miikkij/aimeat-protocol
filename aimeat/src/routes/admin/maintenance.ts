@@ -13,6 +13,8 @@
  *   - POST /v1/admin/maintenance/compact-workspace-versions: one-shot version-history compaction
  *
  * @version-history
+ *   v1.4.0 — 2026-11-19 — PUT on a hook takes `when_missing` ('pass' | 'refuse') for a blocking hook,
+ *     with or without `actions` (services/hooks-overview.ts setHookBinding).
  *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.1 — 2026-09-26 — PUT on a hook binds only actions already published here (security audit
  *     A8-3); a binding refused because the actions could not be read answers 500, not 400.
@@ -31,7 +33,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { listHooks } from '../../services/hooks.js';
-import { buildHooksOverview, setHookActions } from '../../services/hooks-overview.js';
+import { buildHooksOverview, setHookActions, setHookBinding } from '../../services/hooks-overview.js';
 import { emitChange } from '../../services/event-bus.js';
 
 export function adminMaintenanceRouter(
@@ -63,9 +65,11 @@ export function adminMaintenanceRouter(
     });
 
     // PUT /v1/admin/hooks/:hookName — bind actions to a moment (an empty list clears it). Every
-    // reference must name an action already published here: publish it, then bind it.
+    // reference must name an action already published here: publish it, then bind it. A blocking
+    // hook also takes `when_missing` ('pass' | 'refuse'): what it does when its bound action is missing.
     router.put('/v1/admin/hooks/:hookName', requireAuth(), requireOperator(storage), async (req, res) => {
-        const out = await setHookActions(config, storage, req.params.hookName as string, (req.body ?? {}).actions);
+        const body = (req.body ?? {}) as { actions?: unknown; when_missing?: unknown };
+        const out = await setHookBinding(config, storage, req.params.hookName as string, { actions: body.actions, when_missing: body.when_missing });
         if (!out.ok) {
             res.status(out.code === 'INTERNAL_ERROR' ? 500 : 400).json(error(config.nodeId, out.code, out.message));
             return;

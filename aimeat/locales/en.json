@@ -346,6 +346,14 @@
   "explain.services.unit.what": "The server stores the unit with the service and shows it after the pacing amount, for example \"pacing 5 morsels / call\". It does not count minutes, tokens or tasks. Each request for the service takes the pacing amount once from the balance of whoever asks, and a request marked high priority takes twice that amount. The server also keeps a pacing per 1 000 units, which this form sets to 0 and which nothing takes.",
   "explain.services.unit.range": "Per call, per minute, per token or per task. Per call when you leave it as it is.",
   "explain.services.unit.tip": "Choose the unit that tells a reader what one use of the service is. To slow down how fast others use the service, change the pacing amount; the unit does not do it.",
+  "explain.hooks.whenMissing.title": "If its action is missing",
+  "explain.hooks.whenMissing.short": "What a blocking hook does when the action bound to it is no longer published here or has no address: let the event through, or refuse it.",
+  "explain.hooks.whenMissing.what": "A blocking hook (a moment whose name starts with pre_) calls the actions bound to it before a registration, a work request, a board post or a new federation peer goes ahead. When a bound action is no longer published on this server, or is published without an address, the hook has nobody to ask. With the default, the hook lets the event through, as if the action had said yes. With Refuse the event, the hook refuses the event, the same way it refuses when an address does not answer. In both cases every operator gets one notification for that hook and that action per day, and the hook shows in red on this page until you publish the action again, bind another one or clear the hook.",
+  "explain.hooks.whenMissing.range": "Let the event through (the default) or Refuse the event. Only a blocking hook has this setting; a hook that is told afterwards stops nothing.",
+  "explain.hooks.whenMissing.low": "Let the event through: registrations and peering keep working when the action disappears, and the check stands down until you fix it.",
+  "explain.hooks.whenMissing.high": "Refuse the event: nothing the hook checks goes ahead without the check. If the action disappears, every registration or post that the hook checks stops until you fix it.",
+  "explain.hooks.whenMissing.ex1": "The action that checks new accounts against your staff list is published by a colleague's account. You choose Refuse the event, so nobody can register while that action is gone.",
+  "explain.hooks.whenMissing.tip": "Choose Refuse the event only when an event without the check is worse than no events at all, and when you can react to the notification on the same day.",
   "explain.services.webhook.title": "Webhook URL",
   "explain.services.webhook.short": "An address this server calls only when the operator ties the service to a moment on the Hooks page. A request for the service does not call it.",
   "explain.services.webhook.what": "When someone asks for the service, the request becomes a work item that you or your agent deliver. The server does not call this address for it. The address is used when whoever runs this service binds your service to one of the server's moments on the Hooks page, for example before a new account registers, before a work request, or after work is delivered. At that moment the server sends a POST to the address with JSON: the moment, the service, the details of what happened, the server's id and the time. It waits up to 10 seconds. At a moment before something happens (its name starts with pre_), the answer decides: an error, no answer, an address the server refuses, or allowed: false in the answer stops what was about to happen. The server refuses an address on a private network. The catalogue does not show the address to anybody.",
@@ -3727,6 +3735,12 @@
         "group_work": "Work and money",
         "group_social": "Boards and federation",
         "canRefuse": "can refuse",
+        "whenMissing": "If its action is missing",
+        "whenMissingPass": "Let the event through (default)",
+        "whenMissingRefuse": "Refuse the event",
+        "missing": "action missing",
+        "missingPass": "Its action is missing, so this blocking hook lets everything through. Every operator gets a notification once a day.",
+        "missingRefuse": "Its action is missing, so this blocking hook refuses everything it checks. Every operator gets a notification once a day.",
         "toldAfter": "told after",
         "nothingBound": "nothing bound",
         "notPublished": "· not published here, does nothing",
@@ -13080,6 +13094,10 @@
   "notiftext.federation_settlement_refused.title": "A settlement from {node} was refused",
   "notiftext.federation_settlement_refused.body": "It would have added {amount} morsels, past the daily ceiling of {limit}. Nothing was added. If you trust this server, raise its ceiling on the Federation page. Its operator can then send the settlement again.",
   "notiftext.federation_settlement_refused.open": "Open the Federation page",
+  "notiftext.hook_action_missing_pass.title": "The blocking hook {hook} has no action to call",
+  "notiftext.hook_action_missing_pass.body": "{hook} is bound to {ref}, which is not published on this server or has no address. The hook lets every event through until you publish the action again, bind another one or clear the hook. You can set the hook to refuse instead.",
+  "notiftext.hook_action_missing_refuse.title": "The blocking hook {hook} has no action to call",
+  "notiftext.hook_action_missing_refuse.body": "{hook} is bound to {ref}, which is not published on this server or has no address. The hook refuses every event it checks until you publish the action again, bind another one or clear the hook.",
   "notiftext.internet_opening_requested.title": "{owner} asks to open {app} to the internet",
   "notiftext.internet_opening_requested.body": "Reason: {reason}. Forms that open with it: {forms}. It stays closed until an operator approves.",
   "notiftext.internet_opening_opened.title": "{owner} opened {app} to the internet",
@@ -15109,6 +15127,8 @@
     "cfg_operator_country": "Country",
     "cfg_operator_email": "Privacy contact email",
     "cfg_operator_security_email": "Security contact email",
+    "cfg_operator_security_contact": "Vulnerability report contact (security.txt)",
+    "cfg_operator_security_policy_url": "Vulnerability disclosure policy page",
     "cfg_operator_email_footer": "Mail footer line",
     "cfg_operator_hosting_name": "Hosting provider",
     "cfg_operator_hosting_location": "Hosting location",
@@ -15403,6 +15423,8 @@
     "cfgDesc_operator_country": "Country this instance is operated from. Decides the governing law and the international-transfer wording",
     "cfgDesc_operator_email": "Where privacy questions and data-subject requests are sent. Printed on both public pages",
     "cfgDesc_operator_security_email": "Where security reports are sent. Empty falls back to the privacy address",
+    "cfgDesc_operator_security_contact": "Where a security researcher reports a vulnerability in this server: one or more mailto: or https: addresses, separated by commas, the first one to try first. Set, the server publishes them at /.well-known/security.txt; empty, that address answers 404.",
+    "cfgDesc_operator_security_policy_url": "The page that says how you handle a vulnerability report, as an https: address. security.txt names it on its Policy line. Empty leaves the line out.",
     "cfgDesc_operator_email_footer": "The line at the foot of every mail sent from here, in place of \"Sent by AIMEAT Protocol\" and the profile note. One line of text, at most 200 characters. Empty keeps the default.",
     "cfgDesc_operator_hosting_name": "Hosting provider, listed as a sub-processor in the privacy policy",
     "cfgDesc_operator_hosting_location": "Where that provider keeps the data, e.g. \"France (EU/EEA)\". The transfers section reads it",
@@ -19149,6 +19171,7 @@
       "aiSpendDaily": "AI cost you {amount} on {day}.",
       "aiKeyChanged": "You set your AI key.",
       "aiSettingsChanged": "You changed your AI settings: {changed}.",
+      "aiSettingsChangedBy": "{who} changed your AI settings with your confirmation: {changed}.",
       "consentGranted": "You gave {who} access to {what}.",
       "consentRevoked": "You took away {who}'s access to {what}.",
       "seeAll": "See everything that has happened"
@@ -31800,6 +31823,17 @@
       }
     },
     "config": {
+      "operator": {
+        "security_contact": {
+          "title": "Vulnerability report contact",
+          "short": "Where people report a security problem in this server. Set, the server publishes a security.txt file; empty, it publishes none.",
+          "what": "security.txt (RFC 9116) is a small text file at /.well-known/security.txt. Security researchers and scanners read it to find out where to report a vulnerability. The server builds the file from this setting at each request: one Contact line for each address, an Expires line 180 days ahead, a Canonical line with the file's own address on this server, the Policy line when you set a policy page, and Preferred-Languages: en, fi. The server never makes up a contact: with this setting empty, /.well-known/security.txt answers 404, and the privacy and security e-mail settings are not used in its place.",
+          "range": "Empty (the default), or one to ten addresses separated by commas. Each one starts with mailto: (an e-mail address) or https: (a web page or a form). Any other value is refused.",
+          "ex1": "mailto:security@example.org: reports come by e-mail to your security team.",
+          "ex2": "https://example.org/report-a-vulnerability, mailto:security@example.org: a report form first, and e-mail as the second way.",
+          "tip": "Use an address that a person reads every working day. A report that nobody reads is worse than no file, because the researcher thinks you were told."
+        }
+      },
       "node": {
         "processes": {
           "title": "Server processes",

@@ -17,6 +17,8 @@
  *     files: moments (02), bind (03), runs (04), and AskAi (05) here.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.1.0 — 2026-11-19 — The second write: a blocking hook's choice when its action is missing
+ *     (setWhenMissing, PUT .../hooks/:hook with when_missing), set from section 02.
  *   v3.0.0 — 2026-09-27 — Library components only (admin group G2): Section, Verdict and Readings,
  *     FigureStrip, Beside, SettingBox (`pre`) for the paste, Action for the doors, a coral
  *     Mark for the gate chip. The page sheet admin-hooks.css goes.
@@ -173,6 +175,21 @@ export default function HooksTab() {
     }
   }, [load, showSuccess, showError]);
 
+  /** A blocking hook's choice when its action is missing: 'pass' or 'refuse'. */
+  const setWhenMissing = useCallback(async (hook, value) => {
+    setBusy(true);
+    try {
+      const r = await adminService.setHookWhenMissing(hook, value);
+      if (r?.ok === false) throw new Error(r.error?.message || 'refused');
+      showSuccess(r?.data?.when_missing_note || S('bind.saved'));
+      await load();
+    } catch (err) {
+      showError(err?.message || String(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [load, showSuccess, showError]);
+
   const toSection = (n) => document.getElementById('adm-hook-' + n)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   if (error) return html`<${ErrorBox} message=${error} />`;
@@ -181,7 +198,7 @@ export default function HooksTab() {
   return html`<${Fragment}>
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <${RightNow} data=${data} onBind=${bind} toSection=${toSection} />
-    <${HookMoments} data=${data} onBind=${bind} busy=${busy} toSection=${toSection} />
+    <${HookMoments} data=${data} onBind=${bind} onWhenMissing=${setWhenMissing} busy=${busy} toSection=${toSection} />
     <${HookBind} data=${data} onBind=${bind} busy=${busy} />
     <${HookRuns} data=${data} />
     <${AskAi} />

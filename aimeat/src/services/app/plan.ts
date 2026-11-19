@@ -42,6 +42,7 @@
  *   const plan = await readAppPlan(storage, 'alice/talkoot.html');
  *   const out = await writeAppPlan(storage, { appId, patch, by, principal, actor: 'owner' });
  * @version-history
+ *   2026-11-19 — eraseAppPlansOf deletes for good, not to the bin (record-keys.ts eraseAppRecordsOfAuthor).
  *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-30 — `proposals`: layouts and navigations the AI drew for this app, which a choice may name.
@@ -50,7 +51,7 @@
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import type { Storage } from '../../storage/interface.js';
-import { appKeySegment, readAuthorAppRecord, appRecordsOfAuthor, equalAppId, canonicalAppId, listAppRecords } from './record-keys.js';
+import { appKeySegment, readAuthorAppRecord, eraseAppRecordsOfAuthor, equalAppId, canonicalAppId, listAppRecords } from './record-keys.js';
 import { UI_LAYOUT_PRESETS } from '../app-ui/layouts.js';
 import { NAV_MODES, LOOKS } from '../app-ui/registry.js';
 
@@ -400,7 +401,5 @@ export async function deleteAppPlan(storage: Storage, appId: string): Promise<bo
 
 /** Erase the plans of every app `account` authored, for the account erasure. Returns how many went. */
 export async function eraseAppPlansOf(storage: Storage, account: string): Promise<number> {
-  const rows = await appRecordsOfAuthor(storage, NS_PLAN, PREFIX, account);
-  for (const r of rows) await storage.deleteMemory(NS_PLAN, r.key);
-  return rows.length;
+  return eraseAppRecordsOfAuthor(storage, NS_PLAN, PREFIX, account);
 }

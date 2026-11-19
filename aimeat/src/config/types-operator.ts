@@ -9,6 +9,7 @@
  * @structure OperatorType · OperatorConfig
  * @usage import type { OperatorConfig } from './types-operator.js';
  * @version-history
+ *   v1.1.0 — 2026-11-19 — securityContact and securityPolicyUrl: the node's security.txt (RFC 9116).
  *   v1.0.0 — 2026-10-25 — Moved from config-types.ts unchanged.
  */
 
@@ -71,4 +72,13 @@ export interface OperatorConfig {
    * profile note under it ("AIMEAT · aimeat.io", a shop's own name). Empty keeps the default.
    */
   emailFooter?: string;
+  /**
+   * Where a security researcher reports a vulnerability: one or more `mailto:` or `https:` addresses,
+   * comma-separated, in the order to try them. Set, the node serves `/.well-known/security.txt`
+   * (RFC 9116, routes/security-txt.ts); empty, that address answers 404, because the node never
+   * invents a contact.
+   */
+  securityContact?: string;
+  /** The page that states the operator's disclosure policy (an `https:` address), the `Policy` line. */
+  securityPolicyUrl?: string;
 }

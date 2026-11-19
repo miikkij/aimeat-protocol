@@ -9,6 +9,8 @@
  * @structure OPERATOR_CONFIG_FIELDS
  * @usage import { OPERATOR_CONFIG_FIELDS } from './schema-operator.js';
  * @version-history
+ *   v1.3.0 — 2026-11-19 — operator.security_contact and operator.security_policy_url: the node's
+ *     security.txt (RFC 9116, services/security-txt.ts).
  *   v1.2.0 — 2026-11-01 — operator.address says a private person's pages give the email only, not the address.
  *   v1.1.0 — 2026-10-27 — operator.email_footer: the node's own mail foot (aimeat-commercial, Jouni: a shop's buyer
  *     reads "Sent by AIMEAT Protocol" and "Manage your notification settings in your AIMEAT profile" they do not have).
@@ -18,6 +20,7 @@
 import type { OperatorConfig } from '../../config/types-operator.js';
 import type { ConfigFieldShape } from './field-def.js';
 import { oneOf } from './schema-validators.js';
+import { isSecurityContactSetting, isSecurityPolicySetting } from '../security-txt.js';
 
 /** The operator identity block, addressed the way config-schema.ts addresses it. */
 type OperatorFieldKey = `operator.${keyof OperatorConfig}`;
@@ -58,6 +61,17 @@ export const OPERATOR_CONFIG_FIELDS: ConfigFieldShape<OperatorFieldKey>[] = [
   { key: 'operator.securityEmail', dotPath: 'operator.security_email', envVar: 'AIMEAT_OPERATOR_SECURITY_EMAIL', type: 'string',
     validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
     description: 'Where security reports are sent. Empty falls back to the privacy address' },
+  // The node's security.txt (RFC 9116, services/security-txt.ts). The file exists only while a contact
+  // is set: the node never invents one, and the two e-mails above are not used in its place.
+  { key: 'operator.securityContact', dotPath: 'operator.security_contact', envVar: 'AIMEAT_OPERATOR_SECURITY_CONTACT', type: 'string',
+    validate: isSecurityContactSetting, immutable: false,
+    refusal: 'Each contact is a mailto: address (mailto:security@example.org) or an https: page, separated by commas, at most 10',
+    description: 'Where a security researcher reports a vulnerability in this node: one or more mailto: or https: addresses, comma-separated, first to try first. Set, the node serves /.well-known/security.txt with them; empty, that address answers 404',
+    range: 'mailto: or https: addresses, comma-separated, or empty' },
+  { key: 'operator.securityPolicyUrl', dotPath: 'operator.security_policy_url', envVar: 'AIMEAT_OPERATOR_SECURITY_POLICY_URL', type: 'string',
+    validate: isSecurityPolicySetting, immutable: false,
+    description: 'The page that states how you handle a vulnerability report (an https: address). security.txt names it as the Policy line. Empty leaves the line out',
+    range: 'an https: address, or empty' },
   { key: 'operator.hostingName', dotPath: 'operator.hosting_name', envVar: 'AIMEAT_OPERATOR_HOSTING_NAME', type: 'string',
     validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
     description: 'Hosting provider, listed as a sub-processor in the privacy policy' },

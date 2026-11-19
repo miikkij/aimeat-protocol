@@ -18,6 +18,7 @@
  * @structure createStoredConfigReload(config, storage) → { prime, reload }
  * @usage const cfg = createStoredConfigReload(config, storage); await cfg.prime(); … await cfg.reload();
  * @version-history
+ *   v1.1.0 — 2026-11-19 — A `hooks.<name>.when_missing` row is applied as at boot (services/hook-when-missing.ts).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  */
 import type { AimeatConfig, HookName } from '../../config-types.js';
@@ -28,6 +29,7 @@ import { openStoredSetting } from './at-rest.js';
 import { provenanceOf } from './provenance.js';
 import { syncRateLimitTiers } from './rate-limit-sync.js';
 import { logger, setLogLevel } from '../../utils/logger.js';
+import { applyStoredWhenMissing } from '../hook-when-missing.js';
 
 const HOOK_PREFIX = 'hooks.';
 
@@ -49,6 +51,7 @@ export function createStoredConfigReload(config: AimeatConfig, storage: ConfigSt
   /** One changed row. Answers true when the running config took it. */
   const apply = (path: string, raw: string): boolean => {
     if (path.startsWith(HOOK_PREFIX)) {
+      if (applyStoredWhenMissing(config, path, raw)) return true;
       const hookName = path.slice(HOOK_PREFIX.length) as HookName;
       if (!(hookName in config.extensionHooks)) return false;
       try {

@@ -165,7 +165,7 @@
         "aimeat/src/routes/commerce-ucp.ts",
         "aimeat/src/routes/commerce-acp.ts"
       ],
-      "digest": "sha256:eec1a5d487b967fe64b0ee26"
+      "digest": "sha256:5fb09ff4005bebd4b5e86eab"
     },
     "9. AI on the node": {
       "reviewedOn": "2026-11-19",
@@ -191,7 +191,7 @@
         "aimeat/src/tool-catalog/definitions/ai-models.ts",
         "aimeat/src/tool-catalog/definitions/decide.ts"
       ],
-      "digest": "sha256:2e8d9a7e82f1f17f7fb97680"
+      "digest": "sha256:f5a886d9e6fc38d15d6d0771"
     },
     "10. Apps": {
       "reviewedOn": "2026-11-19",
@@ -214,7 +214,7 @@
         "aimeat/src/routes/app-store.ts",
         "aimeat/src/services/dependency-map.ts"
       ],
-      "digest": "sha256:0ef0673f2a07d0962b4abd1f"
+      "digest": "sha256:ba1b22a8850fe9bdfe1c01f5"
     },
     "11. Served libraries and the Design Book": {
       "reviewedOn": "2026-11-19",
@@ -365,7 +365,7 @@
         "aimeat/src/services/prometheus.ts",
         "aimeat/src/services/consul-config.ts"
       ],
-      "digest": "sha256:4fb9f8cdcc68710b32068b74"
+      "digest": "sha256:42c04794caddca320ce23c72"
     },
     "20. Security": {
       "reviewedOn": "2026-11-19",
@@ -462,12 +462,12 @@
       "holds": "from 4.0.0 a query token is refused"
     },
     {
-      "quote": "A refusing hook whose address does not answer refuses.",
+      "quote": "a refusal, an error or no answer within ten seconds refuses it",
       "holder": "aimeat/test/e2e-hooks.ts",
       "holds": "Hook server unreachable → work request blocked"
     },
     {
-      "quote": "A refusing hook whose action is no longer published lets the event through",
+      "quote": "the hook calls nobody and lets the thing through by default",
       "holder": "aimeat/test/unit/hooks.test.ts",
       "holds": "a bound action that is not published is recorded as missing and stops nothing"
     },
@@ -690,7 +690,7 @@
       "aimeat/src/services/basic-agents.ts": "fd280b0ade062a5a"
     },
     "8. Automation: schedules, workflows and extensions": {
-      "aimeat/src/services/hooks.ts": "60779a210c48ef47",
+      "aimeat/src/services/hooks.ts": "420247d21447f0f9",
       "aimeat/src/mcp/agent-schedules.ts": "7ab9f9ab149a0628",
       "aimeat/src/services/schedule/actor.ts": "1a78e3bf8b78e9fc",
       "aimeat/src/services/schedule/agent-task-input.ts": "27e4e9e7b7d8e304",
@@ -725,10 +725,10 @@
       "aimeat/src/routes/commerce-acp.ts": "a46bc118f52567cf"
     },
     "9. AI on the node": {
-      "aimeat/src/services/ai/routing.ts": "8e0484eabfcde29a",
-      "aimeat/src/services/ai/roles.ts": "8c42d081ecc6f071",
-      "aimeat/src/services/ai/policy-store.ts": "4f0f6a8e68d3bd68",
-      "aimeat/src/services/ai/gen-rules-store.ts": "d7da28ee3092c799",
+      "aimeat/src/services/ai/routing.ts": "2233dd201cd0cd90",
+      "aimeat/src/services/ai/roles.ts": "e2afb7ec8d3c1029",
+      "aimeat/src/services/ai/policy-store.ts": "de2a453be234d432",
+      "aimeat/src/services/ai/gen-rules-store.ts": "2f8415970c2bfebb",
       "aimeat/src/services/operator/confirm.ts": "348eaf355869e551",
       "aimeat/src/services/ai/allowance.ts": "e0e9920aa443c369",
       "aimeat/src/services/ai/node-model-rules.ts": "270cb40ab665ef61",
@@ -757,8 +757,8 @@
       "aimeat/src/services/app/publish-gate.ts": "5599761335d61220",
       "aimeat/src/services/app/read-gate.ts": "4a22e372eb36d6f8",
       "aimeat/src/services/app/members.ts": "f39a62bf9fd14079",
-      "aimeat/src/services/app/roadmap.ts": "deeaba385a772ffe",
-      "aimeat/src/services/app/design-spec.ts": "96dbdc40919447ac",
+      "aimeat/src/services/app/roadmap.ts": "0a8460d74e2cbc76",
+      "aimeat/src/services/app/design-spec.ts": "bdc88246f407cb01",
       "aimeat/src/services/app/dev-grant.ts": "73824af1eaaaaa2e",
       "aimeat/src/services/app/visitors.ts": "05abcbde702aa99c",
       "aimeat/src/routes/apps-backup.ts": "853b79dce1939659",
@@ -961,7 +961,7 @@
       "aimeat/src/routes/admin/key-reencrypt.ts": "1bfbc050258279cf",
       "aimeat/src/routes/admin/node-update.ts": "6fc2fbb2564bf146",
       "aimeat/src/routes/admin/cors.ts": "827ff3c09abd1cd7",
-      "aimeat/src/routes/admin/maintenance.ts": "21bd51bb7866b437",
+      "aimeat/src/routes/admin/maintenance.ts": "e7a0319efb7b7d6f",
       "aimeat/src/routes/admin/usage.ts": "4e83838b8930aa59",
       "aimeat/src/routes/admin/economy.ts": "6580b9dc26578989",
       "aimeat/src/services/key-reencrypt/job.ts": "cf09762b712f9afc",

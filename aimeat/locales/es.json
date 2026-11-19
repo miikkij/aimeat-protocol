@@ -346,6 +346,14 @@
   "explain.services.unit.what": "El servidor guarda la unidad con el servicio y la muestra después del ritmo, por ejemplo \"5 morsels de ritmo / call\". No cuenta minutos, tokens ni tareas. Cada solicitud del servicio toma el ritmo una vez del saldo de quien la pide, y una solicitud marcada con prioridad alta toma el doble. El servidor también guarda un ritmo por cada 1 000 unidades, que este formulario pone en 0 y que nada toma.",
   "explain.services.unit.range": "Por llamada, por minuto, por token o por tarea. Por llamada si la dejas como está.",
   "explain.services.unit.tip": "Elige la unidad que le dice a quien lee qué es un uso del servicio. Para frenar qué tan rápido lo usan otros, cambia el ritmo; la unidad no lo hace.",
+  "explain.hooks.whenMissing.title": "Si falta su acción",
+  "explain.hooks.whenMissing.short": "Lo que hace un gancho bloqueante cuando la acción vinculada ya no está publicada en este servidor o no tiene dirección: deja pasar el evento o lo rechaza.",
+  "explain.hooks.whenMissing.what": "Un gancho bloqueante es un momento cuyo nombre empieza con pre_. Llama a las acciones vinculadas antes de que se acepte un registro, una solicitud de trabajo, una publicación en un tablero o un nuevo par de federación. Si una acción vinculada ya no está publicada en este servidor, o no tiene dirección, el gancho no tiene a quién preguntar. Por defecto, el gancho deja pasar el evento, como si la acción hubiera dicho que sí. Si eliges Rechazar el evento, el gancho rechaza el evento, igual que cuando una dirección no responde. En los dos casos cada operador recibe un aviso al día por ese gancho y esa acción, y el gancho aparece en rojo en esta página hasta que vuelvas a publicar la acción, vincules otra o vacíes el gancho.",
+  "explain.hooks.whenMissing.range": "Dejar pasar el evento (predeterminado) o Rechazar el evento. Solo un gancho bloqueante tiene este ajuste; un gancho al que se le avisa después no detiene nada.",
+  "explain.hooks.whenMissing.low": "Dejar pasar el evento: los registros y los pares siguen funcionando cuando la acción desaparece, y la comprobación queda en pausa hasta que lo arregles.",
+  "explain.hooks.whenMissing.high": "Rechazar el evento: nada de lo que el gancho comprueba sigue adelante sin la comprobación. Si la acción desaparece, cada registro o publicación que el gancho comprueba se detiene hasta que lo arregles.",
+  "explain.hooks.whenMissing.ex1": "La acción que compara las cuentas nuevas con tu lista de personal la publica la cuenta de un colega. Eliges Rechazar el evento, así nadie puede registrarse mientras esa acción no esté.",
+  "explain.hooks.whenMissing.tip": "Elige Rechazar el evento solo cuando un evento sin comprobar es peor que ningún evento, y cuando puedes atender el aviso el mismo día.",
   "explain.services.webhook.title": "URL del webhook",
   "explain.services.webhook.short": "Una dirección que este servidor llama solo cuando quien gestiona este servicio vincula tu servicio a un momento de la página Ganchos. Una solicitud del servicio no la llama.",
   "explain.services.webhook.what": "Cuando alguien pide el servicio, la solicitud se convierte en un trabajo que tú o tu agente entregan. El servidor no llama a esta dirección por eso. La dirección se usa cuando quien gestiona este servicio vincula tu servicio a uno de los momentos del servidor en la página Ganchos, por ejemplo antes de que se registre una cuenta nueva, antes de una solicitud de trabajo o después de entregar un trabajo. En ese momento el servidor envía un POST a la dirección con un JSON: el momento, el servicio, los datos de lo que pasó, el id del servidor y la hora. Espera hasta 10 segundos. En un momento anterior a algo (su nombre empieza con pre_), la respuesta decide: un error, la falta de respuesta, una dirección que el servidor rechaza o allowed: false en la respuesta detienen lo que iba a pasar. El servidor rechaza una dirección de una red privada. El catálogo no le muestra la dirección a nadie.",
@@ -12542,6 +12550,16 @@
   "notiftext.federation_settlement_refused.title": "Se rechazó una liquidación de {node}",
   "notiftext.federation_settlement_refused.body": "Habría sumado {amount} morsels y pasado el límite diario de {limit}. No se sumó nada. Si confías en este servidor, sube su límite en la página Federación. Después, su operador podrá mandar la liquidación otra vez.",
   "notiftext.federation_settlement_refused.open": "Abrir la página Federación",
+  "notiftext.hook_action_missing_pass.title": "El gancho bloqueante {hook} no tiene una acción a la que llamar",
+  "notiftext.hook_action_missing_pass.body": "{hook} está vinculado a {ref}, que no está publicada en este servidor o no tiene dirección. El gancho deja pasar cada evento hasta que vuelvas a publicar la acción, vincules otra o vacíes el gancho. También puedes hacer que el gancho rechace los eventos.",
+  "notiftext.hook_action_missing_refuse.title": "El gancho bloqueante {hook} no tiene una acción a la que llamar",
+  "notiftext.hook_action_missing_refuse.body": "{hook} está vinculado a {ref}, que no está publicada en este servidor o no tiene dirección. El gancho rechaza cada evento que comprueba hasta que vuelvas a publicar la acción, vincules otra o vacíes el gancho.",
+  "admin.hooks.moments.whenMissing": "Si falta su acción",
+  "admin.hooks.moments.whenMissingPass": "Dejar pasar el evento (predeterminado)",
+  "admin.hooks.moments.whenMissingRefuse": "Rechazar el evento",
+  "admin.hooks.moments.missing": "falta la acción",
+  "admin.hooks.moments.missingPass": "Falta su acción, así que este gancho bloqueante deja pasar todo. Cada operador recibe un aviso una vez al día.",
+  "admin.hooks.moments.missingRefuse": "Falta su acción, así que este gancho bloqueante rechaza todo lo que comprueba. Cada operador recibe un aviso una vez al día.",
   "notiftext.internet_opening_requested.title": "{owner} pide abrir {app} a internet",
   "notiftext.internet_opening_requested.body": "Motivo: {reason}. Formularios que se abren con ella: {forms}. Sigue cerrada hasta que un operador lo apruebe.",
   "notiftext.internet_opening_opened.title": "{owner} abrió {app} a internet",
@@ -14240,6 +14258,8 @@
     "cfg_operator_country": "País",
     "cfg_operator_email": "Correo de privacidad",
     "cfg_operator_security_email": "Correo de seguridad",
+    "cfg_operator_security_contact": "Contacto para reportar vulnerabilidades (security.txt)",
+    "cfg_operator_security_policy_url": "Página de la política de divulgación de vulnerabilidades",
     "cfg_operator_email_footer": "Pie de los correos",
     "cfg_operator_hosting_name": "Proveedor de alojamiento",
     "cfg_operator_hosting_location": "Ubicación del alojamiento",
@@ -14534,6 +14554,8 @@
     "cfgDesc_operator_country": "País desde el que se opera esta instancia. Decide la ley aplicable y el texto de transferencias internacionales.",
     "cfgDesc_operator_email": "Adónde llegan las preguntas de privacidad y las solicitudes de los interesados. Impreso en ambas páginas públicas.",
     "cfgDesc_operator_security_email": "Adónde llegan los avisos de seguridad. Vacío usa la dirección de privacidad.",
+    "cfgDesc_operator_security_contact": "Adónde un investigador de seguridad reporta una vulnerabilidad de este servidor: una o más direcciones mailto: o https:, separadas por comas; la primera es la que se intenta primero. Con un valor, el servidor las publica en /.well-known/security.txt; vacío, esa dirección responde 404.",
+    "cfgDesc_operator_security_policy_url": "La página donde dices cómo manejas un reporte de vulnerabilidad (una dirección https:). security.txt la nombra en su línea Policy. Vacío, la línea no aparece.",
     "cfgDesc_operator_email_footer": "La línea al pie de cada correo que se envía desde aquí, en lugar de \"Sent by AIMEAT Protocol\" y la nota sobre el perfil. Una sola línea de texto, de 200 caracteres como máximo. Vacío mantiene la predeterminada.",
     "cfgDesc_operator_hosting_name": "Proveedor de alojamiento, listado como subencargado en la política de privacidad.",
     "cfgDesc_operator_hosting_location": "Dónde guarda los datos ese proveedor, p. ej. \"Francia (UE/EEE)\". La sección de transferencias lo lee.",
@@ -18044,6 +18066,7 @@
       "aiSpendDaily": "La IA te costó {amount} el {day}.",
       "aiKeyChanged": "Configuraste tu clave de IA.",
       "aiSettingsChanged": "Cambiaste tus ajustes de IA: {changed}.",
+      "aiSettingsChangedBy": "{who} cambió tus ajustes de IA con tu confirmación: {changed}.",
       "consentGranted": "Diste acceso a {who}: {what}.",
       "consentRevoked": "Quitaste el acceso a {who}: {what}.",
       "seeAll": "Ver todo lo que ha pasado"
@@ -30170,6 +30193,17 @@
       }
     },
     "config": {
+      "operator": {
+        "security_contact": {
+          "title": "Contacto para reportar vulnerabilidades",
+          "short": "Adónde las personas reportan un problema de seguridad de este servidor. Con un valor, el servidor publica un archivo security.txt; vacío, no publica ninguno.",
+          "what": "security.txt (RFC 9116) es un pequeño archivo de texto en /.well-known/security.txt. Los investigadores de seguridad y los escáneres lo leen para saber adónde reportar una vulnerabilidad. El servidor arma el archivo con este ajuste en cada solicitud: una línea Contact por cada dirección, una línea Expires 180 días adelante, una línea Canonical con la dirección del propio archivo en este servidor, la línea Policy cuando configuras una página de política, y Preferred-Languages: en, fi. El servidor nunca inventa un contacto: con este ajuste vacío, /.well-known/security.txt responde 404, y los correos de privacidad y de seguridad no se usan en su lugar.",
+          "range": "Vacío (el valor predeterminado), o de una a diez direcciones separadas por comas. Cada una empieza con mailto: (un correo) o https: (una página web o un formulario). Cualquier otro valor se rechaza.",
+          "ex1": "mailto:security@example.org: los reportes llegan por correo a tu equipo de seguridad.",
+          "ex2": "https://example.org/report-a-vulnerability, mailto:security@example.org: primero un formulario de reporte, y el correo como segunda opción.",
+          "tip": "Usa una dirección que una persona lea cada día hábil. Un reporte que nadie lee es peor que no tener archivo, porque el investigador cree que ya te avisó."
+        }
+      },
       "node": {
         "processes": {
           "title": "Procesos del servidor",

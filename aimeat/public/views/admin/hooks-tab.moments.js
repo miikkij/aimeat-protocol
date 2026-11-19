@@ -14,16 +14,19 @@
  *
  *   Every part is a library component; the page passes data and writes no class.
  *
- * @structure HookMoments({ data, onBind, busy, toSection }) — the filters, the groups, the rows
- * @usage <${HookMoments} data=${data} onBind=${bind} busy=${busy} toSection=${toSection} />
+ * @structure HookMoments({ data, onBind, onWhenMissing, busy, toSection }) — the filters, the groups,
+ *   the rows; WhenMissing — a blocking hook's choice for a missing action and its red state
+ * @usage <${HookMoments} data=${data} onBind=${bind} onWhenMissing=${setWhenMissing} busy=${busy} toSection=${toSection} />
  * @version-history
+ *   v2.1.0 — 2026-11-19 — A bound blocking hook carries "If its action is missing" (let through, the
+ *     default, or refuse) with its question mark, and shows red with a sentence when its action is missing.
  *   v2.0.0 — 2026-09-27 — Library components only (admin group G2): Tabs (filter) for the filters,
  *     the List (cut name-desc-state-doors) with its Group headings for the moments, a coral Mark for
  *     the gate chip, Action for the doors. The moment's own name stands under what it is.
  *   v1.1.0 — 2026-09-13 — Compose the shared poster section heading.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
@@ -38,14 +41,31 @@ import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Tinted } from '/components/Figure.js';
 import { Stack } from '/components/Layout.js';
+import { Select } from '/components/Select.js';
 
 const S = (key, params) => t('admin.hooks.' + key, params);
 
 /** The three groups, in the order a person meets them. */
 const GROUPS = ['accounts', 'work', 'social'];
 
+/**
+ * A blocking hook's choice when its bound action is missing, and the red state when one is. The
+ * sentence says what the hook does with the event now, in the words of the setting it follows.
+ */
+function WhenMissing({ hook, onWhenMissing, busy }) {
+  if (hook.kind !== 'gate' || hook.actions.length === 0) return null;
+  const mode = hook.when_missing === 'refuse' ? 'refuse' : 'pass';
+  return html`<${Fragment}>
+    ${hook.missing ? html`<span><${Badge} type="danger" label=${S('moments.missing')} /></span>
+      <${Note} kind="meta">${S(mode === 'refuse' ? 'moments.missingRefuse' : 'moments.missingPass')}<//>` : null}
+    <${Select} fit label=${S('moments.whenMissing')} help="hooks.whenMissing" value=${mode} disabled=${busy}
+      onChange=${(v) => onWhenMissing(hook.name, v)}
+      options=${[['pass', S('moments.whenMissingPass')], ['refuse', S('moments.whenMissingRefuse')]]} />
+  <//>`;
+}
+
 /** What is bound to one moment, as lines a person can read. */
-function Bound({ hook }) {
+function Bound({ hook, onWhenMissing, busy }) {
   if (hook.actions.length === 0) {
     return html`<${Badge} type="muted" label=${S('moments.nothingBound')} />`;
   }
@@ -63,10 +83,11 @@ function Bound({ hook }) {
       ? html`<span><${Badge} type=${hook.last.allowed ? (hook.last.answer === 'ok' ? 'healthy' : 'watch') : 'danger'}
                              label=${S('runs.answer_' + hook.last.answer)} /></span>`
       : html`<${Note} kind="meta" mono>${S('moments.notCalledYet')}<//>`}
+    <${WhenMissing} hook=${hook} onWhenMissing=${onWhenMissing} busy=${busy} />
   <//>`;
 }
 
-export function HookMoments({ data, onBind, busy, toSection }) {
+export function HookMoments({ data, onBind, onWhenMissing, busy, toSection }) {
   const [only, setOnly] = useState('all');
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -89,7 +110,7 @@ export function HookMoments({ data, onBind, busy, toSection }) {
             ${rows.map(hook => html`
               <${Row} key=${hook.name}>
                 <${Name} meta=${hook.name} desc=${S('moments.w_' + hook.name)}>${S('moments.h_' + hook.name)}<//>
-                <${Desc}><${Bound} hook=${hook} /><//>
+                <${Desc}><${Bound} hook=${hook} onWhenMissing=${onWhenMissing} busy=${busy} /><//>
                 <${Cell}>${hook.kind === 'gate'
                   ? html`<${Mark} tone="coral">${S('moments.canRefuse')}<//>`
                   : html`<${Badge} type="info" label=${S('moments.toldAfter')} />`}<//>

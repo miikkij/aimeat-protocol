@@ -57,6 +57,7 @@ Marks used below:
 - [ ] **[default]** Internet openings behind operator approval: `AIMEAT_APP_INTERNET_OPENING=operator`, at most `AIMEAT_APP_INTERNET_OPENING_MAX_DAYS` (90) per opening. Applies with `AIMEAT_CONTENT_ACCESS=signed-in`. Review open ones with `aimeat_admin_internet_openings` (`aimeat/src/config/visibility.ts`).
 - [ ] **[default]** Anonymous mode off (`AIMEAT_ANONYMOUS`).
 - [ ] **[decide]** Hooks: bind a `pre_` gate hook only to a service you monitor, because a gate that stops answering refuses everything it guards (`aimeat_admin_hooks`).
+- [ ] **[decide]** Hooks: choose what each `pre_` gate does when its bound action is missing (unpublished or without an address). The default lets the event through and tells every operator once a day; `when_missing: refuse` refuses the event instead (`PUT /v1/admin/hooks/:hookName`, `aimeat_admin_hook_set`, the admin Hooks page).
 
 ## 5. Federation
 
@@ -70,6 +71,7 @@ Marks used below:
 - [ ] **[default]** Metrics off; when on, `AIMEAT_METRICS_ACCESS=operator` (`aimeat/.env.example`).
 - [ ] **[default]** First operator through the one-time setup code printed in the start log (`aimeat/src/services/setup-code.ts`). **[decide]** `AIMEAT_SETUP_ALLOWED_IPS` to limit the wizard further.
 - [ ] **[default]** Admin setup closes after the first operator (`AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=false`).
+- [ ] **[change]** `AIMEAT_OPERATOR_SECURITY_CONTACT` to the address where your team takes vulnerability reports, so `/.well-known/security.txt` answers. Why: with no contact set it answers 404 (`aimeat/src/services/security-txt.ts`).
 - [ ] **[decide]** CORS: the default `*` is by design for Bearer routes. Narrow `AIMEAT_CORS_ALLOWED_ORIGINS` only together with the app origins and `null`, or apps break (`aimeat/.env.example`). Inspect with `aimeat_admin_cors_overview`.
 
 ## 7. Logging, backup and checks

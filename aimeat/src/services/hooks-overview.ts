@@ -22,6 +22,7 @@
  * @structure
  *   - buildHooksOverview(config, storage) — the page's one read
  *   - setHookActions(config, storage, hookName, actions) — bind, or clear with []
+ *   - setHookBinding(config, storage, hookName, { actions, when_missing }) — the PUT and the tool
  *   - settleStoredHookBindings(config, storage) — at start, once per node, every stored reference to
  *     the form a binding is stored in now
  *   - moveAccountNameHookBindings(config, storage) — at start, once per node, each `id#name` to the
@@ -33,6 +34,8 @@
  * @usage
  *   const overview = await buildHooksOverview(config, storage);
  * @version-history
+ *   v1.7.0 — 2026-11-19 — Each gate's row says whether a bound action is missing (`missing`) and what
+ *     the gate then does (`when_missing`); the read lists the missing gates (feature audit 2.4).
  *   v1.6.0 — 2026-09-26 — followActionsToFullIdentity(): the move of `id#name` bindings, out of
  *     moveAccountNameHookBindings, so the operator's decision that a held name is its holder's moves
  *     them the same way. A binding left at start is logged as staying, since the move to the full
@@ -67,6 +70,8 @@ import type { Storage } from '../storage/interface.js';
 import type { ActionRecord } from '../storage/types/commerce.js';
 import { HOOK_NAMES, hookKind, HOOK_TIMEOUT_MS, indexActionRefs, resolveHookRef, qualifiedRef, isBareRef, type HookKind } from './hooks.js';
 import { readHookRuns, recordHookRun, HOOK_RUNS_KEPT, type HookRun } from './hook-log.js';
+import { whenMissingOf, whenMissingRefusal, setHookWhenMissing } from './hook-when-missing.js';
+import type { HookWhenMissing } from '../config-types.js';
 import { logger } from '../utils/logger.js';
 
 /** Which part of the node a moment belongs to. The page groups its rows by this. */
@@ -116,6 +121,14 @@ export interface HookRow {
    * The page opens on this: a gate in this state is refusing everything it guards.
    */
   failing: boolean;
+  /**
+   * True when this is a gate and an action bound to it is missing: not published here, or published
+   * without an address. Such a gate calls nobody for that action, and `when_missing` says what it
+   * does with the event (services/hook-when-missing.ts).
+   */
+  missing: boolean;
+  /** A gate's choice for a missing action, `pass` (the default) or `refuse`; null for a notify hook. */
+  when_missing: HookWhenMissing | null;
 }
 
 /** An action that could be bound, as the picker shows it. */
@@ -177,6 +190,8 @@ export async function buildHooksOverview(config: AimeatConfig, storage: Storage)
     return {
       name, kind, guards: HOOK_GUARDS[name], actions, last,
       failing: kind === 'gate' && refs.length > 0 && !!last && !last.allowed,
+      missing: kind === 'gate' && actions.some((a) => !a.ambiguous && (!a.published || !a.has_address)),
+      when_missing: kind === 'gate' ? whenMissingOf(config, name) : null,
     };
   });
 
@@ -198,6 +213,8 @@ export async function buildHooksOverview(config: AimeatConfig, storage: Storage)
     hooks,
     /** The one thing the page leads on: the gate that is refusing everything it guards, if any. */
     failing: hooks.filter((h) => h.failing).map((h) => h.name),
+    /** Every gate whose bound action is missing, whatever its setting does with the event. */
+    missing: hooks.filter((h) => h.missing).map((h) => h.name),
     bindable_actions: bindable,
     runs,
     summary: {
@@ -305,6 +322,36 @@ export async function setHookActions(
     : 'Bound. This moment is told after the fact; whatever the address answers, nothing is stopped.';
 
   return { ok: true, hook: name, actions: list, cleared: false, unknown: [], note };
+}
+
+export type SetHookBindingOutcome =
+  | { ok: true; hook: HookName; actions?: string[]; cleared?: boolean; unknown?: string[]; note: string; when_missing?: HookWhenMissing; when_missing_note?: string }
+  | { ok: false; code: 'INVALID_INPUT' | 'INTERNAL_ERROR'; message: string };
+
+/**
+ * The write behind PUT /v1/admin/hooks/:hookName and aimeat_admin_hook_set: the actions, the
+ * setting for a missing action (`when_missing`), or both. Both are checked before either is written,
+ * so a refused list leaves the setting as it was. Without `when_missing` this is setHookActions.
+ */
+export async function setHookBinding(
+  config: AimeatConfig, storage: Storage, hookName: string, input: { actions?: unknown; when_missing?: unknown },
+): Promise<SetHookBindingOutcome> {
+  const wants = input.when_missing !== undefined;
+  if (wants) {
+    const refusal = whenMissingRefusal(config, hookName, input.when_missing);
+    if (refusal) return { ok: false, code: 'INVALID_INPUT', message: `${refusal} Nothing was changed.` };
+  }
+  let bound: SetHookOutcome | null = null;
+  if (input.actions !== undefined || !wants) {
+    bound = await setHookActions(config, storage, hookName, input.actions);
+    if (!bound.ok) return bound;
+  }
+  if (!wants) return bound!;
+  const set = await setHookWhenMissing(config, storage, hookName, input.when_missing);
+  if (!set.ok) return set;
+  return bound && bound.ok
+    ? { ...bound, when_missing: set.when_missing, when_missing_note: set.note }
+    : { ok: true, hook: set.hook, note: set.note, when_missing: set.when_missing, when_missing_note: set.note };
 }
 
 /** What settling the stored bindings changed at start. */

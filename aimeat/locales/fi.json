@@ -346,6 +346,14 @@
   "explain.services.unit.what": "Palvelin tallentaa yksikön palvelun tietoihin ja näyttää sen tahdistuksen perässä, esimerkiksi \"tahdistus 5 murusta / call\". Palvelin ei laske minuutteja, tokeneita eikä tehtäviä. Jokainen palvelua koskeva pyyntö ottaa tahdistuksen kerran pyytäjän saldosta, ja kiireelliseksi merkitty pyyntö ottaa kaksinkertaisen määrän. Palvelin tallentaa myös tahdistuksen 1 000 yksikköä kohden. Tämä lomake asettaa sen nollaksi, eikä mikään ota sitä.",
   "explain.services.unit.range": "Per kutsu, per minuutti, per tokeni tai per tehtävä. Oletus on per kutsu.",
   "explain.services.unit.tip": "Valitse yksikkö, joka kertoo lukijalle, mikä on palvelun yksi käyttökerta. Jos haluat hidastaa muiden käyttöä, muuta tahdistusta. Yksikkö ei hidasta mitään.",
+  "explain.hooks.whenMissing.title": "Jos sen toiminto puuttuu",
+  "explain.hooks.whenMissing.short": "Mitä estävä koukku tekee, kun siihen sidottua toimintoa ei enää ole julkaistu tällä palvelimella tai sillä ei ole osoitetta: päästää tapahtuman läpi tai hylkää sen.",
+  "explain.hooks.whenMissing.what": "Estävä koukku on hetki, jonka nimi alkaa pre_. Se kutsuu siihen sidottuja toimintoja ennen kuin rekisteröityminen, työpyyntö, taulun viesti tai uusi federaation vertaispalvelin hyväksytään. Jos sidottua toimintoa ei enää ole julkaistu tällä palvelimella tai sillä ei ole osoitetta, koukulla ei ole ketään, jolta kysyä. Oletuksena koukku päästää tapahtuman läpi, aivan kuin toiminto olisi vastannut kyllä. Kun valitset Hylkää tapahtuma, koukku hylkää tapahtuman samalla tavalla kuin silloin, kun osoite ei vastaa. Kummassakin tapauksessa jokainen operaattori saa koukusta ja toiminnosta yhden ilmoituksen päivässä. Koukku näkyy tällä sivulla punaisena, kunnes julkaiset toiminnon uudelleen, sidot toisen toiminnon tai tyhjennät koukun.",
+  "explain.hooks.whenMissing.range": "Päästä tapahtuma läpi (oletus) tai Hylkää tapahtuma. Asetus on vain estävällä koukulla. Koukku, jolle kerrotaan jälkeenpäin, ei pysäytä mitään.",
+  "explain.hooks.whenMissing.low": "Päästä tapahtuma läpi: rekisteröityminen ja vertaispalvelimet toimivat, vaikka toiminto katoaa. Tarkistus on pois käytöstä, kunnes korjaat asian.",
+  "explain.hooks.whenMissing.high": "Hylkää tapahtuma: mikään, minkä koukku tarkistaa, ei mene läpi ilman tarkistusta. Jos toiminto katoaa, jokainen koukun tarkistama rekisteröityminen tai viesti pysähtyy, kunnes korjaat asian.",
+  "explain.hooks.whenMissing.ex1": "Uudet tilit henkilöstölistaa vasten tarkistavan toiminnon on julkaissut kollegasi tili. Valitset Hylkää tapahtuma, jotta kukaan ei voi rekisteröityä, kun toimintoa ei ole.",
+  "explain.hooks.whenMissing.tip": "Valitse Hylkää tapahtuma vain, kun tarkistamaton tapahtuma on pahempi kuin se, ettei tapahtumia tule lainkaan, ja kun ehdit reagoida ilmoitukseen saman päivän aikana.",
   "explain.services.webhook.title": "Webhook URL",
   "explain.services.webhook.short": "Osoite, jota tämä palvelin kutsuu vain, kun palvelun ylläpitäjä liittää palvelusi johonkin Koukut-sivun hetkeen. Palvelua koskeva pyyntö ei kutsu sitä.",
   "explain.services.webhook.what": "Kun joku pyytää palvelua, pyynnöstä tulee työ, jonka sinä tai agenttisi toimitatte. Palvelin ei kutsu tätä osoitetta pyynnön takia. Osoitetta käytetään, kun palvelun ylläpitäjä liittää palvelusi johonkin palvelimen hetkeen Koukut-sivulla, esimerkiksi ennen uuden tilin rekisteröintiä, ennen työpyyntöä tai työn toimituksen jälkeen. Sillä hetkellä palvelin lähettää osoitteeseen POST-pyynnön, jonka JSON kertoo hetken, palvelun, tapahtuman tiedot, palvelimen tunnisteen ja ajan. Palvelin odottaa vastausta enintään 10 sekuntia. Jos hetki on ennen jotakin tapahtumaa (sen nimi alkaa pre_), vastaus ratkaisee. Virhe, puuttuva vastaus, osoite, jota palvelin ei hyväksy, tai vastauksen allowed: false pysäyttää sen, mitä oli tapahtumassa. Palvelin ei hyväksy sisäverkon osoitetta. Hakemisto ei näytä osoitetta kenellekään.",
@@ -3771,6 +3779,12 @@
         "group_work": "Työ ja raha",
         "group_social": "Taulut ja federaatio",
         "canRefuse": "voi hylätä",
+        "whenMissing": "Jos sen toiminto puuttuu",
+        "whenMissingPass": "Päästä tapahtuma läpi (oletus)",
+        "whenMissingRefuse": "Hylkää tapahtuma",
+        "missing": "toiminto puuttuu",
+        "missingPass": "Koukun toiminto puuttuu, joten tämä estävä koukku päästää kaiken läpi. Jokainen operaattori saa siitä ilmoituksen kerran päivässä.",
+        "missingRefuse": "Koukun toiminto puuttuu, joten tämä estävä koukku hylkää kaiken, mitä se tarkistaa. Jokainen operaattori saa siitä ilmoituksen kerran päivässä.",
         "toldAfter": "kerrotaan jälkeen",
         "nothingBound": "ei sidottu",
         "notPublished": "· ei julkaistu täällä, ei tee mitään",
@@ -13847,6 +13861,10 @@
   "notiftext.federation_settlement_refused.title": "Vertaisen {node} selvitys hylättiin",
   "notiftext.federation_settlement_refused.body": "Se olisi lisännyt {amount} murusta ja ylittänyt päivärajan, joka on {limit} murusta. Mitään ei lisätty. Jos luotat tähän palvelimeen, nosta sen rajaa Federaatio-sivulla. Sen jälkeen palvelimen operaattori voi lähettää selvityksen uudelleen.",
   "notiftext.federation_settlement_refused.open": "Avaa Federaatio-sivu",
+  "notiftext.hook_action_missing_pass.title": "Estävällä koukulla {hook} ei ole toimintoa, jota kutsua",
+  "notiftext.hook_action_missing_pass.body": "{hook} on sidottu toimintoon {ref}, jota ei ole julkaistu tällä palvelimella tai jolla ei ole osoitetta. Koukku päästää jokaisen tapahtuman läpi, kunnes julkaiset toiminnon uudelleen, sidot toisen toiminnon tai tyhjennät koukun. Voit myös asettaa koukun hylkäämään tapahtumat.",
+  "notiftext.hook_action_missing_refuse.title": "Estävällä koukulla {hook} ei ole toimintoa, jota kutsua",
+  "notiftext.hook_action_missing_refuse.body": "{hook} on sidottu toimintoon {ref}, jota ei ole julkaistu tällä palvelimella tai jolla ei ole osoitetta. Koukku hylkää jokaisen tarkistamansa tapahtuman, kunnes julkaiset toiminnon uudelleen, sidot toisen toiminnon tai tyhjennät koukun.",
   "notiftext.internet_opening_requested.title": "{owner} pyytää avaamaan sovelluksen {app} internetiin",
   "notiftext.internet_opening_requested.body": "Syy: {reason}. Sovelluksen mukana aukeavat lomakkeet: {forms}. Sovellus pysyy suljettuna, kunnes operaattori hyväksyy avauksen.",
   "notiftext.internet_opening_opened.title": "{owner} avasi sovelluksen {app} internetiin",
@@ -15876,6 +15894,8 @@
     "cfg_operator_country": "Maa",
     "cfg_operator_email": "Tietosuojan yhteysosoite",
     "cfg_operator_security_email": "Tietoturvan yhteysosoite",
+    "cfg_operator_security_contact": "Haavoittuvuusilmoitusten yhteystieto (security.txt)",
+    "cfg_operator_security_policy_url": "Haavoittuvuuksien käsittelyperiaatteiden sivu",
     "cfg_operator_email_footer": "Sähköpostin alatunniste",
     "cfg_operator_hosting_name": "Palvelintarjoaja",
     "cfg_operator_hosting_location": "Palvelinten sijainti",
@@ -16170,6 +16190,8 @@
     "cfgDesc_operator_country": "Maa, josta instanssia pyöritetään. Ratkaisee sovellettavan lain ja siirtoehtojen sanamuodon.",
     "cfgDesc_operator_email": "Osoite, johon tietosuojakysymykset ja rekisteröityjen pyynnöt lähetetään. Näytetään molemmilla julkisilla sivuilla (tietosuojaseloste ja ehdot).",
     "cfgDesc_operator_security_email": "Osoite, johon tietoturvailmoitukset lähetetään. Tyhjä ohjaa tietosuojaosoitteeseen.",
+    "cfgDesc_operator_security_contact": "Mihin tietoturvatutkija ilmoittaa tämän palvelimen haavoittuvuudesta: yksi tai useampi mailto:- tai https:-osoite pilkuin erotettuina, ensimmäinen ensin. Kun arvo on asetettu, palvelin julkaisee osoitteet tiedostossa /.well-known/security.txt. Tyhjänä se osoite vastaa 404.",
+    "cfgDesc_operator_security_policy_url": "Sivu, jolla kerrot, miten käsittelet haavoittuvuusilmoituksen (https:-osoite). security.txt mainitsee sen Policy-rivillä. Tyhjänä riviä ei ole.",
     "cfgDesc_operator_email_footer": "Rivi jokaisen tämän palvelimen lähettämän viestin lopussa. Se korvaa tekstin \"Sent by AIMEAT Protocol\" ja profiilia koskevan huomautuksen. Yksi tekstirivi, enintään 200 merkkiä. Tyhjä pitää oletuksen.",
     "cfgDesc_operator_hosting_name": "Palvelintarjoaja, joka listataan tietosuojaselosteessa alikäsittelijänä.",
     "cfgDesc_operator_hosting_location": "Missä tarjoaja pitää datan, esim. \"Ranska (EU/ETA)\". Siirto-osio lukee tämän.",
@@ -19916,6 +19938,7 @@
       "aiSpendDaily": "AI maksoi {amount} päivänä {day}.",
       "aiKeyChanged": "Asetit AI-avaimesi.",
       "aiSettingsChanged": "Muutit AI-asetuksiasi: {changed}.",
+      "aiSettingsChangedBy": "{who} muutti AI-asetuksiasi, kun olit hyväksynyt muutoksen: {changed}.",
       "consentGranted": "Annoit pääsyn: {who} – {what}.",
       "consentRevoked": "Poistit pääsyn: {who} – {what}.",
       "seeAll": "Katso kaikki mitä on tapahtunut"
@@ -32567,6 +32590,17 @@
       }
     },
     "config": {
+      "operator": {
+        "security_contact": {
+          "title": "Haavoittuvuusilmoitusten yhteystieto",
+          "short": "Mihin ihmiset ilmoittavat tämän palvelimen tietoturvaongelmasta. Kun arvo on asetettu, palvelin julkaisee security.txt-tiedoston. Tyhjänä tiedostoa ei ole.",
+          "what": "security.txt (RFC 9116) on pieni tekstitiedosto osoitteessa /.well-known/security.txt. Tietoturvatutkijat ja skannerit lukevat sen, kun he etsivät, mihin haavoittuvuudesta ilmoitetaan. Palvelin kokoaa tiedoston tästä asetuksesta jokaisella pyynnöllä: Contact-rivi jokaiselle osoitteelle, Expires-rivi 180 päivän päähän, Canonical-rivi, jossa on tiedoston oma osoite tällä palvelimella, Policy-rivi, kun olet asettanut periaatesivun, ja Preferred-Languages: en, fi. Palvelin ei keksi yhteystietoa itse: kun asetus on tyhjä, /.well-known/security.txt vastaa 404, eikä tietosuojan tai tietoturvan sähköpostiosoitetta käytetä sen tilalla.",
+          "range": "Tyhjä (oletus) tai 1–10 osoitetta pilkuin erotettuina. Jokainen alkaa mailto: (sähköpostiosoite) tai https: (verkkosivu tai lomake). Palvelin hylkää muun arvon.",
+          "ex1": "mailto:security@example.org: ilmoitukset tulevat sähköpostilla tietoturvatiimillesi.",
+          "ex2": "https://example.org/report-a-vulnerability, mailto:security@example.org: ensin ilmoituslomake, sähköposti toisena vaihtoehtona.",
+          "tip": "Käytä osoitetta, jota joku lukee joka arkipäivä. Ilmoitus, jota kukaan ei lue, on huonompi kuin tiedoston puuttuminen, koska tutkija luulee, että asiasta on kerrottu."
+        }
+      },
       "node": {
         "processes": {
           "title": "Palvelimen prosessit",

@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   2026-11-19 — extensionHookWhenMissing: per blocking hook, let through or refuse when its action is missing.
  *   2026-11-14 — HelpConfig mixed in (config/help.ts): the settings of Ask someone who knows.
  *   v1.34.0 — 2026-11-14 — balancingTest (AIMEAT_COMPLIANCE_BALANCING_TEST: required | optional | off).
  *   2026-11-08 — memoryMaxArchivedKeysPerAgent (secaudit2026nov08b round 15b, storage/memory-totals:
@@ -82,8 +83,8 @@
 import type { SecurityDoorConfig } from './config/security.js';
 import type { SealedConfig } from './services/config/sealing.js';
 
-import type { ExtensionHooks } from './config/types-hooks.js';
-export type { ExtensionHooks, HookName } from './config/types-hooks.js';
+import type { ExtensionHooks, HookName, HookWhenMissing } from './config/types-hooks.js';
+export type { ExtensionHooks, HookName, HookWhenMissing } from './config/types-hooks.js';
 
 export interface RateLimitTier {
   windowMs: number;
@@ -421,6 +422,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   workQueueMaxPending: number;
   indexNowKey: string | null;
   extensionHooks: ExtensionHooks;
+  /** Per blocking hook: what happens when its bound action is missing (services/hook-when-missing.ts). Absent: 'pass'. */
+  extensionHookWhenMissing?: Partial<Record<HookName, HookWhenMissing>>;
   rateLimits: RateLimitsConfig;
 
   // Per-endpoint rate limits (individual keys for config-schema compatibility)

@@ -11,6 +11,7 @@
  * @version-history
  *   2026-11-19 — /.well-known/did.json is registered at mount time and waits for the node key; it
  *     was registered after the key loaded, behind the 404 fallthrough, and answered 404 everywhere.
+ *   2026-11-19 — securityTxtRouter mounted: /.well-known/security.txt (RFC 9116).
  *   2026-11-14 — helpRouter and helpAdminRouter mounted (Ask someone who knows).
  *   2026-11-14 — teamsRouter mounted beside the organisms (team setup and status).
  *   2026-11-14 — secretSharesRouter mounted beside the vault (secret shares and requests).
@@ -115,6 +116,7 @@ import { glossaryRouter } from '../routes/glossary.js';
 import { nsRouter } from '../routes/ns.js';
 import { markdownMirrorsRouter } from '../routes/markdown-mirrors.js';
 import { agentConventionsRouter } from '../routes/agent-conventions.js';
+import { securityTxtRouter } from '../routes/security-txt.js';
 import { nodeRobotsTxt } from './static-files.js';
 import { mountNodeRobots } from './robots-mount.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
@@ -392,6 +394,7 @@ export async function mountRoutes(
   app.use(nsRouter(config));         // /v1/ns{,.md} — the core ontology at the namespace we cite
   app.use(markdownMirrorsRouter(config));  // <page>.md mirrors (apex only)
   app.use(agentConventionsRouter(config));  // /openapi.json, /skill.md, /agents.txt, webmcp + x402 discovery
+  app.use(securityTxtRouter(config));       // /.well-known/security.txt, when the operator set a contact
   app.use(statsRouter(config, storage, stats, metricsRegistry));
   app.use(wellknownRouter(config, storage));
   app.use(agentSkillsDiscoveryRouter(config, storage));  // /.well-known/agent-skills (RFC v0.2.0)

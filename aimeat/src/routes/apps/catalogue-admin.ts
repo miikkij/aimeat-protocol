@@ -6,6 +6,8 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — DELETE /v1/admin/apps/:owner/:filename removes what the app leaves, through the same
+ *     removeAppLeftovers the owner's delete runs (services/app/delete-sweep.ts), and its dependency edges.
  *   2026-11-14 — GET /v1/apps reads its page, the counts and the own/building refusal through
  *     catalogueAppPage (services/app/catalogue-page.ts), which aimeat_app_list now asks too
  *     (structure programme 2026-11, unit 2b, B7).
@@ -87,10 +89,10 @@ import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { appSeoState } from '../../services/app/seo.js';
 import { stripLegalContent } from '../../services/app/legal.js';
-import { dependencyIndex, appRef as depAppRef } from '../../services/dependency-map.js';
+import { dependencyIndex, forgetDependencies, appRef as depAppRef } from '../../services/dependency-map.js';
 import { isOperatorCaller } from '../../services/operator/override.js';
 import { callerOf } from '../../middleware/caller.js';
-import { removeComplianceDocs } from '../../services/compliance/docs.js';
+import { removeAppLeftovers } from '../../services/app/delete-sweep.js';
 import { listedScreenshotUrl } from './open.js';
 
 export function registerCatalogueAdminRoutes(
@@ -490,10 +492,12 @@ export function registerCatalogueAdminRoutes(
         // Sweep every bucket holding this owner+filename (handles legacy shadow
         // buckets), deleting all versions + the screenshot each time.
         let sweepCount = 0;
+        const buckets: string[] = [];
         for (;;) {
             const app = await storage.getAppByOwnerName(owner, filename);
             if (!app || app.ownerName !== owner) break;
             await storage.deleteApp(app.ownerGaii, filename);
+            buckets.push(app.ownerGaii);
             await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`).catch(err => { logger.warn('DELETE /v1/admin/apps/:owner/:filename: continuing after a suppressed failure', { error: String(err) }); });
             sweepCount++;
             if (sweepCount > 10) break; // safety cap, no real owner has >10 buckets
@@ -502,9 +506,12 @@ export function registerCatalogueAdminRoutes(
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
             return;
         }
-        // The app went, so its compliance documents go (plan doc-mvlftkh9zmc9).
-        await removeComplianceDocs(storage, config.nodeId, { kind: 'app', ownerName: owner, app: filename })
-            .catch(err => { logger.warn('DELETE /v1/admin/apps/:owner/:filename: compliance documents not removed', { error: String(err) }); });
+        // The app went, so what it alone used goes too, the same list the owner's delete runs: its
+        // compliance documents (plan doc-mvlftkh9zmc9), its dependency edges, and everything
+        // services/app/delete-sweep.ts names. Its address is held for its owner.
+        await forgetDependencies(storage, 'app', depAppRef(owner, filename))
+            .catch(err => { logger.warn('DELETE /v1/admin/apps/:owner/:filename: dependency map not cleared', { error: String(err) }); });
+        await removeAppLeftovers(storage, config, { ownerName: owner, ownerGhii: `${owner}@${config.nodeId}`, filename, buckets });
 
         const { owner: operatorName } = await canonicalOwner(req);
         await storage.addSiteChangeLog({

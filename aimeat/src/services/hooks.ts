@@ -46,6 +46,9 @@
  *   if (!r.allowed) return refuse(r.reason);
  * @version-history
  *   2026-11-19 — Header counts corrected: five hooks decide and eight are told (comment only).
+ *   2026-11-19 — A gate whose bound action is missing (not published, or no address) tells the
+ *     operators once per binding per day, and refuses instead of letting the event through when its
+ *     setting says so (services/hook-when-missing.ts). Letting through stays the default.
  *   2026-11-14 — post_help_question and post_help_solved: told after a question of Ask someone who
  *     knows went to a helper and after one was solved. Thirteen moments.
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
@@ -76,6 +79,7 @@ import { readJson, readText } from '../utils/read-capped.js';
  *  action does not decide how much memory a request takes (secaudit 2026-10, C6). */
 const HOOK_ANSWER_MAX_BYTES = 256 * 1024;
 import { recordHookRun, type HookAnswer } from './hook-log.js';
+import { whenMissingOf, tellOperatorsActionMissing } from './hook-when-missing.js';
 
 /**
  * Every moment, in the order a person meets them. THE canonical list: config.ts seeds the same
@@ -265,8 +269,15 @@ export async function executeHooks(
         }
         if (bound.kind === 'missing') {
             logger.warn(`Extension hook ${hookName}: action "${actionRef}" not found, skipping`);
-            await record(storage, hookName, actionRef, undefined, 'missing', null, Date.now() - started, true, subject,
-                'The bound action is not published on this node');
+            // A gate lets the event through by default, as it always has; the operator's setting can
+            // make it refuse instead, and the operators are told once a day either way
+            // (services/hook-when-missing.ts).
+            const refuses = kind === 'gate' && whenMissingOf(config, hookName) === 'refuse';
+            await record(storage, hookName, actionRef, undefined, 'missing', null, Date.now() - started, !refuses, subject,
+                refuses ? 'The bound action is not published on this node, and this hook refuses when its action is missing'
+                    : 'The bound action is not published on this node');
+            if (kind === 'gate') await tellOperatorsActionMissing(config, storage, hookName, actionRef, refuses ? 'refuse' : 'pass');
+            if (refuses) return { allowed: false, reason: `Hook action "${actionRef}" is not published, and this hook refuses when its action is missing`, hookAction: actionRef };
             continue;
         }
         const action = bound.action;
@@ -275,8 +286,12 @@ export async function executeHooks(
         if (!webhookUrl) {
             // Bound, and does nothing. Recorded rather than passed over in silence: on the page this
             // is the row that reads "no address, does nothing", which is the only way an operator
-            // learns that a binding they made is decorative.
-            await record(storage, hookName, actionRef, action.displayName, 'no_address', null, Date.now() - started, true, subject);
+            // learns that a binding they made is decorative. For a gate this is a missing action too.
+            const refuses = kind === 'gate' && whenMissingOf(config, hookName) === 'refuse';
+            await record(storage, hookName, actionRef, action.displayName, 'no_address', null, Date.now() - started, !refuses, subject,
+                refuses ? 'The bound action has no address, and this hook refuses when its action is missing' : undefined);
+            if (kind === 'gate') await tellOperatorsActionMissing(config, storage, hookName, actionRef, refuses ? 'refuse' : 'pass');
+            if (refuses) return { allowed: false, reason: `Hook action "${actionRef}" has no address, and this hook refuses when its action is missing`, hookAction: actionRef };
             continue;
         }
 

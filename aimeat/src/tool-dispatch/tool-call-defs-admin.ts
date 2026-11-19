@@ -9,6 +9,7 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   2026-11-19 -- aimeat_admin_hook_set forwards `when_missing`, and `actions` only when given.
  *   2026-11-14 -- aimeat_admin_usage forwards report, owner, from, to, grain, series and limit to
  *     GET /v1/admin/usage/summary when any report parameter is given.
  *   2026-11-13 -- aimeat_admin_knowledge forwards `author` (unit 3b).
@@ -151,12 +152,18 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
             `/v1/admin/node-update${query({ refresh: optionalBoolean(input, 'refresh') })}`),
     },
     {
-        // THE THIRD SURFACE forwards both parameters: `hook` picks the moment and `actions` is the
-        // body, an empty list included, because that is how a moment is cleared.
+        // THE THIRD SURFACE forwards all three: `hook` picks the moment, `actions` is the body, an
+        // empty list included, because that is how a moment is cleared, and `when_missing` rides
+        // beside it. Each is sent only when given, so the route decides what a missing one means.
         name: 'aimeat_admin_hook_set',
-        handler: ({ client }, input) =>
-            client.put(`/v1/admin/hooks/${encodeURIComponent(requiredString(input, 'hook'))}`,
-                { actions: requiredValue(input, 'actions') }),
+        handler: ({ client }, input) => {
+            const whenMissing = optionalString(input, 'when_missing');
+            return client.put(`/v1/admin/hooks/${encodeURIComponent(requiredString(input, 'hook'))}`, {
+                // As given, so the route's own check answers a value that is not a list.
+                ...(input.actions !== undefined ? { actions: input.actions } : {}),
+                ...(whenMissing !== undefined ? { when_missing: whenMissing } : {}),
+            });
+        },
     },
     {
         // THE THIRD SURFACE forwards both parameters: `who` picks the door (an agent's address carries

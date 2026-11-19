@@ -124,7 +124,7 @@
         "aimeat/src/services/node-admin",
         "aimeat/src/services/hooks.ts"
       ],
-      "digest": "sha256:2daf62bbf9ba1acb7eb72c0b"
+      "digest": "sha256:17cf6d8a6494d343d7b81d20"
     },
     "11-backup-recovery.md": {
       "reviewedOn": "2026-11-15",
@@ -372,7 +372,7 @@
       "aimeat/src/services/node-admin/setup-secret.ts": "7c37998e518e50ba",
       "aimeat/src/services/node-admin/siem-export.ts": "36297d5eba7c1438",
       "aimeat/src/services/node-admin/teams-view.ts": "54307d42939f63cb",
-      "aimeat/src/services/hooks.ts": "60779a210c48ef47"
+      "aimeat/src/services/hooks.ts": "420247d21447f0f9"
     },
     "11-backup-recovery.md": {
       "docs/operations/backup-and-restore.md": "a0eead9e2df11d96",

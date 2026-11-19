@@ -6,6 +6,7 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — eraseOwner takes the config: the erasure removes each app as the owner's delete does.
  *   2026-11-15 — The access request and the grant notices open the workspace (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-13 — GET /:id/invitations/email asks services/organism-read/manager.ts
  *     pendingEmailInvitationsFor, the rule and the read aimeat_organism_invitations_email asks; the
@@ -776,7 +777,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       // The one way an account is deleted (services/owner/erasure.ts): its memory, consents, sessions,
       // grants and audit rows go with it, which the storage cascade alone does not reach (secaudit
       // 2026-10, C7).
-      await eraseOwner(storage, config.nodeId, inv.provisionedOwner);
+      await eraseOwner(storage, config.nodeId, inv.provisionedOwner, config);
       emitChange('ghii');
     }
     await storage.updateInvitation(invId, { status: 'cancelled' });

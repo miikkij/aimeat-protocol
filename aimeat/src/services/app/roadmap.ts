@@ -31,6 +31,7 @@
  *   const road = await readAppRoadmap(storage, ownerGhii, appId);
  *   await addRoadmapEntry(storage, { ownerGhii, appId, state: 'done', what: 'The login pill fits a phone.', by, version });
  * @version-history
+ *   2026-11-19 — eraseAppRoadmapsOf deletes for good, not to the bin (record-keys.ts eraseAppRecordsOfAuthor).
  *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-27 — A roadmap older than the account that now holds the author name is an earlier
@@ -42,7 +43,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { randomUUID } from 'node:crypto';
-import { appKeySegment, readAuthorAppRecord, appRecordsOfAuthor, equalAppId } from './record-keys.js';
+import { appKeySegment, readAuthorAppRecord, eraseAppRecordsOfAuthor, equalAppId } from './record-keys.js';
 
 export const APP_ROADMAP_SPEC = 'aimeat.approadmap/1' as const;
 
@@ -151,9 +152,7 @@ const nextId = () => randomUUID();
  * Returns how many went.
  */
 export async function eraseAppRoadmapsOf(storage: Storage, account: string): Promise<number> {
-  const rows = await appRecordsOfAuthor(storage, NS_ROADMAP, 'approadmap.', account);
-  for (const r of rows) await storage.deleteMemory(NS_ROADMAP, r.key);
-  return rows.length;
+  return eraseAppRecordsOfAuthor(storage, NS_ROADMAP, 'approadmap.', account);
 }
 
 /**

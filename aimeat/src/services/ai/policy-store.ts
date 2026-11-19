@@ -19,6 +19,8 @@
  *   - setOwnerAiPolicy() — the owner writes; an agent proposes and confirms with a token
  *   - policyView() — what GET /v1/ai/policy and the MCP tool show
  * @version-history
+ *   v1.1.0 — 2026-11-19 — An applied change writes the ai_settings_changed account event, naming the
+ *     agent that applied it with its confirm token (settings-trail.ts; feature audit 2026-11-19, 2.3).
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
  *   v1.1.0 — 2026-09-28 — appAiMetaOf(): the app's prefer.* and local.* beside its models (V5).
  *   v1.3.0 — 2026-11-07 — policyView(): `operator`, the operator's allowed models and lock (Jouni, 2026-11-07).
@@ -34,6 +36,7 @@ import { emitChange } from '../event-bus.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator/confirm.js';
 import { AiCompletionError } from './errors.js';
 import { allowedModelsOf, modelsLocked } from './node-model-rules.js';
+import { recordAiSettingsApplied } from './settings-trail.js';
 import {
   normaliseOwnerPolicy, readOwnerPolicy, parseRecommendedModels, isModelRef,
   type OwnerAiPolicy, type RecommendedModels,
@@ -174,7 +177,11 @@ const POLICY_ACTION = 'ai_policy';
 export async function setOwnerAiPolicy(
   storage: Storage, gaii: string, input: unknown, actor: PolicyActor,
 ): Promise<PolicySetResult> {
-  if (actor.kind === 'owner') return { mode: 'applied', policy: await writeOwnerAiPolicy(storage, gaii, input) };
+  if (actor.kind === 'owner') {
+    const policy = await writeOwnerAiPolicy(storage, gaii, input);
+    await recordAiSettingsApplied(storage, gaii, null, 'model rules');
+    return { mode: 'applied', policy };
+  }
 
   const r = normaliseOwnerPolicy(input);
   if ('problems' in r) {
@@ -201,7 +208,10 @@ export async function setOwnerAiPolicy(
     if (e instanceof ConfirmTokenError) throw new AiCompletionError(e.code, 403, e.message);
     throw e;
   }
-  return { mode: 'applied', policy: await writeOwnerAiPolicy(storage, gaii, input) };
+  const policy = await writeOwnerAiPolicy(storage, gaii, input);
+  // The owner confirmed in the chat, outside the node: the row is the person's record of who applied it.
+  await recordAiSettingsApplied(storage, gaii, actor.principal, 'model rules');
+  return { mode: 'applied', policy };
 }
 
 /** What GET /v1/ai/policy and aimeat_ai_policy_set show: the owner's record, the node's list, and the

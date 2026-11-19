@@ -25,6 +25,8 @@
  *   - setOwnerGenRules() — owner writes; an agent proposes and confirms
  *   - genRulesView() — what GET /v1/ai/gen-rules and the MCP tool show
  * @version-history
+ *   v1.1.0 — 2026-11-19 — An applied change writes the ai_settings_changed account event, naming the
+ *     agent that applied it with its confirm token (settings-trail.ts; feature audit 2026-11-19, 2.3).
  *   v1.0.0 — 2026-10-31 — Initial (wish-image-and-video-generation-people-only-in-an-artistic-non-ph).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -36,6 +38,7 @@ import { emitChange } from '../event-bus.js';
 import { updateRecord } from '../record-cas.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator/confirm.js';
 import { AiCompletionError } from './errors.js';
+import { recordAiSettingsApplied } from './settings-trail.js';
 import {
   GEN_RULES, GEN_RULE_MEDIA, arrivalMarks, directiveText, isGenRuleMedia,
   normaliseOwnerGenRules, parseNodeGenRules, readOwnerGenRules, resolveGenRules, ruleStanding,
@@ -166,7 +169,11 @@ export async function setOwnerGenRules(
     throw invalid('saved', [{ field: 'gen_rules', message: 'must be an object { rules?, exceptions? }' }]);
   }
   const body = change as Record<string, unknown>;
-  if (actor.kind === 'owner') return { mode: 'applied', gen_rules: await writeOwnerGenRules(storage, config, ownerGhii, body) };
+  if (actor.kind === 'owner') {
+    const genRules = await writeOwnerGenRules(storage, config, ownerGhii, body);
+    await recordAiSettingsApplied(storage, ownerGhii, null, 'image rules');
+    return { mode: 'applied', gen_rules: genRules };
+  }
 
   const current = await readOwnerGenRulesRecord(storage, ownerGhii);
   // Validated now, so a proposal the confirm step would refuse is never shown to the owner.
@@ -185,7 +192,10 @@ export async function setOwnerGenRules(
     if (e instanceof ConfirmTokenError) throw new AiCompletionError(e.code, 403, e.message);
     throw e;
   }
-  return { mode: 'applied', gen_rules: await writeOwnerGenRules(storage, config, ownerGhii, body) };
+  const genRules = await writeOwnerGenRules(storage, config, ownerGhii, body);
+  // The owner confirmed in the chat, outside the node: the row is the person's record of who applied it.
+  await recordAiSettingsApplied(storage, ownerGhii, actor.principal, 'image rules');
+  return { mode: 'applied', gen_rules: genRules };
 }
 
 export interface GenRuleView {

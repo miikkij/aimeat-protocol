@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · shownLine · shownAmount · isBookkeeping · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-11-19: ai_settings_changed with `by` names the agent that applied the change ("{who} changed
+ *     your AI settings with your confirmation"), not "You changed".
  *   2026-11-15: The agent-request line's fallback says "Your agent is asking to connect.", as en.json does.
  *   2026-11-02: On a node the store sold, an amount or a day the server wrote as text is shown in the
  *     place's own format ("12,50 €", "1.11.2026"), through money() and date() (CoS 04.12). An app
@@ -289,6 +291,12 @@ export function line(item) {
     case 'ai_key_changed':
       return tr('home.feed.aiKeyChanged', 'You set your AI key.');
     case 'ai_settings_changed':
+      // `by` is the agent or app that applied the change with a confirm token; absent, the person did.
+      // The name is the part of the identity before '#', the agent's own name.
+      if (d.by) {
+        return tr('home.feed.aiSettingsChangedBy', '{who} changed your AI settings with your confirmation: {changed}.')
+          .replace('{who}', String(d.by).split('#')[0]).replace('{changed}', d.changed || '');
+      }
       return tr('home.feed.aiSettingsChanged', 'You changed your AI settings: {changed}.').replace('{changed}', d.changed || '');
 
     // Consent

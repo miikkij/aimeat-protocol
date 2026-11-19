@@ -17,6 +17,11 @@
  *   2026-11-19 -- test/e2e-ecosystem-apps-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 2).
  *   2026-11-19 -- test/e2e-owner-export-records.ts joins ALL_SUITES (feature audit 2026-11-19, item 4.2).
  *   2026-11-19 -- test/e2e-app-task-start.ts joins ALL_SUITES (feature audit 2026-11-19, item 2.1).
+ *   2026-11-19 -- e2e-ai-settings-trail.ts joins the list (not the guard tier): an agent's confirmed change to the routing, the model rules, the roles or the image rules writes an account event naming the agent (feature audit 2026-11-19, 2.3).
+ *   2026-11-19 -- e2e-security-txt.ts joins the list (not the guard tier): /.well-known/security.txt answers 404 until the operator sets a contact, then RFC 9116 lines; an invalid contact is refused (feature audit 2026-11-19, 4.7).
+ *   2026-11-19 -- e2e-owner-erasure-apps.ts joins the list (not the guard tier): erasing an account that owns apps removes what deleting each app removes, and another owner's app keeps everything (feature audit 2026-11-19, agent F part 1).
+ *   2026-11-19 -- e2e-hook-when-missing.ts joins the list (not the guard tier): a blocking hook whose action is missing lets the event through and tells the operators once a day, or refuses it when set to (feature audit 2026-11-19, 2.4).
+ *   2026-11-19 -- e2e-app-delete-sweep.ts joins the list (not the guard tier): a deleted app leaves nothing in a store the delete removes, and the owner's other app keeps everything (feature audit 2026-11-19, 4.3).
  *   2026-11-19 -- e2e-data-wallet-agent-consents.ts joins the list (not the guard tier): the Data Wallet lists and revokes the consents the person's agents gave (feature audit 2026-11-19, 1.4).
  *   2026-11-19 -- e2e-app-source-access.ts joins the list (not the guard tier): every route that hands an app's source to another person asks the app's audience (feature audit 2026-11-19, 1.1 and 1.2).
  *   2026-11-15 -- test/e2e-federation-peer-proofs.ts joins ALL_SUITES (audit 2026-11 M130, L056).
@@ -710,6 +715,10 @@ const ALL_SUITES = [
     'test/e2e-app-roadmap.ts',
     'test/e2e-app-design-spec.ts',
     'test/e2e-app-structure.ts',
+    'test/e2e-app-delete-sweep.ts',
+    'test/e2e-owner-erasure-apps.ts',
+    'test/e2e-security-txt.ts',
+    'test/e2e-ai-settings-trail.ts',
     'test/e2e-app-silent.ts',
     // Self-spawns with the portfolio origin ON (28461): the owner's welcome page reads their memory only
     // when its writer may read memory or the owner allowed it (audit H-9).
@@ -1268,6 +1277,7 @@ const ALL_SUITES = [
     'test/e2e-catalogue-classification.ts',
     'test/e2e-notifications.ts',
     'test/e2e-hooks.ts',
+    'test/e2e-hook-when-missing.ts',
     'test/e2e-knowledge.ts',
     // A link row belongs to the namespace of its source package; owner erasure takes the person's rows (secaudit 2026-10, v78, v79).
     'test/e2e-knowledge-link-owner.ts',

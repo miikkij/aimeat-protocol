@@ -20,6 +20,8 @@
  *   ROUTING_KEY · agentRoutingKey · RoutingRules · DEFAULT_RULES · RoutingRecord · readRouting ·
  *   rulesFor · defaultsFor · normaliseRoutingInput · setRouting
  * @version-history
+ *   v1.4.0 — 2026-11-19 — An applied change writes the ai_settings_changed account event, naming the
+ *     agent that applied it with its confirm token (settings-trail.ts; feature audit 2026-11-19, 2.3).
  *   v1.3.0 — 2026-11-07 — An agent's record may name the agent's own text model (`model`; the chat's
  *     model is the chat agent's), refused while the operator locks the models (Jouni, 2026-11-07).
  *   v1.2.0 — 2026-10-31 — rules.openrouterRegion and rules.openrouterRegionFallback: where the person's
@@ -36,6 +38,7 @@ import { emitChange } from '../event-bus.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator/confirm.js';
 import { isObj } from './provider-common.js';
 import { AiCompletionError } from './errors.js';
+import { recordAiSettingsApplied } from './settings-trail.js';
 import { FALLBACK_CLASSES, type FailureClass } from './health.js';
 import { isValidAgentName } from '../../utils/gaii.js';
 import type { AiCapability } from './types.js';
@@ -321,7 +324,11 @@ export async function setRouting(
       'The operator of this node chooses the model, so an agent\'s own model cannot be set. Ask the operator to change it.',
       { next: { description: 'Read the model rules', method: 'GET', url: '/v1/ai/policy' } });
   }
-  if (actor.kind === 'owner') return { mode: 'applied', routing: await writeRouting(storage, gaii, r.value) };
+  if (actor.kind === 'owner') {
+    const routing = await writeRouting(storage, gaii, r.value);
+    await recordAiSettingsApplied(storage, gaii, null, 'routing');
+    return { mode: 'applied', routing };
+  }
   if (!actor.confirmToken) {
     return {
       mode: 'proposal',
@@ -338,5 +345,8 @@ export async function setRouting(
     if (e instanceof ConfirmTokenError) throw new AiCompletionError(e.code, 403, e.message);
     throw e;
   }
-  return { mode: 'applied', routing: await writeRouting(storage, gaii, r.value) };
+  const routing = await writeRouting(storage, gaii, r.value);
+  // The owner confirmed in the chat, outside the node: the row is the person's record of who applied it.
+  await recordAiSettingsApplied(storage, gaii, actor.principal, 'routing');
+  return { mode: 'applied', routing };
 }
