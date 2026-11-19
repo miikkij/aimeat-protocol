@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for AI chat instances and operator channels:
  *   lists active chat sessions (with delete), and manages `ops:`-prefixed operator
- *   boards with an inline live chat panel that polls posts every 5s.
+ *   boards with an inline live chat panel that reads its posts again when a board changes.
  *
  * @structure
- *   - ChannelChat({ boardId }): inline board chat feed + composer (5s polling)
+ *   - ChannelChat({ boardId }): inline board chat feed + composer (live domain `boards`)
  *   - ChatInstancesTab({ data, reload }): operator-channel CRUD + chat-session list
  *
  * @version-history
+ *   v1.4.0 — 2026-11-19 — The channel chat reads its posts on the live domain `boards` instead of every
+ *     5 s (feature audit 2026-11-19, 4.6).
  *   v1.3.0 — 2026-11-09 — The sessions show two figures, your own (the list) and the whole server's
  *     (the menu's count), and say that the list holds your own; it showed one count beside a menu
  *     count that disagreed with it (guidance audit 2026-11-09).
@@ -44,6 +46,7 @@ import { Note } from '/components/Note.js';
 import { TextField } from '/components/TextField.js';
 import { Thread, Message } from '/components/Message.js';
 import { Space } from '/components/Layout.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 
 /* ── Inline Chat View ── */
 function ChannelChat({ boardId }) {
@@ -61,10 +64,11 @@ function ChannelChat({ boardId }) {
     setLoading(false);
   }, [boardId]);
 
+  // A post to any board is the live domain `boards` (services/boards/post.ts), which the admin shell
+  // relays as the window event; the chat reads its posts again then, never on a timer.
   useEffect(() => {
     loadPosts();
-    const iv = setInterval(loadPosts, 5000);
-    return () => clearInterval(iv);
+    return onLiveUpdate(['boards'], () => loadPosts());
   }, [boardId, loadPosts]);
 
   useEffect(() => {
