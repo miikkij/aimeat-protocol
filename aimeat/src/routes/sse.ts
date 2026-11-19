@@ -5,7 +5,8 @@
  * @description Server-Sent Events transport for live UI updates, and the single-use connection
  *   tickets for every connection that cannot send an Authorization header. Exposes
  *   POST /v1/events/ticket (exchange JWT for a single-use connection ticket, optionally for one app),
- *   POST /v1/events/visitor-ticket (the same without an account: the build and one public app),
+ *   POST /v1/events/visitor-ticket (the same without an account: the build, the public counters and
+ *   one public app),
  *   POST /v1/ws/ticket (the same for one WebSocket endpoint, spent at the upgrade in
  *   auth/ws-upgrade.ts) and GET /v1/events?ticket=... (the event stream). Forwards event-bus
  *   changes to connected clients as a `data:` SSE message, COALESCED to at most
@@ -14,6 +15,9 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   2026-11-19 -- A visitor's stream (no app) carries the public domains, PUBLIC_STREAM_DOMAINS: the
+ *     front page's counters (`node-totals`), which it read on a 60-second timer before. A stream for
+ *     one app still carries no domain frame (feature audit 2026-11-19, 4.6).
  *   2026-11-10 -- A stream reopened with `since` gets one `catchup` frame with the domains that changed
  *     after it (services/live/change-journal.ts), through the same owner, scope and membership tests,
  *     or null when the journal cannot answer; each domain frame carries its position as `at` in its
@@ -95,6 +99,7 @@ import { streamCredentialOf, streamCredentialRevoked, type StreamCredential } fr
 import { logger } from '../utils/logger.js';
 import { endOnDrain } from '../services/node/lifecycle.js';
 import { createChangeJournal } from '../services/live/change-journal.js';
+import { NODE_TOTALS_DOMAIN } from '../services/live/node-totals.js';
 
 interface Ticket {
   sub: string;
@@ -116,7 +121,7 @@ interface Ticket {
    * like `allow`. A stream opened for an app carries that app's events and the build, nothing else.
    */
   app?: AppStreamTopic;
-  /** Opened without an account: counted against the visitor caps, carries no domain at all. */
+  /** Opened without an account: counted against the visitor caps, carries the public domains only. */
   visitorIp?: string;
   /**
    * Who opened the stream, as services/audience.ts asks it: a workspace's domain goes only to the
@@ -153,6 +158,13 @@ const VISITOR_STREAMS_MAX = 5000;
 const VISITOR_STREAMS_PER_IP = 24;
 let visitorStreams = 0;
 const visitorStreamsByIp = new Map<string, number>();
+
+/**
+ * The domains a visitor's stream carries: data anyone may read, so its timing tells a visitor
+ * nothing the page would not show. Only the public counters of the front page (services/live/
+ * node-totals.ts), which the page read on a 60-second timer before (feature audit 2026-11-19, 4.6).
+ */
+const PUBLIC_STREAM_DOMAINS: ReadonlySet<string> = new Set([NODE_TOTALS_DOMAIN]);
 
 /** A draft written in many small saves is told at most once a second, like the domain frames. */
 const DRAFT_COALESCE_MS = 1000;
@@ -197,7 +209,7 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
 
   // The same ticket for a visitor without an account: a stream that carries the build (an open page
   // reloads after the node restarts on new code) and, with `{ app }`, one app's new versions, when
-  // anyone may open that app. Never a domain frame and never a draft.
+  // anyone may open that app. Never a draft; without `{ app }`, the public domains and no other.
   router.post('/v1/events/visitor-ticket', rateLimit({ windowMs: 60_000, max: 60 }), async (req, res) => {
     const asked = (req.body as { app?: unknown } | undefined)?.app;
     let app: AppStreamTopic | undefined;
@@ -212,7 +224,8 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
     const ticket = await tickets.issue({
       sub: '',
       presenceGhii: '',
-      allow: new Set<string>(),
+      // The public domains only: an event with an owner or an organism never matches a visitor.
+      allow: new Set<string>(PUBLIC_STREAM_DOMAINS),
       presenceEligible: false,
       visitorIp: req.ip || 'unknown',
       ...(app ? { app } : {}),
@@ -418,9 +431,10 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       }
       queue(evt.domain);
     });
-    // A stream opened for one app, or by a visitor, carries no domain frame: the page that holds it
-    // listens for its app and the build, and the domains are the business of the signed-in shell.
-    const domainFrames = !t.app && visitorIp === undefined;
+    // A stream opened for one app carries no domain frame: the page that holds it listens for its app
+    // and the build. A visitor's stream carries the public domains only (PUBLIC_STREAM_DOMAINS, its
+    // ticket's `allow`), so a front page open without an account hears its counters change.
+    const domainFrames = !t.app;
     if (domainFrames) onChangeEvent(handler);
 
     // A page reopening its stream after a gap sends the last position it heard (`since`). The changes

@@ -267,7 +267,7 @@
         "aimeat/src/services/moderation",
         "aimeat/src/tool-catalog/definitions/moderation.ts"
       ],
-      "digest": "sha256:c2bc0a4aa739f26b3f7e42c9"
+      "digest": "sha256:466f0149018c13b545dd66b5"
     },
     "14. Economy, marketplace and payments": {
       "reviewedOn": "2026-11-19",
@@ -818,7 +818,7 @@
     },
     "13. Notifications, boards and live updates": {
       "aimeat/src/tool-catalog/definitions/boards.ts": "6421b7424f17daa1",
-      "aimeat/src/routes/sse.ts": "8282eb7e03b77514",
+      "aimeat/src/routes/sse.ts": "3e0029a107aac517",
       "aimeat/src/routes/public-events.ts": "9df6e655b36751a9",
       "aimeat/src/routes/boards.ts": "19c7b4220cbe09cb",
       "aimeat/src/services/boards/board-list.ts": "2a0f8abc1c7df8a5",

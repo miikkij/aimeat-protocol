@@ -6,11 +6,14 @@
  *   often-empty 3-tab activity feed with cumulative, never-empty node counters:
  *   public apps, public organisms, connected agents (+ online now), public knowledge
  *   packages, and total app downloads. One fetch of GET /v1/public/node-totals on
- *   mount, refreshed on the aimeat-live-update window event and on a slow interval.
+ *   mount, read again when the live stream says `node-totals` changed.
  *   Rationale: an empty feed reads as "broken"; counts always show the node is alive.
  * @structure default export NodeTotals() — sibling component imported by landing.js.
  * @usage import NodeTotals from './landing-node-totals.js'; <${NodeTotals} />
  * @version-history
+ *   v2.1.0 — 2026-11-19 — The figures are read again on the live domain `node-totals`, which a
+ *     visitor's stream carries too; the 60-second timer and the window-event listener go (the event
+ *     never fired on the front page). Feature audit 2026-11-19, 4.6.
  *   v2.0.0 — 2026-08-28 — The showroom strip: four figures on one dark band (apps, opens, agents,
  *     awake now) in the visitor's words, no icons, no heading. The fetch and the refresh rules are
  *     unchanged; organisms and knowledge packages stay in the answer and leave the strip.
@@ -21,7 +24,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { onLiveUpdate } from '/lib/live-updates.js';
+import { subscribe } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { num as fmtNum } from '/js/format.js';
 
@@ -40,12 +43,13 @@ export default function NodeTotals() {
         .catch(err => { swallowed('landing-node-totals: load', err); });
     };
     load();
-    const off = onLiveUpdate(['agents', 'apps', 'organisms'], () => load());
-    const iv = setInterval(load, 60_000);
+    // The node says when a figure moved (live domain `node-totals`, services/live/node-totals.ts), on
+    // the stream the shell opens for every page, a visitor's included (watchBuild). The window event
+    // fires only on a route that relays the stream, and the front page is not one.
+    const off = subscribe(['node-totals'], () => load());
     return () => {
       alive = false;
       off();
-      clearInterval(iv);
     };
   }, []);
 

@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-19 -- test/e2e-live-page-events.ts joins ALL_SUITES (feature audit 2026-11-19, 4.6).
  *   2026-11-19 -- test/e2e-oidc-link-domains.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 3).
  *   2026-11-19 -- test/e2e-connector-command-approval.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 4).
  *   2026-11-19 -- test/e2e-subscription-renewal.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 5).
@@ -1754,6 +1755,9 @@ const ALL_SUITES = [
     // Casdoor and Entra sign-in through a real OIDC provider over HTTPS on a node of its own: the
     // link domains admit and refuse an address by its domain (feature audit 2026-11-19, 4.5).
     'test/e2e-oidc-link-domains.ts',
+    // The live events four pages read on instead of a timer: `node-totals` on a visitor's stream,
+    // `boards`, `crew-try` to its owner only, and `agents` on a device request (feature audit 2026-11-19, 4.6).
+    'test/e2e-live-page-events.ts',
     // The owner stops an agent and starts it again: new work waits and nobody can start it, a
     // scheduled run is skipped, the runtime is not woken, and a start releases what waited.
     'test/e2e-agent-stop.ts',
