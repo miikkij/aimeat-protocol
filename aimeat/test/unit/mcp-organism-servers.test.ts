@@ -9,6 +9,10 @@
  *   would look like it working: somebody outside the group reaching it, and a workspace binding
  *   turning out to be no narrower than the organism it sits in.
  * @version-history
+ *   v1.3.0 — 2026-11-19 — The workspace block's setup registers the workspace, created by boss, as
+ *     production has it: its setup no longer matched production once organismAdmits read the roles
+ *     from the workspace creator (f-2026nov19-feataudit-workspace-mcp-roles). The assertions are
+ *     unchanged; one test adds the creator and an admin calling with no role.
  *   v1.2.0 — 2026-09-26 — A visitor from another node named like a member, an admin or the owner
  *     reaches, lists and attaches nothing; attaching takes the caller's owner GHII (secaudit 2026-09,
  *     a0ecb62eafb3).
@@ -45,6 +49,8 @@ async function withOrganism(storage: SqliteStorage): Promise<void> {
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   } as never);
 }
+/** The organism alone, for a block that adds its own records to it. */
+const withOrganismOnly = withOrganism;
 
 function orgServer(over: Partial<McpServerRecord> = {}): McpServerRecord {
   const now = new Date().toISOString();
@@ -127,6 +133,17 @@ describe('a server bound to the whole group', () => {
 
 describe('a server bound to ONE workspace inside it', () => {
   const inWorkspace = () => orgServer({ ws: 'ws-secret' });
+  // The workspace exists and boss created it, as in production: its roles are the grants its
+  // creator owns, which is where organismAdmits reads them since 2026-11-19.
+  const withOrganism = async (storage: SqliteStorage): Promise<void> => {
+    await withOrganismOnly(storage);
+    const stamp = new Date().toISOString();
+    await storage.setMemory({
+      key: `organism.${ORG}.meta.workspaces`, ownerGaii: BOSS, visibility: 'private', tags: [], ttlHours: null,
+      version: 1, createdAt: stamp, updatedAt: stamp,
+      value: { workspaces: [{ id: 'ws-secret', name: 'Secret', createdAt: stamp, createdBy: 'boss' }] },
+    } as never);
+  };
 
   it('is NOT reachable by a member who has no role in that workspace', async () => {
     const storage = new SqliteStorage(':memory:');
@@ -159,6 +176,13 @@ describe('a server bound to ONE workspace inside it', () => {
     // binding to a workspace is worth having beside binding to the organism.
     expect(await organismAdmits(storage, config, inWorkspace(), MEMBER, false)).toBe(true);
     expect(await organismAdmits(storage, config, inWorkspace(), MEMBER, true)).toBe(false);
+  });
+
+  it('lets the workspace creator and an admin of the group call it with no role', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await withOrganism(storage);
+    expect(await organismAdmits(storage, config, inWorkspace(), BOSS, true)).toBe(true);
+    expect(await organismAdmits(storage, config, inWorkspace(), ADMIN, true)).toBe(true);
   });
 });
 
