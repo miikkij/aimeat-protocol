@@ -21,6 +21,9 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-11-19 — GET /v1/messages/broadcast/:id also answers an agent holding messages:read about a
+ *     broadcast it sent itself, through broadcastSummary (services/message/broadcast.ts), which
+ *     aimeat_dm_broadcast_summary reads too (feature audit 2026-11-19, 4.4 item 5).
  *   2026-11-15 — POST /v1/messages asks the team approval gate before the send turn (services/team/action-gate.ts, T7).
  *   2026-11-10 — GET /v1/messages/conversations takes waiting, since, limit and preview (additive), with
  *     `total`: the Home's waiting band reads the five threads it shows, not the whole list.
@@ -114,7 +117,8 @@ import { Router, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
-import { requireAuth, requireRole, requireScope, requireExternalPrincipal, requireLocalSession } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope, requireScope, requireExternalPrincipal, requireLocalSession } from '../auth/middleware.js';
+import { callerOf } from '../middleware/caller.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { conversationIdFor, deliveryTargetFor, isAddressableRecipient } from '../utils/messaging.js';
@@ -135,7 +139,7 @@ import { provenanceDeclarationRefusal } from '../services/ai/provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai/provenance-marks.js';
 import { mintMessageProvenance, withMessageProvenance } from '../services/message/provenance.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
-import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message/broadcast.js';
+import { broadcastFromPrincipal, broadcastProvenanceStamp, broadcastSummary } from '../services/message/broadcast.js';
 import { isOperatorCaller } from '../services/operator/override.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner/mailbox-reads.js';
@@ -456,36 +460,21 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── GET /v1/messages/broadcast/:id — aggregated results (recipients + delivery/poll answers) ── */
-  router.get('/v1/messages/broadcast/:id', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
-    const senderGhii = resolve(req);
-    const broadcastId = req.params.id as string;
-    const copies = (await storage.listDmsByBroadcast(broadcastId, senderGhii)).filter(m => m.direction === 'outbound');
-    if (copies.length === 0) {
+  // The owner reads the owner's broadcasts; an agent holding messages:read reads the ones it sent
+  // itself (aimeat_dm_broadcast_summary), keyed by its own identity, never its owner's or a sibling's.
+  // An app grant and an ecosystem app stay refused, as requireRole('owner') refused them.
+  router.get('/v1/messages/broadcast/:id', requireAuth(), requireLocalSession(), requireRoleOrScope('owner', 'messages:read'), async (req, res) => {
+    const kind = callerOf(req, config.nodeId, storage).kind;
+    if (kind !== 'owner' && kind !== 'agent') {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'A broadcast\'s results are read by whoever sent it.'));
+      return;
+    }
+    const summary = await broadcastSummary(storage, resolve(req), req.params.id as string);
+    if (!summary) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such broadcast'));
       return;
     }
-    // For each outbound copy, find the recipient's reply (used by the poll results in Phase 2).
-    const recipients = await Promise.all(copies.map(async (m) => {
-      const replies = await storage.listConversation(senderGhii, m.conversationId, { perPage: 200 });
-      const answer = replies.messages.find(r => r.direction === 'inbound' && r.replyToId === m.id && r.interactive?.role === 'answers');
-      return {
-        recipient: m.recipientGhii,
-        status: m.status,
-        answered: !!answer,
-        answers: answer?.interactive?.role === 'answers' ? answer.interactive.answers : undefined,
-      };
-    }));
-    const first = copies[0];
-    res.json(success(config.nodeId, {
-      broadcast_id: broadcastId,
-      mode: first.respondable === false ? 'announcement' : 'broadcast',
-      interactive: first.interactive ?? null,
-      total: recipients.length,
-      delivered: recipients.filter(r => r.status === 'delivered' || r.status === 'read').length,
-      read: recipients.filter(r => r.status === 'read').length,
-      answered: recipients.filter(r => r.answered).length,
-      recipients,
-    }));
+    res.json(success(config.nodeId, summary));
   });
 
   /* ── The four mailbox READS. ──

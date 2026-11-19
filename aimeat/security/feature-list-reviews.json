@@ -241,9 +241,11 @@
         "aimeat/src/routes/connections.ts",
         "aimeat/src/services/mailbox.ts",
         "aimeat/src/services/refinery",
-        "aimeat/src/routes/unfurl.ts"
+        "aimeat/src/routes/unfurl.ts",
+        "aimeat/src/services/message/broadcast.ts",
+        "aimeat/src/tool-catalog/definitions/broadcast-summary.ts"
       ],
-      "digest": "sha256:244c248f449ea37f65d74ced"
+      "digest": "sha256:05282ae305551feaa129008e"
     },
     "13. Notifications, boards and live updates": {
       "reviewedOn": "2026-11-19",
@@ -796,7 +798,7 @@
     },
     "12. Messages, contacts and email": {
       "aimeat/src/routes/outbound.ts": "bdb77e334bc4bd61",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "bdc50dac9676dad9",
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "f78244c998428584",
       "aimeat/src/tool-catalog/definitions/dm-groups.ts": "abb2efa534fe1126",
       "aimeat/src/tool-catalog/definitions/dm-reactions.ts": "7aed76c7b8c2db88",
       "aimeat/src/tool-catalog/definitions/connections.ts": "6f921f29104aea7d",
@@ -810,7 +812,9 @@
       "aimeat/src/services/refinery/runs.ts": "5f36c34ae12f0f1b",
       "aimeat/src/services/refinery/schedule-input.ts": "0bd52a64f9284078",
       "aimeat/src/services/refinery/scheduled-job.ts": "0edfa3c9bf212605",
-      "aimeat/src/routes/unfurl.ts": "c44dfb0704c68d51"
+      "aimeat/src/routes/unfurl.ts": "c44dfb0704c68d51",
+      "aimeat/src/services/message/broadcast.ts": "5fd4c2f8d1d26ce3",
+      "aimeat/src/tool-catalog/definitions/broadcast-summary.ts": "a95f488c0bf00ab2"
     },
     "13. Notifications, boards and live updates": {
       "aimeat/src/tool-catalog/definitions/boards.ts": "6421b7424f17daa1",

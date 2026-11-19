@@ -69142,7 +69142,11 @@ paths:
     get:
       operationId: getBroadcastResults
       summary: Aggregated broadcast results
-      description: Recipients, delivered/read/answered counts, and (for polls) each recipient's answers.
+      description: |
+        Recipients, delivered/read/answered counts, and (for polls) each recipient's answers.
+        The owner reads the owner's broadcasts; an agent holding `messages:read` reads the broadcasts
+        it sent itself, never its owner's or another agent's; an app grant and an ecosystem app are
+        refused. Also `aimeat_dm_broadcast_summary`.
       tags: [Direct Messages]
       security:
         - BearerAuth: []

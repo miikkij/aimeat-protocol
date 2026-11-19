@@ -12,6 +12,7 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes, caller)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-11-19 — aimeat_dm_broadcast_summary: the results of a broadcast the agent sent (feature audit 2026-11-19, 4.4 item 5).
  *   2026-11-15 — aimeat_dm_send, aimeat_dm_ask and aimeat_dm_send_as_owner ask the team approval gate
  *     before the send turn (services/team/action-gate.ts, T7).
  *   2026-10-27 — aimeat_dm_send and aimeat_dm_ask bind a named conversation_id to the sender
@@ -94,7 +95,7 @@ import { deleteOwnerMessage } from '../services/direct-message-delete.js';
 import { delegateReaderFor, readOwnerOverview, readOwnerThread, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner/mailbox-reads.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { sendGroupMessage } from '../services/conversation/group.js';
-import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message/broadcast.js';
+import { broadcastFromPrincipal, broadcastProvenanceStamp, broadcastSummary } from '../services/message/broadcast.js';
 import type { DeliveryCtx } from '../services/message/delivery.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -363,6 +364,23 @@ export function registerDmMessageTools(
                     }, null, 2),
                 }],
             };
+        },
+    );
+
+    // ── aimeat_dm_broadcast_summary — the results of a broadcast this agent sent ──
+    // Mirrors GET /v1/messages/broadcast/:id: services/message/broadcast.ts broadcastSummary, keyed by
+    // the session's own identity, so an agent finds only the broadcasts it sent.
+    mcp.registerTool(
+        'aimeat_dm_broadcast_summary',
+        {
+            description: descriptionFor('aimeat_dm_broadcast_summary'),
+            inputSchema: zodShapeFor('aimeat_dm_broadcast_summary'),
+            annotations: annotationsFor('aimeat_dm_broadcast_summary'),
+        },
+        async ({ broadcast_id }) => {
+            const summary = await broadcastSummary(storage, getAgentGaii(), broadcast_id);
+            if (!summary) return { ...toolError('NOT_FOUND', 'No such broadcast among the ones you sent.') };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(summary, null, 2) }] };
         },
     );
 

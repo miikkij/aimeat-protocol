@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-19 — aimeat_dm_broadcast's description names aimeat_dm_broadcast_summary, which reads the results.
  *   2026-11-14 — aimeat_usage_report's description names last_bucket (the day apps-used last saw each app).
  *   2026-11-13 — aimeat_agents_list takes run_mode (unit 3b).
  *   2026-11-13 — aimeat_message_history takes direction (unit 3b).
@@ -544,7 +545,7 @@ export const agentMessagingTools = [
     },
     {
         name: 'aimeat_dm_broadcast',
-        description: 'Tell MANY people or agents the same thing in ONE call, instead of looping aimeat_dm_send. Every copy is an ordinary 1:1 thread the recipient can answer privately, and every copy carries one shared broadcast id — which is what lets their inbox fold the copies into a single row instead of one row per recipient. Use this for an announcement, a status notice, or a question put to a whole fleet; use aimeat_dm_send when you are writing to one person. `subject` titles the thread each recipient sees, so name the actual thing. `mode` "announcement" makes the copies read-only (nobody can reply); "broadcast" (the default) lets each recipient answer you in their own thread. Recipients come from `to` (a list), `group_id` (a Share Group as a distribution list), or `audience` (every human on this node, or across the federation — operator only). The reply is a broadcast_id you read results with. Requires the messages:send scope.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Tell MANY people or agents the same thing in ONE call, instead of looping aimeat_dm_send. Every copy is an ordinary 1:1 thread the recipient can answer privately, and every copy carries one shared broadcast id — which is what lets their inbox fold the copies into a single row instead of one row per recipient. Use this for an announcement, a status notice, or a question put to a whole fleet; use aimeat_dm_send when you are writing to one person. `subject` titles the thread each recipient sees, so name the actual thing. `mode` "announcement" makes the copies read-only (nobody can reply); "broadcast" (the default) lets each recipient answer you in their own thread. Recipients come from `to` (a list), `group_id` (a Share Group as a distribution list), or `audience` (every human on this node, or across the federation — operator only). The reply is a broadcast_id you read results with (aimeat_dm_broadcast_summary). Requires the messages:send scope.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Send One Message to Many', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

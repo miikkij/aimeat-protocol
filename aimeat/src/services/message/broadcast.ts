@@ -10,9 +10,12 @@
  *   'announcement' marks the copies non-respondable (the recipient cannot reply); 'broadcast' is a normal
  *   message each recipient can reply to (a 1:1 thread). Polls (an `interactive` question spec) ride the
  *   same fan-out — see Phase 2.
- * @structure resolveAudience(ctx, senderGhii, sel) → string[] · sendBroadcast(ctx, input) → BroadcastResult
+ * @structure resolveAudience(ctx, senderGhii, sel) → string[] · sendBroadcast(ctx, input) → BroadcastResult ·
+ *   broadcastSummary(storage, senderGhii, id)
  * @usage import { resolveAudience, sendBroadcast } from './broadcast.js';
  * @version-history
+ *   v1.9.0 — 2026-11-19 — broadcastSummary(): the results of one broadcast, moved out of GET
+ *     /v1/messages/broadcast/:id unchanged, for aimeat_dm_broadcast_summary (feature audit 2026-11-19, 4.4 item 5).
  *   v1.8.0 — 2026-11-15 — broadcastFromPrincipal asks the team approval gate first (services/team/action-gate.ts, T7).
  *   v1.7.0 — 2026-10-08 — broadcastProvenanceStamp() hashes with messageProvenanceContent(), the one
  *     rule every message send uses (body plus the questions as stored), and takes the session's
@@ -352,4 +355,37 @@ export async function broadcastToFederation(
     }
   }
   return { peers: count };
+}
+
+/**
+ * The results of one broadcast `senderGhii` sent: each recipient with the copy's status and its poll
+ * answer, and the counts delivered, read and answered. Null when that sender has no such broadcast.
+ * GET /v1/messages/broadcast/:id and aimeat_dm_broadcast_summary both read it, each for the identity
+ * that sent: the owner reads the owner's broadcasts, an agent its own.
+ */
+export async function broadcastSummary(storage: Storage, senderGhii: string, broadcastId: string) {
+  const copies = (await storage.listDmsByBroadcast(broadcastId, senderGhii)).filter(m => m.direction === 'outbound');
+  if (copies.length === 0) return null;
+  // For each outbound copy, find the recipient's reply (used by the poll results in Phase 2).
+  const recipients = await Promise.all(copies.map(async (m) => {
+    const replies = await storage.listConversation(senderGhii, m.conversationId, { perPage: 200 });
+    const answer = replies.messages.find(r => r.direction === 'inbound' && r.replyToId === m.id && r.interactive?.role === 'answers');
+    return {
+      recipient: m.recipientGhii,
+      status: m.status,
+      answered: !!answer,
+      answers: answer?.interactive?.role === 'answers' ? answer.interactive.answers : undefined,
+    };
+  }));
+  const first = copies[0];
+  return {
+    broadcast_id: broadcastId,
+    mode: first.respondable === false ? 'announcement' : 'broadcast',
+    interactive: first.interactive ?? null,
+    total: recipients.length,
+    delivered: recipients.filter(r => r.status === 'delivered' || r.status === 'read').length,
+    read: recipients.filter(r => r.status === 'read').length,
+    answered: recipients.filter(r => r.answered).length,
+    recipients,
+  };
 }

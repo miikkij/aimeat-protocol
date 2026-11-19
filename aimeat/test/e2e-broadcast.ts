@@ -6,6 +6,9 @@
 // and GET /v1/messages/broadcast/:id aggregates the results.
 //
 // Version history:
+//   2026-11-19 — Tests 15 and 16: an agent reads the results of the broadcast it sent, over MCP
+//     (aimeat_dm_broadcast_summary) and REST, never another account's, and not without messages:read
+//     (feature audit 2026-11-19, 4.4 item 5).
 //   2026-11-15 — Audit L035: test 5 expects exactly one recipient, and Bob outside the group gets nothing.
 //   2026-09-24 — The limit test is number 14 (there was a test 10 already), and it names the ACCOUNT:
 //     the limit moved into the send services and counts the owner and their agents together.
@@ -39,6 +42,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(priv: string, message: string): Promise<string> {
@@ -503,6 +507,37 @@ await test('14. THE LIMIT: sends and broadcasts share one per-minute limit per a
         body: JSON.stringify({ to: bob.ghii, body: 'somebody else, not held back' }),
     }, 0);
     assert(other.status === 201, `another sender was held back by this one's burst: ${other.status}`);
+});
+
+await test('15. From the chat: an agent sends a broadcast and reads its results with aimeat_dm_broadcast_summary', async () => {
+    const dave = await registerWithPassword(BASE, `bcdave${stamp}`);
+    const agent = await makeAgent(BASE, dave, ['messages:send', 'messages:read']);
+    const s = await openSession(BASE, agent.token, 'e2e-broadcast-summary');
+    const sent = await callTool(s, 'aimeat_dm_broadcast', { to: [bob.ghii, carol.ghii], mode: 'broadcast', body: 'From the chat, to two.' });
+    assert(!sent.isError && typeof sent.data.broadcast_id === 'string', `broadcast: ${sent.text.slice(0, 300)}`);
+    const id = sent.data.broadcast_id as string;
+    const r = await callTool(s, 'aimeat_dm_broadcast_summary', { broadcast_id: id });
+    assert(!r.isError && r.data.broadcast_id === id && r.data.total === 2 && r.data.mode === 'broadcast', `summary: ${r.text.slice(0, 300)}`);
+    const who = (r.data.recipients as any[]).map(x => x.recipient).sort();
+    assert(JSON.stringify(who) === JSON.stringify([bob.ghii, carol.ghii].sort()), `the two recipients: ${JSON.stringify(who)}`);
+    // The same answer over REST, for the agent that sent it.
+    const rest = await json(`/v1/messages/broadcast/${id}`, { headers: { Authorization: `Bearer ${agent.token}` } });
+    assert(rest.status === 200 && rest.body.data.total === 2, `REST by the agent: ${rest.status}`);
+    // Alice's broadcast is not the agent's to read, over MCP or REST.
+    const notMine = await callTool(s, 'aimeat_dm_broadcast_summary', { broadcast_id: bcId });
+    assert(notMine.isError && /^NOT_FOUND: /.test(notMine.text), `another account's broadcast: ${notMine.text.slice(0, 200)}`);
+    assert((await json(`/v1/messages/broadcast/${bcId}`, { headers: { Authorization: `Bearer ${agent.token}` } })).status === 404, 'REST: another account\'s broadcast is 404');
+});
+
+await test('16. An agent without messages:read reads no results, and its owner still reads their own', async () => {
+    const erin = await registerWithPassword(BASE, `bcerin${stamp}`);
+    const agent = await makeAgent(BASE, erin, ['messages:send']);
+    const s = await openSession(BASE, agent.token, 'e2e-broadcast-summary-noscope');
+    const r = await callTool(s, 'aimeat_dm_broadcast_summary', { broadcast_id: bcId });
+    assert(r.isError, `refused: ${r.text.slice(0, 200)}`);
+    assert((await json(`/v1/messages/broadcast/${bcId}`, { headers: { Authorization: `Bearer ${agent.token}` } })).status === 403, 'REST without the word is 403');
+    const own = await json(`/v1/messages/broadcast/${bcId}`, { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(own.status === 200 && own.body.data.total === 2, `the owner in person: ${own.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);

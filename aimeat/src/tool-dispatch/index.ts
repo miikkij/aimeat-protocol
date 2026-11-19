@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.29.0 -- 2026-11-19 -- broadcastSummaryCliTools: aimeat_dm_broadcast_summary.
  *   v1.28.0 -- 2026-11-19 -- organismApprovalCliTools: aimeat_organism_approval_request and aimeat_organism_approvals.
  *   v1.27.0 -- 2026-11-19 -- moderationCliTools: the flag and appeal review tools.
  *   v1.26.0 -- 2026-11-19 -- ecosystemCliTools: aimeat_ecosystem_app_list and aimeat_ecosystem_app_revoke.
@@ -104,6 +105,7 @@ import { csmCliTools } from './tool-call-defs-csm.js';
 import { ecosystemCliTools } from './tool-call-defs-ecosystem.js';
 import { moderationCliTools } from './tool-call-defs-moderation.js';
 import { organismApprovalCliTools } from './tool-call-defs-organism-approvals.js';
+import { broadcastSummaryCliTools } from './tool-call-defs-broadcast-summary.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -171,6 +173,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...ecosystemCliTools,
     ...moderationCliTools,
     ...organismApprovalCliTools,
+    ...broadcastSummaryCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**
