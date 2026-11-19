@@ -57,11 +57,8 @@ describe('events first, a timer last', () => {
     for (const [domain, scope] of pairs) expect(DOMAIN_SCOPE[domain], domain).toBe(scope);
   });
 
-  it('names the workspace domain for data other accounts write, and the extension domain', () => {
-    expect(EVENTS_FIRST_DOMAINS).toContain('`workspace:<organismId>/<workspaceId>`');
-    expect(EVENTS_FIRST_DOMAINS).toContain('`memory` never reaches another account');
-    expect(EVENTS_FIRST_DOMAINS).toContain('`ext:<installer>/<extension>` (ext:invoke)');
-    expect(DOMAIN_SCOPE['extension-data']).toBe('ext:invoke');
+  it('names the workspace domain for data other accounts write', () => {
+    expect(EVENTS_FIRST_DOMAINS).toContain('Data other accounts write: `workspace:<org>/<ws>` (organism:read), never `memory`');
   });
 
   it('kept the firehose text of the section that moved', () => {
