@@ -10,11 +10,14 @@
  * @usage
  *   const r = shareBodyFromToolInput({ space: 'docs', id: 'doc-1', shared: true, until: '2027-01-31' });
  * @version-history
+ *   v1.1.0 — 2026-11-19 — `ics_key`: "new" makes the calendar feed key (body ics_key true) and
+ *     "clear" ends it (null), so an AI can make the calendar feed address from the chat (feature
+ *     audit 2026-11-19, 4.4 item 4).
  *   v1.0.0 — 2026-10-16 — Initial.
  */
 
 export interface ShareToolInput {
-    space?: unknown; id?: unknown; shared?: unknown; access?: unknown; password?: unknown; until?: unknown;
+    space?: unknown; id?: unknown; shared?: unknown; access?: unknown; password?: unknown; until?: unknown; ics_key?: unknown;
 }
 
 /** The share body for one target: a page (`space` + `id`), a space (`space`) or the workspace (neither). */
@@ -31,6 +34,10 @@ export function shareBodyFromToolInput(input: ShareToolInput): { body: Record<st
     if (input.password !== undefined) body.password = input.password;
     if (input.until !== undefined && input.until !== null && input.until !== '') {
         body.until = { [target]: input.until === 'none' ? null : input.until };
+    }
+    if (input.ics_key !== undefined && input.ics_key !== null) {
+        if (input.ics_key !== 'new' && input.ics_key !== 'clear') return { error: '`ics_key` is "new" (make a feed key; it ends the one before) or "clear" (end it).' };
+        body.ics_key = input.ics_key === 'new' ? true : null;
     }
     return { body };
 }

@@ -116,11 +116,13 @@
         "aimeat/src/routes/organisms/workspace-transfer.ts",
         "aimeat/src/routes/organisms/teams.ts",
         "aimeat/src/services/calendar-feed.ts",
+        "aimeat/src/services/workspace/share.ts",
+        "aimeat/src/services/workspace/share-input.ts",
         "aimeat/src/services/workspace-rows",
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:afafda9f610e742d9ae7c23f"
+      "digest": "sha256:60782b8fe616dd8f92dfb281"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-19",
@@ -623,7 +625,7 @@
       "aimeat/src/services/open-items.ts": "7f41fc9dab8fd03a"
     },
     "6. Organisms, workspaces and knowledge": {
-      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "ddd271b2249e51bc",
+      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "f1b48df2e1da166a",
       "aimeat/src/tool-catalog/definitions/workspace-spaces.ts": "a1a3d7cca99de61a",
       "aimeat/src/services/organism-join-requests/access-targets.ts": "e65a66f0ad193e20",
       "aimeat/src/services/organism-join-requests/requests.ts": "67a2eb271e9fb2a9",
@@ -633,6 +635,8 @@
       "aimeat/src/routes/organisms/workspace-transfer.ts": "be3053921b467bd0",
       "aimeat/src/routes/organisms/teams.ts": "08ae9e4c24f9a938",
       "aimeat/src/services/calendar-feed.ts": "8f7f8a44603aefc9",
+      "aimeat/src/services/workspace/share.ts": "bad7652d74e4b1e9",
+      "aimeat/src/services/workspace/share-input.ts": "704c313c49d49621",
       "aimeat/src/services/workspace-rows/row-revisions.ts": "2f605de731f5cceb",
       "aimeat/src/services/workspace-rows/row-schema.ts": "31e80cbaff854066",
       "aimeat/src/services/workspace-rows/row-service.ts": "49298be1c9a26910",

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-19 — aimeat_workspace_share forwards ics_key through shareBodyFromToolInput.
  *   2026-11-15 — aimeat_organism_import forwards preview, people and team (team setup T12).
  *   2026-11-13 — aimeat_workspace_read forwards archived=only to .../workspace/index (unit 3b).
  *   2026-11-13 — aimeat_organism_list forwards visibility on both of its reads (unit 3b).
@@ -516,6 +517,7 @@ export const organismTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const built = shareBodyFromToolInput({
                 space: input.space, id: input.id, shared: input.shared, access: input.access, password: input.password, until: input.until,
+                ics_key: input.ics_key,
             });
             if ('error' in built) throw new Error(built.error);
             return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace/share${query({ ws: requiredString(input, 'ws') })}`, built.body as JsonObject);

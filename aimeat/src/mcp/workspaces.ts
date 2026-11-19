@@ -17,6 +17,7 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-19 — aimeat_workspace_share takes ics_key, the calendar feed key of the same share route.
  *   2026-11-15 — aimeat_workspace_object_delete asks the workspace write rule (checkOrganismNamespaceAccess,
  *     'write', on the record key) as aimeat_workspace_write and DELETE /v1/memory/:key do: a member
  *     without the contributor role is refused with CONSENT_REQUIRED (E2E audit M073).
@@ -470,10 +471,10 @@ export function registerWorkspaceTools(
     mcp.registerTool('aimeat_workspace_share', { description: descriptionFor('aimeat_workspace_share'),
         inputSchema: zodShapeFor('aimeat_workspace_share'),
         annotations: annotationsFor('aimeat_workspace_share') },
-        async ({ organism_id, ws, space, id, shared, access, password, until }): Promise<TextResult> => {
+        async ({ organism_id, ws, space, id, shared, access, password, until, ics_key }): Promise<TextResult> => {
             // services/workspace/share.ts: membership, the creator-or-admin rule, the merge, the end
             // dates and the HTML page default, the same code PUT /v1/organisms/:id/workspace/share runs.
-            const input = shareBodyFromToolInput({ space, id, shared, access, password, until });
+            const input = shareBodyFromToolInput({ space, id, shared, access, password, until, ics_key });
             if ('error' in input) return toolError('INVALID_INPUT', input.error);
             const session = caller();
             // Opening it to anyone with the link asks the node's publish gate, as the PUT does; on an

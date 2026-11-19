@@ -11,12 +11,17 @@
  *   opening it when it is made again or cleared; the share state never shows the key or its hash.
  *   Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-calendar-feed
+ *   The last two tests hold the same key from the chat: aimeat_workspace_share with ics_key makes
+ *   the key the feed opens with and ends it, and a plain member's agent is refused.
  * @version-history
+ *   v1.2.0 — 2026-11-19 — aimeat_workspace_share takes ics_key: the creator's agent makes and ends
+ *     the feed key over MCP, a plain member's agent is refused (feature audit 2026-11-19, 4.4 item 4).
  *   v1.1.0 — 2026-10-13 — A shared event space with no event yet answers an empty calendar.
  *   v1.0.0 — 2026-10-13 — Written before the code: on the node as it stood, format=ics answered
  *     JSON and ics_key was not a field of the share.
  */
 import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -41,6 +46,8 @@ const stamp = Date.now();
 let A: Auth = {};
 let B: Auth = {};
 let aName = '';
+let aOwner = { name: '', token: '' };
+let bOwner = { name: '', token: '' };
 let orgId = '';
 const WS = 'ws-cal';
 const WS2 = 'ws-other';
@@ -58,8 +65,11 @@ async function run() {
   await test('Setup: the creator, a plain member, an organism and a workspace with an event space and a note space', async () => {
     const a = await registerOwner(BASE, `cala${stamp}`);
     aName = a.name;
+    aOwner = { name: a.name, token: a.token };
     A = { Authorization: `Bearer ${a.token}` };
-    B = { Authorization: `Bearer ${(await registerOwner(BASE, `calb${stamp}`)).token}` };
+    const b = await registerOwner(BASE, `calb${stamp}`);
+    bOwner = { name: b.name, token: b.token };
+    B = { Authorization: `Bearer ${b.token}` };
     const o = await call('/v1/organisms', { method: 'POST', headers: A, body: JSON.stringify({ name: `Cal Org ${stamp}`, description: 'x', type: 'project', join_policy: 'open', visibility: 'public' }) });
     assert(o.status === 201, `org ${o.status}: ${o.text}`);
     orgId = o.body.data.organism.id;
@@ -208,6 +218,32 @@ async function run() {
     assert(undeclared.status === 404, `a space the workspace does not declare: expected 404, got ${undeclared.status}`);
     // In the first workspace the note space is not opened by the share: empty or not, it stays 404.
     assert((await call(feed('&space=note&format=ics'), { headers: B })).status === 404, 'a space the share does not open is still 404');
+  });
+
+  await test('from the chat: the creator\'s agent makes the feed key with aimeat_workspace_share, and the key opens the feed', async () => {
+    const agent = await makeAgent(BASE, aOwner, ['memory:read', 'memory:write']);
+    const s = await openSession(BASE, agent.token, 'e2e-calendar-feed');
+    const made = await callTool(s, 'aimeat_workspace_share', { organism_id: orgId, ws: WS, space: 'event', shared: true, ics_key: 'new' });
+    assert(!made.isError, `made: ${made.text.slice(0, 300)}`);
+    const chatKey = made.data.ics_key as string;
+    assert(typeof chatKey === 'string' && chatKey.length >= 40, `a key in the answer, got ${JSON.stringify(made.data).slice(0, 300)}`);
+    assert(String(made.data.ics_url).includes(`key=${chatKey}`) && String(made.data.ics_url).includes('format=ics'), `the feed address: ${made.data.ics_url}`);
+    assert(made.data.share.has_ics_key === true && !JSON.stringify(made.data.share).includes(chatKey), 'the share says there is a key and does not carry it');
+    const r = await call(feed(`&space=event&format=ics&key=${chatKey}`));
+    assert(r.status === 200 && events(r.text) === 3, `the feed with the chat's key: ${r.status}, ${events(r.text)} events`);
+    const cleared = await callTool(s, 'aimeat_workspace_share', { organism_id: orgId, ws: WS, space: 'event', shared: true, ics_key: 'clear' });
+    assert(!cleared.isError && cleared.data.share.has_ics_key === false, `cleared: ${cleared.text.slice(0, 300)}`);
+    assert((await call(feed(`&space=event&format=ics&key=${chatKey}`))).status === 401, 'the cleared key no longer opens the feed');
+    const bad = await callTool(s, 'aimeat_workspace_share', { organism_id: orgId, ws: WS, space: 'event', shared: true, ics_key: 'yes' });
+    assert(bad.isError, `a value that is neither new nor clear is refused: ${bad.text.slice(0, 200)}`);
+  });
+
+  await test('from the chat: a plain member\'s agent cannot make a feed key', async () => {
+    const agent = await makeAgent(BASE, bOwner, ['memory:read', 'memory:write']);
+    const s = await openSession(BASE, agent.token, 'e2e-calendar-feed-member');
+    const r = await callTool(s, 'aimeat_workspace_share', { organism_id: orgId, ws: WS, space: 'event', shared: true, ics_key: 'new' });
+    assert(r.isError && r.offered, `refused by the share rule: ${r.text.slice(0, 300)}`);
+    assert(r.data?.ics_key === undefined && !/key=[A-Za-z0-9_-]{20,}/.test(r.text), 'and no key in the refusal');
   });
 
   console.log(`\n${passed} passed, ${failed} failed\n`);

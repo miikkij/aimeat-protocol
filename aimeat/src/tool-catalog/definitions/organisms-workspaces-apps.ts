@@ -5,6 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-19 — aimeat_workspace_share takes ics_key ("new" or "clear"), the calendar feed key the
+ *     share route makes (feature audit 2026-11-19, 4.4 item 4).
  *   2026-11-15 — aimeat_organism_import takes preview, people and team (team setup T12).
  *   2026-11-14 — aimeat_workspace_create asks for the manifest's "i18n" labels in en, fi and es.
  *   2026-11-13 — aimeat_workspace_read takes archived ('only') (unit 3b).
@@ -540,7 +542,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_share',
-        description: 'Share a published page, a whole document space or the whole workspace OUTSIDE the organism, and get the link to hand out. Name a page with `space` + `id`, a space with `space` alone, the workspace with neither. `shared: false` stops sharing it. `access` is who may open the link: "open" (anyone with it), "account" (anyone signed in to this node), "organism" (only the members of this workspace\'s organism) or "password" (give `password`, 4–128 characters); it applies to everything the workspace shares. `until` (an ISO date) ends the share then, "none" removes the end; an HTML page shared with no end lasts 90 days, a Markdown page has no end. Only published pages are ever shown, so publish first (aimeat_workspace_publish). The answer carries `viewer_url`, the address to give the person, and for an HTML page also `window_url`, the page alone in the whole browser window. Only the workspace creator or an organism admin, or their own agent, may change sharing. When the node asks the owner before making something public, opening the link to anyone stores the rest of the change and answers with publish_request: tell the owner what waits and give them its approve_url.',
+        description: 'Share a published page, a whole document space or the whole workspace OUTSIDE the organism, and get the link to hand out. Name a page with `space` + `id`, a space with `space` alone, the workspace with neither. `shared: false` stops sharing it. `access` is who may open the link: "open" (anyone with it), "account" (anyone signed in to this node), "organism" (only the members of this workspace\'s organism) or "password" (give `password`, 4–128 characters); it applies to everything the workspace shares. `until` (an ISO date) ends the share then, "none" removes the end; an HTML page shared with no end lasts 90 days, a Markdown page has no end. Only published pages are ever shown, so publish first (aimeat_workspace_publish). The answer carries `viewer_url`, the address to give the person, and for an HTML page also `window_url`, the page alone in the whole browser window. Only the workspace creator or an organism admin, or their own agent, may change sharing. When the node asks the owner before making something public, opening the link to anyone stores the rest of the change and answers with publish_request: tell the owner what waits and give them its approve_url. A shared space of calendar events is also a calendar feed that Google, Apple or Outlook calendar subscribes to: `ics_key: "new"` makes its secret key and answers `ics_key` and `ics_url` once (put the space name in place of <space>, and the node address before it); give the address to the person, because the node keeps only its hash. A new key ends the one before, "clear" ends it. An open share needs no key.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Share Workspace Pages', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -556,6 +558,7 @@ export const organismsWorkspacesAppsTools = [
             access: { type: 'string', enum: ['open', 'account', 'organism', 'password'], description: 'Who may open the link: open (anyone with it), account (anyone signed in to this node), organism (only the members of this workspace\'s organism), password (with `password`).' },
             password: { type: 'string', description: 'The share password, 4–128 characters, when access is "password". Tell the person; the node keeps only its hash.' },
             until: { type: 'string', description: 'When the share ends, as an ISO date such as 2027-01-31; "none" removes the end. Left out: no change, and an HTML page newly shared ends after 90 days.' },
+            ics_key: { type: 'string', enum: ['new', 'clear'], description: 'The calendar feed key: "new" makes one (shown once in the answer, and it ends the one before), "clear" ends it. Left out: no change.' },
         },
     },
     {
