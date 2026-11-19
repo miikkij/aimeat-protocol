@@ -29,7 +29,7 @@ import { runSubscriptionRenewals } from '../src/commerce/subscriptions.js';
 import { runAsNode } from '../src/utils/gaii.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { registerOwner } from './helpers/owner-login.js';
-import { BASE as RUNNER_BASE, assert, finish, json as runnerJson, test } from './helpers/harness.js';
+import { BASE as RUNNER_BASE, assert, expectRefusal, finish, json as runnerJson, test } from './helpers/harness.js';
 
 const PORT = Number(new URL(RUNNER_BASE).port || '40251') + 263;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -110,7 +110,7 @@ try {
     reader = await reg('renreader');
     decliner = await reg('rendecline');
     const inst = await json('/v1/extensions', { method: 'POST', headers: auth(studio.token), body: JSON.stringify({ manifest, scripts: SCRIPTS }) });
-    assert(inst.status === 201 || inst.status === 200, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    assert(inst.status === 201, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
     const act = await json(`/v1/extensions/${EXT}/activate`, { method: 'POST', headers: auth(studio.token) });
     assert(act.status === 200, `activate ${act.status}`);
     const p = await setPrice(2_000_000);
@@ -177,7 +177,9 @@ try {
 
   await test('2d. FAILURE: another account cannot answer the reader\'s question', async () => {
     const d = await json(`/v1/publish-requests/${requestId}/decision`, { method: 'POST', headers: auth(studio.token), body: JSON.stringify({ decision: 'approve' }) });
-    assert(d.status === 404 || d.status === 403, `the seller is refused: ${d.status} ${JSON.stringify(d.body?.error)}`);
+    // The request is the reader's: to anyone else it does not exist, as for an id nobody issued.
+    expectRefusal(d, 404, 'NOT_FOUND');
+    assert(Number((await mine(reader)).amount) === 3_000_000, 'the reader\'s subscription is as the reader left it');
   });
 
   console.log('\n3. A declined card');

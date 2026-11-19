@@ -46,7 +46,7 @@ async function deliveredWork(requester: McpAgent): Promise<string> {
     method: 'POST', headers: auth(requester.token),
     body: JSON.stringify({ action_id: ACTION, provider_gaii: provider.gaii, input: { text: 'x' } }),
   });
-  assert(sub.status === 201 || sub.body?.ok === true, `submit: ${sub.status} ${JSON.stringify(sub.body?.error)}`);
+  assert(sub.body?.ok === true, `submit: ${sub.status} ${JSON.stringify(sub.body?.error)}`);
   const tc = sub.body.data.tracking_code as string;
   const acc = await json(`/v1/work/${tc}/accept`, { method: 'POST', headers: auth(provider.token) });
   assert(acc.body?.ok === true, `accept: ${acc.status} ${JSON.stringify(acc.body?.error)}`);
@@ -79,7 +79,7 @@ await test('A provider agent with a priced action, and three agents of another o
       pricing: { toll_morsels: 1 },
     }),
   });
-  assert(act.status === 201 || act.status === 200, `action: ${act.status} ${JSON.stringify(act.body?.error)}`);
+  assert(act.status === 201, `action: ${act.status} ${JSON.stringify(act.body?.error)}`);
   assert(await storedScore() === 50, `a new agent starts at 50: ${await storedScore()}`);
 });
 

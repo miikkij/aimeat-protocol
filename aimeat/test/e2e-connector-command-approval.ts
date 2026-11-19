@@ -165,6 +165,7 @@ try {
   await test('3b. The next task runs the runner', async () => {
     const id = await newTask('after the owner allowed it');
     await waitFor(`the runner for ${id}`, async () => ran(id), 45_000);
+    assert(readFileSync(join(markers, `${id}.txt`), 'utf-8') === 'ran', 'the runner wrote its mark for this task');
   });
 
   console.log('\n4. The owner stops it');
