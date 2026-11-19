@@ -78,8 +78,10 @@ export function figuresOf(s) {
 export function findingText(f) {
   const first = (f.items || [])[0] || {};
   const v = { n: String(f.count ?? 0), name: first.organism || first.legal_name || '' };
+  // A count of one has its own sentence where the language needs it ("1 organism declared itself").
+  const one = f.count === 1 ? tOr(`admin.compliance.aml.finding.${f.code}.titleOne`, '', v) : '';
   return {
-    title: AOr(`finding.${f.code}.title`, f.reason, v),
+    title: one || AOr(`finding.${f.code}.title`, f.reason, v),
     why: tOr(`admin.compliance.aml.finding.${f.code}.why`, '', v),
     proposal: f.proposal ? AOr(`proposal.${f.proposal.action}`, f.proposal.text, v) : '',
   };
@@ -161,11 +163,12 @@ function DeclarationForm({ open, onClose, current, onSaved, onMessage }) {
 
 /** The declarations as rows: who, the three roles, the registrations. */
 function declarationRows(s) {
-  return (s.declarations || []).map((d) => {
+  return (s.declarations || []).map((d, i) => {
     const where = d.scope === 'node' ? A('decl.thisServer') : (d.organism || d.organism_id);
     const roles = A('decl.roles', { officer: d.compliance_officer, manager: d.compliance_manager || '–', deputy: d.deputy || '–' });
     const registered = d.supervisor_registered_at && d.fiu_registered_at;
     return html`<${Row} key=${`${d.scope}:${d.organism_id || 'node'}`}>
+      <${Cell} sign>${String(i + 1)}<//>
       <${Name} desc=${`${where} · ${A('sector.' + d.sector)}`}>${d.legal_name}<//>
       <${Desc} sub=${A('decl.assessment', { date: day(d.risk_assessment_at) })}>${roles}<//>
       <${Cell}>${html`<${Mark} kind="status" tone=${registered ? 'fine' : 'attention'}>${A(registered ? 'decl.registered' : 'decl.notRegistered')}<//>`}<//>
@@ -231,7 +234,7 @@ export default function AmlSection({ aml, switchPage, onChanged, onMessage }) {
       ]} />
 
       <${SubHeading} rule>${A('declTitle')}<//>
-      <${List} cols="name-desc-state" empty=${A('declNone')}>${declarationRows(aml)}<//>
+      <${List} cols="n-name-desc-state" empty=${A('declNone')}>${declarationRows(aml)}<//>
 
       <${SubHeading} rule>${A('proposalsTitle')}<//>
       <${List} cols="name-desc-state-doors" empty=${A('proposalsNone')}>
@@ -255,8 +258,9 @@ export default function AmlSection({ aml, switchPage, onChanged, onMessage }) {
       <//>
 
       <${SubHeading} rule>${A('obTitle')}<//>
-      <${List} cols="name-desc-state" head=${[A('col.obligation'), A('col.evidence'), A('col.state')]}>
-        ${(aml.obligations || []).map((r) => html`<${Row} key=${r.code}>
+      <${List} cols="n-name-desc-state" head=${['', A('col.obligation'), A('col.evidence'), A('col.state')]}>
+        ${(aml.obligations || []).map((r, i) => html`<${Row} key=${r.code}>
+          <${Cell} sign>${String(i + 1)}<//>
           <${Name} desc=${refWords(r.ref)}>${AOr(`ob.${r.code}.title`, r.ref?.text || r.code)}<//>
           <${Desc}>${obligationText(r)}<//>
           <${Cell}>${stateMark(r.status)}<//>
