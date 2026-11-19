@@ -19,6 +19,8 @@
  * @structure DataWalletService.overview(ownerGaii, auditDays?, entryLimit?, opts?) → { consents, audit, permSummary, names }
  * @usage const ov = await createDataWalletService(storage).overview(resolve(req), 30);
  * @version-history
+ *   2026-11-19 — Additive: each consent carries `holder`, the identity it is filed under, so the page
+ *     names the agent that gave a consent.
  *   2026-11-19 — The consents and the trail are the account's, its agents' included, read through
  *     listAccountConsents and consentAuditOf for `opts.consentHolder`: the page neither showed nor let
  *     the person revoke a consent their agent gave, and the active count was short (feature audit 1.4).
@@ -134,6 +136,8 @@ export class DataWalletService {
             id: c.id, data_pattern: c.dataPattern, recipient: c.recipient, purpose: c.purpose,
             scope: c.scope, expires: c.expires, status: c.status, granted_at: c.grantedAt,
             revoked_at: c.revokedAt, metadata: c.metadata,
+            // Who the consent is filed under: the account, or the agent of theirs that gave it.
+            holder: c.ownerGaii,
           })),
           total: consents.length,
         },

@@ -12,6 +12,8 @@
  *   groupRow · groupOpen · eventRow
  * @usage import { targetRow, bucketRow, eventRow } from './rows.js';
  * @version-history
+ *   v1.14.0 — 2026-11-19 — A consent one of the person's agents gave names that agent under "Given
+ *     by", from the consent's `holder`, where it said "not recorded".
  *   v1.13.0 — 2026-11-09 — Grouped by who: a person's row says how many places and in which role;
  *     the agents that reach one place each are one row (foldedRow); the trail is one row per day
  *     (bucketRow: today, yesterday, earlier) whose groups load when it opens, and a group's id and
@@ -79,7 +81,10 @@ export function targetRow(ctx, row) {
 /** One grant as a row of the List; `lead` is the first cell (the workspace or the target), or null. */
 function grantLine(ctx, c, lead) {
   const g = grantWords(c, ctx.names);
-  const by = c.metadata?.grantedBy;
+  // A workspace role names its granter; a consent one of the person's agents gave is filed under
+  // that agent, so the agent's own name (the part before '#') says who gave it.
+  const holder = typeof c.holder === 'string' && c.holder.includes('#') ? c.holder.split('#')[0] : null;
+  const by = c.metadata?.grantedBy ?? holder;
   const sub = lines([
     c.purpose && g.role === 'read' && c.purpose !== 'general' ? c.purpose : null,
     c.scope === 'federation' ? x('scope.federation') : null,

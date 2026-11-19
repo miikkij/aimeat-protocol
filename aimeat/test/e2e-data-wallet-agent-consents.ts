@@ -14,6 +14,7 @@
  *   of it and cannot revoke it. The agent, which holds no consent:read-as-owner, still sees only its own.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-data-wallet-agent-consents
  * @version-history
+ *   v1.1.0 — 2026-11-19 — Each consent carries its `holder`, so the page names the agent that gave it.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, 1.4).
  */
 import { assert, BASE, expectRefusal, finish, json, test } from './helpers/harness.js';
@@ -58,6 +59,15 @@ await test('alice\'s wallet lists both consents, counts both as active, and keep
     assert(ids(w).includes(agentConsent), `the agent's consent is listed: ${JSON.stringify(ids(w))}`);
     assert(w.consents.total === w.consents.consents.length, `total ${w.consents.total} matches the list`);
     assert(w.permSummary.active_consents >= 2, `both are counted active: ${w.permSummary.active_consents}`);
+});
+
+await test('each consent says who gave it: the agent\'s carries the agent, alice\'s own carries alice', async () => {
+    const w = await wallet(alice.token);
+    const rows = w.consents.consents as any[];
+    const theirs = rows.find(c => c.id === agentConsent);
+    const hers = rows.find(c => c.id === ownConsent);
+    assert(theirs?.holder === agent.gaii, `the agent's consent is filed under the agent: ${theirs?.holder} vs ${agent.gaii}`);
+    assert(typeof hers?.holder === 'string' && !hers.holder.includes('#') && hers.holder.startsWith(`${alice.name}@`), `alice's own is filed under her: ${hers?.holder}`);
 });
 
 await test('the agent\'s grant is in alice\'s trail, on the wallet and on GET /v1/consent/audit', async () => {
