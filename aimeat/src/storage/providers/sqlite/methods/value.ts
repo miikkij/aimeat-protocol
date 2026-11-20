@@ -12,6 +12,7 @@
 import type { SqliteStorage } from '../index.js';
 import type {
   ValueKeyRow, ValueKeyDelta, ValueDailyDelta, ValueDailyFilter, ValueDailyGroup, ValueDailySum,
+  DataDailyDelta, DataDailyFilter, DataDailyGroup, DataDailySum,
 } from '../../../types/value.js';
 import * as repo from '../repos/value.js';
 
@@ -38,5 +39,14 @@ export const valueMethods = {
   },
   async foldValueDaily(this: SqliteStorage, beforeDay: string): Promise<number> {
     return repo.foldDaily(this.db, beforeDay);
+  },
+  async upsertDataDaily(this: SqliteStorage, rows: DataDailyDelta[]): Promise<void> {
+    repo.upsertData(this.db, rows);
+  },
+  async sumDataDaily(this: SqliteStorage, filter: DataDailyFilter, groupBy: DataDailyGroup[]): Promise<DataDailySum[]> {
+    return repo.sumData(this.db, filter, groupBy);
+  },
+  async pruneDataDaily(this: SqliteStorage, beforeDay: string): Promise<number> {
+    return repo.pruneData(this.db, beforeDay);
   },
 };

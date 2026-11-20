@@ -6,15 +6,17 @@
  *   per-record upsert writes the maker on insert only and adds the counts; the daily upsert adds; the
  *   fold turns old day rows into week rows (Monday) and deletes them, in one transaction. BIGINT
  *   counts arrive as strings and are converted here, at the edge.
- * @structure valueMethods · pseudonymiseValueProducerDb
- * @usage Object.assign(PostgresKyselyStorage.prototype, valueMethods) in ../index.ts
+ * @structure valueMethods · dataDailyMethods · pseudonymiseValueProducerDb
+ * @usage Object.assign(PostgresKyselyStorage.prototype, valueMethods, dataDailyMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-20 — dataDailyMethods: the data counts (migration 0136).
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 1).
  */
 import { sql } from 'kysely';
 import type { PostgresKyselyStorage } from '../index.js';
 import type {
   ValueKeyRow, ValueKeyDelta, ValueDailyDelta, ValueDailyFilter, ValueDailyGroup, ValueDailySum, ValueSignal,
+  DataDailyDelta, DataDailyFilter, DataDailyGroup, DataDailySum,
 } from '../../../types/value.js';
 
 /** BIGINT arrives as a string; a count is a number everywhere above this layer. */
@@ -168,6 +170,51 @@ export const valueMethods = {
       const res = await trx.deleteFrom('ValueDaily').where('grain', '=', 'day').where('day', '<', beforeDay).executeTakeFirst();
       return Number(res?.numDeletedRows ?? 0);
     });
+  },
+};
+
+/** The data-count columns a caller may group by; anything else is refused rather than put into SQL. */
+const DATA_GROUPABLE: ReadonlySet<DataDailyGroup> = new Set(['day', 'ownerGhii', 'kind', 'source', 'direction', 'sizeBucket', 'level', 'contentClass']);
+
+export const dataDailyMethods = {
+  async upsertDataDaily(this: PostgresKyselyStorage, input: DataDailyDelta[]): Promise<void> {
+    if (input.length === 0) return;
+    const merged = new Map<string, DataDailyDelta>();
+    for (const r of input) {
+      const id = [r.day, r.ownerGhii, r.kind, r.source, r.direction, r.sizeBucket, r.level, r.contentClass].join('\u0000');
+      const had = merged.get(id);
+      if (had) { had.count += r.count; had.bytes += r.bytes; } else merged.set(id, { ...r });
+    }
+    await this.db.insertInto('DataDaily')
+      .values([...merged.values()].map(r => ({ ...r, count: String(r.count), bytes: String(r.bytes) })))
+      .onConflict(oc => oc.columns(['day', 'ownerGhii', 'kind', 'source', 'direction', 'sizeBucket', 'level', 'contentClass']).doUpdateSet({
+        count: eb => sql`${eb.ref('DataDaily.count')} + excluded."count"`,
+        bytes: eb => sql`${eb.ref('DataDaily.bytes')} + excluded."bytes"`,
+      }))
+      .execute();
+  },
+
+  async sumDataDaily(this: PostgresKyselyStorage, f: DataDailyFilter, groupBy: DataDailyGroup[]): Promise<DataDailySum[]> {
+    const cols = groupBy.filter(g => DATA_GROUPABLE.has(g));
+    const conds = [];
+    if (f.ownerGhii) conds.push(sql`"ownerGhii" = ${f.ownerGhii}`);
+    if (f.from) conds.push(sql`"day" >= ${f.from}`);
+    if (f.to) conds.push(sql`"day" <= ${f.to}`);
+    const colList = cols.map(c => sql.ref(c));
+    const select = sql.join([...colList, sql`SUM("count")::bigint AS "count"`, sql`SUM("bytes")::bigint AS "bytes"`, sql`COUNT(DISTINCT "ownerGhii")::bigint AS "owners"`]);
+    const where = conds.length ? sql` WHERE ${sql.join(conds, sql` AND `)}` : sql``;
+    const group = cols.length ? sql` GROUP BY ${sql.join(colList)} ORDER BY ${sql.join(colList)}` : sql``;
+    const res = await sql<Record<string, unknown>>`SELECT ${select} FROM "DataDaily"${where}${group}`.execute(this.db);
+    return res.rows.map(r => {
+      const out: DataDailySum = { count: n(r.count), bytes: n(r.bytes), owners: n(r.owners) };
+      for (const c of cols) (out as unknown as Record<string, unknown>)[c] = r[c] as string;
+      return out;
+    });
+  },
+
+  async pruneDataDaily(this: PostgresKyselyStorage, beforeDay: string): Promise<number> {
+    const res = await this.db.deleteFrom('DataDaily').where('day', '<', beforeDay).executeTakeFirst();
+    return Number(res?.numDeletedRows ?? 0);
   },
 };
 

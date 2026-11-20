@@ -468,6 +468,20 @@ export interface ValueDaily {
   bytes: Generated<string>;
 }
 
+/** What data passed through, without the data (migration 0136, types/value.ts DataDailyDelta). */
+export interface DataDaily {
+  day: string;
+  ownerGhii: string;
+  kind: string;
+  source: string;
+  direction: string;
+  sizeBucket: string;
+  level: Generated<string>;
+  contentClass: Generated<string>;
+  count: Generated<string>;
+  bytes: Generated<string>;
+}
+
 /** The memory write tally: who has had their hands on a key, and how often. Permanent, no prune. */
 export interface MemoryWriteTally {
   ownerGaii: string;
@@ -2648,6 +2662,7 @@ export interface DB {
   MemoryFamilyTally: MemoryFamilyTally;
   ValueKey: ValueKey;
   ValueDaily: ValueDaily;
+  DataDaily: DataDaily;
   MemoryTotals: MemoryTotals;
   EphemeralClaim: EphemeralClaim;
   SecretShare: SecretShare;

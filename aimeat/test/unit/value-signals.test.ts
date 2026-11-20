@@ -22,6 +22,7 @@ import {
   replayValueTouches, valueRecordOf, isAiPrincipal, recordValueWrite, recordValueDelete, recordValueRead,
   flushValueSignals, initValueSignals, resetValueSignals, shutdownValueSignals,
 } from '../../src/services/value/signal-buffer.js';
+import { sourceOf, sizeBucketOf } from '../../src/services/value/data-buffer.js';
 
 const NODE = 'aimeat-local-001-dev';
 const ALICE = `alice@${NODE}`;
@@ -232,6 +233,40 @@ describe('the storage contract, the same on every provider', () => {
         { day: '2026-01-05', signal: 'used', count: 1, bytes: 0, owners: 1 },
       ]);
       answers.push(byDay);
+    }
+    if (answers.length === 2) expect(answers[1]).toEqual(answers[0]);
+  });
+});
+
+describe('the data counts', () => {
+  it('a source and a size class are told from the principal and the bytes', () => {
+    expect(sourceOf(AGENT, ALICE)).toBe('agent');
+    expect(sourceOf(ALICE, ALICE)).toBe('person');
+    expect(sourceOf(APP, ALICE)).toBe('app');
+    expect(sourceOf('ext:weather', ALICE)).toBe('extension');
+    expect(sourceOf('schedule:abc', ALICE)).toBe('automation');
+    expect(sourceOf('carol@other-node', ALICE)).toBe('federation');
+    expect([sizeBucketOf(10), sizeBucketOf(2048), sizeBucketOf(2_000_000), sizeBucketOf(20_000_000), sizeBucketOf(undefined)])
+      .toEqual(['lt1k', 'lt100k', 'lt10m', 'gte10m', 'unknown']);
+  });
+
+  it('day counts add and group the same on every provider, with the owners behind a group', async () => {
+    const answers: unknown[] = [];
+    for (const { storage } of provs) {
+      const day = '2026-02-03';
+      const base = { day, kind: 'memory', source: 'agent', direction: 'in', sizeBucket: 'lt1k', level: '', contentClass: '', count: 1, bytes: 100 };
+      await storage.upsertDataDaily([
+        { ...base, ownerGhii: `dd1-${RUN}@${NODE}` }, { ...base, ownerGhii: `dd1-${RUN}@${NODE}` },
+        { ...base, ownerGhii: `dd2-${RUN}@${NODE}`, kind: 'file', sizeBucket: 'lt10m', bytes: 5000 },
+      ]);
+      const byKind = await storage.sumDataDaily({ from: day, to: day }, ['kind']);
+      answers.push(byKind);
+      expect(byKind).toEqual([
+        { kind: 'file', count: 1, bytes: 5000, owners: 1 },
+        { kind: 'memory', count: 2, bytes: 200, owners: 1 },
+      ]);
+      expect(await storage.pruneDataDaily('2026-02-04')).toBeGreaterThanOrEqual(2);
+      expect(await storage.sumDataDaily({ from: day, to: day }, ['kind'])).toEqual([]);
     }
     if (answers.length === 2) expect(answers[1]).toEqual(answers[0]);
   });

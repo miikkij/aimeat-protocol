@@ -48,6 +48,7 @@ import { classifyKey } from '../../utils/key-family.js';
 import { logger } from '../../utils/logger.js';
 import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 import { recordValueWrite, recordValueDelete } from '../value/signal-buffer.js';
+import { recordDataWrite } from '../value/data-buffer.js';
 
 /**
  * Flush cadence when the caller names none. The counts are at most this stale; the first sighting of
@@ -125,6 +126,8 @@ export function recordMemoryTouch(t: {
     // (services/value/signal-buffer.ts). Synchronous, like this function.
     if (t.kind === 'write') recordValueWrite({ ownerGaii: t.ownerGaii, key: t.key, writerPrincipal: t.writerPrincipal, at: t.at, bytes: t.bytes, level: t.level });
     else recordValueDelete({ ownerGaii: t.ownerGaii, key: t.key, principal: t.writerPrincipal, at: t.at });
+    // And the data counts: what kind of data arrived, from whom, how large (services/value/data-buffer.ts).
+    if (t.kind === 'write') recordDataWrite({ ownerGaii: t.ownerGaii, key: t.key, principal: t.writerPrincipal, kind: 'memory', bytes: t.bytes, at: t.at });
     // A touch by or of an account being erased: the cascade deletes the account's counts and renames
     // it where it touched another account's key, so neither is started again.
     if (erasing.covers(t.ownerGaii) || erasing.covers(t.writerPrincipal)) return;

@@ -30,6 +30,7 @@
  *   pendingContentIntake · holdContentIntakeForErasure
  * @usage contentAfterStore({ storage, config }, file.ownerGaii, file.key);
  * @version-history
+ *   2026-11-20 — The class an arrived item is given is counted in the data counts (services/value/data-buffer.ts), never the item.
  *   v1.4.0 — 2026-11-14 — holdContentIntakeForErasure: before the erasure cascade, the account's
  *     waiting items are dropped and the inspection in progress answers, and no item of the account is
  *     queued until it ends. An inspection that had read the facts record before the cascade stored the
@@ -44,6 +45,7 @@
  *     arrival. It was: each fingerprint stored one, the file arrived, was fingerprinted, and stored the
  *     next, without end (4601 of one owner's 4654 fingerprints in three days).
  */
+import { recordDataClass } from '../value/data-buffer.js';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
@@ -121,7 +123,10 @@ async function inspectOne(item: Pending): Promise<void> {
     }
     const name = localAccountName(ownerGhii);
     const caller = callerFromAuth({ sub: name, owner: name, roles: ['owner'], scopes: [] }, deps.config.nodeId, deps.storage);
-    await inspectSource(deps, caller, source, { automatic: true });
+    const inspected = await inspectSource(deps, caller, source, { automatic: true });
+    // The data counts take the class the inspection gave, never the item (services/value/data-buffer.ts).
+    const cls = inspected.facts.classes?.[0]?.id;
+    if (cls) recordDataClass({ ownerGaii: source.owner, kind: source.kind === 'file' ? 'file' : isWs ? 'workspace' : 'memory', contentClass: cls });
     if (isWs && settings.stages.profile) await sharedProfileOnPublish(deps, caller, source.key);
   } catch (e) {
     logger.warn('contentclass: inspecting an arrived item failed; the write stands', { kind: source.kind, key: source.key, error: String((e as Error)?.message ?? e) });

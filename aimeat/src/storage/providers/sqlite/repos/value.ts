@@ -6,14 +6,16 @@
  *   upsert writes the maker on insert only and adds the counts; the daily upsert adds; the fold turns
  *   old day rows into week rows (Monday) and deletes them, in one transaction.
  * @structure getKeys · upsertKeys · deleteKeys · listKeys · upsertDaily · sumDaily · foldDaily ·
- *   pseudonymiseProducer
+ *   pseudonymiseProducer · upsertData · sumData · pruneData
  * @usage import * as repo from '../repos/value.js';
  * @version-history
+ *   v1.1.0 — 2026-11-20 — data_daily: upsertData, sumData, pruneData.
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 1).
  */
 import type Database from 'better-sqlite3';
 import type {
   ValueKeyRow, ValueKeyDelta, ValueDailyDelta, ValueDailyFilter, ValueDailyGroup, ValueDailySum,
+  DataDailyDelta, DataDailyFilter, DataDailyGroup, DataDailySum,
 } from '../../../types/value.js';
 
 const KEY_UPSERT = `
@@ -160,6 +162,42 @@ export function pseudonymiseProducer(db: Database.Database, ownerGhii: string, m
     n += moved.length;
   }
   return n;
+}
+
+const DATA_UPSERT = `
+  INSERT INTO data_daily (day, ownerGhii, kind, source, direction, sizeBucket, level, contentClass, count, bytes)
+  VALUES (@day, @ownerGhii, @kind, @source, @direction, @sizeBucket, @level, @contentClass, @count, @bytes)
+  ON CONFLICT(day, ownerGhii, kind, source, direction, sizeBucket, level, contentClass) DO UPDATE SET
+    count = count + excluded.count,
+    bytes = bytes + excluded.bytes
+`;
+
+const DATA_GROUPABLE: ReadonlySet<DataDailyGroup> = new Set(['day', 'ownerGhii', 'kind', 'source', 'direction', 'sizeBucket', 'level', 'contentClass']);
+
+export function upsertData(db: Database.Database, rows: DataDailyDelta[]): void {
+  if (rows.length === 0) return;
+  const stmt = db.prepare(DATA_UPSERT);
+  db.transaction((batch: DataDailyDelta[]) => { for (const r of batch) stmt.run(r); })(rows);
+}
+
+export function sumData(db: Database.Database, f: DataDailyFilter, groupBy: DataDailyGroup[]): DataDailySum[] {
+  const cols = groupBy.filter(g => DATA_GROUPABLE.has(g));
+  const where: string[] = [];
+  const args: unknown[] = [];
+  if (f.ownerGhii) { where.push('ownerGhii = ?'); args.push(f.ownerGhii); }
+  if (f.from) { where.push('day >= ?'); args.push(f.from); }
+  if (f.to) { where.push('day <= ?'); args.push(f.to); }
+  const select = [...cols, 'SUM(count) AS count', 'SUM(bytes) AS bytes', 'COUNT(DISTINCT ownerGhii) AS owners'].join(', ');
+  const sql = `SELECT ${select} FROM data_daily`
+    + (where.length ? ` WHERE ${where.join(' AND ')}` : '')
+    + (cols.length ? ` GROUP BY ${cols.join(', ')} ORDER BY ${cols.join(', ')}` : '');
+  return (db.prepare(sql).all(...args) as Array<Record<string, unknown>>).map(r => ({
+    ...r, count: Number(r.count ?? 0), bytes: Number(r.bytes ?? 0), owners: Number(r.owners ?? 0),
+  })) as DataDailySum[];
+}
+
+export function pruneData(db: Database.Database, beforeDay: string): number {
+  return db.prepare('DELETE FROM data_daily WHERE day < ?').run(beforeDay).changes;
 }
 
 /** LIKE has its own wildcards; a key holding `%` or `_` must not become a prefix match for more. */

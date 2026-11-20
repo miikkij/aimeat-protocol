@@ -77860,9 +77860,11 @@ paths:
           schema:
             type: string
             default: day
-            enum: [day, model, app, agent, tool, surface, apps-used, activity, sold, value]
+            enum: [day, model, app, agent, tool, surface, apps-used, activity, sold, value, data]
           description: >-
-            Which report to read. GET /v1/usage/reports lists them with descriptions. value is not a
+            Which report to read. GET /v1/usage/reports lists them with descriptions. data answers
+            what data of the owner's passed through the node, without the data: counts and bytes by
+            kind, source, direction, size class, classification label and content class. value is not a
             usage cut: it answers what the owner's AI made and what happened to it (kept, corrected
             by someone else, deleted within 14 days, opened by someone else), per agent, per key
             family and per goal, with the cost and the saving counted from each goal's baseline, and
@@ -77961,9 +77963,11 @@ paths:
           schema:
             type: string
             default: day
-            enum: [day, model, app, app-model, agent, user, tool, surface, apps-used, activity, provider, value, rhythm]
+            enum: [day, model, app, app-model, agent, user, tool, surface, apps-used, activity, provider, value, rhythm, data]
           description: >-
-            value and rhythm are node-wide only (a named owner is refused). value: what AI made on
+            value, rhythm and data are node-wide only (a named owner is refused). data: what data
+            passed through, without the data; a group behind fewer than five owners is left out and
+            counted, and content at the highest labels is one total, never split by content class. value: what AI made on
             the node and what happened to it, per key family; a family with fewer than five owners
             behind it is left out and counted in hidden_groups. rhythm: tool calls per feature against
             the period before, and the bursts, week and season of the node's use.

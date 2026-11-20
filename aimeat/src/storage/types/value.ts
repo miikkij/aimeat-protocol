@@ -107,6 +107,42 @@ export interface ValueDailyFilter {
 
 export type ValueDailyGroup = 'day' | 'signal' | 'producer' | 'family' | 'ownerGhii' | 'orgId' | 'wsId';
 
+/**
+ * What data passed through the node, without the data: one day's count of writes of one kind, from one
+ * source, in one direction, in one size class, at one classification level and of one content class
+ * (services/value/data-buffer.ts). No key, title, file name, field value or person's content is kept;
+ * `ownerGhii` is the person whose data it is, for their own report and for erasure.
+ */
+export interface DataDailyDelta {
+  day: string;
+  ownerGhii: string;
+  /** memory | workspace | row | file. */
+  kind: string;
+  /** person | agent | app | extension | automation | federation. */
+  source: string;
+  /** in | shared (written into an organism). */
+  direction: string;
+  /** lt1k | lt100k | lt10m | gte10m | unknown. */
+  sizeBucket: string;
+  /** The classification label id, or '' when the record has none yet. */
+  level: string;
+  /** The content class the inspection gave it (invoice, receipt …), or '' when none. */
+  contentClass: string;
+  count: number;
+  bytes: number;
+}
+
+export type DataDailyGroup = 'day' | 'ownerGhii' | 'kind' | 'source' | 'direction' | 'sizeBucket' | 'level' | 'contentClass';
+
+export interface DataDailyFilter { ownerGhii?: string; from?: string; to?: string }
+
+/** One group's sums; `owners` counts the distinct owners behind it. */
+export interface DataDailySum {
+  day?: string; ownerGhii?: string; kind?: string; source?: string; direction?: string;
+  sizeBucket?: string; level?: string; contentClass?: string;
+  count: number; bytes: number; owners: number;
+}
+
 /** One group's sums. The grouped columns are present; `owners` counts the distinct owners behind it. */
 export interface ValueDailySum {
   day?: string;

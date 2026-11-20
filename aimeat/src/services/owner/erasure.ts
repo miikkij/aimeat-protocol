@@ -161,6 +161,7 @@ import { holdConsentAuditForErasure } from '../consent/audit-buffer.js';
 import { holdUsageForErasure } from '../usage/usage-buffer.js';
 import { holdWriteTallyForErasure } from '../data-map/write-tally-buffer.js';
 import { holdValueSignalsForErasure } from '../value/signal-buffer.js';
+import { holdDataCountsForErasure } from '../value/data-buffer.js';
 import { holdScopeUseForErasure } from '../scope/use.js';
 import { holdStandingUseForErasure } from '../ai-standing/use.js';
 import { holdAgentRefusalsForErasure } from '../agent/refusals.js';
@@ -657,6 +658,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string,
     releases.push(await holdUsageForErasure(account));
     releases.push(await holdWriteTallyForErasure(account));
     releases.push(await holdValueSignalsForErasure(account));
+    releases.push(await holdDataCountsForErasure(account));
     releases.push(await holdScopeUseForErasure(account));
     releases.push(await holdStandingUseForErasure(account));
     releases.push(await holdAgentRefusalsForErasure(account));

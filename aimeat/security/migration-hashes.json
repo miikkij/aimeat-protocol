@@ -136,6 +136,7 @@
     "0132_app_parties.sql": "8f7de225daefd96ff62e272b6650b8d823c75c8f70cf1b4ec78ef9a973804857",
     "0133_voucher_payment_method.sql": "d8166a8e38120ebbb7dbb889d2aa943d54bf9349c4c61dc945d85d54574224fb",
     "0134_task_start_app_waits.sql": "9b270b2e4fbcf66855ba361214e19a7c58cb8f0ab0e2629d293a8dddcf1107d9",
-    "0135_value_signals.sql": "5c787e8134eb11c39a245dd353b9cd48a6a82759ec7d70b4fa742d8aceaf70de"
+    "0135_value_signals.sql": "5c787e8134eb11c39a245dd353b9cd48a6a82759ec7d70b4fa742d8aceaf70de",
+    "0136_data_daily.sql": "5525ea0267d097b589c18c99ff125f728597c95f70333b246ba8e1534af08bc7"
   }
 }

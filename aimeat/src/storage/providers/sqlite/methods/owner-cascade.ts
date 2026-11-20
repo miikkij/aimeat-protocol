@@ -60,6 +60,8 @@ export const cascadeMethods = {
     // (repos/value.ts pseudonymiseProducer), the same rule as the tally above.
     this.db.prepare('DELETE FROM value_keys WHERE ownerGaii = ?').run(gaii);
     this.db.prepare('DELETE FROM value_daily WHERE ownerGhii = ?').run(gaii);
+    // The counts of what data of theirs passed through (data_daily); theirs, so they go with them.
+    this.db.prepare('DELETE FROM data_daily WHERE ownerGhii = ?').run(gaii);
     // The archived prior versions of a trackable key. The live row goes above; without this line the
     // value the person last overwrote outlives the value they last wrote, which is the wrong way
     // round. Postgres calls this table MemoryVersion, which is why the parity gate needed a name

@@ -31,6 +31,8 @@ export const OWNER_REPORTS: Record<string, string> = {
   sold: 'call.provider.coordinate',
   /** What the person's AI made and what happened to it (services/value/report.ts); not a usage cut. */
   value: 'value',
+  /** What data of the person's passed through, without the data (services/value/data-report.ts); not a usage cut. */
+  data: 'data',
 };
 
 /** Reports across every owner. Operator-only: the calling route MUST gate on the operator role (services/usage/usage-read.ts). */
@@ -50,6 +52,8 @@ export const NODE_REPORTS: Record<string, string> = {
   value: 'value',
   /** What the node is used for and when: features, bursts, week, season (services/value/usage-rhythm.ts). */
   rhythm: 'rhythm',
+  /** What data passed through the node, without the data, five owners at least behind a group (services/value/data-report.ts). */
+  data: 'data',
 };
 
 /**

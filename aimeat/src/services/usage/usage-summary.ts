@@ -17,6 +17,7 @@
  */
 import { readValueReport, type ValueReport } from '../value/report.js';
 import { readUsageRhythm, type UsageRhythm } from '../value/usage-rhythm.js';
+import { readDataReport, type DataReport } from '../value/data-report.js';
 import type { Storage } from '../../storage/interface.js';
 import { readUsageReport, UnknownReportError, dayNDaysAgo, type UsageReport } from './usage-read.js';
 
@@ -40,7 +41,7 @@ export interface UsageSummaryInput {
 }
 
 export type UsageSummaryResult =
-  | { ok: true; data: UsageReport | ValueReport | UsageRhythm }
+  | { ok: true; data: UsageReport | ValueReport | UsageRhythm | DataReport }
   | { ok: false; code: 'INVALID_INPUT'; message: string };
 
 /** Read one operator usage report. A bad day or an unknown report name is INVALID_INPUT. */
@@ -58,9 +59,10 @@ export async function readUsageSummary(
 
   // The value report and the rhythm are the node's, counted per feature and never per person: a
   // person's own value report is theirs to read (GET /v1/usage/summary), not the operator's.
-  if (report === 'value' || report === 'rhythm') {
+  if (report === 'value' || report === 'rhythm' || report === 'data') {
     if (owner) return { ok: false, code: 'INVALID_INPUT', message: `The ${report} report is node-wide here; a person reads their own with aimeat_usage_report.` };
     if (report === 'rhythm') return { ok: true, data: await readUsageRhythm(storage, { from, to }) };
+    if (report === 'data') return { ok: true, data: await readDataReport(storage, nodeId, { kind: 'node' }, { from, to }) };
     return { ok: true, data: await readValueReport({ storage }, { kind: 'node' }, { from, to }) };
   }
 

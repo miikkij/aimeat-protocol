@@ -66,6 +66,7 @@ import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { bindUsageSettings } from '../services/usage/usage-settings.js';
 import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js';
 import { initValueSignals } from '../services/value/signal-buffer.js';
+import { initDataCounts } from '../services/value/data-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent/audit-buffer.js';
 import { initClassificationAudit } from '../services/classification/audit.js';
 import { initAgentRefusals } from '../services/agent/refusals.js';
@@ -111,6 +112,8 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // The value signals ride the same touches: what happened to the records an AI made
   // (services/value/signal-buffer.ts). Same flush interval as the tally.
   initValueSignals(storage, config.tallyBufferMs);
+  // And the data counts: what passed through, without the data (services/value/data-buffer.ts).
+  initDataCounts(storage, config.tallyBufferMs);
   // Which permissions each `*` agent uses, for the narrowing its owner is offered and for when `*`
   // starts to hold its tasks (services/scope/use.ts). Like the tally, it fills only from now on.
   initScopeUse(storage);
@@ -179,6 +182,8 @@ export async function flushProcessBuffers(): Promise<void> {
   await shutdownWriteTallyBuffer();
   const { shutdownValueSignals } = await import('../services/value/signal-buffer.js');
   await shutdownValueSignals();
+  const { shutdownDataCounts } = await import('../services/value/data-buffer.js');
+  await shutdownDataCounts();
   const { shutdownConsentAuditBuffer } = await import('../services/consent/audit-buffer.js');
   await shutdownConsentAuditBuffer();
   const { shutdownClassificationAudit } = await import('../services/classification/audit.js');

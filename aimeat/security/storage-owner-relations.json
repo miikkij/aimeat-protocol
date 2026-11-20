@@ -173,6 +173,19 @@
       "verification": "behavior-tested",
       "decision": "existing-contract"
     },
+    "DataDaily.ownerGhii": {
+      "role": "ownership",
+      "current": "Deleted by the per-identity cascade (identity-erasure.ts on Postgres, owner-cascade.ts on SQLite), matching ownerGhii, the person whose data was counted.",
+      "reason": "A day row counts what data of this person's passed through, without the data; it is theirs and goes with them.",
+      "evidence": [
+        "src/storage/providers/postgres-kysely/methods/identity-erasure.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts",
+        "src/services/value/data-buffer.ts"
+      ],
+      "test": "test/unit/value-signals.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
     "ValueDaily.ownerGhii": {
       "role": "ownership",
       "current": "Deleted by the per-identity cascade (identity-erasure.ts on Postgres, owner-cascade.ts on SQLite), matching ownerGhii, which is the owner of the AI that made the record.",

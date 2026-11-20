@@ -16,10 +16,12 @@
  * @structure ValueRepository
  * @usage implemented by both storage providers; called through Storage.
  * @version-history
+ *   v1.1.0 — 2026-11-20 — The data counts: upsertDataDaily, sumDataDaily, pruneDataDaily (migration 0136).
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 1).
  */
 import type {
   ValueKeyRow, ValueKeyDelta, ValueDailyDelta, ValueDailyFilter, ValueDailyGroup, ValueDailySum,
+  DataDailyDelta, DataDailyFilter, DataDailyGroup, DataDailySum,
 } from '../types/value.js';
 
 export interface ValueRepository {
@@ -38,4 +40,11 @@ export interface ValueRepository {
   sumValueDaily(filter: ValueDailyFilter, groupBy: ValueDailyGroup[]): Promise<ValueDailySum[]>;
   /** Fold the day rows before `beforeDay` into week rows; answers how many day rows it folded. */
   foldValueDaily(beforeDay: string): Promise<number>;
+
+  /** Add daily counts of what data passed through (types/value.ts DataDailyDelta). */
+  upsertDataDaily(rows: DataDailyDelta[]): Promise<void>;
+  /** Sums grouped by the named columns, with the distinct owners behind each group. */
+  sumDataDaily(filter: DataDailyFilter, groupBy: DataDailyGroup[]): Promise<DataDailySum[]>;
+  /** Delete the day rows before `beforeDay`; the data counts keep no week grain. */
+  pruneDataDaily(beforeDay: string): Promise<number>;
 }

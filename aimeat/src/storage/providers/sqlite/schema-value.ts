@@ -7,6 +7,7 @@
  *   applySchemaTables4; idempotent on every boot.
  * @structure applyValueSchema(db)
  * @version-history
+ *   v1.1.0 — 2026-11-20 — data_daily: what data passed through, without the data (Postgres 0136).
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 1).
  */
 import type Database from 'better-sqlite3';
@@ -47,5 +48,21 @@ export function applyValueSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_value_daily_org ON value_daily(orgId, day);
     CREATE INDEX IF NOT EXISTS idx_value_daily_producer ON value_daily(producer);
     CREATE INDEX IF NOT EXISTS idx_value_daily_day ON value_daily(day);
+
+    CREATE TABLE IF NOT EXISTS data_daily (
+      day          TEXT NOT NULL,
+      ownerGhii    TEXT NOT NULL,
+      kind         TEXT NOT NULL,
+      source       TEXT NOT NULL,
+      direction    TEXT NOT NULL,
+      sizeBucket   TEXT NOT NULL,
+      level        TEXT NOT NULL DEFAULT '',
+      contentClass TEXT NOT NULL DEFAULT '',
+      count        INTEGER NOT NULL DEFAULT 0,
+      bytes        INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, ownerGhii, kind, source, direction, sizeBucket, level, contentClass)
+    );
+    CREATE INDEX IF NOT EXISTS idx_data_daily_owner ON data_daily(ownerGhii, day);
+    CREATE INDEX IF NOT EXISTS idx_data_daily_day ON data_daily(day);
   `);
 }

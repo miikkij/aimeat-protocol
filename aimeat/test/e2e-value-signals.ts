@@ -126,5 +126,24 @@ await test('v07 a person who is not the operator does not read the node\'s repor
     assert(r.status === 403, `alice reads the node: ${r.status}`);
 });
 
+await test('v08 the person reads what data of theirs passed through, without the data', async () => {
+    const r = await callTool(writerAi, 'aimeat_usage_report', { report: 'data' });
+    assert(!r.isError, `report: ${r.text.slice(0, 200)}`);
+    const d = r.data;
+    assert(d.report === 'data' && d.scope === 'own' && d.total.count >= 2, `total: ${JSON.stringify(d.total)}`);
+    assert(d.by_source.some((s: any) => s.key === 'agent') && d.by_source.some((s: any) => s.key === 'person'), `sources: ${JSON.stringify(d.by_source)}`);
+    assert(!JSON.stringify(d).includes('report.november') && !JSON.stringify(d).includes('Sales grew'), 'no key and no content in the report');
+});
+
+await test('v09 the operator\'s data report hides a group with fewer than five owners behind it', async () => {
+    const r = await json('/v1/admin/usage/summary?report=data', { headers: auth(operator.token) });
+    assert(r.status === 200 && r.body.data.scope === 'node', `node data: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+    const d = r.body.data;
+    assert(typeof d.hidden_groups === 'number' && d.high_labels && d.rules.min_owners === 5, `rules: ${JSON.stringify({ h: d.hidden_groups, r: d.rules })}`);
+    for (const list of [d.by_kind, d.by_source, d.by_direction, d.by_size, d.by_level, d.by_class]) {
+        assert(list.every((g: any) => g.owners >= 5), `a group under five owners is shown: ${JSON.stringify(list)}`);
+    }
+});
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

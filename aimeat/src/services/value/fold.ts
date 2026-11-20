@@ -24,6 +24,9 @@ export function valueFoldCutoff(now: Date = new Date()): string {
 /** Fold the day rows before the window into weeks. Answers how many day rows it folded. */
 export async function runValueFold(storage: Storage, now: Date = new Date()): Promise<number> {
   const folded = await storage.foldValueDaily(valueFoldCutoff(now));
+  // The data counts keep no week grain: past the same window they go.
+  const pruned = await storage.pruneDataDaily(valueFoldCutoff(now));
+  if (pruned > 0) logger.info('value-fold: old data counts deleted', { pruned });
   if (folded > 0) logger.info('value-fold: day rows folded into weeks', { folded });
   return folded;
 }

@@ -33,6 +33,7 @@
  *   - rowSpaceSchema
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-11-20 — Appended rows are counted in the data counts by their size (services/value/data-buffer.ts).
  *   2026-11-15 — deleteRow and deleteRowsBefore ask the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-07 — A row space's JSON Schema binds every writer: appendRows checks every body of a
  *     batch against it after the shape and size checks and before the quota and any write, and a
@@ -87,6 +88,7 @@
  *     membership); every entry point goes through gate().
  *   v1.0.0 — 2026-08-26 — Initial.
  */
+import { recordDataWrite } from '../value/data-buffer.js';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type {
@@ -507,6 +509,8 @@ export async function appendRows(
   const revisionsKept = await settleReplacements(storage, caller.identity, deduped, now);
 
   await storage.appendWorkspaceRows(deduped);
+  // The data counts: rows of these sizes were shared into the organism (services/value/data-buffer.ts).
+  for (const r of deduped) recordDataWrite({ ownerGaii: caller.identity, principal: caller.identity, kind: 'row', bytes: r.bytes });
 
   const pruned = await sweepRows(deps, organismId, wsId, space);
   await sweepRevisions(deps, organismId, wsId, space);

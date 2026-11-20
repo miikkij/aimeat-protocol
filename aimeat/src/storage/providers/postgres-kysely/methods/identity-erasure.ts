@@ -72,6 +72,8 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   // (methods/value.ts pseudonymiseValueProducerDb), the same rule as the tally above.
   await db.deleteFrom('ValueKey').where('ownerGaii', '=', gaii).execute();
   await db.deleteFrom('ValueDaily').where('ownerGhii', '=', gaii).execute();
+  // The counts of what data of theirs passed through (migration 0136); theirs, so they go with them.
+  await db.deleteFrom('DataDaily').where('ownerGhii', '=', gaii).execute();
 
   // The archived prior versions of a trackable key. The live row goes above; without this line the
   // value the person last overwrote outlives the value they last wrote, which is the wrong way round.

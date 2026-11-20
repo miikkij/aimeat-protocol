@@ -40,6 +40,7 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.15.0 — 2026-11-20 — A stored file is counted in the data counts by its size and namespace (services/value/data-buffer.ts).
  *   2026-11-15 — The app-owned key refusal says "the app's own endpoint", not "the app's own door".
  *   2026-11-13 — isAnonymousGaii is imported from utils/visibility-words.ts, where it lives, and not
  *     through the re-export in routes/memory/shared.ts (structure programme 2026-11, unit 4).
@@ -123,6 +124,7 @@
  *     says nothing is stamped), and `aiProvenanceId` stores a record the node minted itself. The
  *     presigned mint asks the refusals that need no bytes and carries the statement in the token.
  */
+import { recordDataWrite } from '../value/data-buffer.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { checkStorageQuota, chargeOverage } from '../quota.js';
@@ -478,6 +480,8 @@ export async function writeStorageFile(
     emitRecordChangePriorUnknown('memory', ownerGaii, level.visibility);
     // The content class pipeline on arrival (services/content/intake.ts): scheduled, never awaited.
     fileStored({ storage, config }, ownerGaii, input.key);
+    // The data counts: a file of this size arrived in this namespace (services/value/data-buffer.ts).
+    recordDataWrite({ ownerGaii, principal: ownerGaii, kind: 'file', bytes: size });
     // A welcome page notes its writer before the answer, so the next read meets the record (storage-page-keys.ts).
     await notePageKeyChange(deps, ownerGaii, input.key, writer, input.data);
 
