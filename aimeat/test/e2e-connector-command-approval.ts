@@ -17,6 +17,9 @@
  *   The trust record is a file of this suite's own (AIMEAT_COMMAND_TRUST_FILE), outside the home.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=connector-command-approval
  * @version-history
+ *   v1.1.1 — 2026-11-20 — 1 waits for the row's request_id as well as its waiting status: the server
+ *     writes them in two steps, and the full sweep on GitHub read the row between them (setup race,
+ *     not a product defect).
  *   v1.1.0 — 2026-11-19 — 2b: an agent of the owner without agent:write is refused allowing the
  *     runner (403 SCOPE_DENIED), and the runner stays held.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 4.5).
@@ -138,7 +141,11 @@ try {
 
   console.log('\n1. Held back and reported');
   await test('1. The daemon holds the runner, reports it as waiting, and the owner is asked once', async () => {
-    const row = await waitFor('the waiting program row', async () => { const r = await programRow(); return r?.status === 'waiting' ? r : null; });
+    // The report stores the row as waiting first and the owner's question in a second write
+    // (services/connector/programs.ts), so a slow runner can read the row between the two.
+    const row = await waitFor('the waiting program row with its question to the owner', async () => {
+      const r = await programRow(); return r?.status === 'waiting' && r.request_id ? r : null;
+    });
     assert(row.use === 'runner' && String(row.command).includes('runner.mjs'), `the row names the runner: ${JSON.stringify(row)}`);
     assert(typeof row.request_id === 'string' && row.request_id, `a request asks the owner: ${JSON.stringify(row)}`);
     requestId = row.request_id;
