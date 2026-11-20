@@ -34,6 +34,7 @@
   "reports.skip.not-operator": "No enviado: ya no eres operador.",
   "reports.skip.organism-gone": "No enviado: el organismo ya no existe.",
   "reports.skip.not-organism-owner": "No enviado: ya no eres el creador ni un administrador del organismo.",
+  "reports.skip.no-workspace-read": "No enviado: ya no puedes leer este espacio de trabajo.",
   "reports.skip.invalid": "No enviado: el programador no puede leer este registro ({detail}). Pide a tu IA que lo corrija.",
   "reports.pause": "Pausar",
   "reports.resume": "Reanudar",

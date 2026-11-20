@@ -39,7 +39,7 @@ import { Note } from '/components/Note.js';
 const x = (k, v) => t('reports.' + k, v);
 const PREFIX = 'reports.sub.';
 const enc = encodeURIComponent;
-const SKIPS = ['nothing', 'not-operator', 'organism-gone', 'not-organism-owner', 'invalid'];
+const SKIPS = ['nothing', 'not-operator', 'organism-gone', 'not-organism-owner', 'no-workspace-read', 'invalid'];
 
 /** A memory row as the page reads a subscription; the scheduler checks the same record again at every send. */
 function subOf(row) {

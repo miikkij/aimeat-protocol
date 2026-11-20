@@ -12,9 +12,11 @@
  *   organism's creator or an admin sends nothing for the organism (core:report-subscriptions). The
  *   organism is measured from its own workspace rows (`reports.measure.<organism>.<id>`, the report's
  *   `measures`), a broken or unplaceable measure says why, and a member reads no measure.
- * @structure v01..v13 in order; each later test reads what the earlier ones made.
+ *   A member reads, and subscribes to, the report of a workspace they may read, and of no other.
+ * @structure v01..v14 in order; each later test reads what the earlier ones made.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=value-signals
  * @version-history
+ *   v1.3.0 — 2026-11-20 — v14: a member's workspace report.
  *   v1.2.0 — 2026-11-20 — v12 and v13: an organism's own measures.
  *   v1.1.0 — 2026-11-20 — v10 and v11: report subscriptions, the send and the refusal (phase 4).
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 2).
@@ -216,6 +218,26 @@ await test('v13 a measure of a space the workspace does not have says so, and a 
     const w = await measure(bob, 'mine', { name: 'Mine', wsId: 'deals', space: 'offer', op: 'count' });
     assert(w.status === 200 || w.status === 201, `bob writes his record: ${w.status}`);
     expectRefusal(await json(`/v1/organisms/${teamId}/value`, { headers: auth(bob.token) }), 403, 'ACCESS_DENIED');
+});
+
+await test('v14 a member reads the report of a workspace they may read, and of no other', async () => {
+    const m = await json('/v1/memory', {
+        method: 'POST', headers: auth(alice.token),
+        body: JSON.stringify({ key: `organism.${teamId}.w.open.meta.manifest`, value: manifestOf('open'), visibility: `organism:${teamId}` }),
+    });
+    assert(m.status === 200 || m.status === 201, `an organism-wide workspace: ${m.status} ${JSON.stringify(m.body).slice(0, 200)}`);
+    const open = await json(`/v1/organisms/${teamId}/value?ws=open`, { headers: auth(bob.token) });
+    assert(open.status === 200 && open.body.data.scope === 'organism', `bob reads the open workspace's report: ${open.status} ${JSON.stringify(open.body).slice(0, 200)}`);
+    expectRefusal(await json(`/v1/organisms/${teamId}/value?ws=deals`, { headers: auth(bob.token) }), 403, 'ACCESS_DENIED');
+    expectRefusal(await json(`/v1/organisms/${teamId}/value?ws=open`, { headers: auth(outsider.token) }), 403, 'ACCESS_DENIED');
+    // The same rule at the send: bob's report of the private workspace is skipped and says why.
+    const key = 'reports.sub.deals-week';
+    await json('/v1/memory', {
+        method: 'POST', headers: auth(bob.token),
+        body: JSON.stringify({ key, value: { name: 'Deals week', scope: 'workspace', orgId: teamId, wsId: 'deals', cadence: 'cron', cron: '* * * * *', contents: ['value'] } }),
+    });
+    await runSubscriptions();
+    assert((await record(bob, key)).lastSkip === 'no-workspace-read', `the record says why: ${JSON.stringify(await record(bob, key))}`);
 });
 
 finish();

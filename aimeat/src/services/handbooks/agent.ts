@@ -370,7 +370,8 @@ what the numbers rest on.
 workspace, recipients: me | owners | members | operators, cadence: daily | every-other-day | weekly |
 monthly | cron | burst, hour? (UTC, default 7), weekday? (1 Monday .. 7), monthDay? (1..28), cron?,
 contents: [value | data | rhythm | goals | measures], paused? }. An own report goes to the person only; an organism
-or workspace report needs the person to be its creator or an admin; a node report needs an operator and
+report needs the person to be its creator or an admin; a workspace report too, except that a member who
+may read the workspace takes its report for themselves (recipients me); a node report needs an operator and
 goes to them or to every operator. AIMEAT checks the right at every send, sends nothing for an empty
 period, and writes \`lastSentAt\`, or \`lastSkip\` with the reason, into the record; read those when the
 person asks why a report did not come. They see and pause their reports at /v1/profile?tab=reports.

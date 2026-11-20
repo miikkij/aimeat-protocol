@@ -7,10 +7,12 @@
  *   and never per member or agent. The person's own report is GET /v1/usage/summary?report=value and
  *   the node's is GET /v1/admin/usage/summary?report=value; this is the third scope.
  *
- *   WHO MAY READ IT. The organism's creator and its admins, the people who run it. A member is refused:
- *   a workspace a member cannot open would still show its activity in the counts.
+ *   WHO MAY READ IT. The organism's creator and its admins, the people who run it. A member is refused
+ *   the organism-wide report, because a workspace a member cannot open would still show its activity in
+ *   the counts; with `ws`, a member who may read that workspace reads that workspace's report.
  * @structure valueRouter · GET /v1/organisms/:id/value
  * @version-history
+ *   v1.2.0 — 2026-11-20 — With `ws`, a member who may read that workspace reads its report.
  *   v1.1.0 — 2026-11-20 — `measures`: the organism's own measures the reader keeps
  *     (services/value/measures.ts), each counted only in a workspace the reader may read.
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 2).
@@ -24,6 +26,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { memberRoleOf } from '../../services/workspace/ops-caller.js';
 import { readValueReport } from '../../services/value/report.js';
 import { readMeasures } from '../../services/value/measures.js';
+import { canReadWorkspace } from '../../services/access-guard.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -56,8 +59,18 @@ export function valueRouter(config: AimeatConfig, storage: Storage): Router {
       principal: caller.principal, ownerName: caller.owner, ownerGhii: caller.ownerGhii,
       writerGaii: caller.principal, roles: [...caller.auth.roles],
     }, orgId);
-    if (role !== 'creator' && role !== 'admin') {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'The organism\'s value report is for its creator and admins.'));
+    // A member reads one workspace's report when they may read that workspace: its sums say nothing the
+    // workspace does not already show them. The organism-wide report stays its creators' and admins'.
+    const manager = role === 'creator' || role === 'admin';
+    let allowed = manager;
+    if (!manager && role === 'member' && ws) {
+      const organism = await storage.getOrganism(orgId);
+      allowed = !!organism && await canReadWorkspace(storage, config, organism, caller.auth.sub, caller.owner, caller.principal, ws);
+    }
+    if (!allowed) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', ws
+        ? 'A workspace\'s value report is for the organism\'s creator and admins and the members who may read that workspace.'
+        : 'The organism\'s value report is for its creator and admins.'));
       return;
     }
     const report = await readValueReport({ storage, config }, { kind: 'organism', orgId, ...(ws ? { wsId: ws } : {}) }, { from, to });

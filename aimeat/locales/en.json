@@ -34,6 +34,7 @@
   "reports.skip.not-operator": "Not sent: you are no longer an operator.",
   "reports.skip.organism-gone": "Not sent: the organism no longer exists.",
   "reports.skip.not-organism-owner": "Not sent: you are no longer the organism's creator or an admin.",
+  "reports.skip.no-workspace-read": "Not sent: you may no longer read this workspace.",
   "reports.skip.invalid": "Not sent: the scheduler cannot read this record ({detail}). Ask your AI to fix it.",
   "reports.pause": "Pause",
   "reports.resume": "Resume",

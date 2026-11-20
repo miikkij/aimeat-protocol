@@ -34,6 +34,7 @@
   "reports.skip.not-operator": "Ei lähtenyt: et ole enää operaattori.",
   "reports.skip.organism-gone": "Ei lähtenyt: organismia ei enää ole.",
   "reports.skip.not-organism-owner": "Ei lähtenyt: et ole enää organismin luoja tai ylläpitäjä.",
+  "reports.skip.no-workspace-read": "Ei lähtenyt: et voi enää lukea tätä työtilaa.",
   "reports.skip.invalid": "Ei lähtenyt: ajastin ei pysty lukemaan tätä tietuetta ({detail}). Pyydä tekoälyäsi korjaamaan se.",
   "reports.pause": "Keskeytä",
   "reports.resume": "Jatka",

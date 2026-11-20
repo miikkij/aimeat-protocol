@@ -12,7 +12,7 @@
  *   WHO MAY SEND WHAT, decided at every send and not at the write, because a role can end after the
  *   record was written: `own` goes to its writer only; `workspace` and `organism` need the writer to be
  *   the organism's creator or an admin, and go to the writer, the organism's owners or every active
- *   member; `node` needs the writer to be an operator, and goes to the writer or every operator. A
+ *   member; a member who may read a workspace takes that workspace's report for themselves only; `node` needs the writer to be an operator, and goes to the writer or every operator. A
  *   subscription that no longer holds is skipped and says why in `lastSkip`, which the Reports page
  *   shows. A report with nothing in it is not sent: a report that says nothing teaches its reader to
  *   skip it.
@@ -25,7 +25,8 @@
  *   v1.1.0 — 2026-11-20 — `lastSkip` is a code (SKIP) the Reports page words in the reader's language,
  *     kept on parse so an unchanged reason is not written again every run; a record that is not a
  *     subscription says why (`invalid`, `lastSkipDetail`); contents `measures` adds an organism's own
- *     measures (services/value/measures.ts) to an organism or workspace report.
+ *     measures (services/value/measures.ts) to an organism or workspace report; a member who may read
+ *     a workspace subscribes to its report for themselves (`no-workspace-read` when that ends).
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 4).
  */
 import { Cron } from 'croner';
@@ -35,6 +36,7 @@ import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { notify } from '../notify.js';
 import { organismOwners } from '../organism/ownership.js';
+import { canReadWorkspace } from '../access-guard.js';
 import { readValueReport } from '../value/report.js';
 import { readDataReport } from '../value/data-report.js';
 import { readUsageRhythm } from '../value/usage-rhythm.js';
@@ -79,6 +81,7 @@ export const SKIP = {
   notOperator: 'not-operator',
   organismGone: 'organism-gone',
   notOrganismOwner: 'not-organism-owner',
+  noWorkspaceRead: 'no-workspace-read',
   invalid: 'invalid',
 } as const;
 export type SkipCode = typeof SKIP[keyof typeof SKIP];
@@ -162,7 +165,15 @@ export async function recipientsOf(storage: Storage, config: AimeatConfig, write
   const org = await storage.getOrganism(sub.orgId!);
   if (!org) return { ok: false, reason: SKIP.organismGone };
   const owners = organismOwners(org);
-  if (!owners.includes(name)) return { ok: false, reason: SKIP.notOrganismOwner };
+  if (!owners.includes(name)) {
+    // A member who may read the workspace takes its report for themselves: its sums say nothing the
+    // workspace does not already show them. Anything wider is the organism's creators' and admins'.
+    if (sub.scope === 'workspace' && sub.recipients === 'me') {
+      return await canReadWorkspace(storage, config, org, name, name, writerGhii, sub.wsId!)
+        ? { ok: true, to: [writerGhii] } : { ok: false, reason: SKIP.noWorkspaceRead };
+    }
+    return { ok: false, reason: SKIP.notOrganismOwner };
+  }
   if (sub.recipients === 'me') return { ok: true, to: [writerGhii] };
   if (sub.recipients === 'owners') return { ok: true, to: owners.map(o => `${o}@${config.nodeId}`) };
   const members = await storage.listMembers(sub.orgId!, { status: 'active' });
