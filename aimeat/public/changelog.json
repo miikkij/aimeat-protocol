@@ -4,6 +4,28 @@
     {
       "date": "2026-11-20",
       "kind": "feature",
+      "id": "2026-11-20-apps-your-own-ai-can-work-in",
+      "highlight": true,
+      "audience": [
+        "user",
+        "developer"
+      ],
+      "title": {
+        "en": "Apps your own AI can work in",
+        "fi": "Sovellukset, joissa oma tekoälysi tekee työtä"
+      },
+      "body": {
+        "en": "Every new app is built so your own AI can do in it what you do by hand, and you choose what you keep for yourself. Before any code, the AI that builds the app recommends a build style: AI-accelerated (the default), a quick trial nobody else sees, or a presentation that does not change afterwards. An AI-accelerated app comes with a guide that tells any AI where its data is and which acts you confirm, and an app that enforces a rule also gets tools your AI and your agents call.",
+        "fi": "Jokainen uusi sovellus tehdään niin, että oma tekoälysi voi tehdä siinä saman kuin sinä käsin, ja sinä päätät, mitä teet itse. Ennen koodia sovelluksen rakentava tekoäly suosittelee rakennustapaa: tekoälykiihdytetty (oletus), pikainen kokeilu, jota kukaan muu ei näe, tai esitys, joka ei muutu jälkeenpäin. Tekoälykiihdytetyn sovelluksen mukana tulee ohje, joka kertoo mille tahansa tekoälylle, missä tieto on ja mitkä teot sinä vahvistat. Sovellus, joka valvoo sääntöä, saa lisäksi työkalut, joita tekoälysi ja agenttisi kutsuvat."
+      },
+      "summary": {
+        "en": "Every new app is built so your own AI can do in it what you do by hand.",
+        "fi": "Jokainen uusi sovellus tehdään niin, että tekoälysi voi tehdä siinä saman kuin sinä käsin."
+      }
+    },
+    {
+      "date": "2026-11-20",
+      "kind": "feature",
       "id": "2026-11-20-knowing-the-customer-for-obliged-firms",
       "highlight": false,
       "audience": [
