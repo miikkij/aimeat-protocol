@@ -165,7 +165,7 @@ import { scimRouter } from '../routes/scim.js';
 import { federationRouter } from '../routes/federation.js';
 import { organismsRouter } from '../routes/organisms.js';
 import { teamsRouter } from '../routes/organisms/teams.js';
-import { valueRouter } from '../routes/value.js';
+import { valueRouter } from '../routes/organisms/value.js';
 import { notificationsRouter } from '../routes/notifications.js';
 import { adminSecurityRouter } from '../routes/admin/security.js';
 import { adminCorsRouter } from '../routes/admin/cors.js';
@@ -605,7 +605,7 @@ export async function mountRoutes(
   app.use(scimRouter(config, storage));
   app.use(organismsRouter(config, storage));
   app.use(teamsRouter(config, storage));
-  // The organism's value report (routes/value.ts); the person's and the node's ride the usage reports.
+  // The organism's value report (routes/organisms/value.ts); the person's and the node's ride the usage reports.
   app.use(valueRouter(config, storage));
   app.use(notificationsRouter(config, storage));
   app.use(adminSecurityRouter(config, storage));

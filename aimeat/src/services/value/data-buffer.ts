@@ -21,7 +21,8 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import type { DataDailyDelta } from '../../storage/types/value.js';
-import { parseGAII, ownerGhiiOf } from '../../utils/gaii.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { principalKindOf } from '../caller-facts.js';
 import { logger } from '../../utils/logger.js';
 import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
@@ -51,10 +52,15 @@ interface Pending {
   at: string;
 }
 
+// process-local: each process keeps and flushes its own waiting counts; a second process counts its own writes.
 let storageRef: Storage | null = null;
+// process-local: each process runs its own flush timer over its own counts.
 let flushTimer: ReturnType<typeof setInterval> | null = null;
+// process-local: guards this process's own flush against a second flush running at once.
 let flushing = false;
+// process-local: this process's waiting counts; the totals come from every process's flushes.
 let pending: Pending[] = [];
+// process-local: this process's count of counts dropped at its own ceiling.
 let dropped = 0;
 const erasing = new ErasureHolds();
 
@@ -73,9 +79,9 @@ export function sourceOf(principal: string, ownerGaii: string): string {
   if (principal.includes('@') && ownerGaii.includes('@') && host(principal) !== host(ownerGaii)) return 'federation';
   if (principal.startsWith('schedule:') || principal.startsWith('receiver:')) return 'automation';
   if (principal.startsWith('ext:')) return 'extension';
-  if (principal.startsWith('eco:')) return 'app';
-  if (parseGAII(principal)) return 'agent';
-  return 'person';
+  // A person, an agent or an app: the one answer to what kind of caller an identity is.
+  const kind = principalKindOf(principal);
+  return kind === 'eco' ? 'app' : kind;
 }
 
 function push(p: Pending): void {
@@ -176,6 +182,7 @@ export async function holdDataCountsForErasure(account: ErasedAccount): Promise<
 export function initDataCounts(storage: Storage, flushIntervalMs: number = DEFAULT_FLUSH_INTERVAL_MS): void {
   storageRef = storage;
   if (flushTimer) return;
+  // process-local: each process flushes its own counts on its own timer.
   flushTimer = setInterval(() => { void flushDataCounts(); }, Math.max(100, flushIntervalMs));
   flushTimer.unref?.();
 }

@@ -1609,6 +1609,62 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/value/data-buffer.ts :: interval :: initDataCounts": {
+      "count": 1,
+      "reason": "Each process flushes its own data counts on its own timer; the day totals add up from every process's flushes."
+    },
+    "src/services/value/data-buffer.ts :: let :: dropped": {
+      "count": 1,
+      "reason": "This process's count of data counts dropped at its own ceiling, for its own warning line."
+    },
+    "src/services/value/data-buffer.ts :: let :: flushing": {
+      "count": 1,
+      "reason": "Guards this process's own flush against a second flush of the same process running at once."
+    },
+    "src/services/value/data-buffer.ts :: let :: flushTimer": {
+      "count": 1,
+      "reason": "Each process runs its own flush timer over its own waiting data counts."
+    },
+    "src/services/value/data-buffer.ts :: let :: pending": {
+      "count": 1,
+      "reason": "This process's waiting data counts; a second process keeps and flushes its own, and the stored day totals add both."
+    },
+    "src/services/value/data-buffer.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "The storage this process flushes into, set at its start."
+    },
+    "src/services/value/signal-buffer.ts :: interval :: initValueSignals": {
+      "count": 1,
+      "reason": "Each process flushes its own value touches on its own timer."
+    },
+    "src/services/value/signal-buffer.ts :: let :: dropped": {
+      "count": 1,
+      "reason": "This process's count of value touches dropped at its own ceiling, for its own warning line."
+    },
+    "src/services/value/signal-buffer.ts :: let :: flushing": {
+      "count": 1,
+      "reason": "Guards this process's own flush against a second flush of the same process running at once."
+    },
+    "src/services/value/signal-buffer.ts :: let :: flushTimer": {
+      "count": 1,
+      "reason": "Each process runs its own flush timer over its own waiting touches."
+    },
+    "src/services/value/signal-buffer.ts :: let :: pending": {
+      "count": 1,
+      "reason": "This process's waiting touches. Two processes touching one record replay in two batches against the stored state, so the order between them is the flush order, not the touch order."
+    },
+    "src/services/value/signal-buffer.ts :: let :: seenDay": {
+      "count": 1,
+      "reason": "The day the opens remembered in seenOpens belong to, per process."
+    },
+    "src/services/value/signal-buffer.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "The storage this process flushes into, set at its start."
+    },
+    "src/services/value/signal-buffer.ts :: set :: seenOpens": {
+      "count": 1,
+      "reason": "One reader reopening a record counts as one use a day in this process; with two active processes the same reader can count at most once in each."
+    },
     "src/services/visibility/behaviour-settings.ts :: map :: cache": {
       "count": 1,
       "reason": "DEBT"

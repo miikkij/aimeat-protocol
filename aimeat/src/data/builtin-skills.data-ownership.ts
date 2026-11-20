@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-20 — Section 6: erasure removes the person's value signals and data counts; a record their
+ *     agent made in someone else's namespace keeps its count under a pseudonym (services/value/).
  *   2026-11-19 — Section 6: erasure removes each app as its delete does, and no node log names the
  *     erased person afterwards: the site change log and reviews name a pseudonym, flags on their
  *     content and their appeals go, the activity feed drops their app events (services/owner/erasure.ts).
@@ -374,7 +376,9 @@ let knowledge age, and you should offer them, not wait to be asked:
   that name it. No log of the node names them after the erasure: the lines of the site change log
   about their app deletes and forks name a pseudonym instead of their name, flags on their content
   and their appeals go, a review they made names the pseudonym, and the public activity feed drops
-  the events about their apps. A notification in another person's inbox stays, as that person's own
+  the events about their apps. The counts of what their AI made and what happened to it, and of what
+  data of theirs passed through, go too; where an agent of theirs made a record in someone else's
+  namespace or a group's workspace, that record's count stays with a pseudonym as its maker. A notification in another person's inbox stays, as that person's own
   copy, and expires within 90 days. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a

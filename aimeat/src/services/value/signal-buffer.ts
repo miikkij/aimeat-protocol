@@ -65,12 +65,19 @@ interface Touch {
   level?: string;
 }
 
+// process-local: each process keeps and flushes its own waiting touches; a second process counts its own.
 let storageRef: Storage | null = null;
+// process-local: each process runs its own flush timer over its own touches.
 let flushTimer: ReturnType<typeof setInterval> | null = null;
+// process-local: guards this process's own flush against a second flush running at once.
 let flushing = false;
+// process-local: this process's waiting touches; two processes touching one record replay in two batches.
 let pending: Touch[] = [];
+// process-local: this process's count of touches dropped at its own ceiling.
 let dropped = 0;
+// process-local: one reader reopening a record counts once a day per process; with two, at most twice.
 const seenOpens = new Set<string>();
+// process-local: the day seenOpens belongs to, per process.
 let seenDay = '';
 const erasing = new ErasureHolds();
 
@@ -298,6 +305,7 @@ export async function holdValueSignalsForErasure(account: ErasedAccount): Promis
 export function initValueSignals(storage: Storage, flushIntervalMs: number = DEFAULT_FLUSH_INTERVAL_MS): void {
   storageRef = storage;
   if (flushTimer) return;
+  // process-local: each process flushes its own touches on its own timer.
   flushTimer = setInterval(() => { void flushValueSignals(); }, Math.max(100, flushIntervalMs));
   flushTimer.unref?.();
 }

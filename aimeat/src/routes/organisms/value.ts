@@ -1,5 +1,5 @@
 /**
- * @file src/routes/value.ts
+ * @file src/routes/organisms/value.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The organism's value report (services/value/report.ts, scope `organism`): what AI made
@@ -14,14 +14,14 @@
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 2).
  */
 import { Router, type Request, type Response } from 'express';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
-import { callerOf } from '../middleware/caller.js';
-import { memberRoleOf } from '../services/workspace/ops-caller.js';
-import { readValueReport } from '../services/value/report.js';
-import { isForeignPrincipal } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { success, error } from '../../middleware/envelope.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
+import { callerOf } from '../../middleware/caller.js';
+import { memberRoleOf } from '../../services/workspace/ops-caller.js';
+import { readValueReport } from '../../services/value/report.js';
+import { isForeignPrincipal } from '../../utils/gaii.js';
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[A-Za-z0-9_-]{1,128}$/;

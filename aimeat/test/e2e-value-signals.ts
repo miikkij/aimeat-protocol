@@ -15,23 +15,9 @@
  */
 import { registerOwner, setupOperator, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpSession, type McpAgent } from './helpers/mcp-session.js';
+import { BASE, test, assert, json, expectRefusal, finish } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-async function json(path: string, opts: RequestInit = {}) {
-    for (let i = 0; ; i++) {
-        const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-        if (res.status === 429 && i < 5) { await new Promise(r => setTimeout(r, 1000 * (i + 1))); continue; }
-        const ct = res.headers.get('content-type') ?? '';
-        return { status: res.status, body: ct.includes('json') ? await res.json() as any : { _raw: await res.text() } };
-    }
-}
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 const stamp = Date.now().toString(36).slice(-5);
 
@@ -104,11 +90,11 @@ await test('v05 the organism\'s report is for its creator; a member and an outsi
     const asLead = await json(`/v1/organisms/${teamId}/value`, { headers: auth(alice.token) });
     assert(asLead.status === 200 && asLead.body.data.scope === 'organism' && asLead.body.data.by_producer === undefined, `lead: ${asLead.status} ${JSON.stringify(asLead.body.data ?? asLead.body).slice(0, 200)}`);
     const asMember = await json(`/v1/organisms/${teamId}/value`, { headers: auth(bob.token) });
-    assert(asMember.status === 403, `a member is refused: ${asMember.status}`);
+    assert(asMember.status === 403 && asMember.body?.error?.code === 'ACCESS_DENIED', `a member is refused: ${asMember.status} ${JSON.stringify(asMember.body).slice(0, 160)}`);
     const asOutsider = await json(`/v1/organisms/${teamId}/value`, { headers: auth(outsider.token) });
-    assert(asOutsider.status === 403, `an outsider is refused: ${asOutsider.status}`);
+    expectRefusal(asOutsider, 403, 'ACCESS_DENIED');
     const bad = await json(`/v1/organisms/${teamId}/value?from=yesterday`, { headers: auth(alice.token) });
-    assert(bad.status === 400, `a bad day is refused: ${bad.status}`);
+    expectRefusal(bad, 400, 'INVALID_INPUT');
 });
 
 await test('v06 the operator reads the node\'s value and rhythm, never one person\'s', async () => {
@@ -118,12 +104,12 @@ await test('v06 the operator reads the node\'s value and rhythm, never one perso
     const rhythm = await json('/v1/admin/usage/summary?report=rhythm', { headers: auth(operator.token) });
     assert(rhythm.status === 200 && Array.isArray(rhythm.body.data.features) && rhythm.body.data.rhythm, `rhythm: ${rhythm.status} ${JSON.stringify(rhythm.body).slice(0, 200)}`);
     const named = await json(`/v1/admin/usage/summary?report=value&owner=${alice.name}`, { headers: auth(operator.token) });
-    assert(named.status === 400, `one person's value report is refused to the operator: ${named.status}`);
+    expectRefusal(named, 400, 'INVALID_INPUT');
 });
 
 await test('v07 a person who is not the operator does not read the node\'s report', async () => {
     const r = await json('/v1/admin/usage/summary?report=value', { headers: auth(alice.token) });
-    assert(r.status === 403, `alice reads the node: ${r.status}`);
+    expectRefusal(r, 403);
 });
 
 await test('v08 the person reads what data of theirs passed through, without the data', async () => {
@@ -145,5 +131,4 @@ await test('v09 the operator\'s data report hides a group with fewer than five o
     }
 });
 
-console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
-if (failed > 0) process.exit(1);
+finish();

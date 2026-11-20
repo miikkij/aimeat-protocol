@@ -106,7 +106,7 @@
       "digest": "sha256:983adfede3987480bd533f35"
     },
     "6. Organisms, workspaces and knowledge": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts",
         "aimeat/src/tool-catalog/definitions/workspace-spaces.ts",
@@ -125,10 +125,10 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:ec7c8b5abc5f6c0cb9ef197a"
+      "digest": "sha256:5da5741ca94981ae16689baf"
     },
     "7. The agent fleet": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/services/agent/task-rules.ts",
         "aimeat/src/services/agent/task-start-write.ts",
@@ -146,7 +146,7 @@
         "aimeat/src/routes/connect-tunnel.ts",
         "aimeat/src/services/basic-agents.ts"
       ],
-      "digest": "sha256:f347d1bd5d5e5aec23e0e991"
+      "digest": "sha256:8e3efedfe361eb31fe82c974"
     },
     "8. Automation: schedules, workflows and extensions": {
       "reviewedOn": "2026-11-19",
@@ -232,7 +232,7 @@
       "digest": "sha256:edcd8422add6b2d8c9fc72c8"
     },
     "12. Messages, contacts and email": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/routes/outbound.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts",
@@ -248,7 +248,7 @@
         "aimeat/src/services/message/broadcast.ts",
         "aimeat/src/tool-catalog/definitions/broadcast-summary.ts"
       ],
-      "digest": "sha256:b34cbeab9fab14261aa726f3"
+      "digest": "sha256:b34e4ae5895b3b4ec3911194"
     },
     "13. Notifications, boards and live updates": {
       "reviewedOn": "2026-11-19",
@@ -273,7 +273,7 @@
       "digest": "sha256:562cb5bf0c26b8e876b09590"
     },
     "14. Economy, marketplace and payments": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/tool-catalog/definitions/commerce.ts",
         "aimeat/src/tool-catalog/definitions/exchange.ts",
@@ -654,7 +654,7 @@
       "aimeat/src/tool-catalog/definitions/organism-approvals.ts": "5644a92e75ef5b49",
       "aimeat/src/services/workspace-rows/row-revisions.ts": "2f605de731f5cceb",
       "aimeat/src/services/workspace-rows/row-schema.ts": "31e80cbaff854066",
-      "aimeat/src/services/workspace-rows/row-service.ts": "49298be1c9a26910",
+      "aimeat/src/services/workspace-rows/row-service.ts": "7185deaddfafe624",
       "aimeat/src/services/workspace-rows/row-space.ts": "81e86a414994de22",
       "aimeat/src/services/knowledge/audience.ts": "dc0306b7688d848a",
       "aimeat/src/services/knowledge/link-owner-keep.ts": "7006435a8a84cdcf",
@@ -679,7 +679,7 @@
       "aimeat/src/services/agent/proposals.ts": "60453e3d4eb78066",
       "aimeat/src/services/task/start-op.ts": "4be59ac3ec83da86",
       "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "5c906fac55b9a3ff",
-      "aimeat/src/tool-catalog/definitions/goals.ts": "5370ce446959ed31",
+      "aimeat/src/tool-catalog/definitions/goals.ts": "d1d14a000c53a6ea",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agent-tasks/completion.ts": "1740131b010fd4c2",
       "aimeat/src/routes/agent-tasks/create-read.ts": "4e46eba8bab9bd6b",
@@ -806,7 +806,7 @@
     },
     "12. Messages, contacts and email": {
       "aimeat/src/routes/outbound.ts": "bdb77e334bc4bd61",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "6ebe664306f2c089",
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "059e5ae30d927052",
       "aimeat/src/tool-catalog/definitions/dm-groups.ts": "abb2efa534fe1126",
       "aimeat/src/tool-catalog/definitions/dm-reactions.ts": "7aed76c7b8c2db88",
       "aimeat/src/tool-catalog/definitions/connections.ts": "6f921f29104aea7d",
