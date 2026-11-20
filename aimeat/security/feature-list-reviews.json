@@ -2,7 +2,7 @@
   "about": "When each section of docs/AIMEAT-Feature-List.md was last read against the code it describes, which files or folders that code is (a folder means every file git tracks under it), and which promises of a refusal or a limit a test holds. pnpm check:feature-list fails when a watched file changes after the review, so whoever changed the code re-reads the section; and when a promise's sentence, its test file or the string the test must contain is gone. The watches are the folders and files the section's rows describe: the routes, services and tool catalog entries behind them, chosen so that the code under one section changes on at most about four days a week (measured with git log over 30 days on 2026-11-19), with a specific subfolder or file preferred to a whole services folder. Re-stamp after reading with: pnpm check:feature-list --record \"<section heading>\". A promise no test holds is rewritten in the list to what the code does, never listed here. Reasoning: aimeat/scripts/check-feature-list.ts.",
   "sections": {
     "1. Connecting an AI": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/mcp/oauth.ts",
         "aimeat/src/mcp/oauth-consent-info.ts",
@@ -15,7 +15,7 @@
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/routes/connect-install.ts"
       ],
-      "digest": "sha256:084b871d2d094c8324c7068e"
+      "digest": "sha256:b4200a57f462132fcbbe1ad2"
     },
     "2. Accounts and sign-in": {
       "reviewedOn": "2026-11-19",
@@ -67,7 +67,7 @@
       "digest": "sha256:734e451d2601300d0e3fe0a4"
     },
     "4. Access, consent and sharing": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/services/access-guard.ts",
         "aimeat/src/services/consent.ts",
@@ -86,7 +86,7 @@
         "aimeat/src/routes/account-events.ts",
         "aimeat/src/routes/permissions.ts"
       ],
-      "digest": "sha256:0dcaf1d58efee5aaaee8d2b8"
+      "digest": "sha256:555fc0f364df8be9ce2faa6e"
     },
     "5. Memory, files and search": {
       "reviewedOn": "2026-11-19",
@@ -149,7 +149,7 @@
       "digest": "sha256:8e3efedfe361eb31fe82c974"
     },
     "8. Automation: schedules, workflows and extensions": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/services/hooks.ts",
         "aimeat/src/mcp/agent-schedules.ts",
@@ -165,7 +165,7 @@
         "aimeat/src/routes/commerce-ucp.ts",
         "aimeat/src/routes/commerce-acp.ts"
       ],
-      "digest": "sha256:f8132182ad6fecf1072769e7"
+      "digest": "sha256:0c2834d1260b017ab165cd79"
     },
     "9. AI on the node": {
       "reviewedOn": "2026-11-20",
@@ -194,10 +194,10 @@
         "aimeat/src/tool-catalog/definitions/ai-models.ts",
         "aimeat/src/tool-catalog/definitions/decide.ts"
       ],
-      "digest": "sha256:3f4ff2340dfc74464701d33b"
+      "digest": "sha256:7b2689a5523dd6ca58cb2478"
     },
     "10. Apps": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/services/app/config.ts",
         "aimeat/src/routes/apps/read.ts",
@@ -217,10 +217,10 @@
         "aimeat/src/routes/app-store.ts",
         "aimeat/src/services/dependency-map.ts"
       ],
-      "digest": "sha256:6ba4711ccd3dd6bc5cbaaf5c"
+      "digest": "sha256:53200c3b19590ede60de69a7"
     },
     "11. Served libraries and the Design Book": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/data/library-packs",
         "aimeat/src/tool-catalog/definitions/designbook.ts",
@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:edcd8422add6b2d8c9fc72c8"
+      "digest": "sha256:d62ba72b4940a1b08c7d7342"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-20",
@@ -248,7 +248,7 @@
         "aimeat/src/services/message/broadcast.ts",
         "aimeat/src/tool-catalog/definitions/broadcast-summary.ts"
       ],
-      "digest": "sha256:b34e4ae5895b3b4ec3911194"
+      "digest": "sha256:bd9e709b646c586ed1d5316c"
     },
     "13. Notifications, boards and live updates": {
       "reviewedOn": "2026-11-19",
@@ -287,10 +287,10 @@
         "aimeat/src/services/trust.ts",
         "aimeat/src/routes/agents/purchase-limit.ts"
       ],
-      "digest": "sha256:9b41cd6dc4bde50dfd3deee5"
+      "digest": "sha256:cee838eab4ae720915950383"
     },
     "15. Bookkeeping and business": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/routes/finance-ledger.ts",
         "aimeat/src/tool-catalog/definitions/companies.ts",
@@ -303,7 +303,7 @@
         "aimeat/src/tool-catalog/definitions/dataproduct.ts",
         "aimeat/src/services/finance"
       ],
-      "digest": "sha256:0ccff1f189b57afc66808dd3"
+      "digest": "sha256:0aa7cfd77d3ef7e01f7b8f6a"
     },
     "16. Public presence and discovery": {
       "reviewedOn": "2026-11-19",
@@ -322,7 +322,7 @@
       "digest": "sha256:f5b19d329d4d9a6013a89455"
     },
     "17. AI transparency and compliance": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/data/compliance-domains.ts",
         "aimeat/src/services/compliance/domain-floor.ts",
@@ -336,7 +336,7 @@
         "aimeat/src/services/data-intermediation",
         "aimeat/src/services/provenance-embed"
       ],
-      "digest": "sha256:6279e58f95c574e1a2770e05"
+      "digest": "sha256:c03891e3f8adeb962ba69489"
     },
     "18. Federation and your own node": {
       "reviewedOn": "2026-11-19",
@@ -415,7 +415,7 @@
       "digest": "sha256:e5e051b90b29888d43b64f05"
     },
     "24. Data classification": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/services/classification/defaults.ts",
         "aimeat/src/services/classification/levels.ts",
@@ -426,7 +426,7 @@
         "aimeat/src/tool-catalog/definitions/classification.ts",
         "aimeat/src/services/classify-on-write.ts"
       ],
-      "digest": "sha256:a330b50b7640fa231cdd9635"
+      "digest": "sha256:cbdc800e920ef79f3b907d14"
     }
   },
   "promises": [
@@ -514,7 +514,7 @@
       "aimeat/src/routes/bootstrap.ts": "740c9622a3a61903",
       "aimeat/src/mcp/legacy-sessions.ts": "00cf232e02a68804",
       "aimeat/src/mcp/tasks-extension.ts": "ef9e3abaac54ea08",
-      "aimeat/src/routes/mcp-servers.ts": "1938c72a19158ba4",
+      "aimeat/src/routes/mcp-servers.ts": "cce3909e53f6cf6d",
       "aimeat/src/services/mcp-client/capability-consent.ts": "4dd52ae7253d0974",
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec",
       "aimeat/src/services/mcp-client/cleanup.ts": "52c2d6026df2de23",
@@ -594,7 +594,7 @@
       "aimeat/src/services/consent/consent-read.ts": "3c7055035950899c",
       "aimeat/src/services/consent/write.ts": "1fdb8a516e8e2287",
       "aimeat/src/routes/consent.ts": "6213aa166ff91905",
-      "aimeat/src/routes/app-grants.ts": "caa77094960b7b33",
+      "aimeat/src/routes/app-grants.ts": "06c88c7d284b3012",
       "aimeat/src/tool-catalog/definitions/exposure.ts": "a68011436a566c05",
       "aimeat/src/services/publish-gate.ts": "f2a176eda6dee694",
       "aimeat/src/services/internet-opening/opening-door.ts": "41a835d8a373d62d",
@@ -717,12 +717,12 @@
       "aimeat/src/services/schedule/run-limit.ts": "2b44c8c159d741d9",
       "aimeat/src/services/schedule/types.ts": "f90eef7c590ee88f",
       "aimeat/src/services/schedule/write.ts": "e964d8ddc942e30d",
-      "aimeat/src/tool-catalog/definitions/extensions-cortex.ts": "56744c1e7a48cd80",
+      "aimeat/src/tool-catalog/definitions/extensions-cortex.ts": "98438e8757ff541b",
       "aimeat/src/routes/schedules.ts": "445717db006e0f07",
       "aimeat/src/routes/workflows.ts": "efaf105d6380eca6",
       "aimeat/src/routes/cortex.ts": "05d7830ff08fc276",
       "aimeat/src/tool-catalog/definitions/install-sets.ts": "a9fcbced5e77e2c6",
-      "aimeat/src/tool-catalog/definitions/packages.ts": "3aff29f30905bf73",
+      "aimeat/src/tool-catalog/definitions/packages.ts": "b6f986db0b16c860",
       "aimeat/src/routes/tracked-responses.ts": "c909e26202eb2db3",
       "aimeat/src/routes/signals.ts": "8d30230fbe030bb6",
       "aimeat/src/routes/commerce-ucp.ts": "61be124c31e96974",
@@ -735,7 +735,7 @@
       "aimeat/src/services/calibrator/templates.ts": "448f5fe229c721d1",
       "aimeat/src/services/ai/routing.ts": "2233dd201cd0cd90",
       "aimeat/src/services/ai/roles.ts": "e2afb7ec8d3c1029",
-      "aimeat/src/services/ai/policy-store.ts": "de2a453be234d432",
+      "aimeat/src/services/ai/policy-store.ts": "4f4c8e2abba6f06c",
       "aimeat/src/services/ai/gen-rules-store.ts": "2f8415970c2bfebb",
       "aimeat/src/services/operator/confirm.ts": "348eaf355869e551",
       "aimeat/src/services/ai/allowance.ts": "e0e9920aa443c369",
@@ -756,9 +756,9 @@
     },
     "10. Apps": {
       "aimeat/src/services/app/config.ts": "40bbad5aede08707",
-      "aimeat/src/routes/apps/read.ts": "244e130843f60138",
-      "aimeat/src/tool-catalog/definitions/app-manage.ts": "a53f0c7cdfe3ff29",
-      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "82e0985e955951b0",
+      "aimeat/src/routes/apps/read.ts": "fc935b4c1bfe8f93",
+      "aimeat/src/tool-catalog/definitions/app-manage.ts": "fb7d89f89b8c5cf6",
+      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "d8dcb60b80837bab",
       "aimeat/src/services/app/fork-gate.ts": "532f9095f35a4de8",
       "aimeat/src/services/design-book/grown-genre.ts": "e7193f3fd41c1cc2",
       "aimeat/src/services/app/lineage.ts": "626a0b907ec974eb",
@@ -770,7 +770,7 @@
       "aimeat/src/services/app/dev-grant.ts": "73824af1eaaaaa2e",
       "aimeat/src/services/app/visitors.ts": "05abcbde702aa99c",
       "aimeat/src/routes/apps-backup.ts": "853b79dce1939659",
-      "aimeat/src/routes/app-store.ts": "7373b7b390713a9c",
+      "aimeat/src/routes/app-store.ts": "2649a1f1843112ca",
       "aimeat/src/services/dependency-map.ts": "376c0e1e7ccf2e18"
     },
     "11. Served libraries and the Design Book": {
@@ -798,7 +798,7 @@
       "aimeat/src/data/library-packs/vendored-media.ts": "74a41e912fa4331f",
       "aimeat/src/data/library-packs/vendored-motion.ts": "c3a96d871a0f0134",
       "aimeat/src/data/library-packs/vendored.ts": "aec88fdb7174bded",
-      "aimeat/src/tool-catalog/definitions/designbook.ts": "af2c090e031b7508",
+      "aimeat/src/tool-catalog/definitions/designbook.ts": "e8d8a3d6e5d40812",
       "aimeat/src/services/design-book/grown-genre.ts": "e7193f3fd41c1cc2",
       "aimeat/src/services/design-book/kit-defaults.ts": "65653540823c7163",
       "aimeat/src/routes/themes.ts": "8933e5426eaec4eb",
@@ -816,7 +816,7 @@
       "aimeat/src/services/mailbox.ts": "31e9c3987f3dff3b",
       "aimeat/src/services/refinery/definition-ask.ts": "53b8b6449a3ffb4e",
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
-      "aimeat/src/services/refinery/pipeline.ts": "8e6289116821f229",
+      "aimeat/src/services/refinery/pipeline.ts": "aabc3a27ee2392a5",
       "aimeat/src/services/refinery/runs.ts": "5f36c34ae12f0f1b",
       "aimeat/src/services/refinery/schedule-input.ts": "0bd52a64f9284078",
       "aimeat/src/services/refinery/scheduled-job.ts": "0edfa3c9bf212605",
@@ -858,12 +858,12 @@
       "aimeat/src/tool-catalog/definitions/moderation.ts": "ae6a9716b37aa0a0"
     },
     "14. Economy, marketplace and payments": {
-      "aimeat/src/tool-catalog/definitions/commerce.ts": "8575293c37968368",
-      "aimeat/src/tool-catalog/definitions/exchange.ts": "ec29d4e30527fc93",
+      "aimeat/src/tool-catalog/definitions/commerce.ts": "5407ca44c64dafe8",
+      "aimeat/src/tool-catalog/definitions/exchange.ts": "894e027fefe17002",
       "aimeat/src/routes/commerce-webhooks.ts": "82408169bd101b2f",
       "aimeat/src/services/morsel.ts": "3d5e33c362495127",
       "aimeat/src/routes/commerce.ts": "aa6c548e71ef9527",
-      "aimeat/src/routes/exchange.ts": "1f33bee43401235c",
+      "aimeat/src/routes/exchange.ts": "cc2b179ef66179a8",
       "aimeat/src/routes/commerce-beneficiaries.ts": "ff1199000a3e0f7c",
       "aimeat/src/routes/disputes.ts": "3c507796d3ddbacb",
       "aimeat/src/routes/csm.ts": "50e027af290213ea",
@@ -872,7 +872,7 @@
     },
     "15. Bookkeeping and business": {
       "aimeat/src/routes/finance-ledger.ts": "d0242a27e002469d",
-      "aimeat/src/tool-catalog/definitions/companies.ts": "428b854c65bd689f",
+      "aimeat/src/tool-catalog/definitions/companies.ts": "894da581cda8dfb0",
       "aimeat/src/routes/csm.ts": "50e027af290213ea",
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
       "aimeat/src/routes/companies.ts": "0546ec1a0ac7152e",
@@ -921,7 +921,7 @@
     "17. AI transparency and compliance": {
       "aimeat/src/data/compliance-domains.ts": "3671999359e598ed",
       "aimeat/src/services/compliance/domain-floor.ts": "f25a30a0b00a9fa9",
-      "aimeat/src/tool-catalog/definitions/compliance.ts": "83ae759b2cda0f63",
+      "aimeat/src/tool-catalog/definitions/compliance.ts": "c8384bbcf2a9e64e",
       "aimeat/src/routes/owners/export-sections.ts": "e13ba3d2a3b0f831",
       "aimeat/src/services/mydata-receipt.ts": "5c067e160c40e46c",
       "aimeat/src/routes/ai-provenance.ts": "0f53e7e4d0e5b99a",
@@ -1016,7 +1016,7 @@
       "aimeat/src/services/classification-run/classifier.ts": "3671d4a417649d32",
       "aimeat/src/services/classification-run/scan.ts": "4a1961275529658a",
       "aimeat/src/services/classification-run/switch.ts": "a2b6b4c5d5c7ecfa",
-      "aimeat/src/routes/classification.ts": "010c5fd0003373c5",
+      "aimeat/src/routes/classification.ts": "aa8c8aed96e44932",
       "aimeat/src/tool-catalog/definitions/classification.ts": "fd8a3543b796d9e7",
       "aimeat/src/services/classify-on-write.ts": "7de28fba83f7644f"
     }
