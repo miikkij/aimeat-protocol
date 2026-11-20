@@ -226,8 +226,8 @@ export const GLOSSARY: GlossaryTerm[] = [
   // ── Extensibility ────────────────────────────────────────────────────────────────────────
   {
     term: 'App', area: 'extensibility',
-    form: 'owner/filename.html', example: 'happydude500001/nuotta.html',
-    definition: 'A single-file HTML application published on the node and served on its own origin. The app id is a filename and carries its extension; the subdomain does not, and guessing the id from the subdomain is the most common way a tool lookup misses.',
+    form: 'owner/name', example: 'happydude500001/nuotta',
+    definition: 'A single-file HTML application published on the node and served on its own origin. It is named without `.html` (`nuotta`); the stored file name (`nuotta.html`) names it too.',
     seeAlso: ['App grant', 'App origin', 'App tool'],
   },
   {

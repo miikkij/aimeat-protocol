@@ -19,6 +19,7 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   2026-11-20 — /purchase and /license-check take the app named without `.html` (services/app/app-ref.ts).
  *   2026-10-27 — POST /purchase asks the app's own gates first (services/app-purchase-gate.ts): a hidden
  *     app answers 404, an app open to chosen people refuses a buyer outside them, and without the right
  *     access code (X-Access-Code, ?code= or `code` in the body) the receipt holds no copy of the app
@@ -59,7 +60,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest, AppPurchaseRecord } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { ownerCoordinate } from '../utils/gaii.js';
+import { ownerCoordinate, localAccountName } from '../utils/gaii.js';
+import { resolveAppFilename } from '../services/app/app-ref.js';
 import { emitChange } from '../services/event-bus.js';
 import { sign } from '../auth/keypair.js';
 import { appSpendRefusal } from '../services/metered/access.js';
@@ -109,9 +111,9 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
         const buyerGaii = coordinateOf(req);
         const buyerOwner = req.auth!.owner;
-        const { app_filename, app_owner } = req.body ?? {};
+        const { app_filename: namedApp, app_owner } = req.body ?? {};
 
-        if (!app_filename || typeof app_filename !== 'string') {
+        if (!namedApp || typeof namedApp !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'app_filename is required'));
             return;
         }
@@ -119,6 +121,8 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'app_owner is required'));
             return;
         }
+        // `shop` names `shop.html` (services/app/app-ref.ts); the licence is kept under the file name.
+        const app_filename = await resolveAppFilename(storage, { ownerName: localAccountName(app_owner) }, namedApp);
 
         // Look up the app
         const app = await storage.getAppByOwnerName(app_owner, app_filename);
@@ -367,13 +371,14 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     // GET /v1/app-store/license-check — Check if user has valid license for an app
     router.get('/v1/app-store/license-check', requireAuth(), requireScope('wallet:read'), async (req, res) => {
         const gaii = coordinateOf(req);
-        const appFilename = req.query.app_filename as string;
+        const namedApp = req.query.app_filename as string;
         const appOwner = req.query.app_owner as string;
 
-        if (!appFilename || !appOwner) {
+        if (!namedApp || !appOwner) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'app_filename and app_owner query params required'));
             return;
         }
+        const appFilename = await resolveAppFilename(storage, { ownerName: localAccountName(appOwner) }, namedApp);
 
         // The seller coordinate is the app owner's GHII — the exact value the purchase receipt stored
         // as sellerGaii (app.ownerGaii = `owner@node`). The old code looked the seller up by iterating

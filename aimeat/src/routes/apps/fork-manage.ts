@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-20 — PATCH and DELETE /v1/apps/:filename take the app's name without `.html`
+ *     (services/app/app-ref.ts); the caller is the owner, so the path middleware cannot.
  *   2026-11-19 — DELETE /v1/apps/:filename passes the config to deleteOwnedApp, which now removes what the app leaves.
  *   2026-11-19 — POST .../fork answers the app read's own 403 ACCESS_DENIED (401 SIGN_IN_REQUIRED
  *     without an account) when the app's audience does not admit the caller (forkSourceFor gate
@@ -106,6 +108,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { fileAppPublishAsk, appAskedNote, publishAskedFields, askedStatus } from '../../services/app/publish-gate.js';
 import { appSettingsGate, appSettingsCapRefusal } from '../../services/app/settings-gate.js';
 import { publishAskOf } from '../../services/publish-requests/ask.js';
+import { resolveAppFilename } from '../../services/app/app-ref.js';
 
 /** What PATCH /v1/apps/:filename answers when the body cannot be carried out, before it writes. */
 interface PatchRefusal { status: number; code: string; message: string; }
@@ -289,7 +292,8 @@ export function registerForkManageRoutes(
         const t = await appTargetOr(appTarget, config, req, res, touchesOffering ? 'operate' : 'presentation');
         if (!t) return;
         const { owner, ownerGhii, delegated } = t;
-        const filename = req.params.filename as string;
+        // The owner is the caller here, so the path middleware cannot resolve the name; this does.
+        const filename = await resolveAppFilename(storage, { ownerName: owner }, req.params.filename as string);
 
         // Same lookup order as DELETE: canonical owner-GHII bucket first,
         // then agent-GAII shadow bucket (pre-fix rows), then bare owner,
@@ -564,7 +568,7 @@ export function registerForkManageRoutes(
     router.delete('/v1/apps/:filename', requireAuth(), requireScope('app:manage'), async (req, res) => {
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const { owner, ownerGhii } = await canonicalOwner(req);
-        const filename = req.params.filename as string;
+        const filename = await resolveAppFilename(storage, { ownerName: owner }, req.params.filename as string);
         const versionParam = req.query.version as string | undefined;
         const version = versionParam ? parseInt(versionParam, 10) : undefined;
 

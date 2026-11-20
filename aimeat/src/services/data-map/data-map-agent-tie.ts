@@ -21,6 +21,7 @@
  * @structure tieAgent · untieAgent
  * @usage const out = await tieAgent(storage, config, caller, 'alice/menu.html', 'morning-news', { madeFor: true }, at);
  * @version-history
+ *   v1.0.2 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex of this file's own; no change in behaviour.
  *   v1.0.1 — 2026-10-18 — The findings come from putProgramMap, which checks the map against the app's declared scopes.
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  */
@@ -32,6 +33,7 @@ import {
   putProgramMap, splitAppRef, type DataMapCaller, type DataMapRefusal, type ProgramMapResult,
 } from './data-map-access.js';
 import { DATA_MAP_SPEC, type DataMap, type DataMapRow } from './data-map-types.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 const refusal = (status: number, code: string, message: string): DataMapRefusal => ({ refusal: { status, code, message } });
 
@@ -49,7 +51,7 @@ async function ownAppAndAgent(
   storage: Storage, config: AimeatConfig, caller: DataMapCaller, appRef: string, agent: string,
 ): Promise<DataMapRefusal | { ownerGhii: string; filename: string; appId: string }> {
   const ref = splitAppRef(appRef);
-  if (!ref) return refusal(400, 'INVALID_INPUT', 'Name the app as "owner/filename.html".');
+  if (!ref) return refusal(400, 'INVALID_INPUT', 'Name the app as "owner/name", e.g. "alice/shop".');
   if (caller.ownerName !== ref.owner) return refusal(403, 'FORBIDDEN', 'This map belongs to another account.');
   if (caller.roles.includes('app')) {
     return refusal(403, 'FORBIDDEN', 'A granted app cannot write a data map. The owner states it.');
@@ -57,7 +59,7 @@ async function ownAppAndAgent(
   if (!isValidAgentName(agent)) return refusal(400, 'INVALID_INPUT', 'Name one of your own agents.');
   const record = await storage.getAppByOwnerName(ref.owner, ref.filename);
   if (!record) return refusal(404, 'NOT_FOUND', `No app "${appRef}" on this node.`);
-  return { ownerGhii: record.ownerGaii, filename: ref.filename, appId: ref.filename.replace(/\.html$/i, '') };
+  return { ownerGhii: record.ownerGaii, filename: ref.filename, appId: appDataMapId(ref.filename) };
 }
 
 /**

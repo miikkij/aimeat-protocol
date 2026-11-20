@@ -14,6 +14,8 @@
  * @usage Implemented by SqliteStorage / MongoStorage; consumed by routes/apps.ts
  *   and mcp/apps.ts.
  * @version-history
+ *   2026-11-20 — appFilenamesAmong(): which candidate filenames an owner has, apps and drafts, without
+ *     the payload, for the app reference resolver (wish-sovelluksen-nimi-ilman-html-p-tett-kaikkialla).
  *   v1.0.0 — pre-2026-06 — Initial app repository contract
  *   v1.1.0 — 2026-06-05 — Add normalizeAppOwnerNames() for legacy GHII ownerName
  *     cleanup so agent-published apps surface under the owner's "Published Apps".
@@ -76,6 +78,13 @@ export interface AppRepository {
      * callers must pass the viewer's own GHII.
      */
     listAppDraftFilenames(ownerGaii: string): Promise<string[]>;
+    /**
+     * Which of `candidates` name an app of this owner, published or held only as a draft, in one
+     * read and without the payload. The owner is the bucket key (`ownerGaii`) or the account name
+     * the URL carries (`ownerName`). services/app/app-ref.ts asks it to turn `lifecycle-central` into
+     * the stored `lifecycle-central.html`; reading getApp for that would load the app's bytes twice.
+     */
+    appFilenamesAmong(owner: { ownerGaii: string } | { ownerName: string }, candidates: string[]): Promise<string[]>;
     getApp(ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null>;
     getAppByOwnerName(ownerName: string, filename: string, version?: number): Promise<AppRecord | null>;
     /**

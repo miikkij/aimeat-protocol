@@ -23,6 +23,8 @@
  *   const a = await complianceDocAccess(storage, { sub, owner, roles, scopes }, scope, 'write');
  *   if (!a.ok) return res.status(a.status).json(error(nodeId, a.code, a.message));
  * @version-history
+ *   v1.1.0 — 2026-11-20 — An app scope named without `.html` is resolved to the stored filename and
+ *     written back onto the scope before the lookup (services/app/app-ref.ts).
  *   v1.0.1 — 2026-11-05 — Moved unchanged from src/services/compliance-docs-access.ts to src/services/compliance/docs-access.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1).
  */
@@ -33,6 +35,7 @@ import { actsForSomeone, askOperator, type OperatorCaller } from '../operator/pr
 import { agentBarred } from '../organism/agent-access.js';
 import { isOrgManager } from '../workspace/access.js';
 import type { ComplianceScope } from './docs.js';
+import { resolveAppFilename } from '../app/app-ref.js';
 
 export type DocAccess =
   | { ok: true; by: string; operator: boolean; ownerName: string }
@@ -78,6 +81,10 @@ export async function complianceDocAccess(
   // An app: its owner's, or read by the operator.
   const mine = scope.ownerName === ownerName;
   if (!mine && !(operator && mode === 'read')) return NOT_FOUND('app');
+  // `crm` names `crm.html` (services/app/app-ref.ts). The scope is the one every compliance call
+  // reads after this check, so the stored filename is written back onto it here, once, and the
+  // documents are kept under the same app whichever way it was named.
+  scope.app = await resolveAppFilename(storage, { ownerName: scope.ownerName }, scope.app);
   const app = await storage.getAppByOwnerName(scope.ownerName, scope.app);
   return app ? yes : NOT_FOUND('app');
 }

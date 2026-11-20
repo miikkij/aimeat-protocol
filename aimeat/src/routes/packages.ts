@@ -21,6 +21,7 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-11-20 — compose and compose-set take apps named without `.html` (services/app/app-ref-inputs.ts).
  *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-10-31 — The three package reads pass `config`, so the operator's read of a sold package is
@@ -113,6 +114,7 @@ import { readAccountSale, listedSaleRefusal } from '../services/packages/sale/pa
 import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 import { isOperatorCaller } from '../services/operator/override.js';
 import { readRemoteTemplates } from '../services/federation/remote-templates.js';
+import { appRefCtxFor, normalizeAppRefInput } from '../services/app/app-ref-inputs.js';
 
 // The version generator, the content hash and the per-author ceiling used to live here, one copy
 // per road. They are in services/packages/compose/package-create.ts now, which is the one place a package version is
@@ -165,6 +167,10 @@ export function packagesRouter(
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create packages'));
       return;
     }
+    // `shop` in `apps` names `shop.html` (services/app/app-ref-inputs.ts).
+    if (req.body && typeof req.body === 'object') {
+      await normalizeAppRefInput('aimeat_package_compose', req.body, appRefCtxFor(storage, config.nodeId, owner));
+    }
 
     const {
       name, apps, description, category, tags, visibility, status,
@@ -200,6 +206,7 @@ export function packagesRouter(
       return;
     }
     const b = (req.body ?? {}) as Record<string, unknown>;
+    await normalizeAppRefInput('aimeat_package_compose_set', b, appRefCtxFor(storage, config.nodeId, owner));
     const ownerGhii = await resolveGhii(storage, owner, config);
     const out = await composeSetWithPublishGate({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, { owner, ownerGhii }, {
       name: b.name as string, apps: b.apps as string[], title: b.title as string | undefined,

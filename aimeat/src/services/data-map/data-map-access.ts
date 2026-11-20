@@ -12,6 +12,8 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex
+ *     of this file's own; no change in behaviour.
  *   2026-11-19 — The refusal points at the Atelier spec's data-map section (build-app-atelier/data-map).
  *   2026-11-15 — The hands coverage note says "the writes a person, an agent or an app made", not a door.
  *   2026-11-13 — stateProgramMap answers `balancingTest` when the written map makes the app need a
@@ -60,6 +62,7 @@ import { ecoMayReadKey } from '../ecosystem/access.js';
 import { readDoc } from '../compliance/docs.js';
 import type { ComplianceRegister } from '../compliance/docs-schemas.js';
 import { balancingTestStep, type BalancingTestStep } from '../compliance/lia-write.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 export interface DataMapRefusal {
   refusal: { status: number; code: string; message: string };
@@ -113,7 +116,7 @@ export interface DataMapCaller {
 /** The node itself reading a map for its own check (decide service): no person, no visibility gate. */
 export const NODE_READ = 'node' as const;
 
-const appIdOf = (filename: string): string => filename.replace(/\.html$/i, '');
+const appIdOf = (filename: string): string => appDataMapId(filename);
 
 /**
  * The words of the app's `<meta name="aimeat-scopes">`, read from its stored bytes. They decide
@@ -144,7 +147,7 @@ export async function readProgramMap(
 ): Promise<ProgramMapResult | DataMapRefusal> {
   const ref = splitAppRef(appRef);
   if (!ref) {
-    return { refusal: { status: 400, code: 'INVALID_INPUT', message: 'Name the app as "owner/filename.html".' } };
+    return { refusal: { status: 400, code: 'INVALID_INPUT', message: 'Name the app as "owner/name", e.g. "alice/shop".' } };
   }
   const notFound: DataMapRefusal = {
     refusal: { status: 404, code: 'NOT_FOUND', message: `No app "${appRef}" on this node. Check the owner name and the filename.` },
@@ -335,7 +338,7 @@ export async function stateProgramMap(
 ): Promise<ProgramMapResult | DataMapRefusal> {
   const ref = splitAppRef(appRef);
   if (!ref) {
-    return { refusal: { status: 400, code: 'INVALID_INPUT', message: 'Name the app as "owner/filename.html".' } };
+    return { refusal: { status: 400, code: 'INVALID_INPUT', message: 'Name the app as "owner/name", e.g. "alice/shop".' } };
   }
   if (caller.ownerName !== ref.owner) {
     return { refusal: { status: 403, code: 'FORBIDDEN', message: 'This map belongs to another account.' } };

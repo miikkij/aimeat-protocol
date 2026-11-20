@@ -19,6 +19,8 @@
  *   define-app-iam.ts reads the ladder the gate enforces) · generateIamExtension(input) → { name, manifest, scripts }
  * @usage const ext = generateIamExtension({ appId, extName, levels, commands });
  * @version-history
+ *   v1.1.1 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.1.0 — 2026-10-01 — accumulate() is exported as accumulateCapabilities() so defineAppIam builds its
  *     matrix and its setRoles payload from the same ladder this gate enforces (audit 2026-10-01, defect B).
  *     The manifest no longer declares `required_apis: memory`: the generated scripts read and write no
@@ -28,6 +30,7 @@
  */
 import type { LevelDef } from './model.js';
 import type { CommandDef } from './app-commands.js';
+import { appDisplayName } from '../app/app-ref.js';
 
 export interface GenerateIamExtensionInput {
   /** `owner/file.html` — the app whose roster the node resolves the caller against. */
@@ -60,7 +63,7 @@ export interface GeneratedExtension {
 
 /** A name the install route accepts: lowercase, hyphens, no dots. */
 function slug(appId: string): string {
-  return String(appId).toLowerCase().replace(/\.html?$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return appDisplayName(String(appId).toLowerCase()).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 /**

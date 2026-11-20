@@ -19,6 +19,7 @@
  *     GET /v1/ai/gen-rules — the rules, their levels, the owner's exceptions, what applies to the caller
  *     PUT /v1/ai/gen-rules — owner: apply; agent: propose, then confirm with confirm_token
  * @version-history
+ *   v1.0.2 — 2026-11-20 — PUT takes an exception's app named without `.html` (services/app/app-ref-inputs.ts).
  *   v1.0.1 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
  *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.0.0 — 2026-10-31 — Initial (wish-image-and-video-generation-people-only-in-an-artistic-non-ph).
@@ -37,6 +38,7 @@ import { callerOf } from '../middleware/caller.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { bindGenRulesConfig, genRulesView, setOwnerGenRules } from '../services/ai/gen-rules-store.js';
 import { aiCallerOf } from './ai-policy.js';
+import { appRefCtxFor, normalizeAppRefInput } from '../services/app/app-ref-inputs.js';
 
 /** The scope an agent needs to propose a change to its owner's rules. Outside the `*` bundle. */
 const GEN_RULES_WRITE_SCOPE = 'memory:write-reserved';
@@ -89,6 +91,8 @@ export function aiGenRulesRouter(config: AimeatConfig, storage: Storage): Router
   // ── PUT /v1/ai/gen-rules ── the owner applies; an agent proposes and then confirms.
   router.put('/v1/ai/gen-rules', requireAuth(), requireScope(GEN_RULES_WRITE_SCOPE), validateBody(GenRulesBodySchema, config.nodeId), async (req: Request, res: Response) => {
     const auth = req.auth!;
+    // An exception's `alice/shop` names `alice/shop.html` (services/app/app-ref-inputs.ts).
+    await normalizeAppRefInput('aimeat_ai_gen_rules_set', req.body, appRefCtxFor(storage, config.nodeId, auth.owner));
     // One shape, the one both MCP twins send: { gen_rules, confirm_token }; validateBody checked it.
     const { gen_rules: input, confirm_token } = req.body as z.infer<typeof GenRulesBodySchema>;
     try {

@@ -26,6 +26,7 @@
  * @usage
  *   const appKey = canonicalAiAppId(call.appId, gaii) || '_unknown';
  * @version-history
+ *   2026-11-20 -- The app name comes from services/app/app-ref.ts (appDisplayName) instead of a regex of this file's own; no change in behaviour.
  *   2026-11-05 -- Moved unchanged from src/services/ai-app-id.ts to src/services/ai/app-id.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-27 -- bareNameOnlyEntry: which bare allowlist entry lets another author's app in by its file
  *     name alone, so the owner can be told (secaudit2026oct26).
@@ -40,6 +41,7 @@
  */
 
 import { localAccountName } from '../../utils/gaii.js';
+import { appDisplayName } from '../app/app-ref.js';
 
 /** The account name of an owner GHII of this node (`alice@node` → `alice`); another node's stays whole. */
 function ownerNameOf(ownerGhii?: string): string | undefined {
@@ -59,7 +61,7 @@ export function canonicalAiAppId(raw: unknown, ownerGhii?: string): string | und
     const prefix = localAccountName(id.slice(0, slash));
     if (prefix && prefix === ownerNameOf(ownerGhii)) id = id.slice(slash + 1);
   }
-  id = id.replace(/\.html?$/i, '');
+  id = appDisplayName(id);
   return id || undefined;
 }
 

@@ -22,6 +22,7 @@
  *   const out = await createSubdomainSite(storage, config, req.body ?? {}, resolveIdentity(req.auth!, config.nodeId));
  *   if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   2026-11-20 — An app target named without `.html` is stored as the app's file (services/app/app-ref.ts).
  *   2026-11-13 — resolveAppTarget comes from services/app-access.ts, not from a route file (structure
  *     programme 2026-11, unit 4).
  *   v1.4.0 — 2026-10-25 — A mapping created here has origin 'operator' (served on the apex namespace
@@ -43,6 +44,7 @@ import { resolveAppTarget } from '../app/access.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from './names.js';
 import { appNeedsCodeOrPayment } from '../app/access.js';
 import { isNodeApexLabel } from './node-labels.js';
+import { resolveOwnerAppRef } from '../app/app-ref.js';
 
 /** A refusal, in the shape each door renders as its own error envelope. */
 export interface SubdomainRefusal {
@@ -111,7 +113,10 @@ export async function createSubdomainSite(
 ): Promise<{ ok: true; site: SubdomainSiteRecord } | SubdomainRefusal> {
   const subdomain = String(input.subdomain ?? '').trim().toLowerCase();
   const kind = String(input.kind ?? 'app');
-  const target = String(input.target ?? '').trim();
+  // `alice/shop` names `alice/shop.html` (services/app/app-ref.ts); the stored target names the file,
+  // which is what the app-grant redirect and the publish compare it with.
+  const rawTarget = String(input.target ?? '').trim();
+  const target = kind === 'app' ? await resolveOwnerAppRef(storage, rawTarget) : rawTarget;
   const enabled = input.enabled === undefined ? true : Boolean(input.enabled);
 
   if (!SUBDOMAIN_RE.test(subdomain)) {
@@ -185,7 +190,10 @@ export async function updateSubdomainSite(
     // An existing app row on a node name keeps working; it only cannot be made into one.
     if (input.kind === 'app' && existing.kind !== 'app' && isNodeApexLabel(subdomain, config)) return nodeLabelRefusal(subdomain);
   }
-  if (input.target !== undefined) updates.target = String(input.target).trim();
+  if (input.target !== undefined) {
+    const raw = String(input.target).trim();
+    updates.target = (updates.kind ?? existing.kind) === 'app' ? await resolveOwnerAppRef(storage, raw) : raw;
+  }
   if (input.enabled !== undefined) updates.enabled = Boolean(input.enabled);
 
   // Cross-validate the effective kind/target pair when either changes

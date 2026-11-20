@@ -40,6 +40,8 @@
  *   import { composePackageFromApps } from './package-compose.js';
  *   const out = await composePackageFromApps({ storage, config }, caller, { name, apps });
  * @version-history
+ *   v1.8.1 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.8.0 — 2026-11-01 — Another account's public, active cortex travels in the package again, and a
  *     note names its installer; a private or inactive one stays in expects.cortex (Jouni's ruling on
  *     the v1.7.0 change).
@@ -79,6 +81,7 @@ import { publicDataMap } from '../../data-map/data-map-types.js';
 import { readAppDataMap } from '../../data-map/data-map-store.js';
 import { appToolsKey } from '../../../models/app-tool-schemas.js';
 import { toolsForPackage } from '../install/package-app-tools.js';
+import { appDataMapId } from '../../app/app-ref.js';
 
 /** What the installing node must already have, because this package deliberately does not carry it. */
 export interface ComposeExpectations {
@@ -352,7 +355,7 @@ export async function planComposeFromApps(
         const appMeta = meta.app as Record<string, unknown>;
         // The map lives under the app id without `.html` (data-map-access.ts appIdOf); the tool list
         // under the filename itself (app-tools-key.ts). Read each where its own writer put it.
-        const map = await readAppDataMap(storage, caller.ownerGhii, filename.replace(/\.html$/i, ''));
+        const map = await readAppDataMap(storage, caller.ownerGhii, appDataMapId(filename));
         if (map && map.source !== 'none') appMeta.datamap = publicDataMap(map);
         const toolsRec = await storage.getMemory(caller.ownerGhii, appToolsKey(filename));
         const tools = toolsRec ? toolsForPackage(toolsRec.value) : null;

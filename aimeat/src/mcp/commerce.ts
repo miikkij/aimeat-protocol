@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-20 — aimeat_app_tools_get takes the app's name without `.html` and `owner/name`
+ *     (services/app/app-ref.ts); its not-found hint names the nearest manifests first, without `.html`.
  *   2026-11-14 — aimeat_app_tools_get answers the manifest of an app the operator hid as missing to anyone
  *     but its account and the operator, as the WebMCP listing does (services/app/tools-manifest-reach.ts; unit 2b, B12).
  *   2026-10-29 — aimeat_admin_possible_payouts: the operator lists the open possible payouts and marks one
@@ -127,7 +129,8 @@ import { writeMemoryRecord } from '../services/memory/write.js';
 import { exchangeOutcome, type ReconcileReport } from '../services/exchange/projection.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { resolveOperatorAgentName } from '../services/operator/principal.js';
-import { appToolManifestIds } from '../services/app-tools/manifest-read.js';
+import { appToolManifestIds, resolveToolManifestId } from '../services/app-tools/manifest-read.js';
+import { appDisplayName, splitAppRef } from '../services/app/app-ref.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -341,8 +344,13 @@ export function registerCommerceTools(
             inputSchema: zodShapeFor('aimeat_app_tools_get'),
             annotations: annotationsFor('aimeat_app_tools_get'),
         },
-        async ({ app_id, owner: ownerArg }) => {
-            const targetOwner = localAccountName(ownerArg ?? owner);
+        async ({ app_id: appRef, owner: ownerArg }) => {
+            // `owner/name` in app_id names the owner when the owner argument is left out.
+            const prefixed = splitAppRef(appRef);
+            const targetOwner = localAccountName(ownerArg ?? prefixed.owner ?? owner);
+            // `lifecycle-central`, `lifecycle-central.html` and `owner/lifecycle-central` all name the
+            // stored app (services/app/app-ref.ts); the manifest key carries the stored filename.
+            const app_id = await resolveToolManifestId(storage, targetOwner, `${targetOwner}@${config.nodeId}`, appRef);
             const rec = await storage.getMemory(`${targetOwner}@${config.nodeId}`, appToolsKey(app_id));
             // Cross-owner reads require the record to be PUBLIC — a private manifest is
             // indistinguishable from a missing one (mirrors the WebMCP listing gate). The manifest of an
@@ -351,16 +359,14 @@ export function registerCommerceTools(
             const session = caller();
             const hiddenApp = rec ? await toolsManifestHiddenFrom(storage, config, rec.ownerGaii, rec.key, { owner: session.owner, auth: session.auth }) : false;
             if (!rec || hiddenApp || (targetOwner !== owner && rec.visibility !== 'public')) {
-                // Name the manifests this owner DOES publish. An app id is a filename and carries its
-                // extension, while the app's own subdomain does not: an agent that read
-                // `nuotta.apps.aimeat.io` asked for "nuotta", was told the app declares no manifest,
-                // believed it, and went off to download the app's HTML to work out what it does. The
-                // bare "not found" was true of the key and false of the app.
-                const near = await appToolManifestIds(storage,`${targetOwner}@${config.nodeId}`, targetOwner === owner);
+                // Name the manifests this owner DOES publish, the ones nearest the name asked first: an
+                // agent told only "not found" went off to download the app's HTML to work out what it
+                // does. The names are shown without `.html`, as the caller may send them.
+                const near = await appToolManifestIds(storage,`${targetOwner}@${config.nodeId}`, targetOwner === owner, appRef);
                 const hint = near.length
-                    ? ` This owner publishes tool manifests for: ${near.join(', ')}. An app id is a filename and includes its extension.`
+                    ? ` This owner publishes tool manifests for: ${near.join(', ')}.`
                     : '';
-                return fail(`APP_TOOLS_NOT_FOUND: app "${targetOwner}/${app_id}" declares no ${targetOwner === owner ? '' : 'public '}tool manifest.${hint}`);
+                return fail(`APP_TOOLS_NOT_FOUND: app "${targetOwner}/${appDisplayName(prefixed.name)}" declares no ${targetOwner === owner ? '' : 'public '}tool manifest.${hint}`);
             }
             return ok({ app: `${targetOwner}/${app_id}`, visibility: rec.visibility, manifest: rec.value });
         },

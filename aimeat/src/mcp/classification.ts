@@ -15,6 +15,8 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
  * @version-history
+ *   2026-11-20 — get, set and review name the target through namedTargetOf, so an app named without
+ *     `.html` labels the hosted app (services/classification/labels.ts).
  *   2026-11-15 — exception_set passes board_id and app to makeException, as POST
  *     /v1/classification/exceptions does.
  *   2026-10-23 — pack_list and pack_set: the TL and NATO label packs (services/classification/packs.ts,
@@ -45,7 +47,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import {
-  ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
+  ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, namedTargetOf,
 } from '../services/classification/labels.js';
 import { readAuditLog, readPolicy, writePolicy } from '../services/classification/policy-admin.js';
 import { checkClassificationInput, POLICY_PENDING_NEXT } from '../tool-catalog/definitions/classification.js';
@@ -92,17 +94,17 @@ export function registerClassificationTools(
         const actor = labelActorOf(session.auth, config.nodeId);
         switch (args.action) {
           case 'get':
-            return text(await readContentLabel(deps, actor, targetOf(actor, args)));
+            return text(await readContentLabel(deps, actor, await namedTargetOf(deps, actor, args)));
           case 'set': {
             if (!args.label) return toolError('INVALID_INPUT', 'label is required: a label id from policy_get.');
-            return text(await setLabel(deps, actor, targetOf(actor, args), {
+            return text(await setLabel(deps, actor, await namedTargetOf(deps, actor, args), {
               label: args.label, justification: args.justification, humanSaid: args.human_said,
               confidence: args.confidence, reason: args.reason,
             }));
           }
           case 'review': {
             if (!args.decision) return toolError('INVALID_INPUT', 'decision is accept or reject.');
-            return text(await reviewLabel(deps, actor, targetOf(actor, args), {
+            return text(await reviewLabel(deps, actor, await namedTargetOf(deps, actor, args), {
               decision: args.decision, justification: args.justification, humanSaid: args.human_said,
             }));
           }

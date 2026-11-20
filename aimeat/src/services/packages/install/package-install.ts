@@ -20,6 +20,7 @@
  *   import { installPackage } from './package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   2026-11-20 — An app component's file name comes from htmlFilenameOf (services/app/app-ref.ts); no change in behaviour.
  *   2026-11-08 — A cortex schema part asks the schema lock rule as the installer before anything
  *     registers, on a dry run too: a node-wide pattern, another organism's records or a key another
  *     account's lock governs is refused with the rule's code (package-schema-lock.ts; secaudit2026nov08
@@ -115,6 +116,7 @@ import { isOwnerInPerson } from '../../../utils/gaii.js';
 import { installRoleRefusal } from '../../extension/install-role.js';
 import { packageLockCaller, cortexLockRuleRefusal } from './package-schema-lock.js';
 import { ownerPrefixed } from '../../csm-service.js';
+import { htmlFilenameOf } from '../../app/app-ref.js';
 
 export interface PackageInstallDeps {
     storage: Storage;
@@ -283,7 +285,7 @@ export function registeredNameFor(
     // collision with the owner's own skill is decided on (package-skill-component.ts).
     if (comp.type === 'skill') return skillComponentName(comp.content ?? '') ?? base;
     if (comp.type === 'csm') return ownerPrefixed(base, owner);
-    return comp.type === 'app' && !/\.html?$/i.test(base) ? `${base}.html` : base;
+    return comp.type === 'app' ? htmlFilenameOf(base) : base;
 }
 
 /**

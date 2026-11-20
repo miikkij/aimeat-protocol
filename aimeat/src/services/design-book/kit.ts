@@ -28,6 +28,7 @@
  *   const body = validateKitBody({ reach: 'own', look: 'editorial', tokens: { '--ak-accent': '#1d4ed8/#93c5fd' } });
  *   if (!(await kitReadable(storage, nodeId, part, readerOwnerGhii))) throw notFound;
  * @version-history
+ *   v1.3.1 — 2026-11-20 — The from_app refusal names the app without `.html` (services/app/app-ref.ts).
  *   v1.3.0 — 2026-11-04 — A kit with no ornament set previews as a working screen in the real app shell,
  *     because what makes the office looks theirs (the tabs, the numbered contents, the bar in the
  *     company's colour) is the shell's, and the five-figure screen has none of it.
@@ -170,7 +171,7 @@ export function validateKitBody(o: Record<string, unknown>): KitBody {
   }
   if (o.from_app !== undefined) {
     if (typeof o.from_app !== 'string' || !FILENAME_RE.test(o.from_app)) {
-      throw new DesignBookError('BODY_INVALID', '"from_app" names your own published app the kit was taken from, e.g. "habits.html".', 422);
+      throw new DesignBookError('BODY_INVALID', '"from_app" names your own published app the kit was taken from, e.g. "habits".', 422);
     }
     out.from_app = o.from_app;
   }

@@ -14,6 +14,7 @@
  *   getTemplateProposal/deleteTemplateProposal; templateProposalKey()
  * @usage import { proposeTemplate, listTemplateProposals } from './template-proposals.js';
  * @version-history
+ *   v1.1.1 — 2026-11-20 — `derived_from.filename` takes the app named without `.html` (services/app/app-ref.ts).
  *   v1.1.0 — 2026-11-19 — `tier` is optional: the retired Classic track's T1/T2/T3, kept on older
  *     proposals and tagged only when given. Atelier has no tiers.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
@@ -32,6 +33,7 @@ import { isGEAI, localAccountOf } from '../../utils/gaii.js';
 import { memoryCeilings } from '../memory/ceilings.js';
 import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 import type { ContributionProof } from '../../models/contribution-proof.js';
+import { resolveAppFilename } from './app-ref.js';
 
 const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -108,6 +110,8 @@ export async function proposeTemplate(
         return { error: 'derived_from.owner must be your own owner name' };
     }
     const sourceOwnerGhii = `${input.derived_from.owner}@${config.nodeId}`;
+    // `shop` names `shop.html` (services/app/app-ref.ts); the proposal records the file name.
+    input.derived_from.filename = await resolveAppFilename(storage, { ownerName: input.derived_from.owner }, input.derived_from.filename);
     const app = await storage.getApp(sourceOwnerGhii, input.derived_from.filename);
     if (!app) return { error: `derived_from app not found: ${input.derived_from.owner}/${input.derived_from.filename}` };
 

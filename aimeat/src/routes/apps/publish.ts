@@ -8,6 +8,8 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   2026-11-20 -- POST /v1/apps takes the app's name without `.html`: it updates the owner's
+ *     `name.html`, and a new HTML app named without an extension is stored as `name.html`.
  *   v2.12.0 -- 2026-10-27 -- A publish through an app's grant names that app on the version, inline and
  *     presigned (`publishing_app` in the signed token) (secaudit2026oct26, app-grant-publisher-reads-as-owner).
  *   v2.11.0 -- 2026-10-18 -- The publish gate (services/app-publish-gate.ts): a first publish the node's
@@ -76,7 +78,8 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload/token.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
-import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveIdentity, localAccountName } from '../../utils/gaii.js';
+import { publishFilename } from '../../services/app/app-ref.js';
 import { publishApp } from '../../services/app/publish.js';
 import { servedMarksResponse } from '../../services/app/serve-marks-strip.js';
 import { isSharedApp } from '../../services/app/dev-grant.js';
@@ -105,6 +108,15 @@ export function registerPublishRoutes(
         // version counter is shared (not two parallel buckets that shadow
         // each other). The caller's GAII is preserved in audit logs only.
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+        // The name the publish writes, settled before any gate reads it: `notes` updates the owner's
+        // `notes.html`, and a new HTML app named without an extension is stored as `notes.html`
+        // (services/app/app-ref.ts publishFilename). The target, the development right and the
+        // publish all see this one value.
+        if (req.body && typeof req.body.filename === 'string') {
+            const bodyOwner = typeof req.body.owner === 'string' && req.body.owner ? req.body.owner : req.auth!.owner;
+            const mime = typeof req.body.mime_type === 'string' ? req.body.mime_type : 'text/html';
+            req.body.filename = await publishFilename(storage, { ownerName: localAccountName(bodyOwner) }, req.body.filename, mime);
+        }
         // `owner` in the body names somebody else's catalogue; absent, it is the caller's own, which
         // is what this door has always done. A rung that does not carry `publish` is refused here,
         // before a single byte is decoded.

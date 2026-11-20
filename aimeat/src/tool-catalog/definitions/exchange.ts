@@ -13,6 +13,7 @@
  *   Money is 6-decimal micro-units; morsels are whole units of pacing, never a price. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-11-20 — aimeat_app_tool_invoke's `app` is the app's name without `.html` (services/app/app-ref.ts).
  *   2026-11-02 — aimeat_app_tool_invoke asks exchange:invoke, split out of exchange:write, which still covers it (Jouni, 10.25).
  *   2026-10-13 — aimeat_app_tool_invoke declares ext:invoke beside exchange:write, enforced from 4.0.0 like
  *     the extension action route it reaches (wish-aimeat-app-tool-invoke-ilmoittaa-vain-exchange-write-vaikka-).
@@ -236,7 +237,7 @@ export const exchangeTools = [
         surfaces: ['agent', 'service'],
         input: {
             owner: { type: 'string', required: true, description: 'The provider app\'s owner (bare name or GHII).', zod: z.string().min(1).max(120) },
-            app: { type: 'string', required: true, description: 'The provider app filename (e.g. "company-brief").', zod: z.string().min(1).max(120) },
+            app: { type: 'string', required: true, description: 'The provider app\'s name, e.g. "lifecycle-central" (its file name "lifecycle-central.html" works too).', zod: z.string().min(1).max(120) },
             tool: { type: 'string', required: true, description: 'The tool name to call (e.g. "getCompanyBrief").', zod: z.string().min(1).max(120) },
             input: { type: 'object', required: false, description: 'The tool input object (matching the offering\'s input_schema).' },
         },

@@ -40,6 +40,9 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-20 — Whether the file is an HTML app (the subdomain and the announcement) is isHtmlAppFile.
+ *   2026-11-20 — The app name and the data-map id come from services/app/app-ref.ts (appDisplayName /
+ *     appDataMapId) instead of a regex of this file's own; no change in behaviour.
  *   2026-11-11 — A publish that states no cortex.agents reads the page's aimeat-crews block, the one a
  *     package install reads; a block that cannot be used, a block that differs from the request, and
  *     a definition that names tools and asks for no permissions are named in the publish hints
@@ -181,6 +184,7 @@ import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, t
 export type { RequestedManifest, PublishAppInput, PublishAppRefusal } from './publish-types.js';
 import type { PublishAppInput, PublishAppRefusal } from './publish-types.js';
 import { byAnotherAuthorsApp, tellOwnerAppPublishedByApp } from './published-by-app.js';
+import { appDataMapId, appDisplayName, isHtmlAppFile } from './app-ref.js';
 
 export interface PublishAppResult {
   roadmapHint?: string;
@@ -407,7 +411,7 @@ export async function publishApp(
 
   // ── The manifest: one carry-forward list, applied to every door ──
   const manifest: AppManifest = {
-    name: requested.name ?? prev?.name ?? filename.replace(/\.html?$/i, ''),
+    name: requested.name ?? prev?.name ?? appDisplayName(filename),
     description,
     version: requested.version ?? prev?.version ?? `1.0.${newVersion - 1}`,
     category: requested.category ?? prev?.category ?? 'utility',
@@ -508,7 +512,7 @@ export async function publishApp(
   let dataMap: DataMapStamp | null = null;
   if (isHtml) {
     const at = new Date().toISOString();
-    const appId = filename.replace(/\.html$/i, '');
+    const appId = appDataMapId(filename);
     const existing = await readAppDataMap(storage, ownerGhii, appId);
     dataMap = stampFor(existing, appId, at, parseAppScopes(html));
     manifest.dataMap = dataMap;
@@ -610,7 +614,7 @@ export async function publishApp(
   // Provision the per-app subdomain NOW. Previously assigned on the first path-form open, so a new
   // app's vanity URL 404'd until someone hit the canonical URL — which reads as a broken app rather
   // than a missing mapping. Best-effort: a failed ensure never fails the publish.
-  if (/\.html?$/i.test(filename)) {
+  if (isHtmlAppFile(filename)) {
     try {
       await ensureAppSubdomain(storage, config, ownerName, filename);
     } catch (err) {
@@ -635,7 +639,7 @@ export async function publishApp(
   const announces = isAnnounceable(published);
   // Listable: an app with no description of its own is not announced (TARGET-089 Y2).
   if (published && appSeoListable(published, config)) {
-    const site = /\.html?$/i.test(filename)
+    const site = isHtmlAppFile(filename)
       ? (await storage.listSubdomainSites())
         .find(s => s.enabled && s.kind === 'app' && s.target === `${ownerName}/${filename}`)
       : undefined;

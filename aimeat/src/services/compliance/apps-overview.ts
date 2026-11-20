@@ -13,6 +13,7 @@
  * @structure ComplianceAppRow · appsOverview()
  * @usage const { apps, by_reach } = await appsOverview({ storage, config });
  * @version-history
+ *   v1.0.2 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex of this file's own; no change in behaviour.
  *   v1.0.1 — 2026-11-05 — Moved unchanged from src/services/compliance-apps-overview.ts to src/services/compliance/apps-overview.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.0 — 2026-10-29 — Initial.
  */
@@ -22,6 +23,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { readAppDataMap } from '../data-map/data-map-store.js';
 import { appAiSignals } from './app-signals.js';
 import { appReach, REACH_ORDER, type AppReach } from './app-reach.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 /** How many apps are read, as the records-of-processing gaps read them. */
 const APP_SCAN = 1000;
@@ -63,14 +65,14 @@ export async function appsOverview(deps: { storage: Storage; config: AimeatConfi
   for (const a of apps) {
     const owner = localAccountName(a.ownerName ?? a.ownerGaii ?? '');
     if (!owner) continue;
-    const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, a.filename.replace(/\.html$/i, ''));
+    const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, appDataMapId(a.filename));
     const reach = appReach(map);
     const posture = a.manifest?.aiPosture;
     const ai = appAiSignals(map, posture);
     rows.push({
       app: `${owner}/${a.filename}`,
       owner,
-      title: a.manifest?.name || a.filename.replace(/\.html$/i, ''),
+      title: a.manifest?.name || appDataMapId(a.filename),
       reach: reach.reach,
       personal: reach.personal,
       has_map: reach.hasMap,

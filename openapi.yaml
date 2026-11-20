@@ -252,7 +252,7 @@ tags:
   - name: Agents
     description: Agent lifecycle — registration, device authorization, profile, mode, verification, and per-agent overview aggregates
   - name: Apps
-    description: Hosted single-file HTML apps — publish, fork, version, and per-owner app management
+    description: Hosted single-file HTML apps — publish, fork, version, and per-owner app management. An app is named without `.html` wherever a path or a field names it (`/v1/apps/alice/shop` reaches `shop.html`); the name exactly as given is tried first, then with `.html`. A new HTML app published under a name without an extension is stored as `name.html`.
   - name: App Grants
     description: Scoped H-2 application grants — approve/revoke an app's access to an owner's data areas and fleet
   - name: Permissions
@@ -63575,7 +63575,7 @@ paths:
                   type: array
                   minItems: 1
                   items: { type: string }
-                  description: Filenames of the caller's own apps, e.g. ["shop.html", "admin.html"].
+                  description: Names of the caller's own apps, e.g. ["shop", "admin"] (file names like "shop.html" work too).
                 description: { type: string }
                 category: { type: string }
                 tags: { type: array, items: { type: string } }

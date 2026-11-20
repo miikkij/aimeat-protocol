@@ -16,6 +16,8 @@
  * @structure sweepLapsedMemberships(storage, config) → { swept, revoked, failed }
  * @usage started from server-bootstrap/service-init.ts on a low-frequency timer
  * @version-history
+ *   v1.0.2 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.0.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
  *     language (notiftext.app_member_expired, app_member_expired_self_serve).
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055): the expiry axis.
@@ -23,6 +25,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { listLapsed, removeMember, type AppMemberRecord } from './members.js';
+import { appDisplayName } from './app-ref.js';
 import { syncGrantsForMember } from '../grant-sync.js';
 import { notify } from '../notify.js';
 import { logger } from '../../utils/logger.js';
@@ -87,16 +90,18 @@ export async function sweepLapsedMemberships(
       out.swept += 1;
 
       try {
+        const appFile = rec.appId.split('/')[1];
+        const appName = (appFile !== undefined ? appDisplayName(appFile) : undefined) ?? rec.appId;
         await notify(storage, `${rec.owner}@${config.nodeId}`, {
           type: 'app_member_expired',
-          title: `Your access to ${rec.appId.split('/')[1]?.replace(/\.html?$/i, '') ?? rec.appId} has ended`,
+          title: `Your access to ${appName} has ended`,
           body: rec.renewal === 'self-serve'
             ? 'The term ran out. You can take another one whenever you like.'
             : 'The term ran out. Ask the owner if you need it back.',
           link: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(rec.appId.split('/')[1] ?? '')}?mode=inline`,
           i18n: {
             key: rec.renewal === 'self-serve' ? 'app_member_expired_self_serve' : 'app_member_expired',
-            vars: { app: rec.appId.split('/')[1]?.replace(/\.html?$/i, '') ?? rec.appId },
+            vars: { app: appName },
           },
         });
       } catch (err) {

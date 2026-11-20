@@ -24,6 +24,8 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.6.2 — 2026-11-20 — `ctx.buy('alice/data', tool)` names the manifest of `data.html`
+ *     (services/app-tools/manifest-read.ts resolveToolManifestId).
  *   v1.6.1 — 2026-10-31 — An extension-backed capability whose ref names no installed action in the
  *     seller's namespace is refused EXTENSION_NOT_FOUND before the settle. It ran after the settle as
  *     written, and the run read the bare name in the buyer's namespace, so the buyer's own extension
@@ -66,6 +68,7 @@ import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../member
 import { findBackingCapability } from '../component/address.js';
 import { resolveExtensionForCall } from '../component/versions.js';
 import { splitExtensionRef } from '../capabilities/extension-ref.js';
+import { resolveToolManifestId } from '../app-tools/manifest-read.js';
 
 /**
  * The bare owner name behind any principal the capability registry stores. Extension-backed
@@ -191,10 +194,11 @@ export async function buyForExtension(args: {
   const { config, storage, extName, extOwner, appRef, tool, input } = args;
   const slash = appRef.indexOf('/');
   if (slash < 1 || slash === appRef.length - 1) {
-    return { ok: false, code: 'INVALID_APP', message: 'Buy from "ownerName/appId" — e.g. "alice/data.html"' };
+    return { ok: false, code: 'INVALID_APP', message: 'Buy from "ownerName/app" — e.g. "alice/data"' };
   }
   const sellerOwner = appRef.slice(0, slash);
-  const appId = appRef.slice(slash + 1);
+  // `alice/data` names the manifest of `data.html`, as the tool reads do (services/app-tools/manifest-read.ts).
+  const appId = await resolveToolManifestId(storage, sellerOwner, `${sellerOwner}@${config.nodeId}`, appRef.slice(slash + 1));
 
   if (sellerOwner === extOwner) {
     return { ok: false, code: 'SELF_PURCHASE', message: 'This is your own app; call its capability directly rather than buying it from yourself.' };

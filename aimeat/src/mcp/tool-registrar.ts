@@ -13,12 +13,16 @@
  *        Inside the next step, so the fault answer also says what to do next.
  *     4. usage (mcp/tool-usage-wrap.ts) records the call; it sees a throw before the fault wrapper
  *        answers it, so the usage row keeps the error class.
- *     5. organism agent gate (mcp/organism-agent-gate.ts) refuses an agent an organism does not admit;
- *        innermost, so the refusal is measured and carries a next step.
+ *     5. organism agent gate (mcp/organism-agent-gate.ts) refuses an agent an organism does not admit,
+ *        so the refusal is measured and carries a next step.
+ *     6. app reference (mcp/app-ref-input.ts) turns an app named without `.html` into its stored
+ *        filename in the input; innermost, so the gates see the call as sent and only the handler
+ *        sees the rewritten value.
  *   A registrar wrapper applied first is the one nearest the handler, so the calls below read inside out.
  * @structure toolRegistrar(register, deps)
  * @usage const measuredTool = toolRegistrar(originalTool, { scopes: () => scopes, principal: () => agentGaii, storage, config });
  * @version-history
+ *   2026-11-20 — The app reference wrapper (mcp/app-ref-input.ts), nearest the handler.
  *   2026-10-16 — Moved out of mcp/index.ts, with the fault wrapper added (QA audit E1-01, D2-01, F5-02, E2-02, E5-01).
  */
 import type { AimeatConfig } from '../config.js';
@@ -28,6 +32,7 @@ import { withOrganismAgentGate } from './organism-agent-gate.js';
 import { withErrorNextStep } from './error-next-step.js';
 import { withDeferredScopeNotice } from './deferred-scope-notice.js';
 import { withToolFault } from './tool-fault.js';
+import { withAppRefInput } from './app-ref-input.js';
 
 type AnyFn = (...args: unknown[]) => unknown;
 
@@ -42,5 +47,6 @@ export function toolRegistrar(register: AnyFn, deps: ToolRegistrarDeps): AnyFn {
   const noticed = withDeferredScopeNotice(register, deps.scopes);
   const stepped = withErrorNextStep(noticed);
   const faulted = withToolFault(stepped, { storage: deps.storage, config: deps.config, principal: deps.principal });
-  return withOrganismAgentGate(wrapToolHandler(faulted, deps.principal), deps.principal, deps.storage);
+  const gated = withOrganismAgentGate(wrapToolHandler(faulted, deps.principal), deps.principal, deps.storage);
+  return withAppRefInput(gated, deps.principal, { storage: deps.storage, config: deps.config });
 }

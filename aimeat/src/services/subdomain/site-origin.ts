@@ -16,6 +16,8 @@
  *   - classifySiteOrigin(site, nodeId, isOperator) — 'operator' | 'publisher' | null, on evidence only
  * @usage import { apexServesSite } from './site-origin.js';
  * @version-history
+ *   v1.0.1 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22): publisher labels leave the apex namespace.
  *     autoLabelCandidates moved unchanged out of routes/subdomains.ts ensureAppSubdomain.
  *   v1.0.1 — 2026-10-25 — autoLabelCandidates trims dashes in linear time (CodeQL alerts 1763, 1764).
@@ -24,6 +26,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { SubdomainSiteRecord, SubdomainSiteOrigin } from '../../storage/interface.js';
 import { ERASED_PARTY_PREFIX } from '../../storage/erased-party.js';
 import { isNodeApexLabel } from './node-labels.js';
+import { appDisplayName } from '../app/app-ref.js';
 
 /**
  * The labels ensureAppSubdomain tries for an app, in order: the filename's base, the owner-prefixed
@@ -31,7 +34,7 @@ import { isNodeApexLabel } from './node-labels.js';
  * says whether an older row's label could have come from it.
  */
 export function autoLabelCandidates(ownerBare: string, filename: string): string[] {
-  let base = trimDashes(filename.replace(/\.html?$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-')).slice(0, 50);
+  let base = trimDashes(appDisplayName(filename).toLowerCase().replace(/[^a-z0-9-]+/g, '-')).slice(0, 50);
   if (base.length < 2) base = `app-${base}`.replace(/-+$/g, '').slice(0, 50);
   return [base, trimDashes(`${ownerBare}-${base}`).slice(0, 63), ...Array.from({ length: 50 }, (_, i) => `${base}-${i + 2}`)];
 }

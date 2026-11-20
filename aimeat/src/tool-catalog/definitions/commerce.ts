@@ -11,6 +11,8 @@
  *   never a price; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-11-20 — aimeat_app_tools_publish and aimeat_app_tools_get name the app without `.html`
+ *     (services/app/app-ref.ts).
  *   2026-10-29 — aimeat_admin_possible_payouts: the operator lists the open possible payouts and marks
  *     one arrived (secaudit2026oct26 round 8c).
  *   2026-10-27 — aimeat_commerce_beneficiary_payout: possible_payment_not_arrived (secaudit2026oct26).
@@ -278,7 +280,7 @@ export const commerceTools = [
         scope: ['commerce:sell', 'memory:write'],
         surfaces: ['service', 'commerce'],
         input: {
-            app_id: { type: 'string', required: true, description: 'The app\'s published filename (e.g. "shop.html") — the manifest key is apps.{app_id}.tools. A name without the extension ("shop") is stored under your app "shop.html" when you have one, and the answer names the filename.', zod: z.string().min(1).max(120).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/) },
+            app_id: { type: 'string', required: true, description: 'The app\'s name, e.g. "shop" (its file name "shop.html" works too). The manifest is stored under your app\'s file name, apps.shop.html.tools, and the answer names it.', zod: z.string().min(1).max(120).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/) },
             tools: { type: 'array', required: true, description: 'Full tool list: [{ name, description?, inputSchema?, outputSchema?, action_id?, agent?, exchange?, priceMoney?: {amount /* micro-units */, currency}, pricesMoney?: [{amount, currency}], tollMorsels? /* pacing morsels per use, 0-100 */, usageTerms?, provenance?, odps? }]', zod: z.array(z.record(z.string(), z.unknown())).max(200) },
             odps: { type: 'object', required: false, description: 'APP-LEVEL ODPS defaults inherited by every tool: { language, dataHolder: {legalName, businessID, email, URL, addressCountry}, logoURL, brandSlogan, governanceProfile, portfolioPriority, license: {geographicalArea, applicableLaws} }. A tool\'s own `odps` overrides these field by field.' },
             provenance: { type: 'object', required: false, description: 'APP-LEVEL provenance defaults inherited by every tool: { source, legalBasis, consentStatus, retention, transformations, snapshotHash (SHA-256 hex), lineage: [{source, transform, at}] }. State only what you know.' },
@@ -293,8 +295,8 @@ export const commerceTools = [
         // On `agent`: Commerce, buyer side: the owner's personal agent buys priced offers/app-tools.
         surfaces: ['agent', 'service', 'commerce'],
         input: {
-            app_id: { type: 'string', required: true, description: 'The app\'s published filename', zod: z.string().min(1).max(120) },
-            owner: { type: 'string', required: false, description: 'App owner (bare name). Default: your own owner', zod: z.string().min(1).max(100) },
+            app_id: { type: 'string', required: true, description: 'The app\'s name, e.g. "lifecycle-central" (its file name "lifecycle-central.html" and "owner/lifecycle-central" work too)', zod: z.string().min(1).max(120) },
+            owner: { type: 'string', required: false, description: 'App owner (bare name). Default: the owner in app_id, else your own owner', zod: z.string().min(1).max(100) },
         },
     },
     {

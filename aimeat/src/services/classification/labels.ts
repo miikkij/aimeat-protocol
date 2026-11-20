@@ -45,13 +45,15 @@
  *   The shared shapes (ClassificationError, LabelActor, …) live in label-core.ts and the label
  *   address and batch read (memoryTarget, labelsFor, …) in label-rows.ts; this file re-exports them.
  * @structure labelActorOf() · fileTarget() · fileAddressOf() · rowTarget() · setLabel() · reviewLabel() ·
- *   targetOf() · readContentLabel() · labelForException(); re-exported: ClassificationError ·
+ *   targetOf() · namedTargetOf() · readContentLabel() · labelForException(); re-exported: ClassificationError ·
  *   ClassificationDeps · LabelActor · isOwnerPerson() · isAppActor() · appNameOf() · documentKeyOf() ·
  *   memoryTarget() · labelAddressOf() · documentContentKeys() · labelsFor() · targetId()
  * @usage
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.12.0 — 2026-11-20 — namedTargetOf: a hosted app named without `.html` is resolved before the
+ *     target is made, unless an ecosystem app has that exact name (services/app/app-ref.ts).
  *   v1.11.1 — 2026-10-27 — setLabel and reviewLabel follow memory:read-as-owner as readContentLabel
  *     does: on a record the caller may not read with owner_scope, a label write applies nothing and
  *     waits as a suggestion for the person (PERSON_REVIEWS), answering the policy default and
@@ -126,6 +128,7 @@ import {
 } from './containers.js';
 import { effectiveLabels, type EffectiveLabel } from './effective.js';
 import { ownerScopeLabelView, READ_AS_OWNER_NOTE } from './owner-scope-labels.js';
+import { resolveAppFilename } from '../app/app-ref.js';
 
 export { ClassificationError, isAppActor, isOwnerPerson, appNameOf, type ClassificationDeps, type LabelActor } from './label-core.js';
 export { documentKeyOf, memoryTarget, labelAddressOf, documentContentKeys, labelsFor, targetId } from './label-rows.js';
@@ -621,6 +624,24 @@ export function targetOf(actor: LabelActor, input: TargetInput): ContentLabelTar
   if (kind === 'row') return rowTarget(s(input.organism_id, 'organism_id'), s(input.ws, 'ws'), s(input.space, 'space'), s(input.row_id, 'row_id'));
   if (isContainerKind(kind)) return containerTargetOf(actor, kind, input);
   throw new ClassificationError('INVALID_INPUT', 400, `kind is memory, file, row, ${CONTAINER_KINDS.join(', ')}.`);
+}
+
+/**
+ * targetOf, with an app named without `.html` resolved first: `notes` labels the hosted app
+ * `notes.html` (services/app/app-ref.ts). An ecosystem app of exactly that name keeps it, because
+ * `app` names either kind and an ecosystem app's name is never a filename. The REST route, the MCP
+ * tool and the exception admin all ask this one.
+ */
+export async function namedTargetOf(deps: ClassificationDeps, actor: LabelActor, input: TargetInput): Promise<ContentLabelTarget> {
+  const app = (input as { app?: unknown }).app;
+  if (input.kind === 'app' && typeof app === 'string' && app.trim() && actor.ownerName) {
+    const name = app.trim();
+    if (!(await deps.storage.getEcosystemAppByOwnerAndApp(actor.ownerName, name))) {
+      const filename = await resolveAppFilename(deps.storage, { ownerName: actor.ownerName }, name);
+      return targetOf(actor, { ...input, app: filename } as TargetInput);
+    }
+  }
+  return targetOf(actor, input);
 }
 
 export interface LabelView {

@@ -32,6 +32,8 @@
  * @structure AppPartyCtx · signUp · signIn · verifyLink · partyMe · signOut · appPartyFromRequest · signInWith
  * @usage const out = await signUp(deps, { owner, filename }, body);
  * @version-history
+ *   v1.4.1 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.4.0 — 2026-11-15 — The parties are rows (storage AppParty): a signup inserts under the node's cap
  *     in one transaction, a link is found by its hash's index and a request reads its one row, never the
  *     app's whole list. TOO_MANY_PARTIES names the cap.
@@ -70,6 +72,7 @@ import {
 } from './contract.js';
 import { appIdOf, changeAppParty, findParty, readAppParties, readParty, registrationMode, signupOpen } from './store.js';
 import { deactivatedSince } from '../account/deactivated.js';
+import { appDisplayName } from '../app/app-ref.js';
 
 export type AppPartyAnswer<T> = { ok: true; status?: number; data: T } | { ok: false; status: number; code: string; message: string };
 type Refusal = Extract<AppPartyAnswer<never>, { ok: false }>;
@@ -126,7 +129,7 @@ async function sendLink(deps: Deps, ref: AppRef, ownerGhii: string, appId: strin
     const appUrl = Object.values(await resolveAppUrls(deps.config, deps.storage, [{ owner: ref.owner, filename: ref.filename }]))[0]
         ?? `${deps.config.baseUrl.replace(/\/+$/, '')}/v1/apps/${encodeURIComponent(ref.owner)}/${encodeURIComponent(ref.filename)}`;
     const url = `${appUrl}${appUrl.includes('?') ? '&' : '?'}aimeat_party_link=${encodeURIComponent(token)}`;
-    const m = linkMail(lang, ref.filename.replace(/\.html?$/i, ''), url, purpose === 'signin');
+    const m = linkMail(lang, appDisplayName(ref.filename), url, purpose === 'signin');
     try {
         return await sendMail(mail, { kind: 'sign-in', to: email, why: 'The app party\'s own sign-up or sign-in link, to the address the party gave; one mail a minute per party.' },
             { form: 'html', subject: m.subject, html: m.html, text: m.text }) === 'sent';

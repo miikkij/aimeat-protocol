@@ -17,6 +17,7 @@
  *     PUT  /v1/ai/policy       — owner: apply; agent: propose, then confirm with confirm_token
  *     GET  /v1/ai/recommended  — the node's recommended models per capability
  * @version-history
+ *   v1.2.3 — 2026-11-20 — PUT takes `apps` keys named without `.html` (services/app/app-ref-inputs.ts).
  *   v1.2.2 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
  *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.2.1 — 2026-10-05 — aiCallerOf decides through services/ai/caller-context.ts, the rule every
@@ -43,6 +44,7 @@ import type { CallerClass } from '../services/ai/policy.js';
 import { aiCallerFromCredential } from '../services/ai/caller-context.js';
 import { detectLocale, localeFromCookie } from '../i18n.js';
 import type { RequestLanguage } from '../services/ai/ai-fix-words.js';
+import { appRefCtxFor, normalizeAppRefInput } from '../services/app/app-ref-inputs.js';
 
 /** The scope an agent needs to propose a change to its owner's policy. Outside the `*` bundle. */
 const POLICY_WRITE_SCOPE = 'memory:write-reserved';
@@ -107,6 +109,8 @@ export function aiPolicyRouter(config: AimeatConfig, storage: Storage): Router {
   router.put('/v1/ai/policy', requireAuth(), requireScope(POLICY_WRITE_SCOPE), async (req: Request, res: Response) => {
     const auth = req.auth!;
     const body = (req.body ?? {}) as Record<string, unknown>;
+    // `alice/shop` as an `apps` key names `alice/shop.html` (services/app/app-ref-inputs.ts).
+    await normalizeAppRefInput('aimeat_ai_policy_set', body, appRefCtxFor(storage, config.nodeId, auth.owner));
     // One shape, the one both MCP twins send: { policy, confirm_token }.
     const input = body.policy;
     if (!input || typeof input !== 'object' || Array.isArray(input)) {

@@ -15,6 +15,7 @@
  *   GET|PUT /v1/visibility/behaviour/settings · POST /v1/visibility/behaviour/fix)
  * @usage router.use(visibilityBehaviourRouter(config, storage)) inside signalsRouter (routes/signals.ts)
  * @version-history
+ *   2026-11-20 — Each route takes the app named without `.html` (services/app/app-ref-inputs.ts).
  *   2026-10-15 — POST /v1/visibility/behaviour/fix asks app:write beside signals:write, since it writes the app draft (feature-list audit 91).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
  */
@@ -34,7 +35,8 @@ import {
   behaviourOnFor, setBehaviourSettings, nodeWatchesBehaviour, BehaviourSettingsError,
 } from '../services/visibility/behaviour-settings.js';
 import { runBehaviourFix, behaviourSettingsView, BehaviourFixError } from '../services/visibility/behaviour-fixer.js';
-import { localAccountOf } from '../utils/gaii.js';
+import { localAccountOf, localAccountName } from '../utils/gaii.js';
+import { appRefCtxFor, refFilename } from '../services/app/app-ref-inputs.js';
 
 /** What the script sends. Every map is bounded again by the counter; this only refuses the wrong shape. */
 const BeaconSchema = z.object({
@@ -106,7 +108,9 @@ export function visibilityBehaviourRouter(config: AimeatConfig, storage: Storage
     const owner = ownerOf(req, res);
     if (!owner) return;
     const days = typeof req.query.days === 'string' && /^\d{1,3}$/.test(req.query.days) ? Number(req.query.days) : undefined;
-    const app = typeof req.query.app === 'string' && req.query.app ? req.query.app.slice(0, 200) : undefined;
+    const asked = typeof req.query.app === 'string' && req.query.app ? req.query.app.slice(0, 200) : undefined;
+    // `shop` names `shop.html` (services/app/app-ref-inputs.ts), as on the MCP tool.
+    const app = asked ? String(await refFilename(appRefCtxFor(storage, config.nodeId, owner), localAccountName(owner), asked)) : undefined;
     res.json(success(config.nodeId, await readBehaviour(storage, config, owner, { app, days }), [
       { description: 'Switch an app or the fixing agent', method: 'PUT', url: '/v1/visibility/behaviour/settings' },
     ]));
@@ -124,7 +128,8 @@ export function visibilityBehaviourRouter(config: AimeatConfig, storage: Storage
     const owner = ownerOf(req, res);
     if (!owner) return;
     try {
-      await setBehaviourSettings(storage, owner, { app: parsed.data.app, appEnabled: parsed.data.app_enabled, fixer: parsed.data.fixer });
+      const app = parsed.data.app ? String(await refFilename(appRefCtxFor(storage, config.nodeId, owner), localAccountName(owner), parsed.data.app)) : undefined;
+      await setBehaviourSettings(storage, owner, { app, appEnabled: parsed.data.app_enabled, fixer: parsed.data.fixer });
     } catch (e) {
       if (e instanceof BehaviourSettingsError) {
         res.status(e.code === 'NOT_FOUND' ? 404 : 400).json(error(config.nodeId, e.code, e.message));
@@ -141,10 +146,11 @@ export function visibilityBehaviourRouter(config: AimeatConfig, storage: Storage
     const owner = ownerOf(req, res);
     if (!owner) return;
     try {
-      const run = await runBehaviourFix(storage, config, owner, parsed.data.app, 'owner');
+      const app = String(await refFilename(appRefCtxFor(storage, config.nodeId, owner), localAccountName(owner), parsed.data.app));
+      const run = await runBehaviourFix(storage, config, owner, app, 'owner');
       const name = localAccountOf(owner) ?? '';
       res.json(success(config.nodeId, run, run.draft ? [
-        { description: 'Read the draft', method: 'GET', url: `/v1/apps/${encodeURIComponent(name)}/${encodeURIComponent(parsed.data.app)}/draft` },
+        { description: 'Read the draft', method: 'GET', url: `/v1/apps/${encodeURIComponent(name)}/${encodeURIComponent(app)}/draft` },
       ] : []));
     } catch (e) {
       if (e instanceof BehaviourFixError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }

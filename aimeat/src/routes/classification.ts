@@ -18,6 +18,8 @@
  * @structure classificationRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.7.2 — 2026-11-20 — The label routes name the target through namedTargetOf, so an app named
+ *     without `.html` labels the hosted app (services/classification/labels.ts).
  *   v1.7.1 — 2026-11-15 — POST /v1/classification/exceptions passes board_id and app to the service,
  *     so an audience exception for a board or an app is not refused with "board_id is required".
  *   v1.7.0 — 2026-10-23 — GET and PUT /v1/classification/packs: the TL and NATO label packs (plan
@@ -44,7 +46,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import {
-  ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
+  ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, namedTargetOf,
 } from '../services/classification/labels.js';
 import { readAuditLog, readPolicy, reviewPolicy, writePolicy } from '../services/classification/policy-admin.js';
 import type { PolicyLevel } from '../services/classification/policy.js';
@@ -185,7 +187,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
   router.get('/v1/classification/label', requireAuth(), requireScope('memory:read'), async (req, res) => {
     try {
       const actor = labelActorOf(req.auth!, config.nodeId);
-      const target = targetOf(actor, {
+      const target = await namedTargetOf(deps, actor, {
         kind: req.query.kind, key: req.query.key, organism_id: req.query.organism_id,
         ws: req.query.ws, space: req.query.space, row_id: req.query.row_id, owner: req.query.owner,
         board_id: req.query.board_id, app: req.query.app,
@@ -199,7 +201,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       const body = (req.body ?? {}) as Record<string, unknown>;
       const actor = labelActorOf(req.auth!, config.nodeId);
       if (typeof body.label !== 'string') throw new ClassificationError('INVALID_INPUT', 400, 'label is a label id.');
-      const target = targetOf(actor, {
+      const target = await namedTargetOf(deps, actor, {
         kind: body.kind, key: body.key, organism_id: body.organism_id,
         ws: body.ws, space: body.space, row_id: body.row_id, owner: body.owner,
         board_id: body.board_id, app: body.app,
@@ -219,7 +221,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       const actor = labelActorOf(req.auth!, config.nodeId);
       const decision = body.decision;
       if (decision !== 'accept' && decision !== 'reject') throw new ClassificationError('INVALID_INPUT', 400, 'decision is accept or reject.');
-      const target = targetOf(actor, {
+      const target = await namedTargetOf(deps, actor, {
         kind: body.kind, key: body.key, organism_id: body.organism_id,
         ws: body.ws, space: body.space, row_id: body.row_id, owner: body.owner,
         board_id: body.board_id, app: body.app,

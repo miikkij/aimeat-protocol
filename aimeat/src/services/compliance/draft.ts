@@ -40,6 +40,7 @@
  *   const draft = await draftRegisterFromActivity(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, draft));
  * @version-history
+ *   v1.3.2 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex of this file's own; no change in behaviour.
  *   v1.3.1 — 2026-11-05 — Moved unchanged from src/services/compliance-draft.ts to src/services/compliance/draft.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.3.0 — 2026-10-29 — An app that uses AI with no employment or biometric data in its map gets
  *     "none of these" proposed as its Annex III area, so only the transparency questions are asked
@@ -70,6 +71,7 @@ import { appAiSignals } from './app-signals.js';
 import { readAppDataMap } from '../data-map/data-map-store.js';
 import type { AiActStatement } from '../data-map/data-map-types.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 /** Provenance rows read per draft. Bounded: this is a page of recent activity, not a scan. */
 const PROVENANCE_SAMPLE = 2000;
@@ -151,7 +153,7 @@ interface PrincipalEvidence {
 
 /** `owner/filename-without-.html`, lower case: the key an app's calls and its listing agree on. */
 const appKey = (owner: string, filename: string): string =>
-  `${owner}/${filename.replace(/\.html$/i, '')}`.toLowerCase();
+  `${owner}/${appDataMapId(filename)}`.toLowerCase();
 
 /**
  * Publishing evidence per principal and models per app, read once for the whole draft.
@@ -343,7 +345,7 @@ export async function draftRegisterFromActivity(
     if (!owner) continue;
     const key = appKey(owner, app.filename);
     const storedEntry = storedByApp.get(key);
-    const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, app.filename.replace(/\.html$/i, ''));
+    const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, appDataMapId(app.filename));
     const maker = makerAnswers(map?.aiAct);
     if (storedEntry) {
       // Already in the register: only what the maker answered and nobody saved yet, never over a
@@ -362,7 +364,7 @@ export async function draftRegisterFromActivity(
     if (!signals.usesAi) continue;
 
     const ref = `${owner}/${app.filename}`;
-    const title = app.manifest?.name || app.filename.replace(/\.html$/i, '');
+    const title = app.manifest?.name || appDataMapId(app.filename);
     const id = slugOf('uc-app', ref, usedIds);
     const answers: Record<string, unknown> = {};
     const answerSources: Record<string, ComplianceAnswerSource> = {};

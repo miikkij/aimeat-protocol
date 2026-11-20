@@ -31,6 +31,8 @@
  *   - resolveGenRules() — which rules a call or an arrival meets, and why
  *   - directiveText() — the instruction appended to a prompt
  * @version-history
+ *   v1.1.1 — 2026-11-20 — The refusal names an app as `<owner>/<app>`; the inputs resolve it to the
+ *     app's file before this check (services/app/app-ref-inputs.ts).
  *   v1.1.0 — 2026-11-02 — An owner's exception may name an ecosystem app, `eco:<name>`, now that its
  *     calls are the owner's app and no longer the owner in person (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-10-31 — Initial: people-artistic.
@@ -177,8 +179,10 @@ export function normaliseOwnerGenRules(input: unknown): { record: OwnerGenRules 
         const agent = typeof e.agent === 'string' ? e.agent.trim() : undefined;
         const reason = typeof e.reason === 'string' ? e.reason.trim() : '';
         if (!genRuleById(rule)) problems.push({ field: `${f}.rule`, message: 'is not a rule' });
-        if (!!app === !!agent) problems.push({ field: f, message: 'names exactly one of app (<owner>/<file>.html, or eco:<name> for an ecosystem app) or agent (its name)' });
-        if (app && !APP_ADDRESS.test(app) && !ECO_APP.test(app)) problems.push({ field: `${f}.app`, message: 'is <owner>/<file>.html, or eco:<name> for an ecosystem app' });
+        if (!!app === !!agent) problems.push({ field: f, message: 'names exactly one of app (<owner>/<app>, or eco:<name> for an ecosystem app) or agent (its name)' });
+        // A published app's `<owner>/<app>` arrives here as its file, `<owner>/<app>.html`
+        // (services/app/app-ref-inputs.ts); one that is still bare names no app of that owner.
+        if (app && !APP_ADDRESS.test(app) && !ECO_APP.test(app)) problems.push({ field: `${f}.app`, message: 'is <owner>/<app> of a published app, or eco:<name> for an ecosystem app' });
         if (agent && !AGENT_NAME.test(agent)) problems.push({ field: `${f}.agent`, message: 'is the agent\'s name' });
         if (!reason || reason.length > REASON_MAX) problems.push({ field: `${f}.reason`, message: `is required, at most ${REASON_MAX} characters` });
         exceptions.push({ rule, ...(app ? { app } : {}), ...(agent ? { agent } : {}), reason });

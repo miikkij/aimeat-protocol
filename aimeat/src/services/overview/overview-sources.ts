@@ -20,6 +20,9 @@
  * @structure usageByActor · appUse · providerUse · workspaceActivity · ownOfferings · OwnOffering
  * @usage const calls = await usageByActor(storage, ownerGhii, fromDay, toDay);
  * @version-history
+ *   v1.1.2 — 2026-11-20 — The app file of a data map or a tool manifest comes from htmlFilenameOf.
+ *   v1.1.1 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.1.0 — 2026-11-09 — appPlaces reads only `apps.` keys (it uses apps.<id>.datamap alone).
  *     ownOfferings reads every agent's offers document in one query
  *     (getMemoryByKeysAnyOwner, kept only under its own agent): two queries per agent before, 162 at 79.
@@ -35,6 +38,7 @@ import { offersKeyFor } from '../agent/offers-write.js';
 import { listOfferings, appToolCoordinate } from '../exchange/market.js';
 import { listEntitlementsByProvider } from '../metered/entitlements.js';
 import { logger } from '../../utils/logger.js';
+import { appDataMapId, htmlFilenameOf } from '../app/app-ref.js';
 
 /** The most records one organism's activity read returns; a busier organism counts what fits. */
 const ACTIVITY_ROWS_PER_ORGANISM = 5_000;
@@ -160,7 +164,7 @@ export async function appPlaces(
     const appId = /^apps\.(.+)\.datamap$/.exec(rec.key)?.[1];
     const map = rec.value as { held?: Array<{ where?: string; whereExactly?: string }> } | undefined;
     if (!appId || !Array.isArray(map?.held)) continue;
-    const filename = appId.endsWith('.html') ? appId : `${appId}.html`;
+    const filename = htmlFilenameOf(appId);
     const seen = new Set<string>();
     const places: AppPlace[] = [];
     for (const row of map.held) {
@@ -221,7 +225,7 @@ export async function ownOfferings(
 
   for (const { appId, tools } of manifests) {
     if (tools.length === 0) continue;
-    const filename = appId.endsWith('.html') ? appId : `${appId}.html`;
+    const filename = htmlFilenameOf(appId);
     const ext = appToolCoordinate(ownerName, appId, '').ext;
     let priced = 0;
     let calls = 0;
@@ -230,7 +234,7 @@ export async function ownOfferings(
       calls += callsByCoordinate.get(`${ext}/${t.name}`) ?? 0;
     }
     out.push({
-      kind: 'app-tools', source: filename, name: filename.replace(/\.html$/i, ''),
+      kind: 'app-tools', source: filename, name: appDataMapId(filename),
       tools: tools.length, freeTools: tools.length - priced, pricedTools: priced,
       capability: true,
       exchange: listedExt.has(ext) || tools.some(t => (t as { exchange?: boolean }).exchange === true && isToolPriced(t)),

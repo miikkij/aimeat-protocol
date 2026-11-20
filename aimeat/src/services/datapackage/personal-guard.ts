@@ -29,6 +29,8 @@
  *   const guard = await personalPublicGuard(deps, ownerGhii, name, visibility, producedBy, input.confirmPersonalPublic, trusted.personalPublicConfirmed);
  *   if (!guard.ok) return refusal;
  * @version-history
+ *   v1.1.1 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.1.0 — 2026-11-01 — Decides on the confirmation the service recorded, not the pointer's
  *     `personalPublicConfirmed`, which an app with storage:write rewrites (WP9e).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.7).
@@ -39,6 +41,7 @@ import { appDataMapKey, DATA_MAP_SPEC, type DataMap, type DataMapRow } from '../
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import type { PublicConfirmation } from './audience-record.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 export const PERSONAL_DATA_PUBLIC = 'PERSONAL_DATA_PUBLIC' as const;
 
@@ -81,7 +84,7 @@ async function producerMaps(storage: Storage, ownerGhii: string, producer: Guard
   if (producer.app) {
     const [appOwner, filename] = producer.app.split('/');
     if (appOwner !== owner || !filename) return [];
-    const appId = filename.replace(/\.html$/i, '');
+    const appId = appDataMapId(filename);
     const map = await readAppDataMap(storage, ownerGhii, appId);
     return map ? [{ app: appId, map }] : [];
   }
@@ -89,7 +92,7 @@ async function producerMaps(storage: Storage, ownerGhii: string, producer: Guard
     const { apps } = await storage.listApps({ ownerGaii: ownerGhii, viewerGhii: ownerGhii, limit: 500 });
     const out: Array<{ app: string; map: DataMap }> = [];
     for (const a of apps) {
-      const appId = a.filename.replace(/\.html$/i, '');
+      const appId = appDataMapId(a.filename);
       const map = await readAppDataMap(storage, ownerGhii, appId);
       if (map && namesExtension(map, producer.extension)) out.push({ app: appId, map });
     }

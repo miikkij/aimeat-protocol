@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-20 — aimeat_appdev_pitfall_report's `app_ref` example names the app without `.html`.
  *   2026-11-19 — aimeat_appdev_overview names the Atelier shells and genres instead of the T1/T2/T3
  *     shells; aimeat_app_template_propose no longer asks for a tier (optional and deprecated).
  *   2026-11-13 — aimeat_group_list and aimeat_group_get say which groups an agent sees with and without
@@ -605,7 +606,7 @@ export const capabilitiesGroupsSkillsTools = [
             applies_to: { type: 'array', description: 'Areas: app, auth, ext, cortex, iam, realtime, ai, mobile, publish.', zod: z.array(z.string().max(20)).max(8) },
             severity: { type: 'string', enum: ['info', 'warn', 'critical'], description: 'Default warn.' },
             status: { type: 'string', enum: ['active', 'outdated'], description: 'outdated = kept but hidden from default lists.' },
-            app_ref: { type: 'string', description: 'Related app (owner/filename.html).', zod: z.string().max(200) },
+            app_ref: { type: 'string', description: 'Related app (owner/name, e.g. alice/notes).', zod: z.string().max(200) },
             share: { type: 'boolean', description: 'true = platform-wide public entry; default private to your owner scope.' },
         },
     },

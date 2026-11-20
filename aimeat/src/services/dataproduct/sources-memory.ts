@@ -22,6 +22,8 @@
  * @structure recordsAudienceCap · readRecordsSource · readAppSource · readMemorySource · familyMatches · descriptionsOfJson
  * @usage const src = await readMemorySource(call);
  * @version-history
+ *   v1.4.1 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.4.0 — 2026-11-08 — A memory source and an app source name the label address of every record they
  *     copied, as a records source does (secaudit2026nov08b round 15,
  *     dataproduct/sources-io:derived-product-drops-upstream-version-label-source).
@@ -51,6 +53,7 @@ import { atPath } from '../workflow/engine-step-rows.js';
 import {
     type ResolvedSource, type SourceCall, sourceError, needWord, shapeRows, tableOf, audienceOfStored, narrowest,
 } from './source-common.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 const now = () => new Date().toISOString();
 
@@ -190,7 +193,7 @@ export async function readAppSource(call: SourceCall, exporting: boolean): Promi
     needWord(call, 'memory:read');
     const [appOwner, file] = spec.app!.includes('/') ? spec.app!.split('/', 2) : [caller.owner, spec.app!];
     if (appOwner !== caller.owner) throw sourceError(spec, 'FORBIDDEN', 'an app source reads one of your own apps.', 403);
-    const appId = file!.replace(/\.html$/i, '');
+    const appId = appDataMapId(file!);
     const mapRec = await deps.storage.getMemory(caller.ownerGhii, appDataMapKey(appId));
     const map = mapRec?.value as DataMap | undefined;
     if (!map || map.spec !== DATA_MAP_SPEC || !Array.isArray(map.held)) {

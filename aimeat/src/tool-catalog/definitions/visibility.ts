@@ -10,6 +10,7 @@
  * @structure visibilityTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   2026-11-20 — `app` is the app's name without `.html`; the file name works too (services/app/app-ref.ts).
  *   2026-10-15 — aimeat_visibility_behaviour_fix asks app:write beside signals:write, and says it runs only while the fixer is on (feature-list audit 91).
  *   v1.3.0 — 2026-10-08 — aimeat_visibility_behaviour, _behaviour_set and _behaviour_fix: on-page behaviour and the fixing agent (layer D).
  *   v1.2.0 — 2026-10-08 — aimeat_visibility_feed: the product feeds for Copilot Checkout and Stripe (layer E).
@@ -74,7 +75,7 @@ export const visibilityTools = [
         scope: 'signals:read',
         surfaces: ['appdev', 'commerce'],
         input: {
-            app: { type: 'string', description: 'One app\'s filename, such as shop.html. Without it, every app of the person.', zod: z.string().min(1).max(200) },
+            app: { type: 'string', description: 'One app\'s name, such as shop (its file name shop.html works too). Without it, every app of the person.', zod: z.string().min(1).max(200) },
             days: { type: 'number', description: 'The window in days, counted back from today. Default 7, at most 56.', zod: z.number().int().min(0).max(56) },
         },
     },
@@ -103,7 +104,7 @@ export const visibilityTools = [
         scope: ['signals:write', 'app:write'],
         surfaces: ['appdev', 'commerce'],
         input: {
-            app: { type: 'string', description: 'The app\'s filename, such as shop.html.', required: true, zod: z.string().min(1).max(200) },
+            app: { type: 'string', description: 'The app\'s name, such as shop (its file name shop.html works too).', required: true, zod: z.string().min(1).max(200) },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

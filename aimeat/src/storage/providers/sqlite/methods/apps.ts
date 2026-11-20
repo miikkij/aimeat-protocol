@@ -6,6 +6,7 @@
  *   from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype
  *   merge.
  * @version-history
+ *   2026-11-20 — appFilenamesAmong: which candidate filenames an owner has, apps and drafts, no payload.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.1.0 — 2026-07-25 — Add getAppGrantByOwnerAndApp for the one-live-grant-per-(owner, app)
  *     invariant (schema.ts dedupes + enforces it with a partial unique index).
@@ -588,6 +589,18 @@ export const appMethods = {
   async listAppDraftFilenames(this: SqliteStorage, ownerGaii: string): Promise<string[]> {
     const rows = this.db.prepare('SELECT filename FROM app_drafts WHERE ownerGaii = ?')
       .all(ownerGaii) as Array<{ filename: string }>;
+    return rows.map(r => r.filename);
+  },
+
+  async appFilenamesAmong(this: SqliteStorage, owner: { ownerGaii: string } | { ownerName: string }, candidates: string[]): Promise<string[]> {
+    const names = [...new Set(candidates)].filter(Boolean);
+    if (names.length === 0) return [];
+    const [col, val] = 'ownerGaii' in owner ? ['ownerGaii', owner.ownerGaii] : ['ownerName', owner.ownerName];
+    const marks = names.map(() => '?').join(', ');
+    const rows = this.db.prepare(
+      `SELECT filename FROM apps WHERE ${col} = ? AND filename IN (${marks})
+       UNION SELECT filename FROM app_drafts WHERE ${col} = ? AND filename IN (${marks})`,
+    ).all(val, ...names, val, ...names) as Array<{ filename: string }>;
     return rows.map(r => r.filename);
   },
 };

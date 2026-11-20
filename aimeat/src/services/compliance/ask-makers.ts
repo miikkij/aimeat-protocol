@@ -29,6 +29,7 @@
  *   (compliance-app-reach.ts), so an app with no map, a map in words the node does not know, or
  *   unsaid personal data that others can read is asked about in the same message, AI or not.
  * @version-history
+ *   v1.1.2 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex of this file's own; no change in behaviour.
  *   v1.1.1 — 2026-11-05 — Moved unchanged from src/services/compliance-ask-makers.ts to src/services/compliance/ask-makers.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.1.0 — 2026-10-29 — Only the questions the node asks of an app count as open (askedWhen); an
  *     app whose data map cannot say who sees its data is asked to fix it in the same message.
@@ -46,6 +47,7 @@ import { updateRecord } from '../record-cas.js';
 import { createT, toLocale } from '../../i18n.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 /** Days before the same app is asked again. */
 export const REASK_DAYS = 14;
@@ -84,7 +86,7 @@ export async function unansweredApps(storage: Storage, config: AimeatConfig): Pr
   for (const app of apps.apps) {
     const owner = localAccountName(app.ownerName ?? app.ownerGaii ?? '');
     if (!owner) continue;
-    const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, app.filename.replace(/\.html$/i, ''));
+    const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, appDataMapId(app.filename));
     const ref = `${owner}/${app.filename}`;
     let open = 0;
     if (appAiSignals(map, app.manifest?.aiPosture).usesAi) {
@@ -96,7 +98,7 @@ export async function unansweredApps(storage: Storage, config: AimeatConfig): Pr
     }
     const reach = appReach(map);
     const row: UnansweredApp = {
-      ref, owner, title: app.manifest?.name || app.filename.replace(/\.html$/i, ''), open,
+      ref, owner, title: app.manifest?.name || appDataMapId(app.filename), open,
       noMap: !reach.hasMap, unreadable: reach.unreadable.map(r => r.what), unstated: reach.personalUnstated,
     };
     if (row.open > 0 || row.noMap || row.unreadable.length || row.unstated.length) out.push(row);

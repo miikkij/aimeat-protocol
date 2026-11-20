@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-20 — An extension's `config.app` is named `owner/name`, without `.html` (services/members-only.ts resolves it).
  *   2026-11-20 — FINISH names the publish answer's `ai_path` line and the sections ai-path and app-tools.
  *   2026-11-19 — The research-first flow names one guide, the Atelier specification, its part
  *     `platform` and section `from-classic`; the Classic spec, skill and tiers are gone from it.
@@ -344,7 +345,7 @@ their own member model before this existed and disagreed six ways, so the split 
   approval notifies the approver), keeping the list private (an \`ext:\` namespace is world-readable by
   default), and taking free access away together with the role.
 - **The EXTENSION owns what a member may do.** The capability vocabulary is genuinely per-app, and a
-  browser can never enforce it. Declare the app in your manifest \`config:\` as \`app: owner/file.html\`
+  browser can never enforce it. Declare the app in your manifest \`config:\` as \`app: owner/name\`
   and the node hands your script \`ctx.caller.member\` and \`ctx.caller.isAppOwner\`, resolved before the
   sandbox starts. Do NOT keep your own roster in \`ctx.memory\`. \`aimeat_iam_define\` generates such a
   gate from your role design: install the extension it returns, then \`init({ app, ext })\`.

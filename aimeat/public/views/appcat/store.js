@@ -20,6 +20,8 @@
  *   findApp(owner, filename) · subscribe(fn) · setState(patch)
  * @usage const cat = useCatalog(); cat.own.map(…)
  * @version-history
+ *   v1.4.0 — 2026-11-20 — findApp finds an app named without `.html`, so a link `?app=owner/notes`
+ *     opens `notes.html` (the node's order, src/services/app/app-ref.ts).
  *   v1.3.0 — 2026-11-14 — `opened`: the day the signed-in person last used each app, from their own
  *     usage report (apps-used, last_bucket), read beside the listing; openedOn(app) reads it. Recently
  *     opened (recent.js) and the six-month section (lists.js) stand on it.
@@ -99,9 +101,19 @@ export function openedOn(app) {
 /** Whether the signed-in person owns the app (bare names, as the old page compared them). */
 export function isOwn(app) { return !!(app && state.me && sameOwner(app.owner, state.me)); }
 
-/** The listing row of owner/filename, or null. */
+/**
+ * The listing row of owner/filename, or null. `notes` finds `notes.html`: the name as given first,
+ * then with `.html` and `.htm`, the order the node resolves it in (src/services/app/app-ref.ts).
+ */
 export function findApp(owner, filename) {
-  return state.all.find((a) => a && a.filename === filename && sameOwner(a.owner, owner)) || null;
+  const name = String(filename || '');
+  const names = /\.html?$/i.test(name) ? [name] : [name, `${name}.html`, `${name}.htm`];
+  const own = state.all.filter((a) => a && sameOwner(a.owner, owner));
+  for (const n of names) {
+    const hit = own.find((a) => a.filename === n);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /** Every page of the listing (F179): while a page is full and the rows are fewer than `total`. */

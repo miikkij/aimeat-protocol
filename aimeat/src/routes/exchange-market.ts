@@ -13,6 +13,8 @@
  *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.9.1 — 2026-11-20 — POST /v1/exchange/needs and an app-tool offering take `app_id` named without
+ *     `.html` (services/app/app-ref-inputs.ts, services/app-tools/manifest-read.ts).
  *   v1.9.0 — 2026-11-01 — A datapackage offering's detail and ODPS document name its pinned Table Schemas,
  *     its reads and the purchase address for an outside party; a hand listing of an ext-action carries
  *     `deliversData` (the request's, the action's, else the node's proposal from the output schema), and
@@ -79,6 +81,8 @@ import { logger } from '../utils/logger.js';
 import { findExtension, addressSegment } from '../services/component/address.js';
 import { dataListingRefusal } from '../services/data-intermediation/gate.js';
 import { offeringExtAction } from '../services/exchange/offering-action.js';
+import { appRefCtxFor, normalizeAppRefInput } from '../services/app/app-ref-inputs.js';
+import { resolveToolManifestId } from '../services/app-tools/manifest-read.js';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
@@ -213,9 +217,11 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
 
     // ── kind: app-tool — a provider app sells one of its tools (cross-app selling, Gap 1) ──
     if (b.kind === 'app-tool') {
-      const appId = str(b.app_id), toolName = str(b.tool);
-      if (!appId || !toolName) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'app_id and tool are required for an app-tool offering'));
+      const namedApp = str(b.app_id), toolName = str(b.tool);
+      if (!namedApp || !toolName) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'app_id and tool are required for an app-tool offering'));
       const providerGhii = resolveIdentity(req.auth!, config.nodeId);
+      // `shop` names the manifest of `shop.html`, as the tool reads do (services/app-tools/manifest-read.ts).
+      const appId = await resolveToolManifestId(storage, req.auth!.owner, providerGhii, namedApp);
       const manifestRec = await storage.getMemory(providerGhii, appToolsKey(appId));
       if (!manifestRec) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${appId}" declares no tool manifest (${appToolsKey(appId)}) under your account`));
       const parsed = AppToolsDocSchema.safeParse(manifestRec.value);
@@ -612,6 +618,8 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   /** Post an open need. Providers browse open needs and bid. */
   router.post('/v1/exchange/needs', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
+    // `alice/shop` names `alice/shop.html` (services/app/app-ref-inputs.ts), as on the MCP tool.
+    await normalizeAppRefInput('aimeat_exchange_need_post', b, appRefCtxFor(storage, config.nodeId, req.auth?.owner));
     const description = str(b.description);
     if (!description) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'description is required'));
     // A need is ALWAYS posted on behalf of a specific app — the app that needs data/a method it can't produce

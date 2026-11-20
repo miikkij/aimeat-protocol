@@ -11,6 +11,7 @@
  * @structure organismJoinRequestTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.0.1 — 2026-11-20 — An app `ref` is "owner/name" without `.html` (services/app/app-ref.ts).
  *   v1.0.0 — 2026-11-12 — Initial: a join request could be decided on the page and over REST only,
  *     and a person an app refused had no way to ask on the node at all.
  */
@@ -27,7 +28,7 @@ export const organismJoinRequestTools = [
         surfaces: ['agent', 'service'],
         input: {
             kind: { type: 'string', required: true, enum: ['app', 'portfolio', 'company'], description: 'What it is: app (a published app), portfolio (a welcome page) or company (a company front page).' },
-            ref: { type: 'string', required: true, description: 'Which one. For an app: <owner>/<filename> (e.g. "alice/notes.html"). For a portfolio: the account name whose welcome page it is. For a company: the company id.' },
+            ref: { type: 'string', required: true, description: 'Which one. For an app: <owner>/<name> (e.g. "alice/notes"; "alice/notes.html" works too). For a portfolio: the account name whose welcome page it is. For a company: the company id.' },
             message: { type: 'string', required: false, description: 'A short note to the people who decide: who you are and why you need it. At most 1000 characters.' },
             check: { type: 'boolean', required: false, description: 'true: file nothing, answer only whether a request can be made and what was already asked.' },
         },

@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-11-20 — `apps` are app names without `.html`; file names work too (services/app/app-ref.ts).
  *   2026-11-13 — aimeat_package_list takes category, as GET /v1/packages does (unit 3b).
  *   2026-10-31 — aimeat_package_price_set and aimeat_package_sales (an author sells their own package to
  *     accounts of this node); aimeat_package_buy without `repository` buys such a package and takes
@@ -175,7 +176,7 @@ export const packagesTools = [
         surfaces: ['appdev', 'agent'],
         input: {
             name: { type: 'string', required: true, description: 'Package name. With your owner name it forms the group id.' },
-            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "admin.html"]. At least one.', zod: z.array(z.string().max(INPUT_LIMITS.id)).min(1) },
+            apps: { type: 'array', required: true, description: 'Names of your own apps, e.g. ["shop", "admin"] (file names like "shop.html" work too). At least one.', zod: z.array(z.string().max(INPUT_LIMITS.id)).min(1) },
             description: { type: 'string', description: 'What the package is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
             tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
@@ -198,7 +199,7 @@ export const packagesTools = [
         surfaces: ['appdev', 'agent'],
         input: {
             name: { type: 'string', required: true, description: 'The set\'s package name. With your owner name it forms the group id.' },
-            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "backoffice.html"].', zod: z.array(z.string().max(INPUT_LIMITS.id)).min(1) },
+            apps: { type: 'array', required: true, description: 'Names of your own apps, e.g. ["shop", "backoffice"] (file names like "shop.html" work too).', zod: z.array(z.string().max(INPUT_LIMITS.id)).min(1) },
             title: { type: 'string', description: 'The name a buyer sees. Defaults to name.' },
             organism: { type: 'object', description: '{ key, name }: the organism the declared workspaces go into, its key in the set and its default name.', zod: z.object({ key: z.string().max(INPUT_LIMITS.id).optional(), name: z.string().max(INPUT_LIMITS.name).optional() }) },
             defaults: { type: 'object', description: 'The set\'s default config, { <app filename>: { <field>: value } }. A field given here is not asked of the buyer.', zod: z.record(z.string(), z.record(z.string(), z.unknown())) },

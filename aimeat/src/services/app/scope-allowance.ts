@@ -35,6 +35,7 @@
  *   const words = await appAllowanceWords(storage, 'alice/notes.html');
  *   const asked = withAllowance(requested, words);
  * @version-history
+ *   2026-11-20 — Whether a file is an HTML app is isHtmlAppFile (services/app/app-ref.ts); no change in behaviour.
  *   2026-10-27 — secaudit2026oct26: keepWorkingAppsOnce leaves a grant its holder narrowed by hand
  *     (scopesFixedAt) as the holder left it and counts it in the change log (narrowed_grants_left);
  *     the holder's next sign-in asks for the words once.
@@ -64,6 +65,7 @@ import { done, refuse, type AppOpCaller, type AppOpOutcome } from './op-outcome.
 import {
   APP_SCOPE_ALLOWANCE_SPEC, allowanceAppId, readAppScopeAllowance, writeAppScopeAllowance as writeAllowance,
 } from './scope-allowance-store.js';
+import { isHtmlAppFile } from './app-ref.js';
 
 // The record, its key and the reads the grant routes make live in the leaf app-scope-allowance-store.ts.
 export {
@@ -118,7 +120,7 @@ export async function keepWorkingAppsOnce(
   for (let offset = 0; ; ) {
     const { apps, total } = await storage.listAppsWithContent({ adminView: true, limit: 200, offset, sort: 'newest' });
     for (const app of apps) {
-      if (!/html/i.test(app.mimeType ?? '') && !/\.html?$/i.test(app.filename)) continue;
+      if (!/html/i.test(app.mimeType ?? '') && !isHtmlAppFile(app.filename)) continue;
       const created = Date.parse(app.createdAt);
       if (!Number.isNaN(created) && created >= cutoff) continue;
       const appId = `${app.ownerName}/${app.filename}`;

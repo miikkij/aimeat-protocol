@@ -23,6 +23,8 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.6.1 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.6.0 — 2026-11-19 — An organism that declared itself an anti-money-laundering obliged entity
  *     gets the draft register `org-kyc` of its customer due diligence (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  *   v1.5.3 — 2026-11-05 — Moved unchanged from src/services/compliance-derived.ts to src/services/compliance/derived.ts (codebase analysis 2026-11-03, item D-h).
@@ -66,6 +68,7 @@ import { COMPLIANCE_FRAMEWORKS } from '../../data/compliance-frameworks.js';
 import { readDoc } from './docs.js';
 import type { ComplianceFrameworkAnswers, ComplianceProcessor, ComplianceRegister } from './docs-schemas.js';
 import type { DataMapRow } from '../data-map/data-map-types.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 const EVIDENCE = 'evidence' as const;
 
@@ -158,7 +161,7 @@ function familyOf(row: DataMapRow): string {
 export async function appRegisterDraft(
   storage: Storage, ownerGhii: string, filename: string,
 ): Promise<{ register: ComplianceRegister | null; unstated: string[]; hasMap: boolean; reach: AppReachReading }> {
-  const map = await readAppDataMap(storage, ownerGhii, filename.replace(/\.html$/i, ''));
+  const map = await readAppDataMap(storage, ownerGhii, appDataMapId(filename));
   const reach = appReach(map);
   if (!map) return { register: null, unstated: [], hasMap: false, reach };
   // The regulated domains: stated on a row, or read from the map's words when no row states one.
@@ -179,7 +182,7 @@ export async function appRegisterDraft(
   return {
     hasMap: true, unstated, reach,
     register: personal.length ? {
-      id: `app-${filename.replace(/\.html$/i, '').replace(/[^A-Za-z0-9_-]+/g, '-')}`,
+      id: `app-${appDataMapId(filename).replace(/[^A-Za-z0-9_-]+/g, '-')}`,
       title: `${map.what.slice(0, 120) || filename}`, type: 'personal', role: 'controller',
       purposeText: map.usedFor.slice(0, 2000) || undefined,
       dataCategories: personal.map(r => `${familyOf(r)}: ${r.holds}`.slice(0, 300)),

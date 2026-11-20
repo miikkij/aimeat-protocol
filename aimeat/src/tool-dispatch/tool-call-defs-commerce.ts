@@ -12,6 +12,9 @@
  * @structure commerceCliTools[] — the handler table, spread by tool-call.ts
  * @usage import { commerceCliTools } from './tool-call-defs-commerce.js';
  * @version-history
+ *   2026-11-20 — aimeat_app_tools_get reads the manifest of an app named without `.html`
+ *     (services/app/app-ref.ts order); aimeat_app_tools_publish already lands there through the shared
+ *     memory write (services/app/tools-key.ts).
  *   2026-10-16 — aimeat_commerce_invoice_set proxies PUT /v1/commerce/payout/invoice.
  *   2026-10-16 — aimeat_commerce_psp_delete says the route is the owner's in person; GET /v1/commerce/payout,
  *     which psp_status calls, now admits an agent holding commerce:sell (QA audit D2-02).
@@ -26,6 +29,7 @@
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredArray, optionalRecord } from './tool-call-helpers.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
+import { appFilenameCandidates, splitAppRef } from '../services/app/app-ref.js';
 
 export const commerceCliTools: ConnectCliToolDefinition[] = [
     {
@@ -111,21 +115,32 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
             app_id: { type: 'string', required: true, description: 'The app\'s published filename.' },
             owner: { type: 'string', description: 'App owner GHII (owner@node) for a cross-owner public read. Default: your own owner.' },
         },
-        handler: ({ client }, input) => {
-            const key = `apps.${requiredString(input, 'app_id')}.tools`;
+        handler: async ({ client }, input) => {
             const owner = optionalString(input, 'owner');
             // A bare owner used to fall back to reading YOUR OWN manifest, which is the worst kind
             // of wrong answer: the caller asked about someone else's app and got their own back with
             // no indication that the question had changed. Say so instead.
             if (owner && !owner.includes('@')) {
-                return Promise.resolve({ ok: false as const, error: {
+                return { ok: false as const, error: {
                     code: 'INVALID_INPUT',
                     message: `owner must be a full GHII ("${owner}@<node-id>"), not a bare name — a cross-owner read needs the node it lives on. Omit owner entirely to read your own manifest.`,
-                } });
+                } };
             }
-            return owner
-                ? client.get(`/v1/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}`)
-                : client.get(`/v1/memory/${encodeURIComponent(key)}`);
+            // `shop` names the manifest of `shop.html`: each name the app can be stored under is read
+            // in the node's order (services/app/app-ref.ts), and the first one there answers.
+            const read = (id: string) => {
+                const key = `apps.${id}.tools`;
+                return owner
+                    ? client.get(`/v1/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}`)
+                    : client.get(`/v1/memory/${encodeURIComponent(key)}`);
+            };
+            const [first, ...rest] = appFilenameCandidates(splitAppRef(requiredString(input, 'app_id')).name);
+            let resp = await read(first);
+            for (const id of rest) {
+                if (resp.ok !== false || resp.error?.code !== 'NOT_FOUND') break;
+                resp = await read(id);
+            }
+            return resp;
         },
     },
     {

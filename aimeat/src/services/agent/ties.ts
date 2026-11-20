@@ -26,6 +26,8 @@
  *   readWatchableSpaces · readWorkplace · placeNames · workplaceKey
  * @usage const ties = await readAgentTies({ config, storage }, owner);
  * @version-history
+ *   v1.3.2 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.3.1 — 2026-11-09 — readAgentTies reads the data maps under `apps.` only (the key they are used
  *     at) instead of the owner's whole store.
  *     placeNames takes the organisms' names in one query and reads their registries side by side.
@@ -48,6 +50,7 @@ import { fenceOf } from '../fenced-space.js';
 import type { MemoryRecord } from '../../storage/types/commerce.js';
 import { isValidAgentName } from '../../utils/gaii.js';
 import { resolveAppUrls } from '../app/urls.js';
+import { appDataMapId } from '../app/app-ref.js';
 import { listWorkspaces } from '../structure/overview.js';
 import { listOwnerAppToolNames, type OwnerAppToolName } from '../../commerce/app-tool-catalog.js';
 import { decideWorkspaceRead } from '../workspace/access.js';
@@ -181,7 +184,7 @@ export async function readTieChoices(
   places.sort((a, b) => a.organism_name.localeCompare(b.organism_name) || a.workspace_name.localeCompare(b.workspace_name));
   // A manifest is keyed by the published filename. Older ones were written without the ".html"
   // (apps.company-brief.tools on aimeat.io), so that spelling is read as well.
-  const toolsOf = (filename: string) => toolsByApp?.get(filename) ?? toolsByApp?.get(filename.replace(/\.html$/i, '')) ?? [];
+  const toolsOf = (filename: string) => toolsByApp?.get(filename) ?? toolsByApp?.get(appDataMapId(filename)) ?? [];
   const apps = listed.apps
     .map(a => ({ filename: a.filename, name: a.manifest?.name || a.filename, ...(toolsByApp ? { tools: toolsOf(a.filename) } : {}) }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -288,7 +291,7 @@ export async function readAgentTies(
   const apps: Record<string, AgentApp[]> = {};
   if (named.size > 0) {
     const { apps: listed } = await storage.listApps({ ownerGaii: ownerGhii, viewerGhii: ownerGhii, limit: 1000 });
-    const byId = new Map(listed.map(a => [a.filename.replace(/\.html$/i, ''), a]));
+    const byId = new Map(listed.map(a => [appDataMapId(a.filename), a]));
     const urls = await resolveAppUrls(config, storage, listed.map(a => ({ owner, filename: a.filename })));
     for (const [agent, ties] of named) {
       const rows: AgentApp[] = [];

@@ -41,6 +41,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.15.1 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.15.0 — 2026-11-19 — removeWholeApp: the whole-app half of deleteOwnedApp, extracted unchanged,
  *     so the account erasure removes each app the way the owner's delete does.
  *   v1.14.0 — 2026-11-19 — A whole-app delete runs removeAppLeftovers (services/app/delete-sweep.ts):
@@ -145,6 +147,7 @@ import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, t
 import type { PublishAsk } from '../publish-requests/ask.js';
 import { removeAppLeftovers } from './delete-sweep.js';
 import { managedIntakeForms } from './intake-forms.js';
+import { appDisplayName } from './app-ref.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './owner-scope.js';
 
 /**
@@ -257,7 +260,7 @@ export async function stageAppDraft(
   const badVersion = requested.version !== base?.version ? appDisplayVersionRefusal(requested.version) : null;
   if (badVersion) return { refusal: badVersion };
   const manifest: AppManifest = {
-    name: requested.name ?? base?.name ?? filename.replace(/\.html?$/i, ''),
+    name: requested.name ?? base?.name ?? appDisplayName(filename),
     description: requested.description ?? base?.description ?? '',
     version: requested.version ?? base?.version ?? '1.0.0',
     // 'utility' is what publishApp and the HTTP door both default to. The MCP door said 'tool', so
@@ -508,7 +511,7 @@ export async function forkApp(
   const now = new Date().toISOString();
   const forkedManifest: AppManifest = {
     ...source.manifest,
-    name: `${source.manifest.name || sourceFilename.replace(/\.html?$/i, '')} (fork)`,
+    name: `${source.manifest.name || appDisplayName(sourceFilename)} (fork)`,
     authorDisplay: callerOwner,
     // A fork starts as its own independent app with no pacing amount and no licence terms; the forker
     // sets their own copy's toll_morsels later. Record its origin.

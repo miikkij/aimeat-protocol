@@ -19,6 +19,7 @@
  * @structure overviewRouter(config, storage)
  * @usage router.use(overviewRouter(config, storage)); (routes/home.ts mounts it)
  * @version-history
+ *   v1.0.1 — 2026-11-20 — `focus` takes `app:<name>` and `tools:<name>` without `.html` (services/app/app-ref-inputs.ts).
  *   v1.0.0 — 2026-10-31 — Initial (wish-kokonaiskuva-koneet-agentit-sovellukset-tieto-ja-tarjoukset-).
  */
 import { Router, type Request, type Response } from 'express';
@@ -29,6 +30,7 @@ import { success, error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { readOverview, trimOverview } from '../services/overview/overview-read.js';
 import { OVERVIEW_RANGES, type OverviewRange } from '../services/overview/overview-types.js';
+import { appRefCtxFor, normalizeAppRefInput } from '../services/app/app-ref-inputs.js';
 
 /** The largest `limit` a reader may ask for; the whole answer is the call without one. */
 const MAX_LIMIT = 50;
@@ -49,7 +51,13 @@ export function overviewRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `range must be one of ${OVERVIEW_RANGES.join(', ')}`));
       return;
     }
-    const focus = typeof req.query.focus === 'string' && req.query.focus.trim() ? req.query.focus.trim() : undefined;
+    const asked = typeof req.query.focus === 'string' && req.query.focus.trim() ? req.query.focus.trim() : undefined;
+    // `app:shop` focuses `app:shop.html` (services/app/app-ref-inputs.ts), as on aimeat_overview.
+    const focusInput: Record<string, unknown> = { focus: asked };
+    if (asked && asked.length <= MAX_FOCUS) {
+      await normalizeAppRefInput('aimeat_overview', focusInput, appRefCtxFor(storage, config.nodeId, req.auth?.owner));
+    }
+    const focus = typeof focusInput.focus === 'string' ? focusInput.focus : undefined;
     if (focus && focus.length > MAX_FOCUS) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'focus is an item id from this answer'));
       return;

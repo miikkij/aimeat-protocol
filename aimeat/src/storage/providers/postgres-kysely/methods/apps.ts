@@ -10,6 +10,7 @@
  *   AppDownload row keyed (ownerGaii,filename); the data-hygiene sweeps (normalizeAppOwnerNames,
  *   mergeForkedAppBuckets) replicate the Prisma migration logic exactly.
  * @version-history
+ *   2026-11-20 — appFilenamesAmong: which candidate filenames an owner has, apps and drafts, no payload.
  *   v1.0.0 — 2026-07-15 — Phase 5: app catalog on Postgres+Kysely.
  *   v1.1.0 — 2026-08-19 — listApps stops reading the payload column. It used to SELECT every version row of every
  *     app, bytes included, and dedupe in JS — a flat 3.5 s per catalogue request on the
@@ -253,6 +254,18 @@ export const appMethods = {
 
   async listAppDraftFilenames(this: PostgresKyselyStorage, ownerGaii: string): Promise<string[]> {
     const rows = await this.db.selectFrom('AppDraft').select('filename').where('ownerGaii', '=', ownerGaii).execute();
+    return rows.map(r => r.filename);
+  },
+
+  async appFilenamesAmong(this: PostgresKyselyStorage, owner: { ownerGaii: string } | { ownerName: string }, candidates: string[]): Promise<string[]> {
+    const names = [...new Set(candidates)].filter(Boolean);
+    if (names.length === 0) return [];
+    const byGaii = 'ownerGaii' in owner;
+    const val = byGaii ? owner.ownerGaii : owner.ownerName;
+    const col = byGaii ? 'ownerGaii' : 'ownerName';
+    const rows = await this.db.selectFrom('App').select('filename').where(col, '=', val).where('filename', 'in', names)
+      .union(this.db.selectFrom('AppDraft').select('filename').where(col, '=', val).where('filename', 'in', names))
+      .execute();
     return rows.map(r => r.filename);
   },
 

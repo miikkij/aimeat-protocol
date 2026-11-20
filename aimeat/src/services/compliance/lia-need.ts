@@ -31,6 +31,8 @@
  * @structure TrialState · trialState() · LiaNeed · liaNeedOf() · LiaStanding · liaStanding() · AppLiaReading · appLiaReading() · SPECIAL_CATEGORY_DOMAINS
  * @usage const r = await appLiaReading(deps, scope); for (const n of r.needs) if (n.need === 'required') ...
  * @version-history
+ *   v1.0.1 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -42,6 +44,7 @@ import { appReach, REACH_ORDER, type AppReach, type AppReachReading } from './ap
 import { readDoc, type ComplianceScope } from './docs.js';
 import type { ComplianceRegister } from './docs-schemas.js';
 import type { ComplianceLia, ComplianceTrial } from './lia-schemas.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 /** The domains GDPR art. 9 covers, by the ids of data/compliance-domains.ts. */
 export const SPECIAL_CATEGORY_DOMAINS: ReadonlySet<string> = new Set(['health', 'special-category', 'biometric-genetic']);
@@ -141,7 +144,7 @@ export async function appLiaReading(
     opts.regs ? Promise.resolve({ items: opts.regs }) : readDoc(storage, config.nodeId, 'registers', scope),
     readDoc(storage, config.nodeId, 'lias', scope),
     readDoc(storage, config.nodeId, 'trial', scope),
-    readAppDataMap(storage, ownerGhii, scope.app.replace(/\.html$/i, '')),
+    readAppDataMap(storage, ownerGhii, appDataMapId(scope.app)),
     storage.getAppByOwnerName(scope.ownerName, scope.app),
   ]);
   const reach = appReach(map);

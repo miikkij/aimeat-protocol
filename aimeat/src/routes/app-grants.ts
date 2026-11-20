@@ -20,6 +20,8 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-11-20 — /authorize and the silent bridge take `app` named without `.html`, settled before any
+ *     check reads it (services/app/app-ref.ts).
  *   2026-11-04 — The pending authorize requests and the authorization codes are kept in the node's storage (oneTimeStore 'app-grant-request' and 'app-grant-code'), so a request or code made on one process is used on another; lifetimes and answers are unchanged (codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-02 — The silent bridge answers login_required with reason two_step_setup_required for a session the required two-step policy ends on refresh, and mints no grant from it (secaudit2026nov02d round 13).
  *   2026-11-02 — GET /v1/app-grants/authorize from an app's draft origin reads the draft when the app was never published; it answered 404 APP_NOT_FOUND, so the owner could not sign in to a draft (services/app-origin-target.ts appRecordForAuthorize).
@@ -170,6 +172,7 @@ import { APP_GRANTABLE_SCOPES } from '../services/app/grant-vocabulary.js';
 import { isPackageApp } from '../services/packages/install/package-approvals.js';
 import { LOCALES } from '../i18n.js';
 import { oneTimeStore, type ClaimEntry } from '../services/ephemeral-claims.js';
+import { resolveOwnerAppRef } from '../services/app/app-ref.js';
 export { APP_GRANTABLE_SCOPES, PORTFOLIO_GRANT_SCOPES };
 
 /**
@@ -347,7 +350,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
 
   // ── GET /v1/app-grants/authorize ── app sends the owner's browser here to start the grant.
   router.get('/v1/app-grants/authorize', async (req: Request, res: Response) => {
-    const app = String(req.query.app ?? '').trim();
+    // `alice/shop` names `alice/shop.html` (services/app/app-ref.ts). Settled first, so the redirect
+    // binding, the subdomain check and the grant all read this one value.
+    const app = await resolveOwnerAppRef(storage, String(req.query.app ?? '').trim());
     const responseType = String(req.query.response_type ?? 'code');
     const redirectUri = String(req.query.redirect_uri ?? '').trim();
     const state = String(req.query.state ?? '');
@@ -571,7 +576,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // own, so the page names the app. The caller check above is what makes that safe: only a page of
     // the node's own origin gets here, and what runs on that origin is the node's pages or, on a node
     // one person uses, that person's own apps, which hold that person's session already.
-    const frameApp = typeof req.query.app === 'string' ? req.query.app.trim() : '';
+    const frameApp = typeof req.query.app === 'string' ? await resolveOwnerAppRef(storage, req.query.app.trim()) : '';
     const resolvedOrigin = frameApp
       ? await resolveFrameAppTarget(config, storage, frameApp)
       : await resolveAppOriginTarget(config, storage, String(req.query.origin ?? ''));

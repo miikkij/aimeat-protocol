@@ -27,6 +27,8 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   2026-11-20 — The gated app is read through resolveGatedAppRef, so `config.app` named without
+ *     `.html` gates the app's roster (services/members-only.ts).
  *   2026-11-15 — ctx.files.write of an agent caller without storage:write is refused with the
  *     permission ask (services/permission-ask.ts), as POST /v1/storage refuses it (E2E audit M253).
  *   2026-11-09 — ctx.changed for the caller's run (services/extension-live/changed.ts).
@@ -85,7 +87,7 @@ import { logger } from '../../utils/logger.js';
 import { redactCredentialText } from '../../utils/redact-credentials.js';
 import { getMember, accountOf } from '../app/members.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
-import { resolveGatedApp } from '../members-only.js';
+import { resolveGatedAppRef } from '../members-only.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail, unavailableEmail, sandboxLimits } from './ctx.js';
 import { buildExtensionChanged } from '../extension-live/changed.js';
 import { capabilitiesOfRecord } from './capability-declaration.js';
@@ -233,7 +235,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
 
   // A party runs only the extension that gates its own app, and learns nothing about any other:
   // a missing extension and somebody else's answer the same, before the status or an action is read.
-  if (party && (!resolved.ok || resolveGatedApp(resolved.ext) !== party.appId)) return PARTY_NOT_FOR_EXTENSION;
+  if (party && (!resolved.ok || await resolveGatedAppRef(storage, resolved.ext) !== party.appId)) return PARTY_NOT_FOR_EXTENSION;
   if (!resolved.ok) {
     return { kind: 'refused', status: 404, code: 'NOT_FOUND', message: resolved.reason === 'version'
       ? `Version "${resolved.pinned}" of extension "${extName}" is not kept on this node`
@@ -267,7 +269,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
   // `config: { app: owner/file.html }`; without that it gets null and keeps its own membership model.
   // A party's row is keyed by its identity (services/app-parties/service.ts verifyLink), which
   // accountOf keeps whole, so it never reads as the app's owner.
-  const gatedApp = visitor ? null : resolveGatedApp(ext);
+  const gatedApp = visitor ? null : await resolveGatedAppRef(storage, ext);
   const callerAccount = accountOf(caller.gaii);
   const isAppOwner = !party && !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
   const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, party ? party.ref : callerAccount) : null;

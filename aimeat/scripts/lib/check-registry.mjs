@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-20: check:app-ref, an app's name and its `.html` file are related only in src/services/app/app-ref.ts.
  *  - 2026-11-20: check:feature-reach, every MCP tool, served library and seeded package is named in docs/AIMEAT-Feature-List.md, the capability list an AI reads (feature-documentation.md row 5).
  *  - 2026-11-20: check:partial-defaults, no zod .partial() in src/ or public/: a partial-update schema is patchOf() (src/utils/zod-patch.ts), because .partial() keeps the defaults and a PATCH reset the fields it left out (docs/pitfalls.md §127, now deleted).
  *  - 2026-11-19: `githubOnly: true` on check:field-reach, the CodeQL pass (793 s of the slow eight's 1527 s). `pnpm ready` runs every other check here before it pushes (check:fast --before-push, about three minutes); the CodeQL pass stays on GitHub.
@@ -136,6 +137,9 @@ export const FAST_CHECKS = [
     // From the September 2026 audit's check of the fixes: a visitor from another node is named
     // `alice@their-node`, and a cut at the '@' anywhere in src/ made it the local account `alice`.
     { script: 'check:identity-shortening', label: 'An identity is cut to an account name only by localAccountName or localAccountOf' },
+    // 2026-11-20: about forty places added or removed `.html` on an app name each in its own way, and
+    // the endpoints that did neither refused `lifecycle-central` for `lifecycle-central.html`.
+    { script: 'check:app-ref', label: 'An app name and its .html file are related only in services/app/app-ref.ts' },
     // Secaudit2026oct31w2, after round 10: a data package read decided on the latest.json pointer an
     // app can rewrite, twice; its audience comes from the service's record.
     { script: 'check:datapackage-pointer-reads', label: 'A data package\'s audience is read from the service\'s record, never from latest.json, beyond the listed reads' },

@@ -11,6 +11,7 @@
  * @structure designbookTools
  * @usage import { designbookTools } from './designbook.js';
  * @version-history
+ *   2026-11-20 — `filename` is the app's name without `.html`; the file name works too (services/app/app-ref.ts).
  *   2026-10-30 — The node's default kit: `node` on aimeat_designbook_kit_default, view "defaults" on
  *     aimeat_designbook_kit. aimeat_designbook_status: the operator publishes a part (a kit waiting for
  *     everyone among them) from chat, as POST /v1/designbook/:id/status does on the admin Apps tab.
@@ -87,7 +88,7 @@ export const designbookTools = [
         scope: 'memory:write',
         surfaces: ['agent'],
         input: {
-            filename: { type: 'string', required: true, description: 'The published app the owner is satisfied with, e.g. "habits.html". It must belong to your owner.' },
+            filename: { type: 'string', required: true, description: 'The published app the owner is satisfied with, e.g. "habits" (its file name "habits.html" works too). It must belong to your owner.' },
             kept: { type: 'boolean', description: 'false takes it back. Default true.' },
         },
     },
@@ -126,7 +127,7 @@ export const designbookTools = [
         surfaces: ['agent'],
         input: {
             id: { type: 'string', required: true, description: 'The part to adopt.' },
-            filename: { type: 'string', required: true, description: 'Your published app file the layout lands in, e.g. "errands.html".' },
+            filename: { type: 'string', required: true, description: 'Your published app the layout lands in, e.g. "errands" (its file name "errands.html" works too).' },
             ...aiProvenanceCatalogInput,
         },
     },

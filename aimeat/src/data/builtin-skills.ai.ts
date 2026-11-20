@@ -9,6 +9,7 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY · AI_GEN_RULES_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-11-20 — A gen-rules exception names the app as "<owner>/<app>", without `.html`.
  *   2026-11-20 — configure-routing: a provider's own model, aimeat_ai_provider_model_set (propose-then-confirm).
  *   2026-11-19 — configure-routing, aimeat-ai-model-policy, aimeat-gen-rules: an applied change leaves
  *     an ai_settings_changed account event naming who applied it (services/ai/settings-trail.ts).
@@ -417,7 +418,7 @@ your apps"), then call again with the same \`gen_rules\` and \`confirm_token\` (
 The applied change leaves a line on the owner's account events (\`ai_settings_changed\`) that names
 who applied it.
 \`gen_rules\` is \`{ rules?: { "people-artistic": true | false | null }, exceptions?: [{ rule, app:
-"<owner>/<file>.html" (or an ecosystem app's "eco:<name>") | agent: "<name>", reason }] }\`; \`null\` gives the choice back to the node,
+"<owner>/<app>" (or an ecosystem app's "eco:<name>") | agent: "<name>", reason }] }\`; \`null\` gives the choice back to the node,
 and a given \`exceptions\` replaces the list. The owner also switches them on the AI settings page.
 
 ## Refusals

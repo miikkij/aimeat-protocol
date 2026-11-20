@@ -19,6 +19,7 @@
  *   import { appsVisitorsRouter } from './routes/apps-visitors.js';
  *   app.use(appsVisitorsRouter(config, storage));   // before appsRouter, like appsCostRouter
  * @version-history
+ *   v1.1.0 — 2026-11-20 — Both routes take the app named without `.html` (services/app/app-ref.ts).
  *   v1.0.0 — 2026-09-18 — Initial: the Visitors section of the App Catalog.
  */
 import { Router } from 'express';
@@ -30,6 +31,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { resolveAppFilename } from '../services/app/app-ref.js';
 import { SIGNAL_GEO_LEVELS } from '../models/signal-schemas.js';
 import {
   AppVisitorsError, clampDays, parseAppId, readAppVisitors, setAppMeasurement, type AppRef,
@@ -79,6 +81,8 @@ export function appsVisitorsRouter(config: AimeatConfig, storage: Storage): Rout
   router.get('/v1/apps/visitors', requireAuth(), requireScope('signals:read'), async (req: Request, res: Response) => {
     const ref = ownApp(req, res, { appId: req.query.app_id, filename: req.query.filename });
     if (!ref) return;
+    // `shop` names `shop.html` (services/app/app-ref.ts).
+    ref.filename = await resolveAppFilename(storage, { ownerName: ref.owner }, ref.filename);
     try {
       const report = await readAppVisitors(storage, {
         app: ref, days: clampDays(req.query.days),
@@ -101,6 +105,7 @@ export function appsVisitorsRouter(config: AimeatConfig, storage: Storage): Rout
     }
     const ref = ownApp(req, res, { appId: parsed.data.app_id, filename: parsed.data.filename });
     if (!ref) return;
+    ref.filename = await resolveAppFilename(storage, { ownerName: ref.owner }, ref.filename);
     try {
       const out = await setAppMeasurement(storage, { app: ref, on: parsed.data.on, geo: parsed.data.geo });
       emitChange('signals', resolveIdentity(req.auth!, config.nodeId));

@@ -39,6 +39,8 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   2026-11-20 — A grant's `app:owner/name` grantee is stored with the app's file name, on set and on
+ *     remove (services/app/app-ref-inputs.ts); without `.html` it never matched a call.
  *   2026-11-02 — Personal sign-in on a shared server: POST /node and POST /organism take auth
  *     'per-user-oauth'; POST /:id/authorize on such a server starts the caller's OWN sign-in for
  *     anyone the server admits (`personal: true` in the answer); DELETE /:id/sign-in signs the caller
@@ -110,6 +112,7 @@ import { recordAccountEvent } from '../services/account/events.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
 import { browserCanBind, browserRoundBinding, roundCookiesOf, endRoundBinding } from '../middleware/oauth-round-cookie.js';
 import { callerOf } from '../middleware/caller.js';
+import { appRefCtxFor, normalizeAppRefInput, refBinding } from '../services/app/app-ref-inputs.js';
 
 /** The callback's path, which the round cookie is scoped to (services/mcp-client/oauth.ts mcpCallbackUrl). */
 const MCP_CALLBACK_PATH = '/v1/mcp-servers/callback';
@@ -437,6 +440,9 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       }
 
       const b = (req.body ?? {}) as Record<string, unknown>;
+      // `app:alice/shop` names `app:alice/shop.html`, the grantee a call is matched against
+      // (services/app/app-ref-inputs.ts).
+      await normalizeAppRefInput('aimeat_mcp_grant_set', b, appRefCtxFor(storage, config.nodeId, req.auth?.owner));
       const grantee = typeof b.grantee === 'string' ? b.grantee.trim() : '';
       if (!grantee) {
         return res.status(400).json(error(
@@ -490,15 +496,14 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string, config);
       if (!server) return notFound(res);
 
-      const removed = await removeMcpGrant(
-        storage, ownerOf(req), server.slug, req.params.grantee as string,
-      );
+      const grantee = String(await refBinding(appRefCtxFor(storage, config.nodeId, req.auth?.owner), req.params.grantee as string));
+      const removed = await removeMcpGrant(storage, ownerOf(req), server.slug, grantee);
       if (!removed) return notFound(res);
       emitChange('mcp-servers', ownerOf(req));
       // Worth saying: removing a grant does not remove access, it removes the NARROWING. The scope
       // is what decides again, and somebody expecting the opposite would be badly surprised.
       return res.json(success(config.nodeId, {
-        removed: req.params.grantee,
+        removed: grantee,
         note: 'That narrowing is gone. What this agent may do is decided by its permissions again.',
       }));
     });

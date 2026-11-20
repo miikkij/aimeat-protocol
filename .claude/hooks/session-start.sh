@@ -121,8 +121,9 @@ fi
 
 cat <<'RITUAL'
 
-Before your first edit, in this order. The tools are Lifecycle Central's, called with
-aimeat_app_tool_invoke; skill `aimeat-dev-session` on the node (aimeat_skill_get) has the detail.
+Before your first edit, in this order. The tools are Lifecycle Central's, called as
+aimeat_app_tool_invoke { owner: "happydude500001", app: "lifecycle-central.html", tool, input };
+skill `aimeat-dev-session` on the node (aimeat_skill_get) has the detail.
 
   1. Name the session and the project (both lines above): AIMEAT_SESSION=cc-<owner>-<tag>
      and AIMEAT_PROJECT=aimeat-protocol, exported in the shell that commits.

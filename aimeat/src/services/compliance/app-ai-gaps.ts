@@ -14,6 +14,7 @@
  * @structure appAiGaps()
  * @usage const gaps = await appAiGaps(storage, config, usecases, ownerGhii);
  * @version-history
+ *   v1.0.2 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex of this file's own; no change in behaviour.
  *   v1.0.1 — 2026-11-05 — Moved unchanged from src/services/compliance-app-ai-gaps.ts to src/services/compliance/app-ai-gaps.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.0 — 2026-10-28 — Initial.
  */
@@ -23,6 +24,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { appAiSignals } from './app-signals.js';
 import type { ComplianceUseCase } from './register.js';
 import { readAppDataMap } from '../data-map/data-map-store.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 /** How many apps are read, as the records-of-processing gaps read them. */
 const APP_SCAN = 1000;
@@ -44,7 +46,7 @@ export interface AppAiGap {
   };
 }
 
-const keyOf = (ref: string): string => ref.replace(/\.html$/i, '').toLowerCase();
+const keyOf = (ref: string): string => appDataMapId(ref).toLowerCase();
 
 /**
  * Every app that uses AI and that no use case names, owner's apps only when `ownerGhii` is given.
@@ -61,7 +63,7 @@ export async function appAiGaps(
     if (!owner || (ownerGhii && `${owner}@${config.nodeId}` !== ownerGhii)) continue;
     const ref = `${owner}/${app.filename}`;
     if (registered.has(keyOf(ref))) continue;
-    const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, app.filename.replace(/\.html$/i, ''));
+    const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, appDataMapId(app.filename));
     const s = appAiSignals(map, app.manifest?.aiPosture);
     if (!s.usesAi) continue;
     const highRisk = s.annex3

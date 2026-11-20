@@ -20,6 +20,7 @@
  * @usage
  *   const out = await writeDocOp(deps, caller, 'registers', { scope: 'organism', organism_id }, body, { dryRun });
  * @version-history
+ *   2026-11-20 — The app scope's refusal names the app without `.html`, which is now enough.
  *   2026-11-19 — An organism's register draft carries `org-kyc` when the organism declared itself an
  *     anti-money-laundering obliged entity (organismRegisterDraft reads its `aml` document).
  *   2026-11-19 — A write of the document `aml` asks services/aml/gate.ts first: AIMEAT_AML_MODE none
@@ -81,7 +82,7 @@ export function scopeFrom(input: ScopeInput, caller: OperatorCaller): Compliance
   }
   if (kind === 'app') {
     const app = str(input.app);
-    if (!app) throw new ComplianceDocError(400, 'INVALID_INPUT', 'app is the filename of the app, e.g. crm.html.');
+    if (!app) throw new ComplianceDocError(400, 'INVALID_INPUT', 'app names the app, e.g. crm (its file name crm.html works too).');
     const ownerName = str(input.app_owner) ?? localAccountName(caller.owner ?? caller.sub);
     if (!ownerName) throw new ComplianceDocError(400, 'INVALID_INPUT', 'app_owner names the app\'s owner.');
     return { kind: 'app', ownerName, app };

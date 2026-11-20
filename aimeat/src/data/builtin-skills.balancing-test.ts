@@ -10,6 +10,7 @@
  * @structure BALANCING_TEST_SKILL_ENTRY
  * @usage import { BALANCING_TEST_SKILL_ENTRY } from './builtin-skills.balancing-test.js';
  * @version-history
+ *   v1.1.1 -- 2026-11-20 -- The examples name the app without `.html` (`app: "<app>"`); the file name works too.
  *   v1.1.0 -- 2026-11-14 -- The server's mode (required, optional, off), and an agent with compliance:write
  *     approves a test unless its owner keeps the approval (Jouni, 2026-11-14).
  *   v1.0.0 -- 2026-11-13 -- Initial.
@@ -45,7 +46,7 @@ The draft's \`mode\` is the operator's setting (\`compliance.balancing_test\`):
 
 ## When a test is needed
 
-Read it, do not guess: \`aimeat_compliance_register_read { part: "lia_draft", app: "<file>.html", lang: "en" | "fi" | "es" }\`.
+Read it, do not guess: \`aimeat_compliance_register_read { part: "lia_draft", app: "<app>", lang: "en" | "fi" | "es" }\`.
 \`needed: true\` means at least one register of the app needs a test. The server asks for one when all
 of these hold:
 
@@ -108,7 +109,7 @@ Save as often as you like:
 
 \`\`\`
 aimeat_compliance_register_write {
-  part: "lias", app: "<file>.html",
+  part: "lias", app: "<app>",
   value: { items: [{ id, registerId, language, answers, notes, outcome }] }
 }
 \`\`\`
@@ -123,7 +124,7 @@ document: send every test of the app you want to keep.
 When \`unfinished\` is empty and the person says the test is right, approve it:
 
 \`\`\`
-aimeat_compliance_register_write { part: "lias", app: "<file>.html", item_id: "<test id>", set: { "status": "approved" } }
+aimeat_compliance_register_write { part: "lias", app: "<app>", item_id: "<test id>", set: { "status": "approved" } }
 \`\`\`
 
 With the permission \`compliance:write\` you approve it at once, and the record names you as an AI

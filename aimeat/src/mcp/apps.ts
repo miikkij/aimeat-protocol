@@ -11,6 +11,8 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-20 — aimeat_app_publish takes the app's name without `.html`: it updates the owner's
+ *     `name.html`, and a new HTML app named without an extension is stored as `name.html`.
  *   2026-11-19 — aimeat_app_delete passes the config to deleteOwnedApp, which now removes what the app leaves.
  *   2026-11-14 — aimeat_app_list reads its page through catalogueAppPage (services/app/catalogue-page.ts),
  *     as GET /v1/apps does: own and building are refused to the anonymous credential instead of
@@ -139,6 +141,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { appListingOf } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
+import { publishFilename } from '../services/app/app-ref.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload/token.js';
 import { mintDraftPreview } from '../services/app/draft-preview.js';
@@ -225,9 +228,13 @@ export function registerAppsTools(
             inputSchema: zodShapeFor('aimeat_app_publish'),
             annotations: annotationsFor('aimeat_app_publish'),
         },
-        async ({ filename, owner, roadmap, content, content_base64: givenBase64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack, toll_morsels, license_type }) => {
+        async ({ filename: named, owner, roadmap, content, content_base64: givenBase64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack, toll_morsels, license_type }) => {
             const content_base64 = givenBase64 ?? (content !== undefined ? Buffer.from(content, 'utf-8').toString('base64') : undefined);
             const agentGaii = getAgentGaii();
+            // `notes` publishes over the owner's `notes.html`, and a new HTML app named without an
+            // extension is stored as `notes.html` (services/app/app-ref.ts publishFilename). Resolved
+            // before the target scope, because a development right names the stored filename.
+            const filename = await publishFilename(storage, { ownerName: localAccountName(owner ?? agentGaii) }, named, 'text/html');
             // The same target the HTTP door resolves, through the same function: whose catalogue this
             // lands in, and whether a rung carries publishing into it. Composing `owner@nodeId` here
             // addressed a different bucket than routes/apps.ts for any owner whose GHII record says

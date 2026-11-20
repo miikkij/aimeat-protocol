@@ -21,6 +21,7 @@
  *   requireOwnCompany · companyAddress
  * @usage const company = await createCompany(config, storage, ownerGhii, input);
  * @version-history
+ *   2026-11-20 — An app front page takes the app named without `.html` (services/app/app-ref.ts).
  *   2026-11-13 — listOwnCompanies: the page read GET /v1/companies and aimeat_company_list both call
  *     (structure programme unit 2, pure extraction).
  *   2026-10-18 — setFrontPage also writes `frontPageAccess`, who may open the front page, and keeps what
@@ -45,6 +46,7 @@ import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js'
 import type { CompanyRecord, NewCompanyInput, CompanyFrontPage } from '../../models/company-schemas.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../subdomain/names.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { resolveAppFilename } from '../app/app-ref.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance, type DeclaredProvenance } from '../ai/provenance.js';
 
 export class CompanyError extends Error {
@@ -290,13 +292,14 @@ export async function resolveFrontPage(
     const target = (front.target ?? '').trim();
     const slash = target.indexOf('/');
     if (slash <= 0 || slash === target.length - 1) {
-      throw new CompanyError('INVALID_FRONT_PAGE', 400, 'An app front page is "owner/file.html"');
+      throw new CompanyError('INVALID_FRONT_PAGE', 400, 'An app front page is "owner/app", e.g. "alice/shop"');
     }
     const targetOwner = localAccountName(target.slice(0, slash));
-    const filename = target.slice(slash + 1);
     if (targetOwner !== ownerBare) {
       throw new CompanyError('FRONT_PAGE_NOT_YOURS', 403, 'The front page must be an app you published');
     }
+    // `alice/shop` names `shop.html` (services/app/app-ref.ts); the stored target names the file.
+    const filename = await resolveAppFilename(storage, { ownerName: ownerBare }, target.slice(slash + 1));
     const app = await storage.getAppByOwnerName(ownerBare, filename);
     if (!app) throw new CompanyError('APP_NOT_FOUND', 404, `No published app "${filename}"`);
     front = { kind: 'app', target: `${ownerBare}/${filename}` };

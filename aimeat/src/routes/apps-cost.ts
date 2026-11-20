@@ -21,6 +21,7 @@
  *   import { appsCostRouter } from './routes/apps-cost.js';
  *   app.use(appsCostRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-11-20 — `app_id` takes the app named without `.html` (services/app/app-ref.ts).
  *   v1.0.0 — 2026-07-20 — Initial per-app cost/contract surface (EXCHANGE G3): entitlements + budgets + rake.
  *   v1.0.1 — 2026-09-26 — ownerOf is localAccountName (utils/gaii.ts), which keeps an identity of
  *     another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
@@ -35,6 +36,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { appCostView } from '../services/app/cost.js';
+import { resolveOwnerAppRef } from '../services/app/app-ref.js';
 
 export function appsCostRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -45,7 +47,8 @@ export function appsCostRouter(config: AimeatConfig, storage: Storage): Router {
    * `app_id` is a query param (app ids are "owner/filename" — a slash breaks a path segment).
    */
   router.get('/v1/apps/cost', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
-    const appId = typeof req.query.app_id === 'string' ? req.query.app_id : '';
+    // `alice/shop` names `alice/shop.html`, the label entitlements carry (services/app/app-ref.ts).
+    const appId = typeof req.query.app_id === 'string' ? await resolveOwnerAppRef(storage, req.query.app_id) : '';
     const result = await appCostView(storage, config, {
       owner: req.auth!.owner,
       ownerGhii: resolveIdentity(req.auth!, config.nodeId),

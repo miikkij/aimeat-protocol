@@ -14,6 +14,7 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-11-20 — keep, adopt and propose take an app named without `.html` (services/app/app-ref-inputs.ts).
  *   2026-11-19 — The map, the listing, the part read and the preview offer a genre grown out of an app
  *     only to the readers the app's audience admits; a genre's preview_url carries the preview token,
  *     so a member's frame opens it without a session (feature audit 2026-11-19, 1.2).
@@ -100,6 +101,7 @@ import { kitReach, kitReadable } from '../services/design-book/kit.js';
 import { callerOf } from '../middleware/caller.js';
 import { z } from 'zod';
 import { validateBody } from '../models/schemas.js';
+import { appRefCtxFor, normalizeAppRefInput } from '../services/app/app-ref-inputs.js';
 import { INPUT_LIMITS } from '../models/input-limits.js';
 
 /** PUT /v1/designbook/kits/default: the kit id, or null to clear; the organism for an organism's default. */
@@ -243,8 +245,10 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   router.post('/v1/designbook/keep', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req: Request, res: Response) => {
     try {
       const body = (req.body ?? {}) as { filename?: unknown; kept?: unknown };
+      // `habits` names `habits.html` (services/app/app-ref-inputs.ts), as on the MCP tool.
+      await normalizeAppRefInput('aimeat_designbook_keep', body, appRefCtxFor(storage, config.nodeId, req.auth?.owner));
       if (typeof body.filename !== 'string' || !body.filename.trim()) {
-        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name the app: { "filename": "habits.html" }. Add "kept": false to take it back.'));
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name the app: { "filename": "habits" }. Add "kept": false to take it back.'));
       }
       res.json(success(config.nodeId, await book.keep(caller(req), body.filename.trim(), body.kept !== false)));
     } catch (err) { refuse(res, err); }
@@ -393,6 +397,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       const provenance = provenanceOf(req, res);
       if (!provenance) return;
       const body = req.body as Record<string, unknown>;
+      await normalizeAppRefInput('aimeat_designbook_propose', { part: body.part ?? body }, appRefCtxFor(storage, config.nodeId, req.auth?.owner));
       const out = await book.propose(caller(req), body.part ?? body, provenance);
       res.status(out.replaced_version === null ? 201 : 200).json(success(config.nodeId, out, [
         { description: 'Read it back', method: 'GET', url: `/v1/designbook/${encodeURIComponent(out.id)}` },
@@ -404,6 +409,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   router.post('/v1/designbook/:id/adopt', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req: Request, res: Response) => {
     try {
       const body = req.body as Record<string, unknown>;
+      await normalizeAppRefInput('aimeat_designbook_adopt', body, appRefCtxFor(storage, config.nodeId, req.auth?.owner));
       const filename = typeof body.filename === 'string' ? body.filename : '';
       if (!filename) {
         return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'Pass { filename } — the published app the part is adopted into.'));

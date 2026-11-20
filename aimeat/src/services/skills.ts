@@ -32,6 +32,8 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   2026-11-20 — A binding `app:owner/name` is stored and listed with the app's file name
+ *     (services/app/app-ref.ts); a binding written without `.html` was never listed.
  *   2026-11-14 — A node skill whose `metadata.requires_config` switch is off reads as FEATURE_OFF.
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
@@ -126,6 +128,7 @@ import {
 export { parseSkillRef, formatSkillRef, scopeOwnerGhii, readNodeSkillBody, type SkillScope, type SkillRef } from './skill/refs.js';
 
 // The stored and returned shapes and SkillAccessError live in skill-types.ts (max-file-lines).
+import { resolveBindingRef } from './app/app-ref.js';
 import { SkillAccessError, skillFeatureOff, type SkillVersionSnapshot, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill/types.js';
 export { SkillAccessError, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill/types.js';
 
@@ -232,6 +235,9 @@ export async function publishSkill(
   // and copied to the manifest top level for filtering.
   const binding = parsed.frontmatter.metadata?.binding;
   assertSkillBinding(binding, opts.scope, opts.owner);
+  // `app:alice/notes` names `app:alice/notes.html` (services/app/app-ref.ts): the manifest keeps the
+  // app's file name, the form every reader builds the binding in.
+  const storedBinding = typeof binding === 'string' ? await resolveBindingRef(storage, binding) : undefined;
 
   // A retired skill names its successor the same way: in its own frontmatter, so the fact travels
   // with the file. A ref or a bare name; nothing else, since a reader will paste it into a load.
@@ -355,7 +361,7 @@ export async function publishSkill(
     if (parsed.frontmatter.license) manifest.license = parsed.frontmatter.license;
     if (parsed.frontmatter.compatibility) manifest.compatibility = parsed.frontmatter.compatibility;
     if (parsed.frontmatter.metadata) manifest.metadata = parsed.frontmatter.metadata;
-    if (typeof binding === 'string') manifest.binding = binding;
+    if (storedBinding !== undefined) manifest.binding = storedBinding;
     if (typeof supersededBy === 'string') manifest.supersededBy = supersededBy;
     // The owner editing a package's skill keeps it the package's: the update sees the edit, the uninstall removes it.
     const fromPackage = opts.fromPackage ?? (opts.scope === 'user' ? existingValue?.fromPackage : undefined);
@@ -512,8 +518,10 @@ export async function listSkills(
  * surface (GET /v1/apps/:owner/:filename/skills) and aimeat_skill_list?binding=.
  */
 export async function listSkillsByBinding(
-  storage: Storage, config: AimeatConfig, binding: string, accessor: SkillAccessor,
+  storage: Storage, config: AimeatConfig, asked: string, accessor: SkillAccessor,
 ): Promise<SkillSummary[]> {
+  // `app:alice/notes` reads the skills bound to `app:alice/notes.html` (services/app/app-ref.ts).
+  const binding = await resolveBindingRef(storage, asked);
   const systemGhii = scopeOwnerGhii(config, 'node');
   const records = (await listAcrossOwners(storage, 'skills.'))
     .filter(r => MANIFEST_KEY_RE.test(r.key))

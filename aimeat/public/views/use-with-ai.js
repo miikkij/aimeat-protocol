@@ -20,6 +20,7 @@
  * @structure parseAppPath · exampleInput · prompts · ToolRow · SkillRow · default export UseWithAi
  * @usage routed at /v1/use-with-ai/<owner>/<file> by spa.html; served by routes/portal.ts
  * @version-history
+ *   v1.0.1 -- 2026-11-20 -- The MCP prompt names the app without `.html`, the name the node resolves.
  *   v1.0.0 -- 2026-10-09 -- Initial (wish-ai-skill-and-ai-app-tool-badges-on-a-published-app-with-a-pa).
  */
 import { h } from 'preact';
@@ -78,7 +79,9 @@ function prompts({ name, owner, file, host, base, skills, tools, skillText }) {
     tr('useWithAi.mcpPrompt1', 'Use the app "{name}" by {owner} on {host}.', { name, owner, host }),
     ...skills.map((s) => tr('useWithAi.mcpPromptSkill', 'Load its skill with aimeat_skill_get, ref "{ref}", and follow it.', { ref: s.ref })),
     tools.length
-      ? tr('useWithAi.mcpPromptTools', 'Read its tools with aimeat_app_tools_get (owner "{owner}", app_id "{file}"), then call the one that fits with aimeat_app_tool_invoke (owner "{owner}", app "{file}", tool, input).', { owner, file })
+      // The app's name without `.html`, as a person and an AI name it; the node resolves it to the
+      // file (src/services/app/app-ref.ts).
+      ? tr('useWithAi.mcpPromptTools', 'Read its tools with aimeat_app_tools_get (owner "{owner}", app_id "{file}"), then call the one that fits with aimeat_app_tool_invoke (owner "{owner}", app "{file}", tool, input).', { owner, file: String(file).replace(/\.html?$/i, '') || file })
       : '',
     tr('useWithAi.mcpPromptAsk', 'Ask me before you call a priced tool.'),
   ].filter(Boolean).join('\n');

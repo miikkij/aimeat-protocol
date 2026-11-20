@@ -36,6 +36,7 @@
  *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.18.1 — 2026-11-20 — The from_app refusal names the app without `.html` (services/app/app-ref.ts).
  *   v1.18.0 — 2026-09-26 — Beside a <ul>, <ol> or <menu>, every counter-reset names list-item and `all` is revert or
  *     revert-layer (component-lists.ts listResetRefusal); there list-item in a counter-reset passes.
  *   v1.17.0 — 2026-09-26 — A list item stays in a list of the component (component-lists.ts): an <li> outside a
@@ -686,7 +687,7 @@ export function validateComponentBody(raw: unknown): ComponentBody {
   }
 
   const fromApp = str(o.from_app).trim();
-  if (fromApp && !/^[\w.-]{1,120}$/.test(fromApp)) refuse('from_app is the filename of one of your own published apps, like "habits.html".');
+  if (fromApp && !/^[\w.-]{1,120}$/.test(fromApp)) refuse('from_app names one of your own published apps, like "habits".');
   return { prefix, html, css, use, judgement: { reach: reach as 'general' | 'special', why }, ...(fromApp ? { from_app: fromApp } : {}) };
 }
 

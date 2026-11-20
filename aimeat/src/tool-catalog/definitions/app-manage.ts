@@ -21,6 +21,7 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-20 — `filename` is the app's name without `.html`; the file name works too (services/app/app-ref.ts).
  *   2026-11-15 — icon_upload, with the icon and storage_key fields: the app's PNG icon over MCP, as
  *     POST /v1/apps/:owner/:filename/icon sets it; marks also answers whether the app can be installed
  *     and by whom (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
@@ -98,7 +99,7 @@ export function uiReadQuery(detail: unknown): string {
 
 /** Every field any action takes. A field's description names the actions that read it. */
 export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
-    filename: { type: 'string', description: 'The app, with its extension (e.g. "shop.html").' },
+    filename: { type: 'string', description: 'The app\'s name, e.g. "shop" (its file name "shop.html" works too).' },
     owner: { type: 'string', description: 'The app\'s owner. Omit for your own apps; another owner\'s app needs a development grant, or is read only where the action is public.' },
     // seo
     index: { type: 'boolean', description: 'For seo: true makes the app findable in search engines, false takes it back out. Off until you ask.' },

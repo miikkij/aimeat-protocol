@@ -24,6 +24,7 @@
  *   removeException()
  * @usage const e = await makeException(deps, actor, { key, action: 'leave', reason });
  * @version-history
+ *   v1.2.1 — 2026-11-20 — An exception names its target through namedTargetOf (an app without `.html`).
  *   v1.2.0 — 2026-10-22 — readExceptions at level owner follows memory:read-as-owner, with `note`
  *     (secaudit 2026-10, v77).
  *   v1.1.0 — 2026-10-18 — Action 'audience' (plan doc-mvdipuyqraas, L3.3): the owner in person only,
@@ -32,7 +33,7 @@
  *   v1.0.0 — 2026-09-30 — Initial (Jouni's decisions of 2026-09-30).
  */
 import {
-  ClassificationError, isAppActor, isOwnerPerson, labelForException, targetOf,
+  ClassificationError, isAppActor, isOwnerPerson, labelForException, namedTargetOf,
   type ClassificationDeps, type LabelActor, type TargetInput,
 } from './labels.js';
 import { auditSubjectFor } from './policy-admin.js';
@@ -89,7 +90,7 @@ export async function makeException(deps: ClassificationDeps, actor: LabelActor,
     if (until <= nowOf(deps)) throw new ClassificationError('INVALID_INPUT', 400, 'until is in the future.');
   }
   // Refuse before writing: the target is named and checked first.
-  const { target, label } = await labelForException(deps, actor, targetOf(actor, input), { audience: action === 'audience' });
+  const { target, label } = await labelForException(deps, actor, await namedTargetOf(deps, actor, input), { audience: action === 'audience' });
   return mapped(() => addException(deps, {
     by: actor.principal, byKind: app ? 'app' : 'human', app: actor.app ?? null, scope: target.scope,
     target: { kind: target.kind, key: target.key }, label, action, reason, auto: false, until,

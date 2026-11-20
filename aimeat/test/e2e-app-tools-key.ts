@@ -18,6 +18,10 @@
  *   - Phase 3: the other doors and the refusals (REST, an id that names no app, another owner)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tools-key
  * @version-history
+ *   v1.1.0 — 2026-11-20 — Test 8 asserted that an invoke by the name without `.html` is refused; that
+ *     was the old design. A caller may now name the app without it (services/app/app-ref.ts,
+ *     wish-sovelluksen-nimi-ilman-html-p-tett-kaikkialla), so 8 asserts the call goes through and 8b
+ *     asserts the refusal of an unknown name and its hint, nearest first and without `.html`.
  *   v1.0.2 — 2026-10-12 — The tool carries its morsel amount as tollMorsels instead of price.morsels,
  *     which node 4.0.0 refuses with MORSEL_PRICE_REMOVED on aimeat_app_tools_publish and on POST
  *     /v1/memory; every test after the first publish had failed only because no manifest landed. The
@@ -250,10 +254,18 @@ await test('7. An id that names no app of the owner stays as given (a manifest m
     assert(out.data.app === `${seller.owner}/noapp${STAMP}`, `the id is kept: ${out.text.slice(0, 200)}`);
 });
 
-await test('8. Invoking by the name without the extension is refused and names the filename to use', async () => {
-    const out = await callTool(session, 'aimeat_app_tool_invoke', { owner: seller.owner, app: APP, tool: 'audit', input: { q: 'x' } });
+await test('8. Invoking by the name without the extension calls the same tool (services/app/app-ref.ts)', async () => {
+    const out = await callTool(session, 'aimeat_app_tool_invoke', { owner: seller.owner, app: APP, tool: 'audit', input: { q: 'bare' } });
+    assert(!out.isError, `invoke by the bare name refused: ${out.text.slice(0, 300)}`);
+    assert(out.text.includes('bare'), `the action's echo comes back: ${out.text.slice(0, 300)}`);
+});
+
+await test('8b. A name that matches no app is refused, and the hint names the nearest app first, without ".html"', async () => {
+    const out = await callTool(session, 'aimeat_app_tool_invoke', { owner: seller.owner, app: `${APP}x`, tool: 'audit', input: { q: 'x' } });
     assert(out.isError && out.text.startsWith('APP_TOOLS_NOT_FOUND'), `expected APP_TOOLS_NOT_FOUND: ${out.text.slice(0, 300)}`);
-    assert(out.text.includes(FILE), `the refusal names ${FILE}: ${out.text.slice(0, 300)}`);
+    const hint = out.text.split('publishes tool manifests for: ')[1] ?? '';
+    assert(hint.startsWith(APP), `the nearest name leads the hint: ${out.text.slice(0, 300)}`);
+    assert(!hint.split('\n')[0].includes('.html'), `the hint shows names without .html: ${out.text.slice(0, 300)}`);
 });
 
 await test('9. Another owner writing the same name lands in their own namespace, never under the seller\'s app', async () => {

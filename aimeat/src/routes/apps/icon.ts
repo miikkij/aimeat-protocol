@@ -20,6 +20,8 @@
  * @structure registerAppIconRoutes() — GET and POST /v1/apps/:owner/:filename/icon
  * @usage registerAppIconRoutes(router, config, storage, appTarget); // from appsRouter
  * @version-history
+ *   v1.4.1 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.4.0 — 2026-11-15 — POST stores through services/app/icon-store.ts, shared with the
  *     aimeat_app_manage action icon_upload, and takes `storage_key` in place of `icon`: a PNG the
  *     caller already stored, copied from the caller's own namespace into the owner's icon key
@@ -46,6 +48,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
 import { appIconKey } from '../../services/app/seo.js';
 import { storeAppIcon } from '../../services/app/icon-store.js';
+import { appDisplayName } from '../../services/app/app-ref.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { localAccountName } from '../../utils/gaii.js';
 import type { AppTargetFor } from './helpers.js';
@@ -64,7 +67,7 @@ function badFilename(filename: string): boolean {
 const bareOwner = (segment: string): string => localAccountName(segment);
 
 /** The app's filename without `.html`, for the name a saved picture gets. */
-const pictureName = (filename: string): string => filename.replace(/\.html?$/i, '') || 'app';
+const pictureName = (filename: string): string => appDisplayName(filename) || 'app';
 
 export function registerAppIconRoutes(
     router: Router,

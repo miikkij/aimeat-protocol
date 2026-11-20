@@ -12,11 +12,12 @@
  * @structure internetOpeningTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.0.1 — 2026-11-20 — `app` is the app's name without `.html`; the file name works too (services/app/app-ref.ts).
  *   v1.0.0 — 2026-10-25 — Initial (wish-corp-moodissa-julkaistu-app-ulosp-in-vahdittuna-ja-listattun).
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 
-const APP = { type: 'string' as const, required: true, description: 'The app\'s filename, e.g. "campaign.html" (aimeat_app_list gives it).' };
+const APP = { type: 'string' as const, required: true, description: 'The app\'s name, e.g. "campaign" (its file name "campaign.html" works too).' };
 
 export const internetOpeningTools = [
     {

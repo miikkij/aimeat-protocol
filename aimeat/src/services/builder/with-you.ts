@@ -33,6 +33,7 @@
  *   startBuildWithYou · stopBuildWithYou
  * @usage res.json(success(nodeId, await submitOp(deps, callerOf(req, nodeId, storage), req.body)));
  * @version-history
+ *   v1.2.3 — 2026-11-20 — The queue app's file name comes from htmlFilenameOf (services/app/app-ref.ts).
  *   v1.2.2 — 2026-11-04 — A setting changed on another process of the node is told to the card's
  *     domain by that process only, so a stream hears it once (event-bus.ts origin rule; codebase
  *     analysis 2026-11-03, HA stage 2, e2-bus).
@@ -66,6 +67,7 @@ import { BUILD_CODE } from '../../utils/build-code.js';
 import { logger } from '../../utils/logger.js';
 import { callRemoteTool, statusForRemoteRefusal } from '../mcp-client/invoke.js';
 import { attachedQueueServer, queueAnswerOf, answerText } from './with-you-send.js';
+import { htmlFilenameOf } from '../app/app-ref.js';
 
 export const BUILD_DOMAIN = 'build-with-you';
 const KEY = 'build-with-you.request';
@@ -165,7 +167,7 @@ function sendVia(config: AimeatConfig, base: string, code: string) {
     tool: 'aimeat_app_tool_invoke',
     arguments: {
       owner: decodeURIComponent(m[1]),
-      app: `${decodeURIComponent(m[2])}.html`,
+      app: htmlFilenameOf(decodeURIComponent(m[2])),
       tool: 'submitRequest',
       input: { code, nodeId: config.nodeId, lang: '<the person\'s language: en, fi or es>', spec: { what: '', forWhom: '', use: '', readyWhen: '' } },
     },

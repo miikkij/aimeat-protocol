@@ -25,6 +25,8 @@
  * @usage
  *   const key = await canonicalAppToolsKey(storage, ownerGhii, 'apps.nuotta.tools'); // 'apps.nuotta.html.tools'
  * @version-history
+ *   2026-11-20 — canonicalAppToolsId asks the shared app reference rule (services/app/app-ref.ts)
+ *     instead of its own copy: one read without the payload, and a draft-only app counts.
  *   2026-11-04 — No plain setMemory for a storage without createMemoryIfAbsent: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-01 — A datapackage listing's surface names no app, so it is not read for one (plan D5.1).
@@ -41,6 +43,7 @@ import { listAllOfferings } from '../exchange/market.js';
 import { reconcileAfterSourceWrite } from '../exchange/projection.js';
 import { logger } from '../../utils/logger.js';
 import { claimOnceOnlyStep } from '../once-only-step.js';
+import { findAppFilename } from './app-ref.js';
 
 /**
  * The app id a tool manifest belongs under, for an owner GHII. See THE RULE in the header.
@@ -48,10 +51,9 @@ import { claimOnceOnlyStep } from '../once-only-step.js';
  */
 export async function canonicalAppToolsId(storage: Storage, ownerGaii: string, appId: string): Promise<string> {
     if (parseGAII(ownerGaii)) return appId;
-    if (await storage.getApp(ownerGaii, appId)) return appId;
-    const withExtension = `${appId}.html`;
-    if (await storage.getApp(ownerGaii, withExtension)) return withExtension;
-    return appId;
+    // The one rule for naming an app (services/app/app-ref.ts): exact filename first, then `.html`.
+    const found = await findAppFilename(storage, { ownerGaii }, appId);
+    return found.filename ?? appId;
 }
 
 /** The key a write to `key` belongs under. Any key that is not a tool manifest comes back as it is. */

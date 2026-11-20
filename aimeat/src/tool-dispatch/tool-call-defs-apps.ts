@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-11-20 -- aimeat_app_get finds an app named without `.html` (services/app/app-ref.ts order).
  *   2026-11-15 -- aimeat_app_fork forwards access_code to POST /v1/apps/:owner/:filename/fork (E2E audit M093).
  *   2026-11-13 -- aimeat_app_draft_save forwards mime_type (unit 3b).
  *   2026-11-13 -- aimeat_cortex_list forwards namespace and visibility to GET /v1/cortex (unit 3b).
@@ -77,6 +78,7 @@ import type { ContributionProof } from '../models/contribution-proof.js';
 import { appSettingsTools } from './tool-call-defs-apps-settings.js';
 import { DRAFT_NOTICE_PARAM, draftNoticeBody } from './tool-call-defs-app-draft-edit.js';
 import { installCortexOverHttp } from './extension-install.js';
+import { appFilenameCandidates } from '../services/app/app-ref.js';
 
 /** What a caller states about one run, in the connector's own wire vocabulary. */
 export interface ProofAttachInput {
@@ -360,7 +362,10 @@ export const appTools: ConnectCliToolDefinition[] = [
             const resp = await client.get(`/v1/apps${query({ q: filename, limit: '200' })}`);
             if (resp.ok === false) return resp;
             const apps = ((resp.data ?? {}) as { apps?: Array<Record<string, unknown>> }).apps ?? [];
-            const found = apps.find(a => a.filename === filename && (a.owner === owner || a.ownerName === owner));
+            // `starwars` names `starwars.html`: the name as given first, then with `.html`, the order
+            // the node resolves it in (services/app/app-ref.ts).
+            const ownersApps = apps.filter(a => a.owner === owner || a.ownerName === owner);
+            const found = appFilenameCandidates(filename).map(c => ownersApps.find(a => a.filename === c)).find(Boolean);
             // The listing leaves out hidden, unlisted and (for a visitor) community apps; an app behind an
             // access code is listed with `protected`, and its detail is its owner's, as the node's MCP
             // aimeat_app_get answers it (services/app/visibility.ts; QA audit W15).
@@ -373,7 +378,7 @@ export const appTools: ConnectCliToolDefinition[] = [
                 } };
             }
             // The latest changes and, for a builder, the draft under way, as the node's MCP carries them.
-            const news = await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/news`);
+            const news = await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(String(app.filename))}/news`);
             return { ok: true as const, data: { app, ...(news.ok !== false ? { news: news.data } : {}) } };
         },
     },

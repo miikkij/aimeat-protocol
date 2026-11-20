@@ -1669,6 +1669,9 @@ const ALL_SUITES = [
     'test/e2e-mcp-packages-tools.ts',
     // A tool published over MCP lands under the app filename, so both catalogues show it.
     'test/e2e-app-tools-key.ts',
+    // An app named without `.html` is the same app on a REST path, a REST body, the MCP tool reads
+    // and calls, and the owner's PATCH and DELETE (services/app/app-ref.ts).
+    'test/e2e-app-ref-bare-name.ts',
     'test/e2e-app-tool-free-mcp.ts',
     // The app-tool invoke asks exchange:write of an agent or ecosystem app, as its MCP twin (secaudit 2026-10, v72).
     'test/e2e-app-tool-invoke-scope.ts',

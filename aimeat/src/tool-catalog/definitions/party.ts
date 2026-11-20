@@ -9,6 +9,7 @@
  * @structure partyTools · PARTY_ACTIONS
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.2.1 — 2026-11-20 — `app` is the app's name without `.html`; the file name works too (services/app/app-ref.ts).
  *   v1.2.0 — 2026-11-01 — "share" takes `email` and `locale`, "send_link" sends a share's one-time link
  *     again; aimeat_admin_app_party_registrations, the operator's list and decision of app signup
  *     requests (plan D4.3; WP9b).
@@ -74,7 +75,7 @@ export const partyTools = [
         input: {
             action: { type: 'string', enum: ['list', 'decide'], description: '"list" (the default) or "decide".' },
             owner: { type: 'string', description: 'For decide: the account whose app it is.', zod: z.string().max(120) },
-            app: { type: 'string', description: 'For decide: the app\'s filename, e.g. "club.html".', zod: z.string().max(200) },
+            app: { type: 'string', description: 'For decide: the app\'s name, e.g. "club" (its file name "club.html" works too).', zod: z.string().max(200) },
             decision: { type: 'string', enum: ['approve', 'refuse'], description: 'For decide: "approve" or "refuse".' },
             reason: { type: 'string', description: 'For decide: why, which the owner reads.', zod: z.string().max(500) },
         },

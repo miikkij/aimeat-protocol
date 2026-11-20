@@ -11,6 +11,7 @@
  * @structure dataMapCliTools[] — the handler table, spread by tool-call-defs-core.ts
  * @usage import { dataMapCliTools } from './tool-call-defs-data-map.js';
  * @version-history
+ *   v1.0.1 — 2026-11-20 — The refusal names the app as "owner/name"; the node resolves it to the file.
  *   v1.0.0 — 2026-10-11 — Extracted from tool-call-defs-core.ts (max-file-lines), with
  *     aimeat_app_agent_tie → PUT, and aimeat_app_agent_untie → DELETE, on
  *     /v1/datamap/apps/:owner/:filename/agents/:agent.
@@ -28,7 +29,7 @@ export const dataMapCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const app = requiredString(input, 'app');
             const slash = app.indexOf('/');
-            if (slash <= 0) throw new Error('Name the app as "owner/filename.html".');
+            if (slash <= 0) throw new Error('Name the app as "owner/name", e.g. "alice/shop".');
             return client.get(`/v1/datamap/apps/${encodeURIComponent(app.slice(0, slash))}`
                 + `/${encodeURIComponent(app.slice(slash + 1))}`);
         },
@@ -38,7 +39,7 @@ export const dataMapCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const app = requiredString(input, 'app');
             const slash = app.indexOf('/');
-            if (slash <= 0) throw new Error('Name the app as "owner/filename.html".');
+            if (slash <= 0) throw new Error('Name the app as "owner/name", e.g. "alice/shop".');
             return client.put(`/v1/datamap/apps/${encodeURIComponent(app.slice(0, slash))}`
                 + `/${encodeURIComponent(app.slice(slash + 1))}`, requiredRecord(input, 'data_map'));
         },
@@ -48,7 +49,7 @@ export const dataMapCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const app = requiredString(input, 'app');
             const slash = app.indexOf('/');
-            if (slash <= 0) throw new Error('Name the app as "owner/filename.html".');
+            if (slash <= 0) throw new Error('Name the app as "owner/name", e.g. "alice/shop".');
             const holds = optionalString(input, 'holds');
             return client.put(`/v1/datamap/apps/${encodeURIComponent(app.slice(0, slash))}/${encodeURIComponent(app.slice(slash + 1))}`
                 + `/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}`,
@@ -60,7 +61,7 @@ export const dataMapCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const app = requiredString(input, 'app');
             const slash = app.indexOf('/');
-            if (slash <= 0) throw new Error('Name the app as "owner/filename.html".');
+            if (slash <= 0) throw new Error('Name the app as "owner/name", e.g. "alice/shop".');
             return client.delete(`/v1/datamap/apps/${encodeURIComponent(app.slice(0, slash))}/${encodeURIComponent(app.slice(slash + 1))}`
                 + `/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}`);
         },

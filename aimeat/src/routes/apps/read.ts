@@ -9,6 +9,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead of a regex of
+ *     this file's own; no change in behaviour.
  *   2026-11-15 — The app, its draft and its screenshot answer a browser's navigation to a missing or
  *     hidden one with the not-found page (middleware/not-found-page.ts); every other caller gets the
  *     same JSON 404 as before. A person who opened /v1/apps/<owner>/<missing> saw the JSON envelope.
@@ -167,6 +169,7 @@ import { appNeedsSignIn } from '../../services/app/access.js';
 import { signInGateRefused, screenshotGateRefused, screenshotFollowsAccess, appReaderOf } from './open.js';
 import { hiddenFromReader } from '../../services/app/read-gate.js';
 import { accessCodeUnlockPage } from './access-code-page.js';
+import { appDisplayName } from '../../services/app/app-ref.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai/provenance-marks.js';
@@ -286,7 +289,7 @@ export function registerReadRoutes(
             // A picture, typed by its bytes, or nothing: the stored label is not believed. This door
             // sent it as it was, so a page stored under this key came back as a page (A7-2).
             const shown = setStoredImageHeaders(res, {
-                key: file.key, data: file.data, name: `${filename.replace(/\.html?$/i, '') || 'app'}-screenshot`,
+                key: file.key, data: file.data, name: `${appDisplayName(filename) || 'app'}-screenshot`,
             });
             if (!shown) {
                 sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND',

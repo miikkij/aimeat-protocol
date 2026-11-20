@@ -13,12 +13,14 @@
  *   The stance belongs to the extension that does the work, through the app it names in its
  *   `config.app` (resolveGatedApp). A product sold on top of it (an app-tool, a checkout item) asks
  *   about that extension, so the question has one answer whichever route sold the call.
- * @structure resolveGatedApp(ext) · membersOnlyRefusal(storage, ext, callerGaii) ·
+ * @structure resolveGatedApp(ext) · resolveGatedAppRef(storage, ext) · membersOnlyRefusal(storage, ext, callerGaii) ·
  *   membersOnlyRefusalForCapability(storage, capabilityId, callerGaii) · MEMBERS_ONLY_MESSAGE
  * @usage
  *   const refused = await membersOnlyRefusalForCapability(storage, tool.action_id, buyer);
  *   if (refused) throw new CommerceError('MEMBERS_ONLY', 403, MEMBERS_ONLY_MESSAGE);
  * @version-history
+ *   v1.2.0 — 2026-11-20 — resolveGatedAppRef: `config.app: alice/club` gates `alice/club.html`
+ *     (services/app/app-ref.ts); every runtime reader asks it.
  *   v1.1.0 — 2026-10-25 — membersOnlyRefusalForCapability takes the app's owner and reads a bare binding
  *     as their own extension, as the call does (findBackingCapability; owner namespaces wish, secaudit2026oct22).
  *   v1.0.1 — 2026-10-05 — The installer test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
@@ -31,6 +33,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { isSameAccount } from '../utils/same-account.js';
 import { getCarryPlan, getMember } from './app/members.js';
 import { findBackingCapability } from './component/address.js';
+import { resolveOwnerAppRef } from './app/app-ref.js';
 
 /** What the caller is told, on every route. Nothing has been charged when it is said. */
 export const MEMBERS_ONLY_MESSAGE =
@@ -62,6 +65,18 @@ export function resolveGatedApp(ext: { config?: Record<string, unknown>; install
 }
 
 /**
+ * resolveGatedApp, with the app's name resolved to its file (services/app/app-ref.ts): a manifest
+ * that says `config.app: alice/club` gates the roster and the carry plan of `alice/club.html`, which
+ * is the key both are kept under. Every runtime reader of the gated app asks this one.
+ */
+export async function resolveGatedAppRef(
+  storage: Pick<Storage, 'appFilenamesAmong'>, ext: { config?: Record<string, unknown>; installedBy: string },
+): Promise<string | null> {
+  const declared = resolveGatedApp(ext);
+  return declared ? resolveOwnerAppRef(storage, declared) : null;
+}
+
+/**
  * Is this caller refused by the app's members-only stance? Null when the extension gates no app, the
  * app is not members-only, the caller is the app's owner (or one of their agents), or the caller is a
  * member. Otherwise the app it refuses on behalf of.
@@ -72,7 +87,7 @@ export function resolveGatedApp(ext: { config?: Record<string, unknown>; install
 export async function membersOnlyRefusal(
   storage: Storage, ext: Pick<ExtensionRecord, 'config' | 'installedBy'>, callerGaii: string,
 ): Promise<{ appId: string } | null> {
-  const appId = resolveGatedApp(ext);
+  const appId = await resolveGatedAppRef(storage, ext);
   if (!appId) return null;
   if (isSameAccount(callerGaii, ext.installedBy)) return null;
   const plan = await getCarryPlan(storage, appId);

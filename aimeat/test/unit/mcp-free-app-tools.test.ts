@@ -2,6 +2,8 @@
  * @file test/unit/mcp-free-app-tools.test.ts
  * @description MCP app-tool price decisions preserve free calls, refusals and pinned contracts.
  * @version-history
+ *   2026-11-20 — The storage stub answers appFilenamesAmong, which the invoke asks to resolve the app's name
+ *     (services/app/app-ref.ts); the stub no longer matched the Storage the tool runs on.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   2026-10-20 — appToolBindingRefusal is part of the capability-invoke module this suite mocks, and
@@ -39,7 +41,9 @@ function harness(fields: Record<string, unknown> = {}) {
     handlers.set(name, handler);
   } } as unknown as McpServer;
   const storage = { getMemory: vi.fn().mockResolvedValue({ visibility: 'public', value: { tools: [{ ...tool, ...fields }] } }),
-    getCapability: vi.fn().mockImplementation(async id => ({ id })), listMemory: vi.fn().mockResolvedValue([]) } as unknown as Storage;
+    getCapability: vi.fn().mockImplementation(async id => ({ id })), listMemory: vi.fn().mockResolvedValue([]),
+    // The app reference lookup every Storage has (2026-11-20): the seller's app is sample.html.
+    appFilenamesAmong: vi.fn().mockResolvedValue(['sample.html']) } as unknown as Storage;
   registerExchangeRunTools(mcp, storage, { nodeId: 'node.test' } as AimeatConfig, () => caller, () => 'session-token', scopes);
   return { storage, call: (input: Record<string, unknown> = {}) => handlers.get('aimeat_app_tool_invoke')!({ owner: 'seller', app: 'sample.html', tool: 'read', input }) };
 }

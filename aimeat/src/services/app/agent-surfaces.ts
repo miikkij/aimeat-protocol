@@ -22,11 +22,14 @@
  *   const face = await buildAppAgentFace(config, storage, app);
  *   res.type('text/plain; charset=utf-8').send(appLlmsTxt(config, app, tools, face?.markdown));
  * @version-history
+ *   v1.2.0 — 2026-11-20 — llms.txt names the app without `.html` in its tool calls and says the file
+ *     name works too; it said the id must carry its extension, which is no longer so (services/app/app-ref.ts).
  *   v1.1.0 — 2026-08-29 — llms.txt gains a Legal section naming the app's own pages when it has any.
  *   v1.0.0 — 2026-07-28 — Initial (agent-readability phase 12b)
  */
 import type { AimeatConfig } from '../../config.js';
 import type { AppRecord } from '../../storage/interface.js';
+import { appDisplayName as bareAppName } from './app-ref.js';
 
 /** Display name for an app: its manifest name, else the filename without its extension. */
 export function appDisplayName(app: AppRecord): string {
@@ -59,7 +62,7 @@ export function appLlmsTxt(
   const o = encodeURIComponent(app.ownerName);
   const f = encodeURIComponent(app.filename);
   const toolLines = tools.length
-    ? tools.map((t) => `- \`${t}\` — call via \`aimeat_app_tool_invoke { owner: "${app.ownerName}", app: "${app.filename}", tool: "${t}" }\``).join('\n')
+    ? tools.map((t) => `- \`${t}\` — call via \`aimeat_app_tool_invoke { owner: "${app.ownerName}", app: "${bareAppName(app.filename)}", tool: "${t}" }\``).join('\n')
     : '- This app publishes no priced tools.';
   // The app's own legal pages, when it has any: an agent deciding whether to use a shop reads the
   // terms and the privacy notice of the SHOP, which are the app's and not the node's.
@@ -69,9 +72,8 @@ export function appLlmsTxt(
 
   return `# ${appDisplayName(app)}
 
-> ${appSummary(app)} Published on AIMEAT by ${app.ownerName}; served at ${origin}. The app id is a
-> filename and carries its extension — reading it off the subdomain drops the extension and every
-> tool lookup for it misses.
+> ${appSummary(app)} Published on AIMEAT by ${app.ownerName}; served at ${origin}. The app is
+> named \`${bareAppName(app.filename)}\` in every call; its file name \`${app.filename}\` works too.
 
 ## Documentation
 

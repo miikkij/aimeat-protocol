@@ -13,6 +13,7 @@
  * @structure memberAddress · appDeepLink · appStem · ApproveMemberInput · approveMember
  * @usage const r = await approveMember(storage, config.nodeId, { appId, owner, filename, account, role, approvedBy, by, ownerGhii });
  * @version-history
+ *   v1.0.2 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead of a regex of this file's own; no change in behaviour.
  *   v1.0.1 — 2026-10-01 — A seat limit of 0 is refused as "the plan allows no seats", not "all 0 seats are taken".
  *   v1.0.0 — 2026-10-01 — Extracted from routes/app-members.ts POST .../members. Adds the role-change
  *     notification (A4), the notices in the member's language (B4) and the audit row (B2).
@@ -24,6 +25,7 @@ import {
 import { syncGrantsForMember } from '../grant-sync.js';
 import { recordAppAudit } from './audit.js';
 import { sendMemberNotice } from './member-notices.js';
+import { appDisplayName } from './app-ref.js';
 
 /**
  * The member's identity for a notification or a grant. A member of THIS node is stored by bare
@@ -39,7 +41,7 @@ export function appDeepLink(appId: string): string {
 }
 
 /** The app's file name without .html, as the notifications name the app. */
-export const appStem = (filename: string) => filename.replace(/\.html?$/i, '');
+export const appStem = (filename: string) => appDisplayName(filename);
 
 export interface ApproveMemberInput {
   appId: string;

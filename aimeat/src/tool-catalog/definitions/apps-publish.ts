@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-11-20 — The app is named without `.html` in every example (services/app/app-ref.ts).
  *   2026-11-19 — spec_token names the Atelier specification only; the Classic one is retired.
  *   2026-11-15 — aimeat_app_fork takes access_code, the code of a source app behind one (E2E audit M093).
  *   2026-11-14 — aimeat_app_list's `search` says it reads the file name too, as both storages do.
@@ -94,7 +95,7 @@ export const appPublishTools = [
             roadmap: { type: 'string', description: 'What this version changes. Required when the app is shared with another developer.' },
             ...SPEC_GATE_INPUT,
             ...aiProvenanceCatalogInput,
-            filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html". Alphanumeric, dots, hyphens, underscores.' },
+            filename: { type: 'string', required: true, description: 'The app\'s name, e.g. "starwars". A name you already use updates that app; a new name without an extension is stored as "starwars.html". Alphanumeric, dots, hyphens, underscores.' },
             name: { type: 'string', required: true, description: 'Display name shown in the catalogue.' },
             content: { type: 'string', description: 'The app HTML as plain text; the tool encodes it. Omit both content fields for upload mode. Use @file:path with the CLI fallback.' },
             content_base64: { type: 'string', description: 'Already base64-encoded HTML, if you did the encoding yourself. Give this or content, not both.' },
@@ -138,7 +139,7 @@ export const appPublishTools = [
         surfaces: ['appdev'],
         input: {
             owner: { type: 'string', required: true, description: 'Owner name of the app.' },
-            filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html".' },
+            filename: { type: 'string', required: true, description: 'The app\'s name, e.g. "starwars" (its file name "starwars.html" works too).' },
         },
     },
     {
@@ -182,7 +183,7 @@ export const appPublishTools = [
         surfaces: ['appdev'],
         input: {
             owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
-            filename: { type: 'string', required: true, description: 'App filename this draft stages (e.g. "drumpad.html").' },
+            filename: { type: 'string', required: true, description: 'The app this draft stages, e.g. "drumpad" (its file name "drumpad.html" works too; a new name is stored as "drumpad.html").' },
             // Base64 under both names: the connector and the shell have read `content` as base64 since
             // the tool was written, and the node's MCP named it content_base64. One of the two is needed.
             content: { type: 'string', description: 'Base64-encoded HTML of the draft (the next version to test). Give this or content_base64. Use @file:path with the CLI fallback.' },
@@ -241,7 +242,7 @@ export const appPublishTools = [
         surfaces: ['appdev'],
         input: {
             owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
-            filename: { type: 'string', required: true, description: 'App filename this draft stages (e.g. "pong.html").' },
+            filename: { type: 'string', required: true, description: 'The app this draft stages, e.g. "pong" (its file name "pong.html" works too; a new name is stored as "pong.html").' },
             content: { type: 'string', required: true, description: 'The text to write. Plain UTF-8, not base64.' },
             mode: { type: 'string', enum: ['append', 'replace'], description: 'append (default) adds to the end; replace overwrites the whole draft.' },
             expected_size_bytes: { type: 'number', description: 'Refuse unless the draft is currently this many bytes. Guards a multi-call build against a lost update.', zod: z.number().int().nonnegative() },

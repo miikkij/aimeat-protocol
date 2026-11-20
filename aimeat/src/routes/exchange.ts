@@ -23,6 +23,8 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   2026-11-20 — The app labels (`app_id`, `reason.app_id`, `?app_id`) take the app named without
+ *     `.html` and are kept with its file name (services/app/app-ref-inputs.ts).
  *   2026-11-15 — POST /v1/exchange/entitlements asks the team approval gate before it mints (services/team/action-gate.ts, T7).
  *   2026-10-27 — Accepting a proposal on a revoked contract answers 409 CONTRACT_ENDED; a consumer's pause
  *     stands when the provider accepts (secaudit2026oct26, exchange-proposals:accept-reactivates-ended-contract).
@@ -92,6 +94,7 @@ import { logger } from '../utils/logger.js';
 import { notifyGrantIssued, notifyGrantsRevoked } from '../services/membership-notify.js';
 import { registerExchangeAgentWorkRoutes } from './exchange-agent-work.js';
 import { teamAgentGate } from '../services/team/action-gate.js';
+import { appRefCtxFor, normalizeAppRefInput, refOwnerFilename } from '../services/app/app-ref-inputs.js';
 
 /**
  * The exact principal string a grant must be keyed by — the one the gate will see on the call.
@@ -162,6 +165,8 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
+    // `alice/shop` names `alice/shop.html`, the label the app's cost page reads (services/app/app-ref-inputs.ts).
+    await normalizeAppRefInput('aimeat_exchange_accept', b, appRefCtxFor(storage, config.nodeId, owner));
     const capUnits = typeof b.cap_units === 'number' && Number.isFinite(b.cap_units) && b.cap_units >= 0
       ? Math.floor(b.cap_units) : null;
     const appId = typeof b.app_id === 'string' && b.app_id ? b.app_id : null;
@@ -288,6 +293,14 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/exchange/grants', requireAuth(), requireScope('exchange:grant'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
+    // The app labels (`app_id`, `reason.app_id`) are kept with the app's file name, the form the
+    // revoke and the cost page compare (services/app/app-ref-inputs.ts).
+    const appCtx = appRefCtxFor(storage, config.nodeId, owner);
+    if (b.app_id !== undefined) b.app_id = await refOwnerFilename(appCtx, b.app_id);
+    if (b.reason && typeof b.reason === 'object') {
+      const r = b.reason as Record<string, unknown>;
+      if (r.app_id !== undefined) r.app_id = await refOwnerFilename(appCtx, r.app_id);
+    }
     const rawConsumer = typeof b.consumer === 'string' ? b.consumer.trim() : '';
     const offeringId = typeof b.offering_id === 'string' ? b.offering_id.trim() : '';
     if (!rawConsumer || !offeringId) {
@@ -354,7 +367,8 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/exchange/grants', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const providerGhii = `${req.auth!.owner}@${config.nodeId}`;
     const mine = await listGrantsByProvider(storage, providerGhii);
-    const appId = typeof req.query.app_id === 'string' ? req.query.app_id : '';
+    const appId = typeof req.query.app_id === 'string'
+      ? String(await refOwnerFilename(appRefCtxFor(storage, config.nodeId, req.auth!.owner), req.query.app_id)) : '';
     const filtered = appId ? mine.filter(g => g.grant?.reason?.appId === appId) : mine;
     return res.json(success(config.nodeId, {
       grants: filtered.map(g => grantView(config, g)),
@@ -385,7 +399,8 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const consumer = typeof b.consumer === 'string' && b.consumer.trim()
       ? normaliseConsumer(b.consumer.trim(), config.nodeId) : null;
     const offeringId = typeof b.offering_id === 'string' ? b.offering_id.trim() : '';
-    const appId = typeof b.app_id === 'string' ? b.app_id.trim() : '';
+    const appId = typeof b.app_id === 'string'
+      ? String(await refOwnerFilename(appRefCtxFor(storage, config.nodeId, owner), b.app_id.trim())) : '';
     const role = typeof b.role === 'string' ? b.role.trim() : '';
 
     let targets: MeteredEntitlement[] = [];

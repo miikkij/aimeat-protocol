@@ -6,6 +6,8 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.12.0 -- 2026-11-20 -- A new draft named without an extension is stored as `name.html`, and
+ *     seed's `from_filename` takes the app's name without `.html` (services/app/app-ref.ts).
  *   v2.11.2 -- 2026-11-13 -- POST .../publish-draft reads the draft and asks the roadmap question through
  *     services/app/draft-to-publish.ts, which aimeat_app_draft_publish calls too (structure programme 2026-11, unit 2b).
  *   v2.11.1 -- 2026-10-27 -- POST .../publish-draft through an app's grant names that app on the version (secaudit2026oct26).
@@ -94,6 +96,7 @@ import { draftNoticeFrom } from '../../services/app/news.js';
 import type { AppDraftNotice } from '../../storage/interface.js';
 import { appDisplayVersionRefusal } from '../../services/app/display-version.js';
 import { publishingAppOf } from '../../services/app/published-by-app.js';
+import { publishFilename, resolveAppFilename } from '../../services/app/app-ref.js';
 
 /**
  * The body's `notice` (what the draft changes) as the record the slot keeps: undefined when not sent,
@@ -142,11 +145,13 @@ export function registerDraftRoutes(
     // published versions are untouched. Manifest fields default from the current live
     // app when omitted, so a draft that only changes the HTML keeps its name/category.
     router.put('/v1/apps/:owner/:filename/draft', requireAuth(), requireScope('app:write'), async (req, res) => {
-        const filename = req.params.filename as string;
         const t = await appTargetOr(appTarget, config, req, res, 'draft');
         if (!t) return;
         const { owner, ownerGhii } = t;
         const { content, mime_type, name, description, category, tags, icon, uses_cortex, protection } = req.body ?? {};
+        // A new draft named without an extension is `name.html`, like every app; an existing one
+        // was already resolved in the path (middleware/app-ref-path.ts, services/app/app-ref.ts).
+        const filename = await publishFilename(storage, { ownerName: owner }, req.params.filename as string, typeof mime_type === 'string' ? mime_type : undefined);
 
         if (!content || typeof content !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'content is required (base64 encoded)'));
@@ -219,10 +224,10 @@ export function registerDraftRoutes(
 
     // POST /v1/apps/:owner/:filename/draft/write — append a piece, or replace the whole draft.
     router.post('/v1/apps/:owner/:filename/draft/write', requireAuth(), requireScope('app:write'), async (req, res) => {
-        const filename = req.params.filename as string;
         const t = await appTargetOr(appTarget, config, req, res, 'draft');
         if (!t) return;
         const { owner, ownerGhii } = t;
+        const filename = await publishFilename(storage, { ownerName: owner }, req.params.filename as string, 'text/html');
         const { content, mode, expected_size_bytes, name, description } = req.body ?? {};
 
         if (typeof content !== 'string') {
@@ -338,11 +343,13 @@ export function registerDraftRoutes(
 
     // POST /v1/apps/:owner/:filename/draft/seed — copy a published version into the slot.
     router.post('/v1/apps/:owner/:filename/draft/seed', requireAuth(), requireScope('app:write'), async (req, res) => {
-        const filename = req.params.filename as string;
         const t = await appTargetOr(appTarget, config, req, res, 'draft');
         if (!t) return;
         const { owner, ownerGhii } = t;
-        const { from_filename, version } = req.body ?? {};
+        const filename = await publishFilename(storage, { ownerName: owner }, req.params.filename as string, 'text/html');
+        const { version } = req.body ?? {};
+        const from_filename = typeof req.body?.from_filename === 'string'
+            ? await resolveAppFilename(storage, { ownerName: owner }, req.body.from_filename) : undefined;
 
         if (version !== undefined && typeof version !== 'number') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'version must be a number'));

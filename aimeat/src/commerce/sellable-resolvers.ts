@@ -16,6 +16,8 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   2026-11-20 — An app-tool line item's `app` takes the app named without `.html`
+ *     (services/app-tools/manifest-read.ts resolveToolManifestId).
  *   2026-10-31 — The app-tool resolver refuses an `action_id` whose capability the seller does not own
  *     (CAPABILITY_NOT_OWNED_BY_APP) at the session's opening and at the completion re-resolve, before
  *     the collect; it refused only in fulfil, after the collect, and relied on the refund
@@ -74,6 +76,7 @@ import { readSplit } from './beneficiary-split.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { membersOnlyRefusal, membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 import { findBackingCapability, addressSegment } from '../services/component/address.js';
+import { resolveToolManifestId } from '../services/app-tools/manifest-read.js';
 
 /** Core 'pacing-pack' kind (pacing-pack.ts), re-exported so the route loader registers every core kind from one module. */
 export { pacingPackSellableResolver } from './pacing-pack.js';
@@ -211,7 +214,9 @@ export function appToolSellableResolver(): SellableResolver {
         throw new CommerceError('INVALID_ITEM', 400, 'App-tool line items need app: "ownerName/appId"');
       }
       const sellerOwner = appRef.slice(0, slash);
-      const appId = appRef.slice(slash + 1);
+      // `alice/shop` names the manifest of `shop.html`, as the tool reads do
+      // (services/app-tools/manifest-read.ts); the session and the completion resolve it alike.
+      const appId = await resolveToolManifestId(storage, sellerOwner, `${sellerOwner}@${config.nodeId}`, appRef.slice(slash + 1));
       const toolName = ref.tool ?? ref.offer_id ?? '';
       if (!toolName) throw new CommerceError('INVALID_ITEM', 400, 'App-tool line items need a tool name');
       if ((ref.quantity ?? 1) > 1) {

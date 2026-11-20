@@ -29,6 +29,8 @@
  *   noteAsked · noteDeclined · ownAppOf · bindOnSave · delegationView · tellBoundToOwnApp
  * @usage const bound = await readDelegationApp(storage, nodeId, delegation.id);
  * @version-history
+ *   2026-11-20 — ownAppOf names the app by the shared rule: the label's exact file first, then `.html`
+ *     (services/app/app-ref.ts); it added `.html` on its own, so an app whose file has no extension was missed.
  *   2026-11-10 — The binding notice opens the app it names, not the Notifications page it is listed on (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-10-29 — Initial (secaudit2026oct26 round 8c, delegated-publish/app-id-not-bound-to-caller).
  */
@@ -39,6 +41,7 @@ import { notify } from '../notify.js';
 import { emitChange } from '../event-bus.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { htmlFilenameOf, resolveAppFilename } from '../app/app-ref.js';
 
 const SPEC = 'aimeat.delegation-app/v1';
 const KEY_PREFIX = 'connections.delegation-app.';
@@ -126,7 +129,8 @@ export async function ownAppOf(storage: Storage, channelOwnerGhii: string, label
   const bare = bareLabel(label);
   // An `eco:` label names an ecosystem app by its global name, never a file of the channel owner's.
   if (!bare || bare.includes('/') || /^eco:/i.test(label.trim())) return null;
-  const filename = /\.html?$/i.test(bare) ? bare : `${bare}.html`;
+  // The channel owner's app the label names: exact file first, then `.html` (services/app/app-ref.ts).
+  const filename = await resolveAppFilename(storage, { ownerGaii: channelOwnerGhii }, bare).then(f => f === bare ? htmlFilenameOf(bare) : f);
   const app = await storage.getApp(channelOwnerGhii, filename).catch((err: unknown) => {
     logger.warn('delegation app: the channel owner\'s app could not be read; the delegation stays as it is', { owner: channelOwnerGhii, filename, error: String(err) });
     return null;

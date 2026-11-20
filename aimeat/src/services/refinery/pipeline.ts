@@ -18,6 +18,7 @@
  * @structure RefineryDefinition · RefineryCaller · RunState · Ctx · loadDefinition · readAttachments · runBatch
  * @usage const run = await runBatch(deps, caller, 'postinjalostamo', { onProgress });
  * @version-history
+ *   v1.0.1 — 2026-11-20 — The default app's file name comes from htmlFilenameOf (services/app/app-ref.ts).
  *   v1.0.0 — 2026-09-29 — Initial.
  *   v1.0.1 — 2026-09-29 — The "already filed?" row read uses a system classification reader (TARGET-082).
  *   v1.0.2 — 2026-09-29 — TARGET-082 review: an attachment whose text goes to the model is read
@@ -71,6 +72,7 @@ import {
   parseMessage, listPage, isGraph, redact, senderDomain, ruleFor, extractionPrompt, parseJsonAnswer, queueFor,
   type MailMessage, type RefineryRule, type Queue,
 } from './message.js';
+import { htmlFilenameOf } from '../app/app-ref.js';
 
 export interface RefineryDeps { storage: Storage; config: AimeatConfig }
 
@@ -164,7 +166,7 @@ export async function loadDefinition(storage: Storage, ownerGhii: string, prefix
     classes,
     rules: Array.isArray(c.rules) ? c.rules as RefineryRule[] : [],
     spaces: { items: String(spaces.items ?? 'viesti'), events: String(spaces.events ?? 'tapahtuma') },
-    app: String(c.app ?? `${prefix}.html`),
+    app: String(c.app ?? htmlFilenameOf(prefix)),
     keepText: c.keepText === true,
   };
   const missing = [

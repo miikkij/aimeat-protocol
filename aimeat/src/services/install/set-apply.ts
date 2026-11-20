@@ -34,6 +34,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   2026-11-20 — An app component's file name comes from htmlFilenameOf (services/app/app-ref.ts): an id
+ *     that already ends in `.html` no longer becomes `x.html.html`.
  *   2026-11-15 — linkRepository refuses a repository public_key that is not an Ed25519 public key, or
  *     is a small-order one, with 400 INVALID_PEER_KEY before the card read; a repository already
  *     linked under the same key is not checked again (ed25519PublicKeyProblem; audit 2026-11 L056).
@@ -116,6 +118,7 @@ import { writeAppWorkspaceLinks, type AppWorkspaceLink } from '../app/workspaces
 import { grantInstalledApps, landingPath, type AppGrantStep } from './set-grants.js';
 import { recordOperatorAction } from '../operator/access-audit.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
+import { htmlFilenameOf } from '../app/app-ref.js';
 
 // The namespace lives with the trust check (install-set-trust.ts), which package-pull.ts reads
 // without importing this file back.
@@ -537,7 +540,7 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
  * name for, in the words the install would use (registerSkillComponent, as a dry run).
  */
 async function skillsLeftOut(deps: ApplyDeps, owner: string, localGroup: string, components: PackageComponent[]): Promise<string[]> {
-    const appNames = new Map(components.filter(c => c.type === 'app').map(c => [c.id, `${c.id}.html`] as [string, string]));
+    const appNames = new Map(components.filter(c => c.type === 'app').map(c => [c.id, htmlFilenameOf(c.id)] as [string, string]));
     const out: string[] = [];
     for (const c of components.filter(k => k.type === 'skill')) {
         const dry = await registerSkillComponent(deps.storage, {

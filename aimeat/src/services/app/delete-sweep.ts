@@ -57,6 +57,8 @@
  * @usage
  *   await removeAppLeftovers(storage, config, { ownerName, ownerGhii, filename, buckets: [app.ownerGaii] });
  * @version-history
+ *   v1.1.3 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.1.2 — 2026-11-19 — The grants and push devices steps remove by app id in storage
  *     (revokeAppGrantsForApp, deletePushSubscriptionsForApp) instead of reading every row on the node.
  *   v1.1.1 — 2026-11-19 — The AI settings step keeps the owner's own role bindings of the app: the roles
@@ -103,6 +105,7 @@ import { ROLES_KEY } from '../ai/roles.js';
 import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 import { reconcileOwnerOfferings } from '../exchange/projection.js';
 import { listSkillsByBinding, deleteSkill } from '../skills.js';
+import { appDataMapId } from './app-ref.js';
 
 /** The app a whole-app delete removed. */
 export interface AppSweepTarget {
@@ -213,7 +216,7 @@ export const APP_SWEEP_STEPS: ReadonlyArray<{ name: string; run: (c: SweepCtx) =
       const { storage, t } = c;
       if (c.remaining === null) throw new Error('the owner\'s other apps are unknown, so a shared name cannot be ruled out');
       const remaining = c.remaining;
-      const stripped = (f: string) => f.replace(/\.html$/i, '');
+      const stripped = (f: string) => appDataMapId(f);
       const refs: Ref[] = [];
       if (!remaining.some(f => stripped(f) === stripped(t.filename))) refs.push(...await refsOf(storage, t.ownerGhii, appDataMapKey(stripped(t.filename))));
       const slug = catalogSlug(t.ownerName, t.filename);

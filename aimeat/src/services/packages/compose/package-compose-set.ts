@@ -22,6 +22,8 @@
  *   problem the dry run would list, before anything is written.
  * @structure ComposeSetInput · ComposeSetResult · composeSet(deps, caller, input)
  * @version-history
+ *   v1.2.1 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.2.0 — 2026-10-17 — The visibility check is package-create.ts packageVisibilityRefusal: members and
  *     organism:<id> pass, an organism the author is not in is a problem (plan doc-mvcn6c7e4e5q, V3.7).
  *   v1.1.0 — 2026-10-10 — The plan checks what the writes would refuse: the visibility, each package's
@@ -43,6 +45,7 @@ import { parseBundledCrews } from '../../app/bundled-crews.js';
 import { checkAppConfigValues, type AppConfigSchema } from '../../app/config.js';
 import { parseInstallBundle, BUNDLE_SPEC } from '../../install/set-spec.js';
 import type { AppWorkspaceDeclaration } from '../../app/workspaces.js';
+import { appDisplayName } from '../../app/app-ref.js';
 
 export interface ComposeSetInput {
     /** The set's package name; with the owner it forms the bundle's group id. */
@@ -91,7 +94,7 @@ const KEY_RE = /^[a-z][a-z0-9-]{0,39}$/;
 
 /** "Shop Admin.html" → "shop-admin": the package name an app's own package gets. */
 export function packageNameOf(filename: string): string {
-    const base = filename.replace(/\.html?$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    const base = appDisplayName(filename).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
     return base || 'app';
 }
 

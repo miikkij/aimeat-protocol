@@ -8,8 +8,8 @@
  *     name made into a slug with .html added; the description is the record's; the access code starts
  *     empty and hidden. Signed out, the status says to sign in and Publish is off; a sign-in or a
  *     sign-out while the dialog is open turns Publish on or off at once (F110).
- *   - Publish: checks the filename (^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$; the .html ending the hint asks
- *     for is not enforced, as on the old page), the access code (4–64 when given) and the description
+ *   - Publish: checks the filename (^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$; a name without an extension is
+ *     stored as name.html by the node, src/services/app/app-ref.ts), the access code (4–64 when given) and the description
  *     (needed for an app not yet published), then POST /v1/apps { filename, content (base64),
  *     mime_type, name, description, tags, icon?, access_code? }. Category and uses_cortex are not sent,
  *     so the node keeps them on a republish. "Publishing..." → "✔ Published! {address}", the lists are
@@ -28,6 +28,7 @@
  *   ({ filename, download_url, version_number, versions_url, …, description, parked }) after a publish
  *   (and the unlisting).
  * @version-history
+ *   v1.1.1 — 2026-11-20 — The filename field asks for the app's name (placeholder my-app); the node adds `.html`.
  *   v1.1.0 — 2026-09-27 — Parity: the status line is the old page's (.85rem, green while publishing
  *     and when done, coral when refused, 8px under the fields even while empty).
  *   v1.0.0 — 2026-09-27 — Initial (appcat).
@@ -161,7 +162,7 @@ export default function PublishDialog(props) {
   return html`<${Dialog} title=${x('publish.title')} size="md" onClose=${close} footer=${footer}>
     <${Fields} plain>
       <${TextField} label=${x('publish.filename')} value=${filename} onInput=${setFilename}
-        placeholder="my-app.html" autoComplete="off" hint=${x('publish.filenameHint')} />
+        placeholder="my-app" autoComplete="off" hint=${x('publish.filenameHint')} />
       <${TextArea} label=${x('publish.description')} rows=${2} value=${description} onInput=${setDescription}
         placeholder=${x('publish.descriptionPh')} hint=${x('publish.descriptionHint')} />
       <${TextField} secret label=${x('publish.accessCode')} value=${code} onInput=${setCode}

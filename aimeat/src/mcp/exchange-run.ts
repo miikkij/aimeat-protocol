@@ -21,6 +21,8 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-11-20 — aimeat_app_tool_invoke takes the app's name without `.html` and `owner/name`
+ *     (services/app/app-ref.ts); its not-found hint names the nearest manifests first, without `.html`.
  *   2026-11-14 — aimeat_app_tool_invoke reads the manifest through loadPublicToolManifest
  *     (services/app-tools/manifest-read.ts), which POST .../webmcp/tools/:tool asks too (unit 2b, B14).
  *   2026-10-31 — aimeat_app_tool_invoke resolves the binding of a contracted or granted call inside the
@@ -110,7 +112,8 @@ import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { meteredRefusalText } from '../services/extension-access/metered-response.js';
 import { applyLockedInput, isToolPriced } from '../models/app-tool-schemas.js';
-import { appToolManifestIds, loadPublicToolManifest } from '../services/app-tools/manifest-read.js';
+import { appToolManifestIds, loadPublicToolManifest, resolveToolManifestId } from '../services/app-tools/manifest-read.js';
+import { appDisplayName } from '../services/app/app-ref.js';
 import { checkAppToolInput } from '../services/app/tool-input.js';
 import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
 import { sendDirectMessage } from '../services/message/send.js';
@@ -171,17 +174,19 @@ export function registerExchangeRunTools(
             inputSchema: zodShapeFor('aimeat_app_tool_invoke'),
             annotations: annotationsFor('aimeat_app_tool_invoke'),
         },
-        async ({ owner: appOwner, app, tool, input }) => {
+        async ({ owner: appOwner, app: appRef, tool, input }) => {
             const ownerName = localAccountName(appOwner);
+            // `lifecycle-central`, `lifecycle-central.html` and `owner/lifecycle-central` all name the
+            // stored app (services/app/app-ref.ts); everything below keys on the stored filename.
+            const app = await resolveToolManifestId(storage, ownerName, `${ownerName}@${config.nodeId}`, appRef);
             // The read POST .../webmcp/tools/:tool asks (services/app-tools/manifest-read.ts).
             const manifest = await loadPublicToolManifest(storage, config.nodeId, ownerName, app);
             if (manifest.state === 'absent') {
-                // An app id is a FILENAME and carries its extension; the app's own subdomain does not.
                 // Naming what this owner actually publishes turns a dead end into a one-step correction,
                 // instead of sending the caller off to read the app's source to guess.
-                const near = await appToolManifestIds(storage, `${ownerName}@${config.nodeId}`, false);
+                const near = await appToolManifestIds(storage, `${ownerName}@${config.nodeId}`, false, appRef);
                 const hint = near.length ? ` This owner publishes tool manifests for: ${near.join(', ')}.` : '';
-                return fail(`APP_TOOLS_NOT_FOUND: app "${ownerName}/${app}" declares no tool manifest.${hint}`);
+                return fail(`APP_TOOLS_NOT_FOUND: app "${ownerName}/${appDisplayName(appRef)}" declares no tool manifest.${hint}`);
             }
             if (manifest.state === 'malformed') return fail(`INVALID_TOOL_MANIFEST: app "${ownerName}/${app}" tool manifest is malformed`);
             const toolDef = manifest.tools.find(t => t.name === tool);

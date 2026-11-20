@@ -15,6 +15,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.40.1 — 2026-11-20 — The app host's path form `/<owner>/<name>` serves `<name>.html` too
+ *     (services/app/app-ref.ts); it took only `/<owner>/<name>.html`.
  *   v1.40.0 — 2026-11-15 — A draft link whose draft is gone answers a browser with the not-found page
  *     too; serveDraftPreview takes the request for that.
  *   v1.39.0 — 2026-11-09 — An unknown app, portfolio or company address answers a browser with the
@@ -226,6 +228,7 @@ import { apexServesSite } from '../services/subdomain/site-origin.js';
 import {
   RESERVED_SUBDOMAINS, SUBDOMAIN_RE, DRAFT_LABEL_SUFFIX, draftBaseLabel, ensureAppSubdomain,
 } from '../services/subdomain/names.js';
+import { appDisplayName, findAppFilename } from '../services/app/app-ref.js';
 
 // RESERVED_SUBDOMAINS, SUBDOMAIN_RE, DRAFT_LABEL_SUFFIX, draftBaseLabel and ensureAppSubdomain
 // moved unchanged to services/subdomain/names.ts (codebase analysis 2026-11-03, item D-d).
@@ -702,11 +705,18 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
   router.get('/:owner/:filename', async (req: Request, res: Response, next) => {
     if (!req.appOrigin) return next();
     const owner = req.params.owner as string;
-    const filename = req.params.filename as string;
-    // Only treat genuine app HTML filenames as app requests; anything else (API
-    // segments like /v1/..., assets) falls through to normal routing.
-    if (!/\.html?$/i.test(filename) || filename.includes('..')) return next();
+    const named = req.params.filename as string;
+    if (named.includes('..')) return next();
     const bareOwner = localAccountName(owner);
+    // Only an app's HTML file is an app request here: `/<owner>/<name>.html`, or `/<owner>/<name>`
+    // when that owner has `<name>.html` (services/app/app-ref.ts). Anything else (API segments like
+    // /v1/..., assets) falls through to normal routing.
+    // A name with any other extension (`/lib/x.js`) is never looked up, so an asset costs no query.
+    const isHtml = (f: string) => appDisplayName(f) !== f;
+    const filename = isHtml(named) ? named
+      : named.includes('.') ? null
+      : (await findAppFilename(storage, { ownerName: bareOwner }, named)).filename;
+    if (!filename || !isHtml(filename)) return next();
     const app = await resolveServableApp(storage, `${bareOwner}/${filename}`);
     if (!app) return next();
     const restricted = appIsRestricted(config, app);

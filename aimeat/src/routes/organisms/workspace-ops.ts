@@ -7,6 +7,7 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-11-20 — PUT /v1/organisms/:id/workspace takes a pinned app named without `.html` (services/app/app-ref-inputs.ts).
  *   2026-11-15 — DELETE /v1/organisms/:id/workspace asks the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-14 — PUT /v1/organisms/:id/workspace asks requireMember, the role aimeat_workspace_update
  *     asks; the answers are unchanged (structure programme 2026-11, unit 2b phase B).
@@ -125,6 +126,7 @@ import { loadServedProvenance, loadServedProvenanceMany, setProvenanceHeaders, e
 import type { OrganismHelpers } from './shared.js';
 import { logger } from '../../utils/logger.js';
 import { teamDeleteGate } from '../../services/team/action-gate.js';
+import { appRefCtxFor, normalizeAppRefInput } from '../../services/app/app-ref-inputs.js';
 
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
@@ -394,6 +396,10 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     // aimeat_workspace_update asks too (roleOf).
     const member = await H.requireMember(req, res, id);
     if (!member) return;
+    // A pinned app `{ owner, filename: "shop" }` names `shop.html` (services/app/app-ref-inputs.ts).
+    if (req.body && typeof req.body === 'object') {
+      await normalizeAppRefInput('aimeat_workspace_update', req.body, appRefCtxFor(storage, config.nodeId, req.auth?.owner));
+    }
     const { role } = member;
     if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
     // Archived workspace/organism is read-only — block structure/name/readme edits.

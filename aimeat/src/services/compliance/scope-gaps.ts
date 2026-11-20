@@ -19,6 +19,8 @@
  *   const gaps = await scopeGaps({ storage, config }, { kind: 'organism', organismId });
  *   const all = await nodeWideScopeGaps({ storage, config });
  * @version-history
+ *   v1.4.1 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.4.0 — 2026-11-13 — An app's register that rests on legitimate interests: a missing, unapproved,
  *     reopened, overdue or negative balancing test, legitimate interests named for special category
  *     data, and a trial that ended with no decision (lia-need.ts). An app whose data only its user
@@ -58,6 +60,7 @@ import type { ComplianceBreach, ComplianceDpia, ComplianceRegister, ComplianceRe
 import { appLiaReading, restsOnLegitimateInterests, trialState } from './lia-need.js';
 import type { ComplianceTrial } from './lia-schemas.js';
 import { liasForRead } from './lia-write.js';
+import { appDataMapId } from '../app/app-ref.js';
 
 export type ScopeGapKind =
   | 'register-without-legal-basis' | 'register-without-special-basis' | 'register-without-retention'
@@ -238,7 +241,7 @@ async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app'
   // A personal row with no stated domain: the label floor, the DPIA duty and the AI Act area cannot
   // follow data nobody placed. What the map's words point to rides along, so the fix is one look.
   if (draft.hasMap && draft.register) {
-    const map = await readAppDataMap(deps.storage, ownerGhii, scope.app.replace(/\.html$/i, ''));
+    const map = await readAppDataMap(deps.storage, ownerGhii, appDataMapId(scope.app));
     // The rows the register holds: the ones others can read, and regulated ones only the user sees.
     const held = draft.register.dataCategories ?? [];
     const unstated = (map?.held ?? []).filter(r => r.personalData === 'yes' && r.domains === undefined

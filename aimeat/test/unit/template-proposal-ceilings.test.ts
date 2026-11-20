@@ -7,6 +7,7 @@
  *   and on the node MCP tool alike (secaudit 2026-10 last items, F3).
  * @usage pnpm test -- template-proposal-ceilings
  * @version-history
+ *   v1.0.1 — 2026-11-20 — The stub answers appFilenamesAmong, which proposeTemplate asks (services/app/app-ref.ts).
  *   v1.0.0 — 2026-10-06 — Initial (secaudit 2026-10 last items, F3).
  */
 import { describe, it, expect } from 'vitest';
@@ -20,6 +21,8 @@ function stubStorage(keysHeld: number): { storage: Storage; writes: string[] } {
     const writes: string[] = [];
     const storage = {
         getApp: async () => ({ versionNumber: 3 }),
+        // The app reference lookup every Storage has (2026-11-20): the app is there under the name given.
+        appFilenamesAmong: async (_owner: unknown, candidates: string[]) => candidates.slice(0, 1),
         getMemory: async () => null,
         countMemory: async () => keysHeld,
         sumMemoryBytes: async () => 0,

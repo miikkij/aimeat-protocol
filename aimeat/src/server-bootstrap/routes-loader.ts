@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-20 — appRefPathMiddleware before the routers: an app named without `.html` in a
+ *     `/v1/apps/<owner>/<name>` path reaches the app's routes.
  *   2026-11-20 — valueRouter mounted: GET /v1/organisms/:id/value, the organism's value report.
  *   2026-11-19 — The SiteService built here is registered as the node's one (registerNodeSiteService),
  *     which the MCP tool aimeat_site_template uses.
@@ -314,6 +316,7 @@ import { initProcessBuffers } from './process-buffers.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { metricsMiddleware } from '../middleware/metrics.js';
 import { statsMiddleware } from '../middleware/stats.js';
+import { appRefPathMiddleware } from '../middleware/app-ref-path.js';
 
 export interface MountRoutesOptions {
   rejectForRelay: express.RequestHandler;
@@ -372,6 +375,8 @@ export async function mountRoutes(
   // The same request, counted for the Statistics page. Beside the Prometheus one on purpose, and
   // not opt-in: see the header of src/middleware/stats.ts for what this line being absent cost.
   app.use(statsMiddleware(stats));
+  // `/v1/apps/<owner>/<name>` without `.html` reaches the app's routes (middleware/app-ref-path.ts).
+  app.use(appRefPathMiddleware(storage));
 
   // Presigned upload endpoint (raw body — no JSON parsing needed)
   app.use(uploadRouter(config, storage));

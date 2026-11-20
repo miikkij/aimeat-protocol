@@ -30,6 +30,8 @@
  *   resolveFeedId · feedIdOf
  * @usage const { products } = await listOwnerProducts(storage, config, ownerGhii, settings);
  * @version-history
+ *   v1.0.1 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.0.0 — 2026-10-08 — Initial (layer E).
  *   v1.0.1 — 2026-10-10 — oneLine drops tags until nothing changes, then any `<` or `>` left (code
  *     scanning alert 1710).
@@ -41,6 +43,7 @@ import type { Offer } from '../../models/offer-schemas.js';
 import { listPricedAppTools } from '../../commerce/app-tool-catalog.js';
 import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { appDisplayName } from '../app/app-ref.js';
 
 /** The owner's choices for the feeds. Stored in `signals.visibility.feed` (merchant-feed-settings.ts). */
 export interface FeedSettings {
@@ -168,7 +171,7 @@ export async function listOwnerProducts(
     const appPage = `${base}/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(t.appId)}?mode=inline`;
     products.push({
       id: feedIdOf(t.sku), sku: t.sku, kind: 'app-tool',
-      title: oneLine(`${t.appId.replace(/\.html?$/i, '')}: ${t.name}`, 150),
+      title: oneLine(`${appDisplayName(t.appId)}: ${t.name}`, 150),
       description: oneLine(t.description || t.name, 5000),
       ...linkFor(t.sku, appPage), imageLink: fallbackImage, priceMicros: usd, brand,
     });

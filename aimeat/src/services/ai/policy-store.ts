@@ -19,6 +19,7 @@
  *   - setOwnerAiPolicy() — the owner writes; an agent proposes and confirms with a token
  *   - policyView() — what GET /v1/ai/policy and the MCP tool show
  * @version-history
+ *   v1.1.1 — 2026-11-20 — appAddress adds `.html` through htmlFilenameOf (services/app/app-ref.ts); a `.htm` app keeps its file.
  *   v1.1.0 — 2026-11-19 — An applied change writes the ai_settings_changed account event, naming the
  *     agent that applied it with its confirm token (settings-trail.ts; feature audit 2026-11-19, 2.3).
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
@@ -41,6 +42,7 @@ import {
   normaliseOwnerPolicy, readOwnerPolicy, parseRecommendedModels, isModelRef,
   type OwnerAiPolicy, type RecommendedModels,
 } from './policy.js';
+import { htmlFilenameOf } from '../app/app-ref.js';
 
 /** The owner's model policy. Under the reserved `ai.policy.` prefix (utils/reserved-keys.ts). */
 export const POLICY_KEY = 'ai.policy.models';
@@ -104,7 +106,7 @@ function appAddress(payerGaii: string, appRef: string): { owner: string; filenam
   const owner = slash > 0 ? ref.slice(0, slash) : localAccountName(payerGaii);
   const file = slash > 0 ? ref.slice(slash + 1) : ref;
   if (!owner || !file || file.includes('/')) return null;
-  return { owner, filename: file.endsWith('.html') ? file : `${file}.html` };
+  return { owner, filename: htmlFilenameOf(file) };
 }
 
 /**

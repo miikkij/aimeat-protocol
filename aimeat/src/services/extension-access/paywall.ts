@@ -15,6 +15,8 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   2026-11-20 — The gated app's carry plan is read through resolveGatedAppRef (services/members-only.ts),
+ *     and the x-aimeat-app-tool header takes the app named without `.html`.
  *   2026-11-04 — Moved unchanged from routes/extensions/ with the five modules it reads, so the MCP
  *     tool and the services take the paywall from a service (codebase analysis 2026-11-03, item D-f).
  *   2026-10-31 — Step 3.5 runs before the uncontracted pacing at 3.1: a bad product name
@@ -96,7 +98,8 @@ import { listInterfaceVersions } from '../app/tool-interfaces.js';
 import { appSpendRefusal } from '../metered/access.js';
 import { respondMeteredRefusal } from './metered-response.js';
 import { burnPacingToll, refusePacingShortfall, resolvePacingToll } from './pacing.js';
-import { resolveGatedApp } from '../members-only.js';
+import { resolveGatedAppRef } from '../members-only.js';
+import { appFilenameCandidates } from '../app/app-ref.js';
 import { membersOnlyRefusal, MEMBERS_ONLY_MESSAGE } from '../members-only.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -357,7 +360,7 @@ export async function enforcePaywall(args: {
   //
   //     `open` (the default) leaves this alone: anybody may call, a member is carried and pays
   //     nothing, everybody else pays. Membership is the free tier, not the door.
-  const gatedApp = resolveGatedApp(ext);
+  const gatedApp = await resolveGatedAppRef(storage, ext);
   const appPlan = gatedApp ? await getCarryPlan(storage, gatedApp) : null;
   const shut = await membersOnlyRefusal(storage, ext, callerGaii);
   if (shut) {
@@ -477,8 +480,14 @@ export async function enforcePaywall(args: {
     const named = parseNamedTool(namedAppTool);
     if (namedAppTool && !named) {
       res.status(400).json(error(config.nodeId, 'INVALID_APP_TOOL',
-        `Name the product as "{app_id}/{tool}" in the ${APP_TOOL_HEADER} header, e.g. "notes.html/search".`));
+        `Name the product as "{app}/{tool}" in the ${APP_TOOL_HEADER} header, e.g. "notes/search".`));
       return { ok: false };
+    }
+    // `notes/search` names the tool sold as `notes.html · search`: the name as given first, then with
+    // `.html` (services/app/app-ref.ts appFilenameCandidates).
+    if (named) {
+      const soldAs = appFilenameCandidates(named.appId).find(c => sold.some(s => s.appId === c && s.tool === named.tool));
+      if (soldAs) named.appId = soldAs;
     }
     if (named && !sold.some(s => s.appId === named.appId && s.tool === named.tool)) {
       res.status(400).json(error(config.nodeId, 'APP_TOOL_MISMATCH',

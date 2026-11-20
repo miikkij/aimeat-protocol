@@ -17,6 +17,7 @@
  *     GET /v1/ai/roles
  *     PUT /v1/ai/roles
  * @version-history
+ *   v1.1.2 — 2026-11-20 — PUT takes binding keys named without `.html` (services/app/app-ref-inputs.ts).
  *   v1.1.1 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
  *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.1.0 — 2026-09-28 — GET answers an app with its own roles only (it had seen every app's).
@@ -36,6 +37,7 @@ import { AiCompletionError } from '../services/ai/errors.js';
 import { setRoles } from '../services/ai/roles.js';
 import { aiRolesView, appRolesView, knownRoleProviders } from '../services/ai/roles-view.js';
 import { aiCallerOf } from './ai-policy.js';
+import { appRefCtxFor, normalizeAppRefInput } from '../services/app/app-ref-inputs.js';
 
 /** The scope an agent needs to propose a change to the roles. Outside the `*` bundle, as for the routing. */
 const ROLES_WRITE_SCOPE = 'memory:write-reserved';
@@ -68,6 +70,8 @@ export function aiRolesRouter(config: AimeatConfig, storage: Storage): Router {
   router.put('/v1/ai/roles', requireAuth(), requireScope(ROLES_WRITE_SCOPE), async (req: Request, res: Response) => {
     const auth = req.auth!;
     const body = (req.body ?? {}) as Record<string, unknown>;
+    // `alice/shop#writer` as a binding key names `alice/shop.html` (services/app/app-ref-inputs.ts).
+    await normalizeAppRefInput('aimeat_ai_role_set', body, appRefCtxFor(storage, config.nodeId, auth.owner));
     // One shape, the one the MCP twins send: { roles?, bindings?, confirm_token? }.
     const input = { ...(body.roles !== undefined ? { roles: body.roles } : {}), ...(body.bindings !== undefined ? { bindings: body.bindings } : {}) };
     try {

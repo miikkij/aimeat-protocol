@@ -18,6 +18,7 @@
  * @structure complianceTools — the four definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-11-20 — `app` is the app's name without `.html` (services/app/app-ref.ts).
  *   2026-11-14 — The server's balancing test mode, and an agent approves a test unless its owner keeps the approval.
  *   2026-11-13 — An app's balancing test: the read's part `lia_draft` with `lang`, and the document
  *     kinds `lias`, `trial` (the app's trial mark) and `contact` (an organism's privacy contact).
@@ -54,7 +55,7 @@ export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'bre
 const SCOPE_INPUT = {
     scope: { type: 'string', enum: ['node', 'organism', 'app', 'all'], description: 'Whose document: node (default, the operator\'s), organism (with organism_id), app (with app). "all" is for reading only, by the operator: every place that keeps this part (the installation, each organism, each app), each with its name and may_write. Not for the AI Act parts.' },
     organism_id: { type: 'string', description: 'scope "organism": the organism.' },
-    app: { type: 'string', description: 'scope "app": the app\'s filename, e.g. crm.html.' },
+    app: { type: 'string', description: 'scope "app": the app\'s name, e.g. crm (its file name crm.html works too).' },
     app_owner: { type: 'string', description: 'scope "app": the app owner\'s account name, when the operator reads another owner\'s app. Absent: your own owner\'s app.' },
 } as const;
 

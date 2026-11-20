@@ -7,6 +7,9 @@
  *   end-to-end over the MCP surface (task-path fulfillment + fee arithmetic on the wallets).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-commerce
  * @version-history
+ *   2026-11-20 — 7b asserted that `mcpshop` is refused because the id must carry its extension; that
+ *     was the old design. It now asserts the bare name reads the manifest and an unknown name is refused
+ *     with a hint (services/app/app-ref.ts, wish-sovelluksen-nimi-ilman-html-p-tett-kaikkialla).
  *   2026-10-17 — 2, 5d: the narrow agent is offered checkout_open and invoice_set (permission ask,
  *     mcp/permission-ask-gate.ts), and each call is refused SCOPE_DENIED with the allow address;
  *     psp_set needs commerce:psp, outside every wildcard, and stays off the list.
@@ -369,16 +372,17 @@ await test('7c. A manifest past the memory value ceiling is refused, and the goo
         `the earlier manifest did not survive: ${still.text.slice(0, 200)}`);
 });
 
-await test('7b. A missed app id NAMES the manifests this owner does publish', async () => {
-    // An app id is a filename and carries its extension; the app's own subdomain does not. An agent
-    // that read `mcpshop.apps.…` asked for "mcpshop", was told the app declares no manifest, believed
-    // it, and went off to download the app's HTML. The bare "not found" was true of the key and false
-    // of the app, so the error has to name what is actually there.
-    const r = await mcp.call('aimeat_app_tools_get', { app_id: 'mcpshop' });
+await test('7b. The name without ".html" reads the manifest; a missed name NAMES the manifests this owner does publish', async () => {
+    // An agent that read `mcpshop.apps.…` asked for "mcpshop". That was refused until 2026-11-20; the
+    // name without the extension now names the same manifest (services/app/app-ref.ts), even before
+    // the app is published.
+    const bare = await mcp.call('aimeat_app_tools_get', { app_id: 'mcpshop' });
+    assert(!bare.isError && bare.data.manifest?.tools?.[0]?.name === 'summarize', `the bare name reads the manifest: ${bare.text.slice(0, 200)}`);
+    // A name that matches nothing still fails, and names what is actually there, without `.html`.
+    const r = await mcp.call('aimeat_app_tools_get', { app_id: 'mcpshoq' });
     assert(r.isError, `a wrong id must still fail: ${r.text}`);
     assert(r.text.includes('APP_TOOLS_NOT_FOUND'), `keeps its code: ${r.text}`);
-    assert(r.text.includes('mcpshop.html'), `names the real app id, got: ${r.text}`);
-    assert(r.text.includes('includes its extension'), `says WHY the id missed, got: ${r.text}`);
+    assert(r.text.includes('mcpshop'), `names the real app, got: ${r.text}`);
 });
 
 await test('8. offer_price_set sets an own offer\'s pacing amount in morsels + a price in EUR micro-units', async () => {

@@ -15,6 +15,8 @@
  * @structure APP_SCAN · registerDrafts() · obligedOrganisms() · appPartiesRegister()
  * @usage const drafts = await registerDrafts({ storage, config }, await listDocs(storage, nodeId, 'registers'));
  * @version-history
+ *   v1.2.1 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
+ *     of a regex of this file's own; no change in behaviour.
  *   v1.2.0 — 2026-11-19 — An organism that declared itself an anti-money-laundering obliged entity is
  *     a draft place: its customer due diligence register `org-kyc`, with its member register when it
  *     keeps none (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
@@ -32,6 +34,7 @@ import { appRegisterDraft, nodeRegistersDraft, organismRegisterDraft } from './d
 import type { ComplianceRegister } from './docs-schemas.js';
 import { readAppParties, signupOpen } from '../app-parties/store.js';
 import { readAmlDeclarations } from '../aml/gate.js';
+import { appDisplayName } from '../app/app-ref.js';
 
 /** How many apps are read, as the gap scan reads them (compliance-scope-gaps.ts). */
 const APP_SCAN = 1000;
@@ -95,7 +98,7 @@ async function obligedOrganisms(storage: Storage, nodeId: string): Promise<strin
 export async function appPartiesRegister(deps: { storage: Storage; config: AimeatConfig }, owner: string, filename: string): Promise<ComplianceRegister | null> {
     const rec = await readAppParties(deps.storage, `${owner}@${deps.config.nodeId}`, `${owner}/${filename}`);
     if (!(await deps.storage.countAppParties(`${owner}/${filename}`)) && !signupOpen(deps.config, rec.registration)) return null;
-    const stem = filename.replace(/\.html?$/i, '').replace(/[^A-Za-z0-9_-]+/g, '-');
+    const stem = appDisplayName(filename).replace(/[^A-Za-z0-9_-]+/g, '-');
     return {
         id: `app-${stem}-parties`, title: `People who registered to ${filename}`.slice(0, 300), type: 'personal', purpose: 'member', role: 'controller',
         subjects: ['people registered to the app without an account'],

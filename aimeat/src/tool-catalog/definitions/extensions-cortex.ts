@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   2026-11-20 — aimeat_iam_define's `app_id` is "owner/name" without `.html` (services/app/app-ref.ts).
  *   2026-11-13 — aimeat_cortex_list takes namespace and visibility, as GET /v1/cortex does (unit 3b).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — aimeat_extension_config_set says emailPolicy "unrestricted" is asked of the operators (secaudit2026oct22).
@@ -164,13 +165,13 @@ export const extensionsCortexTools = [
     },
     {
         name: 'aimeat_iam_define',
-        description: 'Design an app\'s in-app permission model and get the gate that enforces it. Validates a level schema (ordinal levels, lower = more power, each with app capability strings; a level 0 holding "*" is required) and a command manifest (each command names the capability it needs and a mutation tier read|write|irreversible). A level also holds every weaker level\'s capabilities. It changes no live state; it returns: `matrix`, per level the commands it may run and the ones a human should confirm; `extension`, only when app_id names an app as owner/file.html, an installable gate { name, manifest, scripts } with the actions check, commands and roles, which reads each caller\'s role from the app\'s member list on this node; and `apply`, setRoles/setLevels/setCommands payloads for the "admin" action of an aimeat-iam package install (aimeat_extension_invoke), which the generated gate does not need. To use the generated gate: install it with aimeat_extension_install { manifest: extension.manifest, scripts: extension.scripts, activate: true } (add update: true and the next version when regenerating over an installed gate), then in the app call AIMEAT.iam.init({ app: "<owner/file.html>", ext: extension.name }) from the aimeat-iam browser library. One model for both user kinds (a person and their agents).',
+        description: 'Design an app\'s in-app permission model and get the gate that enforces it. Validates a level schema (ordinal levels, lower = more power, each with app capability strings; a level 0 holding "*" is required) and a command manifest (each command names the capability it needs and a mutation tier read|write|irreversible). A level also holds every weaker level\'s capabilities. It changes no live state; it returns: `matrix`, per level the commands it may run and the ones a human should confirm; `extension`, only when app_id names an app as owner/name, an installable gate { name, manifest, scripts } with the actions check, commands and roles, which reads each caller\'s role from the app\'s member list on this node; and `apply`, setRoles/setLevels/setCommands payloads for the "admin" action of an aimeat-iam package install (aimeat_extension_invoke), which the generated gate does not need. To use the generated gate: install it with aimeat_extension_install { manifest: extension.manifest, scripts: extension.scripts, activate: true } (add update: true and the next version when regenerating over an installed gate), then in the app call AIMEAT.iam.init({ app: "<owner/file.html>", ext: extension.name }) from the aimeat-iam browser library. One model for both user kinds (a person and their agents).',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Design App IAM', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         surfaces: ['appdev'],
         input: {
-            app_id: { type: 'string', description: 'owner/file.html of the app the gate protects; with it the result includes the installable `extension`. A name without a slash only labels the schema and generates no extension.' },
+            app_id: { type: 'string', description: 'owner/name of the app the gate protects, e.g. alice/club (alice/club.html works too); with it the result includes the installable `extension`. A name without a slash only labels the schema and generates no extension.' },
             levels: { type: 'array', required: true, description: 'Level schema: array of { level (int, 0 = most power), key, label, capabilities: string[] }.', zod: z.array(z.object({
                 level: z.number(), key: z.string().max(INPUT_LIMITS.id), label: z.string().max(INPUT_LIMITS.name), capabilities: z.array(z.string().max(INPUT_LIMITS.id)),
             })) },
