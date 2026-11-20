@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-11-20 — Initial (wish-atelier-ohjaa-teko-lykiihdytykseen-skilli-suora-kirjoitus-ja).
  */
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
-import { BASE, assert, finish, json as request, test } from './helpers/harness.js';
+import { BASE, assert, expectRefusal, finish, json as request, test } from './helpers/harness.js';
 
 /** The harness request, signed in with `token`. */
 function json(path: string, token: string, opts: RequestInit = {}) {
@@ -70,6 +70,16 @@ await test('a declared presentation and a quick prototype get no ai_path line, a
     assert(shown.ai_path === undefined && shown.ai_path_tools_count === undefined, `a presentation: ${JSON.stringify(shown.ai_path)}`);
     const proto = await publish(page(file, '<meta name="aimeat-level" content="proto">'));
     assert(proto.ai_path === undefined, `a quick prototype: ${JSON.stringify(proto.ai_path)}`);
+});
+
+// The skill and the publish answer send an AI to the data map to find where the data lives, so
+// nobody but the app's own builders may rewrite it.
+await test('another owner cannot rewrite the data map an AI reads to find this app\'s data', async () => {
+    const otherName = `aipathx${stamp}`;
+    await registerOwner(BASE, otherName);
+    const other = (await ownerSignIn(BASE, otherName)).body.data.token;
+    const r = await json(`/v1/datamap/apps/${ownerName}/${file}`, other, { method: 'PUT', body: JSON.stringify({ spec: 'aimeat.datamap/2', what: 'Moved.', held: [] }) });
+    expectRefusal(r, 403);
 });
 
 finish();
