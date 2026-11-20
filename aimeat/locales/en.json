@@ -29613,7 +29613,7 @@
     "source.save": "Save working copy",
     "publish.title": "Publish App",
     "publish.filename": "Filename",
-    "publish.filenameHint": "Letters, numbers, dots, hyphens, underscores. The name is enough: the node stores my-app as my-app.html.",
+    "publish.filenameHint": "Letters, numbers, dots, hyphens, underscores. The name is enough: my-app is saved as my-app.html.",
     "publish.description": "Description",
     "publish.descriptionPh": "What does this app do? 1-2 sentences (your AI can write it)",
     "publish.descriptionHint": "Shown in the catalogue and in the front page's app list. Required for a new app.",

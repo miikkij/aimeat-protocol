@@ -909,10 +909,10 @@
     },
     "src/services/app-tools/manifest-read.ts": {
       "reads": {
-        "getMemory": 1,
+        "getMemory": 2,
         "listMemory": 1
       },
-      "why": "Moved 2026-11-13 from src/mcp/commerce.ts and src/mcp/exchange-run.ts with appToolManifestIds (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: app-id key names for a hint, private ones only for the owner. Moved 2026-11-14 from src/mcp/exchange-run.ts with loadPublicToolManifest (structure programme 2026-11, unit 2b, B14), the node's own read: a public tool manifest read to route an invocation, which POST .../webmcp/tools/:tool and aimeat_app_tool_invoke both ask."
+      "why": "Moved 2026-11-13 from src/mcp/commerce.ts and src/mcp/exchange-run.ts with appToolManifestIds (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: app-id key names for a hint, private ones only for the owner. Moved 2026-11-14 from src/mcp/exchange-run.ts with loadPublicToolManifest (structure programme 2026-11, unit 2b, B14), the node's own read: a public tool manifest read to route an invocation, which POST .../webmcp/tools/:tool and aimeat_app_tool_invoke both ask. Added 2026-11-20 (resolveToolManifestId, wish-sovelluksen-nimi-ilman-html-p-tett-kaikkialla), the node's own read: whether a manifest key exists under each name an app may be stored as, to pick the key; the value is not returned, and the caller then reads the chosen key through the reads above, which hold the visibility rules."
     },
     "src/services/app-ui/service.ts": {
       "reads": {
