@@ -21949,8 +21949,8 @@
     "confirmAddOwner": "Make {member} an owner too? They get everything you can do, and you keep it.",
     "confirmRemoveOwner": "Take {member} off the owners? They stay as an admin.",
     "roleOwner": "owner",
-    "roleAdmin": "admin",
-    "roleMember": "member",
+    "roleAdminShort": "admin",
+    "roleMemberShort": "member",
     "records": {
       "title": "Records of processing",
       "leadEdit": "What personal data this place keeps, about whom, why and for how long. Copy the prompt to your own AI: it asks you what only you know and shows you the result before it saves anything.",

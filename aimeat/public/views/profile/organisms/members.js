@@ -10,7 +10,7 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
- *   2026-11-20 — A member's role badge is in the reader's language (organisms.roleAdmin, roleMember);
+ *   2026-11-20 — A member's role badge is in the reader's language (organisms.roleAdminShort, roleMemberShort);
  *     it showed the stored word, so a Finnish page read "member".
  *   2026-11-19 — A member's row names the agents that may write the apps' protected data past the
  *     apps' own tools (writes_past_app_rules: the agent's grant covers organism:direct).
@@ -55,8 +55,8 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 
 /** A member's role in the reader's language; a role with no word of its own is shown as stored. */
-const roleWord = (role) => (role === 'admin' ? t('organisms.roleAdmin')
-  : !role || role === 'member' ? t('organisms.roleMember') : role);
+const roleWord = (role) => (role === 'admin' ? t('organisms.roleAdminShort')
+  : !role || role === 'member' ? t('organisms.roleMemberShort') : role);
 import { t } from '/js/i18n.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { List, Row as ListRow, Lead, Name, Doors, Group } from '/components/List.js';
