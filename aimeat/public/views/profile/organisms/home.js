@@ -13,7 +13,7 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
- *   v3.13.0 -- 2026-11-20 -- A folded section "Directive for members' AI" (directive-panel.js): the organism's directive, and for its creators the answers as counts and the sentence to make or change it.
+ *   v3.13.0 -- 2026-11-20 -- A folded section "Directive for members' AI" (directive-panel.js): the organism's directive, and for its creators the answers as counts and the sentence to make or change it. The folded sections with a detail line (06, 08, 09) take FoldSection's `wrap`: at 390 px the detail ran past the edge and was cut off.
  *   v3.12.0 -- 2026-11-14 -- A team's page opens with what waits for you, the team context and skill, and you in this team (team-sections.js, team setup T14, T15); the organism's sections follow, numbered on.
  *   v3.11.1 -- 2026-11-14 -- A team's title, crumb and description are in the reader's language (orgName, orgDescription, team setup T24).
  *   v3.11.0 -- 2026-10-31 -- "Show in the overview" under the map: the Overview page opened on this organism (views/home/overview.js).
@@ -264,7 +264,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
         ${fullTimeline ? html`<${TimelinePanel} orgId=${org.id} defaultOpen=${true} />` : html`<${TimelineRecent} rows=${timeline} limit=${5} />`}
       <//>
 
-      <${Section} fold id="og-readme" num=${num(6)} title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
+      <${Section} fold wrap id="og-readme" num=${num(6)} title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
         ${readme || canEdit
           ? html`<${ReadmePanel} markdown=${readme} canEdit=${canEdit} kind="organism" name=${org.name} aiPromptSeed=${tocSeed} onSave=${saveReadme} />`
           : html`<${Note}>${tr('organisms.readmeEmpty', 'No README yet.')}<//>`}
@@ -278,13 +278,13 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
           load=${() => orgService.getOrganismOverview(org.id)} defaultOpen />
       <//>
 
-      <${Section} fold id="og-ai" num=${num(8)} title=${tr('organisms.forAiTitle', 'Bring your AI here')} sub=${tr('organisms.forAiHint', '')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
+      <${Section} fold wrap id="og-ai" num=${num(8)} title=${tr('organisms.forAiTitle', 'Bring your AI here')} sub=${tr('organisms.forAiHint', '')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
         <${Note} kind="lead">${tr('organisms.instrBlockLead', 'Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure.')}<//>
         <${InstructionBlock} orgId=${org.id} />
       <//>
 
       ${showDirective ? html`
-        <${Section} fold id="og-directive" num=${num(9)} title=${t('organisms.directive.title')} sub=${t('organisms.directive.sub')}
+        <${Section} fold wrap id="og-directive" num=${num(9)} title=${t('organisms.directive.title')} sub=${t('organisms.directive.sub')}
           open=${openDirective} onToggle=${() => setOpenDirective(o => !o)}>
           <${DirectivePanel} org=${org} directives=${directive.directives} summary=${directive.summary} canEdit=${canEdit} />
         <//>` : null}

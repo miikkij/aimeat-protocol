@@ -36,7 +36,7 @@ export function DirectivePanel({ org, directives, summary, canEdit }) {
         <${Facts} rows=${[
           { k: x('askLabel'), v: x('ask.' + own.ask) },
           { k: x('updated'), v: date(own.updated_at) },
-          directives?.your_answer?.answer ? { k: x('yourAnswer'), v: x('answer.' + directives.your_answer.answer) } : null,
+          directives?.your_answer?.answer ? { k: x('yourAnswer'), v: x('yours.' + directives.your_answer.answer) } : null,
         ].filter(Boolean)} />` : html`<${Note} kind="quiet">${x('none')}<//>`}
       ${summary ? html`
         <${FigureStrip} flush items=${[
