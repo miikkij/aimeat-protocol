@@ -24,6 +24,8 @@
  *   atelierPlatformIds() · ATELIER_PLATFORM_PART_LINE
  * @usage const piece = atelierPlatformPiece('group', config.baseUrl);   // null for an unknown id
  * @version-history
+ *   v1.3.0 — 2026-11-20 — The platform index points at the node's capability list (`aimeat_handbook_get
+ *     { tier: "features" }`, /v1/everything), which check:feature-reach holds whole.
  *   v1.2.0 — 2026-11-20 — The sections `ai-path` and `app-tools` (atelier-ai-path.ts): the path the
  *     person's own AI takes into the app, and an action it calls, backed by an extension, with the
  *     space it guards closed.
@@ -133,6 +135,12 @@ function platformIndex(nodeUrl: string): string {
     + 'read the ones this app is in BEFORE you write that part of it, and leave the others. '
     + 'Over MCP: `aimeat_handbook_get { tier: "build-app-atelier/<id>" }`. Over HTTP: `GET ' + nodeUrl + '/v1/prompts/build-app-atelier/sections/<id>?format=txt`.\n';
   for (const s of ATELIER_PLATFORM) out += '- `' + s.id + '` — ' + s.when + '\n';
+  // The capability list (docs/AIMEAT-Feature-List.md, held whole by check:feature-reach): what the node
+  // does beyond these sections, so an app hands a job to the node instead of rebuilding it in the page.
+  out += 'Beyond these sections, the node itself does more: `aimeat_handbook_get { tier: "features" }` lists every capability by area '
+    + '(agents that work on a schedule, workflows, mail, payments, signing, receivers, data packages, what the owner lets every AI do without asking), '
+    + 'and `GET ' + nodeUrl + '/v1/everything` is the same list. Read it before you design a feature, hand a job to the node when it already does it, '
+    + 'and tell the person which capability the app uses, in plain words.\n';
   return out;
 }
 

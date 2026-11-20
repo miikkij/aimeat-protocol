@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-20: check:feature-reach, every MCP tool, served library and seeded package is named in docs/AIMEAT-Feature-List.md, the capability list an AI reads (feature-documentation.md row 5).
  *  - 2026-11-20: check:partial-defaults, no zod .partial() in src/ or public/: a partial-update schema is patchOf() (src/utils/zod-patch.ts), because .partial() keeps the defaults and a PATCH reset the fields it left out (docs/pitfalls.md §127, now deleted).
  *  - 2026-11-19: `githubOnly: true` on check:field-reach, the CodeQL pass (793 s of the slow eight's 1527 s). `pnpm ready` runs every other check here before it pushes (check:fast --before-push, about three minutes); the CodeQL pass stays on GitHub.
  *  - 2026-11-19: check:feature-list, every section of the feature list was read against the code it describes, and every promise of a refusal or a limit it makes is held by a test.
@@ -73,6 +74,7 @@ export const FAST_CHECKS = [
     // the source, and the node copy had drifted five commits behind it with nothing to say so.
     { script: 'check:design-language-publish', label: 'The node copy of skill aimeat-design-language is the repository copy, published and recorded' },
     { script: 'check:it-adoption', label: 'Every page of the IT adoption package was read against the code it describes, that code has not changed since, and the settings and tools it names exist' },
+    { script: 'check:feature-reach', label: 'Every MCP tool, served library and seeded package is named in the feature list, the capability list an AI reads' },
     { script: 'check:feature-list', label: 'Every section of the feature list was read against the code it describes, that code has not changed since, and every promise of a refusal or a limit is held by a test' },
     { script: 'check:app-catalog', label: 'app-catalog.html ↔ sources in sync' },
     { script: 'check:everything', label: 'everything.json ↔ docs/AIMEAT-Feature-List.md in sync' },

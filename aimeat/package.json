@@ -143,6 +143,7 @@
     "check:skill-evals": "tsx scripts/check-skill-evals.ts",
     "check:it-adoption": "tsx scripts/check-it-adoption.ts",
     "check:feature-list": "tsx scripts/check-feature-list.ts",
+    "check:feature-reach": "tsx scripts/check-feature-reach.ts",
     "check:silent-catch": "tsx scripts/check-silent-catch.ts",
     "check:js-syntax": "node --experimental-vm-modules --import tsx scripts/check-js-syntax.ts",
     "check:ai-disclosure": "tsx scripts/check-ai-disclosure.ts",

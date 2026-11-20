@@ -543,7 +543,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:8e53aa61a380162182d1ea39",
+      "digest": "sha256:814128c1a0093ea0ce5406e5",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -560,14 +560,14 @@
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/scripts/sandbox.ts",
         "aimeat/scripts/sandbox-machines.ts",
         "aimeat/scripts/ui-compare.ts",
         "aimeat/src/services/builder/app-prompt.ts"
       ],
-      "digest": "sha256:09a1b85c4a42f3f5f8209297",
+      "digest": "sha256:e05641bd19a2bff41ec7d630",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -831,7 +831,7 @@
       "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
       "aimeat/src/routes/app-templates.ts": "960dd944924d2601",
       "aimeat/src/services/builder/atelier-prompt.ts": "23bb81893ca47096",
-      "aimeat/src/services/builder/app-prompt.ts": "785fc0f78cc3040f",
+      "aimeat/src/services/builder/app-prompt.ts": "629ec165cf96f41e",
       "aimeat/src/services/app/publish.ts": "5187be36e9d0aed7",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
@@ -850,7 +850,7 @@
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
       "aimeat/scripts/ui-compare.ts": "a9f4b0a0d091a9ee",
-      "aimeat/src/services/builder/app-prompt.ts": "785fc0f78cc3040f"
+      "aimeat/src/services/builder/app-prompt.ts": "629ec165cf96f41e"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3",

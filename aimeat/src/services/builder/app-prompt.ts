@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from './app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-11-20 — The MCP research step points at the node's capability list (`aimeat_handbook_get
+ *     { tier: "features" }`, /v1/everything), which check:feature-reach holds whole.
  *   2026-11-19 — An outside key "lives in a server extension", not "an extension (T3)": the section is
  *     served to Atelier builders too (atelier-platform.ts), and Atelier has no tiers.
  *   2026-11-15 — ADDITIVE: "Installing the app on a phone, and its home-screen icon" (icon_upload, who can install).
@@ -735,6 +737,9 @@ function composeAppPrompt(
   body += '### If you are an agentic coder with AIMEAT MCP tools\n';
   body += 'When `aimeat_*` MCP tools are available in your environment (Claude Code, Cursor, OpenHands, any MCP client), they are already authenticated as the user — USE THEM for node operations instead of raw HTTP: `aimeat_app_publish` to publish/update the app (upload mode for files > 1 KB), `aimeat_storage_upload` for files, `aimeat_memory_write`/`aimeat_memory_read` for data, `aimeat_discover` for discovery. Register throwaway accounts only for cross-user testing; the app itself is published under the user\'s own account via MCP. The publish walkthrough below is for HUMANS pasting in a chat — skip telling it to an MCP-equipped agent, just publish.\n';
   body += 'Load the paved-path skill first: `aimeat_skill_get` with ref `node:aimeat-app-builder` (spec-first workflow, research-before-building, publish checklist). Research with ONE call: `aimeat_appdev_overview` (pass your OWN model id — self-identify, never ask the user) — your existing apps + template proposals, library packs with per-model proofs, curated + learned pitfalls. Skim the pitfalls for the areas you touch before you hit them.\n';
+  // The capability list (docs/AIMEAT-Feature-List.md, held whole by check:feature-reach): what the node
+  // does beyond the libraries, so an app hands a job to the node instead of rebuilding it in the page.
+  body += 'Before you design a feature, read what the node itself can do: `aimeat_handbook_get` with `tier: "features"` lists every capability by area (agents that work on a schedule, workflows, mail, payments, signing, receivers, data packages, what the owner lets every AI do without asking), and GET ' + nodeUrl + '/v1/everything is the same list. Hand a job to the node when it already does it, and tell the person which capability the app uses, in plain words.\n';
   // The spec token. Added 2026-08-11 after an app went live with three defects this document
   // already answers, published by an agent that never fetched it: the soft "read this first" in the
   // MCP instructions and in the skill changed nothing, while the machine-readable `mobile_hints` in
