@@ -9,6 +9,7 @@
  *   and season (services/value/rhythm.ts). Counts only, never a person.
  * @structure FEATURES · featureOf · UsageRhythm · readUsageRhythm
  * @version-history
+ *   v1.1.0 — 2026-11-20 — A call is read by its coordinate, a REST route by its first path segment.
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 2).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -30,8 +31,27 @@ export const FEATURES: ReadonlyArray<[feature: string, prefixes: string[]]> = [
   ['reports', ['aimeat_usage_', 'aimeat_overview', 'aimeat_admin_']],
 ];
 
-export function featureOf(tool: string): string {
-  for (const [feature, prefixes] of FEATURES) if (prefixes.some(p => tool.startsWith(p))) return feature;
+/** A REST route's first path segment after /v1/ and the feature it belongs to. */
+const ROUTE_FEATURES: Readonly<Record<string, string>> = {
+  memory: 'memory', context: 'memory', knowledge: 'memory', discover: 'memory', files: 'memory', storage: 'memory',
+  organisms: 'organisms', teams: 'organisms', workspaces: 'workspaces',
+  goals: 'goals', tasks: 'tasks', work: 'tasks', apps: 'apps', designbook: 'apps', appcat: 'apps',
+  boards: 'boards', messages: 'messages', dm: 'messages', mail: 'messages', agents: 'agents', crews: 'agents',
+  skills: 'skills', handbook: 'skills', usage: 'reports', admin: 'reports', overview: 'reports',
+};
+
+/**
+ * The feature a call belongs to. A call is named by its coordinate: an MCP tool's name
+ * (`aimeat_memory_write`) or a REST route (`POST /v1/memory/x`); a workspace route under
+ * /v1/organisms/:id/workspace counts as workspaces.
+ */
+export function featureOf(coordinate: string): string {
+  for (const [feature, prefixes] of FEATURES) if (prefixes.some(p => coordinate.startsWith(p))) return feature;
+  const path = /\/v1\/([^/?\s]+)(\/[^?\s]*)?/.exec(coordinate);
+  if (path) {
+    if (path[1] === 'organisms' && /\/workspace/.test(path[2] ?? '')) return 'workspaces';
+    return ROUTE_FEATURES[path[1]] ?? 'other';
+  }
   return 'other';
 }
 
@@ -52,7 +72,8 @@ async function callsByFeature(storage: Storage, from: string, to: string): Promi
   const r = await readUsageReport(storage, { report: 'tool', scope: 'node', from, to, limit: 2000 });
   const out = new Map<string, number>();
   for (const g of r.groups) {
-    const tool = String((g.dims as Record<string, string | undefined>).tool ?? g.key);
+    const dims = g.dims as Record<string, string | undefined>;
+    const tool = String(dims.coordinate ?? dims.tool ?? g.key);
     const f = featureOf(tool);
     out.set(f, (out.get(f) ?? 0) + g.calls);
   }

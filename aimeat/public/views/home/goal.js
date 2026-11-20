@@ -18,6 +18,8 @@
  * @structure default GoalView({ navigate })
  * @usage routed at /v1/home?goal=<id> by spa.html
  * @version-history
+ *   v1.1.0 — 2026-11-20 — "What it gave" (goal-value.js): the baseline, what the results became, the
+ *     cost and the saving counted from the baseline.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { h } from 'preact';
@@ -53,6 +55,7 @@ import { swallowed } from '/js/swallowed.js';
 import { apiGet } from '/js/api.js';
 import { StepCard, NobodyCard, goalPrompt } from './goal-steps.js';
 import { keepLineBreaks } from './line-breaks.js';
+import { GoalValue } from './goal-value.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const g = (key, fallback) => tr('home.goal.' + key, fallback);
@@ -265,6 +268,8 @@ export default function GoalView({ navigate }) {
             </div>`;
           })}
         <//>`}
+
+      ${goal.status !== 'proposed' && html`<${GoalValue} goal=${goal} />`}
 
       <${PageSection} group ends title=${titled(g('planTitle', 'The work'), 'concept.open_work')}>
         ${shown.length === 0 && html`<${Note} kind="quiet">${g('noWork', 'No work yet. The coordinator or your own AI adds it.')}<//>`}

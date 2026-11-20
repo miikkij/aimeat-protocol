@@ -11,6 +11,8 @@
  *   v1.19.0 — 2026-11-19 — The contents rail ("On this page") beside every admin page with two or
  *     more sections, read from the sections the page drew (ContentsRail kit mode), as on the Settings &
  *     Controls pages; on a narrow screen the closed row over the page. Config keeps its own index.
+ *   v1.19.0 — 2026-11-20 — The `value` page (views/admin/value-tab.js): what the node is used for and
+ *     when, what happened to what AI made here, and what data passed through.
  *   v1.18.0 — 2026-11-14 — The `help` page (views/admin/help-tab.js): Ask someone who knows, its
  *     settings, report and status.
  *   v1.17.0 — 2026-11-09 — Every admin page starts with PageStart (`pageStart.admin.<id>.*`: what the
@@ -92,6 +94,7 @@ import DatabaseTab     from './admin/database-tab.js';
 import FileStoresTab   from './admin/file-stores-tab.js';
 import MetricsTab      from './admin/metrics-tab.js';
 import UsageTab        from './admin/usage-tab.js';
+import ValueTab        from './admin/value-tab.js';
 import OwnersTab       from './admin/owners-tab.js';
 import AgentsTab       from './admin/agents-tab.js';
 import GhiiTab         from './admin/ghii-tab.js';
@@ -155,6 +158,7 @@ const NAV_GROUPS = [
     { id: 'file-stores',  key: 'admin.fileStores.title', component: FileStoresTab },
     { id: 'metrics',      key: 'dashboard.metrics',    component: MetricsTab },
     { id: 'usage',        key: 'dashboard.usage',      component: UsageTab },
+    { id: 'value',        key: 'dashboard.valueTab',   component: ValueTab },
     { id: 'prompts',      key: 'dashboard.promptsTab', component: PromptsTab },
   ]},
   { key: 'dashboard.navIdentity', items: [

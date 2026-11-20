@@ -13,6 +13,8 @@
  * @structure weekOf · teamWeekRecords · runTeamWeeklyReports
  * @usage registered as the core job team-weekly (services/core-jobs.ts), Fridays at 14:05.
  * @version-history
+ *   v1.3.0 — 2026-11-20 — teamAiWeek: the report carries what AI made in the team's workspaces this week
+ *     and what happened to it, as the team's sums; a week with only AI work is reported too.
  *   v1.2.0 — 2026-11-14 — teamWeekRecords, the counts team status reads for a member's home (T15).
  *   v1.1.0 — 2026-11-14 — Decision titles pass each lead's classification reader; the counts stay whole.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T8).
@@ -69,6 +71,17 @@ export async function teamWeekRecords(storage: Storage, orgId: string, team: Tea
 }
 
 /** Every team's week to its leads. Never throws per team. */
+/**
+ * What AI made in the team's workspaces in the seven days before `now`, and what happened to it: the
+ * team's sums from the value signals (storage ValueDaily, by organism), never per member or agent.
+ */
+export async function teamAiWeek(storage: Storage, orgId: string, now: number): Promise<{ made: number; corrected: number; rejected: number; used: number }> {
+    const day = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+    const rows = await storage.sumValueDaily({ orgId, from: day(now - 6 * 86_400_000), to: day(now) }, ['signal']);
+    const n = (s: string): number => rows.filter(r => r.signal === s).reduce((t, r) => t + r.count, 0);
+    return { made: n('produced') + n('refined'), corrected: n('corrected'), rejected: n('rejected'), used: n('used') };
+}
+
 export async function runTeamWeeklyReports(storage: Storage, config: AimeatConfig, now = Date.now()): Promise<{ teams: number; reported: number }> {
     let teams = 0, reported = 0;
     const PAGE = 200;
@@ -81,7 +94,10 @@ export async function runTeamWeeklyReports(storage: Storage, config: AimeatConfi
                     const team = await readTeamRecord(storage, organism.id);
                     if (!team) continue;
                     const w = await weekOf(storage, organism, team, now);
-                    if (!w.decided.length && !w.open && !w.waiting) continue;
+                    // What AI made in the team's workspaces this week and what happened to it: the
+                    // team's sums from the value signals, never per member (services/value/).
+                    const ai = await teamAiWeek(storage, organism.id, now);
+                    if (!w.decided.length && !w.open && !w.waiting && !ai.made) continue;
                     for (const lead of organismOwners(organism)) {
                         // The titles this lead may read: a classified decision above the lead's
                         // clearance is counted, never named.
@@ -92,11 +108,12 @@ export async function runTeamWeeklyReports(storage: Storage, config: AimeatConfi
                         const vars = {
                             decided: w.decided.length, decisions: titles.join('; ') || '-',
                             open: w.open, waiting: w.waiting, ai: w.aiConnected, members: w.members,
+                            aiMade: ai.made, aiCorrected: ai.corrected, aiRejected: ai.rejected, aiUsed: ai.used,
                         };
                         await notify(storage, `${lead}@${config.nodeId}`, {
                             type: 'team_weekly',
                             title: `The week in the team: ${w.decided.length} decisions, ${w.waiting} waiting`,
-                            body: `Decided: ${vars.decisions}. Open: ${w.open}. Waiting for a person: ${w.waiting}. Own AI connected: ${w.aiConnected} of ${w.members}.`,
+                            body: `Decided: ${vars.decisions}. Open: ${w.open}. Waiting for a person: ${w.waiting}. Own AI connected: ${w.aiConnected} of ${w.members}. AI made ${ai.made}: ${ai.corrected} corrected, ${ai.rejected} deleted, ${ai.used} opened by someone else.`,
                             link: `/v1/profile?tab=organisms&org=${encodeURIComponent(organism.id)}`,
                             i18n: { key: 'team_weekly', vars, orgVars: { org: organism.id } },
                         });

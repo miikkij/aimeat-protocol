@@ -19,6 +19,8 @@
  * @structure AgentAiSection({ agentName, showToast })
  * @usage import { AgentAiSection } from './agent-ai-section.js';
  * @version-history
+ *   v1.15.0 — 2026-11-20 — What happened to this agent's results in 30 days: made, corrected by someone
+ *     else, deleted within 14 days, opened by someone else (the person's value report).
  *   v1.14.0 — 2026-10-02 — The question marks that explain the daily cap and the gate: agent.daily_cap,
  *     decide.gate on their headings (components/HelpTip.js). The cap's line with today's spend and the
  *     gate's description stay.
@@ -81,6 +83,7 @@ export function AgentAiSection({ agentName, showToast }) {
   const [tested, setTested] = useState({});
   const [providers, setProviders] = useState(null);
   const [provSaved, setProvSaved] = useState(null);
+  const [results, setResults] = useState(null);
 
   // The decision providers the owner may use, with the one set for each agent. Read beside the keys;
   // a node without providers answers without the door, and then the block is not shown.
@@ -90,13 +93,22 @@ export function AgentAiSection({ agentName, showToast }) {
     setProviders(prev => (JSON.stringify(prev) === JSON.stringify(p) ? prev : p));
   }, []);
 
+  // What happened to this agent's results in the last 30 days: the person's own value report
+  // (services/value/report.ts), its row for this agent. The report lists only the person's own agents.
+  const loadResults = useCallback(async () => {
+    const r = await apiGet('/v1/usage/summary?report=value');
+    const row = (r?.data?.by_producer ?? []).find(p => String(p.producer).startsWith(`${agentName}#`)) ?? null;
+    setResults(prev => (JSON.stringify(prev) === JSON.stringify(row) ? prev : row));
+  }, [agentName]);
+
   const load = useCallback(async () => {
     const r = await apiGet(base);
     const d = r?.data ?? null;
     setData(prev => (JSON.stringify(prev) === JSON.stringify(d) ? prev : d));
     loadProviders().catch(err => swallowed('agent-ai-section: providers', err));
+    loadResults().catch(err => swallowed('agent-ai-section: results', err));
     return d;
-  }, [base, loadProviders]);
+  }, [base, loadProviders, loadResults]);
 
   useEffect(() => {
     load().then(d => {
@@ -256,6 +268,16 @@ export function AgentAiSection({ agentName, showToast }) {
                 })}>${rule}<//>
               <//>`)}
           <//>`}
+      `)}
+
+      ${part(t('agentAi.resultsTitle'), html`
+        <${Note}>${t('agentAi.resultsDesc')}<//>
+        <${FigureStrip} flush items=${[
+          { key: 'made', n: (results?.produced ?? 0) + (results?.refined ?? 0), label: t('agentAi.r.made') },
+          { key: 'corrected', n: results?.corrected ?? 0, label: t('agentAi.r.corrected') },
+          { key: 'rejected', n: results?.rejected ?? 0, label: t('agentAi.r.rejected') },
+          { key: 'used', n: results?.used ?? 0, label: t('agentAi.r.used') },
+        ]} />
       `)}
     <//><//>`;
 }

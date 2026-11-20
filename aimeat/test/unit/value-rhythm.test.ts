@@ -68,4 +68,12 @@ describe('features of the tool calls', () => {
     expect(featureOf('aimeat_v2_task_create')).toBe('tasks');
     expect(featureOf('something_else')).toBe('other');
   });
+
+  it('folds a REST route by its first segment, and a workspace route under an organism into workspaces', () => {
+    expect(featureOf('POST /v1/memory')).toBe('memory');
+    expect(featureOf('GET /v1/goals/g-1')).toBe('goals');
+    expect(featureOf('POST /v1/organisms/o1/workspace/drafts')).toBe('workspaces');
+    expect(featureOf('GET /v1/organisms/o1/members')).toBe('organisms');
+    expect(featureOf('POST /v1/connections/start')).toBe('other');
+  });
 });

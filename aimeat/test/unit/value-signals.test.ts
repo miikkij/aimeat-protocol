@@ -23,6 +23,7 @@ import {
   flushValueSignals, initValueSignals, resetValueSignals, shutdownValueSignals,
 } from '../../src/services/value/signal-buffer.js';
 import { sourceOf, sizeBucketOf } from '../../src/services/value/data-buffer.js';
+import { teamAiWeek } from '../../src/services/team/weekly-report.js';
 
 const NODE = 'aimeat-local-001-dev';
 const ALICE = `alice@${NODE}`;
@@ -269,6 +270,22 @@ describe('the data counts', () => {
       expect(await storage.sumDataDaily({ from: day, to: day }, ['kind'])).toEqual([]);
     }
     if (answers.length === 2) expect(answers[1]).toEqual(answers[0]);
+  });
+});
+
+describe('the team\'s week in the Friday report', () => {
+  it('counts what AI made in the organism in the seven days before, and nothing older or elsewhere', async () => {
+    const storage = provs[0].storage;
+    const org = `teamorg-${RUN}`;
+    const now = Date.parse('2026-03-13T12:00:00.000Z');
+    const row = { ownerGhii: `tw-${RUN}@${NODE}`, orgId: org, wsId: 'ws-1', producer: AGENT, family: 'organism.<id>.w.<id>.offer.*', count: 1, bytes: 0 };
+    await storage.upsertValueDaily([
+      { ...row, day: '2026-03-12', signal: 'produced' }, { ...row, day: '2026-03-10', signal: 'produced' },
+      { ...row, day: '2026-03-11', signal: 'corrected' }, { ...row, day: '2026-03-12', signal: 'used' },
+      { ...row, day: '2026-03-01', signal: 'produced' },
+      { ...row, orgId: `other-${RUN}`, day: '2026-03-12', signal: 'produced' },
+    ]);
+    expect(await teamAiWeek(storage, org, now)).toEqual({ made: 2, corrected: 1, rejected: 0, used: 1 });
   });
 });
 

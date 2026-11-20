@@ -8,6 +8,10 @@ forbidden, and how a row is added or changed. `language-context.md` lists the ot
 | The thing | In one sentence | en | fi | es |
 |---|---|---|---|---|
 | the key that seals every stored secret | AIMEAT_ENCRYPTION_KEY, and AIMEAT_ENCRYPTION_KEY_1 while it is replaced; set in the server's environment, never shown; an operator word, on the Config page (group Node) | data key; moving the stored secrets to a new key: the re-encrypt job | salausavain; työ, joka siirtää tallennetut salaisuudet uudelle avaimelle | clave de cifrado; el trabajo que pasa los secretos guardados a la clave nueva |
+| the operator's page on use, rhythm and what AI made | admin page `value`: calls per feature, bursts, week and season, what happened to what AI made, and what data passed through, counts only | Value and rhythm | Hyöty ja rytmi | Valor y ritmo |
+| a day of use well above the usual | more than three times the median of the 28 days before it (services/value/rhythm.ts) | burst | purske | pico |
+| what happened to a record an AI made | made, corrected (someone else changed it), rejected (deleted within 14 days), used (someone else opened it); counted by the node, never acknowledged | made / corrected / rejected / used | tehty / korjattu / hylätty / käytetty | hecho / corregido / rechazado / usado |
+| what the work costs without AI, given when a goal is made | minutes per result, week or month; the saving is counted from it | baseline | lähtötaso | punto de partida |
 | the dark side menu of the admin pages | the menu only the operator of this installation sees; its heading tells at once that this is the operator's side | operator menu | operaattorin valikko | menú del operador |
 | the person's progress on the home | seven stages from a good AI to something shared; each is ticked when the account holds it | your path / stage | polkusi / vaihe | tu camino / etapa |
 | an entry of the node's own change log, shown on the home | what the platform itself got or lost, never a change to the person's own data; the home lists the ones since the last visit | system update | järjestelmäpäivitys | actualización del sistema |
