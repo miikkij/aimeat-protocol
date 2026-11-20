@@ -22460,7 +22460,7 @@
     "perMember.made": "tehty",
     "perMember.corrected": "korjattu",
     "perMember.rejected": "poistettu",
-    "perMember.used": "muut avasivat",
+    "perMember.used": "avattu",
     "structureOverviewOrg": "Organismin rakenne sisällysluettelona",
     "structureOverviewWs": "Työtilan rakenne sisällysluettelona",
     "structEmpty": "Ei vielä rakennetta näytettäväksi.",
@@ -22716,6 +22716,8 @@
     "confirmAddOwner": "Tehdäänkö {member} myös omistajaksi? Hän saa kaiken minkä sinäkin, ja sinä pidät omasi.",
     "confirmRemoveOwner": "Poistetaanko {member} omistajista? Hän jää adminiksi.",
     "roleOwner": "omistaja",
+    "roleAdmin": "ylläpitäjä",
+    "roleMember": "jäsen",
     "records": {
       "title": "Seloste käsittelytoimista",
       "leadEdit": "Mitä henkilötietoja tämä paikka pitää, keistä, miksi ja kuinka kauan. Kopioi kehote omalle tekoälyllesi: se kysyy sinulta sen, minkä vain sinä tiedät, ja näyttää tuloksen ennen kuin tallentaa mitään.",

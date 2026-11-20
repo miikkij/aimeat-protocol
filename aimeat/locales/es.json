@@ -20515,7 +20515,7 @@
     "perMember.made": "hecho",
     "perMember.corrected": "corregido",
     "perMember.rejected": "borrado",
-    "perMember.used": "abierto por otros",
+    "perMember.used": "abierto",
     "structureOverviewOrg": "Estructura del organismo: índice",
     "structureOverviewWs": "Estructura del espacio de trabajo: índice",
     "structEmpty": "Todavía no hay estructura que mostrar.",
@@ -20770,6 +20770,8 @@
     "confirmAddOwner": "¿Hacer a {member} propietario también? Podrá todo lo que puedes tú, y tú conservas lo tuyo.",
     "confirmRemoveOwner": "¿Quitar a {member} de los propietarios? Se queda como administrador.",
     "roleOwner": "propietario",
+    "roleAdmin": "administrador",
+    "roleMember": "miembro",
     "records": {
       "title": "Registro de actividades de tratamiento",
       "leadEdit": "Qué datos personales guarda este lugar, de quién, para qué y durante cuánto tiempo. Copia el prompt a tu propia IA: te pregunta lo que solo tú sabes y te muestra el resultado antes de guardar nada.",

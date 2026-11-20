@@ -10,6 +10,8 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   2026-11-20 — A member's role badge is in the reader's language (organisms.roleAdmin, roleMember);
+ *     it showed the stored word, so a Finnish page read "member".
  *   2026-11-19 — A member's row names the agents that may write the apps' protected data past the
  *     apps' own tools (writes_past_app_rules: the agent's grant covers organism:direct).
  *   2026-11-14 — Each active member's row says whether their own AI is connected (an agent of theirs
@@ -51,6 +53,10 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
+
+/** A member's role in the reader's language; a role with no word of its own is shown as stored. */
+const roleWord = (role) => (role === 'admin' ? t('organisms.roleAdmin')
+  : !role || role === 'member' ? t('organisms.roleMember') : role);
 import { t } from '/js/i18n.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { List, Row as ListRow, Lead, Name, Doors, Group } from '/components/List.js';
@@ -335,7 +341,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
               <!-- The stored role is still 'creator', and several members can hold it now, so
                    the badge says what it means: owner. Two rows both reading "creator" asks
                    the viewer which one really made the organism. -->
-              <${Name} after=${html` <${PresenceDot} ghii=${toGhii(m.ghii)} /> <${Mark} tone=${isOwnerRow ? 'fine' : undefined}>${isOwnerRow ? (t('organisms.roleOwner') || 'owner') : (m.role || 'member')}<//>`}
+              <${Name} after=${html` <${PresenceDot} ghii=${toGhii(m.ghii)} /> <${Mark} tone=${isOwnerRow ? 'fine' : undefined}>${isOwnerRow ? (t('organisms.roleOwner') || 'owner') : roleWord(m.role)}<//>`}
                 meta=${line || agentsLine || aiLine ? html`${line}${line && (agentsLine || aiLine) ? html`<br />` : null}${aiLine}${aiLine && agentsLine ? ' · ' : null}${agentsLine}${directLine ? html`<br />${directLine}` : null}` : null}>${(m.ghii)}<//>
               <${Doors} menu=${menuItems.length ? menuItems : null} menuLabel=${t('organisms.moreActions') || 'More actions'} />
             <//>`;
