@@ -56,7 +56,7 @@ const AiStandingBodySchema = z.object({
 export function registerAiStandingRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/ai-standing?lang= — the setting, for the account holder and for each of their agents.
   router.get('/v1/ai-standing', requireAuth(), requireScope('agent:read'), async (req, res) => {
-    const out = await readStandingView({ storage, config }, callerOf(req, config.nodeId, storage), toLocale(String(req.query.lang ?? 'en')));
+    const out = await readStandingView({ storage, config }, callerOf(req, config.nodeId, storage), req.query.lang);
     if (!out.ok) {
       res.status(403).json(error(config.nodeId, out.code, out.message));
       return;

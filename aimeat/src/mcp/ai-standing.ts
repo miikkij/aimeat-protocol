@@ -19,7 +19,6 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { readStandingView } from '../services/ai-standing/view.js';
-import { toLocale } from '../i18n.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -30,7 +29,7 @@ export function registerAiStandingTools(
   caller: () => CallerContext,
 ): void {
   mcp.registerTool('aimeat_ai_standing_get', { description: descriptionFor('aimeat_ai_standing_get'), inputSchema: zodShapeFor('aimeat_ai_standing_get'), annotations: annotationsFor('aimeat_ai_standing_get') }, async ({ lang }) => {
-    const out = await readStandingView({ storage, config }, caller(), toLocale(String(lang ?? 'en')));
+    const out = await readStandingView({ storage, config }, caller(), lang);
     if (!out.ok) return toolError(out.code, out.message);
     return text(out.view);
   });

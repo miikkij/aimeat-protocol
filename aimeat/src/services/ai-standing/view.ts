@@ -5,15 +5,15 @@
  * @description What GET /v1/ai-standing and the MCP tool aimeat_ai_standing_get answer: every
  *   permission the "Allow always" setting can name, whether it is on, who set it and when, and whether
  *   the node lets it stand now. One function, so the two doors cannot disagree.
- * @structure StandingView · standingView(config, rec, locale) · readStandingView(deps, caller, locale)
- * @usage res.json(success(nodeId, await readStandingView({ storage, config }, caller, 'fi')));
+ * @structure StandingView · standingView(config, rec, locale) · readStandingView(deps, caller, lang)
+ * @usage res.json(success(nodeId, await readStandingView({ storage, config }, caller, req.query.lang)));
  * @version-history
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-toimii-itsen-isesti-omistajan-asetuksella-salli-aina-ja-k).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { CallerContext } from '../caller-context.js';
-import type { Locale } from '../../i18n.js';
+import { toLocale, type Locale } from '../../i18n.js';
 import { plainPermission } from '../permission-ask.js';
 import { standingCandidates, standingClassOf, standingRefusal, type StandingClass } from './words.js';
 import { readStanding, type StandingRecord } from './settings.js';
@@ -65,11 +65,11 @@ export function standingView(config: AimeatConfig, rec: StandingRecord, locale: 
 export async function readStandingView(
   deps: { storage: Storage; config: AimeatConfig },
   caller: Pick<CallerContext, 'inPerson' | 'kind' | 'visitor' | 'ownerGhii'>,
-  locale: Locale,
+  lang: unknown,
 ): Promise<{ ok: true; view: StandingView } | { ok: false; code: 'ACCESS_DENIED'; message: string }> {
   if (caller.visitor || !(caller.inPerson || caller.kind === 'agent')) {
     return { ok: false, code: 'ACCESS_DENIED', message: 'The account holder and their own agents read this setting.' };
   }
   const rec = await readStanding(deps.storage, caller.ownerGhii);
-  return { ok: true, view: standingView(deps.config, rec, locale) };
+  return { ok: true, view: standingView(deps.config, rec, toLocale(String(lang ?? 'en'))) };
 }
