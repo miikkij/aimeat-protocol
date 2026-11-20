@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.82.0 -- 2026-11-20 -- Ask the baseline when proposing a goal; aimeat_usage_report value and data
+ *     answer what AI gave the person and what data passed through.
  *   v1.81.0 -- 2026-11-20 -- Which provider answers: aimeat_ai_provider_model_set, a provider's model by proposal.
  *   v1.80.0 -- 2026-11-20 -- What you may do without asking: aimeat_ai_standing_get, the owner's "Allow
  *     always" setting (services/ai-standing/).
@@ -349,6 +351,16 @@ As an agent: \`aimeat_goal_work\` action \`available\` lists open work your tags
 takes one and gives you a task (complete it as usual), \`leave\` hands the next work to another agent
 (never to yourself). A goal's coordinator is woken by a task when something happens; read the goal,
 decide, and say why in \`reason\`. Ask before a change that \`preview\` says ends running work.
+When you propose a goal, ask one question first: how long the work takes the person without AI (per
+result, per week or per month), or which number it should move; give the answer as \`baseline\`
+({ minutes, per, note?, measure? }). It is what the saving is counted from.
+
+**What AI gave the person.** \`aimeat_usage_report\` report \`value\` answers "what has AI given us" with
+counts the node made itself: results your agents made, kept as they were, corrected by someone else,
+deleted within 14 days, opened by someone else; per agent and per goal, with the cost and the saving
+counted from each goal's baseline. Report \`data\` says what data of the person's passed through, never
+the data. Give the numbers, then your reading of them, and say which is which; the report's \`rules\` say
+what the numbers rest on.
 
 **Build it with you, and what was done.** \`aimeat_build_request_status\` · \`aimeat_build_request_submit\`
 · \`aimeat_trail_list\`. A place may send ONE build request to the operator's builders: the first agent or
