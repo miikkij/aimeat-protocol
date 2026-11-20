@@ -15,6 +15,7 @@
  *   v1.2.0 — 2026-10-12 — Selects `community`; with includeCommunity a signed-in viewer's listing
  *     also returns other owners' parked apps marked community.
  *   v1.3.0 — 2026-10-17 — Selects `access` (who may open the app), so a listing row carries it.
+ *   v1.4.0 — 2026-11-20 — `access` filters the listing to the apps opened to one organism (the organism's app wall).
  */
 import type { AppListOptions, AppManifest } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -55,6 +56,10 @@ export async function runAppListing<T extends { manifest: AppManifest }>(
   if (opts?.ownerGaii) {
     conditions.push(`a.ownerGaii = ?`);
     params.push(opts.ownerGaii);
+  }
+  if (opts?.access) {
+    conditions.push(`a.access = ?`);
+    params.push(opts.access);
   }
   if (opts?.category) {
     conditions.push(`json_extract(a.manifest, '$.category') = ?`);

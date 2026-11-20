@@ -159,6 +159,7 @@ import { registerDmGroupTools } from './dm-groups.js';
 import { registerDmReactionTools } from './dm-reactions.js';
 import { registerPublishRequestTools } from './publish-requests.js';
 import { registerAiStandingTools } from './ai-standing.js';
+import { registerOrganismAppsTools } from './organism-apps.js';
 import { registerSecretHostAskTools } from './secret-host-ask.js';
 import { registerAccountRightsTools } from './account-rights.js';
 import { registerOverviewTools } from './overview.js';
@@ -328,6 +329,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerFileStoreTools(mcp, storage, config, caller);
     registerPublishRequestTools(mcp, storage, config, caller);
     registerAiStandingTools(mcp, storage, config, caller);
+    registerOrganismAppsTools(mcp, storage, config, caller);
     registerSecretHostAskTools(mcp, storage, config, caller);
     registerAccountRightsTools(mcp, storage, config, caller);
     registerOverviewTools(mcp, storage, config, caller);

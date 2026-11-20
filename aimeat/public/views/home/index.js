@@ -16,6 +16,7 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-11-20: The rail's pages lead to the new entry first ("Start something bigger", /v1/goal-start).
  *   2026-11-14: The finished home has the contents rail beside it (components/ContentsRail.js): its
  *     drawn sections as numbered links with their counts, and the ways on (all system updates, the
  *     home settings, Settings & Controls). The operator turns it off in Admin > Portal > Home; the
@@ -246,6 +247,8 @@ export default function HomeView({ navigate }) {
     sections: railSections,
     pagesLabel: tr('home.rail.pages', 'Pages'),
     pages: [
+      // The new entry: what the person wants, in their own words, and one message for their AI.
+      { key: 'goal-start', label: tr('home.rail.goalStart', 'Start something bigger'), onClick: () => navigate('/v1/goal-start') },
       { key: 'updates', label: tr('home.rail.allUpdates', 'All system updates'), onClick: () => navigate('/v1/changelog') },
       { key: 'home-settings', label: tr('home.settings.open', 'Home settings'), onClick: openSettings },
       { key: 'controls', label: tr('nav.profile', 'Settings & Controls'), onClick: () => navigate('/v1/profile') },

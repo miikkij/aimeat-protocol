@@ -52835,6 +52835,31 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/organisms/{id}/apps:
+    get:
+      operationId: getOrganismAppWall
+      summary: The organism's own app wall
+      description: >-
+        The apps the organism's members opened to it (their access is the organism), newest first, for
+        its members and their agents: each with `owner`, `filename`, `name`, `description`, `icon`, `url`,
+        `published_at` (the latest version), `opens` (since it was first published, the count the App
+        Catalog shows), `opens_today` (today's UTC day, summed over every viewer, so nobody who opened it
+        is named), `teams` (the author's teams, in `lang`) and `capabilities` (the served libraries,
+        cortexes and extensions its source uses, each `{ id, title, kind }`). An app its owner made
+        unlisted, or the operator hid, is left out. There is no popularity order. A training is an
+        organism of its own, so the apps of a training are this wall of that organism. The MCP tool
+        aimeat_organism_apps answers the same. A non-member is refused with 403 ACCESS_DENIED.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string }, description: Organism ID }
+        - { in: query, name: lang, required: false, schema: { type: string, enum: [en, fi, es] }, description: The language of the capability titles and team names. Default en. }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/organisms/{id}/overview:
     get:
       operationId: getOrganismOverview

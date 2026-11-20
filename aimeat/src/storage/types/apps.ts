@@ -595,6 +595,10 @@ export interface AppListOptions {
   // Operator-only listing: when true, return EVERY app regardless of parked or
   // operator-hidden state (the admin moderation view). Bypasses both filters.
   adminView?: boolean;
+  /** Only apps whose `access` is exactly this, e.g. `organism:<id>` for the apps opened to one
+   *  organism (services/app/organism-wall.ts). setAppAccess writes it on every version row, so the
+   *  filter is applied before the latest version is picked. */
+  access?: string;
 }
 
 // Subdomain → published-app / redirect mapping (operator-managed).

@@ -20,6 +20,7 @@
  * @structure AppCat({ navigate }) (default) · readView() · writeView(v)
  * @usage routed at /v1/appcat by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.7.0 — 2026-11-20 — ?view=org: the organisation's app wall (appcat/org-wall.js), with ?org=<organism id>.
  *   v1.6.0 — 2026-11-14 — Recently opened (recent.js) over Your apps, and the own apps not used nor
  *     changed in six months in a folded section under it (RestingList), while no search, tag or state
  *     is on (wish-omien-sovellusten-l-yt-minen-kun-niit-on-satoja).
@@ -55,6 +56,7 @@ import { CatRail } from '/views/appcat/rail.js';
 import { CatMasthead, openAdd } from '/views/appcat/masthead.js';
 import { CatBand, CatTools, CortexBar, SEARCH_ID } from '/views/appcat/tools.js';
 import { LibraryList, RestingList, CommunityList, FavouritesList, BuildingList, CatFoot } from '/views/appcat/lists.js';
+import { OrgWall } from '/views/appcat/org-wall.js';
 import { StartedList } from '/views/appcat/started.js';
 import { RecentList } from '/views/appcat/recent.js';
 import { InstallCta } from '/components/InstallCta.js';
@@ -63,7 +65,7 @@ import { t } from '/js/i18n.js';
 import { KUNTO_KEYS, STATES, filterRows, sortRows, stateCounts, resting } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
-const VIEWS = ['library', 'community', 'favorites', 'building'];
+const VIEWS = ['library', 'community', 'favorites', 'building', 'org'];
 
 /** The view the address names (F71, F262 → ?view=); an unknown one is the library (F70). */
 export function readView() {
@@ -219,10 +221,12 @@ export default function AppCat() {
   const ownRedraw = [q, tag, stateFilter, sort, cat.favourites, cat.all];
   const serverRedraw = [sort, cat.favourites, cat.all];
   const counts = stateCounts(cat.own, cat.skillsBound);
-  const tagRows = view === 'community' ? cat.community : view === 'favorites' ? favRowsAll : view === 'building' ? (cat.building || []) : cat.own;
+  // The organisation's wall has its own sides and no tag filter: the rail shows no tags there.
+  const tagRows = view === 'org' ? null : view === 'community' ? cat.community : view === 'favorites' ? favRowsAll : view === 'building' ? (cat.building || []) : cat.own;
+  const wall = view === 'org';
   const Detail = detailModule.Detail || detailModule.default;
 
-  const rail = html`<${CatRail} view=${view} onView=${chooseView} loaded=${cat.loaded}
+  const rail = html`<${CatRail} view=${view} onView=${chooseView} loaded=${cat.loaded} signedIn=${!!cat.me}
     counts=${{ library: cat.own.length, community: cat.community.length, favorites: favRowsAll.length, building: (cat.building || []).length }}
     states=${view === 'library' ? counts : null} stateFilter=${stateFilter} onState=${chooseState}
     tagRows=${tagRows} tag=${tag} onTag=${setTag} tagsOpen=${tagsOpen} onTagsOpen=${() => setTagsOpen(!tagsOpen)} />`;
@@ -230,9 +234,9 @@ export default function AppCat() {
   return html`
     <${IndexFrame} dense index=${rail} label=${x('header.title')}>
       <${CatMasthead} own=${cat.own} me=${cat.me} loaded=${cat.loaded} />
-      ${cat.me ? html`<${InstallCta} id="apps" title=${t('install.titleApps')} body=${t('install.bodyApps')} />` : null}
+      ${cat.me && !wall ? html`<${InstallCta} id="apps" title=${t('install.titleApps')} body=${t('install.bodyApps')} />` : null}
       ${view === 'library' && cat.loaded && cat.own.length > 0 ? html`<${CatBand} counts=${counts} n=${cat.own.length} />` : null}
-      <${CatTools} q=${q} onQuery=${setQ} sort=${sort} onSort=${setSort} />
+      ${wall ? null : html`<${CatTools} q=${q} onQuery=${setQ} sort=${sort} onSort=${setSort} />`}
       ${view === 'library' ? html`<${CortexBar} />` : null}
       ${view === 'library' && cat.me && !filtering && !stateFilter ? html`<${RecentList} rows=${cat.all} />` : null}
       ${view === 'library' ? html`<${StartedList} signedIn=${!!cat.me} />` : null}
@@ -240,8 +244,9 @@ export default function AppCat() {
       ${view === 'library' ? html`<${RestingList} rows=${shownResting} favourites=${cat.favourites} closeOn=${ownRedraw} />` : null}
       ${view === 'community' ? html`<${CommunityList} rows=${communityRows} order=${communityOrder} total=${cat.community.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
       ${view === 'favorites' ? html`<${FavouritesList} rows=${favRows} order=${favOrder} total=${favRowsAll.length} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
+      ${view === 'org' ? html`<${OrgWall} owner=${cat.me} />` : null}
       ${view === 'building' ? html`<${BuildingList} rows=${buildingRows} order=${buildingOrder} total=${(cat.building || []).length} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
-      <${CatFoot} loaded=${cat.loaded} n=${cat.own.length} />
+      ${wall ? null : html`<${CatFoot} loaded=${cat.loaded} n=${cat.own.length} />`}
     <//>
     <${DialogHost} />
     ${cat.detail && Detail ? html`<${Detail} app=${cat.detail} onClose=${closeDetail} />` : null}

@@ -15,6 +15,7 @@
  *     mint, emailed code = its password; per-inviter quota; app-origin callable via organism:invite scope)
  * @usage app.use(organismsRouter(config, storage));
  * @version-history
+ *   2026-11-20 -- GET /:id/apps, the organism's app wall (organisms/apps-wall.ts).
  *   2026-10-16 -- POST /:id/workspace/documents/:space/:docId/frame and …/opened (organisms/workspace-pages.ts):
  *     an HTML page's frame address for a member, and the day a page was last opened.
  *   2026-10-13 -- POST /:id/workspace/spaces/:space/extensions (organisms/workspace-space-extensions.ts):
@@ -118,6 +119,7 @@ import { createOrganismHelpers } from './organisms/shared.js';
 import { registerOrganismCrudRoutes } from './organisms/crud.js';
 import { registerOrganismMembershipRoutes } from './organisms/membership.js';
 import { registerOrganismWorkspaceReadRoutes } from './organisms/workspace-read.js';
+import { registerOrganismAppsWallRoutes } from './organisms/apps-wall.js';
 import { registerOrganismWorkspaceAccessRoutes } from './organisms/workspace-access.js';
 import { inviteAcceptRouter } from './invite-accept.js';
 import { registerOrganismWorkspaceOpsRoutes } from './organisms/workspace-ops.js';
@@ -158,6 +160,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   registerOrganismCrudRoutes(router, config, storage, H);
   registerOrganismMembershipRoutes(router, config, storage);
   registerOrganismWorkspaceReadRoutes(router, config, storage);
+  registerOrganismAppsWallRoutes(router, config, storage);
   registerOrganismWorkspaceAccessRoutes(router, config, storage, H);
   // The PUBLIC invitation token flow. It serves organism AND node-level invitations, so it is a
   // module of its own — mounted here because this is where the organism helper bag already lives.

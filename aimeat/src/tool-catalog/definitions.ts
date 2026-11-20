@@ -149,6 +149,7 @@ import { livingTools } from './definitions/living.js';
 import { calibratorTools } from './definitions/calibrator.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { aiStandingTools } from './definitions/ai-standing.js';
+import { organismAppsTools } from './definitions/organism-apps.js';
 import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
 import { secretShareTools } from './definitions/secret-shares.js';
@@ -217,6 +218,7 @@ const CATALOG: CatalogTool[] = [
     ...organismApprovalTools,
     ...publishRequestTools,
     ...aiStandingTools,
+    ...organismAppsTools,
     ...accountRightsTools,
     ...secretAddressTools,
     ...secretShareTools,
@@ -261,7 +263,7 @@ export type CatalogTool =
     | (typeof fileStoreTools)[number] | (typeof dmGroupTools)[number] | (typeof dmReactionTools)[number]
     | (typeof organismAgentTools)[number] | (typeof teamTools)[number] | (typeof organismJoinRequestTools)[number]
     | (typeof organismApprovalTools)[number] | (typeof publishRequestTools)[number] | (typeof accountRightsTools)[number]
-    | (typeof aiStandingTools)[number]
+    | (typeof aiStandingTools)[number] | (typeof organismAppsTools)[number]
     | (typeof secretAddressTools)[number] | (typeof secretShareTools)[number] | (typeof helpTools)[number]
     | (typeof dataProductTools)[number] | (typeof partyTools)[number] | (typeof receiverTools)[number]
     | (typeof buildWithYouTools)[number] | (typeof datapackageSellTools)[number] | (typeof dataspaceTools)[number]

@@ -9,6 +9,7 @@
  * @structure CatRail(props)
  * @usage html`<${CatRail} view=${view} onView=${setView} … />`
  * @version-history
+ *   v1.6.0 — 2026-11-20 — The organisation's app wall among the views, for a signed-in person (appcat/org-wall.js).
  *   v1.5.0 — 2026-10-31 — Jouni's review of v31 (K39): the fold reads "Ylläpito (kehittäjille)" with no
  *     number, and holds the state filters too.
  *   v1.4.0 — 2026-10-31 — On a node the store sold, the "Something missing" rows wait behind one
@@ -32,11 +33,11 @@ const html = htm.bind(h);
 const TAGS_FOLDED = 8;
 
 /**
- * @param {{ view: string, onView: (v: string) => void, loaded: boolean,
+ * @param {{ view: string, onView: (v: string) => void, loaded: boolean, signedIn?: boolean,
  *   counts: { library: number, community: number, favorites: number, building: number },
  *   states: { listed: number, community: number, unlisted: number, draft: number, kunto: Record<string, number> } | null,
  *   stateFilter: string|null, onState: (s: string) => void,
- *   tagRows: any[], tag: string|null, onTag: (t: string|null) => void, tagsOpen: boolean, onTagsOpen: () => void }} p
+ *   tagRows: any[]|null, tag: string|null, onTag: (t: string|null) => void, tagsOpen: boolean, onTagsOpen: () => void }} p
  */
 export function CatRail(p) {
   const [kuntoOpen, setKuntoOpen] = useState(false);
@@ -46,8 +47,11 @@ export function CatRail(p) {
     { value: 'favorites', label: x('view.favorites'), n: p.loaded ? p.counts.favorites : '' },
     // Only for a person who builds somebody else's app: the others never see an empty view.
     ...(p.counts.building > 0 ? [{ value: 'building', label: x('view.building'), n: p.counts.building }] : []),
+    // The apps colleagues opened to an organism the person belongs to (appcat/org-wall.js).
+    ...(p.signedIn ? [{ value: 'org', label: x('orgWall.view'), n: '' }] : []),
   ];
-  const tags = tagCounts(p.tagRows);
+  // `tagRows` null: the view has no tag filter (the organisation's apps), so the group is left out.
+  const tags = p.tagRows ? tagCounts(p.tagRows) : [];
   const activeLc = p.tag ? p.tag.toLowerCase() : null;
   let shown = p.tagsOpen ? tags : tags.slice(0, TAGS_FOLDED);
   // An active tag past the fold stays on screen, or the reader cannot see why the list is short (F20).
@@ -77,12 +81,12 @@ export function CatRail(p) {
               count=${p.states.kunto[k]} onClick=${() => p.onState(k)}>${x('kunto.' + k)}<//>`)}
             ${kuntoOpen ? html`<${SideMenuMore} onClick=${() => setKuntoOpen(false)}>${x('rail.kuntoHide')}<//>` : null}`}
         <//>` : null}
-      <${SideMenuGroup} title=${x('rail.tags')}>
+      ${p.tagRows ? html`<${SideMenuGroup} title=${x('rail.tags')}>
         <${SideMenuItem} tally small active=${p.tag === null} count=${p.tagRows.length} onClick=${() => p.onTag(null)}>${x('tag.all')}<//>
         ${shown.map((tg) => html`<${SideMenuItem} key=${tg.key} tally small active=${activeLc === tg.key} count=${tg.n}
           onClick=${() => p.onTag(tg.label)}>${tg.label}<//>`)}
         ${tags.length > TAGS_FOLDED ? html`<${SideMenuMore} onClick=${p.onTagsOpen}>${p.tagsOpen ? x('rail.fewerTags') : x('rail.allTags', { n: tags.length })}<//>` : null}
-      <//>
+      <//>` : null}
     <//>`;
 }
 

@@ -60,6 +60,9 @@ export const SPA_PAGE_PATHS: readonly string[] = [
   // The connect story (2026-08-29): the road from "connect the AI you already use" to the
   // guided path, told before the account exists.
   '/v1/connect-your-ai',
+  // The new entry (2026-11-20): what the person wants, in their words, and one message for their own AI
+  // (views/goal-start.js, skill node:aimeat-goal-recipes).
+  '/v1/goal-start',
   // Everything in AIMEAT (2026-09-15): the whole feature list as a page. Registered here AND in
   // spa.html's ROUTES, or F5 is a 404; /everything is its short address.
   '/v1/everything',

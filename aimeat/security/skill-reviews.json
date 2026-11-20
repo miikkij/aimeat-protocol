@@ -78,6 +78,17 @@
       ],
       "digest": "sha256:a63ab3aed359325610ac7a46"
     },
+    "node:aimeat-goal-recipes": {
+      "reviewedOn": "2026-11-20",
+      "watches": [
+        "aimeat/src/tool-catalog/definitions/goals.ts",
+        "aimeat/src/services/journey-state.ts",
+        "aimeat/src/services/ai-standing/view.ts",
+        "aimeat/src/services/app/organism-wall.ts",
+        "aimeat/public/views/goal-start.js"
+      ],
+      "digest": "sha256:473a49f04801a6cc6cba0601"
+    },
     "node:aimeat-find-my-app": {
       "reviewedOn": "2026-11-20",
       "watches": [
@@ -1035,7 +1046,7 @@
       "aimeat/src/mcp/apps.ts": "7b59c97a7c009bfc",
       "aimeat/src/tool-catalog/definitions/apps-publish.ts": "d8dcb60b80837bab",
       "aimeat/src/services/usage/usage-read.ts": "7e2062c63eacffc3",
-      "aimeat/public/views/appcat.js": "325750f08208eb54"
+      "aimeat/public/views/appcat.js": "75fbfcc0f8fd8cec"
     },
     "node:aimeat-ask-someone-who-knows": {
       "aimeat/src/services/help/questions.ts": "b50cbe9a38572b55",
@@ -1068,6 +1079,13 @@
     "agent:ui-design-review": {
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
       ".claude/rules/page-guidance.md": "2d641d98bbc4a1e5"
+    },
+    "node:aimeat-goal-recipes": {
+      "aimeat/src/tool-catalog/definitions/goals.ts": "d1d14a000c53a6ea",
+      "aimeat/src/services/journey-state.ts": "a0df915b520b7710",
+      "aimeat/src/services/ai-standing/view.ts": "4745ec5c41af7335",
+      "aimeat/src/services/app/organism-wall.ts": "472a6177b34b9573",
+      "aimeat/public/views/goal-start.js": "5dcc5bff67bc1750"
     }
   }
 }

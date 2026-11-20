@@ -36,6 +36,7 @@
  *   v1.8.1 — 2026-10-23 — getApp, getAppByOwnerName, getLatestVersionNumber and updateAppMeta read
  *     with LIMIT 1. executeTakeFirst() adds no LIMIT, so each read fetched every version row with its
  *     content: 503 versions and 1 041 MB for one app, which stalled aimeat.io at 06:56 that day.
+ *   2026-11-20 — listApps and listAppsWithContent take `access`: the apps opened to one organism (its app wall).
  *   2026-11-04 — listAppVersionSummaries: the version list without the content; GET .../versions
  *     read every version's payload through listAppVersions (codebase analysis 2026-11-03, item A1).
  *   2026-11-04 — findOperatorHiddenApps: which of the named apps the operator hid, without the payload
@@ -292,6 +293,8 @@ export const appMethods = {
       .select([...SUMMARY_COLUMNS])
       .distinctOn(['ownerGaii', 'filename']);
     if (opts?.ownerGaii) q = q.where('ownerGaii', '=', opts.ownerGaii);
+    // setAppAccess writes `access` on every version row, so filtering before DISTINCT ON keeps the latest.
+    if (opts?.access) q = q.where('access', '=', opts.access);
     // DISTINCT ON requires the leading ORDER BY terms to match its expressions; versionNumber DESC
     // then decides WHICH row of each group survives. The presentation sort happens below.
     const latestRows = await q
@@ -305,6 +308,7 @@ export const appMethods = {
   async listAppsWithContent(this: PostgresKyselyStorage, opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }> {
     let q = this.db.selectFrom('App').selectAll().distinctOn(['ownerGaii', 'filename']);
     if (opts?.ownerGaii) q = q.where('ownerGaii', '=', opts.ownerGaii);
+    if (opts?.access) q = q.where('access', '=', opts.access);
     const latestRows = await q
       .orderBy('ownerGaii')
       .orderBy('filename')

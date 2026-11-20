@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-20 -- aimeat-goal-recipes (builtin-skills.goal-recipes.ts): what a person wants, in their words, built after the AI names the capabilities.
  *   2026-11-19 -- "Build and publish apps" names the Atelier spec and its platform part; the Classic spec is retired.
  *   2026-11-14 -- +ask-someone-who-knows (builtin-skills.ask-someone.ts): asking and answering the people
  *     on this node who know, and the operator's report; shown only while the feature is on.
@@ -278,6 +279,7 @@ import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.
 import { AGENT_AVATAR_SKILL_ENTRY } from './builtin-skills.agent-avatar.js';
 import { APP_AGENTS_SKILL_ENTRY } from './builtin-skills.app-agents.js';
 import { FIND_MY_APP_SKILL_ENTRY } from './builtin-skills.find-my-app.js';
+import { GOAL_RECIPES_SKILL_ENTRY } from './builtin-skills.goal-recipes.js';
 import { ASK_SOMEONE_SKILL_ENTRY } from './builtin-skills.ask-someone.js';
 
 export interface BuiltinSkill {
@@ -303,6 +305,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   APP_BUILDER_ATELIER_SKILL_ENTRY,
   APP_AGENTS_SKILL_ENTRY,
   FIND_MY_APP_SKILL_ENTRY,
+  GOAL_RECIPES_SKILL_ENTRY,
   DECIDE_SKILL_ENTRY,
   REFINERY_SKILL_ENTRY,
   CONTENT_CLASSES_SKILL_ENTRY,
