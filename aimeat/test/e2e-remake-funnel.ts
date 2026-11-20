@@ -16,6 +16,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-funnel
  * @version-history
+ *   2026-11-20 — The home_initialized test waits (at most 10 s) for the marker, which the home state
+ *     writes without awaiting; it lost that race in a Postgres sweep and was green alone.
  *   2026-11-15 — Audit M118: a remake account initializes its home (agent proof + home state) and
  *     the funnel's home_initialized column must move from 0 to 1, not only read zero.
  *   v2.0.0 — 2026-08-27 — Phase 3 is the start page, not the switch: every account defaults to the
@@ -241,9 +243,16 @@ await test('home_initialized moves from 0 to 1 once a remake account initializes
     assert(w.status === 201, `hello_mcp write ${w.status}: ${JSON.stringify(w.body.error)}`);
     const st = await json('/v1/home/state', auth(tokenHuman));
     assert(st.body.data?.state?.initialized === true, `setup: the home must be initialized, got ${JSON.stringify(st.body.data ?? st.body).slice(0, 300)}`);
-    const { body } = await json('/v1/admin/onboarding-funnel?limit=1000', auth(tokenOp));
-    const row = (body.data?.rows ?? []).find((r: any) => r.owner === ownerHuman);
-    assert(typeof row?.homeInitializedAt === 'string', `the row carries the marker: ${JSON.stringify(row)}`);
+    // The home state stamps the marker without awaiting the write (services/home/state.ts), so the
+    // funnel may be read before it lands: under a loaded sweep on Postgres it was. Wait for it, bounded.
+    let body: any;
+    let row: any;
+    for (const until = Date.now() + 10_000; ; await new Promise(r => setTimeout(r, 100))) {
+        body = (await json('/v1/admin/onboarding-funnel?limit=1000', auth(tokenOp))).body;
+        row = (body.data?.rows ?? []).find((r: any) => r.owner === ownerHuman);
+        if (typeof row?.homeInitializedAt === 'string' || Date.now() > until) break;
+    }
+    assert(typeof row?.homeInitializedAt === 'string', `the row carries the marker within 10 s: ${JSON.stringify(row)}`);
     const remake = (body.data?.cohorts ?? []).find((c: any) => c.track === 'remake');
     assert(remake?.home_initialized === 1, `home_initialized should be 1, got ${remake?.home_initialized}`);
     assert(remake.home_initialized_rate_pct > 0, `home_initialized_rate_pct should be > 0, got ${remake.home_initialized_rate_pct}`);
