@@ -24,6 +24,7 @@ import {
 } from '../../src/services/value/signal-buffer.js';
 import { sourceOf, sizeBucketOf } from '../../src/services/value/data-buffer.js';
 import { teamAiWeek } from '../../src/services/team/weekly-report.js';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 
 const NODE = 'aimeat-local-001-dev';
 const ALICE = `alice@${NODE}`;
@@ -169,6 +170,8 @@ describe('a workspace record is one record whatever copy is touched', () => {
 // ── The storage contract, on every configured provider ──
 
 const SQLITE_PATH = `./test/.value-signals-${process.pid}.db`;
+// CI's PostgreSQL job sets the flag: there a missing URL fails the file instead of skipping its half.
+requirePostgresWhenAsked('value-signals');
 const PG_URL = process.env.DATABASE_URL ?? '';
 interface Provider { name: string; storage: Storage }
 const provs: Provider[] = [];
