@@ -31,13 +31,17 @@ import { appDisplayName, appFilenameCandidates, findAppFilename, splitAppRef } f
 export async function resolveToolManifestId(
     storage: Pick<Storage, 'appFilenamesAmong' | 'getMemory'>, ownerName: string, ownerGhii: string, ref: string,
 ): Promise<string> {
-    const found = await findAppFilename(storage, { ownerName }, ref);
+    const raw = String(ref ?? '').trim();
+    // A manifest stored under the id exactly as given wins, whatever its shape: an id may itself hold
+    // a slash (`alice/dup-app`), and the exact name always comes first (services/app/app-ref.ts).
+    if (raw && await storage.getMemory(ownerGhii, appToolsKey(raw))) return raw;
+    const found = await findAppFilename(storage, { ownerName }, raw);
     if (found.filename) return found.filename;
-    if (found.foreign) return String(ref ?? '').trim();
+    if (found.foreign) return raw;
     for (const c of appFilenameCandidates(found.name)) {
-        if (await storage.getMemory(ownerGhii, appToolsKey(c))) return c;
+        if (c !== raw && await storage.getMemory(ownerGhii, appToolsKey(c))) return c;
     }
-    return found.name;
+    return found.name || raw;
 }
 
 /** An app's public tool manifest as an invoke reads it: absent (missing or not public), malformed, or its tools. */
