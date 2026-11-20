@@ -62,7 +62,7 @@ export function GoalValue({ goal }) {
     b?.measure && { k: g('measure', 'Should move'), v: b.measure },
     v && { k: g('results', 'Results'), v: String(v.results), sub: fill(g('resultsSub', '{asIs} as they were · {corrected} corrected · {used} opened by someone else · {gone} gone'), { asIs: v.as_is, corrected: v.corrected, used: v.used, gone: v.gone }) },
     { k: g('cost', 'AI cost'), v: money(goal.spent?.usd ?? 0) },
-    v && v.saving_minutes !== null && { k: g('saving', 'Saving counted'), state: 'fine', v: duration(v.saving_minutes), sub: g('savingSub', 'The baseline times the results still standing; your AI reads what it rests on.') },
+    v && v.saving_minutes !== null && { k: g('saving', 'Saving counted'), v: duration(v.saving_minutes), sub: g('savingSub', 'The baseline times the results still standing; your AI reads what it rests on.') },
   ].filter(Boolean);
 
   return html`

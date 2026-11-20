@@ -13,6 +13,9 @@
  *   ValueTab (default)
  * @usage Mounted by the admin dashboard tab router (views/admin.js), id `value`.
  * @version-history
+ *   v1.0.1 — 2026-11-20 — Browser check: the rhythm rows keep a short value (the wait goes in the
+ *     explanation), section 04 says why it is empty and shows the direction, the paste follows the
+ *     period, one dashed box on the page, counts without a plural noun.
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 3).
  */
 import { h, Fragment } from 'preact';
@@ -95,12 +98,15 @@ function WhatIsUsed({ rhythm, control }) {
 function Rhythm({ rhythm }) {
   const r = rhythm?.rhythm ?? { bursts: [], week: { days: 0, shares: null }, season: { months: 0, byMonth: null } };
   const bursts = (r.bursts ?? []).slice(0, 6);
-  const week = r.week?.shares
+  // The value column stays short; why a figure is not shown yet is said in the row's explanation.
+  const weekReady = !!r.week?.shares;
+  const week = weekReady
     ? WEEKDAYS.map((d, i) => `${S('weekday.' + d)} ${Math.round(r.week.shares[i] * 100)} %`).join(' · ')
-    : S('rhythm.weekWait', { n: num(r.week?.days ?? 0) });
-  const season = r.season?.byMonth
+    : S('rhythm.weekSoFar', { n: num(r.week?.days ?? 0) });
+  const seasonReady = !!r.season?.byMonth;
+  const season = seasonReady
     ? r.season.byMonth.map(m => `${m.month} ${m.vsMean > 0 ? '+' : ''}${Math.round(m.vsMean * 100)} %`).join(' · ')
-    : S('rhythm.seasonWait', { n: num(r.season?.months ?? 0) });
+    : S('rhythm.seasonSoFar', { n: num(r.season?.months ?? 0) });
   return html`
     <${Section} id="adm-val-02" num="02" title=${S('rhythm.title')}>
       <${Note} kind="lead">${S('rhythm.lead')}<//>
@@ -112,8 +118,8 @@ function Rhythm({ rhythm }) {
         mark: html`<${Badge} type="warning" label=${S('rhythm.times', { n: b.times })} />`,
         value: S('rhythm.burstValue', { day: b.day, n: num(b.count), usual: num(b.usual) }),
       }))),
-    { key: 'week', name: S('rhythm.week'), why: S('rhythm.weekWhy'), mark: null, value: week },
-    { key: 'season', name: S('rhythm.season'), why: S('rhythm.seasonWhy'), mark: null, value: season, last: true },
+    { key: 'week', name: S('rhythm.week'), why: weekReady ? S('rhythm.weekWhy') : S('rhythm.weekWait'), mark: null, value: week },
+    { key: 'season', name: S('rhythm.season'), why: seasonReady ? S('rhythm.seasonWhy') : S('rhythm.seasonWait'), mark: null, value: season, last: true },
   ]} />
     <//>`;
 }
@@ -161,6 +167,8 @@ function dataRows(list, prefix, empty) {
 /** Section 04: what data passed through, without the data. */
 function DataPassed({ data }) {
   const d = data ?? {};
+  const left = [...dataRows(d.by_kind, 'kind.'), ...dataRows(d.by_source, 'source.'), ...dataRows(d.by_direction, 'direction.'), ...dataRows(d.by_size, 'size.')];
+  const right = [...dataRows(d.by_level, '', 'data.noLabel'), ...dataRows(d.by_class, '', 'data.noClass')];
   return html`
     <${Section} id="adm-val-04" num="04" title=${S('data.title')}>
       <${Note} kind="lead">${S('data.lead')}<//>
@@ -169,16 +177,16 @@ function DataPassed({ data }) {
     { key: 'high', n: num(d.high_labels?.count ?? 0), label: S('data.high'), sub: S('data.highSub') },
     { key: 'hidden', n: num(d.hidden_groups ?? 0), tone: 'dim', label: S('data.hidden'), sub: S('data.hiddenSub') },
   ]} />
-      <${Beside} wide side=${html`<${Readings} rows=${[...dataRows(d.by_level, '', 'data.noLabel'), ...dataRows(d.by_class, '', 'data.noClass')]} />`}>
-        <${Readings} rows=${[...dataRows(d.by_kind, 'kind.'), ...dataRows(d.by_source, 'source.'), ...dataRows(d.by_size, 'size.')]} />
-      <//>
-      <${Note} kind="aside">${S('data.never')}<//>
+      ${left.length || right.length
+        ? html`<${Beside} wide side=${html`<${Readings} rows=${right} />`}><${Readings} rows=${left} /><//>`
+        : html`<${Note} kind="meta">${S('data.none')}<//>`}
+      <${Note} kind="meta">${S('data.never')}<//>
     <//>`;
 }
 
-/** Section 05: the same numbers through the operator's own AI. */
-function AskAi() {
-  const paste = S('ask.prompt');
+/** Section 05: the same numbers through the operator's own AI, over the period the page shows. */
+function AskAi({ period }) {
+  const paste = S('ask.prompt', { period: S('period.' + period) });
   return html`
     <${Section} id="adm-val-05" num="05" title=${S('ask.title')}
       doors=${html`<${Action} small soft copy=${paste}>${S('ask.copy')}<//>`}>
@@ -222,6 +230,6 @@ export default function ValueTab() {
     <${Rhythm} rhythm=${state.rhythm} />
     <${AiResults} value=${state.value} />
     <${DataPassed} data=${state.data} />
-    <${AskAi} />
+    <${AskAi} period=${period} />
   <//>`;
 }
