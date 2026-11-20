@@ -11,6 +11,8 @@
  *   a workspace a member cannot open would still show its activity in the counts.
  * @structure valueRouter · GET /v1/organisms/:id/value
  * @version-history
+ *   v1.1.0 — 2026-11-20 — `measures`: the organism's own measures the reader keeps
+ *     (services/value/measures.ts), each counted only in a workspace the reader may read.
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 2).
  */
 import { Router, type Request, type Response } from 'express';
@@ -21,6 +23,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { callerOf } from '../../middleware/caller.js';
 import { memberRoleOf } from '../../services/workspace/ops-caller.js';
 import { readValueReport } from '../../services/value/report.js';
+import { readMeasures } from '../../services/value/measures.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -58,7 +61,9 @@ export function valueRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const report = await readValueReport({ storage, config }, { kind: 'organism', orgId, ...(ws ? { wsId: ws } : {}) }, { from, to });
-    res.json(success(config.nodeId, report, [
+    // The organism's own measures as this reader keeps them, counted only where the reader may read.
+    const measures = await readMeasures({ storage, config }, caller.ownerGhii, orgId, { from: report.from, to: report.to, ...(ws ? { wsId: ws } : {}) });
+    res.json(success(config.nodeId, { ...report, measures }, [
       { description: 'Your own value report', method: 'GET', url: '/v1/usage/summary?report=value' },
     ]));
   });

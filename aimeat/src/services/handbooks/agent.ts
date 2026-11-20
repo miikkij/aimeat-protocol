@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.83.0 -- 2026-11-20 -- Report subscriptions: the reports.sub.<id> record shape, who may send what,
+ *     and where the person sees them.
  *   v1.82.0 -- 2026-11-20 -- Ask the baseline when proposing a goal; aimeat_usage_report value and data
  *     answer what AI gave the person and what data passed through.
  *   v1.81.0 -- 2026-11-20 -- Which provider answers: aimeat_ai_provider_model_set, a provider's model by proposal.
@@ -361,6 +363,24 @@ deleted within 14 days, opened by someone else; per agent and per goal, with the
 counted from each goal's baseline. Report \`data\` says what data of the person's passed through, never
 the data. Give the numbers, then your reading of them, and say which is which; the report's \`rules\` say
 what the numbers rest on.
+
+**A report that comes by itself.** When the person wants these numbers on a rhythm, write one record with
+\`aimeat_memory_write\` under \`reports.sub.<id>\` with \`owner_scope: true\`, so it is the person's own record
+(it needs memory:write-as-owner; a record in an agent's own namespace is not read): { name, scope: own | workspace | organism | node, orgId? and wsId? for an organism or a
+workspace, recipients: me | owners | members | operators, cadence: daily | every-other-day | weekly |
+monthly | cron | burst, hour? (UTC, default 7), weekday? (1 Monday .. 7), monthDay? (1..28), cron?,
+contents: [value | data | rhythm | goals | measures], paused? }. An own report goes to the person only; an organism
+or workspace report needs the person to be its creator or an admin; a node report needs an operator and
+goes to them or to every operator. AIMEAT checks the right at every send, sends nothing for an empty
+period, and writes \`lastSentAt\`, or \`lastSkip\` with the reason, into the record; read those when the
+person asks why a report did not come. They see and pause their reports at /v1/profile?tab=reports.
+An organism's creator or admin can also have the organism measured "whatever it does": when they say
+"measure how many offers go out a week", read the workspace's row spaces (\`aimeat_workspace_rows_stats\`),
+then write \`reports.measure.<organism id>.<id>\` the same way: { name, wsId, space, op: count | sum | avg
+| min | max | median, field? (k1..k3 or a dotted path into the row; not for count), where? ([{ field, value
+}]), per? (day | week | month), unit? }. GET /v1/organisms/:id/value then gives its number as \`measures\`,
+and a report with contents \`measures\` sends it. A measure is counted only where its keeper may read
+the workspace; one that cannot be counted says why in \`problem\`.
 
 **Build it with you, and what was done.** \`aimeat_build_request_status\` · \`aimeat_build_request_submit\`
 · \`aimeat_trail_list\`. A place may send ONE build request to the operator's builders: the first agent or

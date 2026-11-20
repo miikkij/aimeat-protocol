@@ -22,6 +22,10 @@
  * @structure SUBSCRIPTION_PREFIX · ReportSubscription · parseSubscription · isDue · windowOf ·
  *   recipientsOf · buildReport · runReportSubscriptions
  * @version-history
+ *   v1.1.0 — 2026-11-20 — `lastSkip` is a code (SKIP) the Reports page words in the reader's language,
+ *     kept on parse so an unchanged reason is not written again every run; a record that is not a
+ *     subscription says why (`invalid`, `lastSkipDetail`); contents `measures` adds an organism's own
+ *     measures (services/value/measures.ts) to an organism or workspace report.
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 4).
  */
 import { Cron } from 'croner';
@@ -34,13 +38,15 @@ import { organismOwners } from '../organism/ownership.js';
 import { readValueReport } from '../value/report.js';
 import { readDataReport } from '../value/data-report.js';
 import { readUsageRhythm } from '../value/usage-rhythm.js';
+import { readMeasures } from '../value/measures.js';
 
 export const SUBSCRIPTION_PREFIX = 'reports.sub.';
 
 export type ReportScope = 'own' | 'workspace' | 'organism' | 'node';
 export type ReportCadence = 'daily' | 'every-other-day' | 'weekly' | 'monthly' | 'cron' | 'burst';
 export type ReportRecipients = 'me' | 'owners' | 'members' | 'operators';
-export type ReportContent = 'value' | 'data' | 'rhythm' | 'goals';
+/** `measures`: an organism or workspace report's own measures (services/value/measures.ts). */
+export type ReportContent = 'value' | 'data' | 'rhythm' | 'goals' | 'measures';
 
 export interface ReportSubscription {
   id: string;
@@ -61,13 +67,26 @@ export interface ReportSubscription {
   paused?: boolean;
   lastSentAt?: string;
   lastBurstDay?: string;
-  lastSkip?: string;
+  /** Why the last due run sent nothing, as a code the Reports page words (SKIP). */
+  lastSkip?: SkipCode;
+  /** For `invalid`: what in the record is wrong, in the parser's words (for the person's AI). */
+  lastSkipDetail?: string;
 }
+
+/** Why a due subscription sent nothing. Stored as a code so the page can say it in the reader's language. */
+export const SKIP = {
+  nothing: 'nothing',
+  notOperator: 'not-operator',
+  organismGone: 'organism-gone',
+  notOrganismOwner: 'not-organism-owner',
+  invalid: 'invalid',
+} as const;
+export type SkipCode = typeof SKIP[keyof typeof SKIP];
 
 const CADENCES: readonly ReportCadence[] = ['daily', 'every-other-day', 'weekly', 'monthly', 'cron', 'burst'];
 const SCOPES: readonly ReportScope[] = ['own', 'workspace', 'organism', 'node'];
 const RECIPIENTS: readonly ReportRecipients[] = ['me', 'owners', 'members', 'operators'];
-const CONTENTS: readonly ReportContent[] = ['value', 'data', 'rhythm', 'goals'];
+const CONTENTS: readonly ReportContent[] = ['value', 'data', 'rhythm', 'goals', 'measures'];
 
 /** A stored value as a subscription, or the reason it is not one. */
 export function parseSubscription(id: string, value: unknown): { ok: true; sub: ReportSubscription } | { ok: false; reason: string } {
@@ -100,6 +119,7 @@ export function parseSubscription(id: string, value: unknown): { ok: true; sub: 
       contents, paused: v.paused === true,
       ...(typeof v.lastSentAt === 'string' ? { lastSentAt: v.lastSentAt } : {}),
       ...(typeof v.lastBurstDay === 'string' ? { lastBurstDay: v.lastBurstDay } : {}),
+      ...(typeof v.lastSkip === 'string' ? { lastSkip: v.lastSkip as SkipCode } : {}),
     },
   };
 }
@@ -131,18 +151,18 @@ export function windowOf(sub: ReportSubscription, now: Date): { from: string; to
 }
 
 /** Who receives it, decided now from the writer's current rights; or why it may not be sent. */
-export async function recipientsOf(storage: Storage, config: AimeatConfig, writerGhii: string, sub: ReportSubscription): Promise<{ ok: true; to: string[] } | { ok: false; reason: string }> {
+export async function recipientsOf(storage: Storage, config: AimeatConfig, writerGhii: string, sub: ReportSubscription): Promise<{ ok: true; to: string[] } | { ok: false; reason: SkipCode }> {
   if (sub.scope === 'own') return { ok: true, to: [writerGhii] };
   const name = localAccountName(writerGhii);
   if (sub.scope === 'node') {
     const operators = await storage.listOperatorNames({ limit: 50 });
-    if (!operators.includes(name)) return { ok: false, reason: 'the writer is no longer an operator' };
+    if (!operators.includes(name)) return { ok: false, reason: SKIP.notOperator };
     return { ok: true, to: sub.recipients === 'operators' ? operators.map(o => `${o}@${config.nodeId}`) : [writerGhii] };
   }
   const org = await storage.getOrganism(sub.orgId!);
-  if (!org) return { ok: false, reason: 'the organism is gone' };
+  if (!org) return { ok: false, reason: SKIP.organismGone };
   const owners = organismOwners(org);
-  if (!owners.includes(name)) return { ok: false, reason: 'the writer is no longer the organism\'s creator or an admin' };
+  if (!owners.includes(name)) return { ok: false, reason: SKIP.notOrganismOwner };
   if (sub.recipients === 'me') return { ok: true, to: [writerGhii] };
   if (sub.recipients === 'owners') return { ok: true, to: owners.map(o => `${o}@${config.nodeId}`) };
   const members = await storage.listMembers(sub.orgId!, { status: 'active' });
@@ -156,7 +176,7 @@ export async function buildReport(
 ): Promise<{ empty: boolean; vars: Record<string, string | number>; text: string; burstDay?: string }> {
   const { from, to } = windowOf(sub, now);
   const parts: string[] = [];
-  const vars: Record<string, string | number> = { name: sub.name, from, to, made: 0, corrected: 0, rejected: 0, used: 0, writes: 0, burst: '-' };
+  const vars: Record<string, string | number> = { name: sub.name, from, to, made: 0, corrected: 0, rejected: 0, used: 0, writes: 0, burst: '-', measures: '' };
   let burstDay: string | undefined;
   if (sub.contents.includes('value') || sub.contents.includes('goals') || sub.cadence === 'burst') {
     const scope = sub.scope === 'own' ? { kind: 'own' as const, ownerGhii: writerGhii }
@@ -193,6 +213,15 @@ export async function buildReport(
     const top = r.features.slice(0, 3).map(f => `${f.feature} ${f.calls}`).join(', ');
     if (top) parts.push(`Most used: ${top}.`);
   }
+  if (sub.contents.includes('measures') && (sub.scope === 'organism' || sub.scope === 'workspace')) {
+    // The writer's own measures of the organism, each counted only where the writer may read.
+    const counted = (await readMeasures(deps, writerGhii, sub.orgId!, { from, to, ...(sub.wsId ? { wsId: sub.wsId } : {}) }))
+      .filter(m => !m.problem && m.value !== null);
+    if (counted.length) {
+      vars.measures = counted.map(m => `${m.name}: ${Math.round(m.value! * 100) / 100}${m.unit ? ` ${m.unit}` : ''}`).join(' · ');
+      parts.push(`${vars.measures}.`);
+    }
+  }
   return { empty: parts.length === 0, vars, text: parts.join(' '), ...(burstDay ? { burstDay } : {}) };
 }
 
@@ -214,15 +243,22 @@ export async function runReportSubscriptions(storage: Storage, config: AimeatCon
       // Only a person's own record counts: a subscription in an agent's namespace is the agent's note.
       if (writerGhii !== rec.ownerGaii) continue;
       const parsed = parseSubscription(rec.key.slice(SUBSCRIPTION_PREFIX.length), rec.value);
-      if (!parsed.ok) continue;
+      if (!parsed.ok) {
+        // A record the person can open says why it sends nothing; one that is not an object stays as it is.
+        const v = rec.value as Record<string, unknown> | null;
+        if (v && typeof v === 'object' && !Array.isArray(v) && (v.lastSkip !== SKIP.invalid || v.lastSkipDetail !== parsed.reason)) {
+          await stamp(storage, rec, { lastSkip: SKIP.invalid, lastSkipDetail: parsed.reason });
+        }
+        continue;
+      }
       const sub = parsed.sub;
       try {
         if (!isDue(sub, now)) continue;
         const to = await recipientsOf(storage, config, writerGhii, sub);
-        if (!to.ok) { if (sub.lastSkip !== to.reason) await stamp(storage, rec, { lastSkip: to.reason }); continue; }
+        if (!to.ok) { if (sub.lastSkip !== to.reason) await stamp(storage, rec, { lastSkip: to.reason, lastSkipDetail: undefined }); continue; }
         const report = await buildReport({ storage, config }, writerGhii, sub, now);
         if (report.empty) {
-          if (sub.cadence !== 'burst') await stamp(storage, rec, { lastSentAt: now.toISOString(), lastSkip: 'nothing happened' });
+          if (sub.cadence !== 'burst') await stamp(storage, rec, { lastSentAt: now.toISOString(), lastSkip: SKIP.nothing, lastSkipDetail: undefined });
           continue;
         }
         for (const ghii of to.to) {
@@ -235,7 +271,7 @@ export async function runReportSubscriptions(storage: Storage, config: AimeatCon
           });
         }
         sent++;
-        await stamp(storage, rec, { lastSentAt: now.toISOString(), lastSkip: undefined, ...(report.burstDay ? { lastBurstDay: report.burstDay } : {}) });
+        await stamp(storage, rec, { lastSentAt: now.toISOString(), lastSkip: undefined, lastSkipDetail: undefined, ...(report.burstDay ? { lastBurstDay: report.burstDay } : {}) });
       } catch (err) {
         logger.warn('report-subscriptions: one subscription failed', { key: rec.key, error: String(err) });
       }

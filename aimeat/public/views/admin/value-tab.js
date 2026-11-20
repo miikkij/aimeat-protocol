@@ -13,6 +13,8 @@
  *   ValueTab (default)
  * @usage Mounted by the admin dashboard tab router (views/admin.js), id `value`.
  * @version-history
+ *   v1.1.0 — 2026-11-20 — Section 05 links to the Reports page, where the same figures come as a
+ *     report subscription (services/reports/subscriptions.ts).
  *   v1.0.1 — 2026-11-20 — Browser check: the rhythm rows keep a short value (the wait goes in the
  *     explanation), section 04 says why it is empty and shows the direction, the paste follows the
  *     period, one dashed box on the page, counts without a plural noun.
@@ -197,6 +199,7 @@ function AskAi({ period }) {
     { key: 'value', name: S('ask.value'), why: S('ask.valueWhy'), mark: null, value: 'aimeat_admin_usage · value' },
     { key: 'data', name: S('ask.data'), why: S('ask.dataWhy'), mark: null, value: 'aimeat_admin_usage · data', last: true },
   ]} />
+        <${Action} href="/v1/profile?tab=reports">${S('ask.subscribe')}<//>
       <//>
     <//>`;
 }

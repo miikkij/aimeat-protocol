@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-11-20 — The "Reports" tab (views/profile/reports-tab.js, id 'reports'): the person's report
+ *     subscriptions in four scopes, with pause, resume and remove (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi).
  *   2026-11-19 — The "Customer due diligence" tab (views/profile/kyc-tab.js, id 'kyc'): an obliged
  *     organism's customer cards, suspicions and settings, and one's own verification; and the hidden
  *     'identify' tab (views/profile/kyc/identify.js), where a customer gives their verified identity
@@ -139,6 +141,7 @@ const TABS = [
   { id: 'mcp',           key: 'profile.tabs.mcp',            load: () => import('./profile/mcp-tab.js').then(byDefault),            minTier: 'new' },
   { id: 'wallet',        key: 'profile.tabs.wallet',         load: () => import('./profile/wallet-tab.js').then(byDefault),         minTier: 'new' },
   { id: 'usage',         key: 'profile.tabs.usage',          load: () => import('./profile/usage-tab.js').then(byDefault),          minTier: 'new' },
+  { id: 'reports',       key: 'profile.tabs.reports',        load: () => import('./profile/reports-tab.js').then(byDefault),        minTier: 'new' },
   { id: 'visibility',    key: 'profile.tabs.visibility',     load: () => import('./profile/visibility-tab.js').then(byDefault),     minTier: 'new' },
   { id: 'pnl',           key: 'profile.tabs.pnl',            load: () => import('./profile/pnl-tab.js').then((m) => m.PnlTab),      minTier: 'active' },
   { id: 'companies',     key: 'profile.tabs.companies',      load: () => import('./profile/companies-tab.js').then((m) => m.CompaniesTab), minTier: 'active' },

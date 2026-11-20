@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-11-20 — The business group lists Reports (report subscriptions) after Usage.
  *   2026-11-19 — The account group lists Knowing the customer (kyc) after the data wallet.
  *   v1.34.0 -- 2026-11-14 -- "Vault" under Account, after Access: the secrets a person shares and receives (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   v1.33.0 -- 2026-11-08 -- "Contexts" under Information, after Memory: the things a person keeps working on with their AI, each one record their AI shapes in chat (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
@@ -668,6 +669,9 @@ export const SIDEBAR_GROUPS = [
     { id: 'companies', labelKey: 'profile.tabs.companies' },
     { id: 'pnl', labelKey: 'profile.tabs.pnl' },
     { id: 'usage', labelKey: 'profile.tabs.usage' },
+    /* Report subscriptions: what AI made and what passed through, sent on a rhythm the person chose
+     * (services/reports/subscriptions.ts). */
+    { id: 'reports', labelKey: 'profile.tabs.reports' },
     { id: 'visibility', labelKey: 'profile.tabs.visibility' },
   ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [

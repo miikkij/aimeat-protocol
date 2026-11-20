@@ -51996,7 +51996,11 @@ paths:
         within 14 days, opened by someone else), as sums per key family and per day, with the bursts,
         week and season of the results. Never per member or per agent. With ws, one workspace. The
         person's own report is GET /v1/usage/summary?report=value. Requires organism:read and the
-        caller to be the organism's creator or an admin; a member is refused.
+        caller to be the organism's creator or an admin; a member is refused. `measures` holds the
+        organism's own measures the caller keeps as memory records under
+        reports.measure.<organism>.<id> ({ name, wsId, space, op count|sum|avg|min|max|median, field?,
+        where?, per? day|week|month, unit? }), each counted from the workspace's rows over the window,
+        and only in a workspace the caller may read; one that cannot be counted says why in `problem`.
       security:
         - BearerAuth: []
       parameters:

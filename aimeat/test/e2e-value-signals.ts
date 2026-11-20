@@ -7,10 +7,16 @@
  *   (aimeat_usage_report report=value, GET /v1/usage/summary); a goal carries the baseline the AI asked
  *   (aimeat_goal_set baseline); the organism's report is for its creator and admins only (GET
  *   /v1/organisms/:id/value, a member and an outsider refused); the operator's value and rhythm reports
- *   are node-wide and refuse a named person (GET /v1/admin/usage/summary).
- * @structure v01..v07 in order; each later test reads what the earlier ones made.
+ *   are node-wide and refuse a named person (GET /v1/admin/usage/summary). A report subscription
+ *   (`reports.sub.<id>`) sends its report as a notification once, and a member who is not the
+ *   organism's creator or an admin sends nothing for the organism (core:report-subscriptions). The
+ *   organism is measured from its own workspace rows (`reports.measure.<organism>.<id>`, the report's
+ *   `measures`), a broken or unplaceable measure says why, and a member reads no measure.
+ * @structure v01..v13 in order; each later test reads what the earlier ones made.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=value-signals
  * @version-history
+ *   v1.2.0 — 2026-11-20 — v12 and v13: an organism's own measures.
+ *   v1.1.0 — 2026-11-20 — v10 and v11: report subscriptions, the send and the refusal (phase 4).
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 2).
  */
 import { registerOwner, setupOperator, type RegisteredOwner } from './helpers/owner-login.js';
@@ -129,6 +135,87 @@ await test('v09 the operator\'s data report hides a group with fewer than five o
     for (const list of [d.by_kind, d.by_source, d.by_direction, d.by_size, d.by_level, d.by_class]) {
         assert(list.every((g: any) => g.owners >= 5), `a group under five owners is shown: ${JSON.stringify(list)}`);
     }
+});
+
+const runSubscriptions = () => json('/v1/admin/scheduler/jobs/core:report-subscriptions/trigger', { method: 'POST', headers: auth(operator.token) });
+const record = async (who: RegisteredOwner, key: string) =>
+    (await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(who.token) })).body?.data?.value ?? {};
+const reportsTo = async (who: RegisteredOwner) =>
+    (((await json('/v1/notifications', { headers: auth(who.token) })).body?.data?.notifications ?? []) as any[])
+        .filter(n => n.i18n?.key === 'report_subscription');
+
+await test('v10 the person\'s AI saves a report subscription, and the report arrives as a notification', async () => {
+    const key = 'reports.sub.my-ai-work';
+    // The subscription is the person's record: the AI writes it under the owner (handbook "A report that comes by itself").
+    const secretary = await openSession(BASE, (await makeAgent(BASE, alice, ['memory:read', 'memory:write', 'memory:write-as-owner'])).token, 'alice-secretary');
+    const saved = await callTool(secretary, 'aimeat_memory_write', {
+        key, owner_scope: true, value: { name: 'My AI work', scope: 'own', cadence: 'cron', cron: '* * * * *', contents: ['value', 'data'] },
+    });
+    assert(!saved.isError, `the AI saves it: ${saved.text.slice(0, 200)}`);
+    const run = await runSubscriptions();
+    assert(run.status === 200, `the job runs: ${run.status} ${JSON.stringify(run.body).slice(0, 200)}`);
+    const got = await reportsTo(alice);
+    assert(got.length === 1 && Number(got[0].i18n.vars.made) >= 1, `one report with what AI made: ${JSON.stringify(got).slice(0, 300)}`);
+    assert(typeof (await record(alice, key)).lastSentAt === 'string', 'the record says when it went out');
+    await runSubscriptions();
+    assert((await reportsTo(alice)).length === 1, 'the same minute sends it once');
+});
+
+await test('v11 a member who is not the organism\'s creator or an admin sends nothing for the organism', async () => {
+    const key = 'reports.sub.team-month';
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: auth(bob.token),
+        body: JSON.stringify({ key, value: { name: 'Team month', scope: 'organism', orgId: teamId, recipients: 'members', cadence: 'cron', cron: '* * * * *', contents: ['value'] } }),
+    });
+    assert(w.status === 200 || w.status === 201, `bob writes the record: ${w.status}`);
+    const before = (await reportsTo(alice)).length;
+    const run = await runSubscriptions();
+    assert(run.status === 200, `the job runs: ${run.status}`);
+    assert((await record(bob, key)).lastSkip === 'not-organism-owner', `the record says why: ${JSON.stringify(await record(bob, key))}`);
+    assert((await reportsTo(bob)).length === 0 && (await reportsTo(alice)).length === before, 'no member receives the organism\'s report');
+});
+
+const manifestOf = (name: string) => ({
+    manifestVersion: '1', id: teamId, name, kind: 'workspace', status: 'active',
+    objectTypes: [{ name: 'offer', schemaRef: 'schema:offer@1', namespace: 'sales.offer', backing: 'rows', writeRole: 'member', mode: 'records', indexOn: ['status'] }],
+});
+const putRows = async (who: RegisteredOwner, ws: string, rows: Array<Record<string, unknown>>) => {
+    const m = await json('/v1/memory', {
+        method: 'POST', headers: auth(who.token),
+        body: JSON.stringify({ key: `organism.${teamId}.w.${ws}.meta.manifest`, value: manifestOf(ws), visibility: 'private' }),
+    });
+    assert(m.status === 200 || m.status === 201, `manifest ${ws}: ${m.status} ${JSON.stringify(m.body).slice(0, 200)}`);
+    const r = await json(`/v1/organisms/${teamId}/workspace/rows/offer?ws=${ws}`, { method: 'POST', headers: auth(who.token), body: JSON.stringify({ rows: rows.map(body => ({ body })) }) });
+    assert(r.status === 200 && r.body.data.written === rows.length, `rows ${ws}: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+};
+const measure = (who: RegisteredOwner, id: string, value: Record<string, unknown>) => json('/v1/memory', {
+    method: 'POST', headers: auth(who.token), body: JSON.stringify({ key: `reports.measure.${teamId}.${id}`, value }),
+});
+
+await test('v12 the organism is measured from its own rows: how many offers went out, and their mean', async () => {
+    await putRows(alice, 'deals', [
+        { status: 'sent', amount: 1000 }, { status: 'sent', amount: 3000 }, { status: 'sent', amount: 2000 }, { status: 'draft', amount: 9000 },
+    ]);
+    await measure(alice, 'offers-sent', { name: 'Offers sent', wsId: 'deals', space: 'offer', op: 'count', where: [{ field: 'status', value: 'sent' }], per: 'week', unit: 'offers' });
+    await measure(alice, 'mean-offer', { name: 'Mean offer', wsId: 'deals', space: 'offer', op: 'avg', field: 'amount', where: [{ field: 'status', value: 'sent' }] });
+    await measure(alice, 'broken', { name: 'Broken', wsId: 'deals', space: 'offer', op: 'sum' });
+    const r = await json(`/v1/organisms/${teamId}/value`, { headers: auth(alice.token) });
+    assert(r.status === 200, `report: ${r.status}`);
+    const byId = Object.fromEntries((r.body.data.measures as any[]).map(m => [m.id, m]));
+    assert(byId['offers-sent']?.value === 3 && byId['offers-sent'].series?.length >= 1, `count: ${JSON.stringify(byId['offers-sent'])}`);
+    assert(byId['mean-offer']?.value === 2000, `mean: ${JSON.stringify(byId['mean-offer'])}`);
+    assert(byId.broken?.problem === 'invalid' && byId.broken.value === null, `a measure without its field says so: ${JSON.stringify(byId.broken)}`);
+});
+
+await test('v13 a measure of a space the workspace does not have says so, and a member reads no measure', async () => {
+    await measure(alice, 'no-space', { name: 'Calls', wsId: 'deals', space: 'call', op: 'count' });
+    const r = await json(`/v1/organisms/${teamId}/value`, { headers: auth(alice.token) });
+    const byId = Object.fromEntries((r.body.data.measures as any[]).map(m => [m.id, m]));
+    assert(byId['no-space']?.problem === 'no-space' && byId['no-space'].value === null, `a missing space: ${JSON.stringify(byId['no-space'])}`);
+    // bob keeps a measure of his own; as a member he is refused the organism's report, measures and all.
+    const w = await measure(bob, 'mine', { name: 'Mine', wsId: 'deals', space: 'offer', op: 'count' });
+    assert(w.status === 200 || w.status === 201, `bob writes his record: ${w.status}`);
+    expectRefusal(await json(`/v1/organisms/${teamId}/value`, { headers: auth(bob.token) }), 403, 'ACCESS_DENIED');
 });
 
 finish();

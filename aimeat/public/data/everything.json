@@ -3416,6 +3416,15 @@
      "plain": "What AI gave you Ask your AI what AI has given you and get counts, not adjectives: what your agents made, how much of it was kept as it was, corrected by someone else, deleted within two weeks or opened by someone else, per agent and per goal, with the cost and the saving counted from the baseline your AI asked when the goal was made (minutes per result, week or month). Nobody acknowledges anything: the node counts it when records are written, deleted and opened. The same report says what data of yours passed through, by kind, source, size, label and content class, and never the data itself. An organism's creator and admins read its sums per feature, never per member; the operator reads node-wide sums, the rhythm of the node's use (bursts, week, season) and the data that passed through, with a group behind fewer than five owners left out. Day counts become week counts after 400 days. aimeat_usage_report (value, data), aimeat_goal_set (baseline), aimeat_admin_usage (value, rhythm, data), /v1/usage/summary, /v1/organisms/{id}/value, /v1/admin/usage/summary"
     },
     {
+     "slug": "g-14-reports-on-a-rhythm-you-choose",
+     "cells": [
+      "<strong>Reports on a rhythm you choose</strong>",
+      "Tell your AI how often you want to hear what AI did, and the report comes as a notification without anyone opening a page: every day, every other day, weekly, monthly, on a timetable of your own, or when use comes in a burst. One kind of report covers four reaches: your own work, a workspace or an organism you created or are an admin of (to you, its owners or every member, as sums), and the whole AIMEAT for an operator (to you or every operator). A period with nothing in it sends nothing, and the right to send is checked at every send. The Reports page lists them with when each went out or why it did not, and pauses and removes them. An organism's creator or admin can also have the organism measured &quot;whatever it does&quot;: say &quot;measure how many offers go out a week&quot; and your AI makes a measure counted from the organism's own workspace rows (a count, sum, mean, smallest, largest or median, per day, week or month), which the organism's report shows and a report can send.",
+      "<code>aimeat_memory_write</code> (<code>reports.sub.&lt;id&gt;</code>, <code>reports.measure.&lt;organism&gt;.&lt;id&gt;</code>), <code>/v1/memory</code>, <code>/v1/organisms/{id}/value</code> (<code>measures</code>), <code>/v1/profile?tab=reports</code>"
+     ],
+     "plain": "Reports on a rhythm you choose Tell your AI how often you want to hear what AI did, and the report comes as a notification without anyone opening a page: every day, every other day, weekly, monthly, on a timetable of your own, or when use comes in a burst. One kind of report covers four reaches: your own work, a workspace or an organism you created or are an admin of (to you, its owners or every member, as sums), and the whole AIMEAT for an operator (to you or every operator). A period with nothing in it sends nothing, and the right to send is checked at every send. The Reports page lists them with when each went out or why it did not, and pauses and removes them. An organism's creator or admin can also have the organism measured \"whatever it does\": say \"measure how many offers go out a week\" and your AI makes a measure counted from the organism's own workspace rows (a count, sum, mean, smallest, largest or median, per day, week or month), which the organism's report shows and a report can send. aimeat_memory_write (reports.sub.<id>, reports.measure.<organism>.<id>), /v1/memory, /v1/organisms/{id}/value (measures), /v1/profile?tab=reports"
+    },
+    {
      "slug": "g-14-exchange",
      "cells": [
       "<strong>EXCHANGE</strong>",
@@ -5171,6 +5180,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 531
+  "rows": 532
  }
 }
