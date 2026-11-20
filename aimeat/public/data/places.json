@@ -119,6 +119,7 @@
         ] },
         { "id": "pnl", "labelKey": "profile.tabs.pnl" },
         { "id": "usage", "labelKey": "profile.tabs.usage" },
+        { "id": "reports", "labelKey": "profile.tabs.reports" },
         { "id": "visibility", "labelKey": "profile.tabs.visibility" }
       ] },
       { "titleKey": "profile.landing.menuBuildShare", "items": [
@@ -278,6 +279,13 @@
         { "id": "file-stores", "labelKey": "admin.fileStores.title" },
         { "id": "metrics", "labelKey": "dashboard.metrics" },
         { "id": "usage", "labelKey": "dashboard.usage" },
+        { "id": "value", "labelKey": "dashboard.valueTab", "sections": [
+          { "id": "adm-val-01", "num": "01", "labelKey": "admin.value.used.title" },
+          { "id": "adm-val-02", "num": "02", "labelKey": "admin.value.rhythm.title" },
+          { "id": "adm-val-03", "num": "03", "labelKey": "admin.value.ai.title" },
+          { "id": "adm-val-04", "num": "04", "labelKey": "admin.value.data.title" },
+          { "id": "adm-val-05", "num": "05", "labelKey": "admin.value.ask.title" }
+        ] },
         { "id": "prompts", "labelKey": "dashboard.promptsTab" }
       ] },
       { "titleKey": "dashboard.navIdentity", "items": [
