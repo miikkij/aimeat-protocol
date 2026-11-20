@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-20 — GET /v1/organisms/:id carries `value_per_member` for a member while the creators see
+ *     the value report per member (services/value/per-member.ts).
  *   2026-11-20 — GET /v1/organisms/:id carries the organism's directive for a member and its answer
  *     counts for a creator or admin (services/organism/directives.ts).
  *   2026-11-19 — DELETE /v1/organisms/:id answers 409 KYC_RECORDS_RETAINED while the organism keeps customer due diligence records (AMLR art. 77).
@@ -124,6 +126,7 @@ import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { callerOf } from '../../middleware/caller.js';
 import { teamDeleteGate } from '../../services/team/action-gate.js';
 import { directiveFields } from '../../services/organism/directives.js';
+import { perMemberFields } from '../../services/value/per-member.js';
 
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
@@ -337,6 +340,8 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       your_membership: yourMembership ? { role: yourMembership.role, status: yourMembership.status } : null,
       // What the organism's creators ask a member's AI to do (services/organism/directives.ts).
       ...await directiveFields({ storage, config }, detailCaller.ownerName ?? undefined, id),
+      // Whether the creators see the value report per member, and this member's own numbers (services/value/per-member.ts).
+      ...await perMemberFields({ storage, config }, detailCaller.ownerName ?? undefined, id),
     }));
   });
 

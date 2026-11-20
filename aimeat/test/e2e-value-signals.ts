@@ -273,4 +273,38 @@ await test('v15 a directive reaches a member\'s AI with the organism and the wor
     expectRefusal(await json(`/v1/organisms/${teamId}`, { headers: auth(outsider.token) }), 404);
 });
 
+await test('v16 per member only when a creator turns it on, and every member is told', async () => {
+    // Work an AI made in the organism: alice's agent writes a note into a workspace of the organism.
+    const notes = await json('/v1/memory', {
+        method: 'POST', headers: auth(alice.token),
+        body: JSON.stringify({ key: `organism.${teamId}.w.notes.meta.manifest`, visibility: `organism:${teamId}`, value: {
+            manifestVersion: '1', id: teamId, name: 'notes', kind: 'workspace', status: 'active',
+            objectTypes: [{ name: 'note', schemaRef: 'schema:note@1', namespace: 'team.note', backing: 'memory', writeRole: 'member', mode: 'records' }],
+        } }),
+    });
+    assert(notes.status === 200 || notes.status === 201, `a notes workspace: ${notes.status}`);
+    const made = await callTool(aliceAi, 'aimeat_workspace_write', { organism_id: teamId, ws: 'notes', space: 'note', id: 'n1', value: { text: 'Three offers went out today.' } });
+    assert(!made.isError, `the AI writes in the organism: ${made.text.slice(0, 200)}`);
+
+    const off = await json(`/v1/organisms/${teamId}/value`, { headers: auth(alice.token) });
+    assert(off.body.data.per_member?.on === false && off.body.data.by_member === undefined, `off by default: ${JSON.stringify(off.body.data.per_member)}`);
+    assert((await json(`/v1/organisms/${teamId}`, { headers: auth(bob.token) })).body.data.value_per_member === undefined, 'a member is told nothing while it is off');
+
+    const key = `organism.${teamId}.meta.valuereport`;
+    expectRefusal(await json('/v1/memory', { method: 'POST', headers: auth(bob.token), body: JSON.stringify({ key, value: { perMember: true } }) }), 403);
+    const on = await json('/v1/memory', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key, value: { perMember: true } }) });
+    assert(on.status === 200 || on.status === 201, `the creator turns it on: ${on.status}`);
+
+    const lead = await json(`/v1/organisms/${teamId}/value`, { headers: auth(alice.token) });
+    const rows = lead.body.data.by_member as Array<Record<string, unknown>>;
+    assert(lead.body.data.per_member?.on === true && Array.isArray(rows), `the creator sees per member: ${JSON.stringify(lead.body.data.per_member)}`);
+    const aliceRow = rows.find(r => r.member === alice.ghii);
+    assert(!!aliceRow && Number(aliceRow.produced) >= 1, `alice's AI work is counted for her: ${JSON.stringify(rows)}`);
+    assert(rows.every(r => r.member !== outsider.ghii), 'nobody outside the organism is listed');
+    const told = (await json(`/v1/organisms/${teamId}`, { headers: auth(bob.token) })).body.data.value_per_member;
+    assert(told?.on === true && typeof told.yours?.produced === 'number', `the member is told it is on, with his own numbers: ${JSON.stringify(told)}`);
+    // A workspace report never carries per-member rows, whoever asks.
+    assert((await json(`/v1/organisms/${teamId}/value?ws=open`, { headers: auth(alice.token) })).body.data.by_member === undefined, 'no per-member rows on a workspace report');
+});
+
 finish();

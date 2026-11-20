@@ -12,6 +12,8 @@
  *   the counts; with `ws`, a member who may read that workspace reads that workspace's report.
  * @structure valueRouter · GET /v1/organisms/:id/value
  * @version-history
+ *   v1.3.0 — 2026-11-20 — `per_member` (the creators' setting) and, while it is on, `by_member` for the
+ *     organism's creators and admins (services/value/per-member.ts).
  *   v1.2.0 — 2026-11-20 — With `ws`, a member who may read that workspace reads its report.
  *   v1.1.0 — 2026-11-20 — `measures`: the organism's own measures the reader keeps
  *     (services/value/measures.ts), each counted only in a workspace the reader may read.
@@ -26,6 +28,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { memberRoleOf } from '../../services/workspace/ops-caller.js';
 import { readValueReport } from '../../services/value/report.js';
 import { readMeasures } from '../../services/value/measures.js';
+import { perMemberSetting, byMember } from '../../services/value/per-member.js';
 import { canReadWorkspace } from '../../services/access-guard.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 
@@ -76,7 +79,15 @@ export function valueRouter(config: AimeatConfig, storage: Storage): Router {
     const report = await readValueReport({ storage, config }, { kind: 'organism', orgId, ...(ws ? { wsId: ws } : {}) }, { from, to });
     // The organism's own measures as this reader keeps them, counted only where the reader may read.
     const measures = await readMeasures({ storage, config }, caller.ownerGhii, orgId, { from: report.from, to: report.to, ...(ws ? { wsId: ws } : {}) });
-    res.json(success(config.nodeId, { ...report, measures }, [
+    // Per member: only for the organism's creators and admins, organism-wide, and only while a creator
+    // has turned it on (services/value/per-member.ts); the members are told it is on.
+    const perMember = manager && !ws ? await perMemberSetting(storage, orgId) : null;
+    const members = perMember?.on ? await byMember(storage, config.nodeId, orgId, { from: report.from, to: report.to }) : undefined;
+    res.json(success(config.nodeId, {
+      ...report, measures,
+      ...(perMember ? { per_member: perMember } : {}),
+      ...(members ? { by_member: members } : {}),
+    }, [
       { description: 'Your own value report', method: 'GET', url: '/v1/usage/summary?report=value' },
     ]));
   });

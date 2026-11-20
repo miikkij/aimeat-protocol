@@ -11,6 +11,9 @@
  * @structure MeasuresPanel({ org })
  * @usage html`<${MeasuresPanel} org=${org} />`
  * @version-history
+ *   v1.1.0 — 2026-11-20 — "Per member": while a creator has turned it on, each active member's numbers
+ *     from the same report (`by_member`), and that the members are told; otherwise a line saying it is
+ *     off (wish-j-senkohtaiset-korjausluvut-tiimin-vet-j-lle-kun-luoja-kytke).
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, organism measures).
  */
 import { h } from 'preact';
@@ -26,6 +29,8 @@ import { Note } from '/components/Note.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { HelpTip } from '/components/HelpTip.js';
 import { Stack, Row as Line } from '/components/Layout.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { countItems } from '/views/profile/organisms/per-member-setting.js';
 
 const html = htm.bind(h);
 const x = (k, v) => t('organisms.measures.' + k, v);
@@ -47,11 +52,13 @@ function latestWords(m) {
 
 export function MeasuresPanel({ org }) {
   const [measures, setMeasures] = useState(null);
+  const [perMember, setPerMember] = useState(null);
   const [failed, setFailed] = useState(false);
   const load = useCallback(async () => {
     try {
       const r = await apiGet(`/v1/organisms/${encodeURIComponent(org.id)}/value`);
       setMeasures(r?.data?.measures ?? []);
+      setPerMember({ on: r?.data?.per_member?.on === true, rows: r?.data?.by_member ?? [] });
       setFailed(false);
     } catch (e) { swallowed('measures-panel: load', e); setFailed(true); }
   }, [org.id]);
@@ -79,5 +86,20 @@ export function MeasuresPanel({ org }) {
         <//>`}
       <${Note}>${x('window')}<//>
       <${PromptCard} label=${x('promptLabel')} prompt=${x('prompt', { name: org.name })} copyLabel=${x('copy')} />
+      ${perMember ? html`
+        <${SubHeading}>${t('organisms.perMember.title')}<//>
+        ${perMember.on ? html`
+          <${List} cols="name-desc-state-doors" head=${[t('organisms.perMember.colMember'), t('organisms.perMember.colCounts'), '', '']}
+            empty=${html`<${Note} kind="quiet">${t('organisms.perMember.none')}<//>`}>
+            ${perMember.rows.map((r) => html`
+              <${Row} key=${r.member}>
+                <${Name}>${String(r.member).split('@')[0]}<//>
+                <${Desc}>${countItems(r).map((c) => `${c.label} ${num(c.n)}`).join(' · ')}<//>
+                <${Cell} />
+                <${Doors} />
+              <//>`)}
+          <//>
+          <${Note}>${t('organisms.perMember.membersTold')}<//>`
+        : html`<${Note} kind="quiet">${t('organisms.perMember.off')}<//>`}` : null}
     <//>`;
 }

@@ -17,6 +17,7 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.15.0 -- 2026-11-20 -- "Who sees" has the check line that shows the value report per member to the creators and admins (per-member-setting.js), with its question mark organism.value_per_member; only a creator changes it.
  *   v1.14.0 -- 2026-11-12 -- "Who gets in" has the Access requests choice (access_requests, on or off) with its question mark, organism.access_requests. Sent only when changed.
  *   v1.13.1 -- 2026-11-10 -- Fresher org data replaces each untouched field on its own. It replaced the whole form or nothing, so with one field touched, an Agents setting changed elsewhere stayed at its old value and the save sent it back.
  *   v1.13.0 -- 2026-10-27 -- A refused save shows each field's message under the name, description or type field (Fields `errors`, js/field-errors.js); the name and description stop at the server's limits (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -73,6 +74,7 @@ import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.
 import { INPUT_LIMITS } from '/js/input-limits.js';
 import { refreshUntouched } from './form-baseline.js';
 import { OrganismRecords } from '/views/profile/organisms/compliance-records.js';
+import { PerMemberSetting } from '/views/profile/organisms/per-member-setting.js';
 
 const TYPE_PRESETS = ['community', 'team', 'club', 'cooperative', 'project'];
 const JOIN = ['open', 'approval_required', 'invite_only'];
@@ -292,6 +294,9 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
           <//>
           <${Space} above="large">
             <${ContainerLabel} kind="organism" organismId=${org.id} canSet=${canEdit} showToast=${showToast} />
+          <//>
+          <${Space} above="large">
+            <${PerMemberSetting} org=${org} isCreator=${isCreator} showToast=${showToast} />
           <//>
         <//>
 

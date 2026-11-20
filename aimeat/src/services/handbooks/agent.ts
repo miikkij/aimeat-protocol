@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.85.0 -- 2026-11-20 -- The organism's value report per member: off until a creator turns it on,
+ *     and every member is told (by_member, value_per_member).
  *   v1.84.0 -- 2026-11-20 -- Organism measures and directives: how an AI writes a measure, and how it
  *     shows a directive and saves the person's answer.
  *   v1.83.0 -- 2026-11-20 -- Report subscriptions: the reports.sub.<id> record shape, who may send what,
@@ -384,6 +386,11 @@ then write \`reports.measure.<organism id>.<id>\` the same way: { name, wsId, sp
 }]), per? (day | week | month), unit? }. GET /v1/organisms/:id/value then gives its number as \`measures\`,
 and a report with contents \`measures\` sends it. A measure is counted only where its keeper may read
 the workspace; one that cannot be counted says why in \`problem\`.
+The organism's value report is sums only until a creator turns on the report per member (the meta
+record \`organism.<id>.meta.valuereport\` { perMember: true }, or Settings, Who sees); then its creators
+and admins also get \`by_member\`, and every member gets \`value_per_member\` with the organism: that it
+is on, and their own numbers. Tell the person so when they ask about it. Numbers about one person's
+work are monitoring: before you turn it on for a workplace, ask whether the people concerned agreed.
 
 **A directive from an organism's creators.** When \`aimeat_organism_get\` or \`aimeat_workspace_read\` answers
 with \`organism_directive\` (not your own agent directives), the organism's creators ask every member's AI to do something about reporting. Show

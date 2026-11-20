@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-20 — aimeat_organism_get carries `value_per_member` for a member while the creators see the
+ *     value report per member (services/value/per-member.ts).
  *   2026-11-20 — aimeat_organism_get carries the organism's directive for a member and its answer
  *     counts for a creator or admin (services/organism/directives.ts).
  *   2026-11-15 — aimeat_organism_import takes preview, people and team (services/team/transfer.ts, T12).
@@ -152,6 +154,7 @@ import { resourceRefusal } from './resource-refusal.js';
 import { registerOrganismJoinRequestTools } from './organism-join-requests.js';
 import { registerTeamTools } from './teams.js';
 import { directiveFields } from '../services/organism/directives.js';
+import { perMemberFields } from '../services/value/per-member.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -351,6 +354,8 @@ export function registerOrganismsTools(
                         updated_at: organism.updatedAt,
                         // What the organism's creators ask a member's AI to do (services/organism/directives.ts).
                         ...await directiveFields({ storage, config }, getOwnerName(), organism.id),
+                        // Whether the creators see the value report per member, and your own numbers.
+                        ...await perMemberFields({ storage, config }, getOwnerName(), organism.id),
                     }, null, 2),
                 }],
             };

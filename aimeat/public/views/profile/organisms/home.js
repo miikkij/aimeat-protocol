@@ -13,6 +13,7 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.15.0 -- 2026-11-20 -- The Members section tells every member when the creators see the value report per member, with their own numbers (PerMemberNotice).
  *   v3.14.0 -- 2026-11-20 -- A folded section "Measures" for the creators and admins (measures-panel.js): the organism's own measures with their numbers, read when the section opens.
  *   v3.13.0 -- 2026-11-20 -- A folded section "Directive for members' AI" (directive-panel.js): the organism's directive, and for its creators the answers as counts and the sentence to make or change it. The folded sections with a detail line (06, 08, 09) take FoldSection's `wrap`: at 390 px the detail ran past the edge and was cut off.
  *   v3.12.0 -- 2026-11-14 -- A team's page opens with what waits for you, the team context and skill, and you in this team (team-sections.js, team setup T14, T15); the organism's sections follow, numbered on.
@@ -58,6 +59,7 @@ import { StructureOverview } from '/views/profile/organisms/widgets.js';
 import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
 import { DirectivePanel } from '/views/profile/organisms/directive-panel.js';
 import { MeasuresPanel } from '/views/profile/organisms/measures-panel.js';
+import { PerMemberNotice } from '/views/profile/organisms/per-member-setting.js';
 import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
 import { TimelinePanel, TimelineRecent, loadTimelineRows } from '/views/profile/organisms/timeline-panel.js';
 import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
@@ -89,6 +91,8 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const [openAi, setOpenAi] = useState(false);
   const [openDirective, setOpenDirective] = useState(false);
   const [openMeasures, setOpenMeasures] = useState(false);
+  // While the creators see the value report per member, every member is told so with their own numbers.
+  const [perMember, setPerMember] = useState(null);
   const [directive, setDirective] = useState({ directives: null, summary: null });
   const [fullTimeline, setFullTimeline] = useState(false);
   const [timeline, setTimeline] = useState(null);
@@ -125,6 +129,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       setReadme(full?.data?.readme || '');
       setYourMembership(full?.data?.your_membership ?? null);
       setDirective({ directives: full?.data?.organism_directive ?? null, summary: full?.data?.organism_directive_summary ?? null });
+      setPerMember(full?.data?.value_per_member ?? null);
       setTocSeed(toc || '');
       setTimeline(rows);
     };
@@ -250,6 +255,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       <//>
 
       <${Section} id="og-members" num=${num(2)} title=${tr('organisms.tabMembers', 'Members')} count=${memberCount}>
+        <${PerMemberNotice} info=${perMember} />
         <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
           showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="members" />
       <//>

@@ -51800,6 +51800,10 @@ paths:
         organism.{id}.meta.directive, written by a creator or admin); the AI shows it as written and
         acts only on the person's yes. A creator or admin also gets `organism_directive_summary`: the members'
         answers as counts, never by name, and `review_due` after 60 days with no answer.
+
+        Value per member: while a creator shows the organism's value report per member, an active
+        member gets `value_per_member` ({ on, set_at, from, to, yours }): that it is on, and their own
+        numbers for the last 30 days.
       tags: [Organisms]
       parameters:
         - name: id
@@ -52003,7 +52007,11 @@ paths:
         week and season of the results. Never per member or per agent. With ws, one workspace. The
         person's own report is GET /v1/usage/summary?report=value. Requires organism:read and the
         caller to be the organism's creator or an admin; a member is refused the organism-wide report
-        and reads one workspace's report (ws) when they may read that workspace. `measures` holds the
+        and reads one workspace's report (ws) when they may read that workspace. For the creators and
+        admins, organism-wide, `per_member` says whether a creator turned on the report per member
+        (the meta record organism.{id}.meta.valuereport { perMember: true }), and while it is on
+        `by_member` gives each active member's numbers; every member is told with GET
+        /v1/organisms/{id} (`value_per_member`). `measures` holds the
         organism's own measures the caller keeps as memory records under
         reports.measure.<organism>.<id> ({ name, wsId, space, op count|sum|avg|min|max|median, field?,
         where?, per? day|week|month, unit? }), each counted from the workspace's rows over the window,
