@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-20 — GET /v1/memory/:key records the open for the value signals (services/value/signal-buffer.ts).
  *   2026-11-09 — GET /v1/memory/:key with owner_scope or ?agent= shows a caller a same-owner record kept
  *     at organism:<id> when that organism admits it (ownerScopeViewAdmitting).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
@@ -78,6 +79,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  */
 
+import { recordValueRead } from '../../services/value/signal-buffer.js';
 import type { Router } from 'express';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../../services/memory/bin.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
@@ -227,6 +229,8 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     record = shown;
 
     stats?.increment('memory_reads');
+    // A reader other than the maker opened an AI-made record: a use (services/value/signal-buffer.ts).
+    recordValueRead({ ownerGaii: record.ownerGaii, key: record.key, readerPrincipal: resolve(req) });
 
     // TARGET-058: how this record's value was made, on the ONE envelope carrier plus the two
     // response headers. The read is already authorized above, so the caller may see the whole

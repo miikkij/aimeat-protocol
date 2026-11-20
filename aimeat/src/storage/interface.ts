@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   2026-11-20 — ValueRepository: what happened to the records an AI made, per record and per day
+ *     (types/value.ts).
  *   2026-11-15 — AppPartyRepository: an app's own users and what they keep in it, in their own tables
  *     (types/app-parties.ts).
  *   2026-11-14 — HelpRepository: Ask someone who knows, its participants, questions and routes
@@ -89,6 +91,7 @@ export * from './types/account-events.js';
 export * from './types/workspace-rows.js';
 export * from './types/sso.js';
 export * from './types/held-names.js';
+export * from './types/value.js';
 
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { BusWire } from './bus-wire.js';
@@ -97,6 +100,7 @@ import type { AgentRepository } from './repositories/agent.repository.js';
 import type { EcosystemAppRepository } from './repositories/ecosystem-app.repository.js';
 import type { MemoryRepository } from './repositories/memory.repository.js';
 import type { MemoryTallyRepository } from './repositories/memory-tally.repository.js';
+import type { ValueRepository } from './repositories/value.repository.js';
 import type { MemoryShapeRepository } from './repositories/memory-shape.repository.js';
 import type { ActionRepository } from './repositories/action.repository.js';
 import type { WorkRepository } from './repositories/work.repository.js';
@@ -175,7 +179,7 @@ import type { HelpRepository } from './repositories/help.repository.js';
 import type { AppPartyRepository } from './repositories/app-party.repository.js';
 
 export interface Storage extends
-  OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository, MemoryShapeRepository,
+  OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository, MemoryShapeRepository, ValueRepository,
   ActionRepository, WorkRepository, WalletRepository,
   BoardRepository, OtkRepository, DisputeRepository,
   FileRepository, IdentityRepository,

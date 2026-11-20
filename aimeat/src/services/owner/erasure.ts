@@ -23,9 +23,10 @@
  * @structure eraseOwner(storage, nodeId, name, config) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name, config);
  * @version-history
+ *   2026-11-20 — holdValueSignalsForErasure joins the write buffers held for the erasure.
  *   2026-11-20 — holdStandingUseForErasure: the buffer of acts an agent did without asking holds the
  *     account like the other write buffers (services/ai-standing/use.ts).
- *   2026-11-19 —Steps site_change_log, moderation and public_activity: the site change log named the
+ *   2026-11-19 — Steps site_change_log, moderation and public_activity: the site change log named the
  *     erased person by the bare account name on their app deletes, which the next holder of the name
  *     would read as theirs. It names the pseudonym the held app addresses take, which the erasure now
  *     draws once; flags on the person's content and their appeals go, their reviews name the
@@ -159,6 +160,7 @@ import { removeWithClassificationAudit, flushClassificationAudit } from '../clas
 import { holdConsentAuditForErasure } from '../consent/audit-buffer.js';
 import { holdUsageForErasure } from '../usage/usage-buffer.js';
 import { holdWriteTallyForErasure } from '../data-map/write-tally-buffer.js';
+import { holdValueSignalsForErasure } from '../value/signal-buffer.js';
 import { holdScopeUseForErasure } from '../scope/use.js';
 import { holdStandingUseForErasure } from '../ai-standing/use.js';
 import { holdAgentRefusalsForErasure } from '../agent/refusals.js';
@@ -654,6 +656,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string,
     releases.push(await holdConsentAuditForErasure(account));
     releases.push(await holdUsageForErasure(account));
     releases.push(await holdWriteTallyForErasure(account));
+    releases.push(await holdValueSignalsForErasure(account));
     releases.push(await holdScopeUseForErasure(account));
     releases.push(await holdStandingUseForErasure(account));
     releases.push(await holdAgentRefusalsForErasure(account));

@@ -18,9 +18,10 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-11-20 — initValueSignals / shutdownValueSignals: the value signals buffer (services/value/signal-buffer.ts).
  *   2026-11-20 — initStandingUse and its shutdown flush: the owner's feed line when an agent acts
  *     without asking (services/ai-standing/use.ts).
- *   2026-11-19 —startNodeTotalsLive: the watcher that emits `node-totals` when a public counter moves,
+ *   2026-11-19 — startNodeTotalsLive: the watcher that emits `node-totals` when a public counter moves,
  *     stopped at shutdown (feature audit 2026-11-19, 4.6).
  *   2026-11-15 — configureSiem: security events to the organisation's monitoring (team setup T10).
  *   2026-11-04 — The running AI job service is read from nodeContext() (services/node-context.ts) in place of
@@ -64,6 +65,7 @@ import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { bindUsageSettings } from '../services/usage/usage-settings.js';
 import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js';
+import { initValueSignals } from '../services/value/signal-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent/audit-buffer.js';
 import { initClassificationAudit } from '../services/classification/audit.js';
 import { initAgentRefusals } from '../services/agent/refusals.js';
@@ -106,6 +108,9 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // The write tally starts collecting here. It fills only from now on: the writer was never
   // recorded before this, so there is no history to seed it from.
   initWriteTallyBuffer(storage, config.tallyBufferMs);
+  // The value signals ride the same touches: what happened to the records an AI made
+  // (services/value/signal-buffer.ts). Same flush interval as the tally.
+  initValueSignals(storage, config.tallyBufferMs);
   // Which permissions each `*` agent uses, for the narrowing its owner is offered and for when `*`
   // starts to hold its tasks (services/scope/use.ts). Like the tally, it fills only from now on.
   initScopeUse(storage);
@@ -172,6 +177,8 @@ export async function flushProcessBuffers(): Promise<void> {
   await shutdownStandingUse();
   const { shutdownWriteTallyBuffer } = await import('../services/data-map/write-tally-buffer.js');
   await shutdownWriteTallyBuffer();
+  const { shutdownValueSignals } = await import('../services/value/signal-buffer.js');
+  await shutdownValueSignals();
   const { shutdownConsentAuditBuffer } = await import('../services/consent/audit-buffer.js');
   await shutdownConsentAuditBuffer();
   const { shutdownClassificationAudit } = await import('../services/classification/audit.js');

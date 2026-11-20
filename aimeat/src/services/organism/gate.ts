@@ -11,6 +11,8 @@
  * @structure createOrganismGate(config, storage) · OrganismGate · BatchPublishItemResult
  * @usage const H = createOrganismGate(config, storage); await H.writeDecision(organismId, by, summary, refs);
  * @version-history
+ *   2026-11-20 — The published value's size goes to recordMemoryTouch, so the value signals tell a publish
+ *     of a draft as it was from a correction (services/value/signal-buffer.ts).
  *   2026-11-08 — publishDraft and publishDraftsBatch keep the holder's `status` when a publisher of
  *     another account publishes over a living-document config (services/living/config-publish.ts): a
  *     member's republish resumed a paused document or revived a retired one (secaudit2026nov08b round 15,
@@ -134,6 +136,7 @@ import type { ResolvedShare } from '../../routes/organisms/share-types.js';
 import { readShareMetaOf, redactShareOf, memberRoleOf } from '../workspace/share.js';
 import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from '../html-page.js';
 import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
+import { valueBytes } from '../value/signal-buffer.js';
 import { holderLivingStatus } from '../living/config-publish.js';
 
 export type OrganismGate = ReturnType<typeof createOrganismGate>;
@@ -324,7 +327,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
     await collapseKeyTo(storage, `${base}.latest`, latestOwner);
     // Who wrote it, as every memory write door records: the publisher, which may be a member of
     // another account writing over the holder's record (the living pulse reads this; secaudit2026nov02d).
-    recordMemoryTouch({ ownerGaii: latestOwner, key: `${base}.latest`, writerPrincipal: publisher, kind: 'write' });
+    recordMemoryTouch({ ownerGaii: latestOwner, key: `${base}.latest`, writerPrincipal: publisher, kind: 'write', bytes: valueBytes(draftValue) });
     // Memory Contracts (reactive): publishing a watched record fires Tracked Response evaluation
     // (gated O(1) on the track-registry in the subscriber).
     emitMemoryWritten(latestOwner, `${base}.latest`);
@@ -526,7 +529,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
     // ...and schedule write-time classification of each (TARGET-082 V3), never awaited.
     for (const e of toEmit) {
-      recordMemoryTouch({ ownerGaii: e.owner, key: e.key, writerPrincipal: publisher, kind: 'write' });
+      recordMemoryTouch({ ownerGaii: e.owner, key: e.key, writerPrincipal: publisher, kind: 'write', bytes: valueBytes(e.value) });
       emitMemoryWritten(e.owner, e.key);
       classifyAfterWrite({ storage, config }, e.owner, e.key, e.value);
     }

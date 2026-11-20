@@ -15,6 +15,7 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   2026-11-20 — valueMethods bound (ValueKey, ValueDaily; migration 0135).
  *   2026-11-15 — appPartyMethods bound (AppParty, AppPartyData; migration 0132).
  *   2026-11-14 — helpMethods bound (HelpParticipant, HelpQuestion, HelpRoute; migration 0131).
  *   2026-11-14 — secretShareMethods bound (SecretShare, SecretShareEvent, SecretShareMember,
@@ -105,6 +106,7 @@ import { usageMethods } from './methods/usage.js';
 import { accountEventMethods } from './methods/account-events.js';
 import { workspaceRowMethods } from './methods/workspace-rows.js';
 import { memoryTallyMethods } from './methods/memory-tally.js';
+import { valueMethods } from './methods/value.js';
 import { memoryShapeMethods } from './methods/memory-shape.js';
 import { ssoConnectionMethods } from './methods/sso-connections.js';
 import { capabilityMethods } from './methods/capabilities.js';
@@ -333,6 +335,7 @@ Object.assign(
   accountEventMethods,
   workspaceRowMethods,
   memoryTallyMethods,
+  valueMethods,
   memoryShapeMethods,
   ssoConnectionMethods,
   capabilityMethods,

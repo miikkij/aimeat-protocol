@@ -30,6 +30,7 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-20 — readWorkspaceOp records each record it opens by id for the value signals (services/value/signal-buffer.ts).
  *   2026-11-13 — readWorkspaceOp takes `archived` ('only' reads the archived content alone), as
  *     GET /v1/organisms/:id/workspace does (structure programme 2026-11, unit 3b).
  *   2026-11-10 — writeWorkspaceDraftsOp passes the organism rule's refusal through (status, code,
@@ -135,6 +136,7 @@
  *     compare-and-swap services/workspace-write.ts already offered) and `_draftVersion` on an
  *     opened record, which is what a script needs to swap against.
  */
+import { recordValueRead } from '../value/signal-buffer.js';
 import type { Storage, MemoryRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { canWriteNamespaceRule, readOrganismConfig, fresherRec } from '../organism/record-helpers.js';
 import { createOrganismGate, type BatchPublishItemResult } from '../organism/gate.js';
@@ -307,6 +309,8 @@ export async function readWorkspaceOp(
             const draft = wholeOf(hit?.slot.draft);
             const cur = latest ?? draft;
             if (!hit || !cur) { missing.push(asked); continue; }
+            // A reader other than the maker opened an AI-made record: a use (services/value/signal-buffer.ts).
+            recordValueRead({ ownerGaii: cur.ownerGaii, key: cur.key, readerPrincipal: caller.principal });
             found.push({
                 space: hit.name, id: hit.id, value: cur.value,
                 published: !!latest, _version: cur.version, _createdAt: cur.createdAt, _updatedAt: cur.updatedAt,

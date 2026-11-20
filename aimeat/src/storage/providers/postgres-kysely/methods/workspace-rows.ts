@@ -17,6 +17,7 @@
  *   deleteWorkspaceRowsOf (a deleted workspace's or organism's rows and revisions)
  * @usage Object.assign(PostgresKyselyStorage.prototype, workspaceRowMethods) in ../index.ts
  * @version-history
+ *   2026-11-20 — aggregateWorkspaceRows: an organism's own measure over the rows (value signals, phase 1).
  *   v1.3.0 — 2026-11-11 — deleteWorkspaceRowsOf (the workspace delete route and the organism delete).
  *   v1.2.0 — 2026-10-22 — updatedBy (migration 0113), getWorkspaceRowsByIds, and the row revisions:
  *     a row's earlier content kept when another writer family replaced it (secaudit 2026-10, v80).
@@ -35,6 +36,41 @@ import type {
 } from '../../../interface.js';
 import { encodeRowCursor, decodeRowCursor } from '../../../workspace-row-cursor.js';
 import type { PostgresKyselyStorage } from '../index.js';
+import {
+  WORKSPACE_ROW_FIELD, WORKSPACE_ROW_MEDIAN_CAP,
+  type WorkspaceRowAggregateQuery, type WorkspaceRowAggregate,
+} from '../../../types/workspace-rows.js';
+
+/** The SQL that reads a field as text: an index column by name, a body path by #>> and a parameter. */
+function fieldText(field: string) {
+  if (!WORKSPACE_ROW_FIELD.test(field)) throw new Error(`INVALID_FIELD: ${field}`);
+  if (/^k[123]$/.test(field)) return sql.ref(field);
+  return sql`("body" #>> ${field.split('.')}::text[])`;
+}
+
+/** The SQL that reads a field as a number, or NULL when it is not a number. */
+function fieldNumber(field: string) {
+  if (!WORKSPACE_ROW_FIELD.test(field)) throw new Error(`INVALID_FIELD: ${field}`);
+  if (/^k[123]$/.test(field)) {
+    return sql`CASE WHEN ${sql.ref(field)} ~ '^-?[0-9]+([.][0-9]+)?$' THEN ${sql.ref(field)}::double precision END`;
+  }
+  const path = field.split('.');
+  return sql`CASE WHEN jsonb_typeof("body" #> ${path}::text[]) = 'number' THEN ("body" #>> ${path}::text[])::double precision END`;
+}
+
+function periodSql(period: WorkspaceRowAggregateQuery['period']) {
+  if (period === 'day') return sql`substr("occurredAt", 1, 10)`;
+  if (period === 'month') return sql`substr("occurredAt", 1, 7)`;
+  if (period === 'week') return sql`to_char(date_trunc('week', substr("occurredAt", 1, 10)::date), 'YYYY-MM-DD')`;
+  return sql`NULL::text`;
+}
+
+/** The median of sorted numbers; the mean of the two middle ones for an even count. */
+function medianOf(sorted: number[]): number | null {
+  if (sorted.length === 0) return null;
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
 
 function toRow(r: Record<string, unknown>): WorkspaceRowRecord {
   const body = r.body && typeof r.body === 'object' && !Array.isArray(r.body)
@@ -204,6 +240,45 @@ export const workspaceRowMethods = {
       await this.db.deleteFrom('WorkspaceRow').where('id', 'in', ids).execute();
       return ids.length;
     });
+  },
+
+  async aggregateWorkspaceRows(this: PostgresKyselyStorage, q: WorkspaceRowAggregateQuery): Promise<WorkspaceRowAggregate[]> {
+    const conds = [sql`"organismId" = ${q.organismId}`, sql`"wsId" = ${q.wsId}`, sql`"namespace" = ${q.namespace}`];
+    for (const c of q.where ?? []) conds.push(sql`${fieldText(c.field)} = ${String(c.value)}`);
+    if (q.from) conds.push(sql`"occurredAt" >= ${q.from}`);
+    if (q.to) conds.push(sql`"occurredAt" <= ${q.to}`);
+    const where = sql.join(conds, sql` AND `);
+    const period = periodSql(q.period);
+    const grouped = !!q.period;
+    if (q.op === 'count') {
+      const res = await sql<{ period: string | null; rows: string }>`
+        SELECT ${period} AS "period", COUNT(*)::bigint AS "rows" FROM "WorkspaceRow" WHERE ${where}
+        ${grouped ? sql`GROUP BY 1 ORDER BY 1` : sql``}`.execute(this.db);
+      return res.rows.map(r => ({ period: r.period ?? null, value: Number(r.rows), rows: Number(r.rows) }));
+    }
+    if (!q.field) throw new Error('INVALID_FIELD: this measure needs a field');
+    const num = fieldNumber(q.field);
+    if (q.op === 'median') {
+      const res = await sql<{ period: string | null; v: number | null }>`
+        SELECT ${period} AS "period", ${num} AS "v" FROM "WorkspaceRow" WHERE ${where} LIMIT ${WORKSPACE_ROW_MEDIAN_CAP + 1}`.execute(this.db);
+      if (res.rows.length > WORKSPACE_ROW_MEDIAN_CAP) throw new Error(`TOO_MANY_ROWS: a median reads at most ${WORKSPACE_ROW_MEDIAN_CAP} rows`);
+      const groups = new Map<string | null, { values: number[]; rows: number }>();
+      for (const r of res.rows) {
+        const key = r.period ?? null;
+        const g = groups.get(key) ?? { values: [], rows: 0 };
+        g.rows += 1;
+        if (r.v !== null && r.v !== undefined) g.values.push(Number(r.v));
+        groups.set(key, g);
+      }
+      return [...groups.entries()]
+        .sort((a, b) => String(a[0] ?? '').localeCompare(String(b[0] ?? '')))
+        .map(([p, g]) => ({ period: p, value: medianOf(g.values.sort((x, y) => x - y)), rows: g.rows }));
+    }
+    const fn = { sum: sql`SUM`, avg: sql`AVG`, min: sql`MIN`, max: sql`MAX` }[q.op];
+    const res = await sql<{ period: string | null; v: string | number | null; rows: string }>`
+      SELECT ${period} AS "period", ${fn}(${num}) AS "v", COUNT(*)::bigint AS "rows" FROM "WorkspaceRow" WHERE ${where}
+      ${grouped ? sql`GROUP BY 1 ORDER BY 1` : sql``}`.execute(this.db);
+    return res.rows.map(r => ({ period: r.period ?? null, value: r.v === null || r.v === undefined ? null : Number(r.v), rows: Number(r.rows) }));
   },
 
   async workspaceRowStats(

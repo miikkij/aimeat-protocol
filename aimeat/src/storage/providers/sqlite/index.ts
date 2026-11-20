@@ -15,6 +15,7 @@
  *   held by `pnpm check:storage-file-parity`.
  * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
  * @version-history
+ *   2026-11-20 — valueMethods bound (value_keys, value_daily; schema-value.ts).
  *   2026-11-15 — appPartyMethods bound (app_parties, app_party_data; schema-app-parties.ts).
  *   2026-11-14 — helpMethods bound (help_participants, help_questions, help_routes; schema-help.ts).
  *   2026-11-14 — secretShareMethods bound (secret_shares, secret_share_events, secret_share_members,
@@ -114,6 +115,7 @@ import { knowledgeMethods } from './methods/knowledge.js';
 import { mcpServerMethods } from './methods/mcp-servers.js';
 import { memoryMethods } from './methods/memory.js';
 import { memoryTallyMethods } from './methods/memory-tally.js';
+import { valueMethods } from './methods/value.js';
 import { memoryShapeMethods } from './methods/memory-shape.js';
 import { moderationMethods } from './methods/moderation.js';
 import { nodeExtEscrowMethods } from './methods/node-ext-escrow.js';
@@ -333,6 +335,7 @@ Object.assign(
   mcpServerMethods,
   memoryMethods,
   memoryTallyMethods,
+  valueMethods,
   memoryShapeMethods,
   moderationMethods,
   nodeExtEscrowMethods,

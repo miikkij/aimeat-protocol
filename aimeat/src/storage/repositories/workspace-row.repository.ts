@@ -21,12 +21,14 @@
  *   - deleteWorkspaceRowsBefore(...)          -- retention by age
  *   - trimWorkspaceRows(...)                  -- retention by count
  *   - workspaceRowStats(...)                  -- count/bytes/span without reading rows
+ *   - aggregateWorkspaceRows(query)           -- an organism's own measure over the rows
  *   - workspaceRowUsage(scope)                -- what the quota gate reads
  *   - getWorkspaceRowsByIds(...)              -- the rows an append is about to replace
  *   - *WorkspaceRowRevision(s)                -- earlier contents kept on a cross-writer replacement
  *   - deleteWorkspaceRowsOf(org, ws?)         -- a deleted workspace's or organism's rows and revisions
  * @usage import type { WorkspaceRowRepository } from './repositories/workspace-row.repository.js';
  * @version-history
+ *   v1.4.0 — 2026-11-20 — aggregateWorkspaceRows: an organism's own measure over the rows (value signals, phase 1).
  *   v1.3.0 — 2026-11-11 — deleteWorkspaceRowsOf: a workspace delete removes its rows and revisions,
  *     which no route could reach once the manifest was gone (incident 2026-10-23).
  *   v1.2.0 — 2026-10-22 — getWorkspaceRowsByIds and the revision methods: a replacement by another
@@ -39,6 +41,8 @@ import type {
   WorkspaceRowFilter,
   WorkspaceRowPage,
   WorkspaceRowStats,
+  WorkspaceRowAggregateQuery,
+  WorkspaceRowAggregate,
   WorkspaceRowUsage,
   WorkspaceRowScope,
   WorkspaceRowRevision,
@@ -82,6 +86,13 @@ export interface WorkspaceRowRepository {
   workspaceRowStats(
     organismId: string, wsId: string, namespace?: string,
   ): Promise<WorkspaceRowStats[]>;
+
+  /**
+   * A count, sum, average, minimum, maximum or median over a row space's rows, filtered by field
+   * values and a time span, optionally one answer per day, week or month (an organism's own measure,
+   * services/value/row-measure.ts). A median past WORKSPACE_ROW_MEDIAN_CAP numbers throws.
+   */
+  aggregateWorkspaceRows(query: WorkspaceRowAggregateQuery): Promise<WorkspaceRowAggregate[]>;
 
   /** Rows and bytes for a scope. The quota gate's only read. */
   workspaceRowUsage(scope: WorkspaceRowScope): Promise<WorkspaceRowUsage>;

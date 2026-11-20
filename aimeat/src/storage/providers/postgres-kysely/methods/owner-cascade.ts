@@ -36,6 +36,8 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   2026-11-20 — deleteOwnerCascade pseudonymises the person's agents as the maker in the value
+ *     signals of other people's records (methods/value.ts).
  *   2026-11-08 — deleteOwnerCascade keeps the person's schema locks in force under the erasure's
  *     pseudonym (schema-lock-erasure.ts; secaudit2026nov08 round 14).
  *   v1.18.0 — 2026-10-14 — deleteOwnerCascade runs the 28 identity columns left undecided through
@@ -100,6 +102,7 @@
 import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
 import { pseudonymiseTallyWriterDb } from './memory-tally.js';
+import { pseudonymiseValueProducerDb } from './value.js';
 import { erasedPartyPseudonym, partyIdentities, erasedAccountParty } from '../../../erased-party.js';
 import { pseudonymiseLedgerPartyDb, settleErasedPartyWorkDb } from './work-ledger-erasure.js';
 import { eraseAccountRecordsDb } from './account-records-erasure.js';
@@ -243,6 +246,9 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // their "four hands" into three. Runs before the GHII rows go, because the node id comes from one.
   const nodeId = ghiis[0]?.ghii.split('@')[1] ?? '';
   if (nodeId) await pseudonymiseTallyWriterDb(db, name, nodeId);
+  // The same for the value signals: an agent of this person as the maker of another person's record.
+  // Those counts are the other person's record (methods/value.ts).
+  for (const g of ghiis) await pseudonymiseValueProducerDb(db, g.ghii, pseudonym);
 
   // The purchase receipts this person is a party to stay, because each one is also the other side's
   // book entry. The name leaves them: it is released for reuse, and every purchase read keys on it.

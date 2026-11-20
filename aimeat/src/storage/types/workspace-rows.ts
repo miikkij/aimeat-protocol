@@ -42,6 +42,7 @@
  *   - WorkspaceRowRevision -- an earlier content of a row, kept when another writer family replaced it
  * @usage import type { WorkspaceRowRecord } from '../storage/interface.js';
  * @version-history
+ *   v1.2.0 — 2026-11-20 — WorkspaceRowAggregateQuery and WorkspaceRowAggregate: an organism's own measure.
  *   v1.1.1 — 2026-10-27 — The comment on WorkspaceRowRevision.id says the row label is addressed by
  *     rowId, as every label writer and reader does since secaudit2026oct26.
  *   v1.1.0 — 2026-10-22 — `updatedBy` on a row, and WorkspaceRowRevision: a replacement by another
@@ -177,6 +178,41 @@ export interface WorkspaceRowStats {
   /** Newest `createdAt` — when anything last landed here. */
   lastWriteAt: string | null;
 }
+
+/**
+ * A measure over a row space's rows: an organism's own measure (services/value/row-measure.ts). A
+ * field is a dotted path into the row's body (at most four segments of letters, digits and `_`), or
+ * one of the declared index columns k1..k3.
+ */
+export interface WorkspaceRowAggregateQuery {
+  organismId: string;
+  wsId: string;
+  namespace: string;
+  /** Rows whose field equals the value, compared as text. All conditions must hold. */
+  where?: Array<{ field: string; value: string | number }>;
+  /** Inclusive bounds on `occurredAt` (ISO). */
+  from?: string;
+  to?: string;
+  op: 'count' | 'sum' | 'avg' | 'min' | 'max' | 'median';
+  /** The numeric field the op reads; not used by count. A row whose field is not a number is skipped. */
+  field?: string;
+  /** One answer per period of `occurredAt`, or one answer for all. */
+  period?: 'day' | 'week' | 'month';
+}
+
+/** One period's answer. `rows` counts the rows that matched; `value` is null when no number was there. */
+export interface WorkspaceRowAggregate {
+  /** YYYY-MM-DD (the day, or the week's Monday) or YYYY-MM; null without a period. */
+  period: string | null;
+  value: number | null;
+  rows: number;
+}
+
+/** A median reads its numbers; past this many in one answer it is refused rather than slow. */
+export const WORKSPACE_ROW_MEDIAN_CAP = 200_000;
+
+/** The field paths a measure may name: a declared index column, or a dotted path into the body. */
+export const WORKSPACE_ROW_FIELD = /^(k[123]|[A-Za-z_][A-Za-z0-9_]{0,63}(\.[A-Za-z_][A-Za-z0-9_]{0,63}){0,3})$/;
 
 /** The two numbers a quota check needs, for whatever scope it asked about. */
 export interface WorkspaceRowUsage {

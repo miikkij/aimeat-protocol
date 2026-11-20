@@ -37,6 +37,7 @@
  *   const prev = await findWorkspaceRecord(storage, key);
  *   await writeWorkspaceRecord({ storage, config }, { key, value, owner: ownerGhii, prev });
  * @version-history
+ *   2026-11-20 — afterMemoryWrite gets the value's size, for the value signals (services/value/signal-buffer.ts).
  *   2026-11-04 — requireCas() deleted: setMemoryIfVersion and createMemoryIfAbsent are required on
  *     Storage, so the guarded write calls them directly (codebase analysis 2026-11-03, item D-e).
  *   v1.4.0 — 2026-11-03 — deleteWorkspaceInstance also removes the document's shared fingerprint
@@ -53,6 +54,7 @@
  *     delete move out of src/mcp/workspaces.ts; the fan-out every other write surface runs
  *     (afterMemoryWrite) comes with them, so an agent's workspace write stops being silent.
  */
+import { valueBytes } from '../value/signal-buffer.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { fresherRec, collapseKeyTo } from '../organism/record-helpers.js';
@@ -186,7 +188,9 @@ export async function writeWorkspaceRecord(
     emitChange('memory');
     // Write-time classification (TARGET-082 V3): scheduled, never awaited, nothing while it is off.
     classifyAfterWrite(deps, input.owner, input.key, input.value);
-    await afterMemoryWrite(deps, input.owner, input.key, !!prev, input.principal);
+    // The value's size, so the value signals tell a correction from a publish as it was
+    // (services/value/signal-buffer.ts).
+    await afterMemoryWrite(deps, input.owner, input.key, !!prev, input.principal, undefined, { bytes: valueBytes(input.value) });
     return { written: true, version: record.version };
 }
 

@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-20 — afterMemoryWrite takes the value's size and declared provenance level and hands them
+ *     to recordMemoryTouch, for the value signals (services/value/signal-buffer.ts).
  *   2026-11-13 — misdirectedCrewKey and crewSitesWriteRefusal come from crews/def-envelope.ts, not from
  *     crew-def-store.ts, which publishes through this file (structure programme 2026-11, unit 4).
  *   2026-11-13 — memoryContentBytes and isAnonymousGaii are imported from utils/, where they live, and
@@ -148,6 +150,7 @@
  *     door instead of writing to storage itself.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B: shared service, gate inside).
  */
+import { valueBytes } from '../value/signal-buffer.js';
 import type { MemoryRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { validateMemoryWrite } from '../schema-validator.js';
 import { writerAudienceAuth } from '../csm/readers.js';
@@ -570,7 +573,12 @@ export async function writeMemoryRecord(
     //    runs here rather than in each caller's tail — which is where it used to live, on one door
     //    only. A caller that cannot offer an optional piece (a node with no peers has no replication
     //    queue; a tool call has no HTTP response) simply omits it, and the rest still happens.
-    const after = await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, tallyWriterOf(caller, config.nodeId, caller.app), input.noTriggers);
+    const after = await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, tallyWriterOf(caller, config.nodeId, caller.app), input.noTriggers, {
+        // The value signals (services/value/signal-buffer.ts) tell a correction's size from these
+        // bytes, and a refinement from the declared level.
+        bytes: valueBytes(input.value),
+        level: input.declaredProvenance?.level,
+    });
 
     const warnings: MemoryWriteWarning[] = [];
     if (shadowedBy) warnings.push(shadowWarning(input.key, caller.targetGaii, shadowedBy));
@@ -639,12 +647,15 @@ export async function afterMemoryWrite(
      */
     writerPrincipal?: string,
     noTriggers?: boolean,
+    /** The value's size and declared provenance level, for the value signals. Optional: a caller
+     *  that does not know them still records the write. */
+    written?: { bytes?: number; level?: string },
 ): Promise<AfterMemoryWriteReport> {
     const { storage, config } = deps;
 
     // Who has had their hands on this key. Synchronous, unawaited by contract, and the first sighting
     // of a (key, principal) pair is written straight through — see write-tally-buffer.ts.
-    if (writerPrincipal) recordMemoryTouch({ ownerGaii: gaii, key, writerPrincipal, kind: 'write' });
+    if (writerPrincipal) recordMemoryTouch({ ownerGaii: gaii, key, writerPrincipal, kind: 'write', ...written });
 
     // Event-driven replication: the scheduled sync would pick the record up later, so a failure
     // here costs latency rather than the record.

@@ -7,6 +7,7 @@
  * @structure workspaceRowMethods
  * @usage Object.assign(SqliteStorage.prototype, workspaceRowMethods) in ../index.ts
  * @version-history
+ *   2026-11-20 — aggregateWorkspaceRows (repos/workspace-row-aggregate.ts): an organism's own measure.
  *   v1.3.0 — 2026-11-11 — deleteWorkspaceRowsOf (the workspace delete route and the organism delete).
  *   v1.2.0 — 2026-10-22 — getWorkspaceRowsByIds and the row revision methods (secaudit 2026-10, v80).
  *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its unit test.
@@ -24,8 +25,13 @@ import type {
 } from '../../../interface.js';
 import * as repo from '../repos/workspace-rows.js';
 import * as revisionRepo from '../repos/workspace-row-revisions.js';
+import { aggregateRows } from '../repos/workspace-row-aggregate.js';
+import type { WorkspaceRowAggregateQuery, WorkspaceRowAggregate } from '../../../types/workspace-rows.js';
 
 export const workspaceRowMethods = {
+  async aggregateWorkspaceRows(this: SqliteStorage, query: WorkspaceRowAggregateQuery): Promise<WorkspaceRowAggregate[]> {
+    return aggregateRows(this.db, query);
+  },
   async appendWorkspaceRows(this: SqliteStorage, rows: WorkspaceRowRecord[]): Promise<void> {
     return repo.appendWorkspaceRows(this.db, rows);
   },

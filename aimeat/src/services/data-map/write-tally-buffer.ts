@@ -30,6 +30,9 @@
  *   import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
  *   recordMemoryTouch({ ownerGaii, key, writerPrincipal, kind: 'write' });
  * @version-history
+ *   v1.3.0 — 2026-11-20 — recordMemoryTouch hands each touch to the value signals too
+ *     (services/value/signal-buffer.ts), with the value's size and declared level when the endpoint
+ *     knows them, so every endpoint this counts is counted there.
  *   v1.2.0 — 2026-11-14 — holdWriteTallyForErasure: before the erasure cascade, the account's waiting
  *     counts are dropped, the writes in progress answer, and its touches of other accounts' keys are
  *     written so the cascade gives them the erasure's pseudonym; no touch of the account is kept until
@@ -44,6 +47,7 @@ import type { Storage } from '../../storage/interface.js';
 import { classifyKey } from '../../utils/key-family.js';
 import { logger } from '../../utils/logger.js';
 import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
+import { recordValueWrite, recordValueDelete } from '../value/signal-buffer.js';
 
 /**
  * Flush cadence when the caller names none. The counts are at most this stale; the first sighting of
@@ -110,9 +114,17 @@ export function recordMemoryTouch(t: {
   writerPrincipal: string;
   kind: 'write' | 'delete';
   at?: string;
+  /** The value's size after a write, when the endpoint knows it (the value signals' correction size). */
+  bytes?: number;
+  /** The provenance level the writer declared, when the endpoint knows it. */
+  level?: string;
 }): void {
   try {
     if (!t.ownerGaii || !t.key || !t.writerPrincipal) return;
+    // The value signals read the same touches: what happened to a record an AI made
+    // (services/value/signal-buffer.ts). Synchronous, like this function.
+    if (t.kind === 'write') recordValueWrite({ ownerGaii: t.ownerGaii, key: t.key, writerPrincipal: t.writerPrincipal, at: t.at, bytes: t.bytes, level: t.level });
+    else recordValueDelete({ ownerGaii: t.ownerGaii, key: t.key, principal: t.writerPrincipal, at: t.at });
     // A touch by or of an account being erased: the cascade deletes the account's counts and renames
     // it where it touched another account's key, so neither is started again.
     if (erasing.covers(t.ownerGaii) || erasing.covers(t.writerPrincipal)) return;

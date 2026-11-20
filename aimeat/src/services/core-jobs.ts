@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-20 — value-fold: the value signals' old day counts become week counts (services/value/fold.ts).
  *   2026-11-19 — kyc-lists and kyc-daily: customer due diligence (services/kyc/jobs.ts).
  *   2026-11-16 — The notice of a timed-out dispute that waits for a ruling opens that dispute on the admin Work page.
  *   2026-11-14 — team-weekly: the team's week to its leads (services/team/weekly-report.ts).
@@ -199,6 +200,11 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('team-weekly', async () => {
     const { runTeamWeeklyReports } = await import('./team/weekly-report.js');
     await runTeamWeeklyReports(storage, config);
+  });
+  // The value signals' day counts past their window become week counts (services/value/fold.ts).
+  scheduler.registerCoreHandler('value-fold', async () => {
+    const { runValueFold } = await import('./value/fold.js');
+    await runValueFold(storage);
   });
 
   // The operator's monthly compliance report, built from the month that ended and stored under

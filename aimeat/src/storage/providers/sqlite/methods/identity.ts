@@ -11,6 +11,8 @@
  *   v1.12.0 — 2026-11-19 — countAgents: the total and the recently seen agents in one aggregate query.
  *   2026-11-08 — deleteOwner keeps the person's schema locks in force under the erasure's pseudonym
  *     (repos/schema-lock-erasure.ts; secaudit2026nov08 round 14).
+ *   v1.12.0 — 2026-11-20 — deleteOwner pseudonymises the person's agents as the maker in the value
+ *     signals of other people's records (repos/value.ts).
  *   v1.11.0 — 2026-11-19 — taskStartAppWaits on create, update and read, 1 or NULL (migration 0134).
  *   v1.10.0 — 2026-11-02 — listOperatorNames: the active operator accounts' names, one filtered query with a limit.
  *   v1.9.0 — 2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
@@ -38,6 +40,7 @@
 import type { OwnerRecord, AgentRecord, GHIIRecord, GHIIPatch, GrantsToIdentityCleared } from '../../../interface.js';
 import { sameScopeList, floorListOf } from '../../../scope-list.js';
 import { pseudonymiseWriter } from '../repos/memory-tally.js';
+import { pseudonymiseProducer as pseudonymiseValueProducer } from '../repos/value.js';
 import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
 import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
 import { eraseAccountRecords } from '../repos/account-records-erasure.js';
@@ -204,6 +207,9 @@ export const identityMethods = {
       // still readable.
       const tallyNodeId = ghiiRows[0]?.ghii.split('@')[1] ?? '';
       if (tallyNodeId) pseudonymiseWriter(this.db, name, tallyNodeId);
+      // The same for the value signals: an agent of this person as the maker of another person's
+      // record. Those counts are the other person's record (repos/value.ts).
+      for (const r of ghiiRows) pseudonymiseValueProducer(this.db, r.ghii, pseudonym);
 
       // The purchase receipts this person is a party to stay, because each one is also the other
       // side's book entry. The name leaves them: it is released for reuse, and every purchase read

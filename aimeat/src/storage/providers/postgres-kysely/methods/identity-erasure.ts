@@ -17,6 +17,7 @@
  *     rows issued in the account name
  * @usage import { cascadeDeleteIdentityData } from './identity-erasure.js';
  * @version-history
+ *   2026-11-20 — ValueKey and ValueDaily join the per-identity cascade (value signals, migration 0135).
  *   2026-11-04 — MemoryTotals joins the per-identity cascade, after Memory (codebase analysis 2026-11-03, item C3).
  *   v1.6.0 — 2026-10-29 — deleteInstalledCortexesDb writes each bare cortex name it deletes down as freed
  *     (`freed:<pseudonym>`): free for the next install, and the apps that loaded it ask their owner first
@@ -66,6 +67,11 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   // cascade (owner-cascade.ts deleteOwnerCascade) calls directly.
   await db.deleteFrom('MemoryWriteTally').where('ownerGaii', '=', gaii).execute();
   await db.deleteFrom('MemoryFamilyTally').where('ownerGaii', '=', gaii).execute();
+  // The value signals of this namespace's records and this person's daily counts. Rows where an agent
+  // of theirs made another person's record are pseudonymised by the owner cascade instead
+  // (methods/value.ts pseudonymiseValueProducerDb), the same rule as the tally above.
+  await db.deleteFrom('ValueKey').where('ownerGaii', '=', gaii).execute();
+  await db.deleteFrom('ValueDaily').where('ownerGhii', '=', gaii).execute();
 
   // The archived prior versions of a trackable key. The live row goes above; without this line the
   // value the person last overwrote outlives the value they last wrote, which is the wrong way round.

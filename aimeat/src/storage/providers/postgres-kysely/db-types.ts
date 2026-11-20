@@ -438,6 +438,36 @@ export interface SsoConnection {
   updatedAt: Generated<Timestamp>;
 }
 
+/** The state of one live AI-made record (migration 0135, types/value.ts). Counts are BIGINT strings. */
+export interface ValueKey {
+  ownerGaii: string;
+  key: string;
+  producer: string;
+  producerLevel: string | null;
+  producedAt: string;
+  revisions: Generated<string>;
+  corrections: Generated<string>;
+  correctionBytes: Generated<string>;
+  lastCorrectedAt: string | null;
+  readsByOthers: Generated<string>;
+  lastReadAt: string | null;
+  lastBytes: Generated<string>;
+}
+
+/** One day's (or, folded, one week's) count of one value signal (migration 0135). */
+export interface ValueDaily {
+  day: string;
+  grain: Generated<string>;
+  ownerGhii: string;
+  orgId: Generated<string>;
+  wsId: Generated<string>;
+  producer: string;
+  family: string;
+  signal: string;
+  count: Generated<string>;
+  bytes: Generated<string>;
+}
+
 /** The memory write tally: who has had their hands on a key, and how often. Permanent, no prune. */
 export interface MemoryWriteTally {
   ownerGaii: string;
@@ -2616,6 +2646,8 @@ export interface DB {
   AccountEvent: AccountEvent;
   MemoryWriteTally: MemoryWriteTally;
   MemoryFamilyTally: MemoryFamilyTally;
+  ValueKey: ValueKey;
+  ValueDaily: ValueDaily;
   MemoryTotals: MemoryTotals;
   EphemeralClaim: EphemeralClaim;
   SecretShare: SecretShare;

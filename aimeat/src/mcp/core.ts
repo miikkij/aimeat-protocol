@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-20 — aimeat_memory_read records the open for the value signals (services/value/signal-buffer.ts).
  *   2026-11-14 — aimeat_agent_profile reads through agentProfileNow (services/agent/profile-read.ts), as
  *     GET /v1/agents/:gaii does: the trust score is computed now and stored, not the stored one (unit 2b, B4).
  *   2026-11-14 — aimeat_wallet_balance reads the owner's wallet through walletStanding
@@ -178,6 +179,7 @@
  *     a person editing the same record. Optional. Reasoning: mcp/memory-version-lock.ts.
  */
 
+import { recordValueRead } from '../services/value/signal-buffer.js';
 import { McpServer } from '@modelcontextprotocol/server';
 import { registerMemoryBinTools } from './core-memory-bin.js';
 import { registerMemoryHistoryTool } from './core-memory-history.js';
@@ -520,6 +522,8 @@ export function registerCoreTools(
                 }
                 return { content: [{ type: 'text' as const, text: 'Memory not found' }], isError: true };
             }
+            // A reader other than the maker opened an AI-made record: a use (services/value/signal-buffer.ts).
+            recordValueRead({ ownerGaii: record.ownerGaii, key: record.key, readerPrincipal: agentGaii });
             return structuredResult('aimeat_memory_read', response_format, {
                 key: record.key,
                 value: record.value,

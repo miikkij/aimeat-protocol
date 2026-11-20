@@ -173,6 +173,20 @@
       "verification": "behavior-tested",
       "decision": "existing-contract"
     },
+    "ValueDaily.ownerGhii": {
+      "role": "ownership",
+      "current": "Deleted by the per-identity cascade (identity-erasure.ts on Postgres, owner-cascade.ts on SQLite), matching ownerGhii, which is the owner of the AI that made the record.",
+      "reason": "A day row counts what this person's AI made and what happened to it; it is theirs and goes with them. The per-record rows of other people's and organism records an agent of theirs made stay, with the erasure's pseudonym as maker.",
+      "evidence": [
+        "src/storage/providers/postgres-kysely/methods/identity-erasure.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts",
+        "src/storage/providers/postgres-kysely/methods/value.ts",
+        "src/storage/providers/sqlite/repos/value.ts"
+      ],
+      "test": "test/unit/value-signals.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
     "VaultDeviceKey.ownerGhii": {
       "role": "ownership",
       "current": "eraseOwner calls deleteVaultDeviceKeysByOwner (step vault_device_keys).",

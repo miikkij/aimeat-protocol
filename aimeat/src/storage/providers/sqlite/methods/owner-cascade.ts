@@ -12,6 +12,7 @@
  * @structure cascadeMethods.cascadeDeleteAgentData(gaii) — every owner-scoped table for one identity
  * @usage Object.assign(SqliteStorage.prototype, cascadeMethods) in providers/sqlite/index.ts
  * @version-history
+ *   2026-11-20 — value_keys and value_daily join the cascade (value signals, phase 1).
  *   2026-11-04 — memory_totals joins the cascade, after memory (codebase analysis 2026-11-03, item C3).
  *   v1.7.0 — 2026-10-22 — knowledge_links joins the cascade: the links of the identity's packages and
  *     the ones it contributed (secaudit 2026-10, v79).
@@ -54,6 +55,11 @@ export const cascadeMethods = {
     // deleteOwner calls directly.
     this.db.prepare('DELETE FROM memory_write_tally WHERE ownerGaii = ?').run(gaii);
     this.db.prepare('DELETE FROM memory_family_tally WHERE ownerGaii = ?').run(gaii);
+    // The value signals of this namespace's records and this person's daily counts. Rows where an
+    // agent of theirs made another person's record are pseudonymised by deleteOwner instead
+    // (repos/value.ts pseudonymiseProducer), the same rule as the tally above.
+    this.db.prepare('DELETE FROM value_keys WHERE ownerGaii = ?').run(gaii);
+    this.db.prepare('DELETE FROM value_daily WHERE ownerGhii = ?').run(gaii);
     // The archived prior versions of a trackable key. The live row goes above; without this line the
     // value the person last overwrote outlives the value they last wrote, which is the wrong way
     // round. Postgres calls this table MemoryVersion, which is why the parity gate needed a name
