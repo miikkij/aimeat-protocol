@@ -4,10 +4,12 @@
  *   enough to investigate and nothing that could be replayed, and repeated guessing gets slower and
  *   then refused.
  *
- *   Runs its own server so the tarpit can be turned down to hundreds of milliseconds. The shipped
+ *   Runs its own server so the tarpit can be turned down to a second a step. The shipped
  *   numbers are four seconds a step to a thirty-second ceiling, which is the right cost for an
  *   attacker and the wrong length for a test.
  * @version-history
+ *   2026-11-20 — The step is 1000 ms, not 300: an undelayed refusal took 306 ms on a loaded runner and
+ *     failed test 4, whose bound is one step.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.1.0 — 2026-09-06 — Every assertion about a log line WAITS for it. The node answers before it
  *     appends, so reading the file the instant a call returns is a race, and the refusal this suite
@@ -34,8 +36,11 @@ const DB_PATH = './test/.test-auth-tarpit.db';
 const logDir = mkdtempSync(join(tmpdir(), 'aimeat-tarpit-'));
 const LOG = join(logDir, 'auth-failures.log');
 
-// Turned down so the suite runs in seconds: one free refusal, 300 ms a step, refuse after four.
-const FREE = 1, STEP_MS = 300, BLOCK_AFTER = 4;
+// Turned down so the suite runs in seconds: one free refusal, one second a step, refuse after four.
+// The step must sit well above the work of an undelayed refusal (a bcrypt round and a database
+// call), because test 4 asserts that work stays under one step: at 300 ms a loaded CI runner took
+// 306 ms with no delay at all, on Postgres, twice (2026-10-22 and 2026-11-20).
+const FREE = 1, STEP_MS = 1000, BLOCK_AFTER = 4;
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -99,7 +104,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_LOGIN_TARPIT_ENABLED: 'true',
         AIMEAT_LOGIN_TARPIT_FREE: String(FREE),
         AIMEAT_LOGIN_TARPIT_STEP_MS: String(STEP_MS),
-        AIMEAT_LOGIN_TARPIT_MAX_DELAY_MS: '1200',
+        AIMEAT_LOGIN_TARPIT_MAX_DELAY_MS: String(4 * STEP_MS),
         AIMEAT_LOGIN_TARPIT_BLOCK_AFTER: String(BLOCK_AFTER),
         AIMEAT_LOGIN_TARPIT_WINDOW_MS: '900000',
         // Generous, so what is being measured is the tarpit and not the rate limiter in front of it.
