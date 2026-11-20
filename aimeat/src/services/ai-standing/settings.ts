@@ -20,7 +20,7 @@
  *
  *   WHERE. One record per account in the account's service namespace (services/service-records.ts),
  *   `ai-standing.settings`, where no memory route writes: no agent can give itself a word by writing
- *   the record. Only the account holder in person changes it (routes/account/ai-standing.ts); an AI
+ *   the record. Only the account holder in person changes it (routes/agents/ai-standing.ts); an AI
  *   reads it.
  * @structure STANDING_PREFIX · STANDING_KEY · StandingRecord · emptyStanding · parseStanding ·
  *   readStanding(storage, ownerGhii) · standingWordsFor(config, rec) · setStandingWords(deps, ownerGhii, wanted, by) ·
