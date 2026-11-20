@@ -17,6 +17,8 @@
  * @structure openCustomer · updateCustomer · recordIdentity · screenCustomer · decideHit · approveCustomer ·
  *   reviewCustomer · endCustomer · extendHold · readCustomer · customerAsOf · listCustomers · rescreenAll
  * @version-history
+ *   v1.0.3 — 2026-11-20 — The update schemas are patchOf() schemas (utils/zod-patch.ts), which carry no
+ *     defaults, so sentFields is gone; check:partial-defaults refuses .partial() in src/.
  *   v1.0.2 — 2026-11-20 — A settings update keeps the fields it does not send too (sentFields): one
  *     staff change emptied the officers and the country list.
  *   v1.0.1 — 2026-11-19 — An update keeps the fields it does not send: zod 4 fills a field's default
@@ -27,7 +29,7 @@ import { randomUUID } from 'node:crypto';
 import type { CallerContext } from '../caller-context.js';
 import { KycError, kycContext, requireCards, requireInPerson, requireOfficer, requireSettings, type KycContext, type KycDeps } from './access.js';
 import {
-  CustomerInputSchema, IdentitySchema, KycSettingsSchema, sentFields,
+  CustomerInputSchema, IdentitySchema, KycSettingsSchema,
   type CustomerHead, type CustomerInput, type CustomerVersion, type Identity, type Screening, type ScreeningHit,
 } from './contract.js';
 import { rateRisk, retentionUntil, type RiskFacts } from './risk.js';
@@ -35,8 +37,10 @@ import { screen, type SanctionsList, type Subject } from './screening/index.js';
 import { loadLists } from './screening/store.js';
 import { appendVersion, listHeads, readHead, readSettings, readVersions, versionAsOf, writeSettings } from './store.js';
 import type { KycSettings } from './contract.js';
+import { patchOf } from '../../utils/zod-patch.js';
 
 const MAX_HOLD_YEARS = 10;
+const SettingsPatchSchema = patchOf(KycSettingsSchema);
 
 function newId(): string { return `c-${randomUUID().slice(0, 13)}`; }
 
@@ -130,10 +134,10 @@ async function cardsContext(deps: KycDeps, caller: CallerContext, org: string): 
 }
 
 function parseInput(input: unknown): CustomerInput {
+  // CustomerInputSchema is a patchOf() schema: a field left out stays out, so pep and the owners keep their values.
   const parsed = CustomerInputSchema.safeParse(input ?? {});
   if (!parsed.success) throw new KycError(400, 'INVALID_INPUT', parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
-  // An update that leaves out pep or beneficialOwners must not reset them to 'unknown' and [].
-  return sentFields(input, parsed.data) as CustomerInput;
+  return parsed.data;
 }
 
 async function current(deps: KycDeps, org: string, id: string): Promise<CustomerVersion> {
@@ -297,12 +301,11 @@ export async function updateSettings(deps: KycDeps, caller: CallerContext, org: 
   const ctx = await kycContext(deps, caller, org);
   requireSettings(ctx);
   // Validated before the write, so a wrong value answers 400 with the field, not a failure inside the write.
-  const parsed = KycSettingsSchema.partial().safeParse(stripUndefined((patch ?? {}) as Record<string, unknown>));
+  // patchOf: only what the caller sent, so adding one staff member does not empty the officers or the country list.
+  const parsed = SettingsPatchSchema.safeParse(stripUndefined((patch ?? {}) as Record<string, unknown>));
   if (!parsed.success) throw new KycError(400, 'INVALID_INPUT', parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
-  // Only what the caller sent: adding one staff member must not empty the officers or the country list.
-  const sent = sentFields(patch, parsed.data as Record<string, unknown>);
   return writeSettings(deps.storage, deps.config.nodeId, org, (cur) => ({
-    ...cur, ...sent, updatedAt: now(), updatedBy: ctx.by,
+    ...cur, ...parsed.data, updatedAt: now(), updatedBy: ctx.by,
   }) as KycSettings);
 }
 

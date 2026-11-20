@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-20: check:partial-defaults, no zod .partial() in src/ or public/: a partial-update schema is patchOf() (src/utils/zod-patch.ts), because .partial() keeps the defaults and a PATCH reset the fields it left out (docs/pitfalls.md §127, now deleted).
  *  - 2026-11-19: `githubOnly: true` on check:field-reach, the CodeQL pass (793 s of the slow eight's 1527 s). `pnpm ready` runs every other check here before it pushes (check:fast --before-push, about three minutes); the CodeQL pass stays on GitHub.
  *  - 2026-11-19: check:feature-list, every section of the feature list was read against the code it describes, and every promise of a refusal or a limit it makes is held by a test.
  *  - 2026-11-15: `slow: true` on the eight checks that took 1527 of 2158 s of check time on a quiet laptop (check:field-reach alone 793 s, the CodeQL measurement). check:fast skips them on a workstation and runs them in CI and on `pnpm ready`'s branch, so the one local run before ready takes about three minutes, not eighteen.
@@ -63,6 +64,7 @@ export const FAST_CHECKS = [
     { script: 'check:config-coverage', label: 'Every setting reachable in the admin Config tab' },
     { script: 'check:config-tab', label: 'The Config tab: every section indexed, every setting named and read, lists and numbers consistent' },
     { script: 'check:no-max-tokens', label: 'No max_tokens caps on AI calls' },
+    { script: 'check:partial-defaults', label: 'No zod .partial(): a partial update is patchOf(), which keeps no defaults' },
     { script: 'check:openapi', label: 'openapi.yaml parses + refs resolve' },
     { script: 'check:openapi-routes', label: 'The contract and the code name the same routes' },
     { script: 'check:skill-reviews', label: 'Every skill was read against the code it describes, and that code has not changed since' },

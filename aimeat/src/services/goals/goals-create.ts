@@ -12,6 +12,7 @@
  * @structure GoalInputSchema · GoalPatchSchema · roundsFrom() · buildGoal() · applyPatch() · previewPatch()
  * @usage const goal = buildGoal(access, GoalInputSchema.parse(body), now);
  * @version-history
+ *   v1.2.1 — 2026-11-20 — GoalPatchSchema is built with patchOf() (utils/zod-patch.ts); check:partial-defaults refuses .partial().
  *   v1.2.0 — 2026-11-08 — A change to the rounds keeps what it does not name: the Settings page's save
  *     (trigger and cron only) had removed the goal's time zone and its works per round. A clock round
  *     with an empty cron is refused on change too, not only on create (group k3-goalrounds).
@@ -20,6 +21,7 @@
  */
 import { z } from 'zod';
 import { INPUT_LIMITS } from '../../models/input-limits.js';
+import { patchOf } from '../../utils/zod-patch.js';
 import { Cron } from 'croner';
 import { GoalError, logEntry, newId, type GoalAccess } from './goals-store.js';
 import { WorkSpecSchema, makeWork, parseWorkSpec, appendWorks } from './goals-work.js';
@@ -88,7 +90,7 @@ export const GoalInputSchema = z.object({
 }).strict();
 export type GoalInput = z.infer<typeof GoalInputSchema>;
 
-export const GoalPatchSchema = GoalInputSchema.omit({ works: true, parent_goal_id: true, propose: true }).partial().extend({
+export const GoalPatchSchema = patchOf(GoalInputSchema.omit({ works: true, parent_goal_id: true, propose: true })).extend({
   preview: z.boolean().optional(),
   /** For a goal with rounds: the change is for this round only. */
   this_round_only: z.boolean().optional(),

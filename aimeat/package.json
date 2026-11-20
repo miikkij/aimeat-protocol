@@ -136,6 +136,7 @@
     "check:config-coverage:report": "tsx scripts/check-config-coverage.ts",
     "check:config-coverage:seed": "tsx scripts/check-config-coverage.ts --seed",
     "check:no-max-tokens": "tsx scripts/check-no-max-tokens.ts",
+    "check:partial-defaults": "tsx scripts/check-partial-defaults.ts",
     "check:openapi": "tsx scripts/check-openapi.ts",
     "check:openapi-routes": "tsx scripts/check-openapi-routes.ts",
     "check:skill-reviews": "tsx scripts/check-skill-reviews.ts",

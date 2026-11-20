@@ -19,6 +19,7 @@
  *   the inferred types · MEASURE_AREAS
  * @usage const parsed = CreateInputSchema.safeParse(body);
  * @version-history
+ *   2026-11-20 — The Annex II and IV overrides are patchOf() schemas (utils/zod-patch.ts); check:partial-defaults refuses .partial().
  *   2026-11-05 — Moved unchanged from src/services/compliance-agreements-schemas.ts to src/services/compliance/agreements-schemas.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-31 — A review's level may be `test`: a PDF signed elsewhere whose valid signatures all chain to the EU reference wallet's test roots (secaudit2026oct26 outside-02b).
  *   2026-10-29 — A version and an agreement may be `test-signed`: signed in test, not in force, on a node
@@ -32,6 +33,7 @@
 import { z } from 'zod';
 import { INPUT_LIMITS } from '../../models/input-limits.js';
 import { isValidEmail } from '../../utils/email-validator.js';
+import { patchOf } from '../../utils/zod-patch.js';
 
 /** The state of one version, in order. `review` means a signed copy arrived and waits for a person. */
 /**
@@ -248,9 +250,9 @@ export const CreateInputSchema = z.object({
   options: OptionsInputSchema.optional(),
   /** Annex parts the caller writes over the generated ones; whatever is given is marked human (or ai). */
   annexes: z.object({
-    II: AnnexesSchema.shape.II.partial().optional(),
+    II: patchOf(AnnexesSchema.shape.II).optional(),
     III: z.object({ measures: z.array(MeasureSchema).max(60).optional(), assistance: text(2000).optional() }).optional(),
-    IV: AnnexesSchema.shape.IV.partial().optional(),
+    IV: patchOf(AnnexesSchema.shape.IV).optional(),
   }).optional(),
   /** Who wrote the overrides: a person (human, the default) or a model (ai). */
   written_by: z.enum(['human', 'ai']).optional(),

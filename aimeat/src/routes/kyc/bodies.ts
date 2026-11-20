@@ -8,11 +8,13 @@
  * @structure EmptyBody · NoteBody · CustomerBody · IdentityBody · HitBody · EndBody · HoldBody · SettingsBody ·
  *   MarkBody · SuspicionDraftBody · SubmitBody · CloseBody · RiskAssessmentRecordedBody
  * @version-history
+ *   v1.1.1 — 2026-11-20 — SettingsBody and SuspicionDraftBody are patchOf() schemas (utils/zod-patch.ts).
  *   v1.1.0 — 2026-11-19 — RiskAssessmentRecordedBody (POST /v1/kyc/:org/risk-assessment/recorded).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import { z } from 'zod';
 import { INPUT_LIMITS } from '../../models/input-limits.js';
+import { patchOf } from '../../utils/zod-patch.js';
 import { CustomerInputSchema, IdentitySchema, KycSettingsSchema, SuspicionReportSchema } from '../../services/kyc/contract.js';
 
 const note = z.string().max(2000).optional();
@@ -32,9 +34,9 @@ export const HitBody = z.object({
 });
 export const EndBody = z.object({ note, ended_at: date.optional() }).optional();
 export const HoldBody = z.object({ until: date, basis: z.string().min(1).max(500) });
-export const SettingsBody = KycSettingsSchema.pick({ staff: true, officers: true, highRiskCountries: true, reviewMonths: true }).partial();
+export const SettingsBody = patchOf(KycSettingsSchema.pick({ staff: true, officers: true, highRiskCountries: true, reviewMonths: true }));
 export const MarkBody = z.object({ customer_id: z.string().max(64).optional(), observation: z.string().min(1).max(4000) });
-export const SuspicionDraftBody = SuspicionReportSchema.pick({ reportType: true, indicators: true, transactions: true, narrative: true }).partial();
+export const SuspicionDraftBody = patchOf(SuspicionReportSchema.pick({ reportType: true, indicators: true, transactions: true, narrative: true }));
 export const SubmitBody = z.object({ goaml_ref: z.string().min(1).max(120), submitted_at: date.optional(), decision: z.string().max(2000).optional() });
 export const CloseBody = z.object({ decision: z.string().min(1).max(2000) });
 /** Recording the business-wide risk assessment: where the document is, optionally. */
