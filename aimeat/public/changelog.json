@@ -4,6 +4,28 @@
     {
       "date": "2026-11-20",
       "kind": "feature",
+      "id": "2026-11-20-pick-your-ai-model-from-a-list-or-let-your-ai-change-it",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Pick your AI model from a list, or let your AI change it",
+        "fi": "Valitse tekoälymalli listasta tai anna tekoälysi vaihtaa se"
+      },
+      "body": {
+        "en": "On the AI page you choose each provider's model from the models you may use, with their prices, and you can still type one. Your AI can change a provider's model in the chat after you confirm, and it cannot pick a model your model policy does not allow.",
+        "fi": "Tekoälysivulla valitset tarjoajan mallin niistä malleista, joita saat käyttää, ja näet niiden hinnat. Voit yhä kirjoittaa mallin itse. Tekoälysi voi vaihtaa mallin chatissa, kun olet hyväksynyt muutoksen. Se ei voi valita mallia, jota mallirajauksesi ei salli."
+      },
+      "summary": {
+        "en": "Choose a provider's model from a priced list, or have your AI change it after you confirm.",
+        "fi": "Valitse tarjoajan malli hinnoitellusta listasta tai anna tekoälysi vaihtaa se hyväksynnälläsi."
+      }
+    },
+    {
+      "date": "2026-11-20",
+      "kind": "feature",
       "id": "2026-11-20-allow-always-for-all-your-ais",
       "highlight": false,
       "audience": [
