@@ -50,18 +50,21 @@ describe('the Atelier specification in parts', () => {
     const start = atelierPiece(full, 'start', config.baseUrl)!.text;
     for (const id of ['genre', 'libraries', 'book', 'patterns', 'look', 'motion']) expect(start).toContain('`' + id + '`');
     // Since 2026-11-08 (B): `libraries` and `patterns` on every level, `genre` and `book` on `fine`.
-    expect(start).toMatch(/Read `libraries` and `patterns` BEFORE you write any code, and on `fine` `genre` and `book` too/);
+    expect(start).toMatch(/Read `libraries`, `patterns` and `screens` BEFORE you write any code, and on `fine` `genre` and `book` too/);
     expect(start).toMatch(/aimeat_handbook_get \{ tier: "build-app-atelier\/<id>" \}/);
     expect(start).toMatch(/spec_token: atelier-[0-9a-f]{12}/);
   });
 
   // B, 2026-11-08: two real builds met four rounds of questions before the level was asked. The
-  // level is question 0, and it decides what a prototype and an ordinary page skip.
-  it('the interview asks the level first and lets it decide the rest', () => {
+  // level is item 0, and it decides what a prototype and an ordinary page skip. Since 2026-11-20
+  // it is not asked: the finest, unless the owner chose a lower one
+  // (wish-atelier-leve-n-ytt-suunnitellaan-ja-taso-on-fine-ellei-k-ytt).
+  it('the interview settles the level first, the finest unless the owner chose lower, and lets it decide the rest', () => {
     const start = atelierPiece(full, 'start', config.baseUrl)!.text;
     const interview = start.slice(start.indexOf('## First, a short interview'), start.indexOf('BEFORE YOU SEND THESE QUESTIONS'));
-    expect(interview.indexOf('0. Which level')).toBeGreaterThan(-1);
-    expect(interview.indexOf('0. Which level')).toBeLessThan(interview.indexOf('1. What should the app do'));
+    expect(interview.indexOf('0. Do NOT ask the level: it is the finest')).toBeGreaterThan(-1);
+    expect(interview.indexOf('0. Do NOT ask the level')).toBeLessThan(interview.indexOf('1. What should the app do'));
+    expect(start).toMatch(/FIRST, THE LEVEL: THE FINEST, unless the owner chose a lower one/);
     expect(interview).toMatch(/`proto`: ask 1, 2 and 4 only, draw no layouts, no introduction/);
     expect(interview).toMatch(/`fine` or no answer: all of it/);
   });
@@ -123,5 +126,17 @@ describe('the Atelier specification in parts', () => {
     const index = start.slice(start.indexOf('### This specification comes in parts'));
     expect(index).toMatch(/on `fine` an Atelier app is forked from a genre/);
     expect(index).toMatch(/`proto` or `plain` app starts from `shell-atelier`/);
+  });
+
+  // 2026-11-20: builds made the phone well and the desktop as the phone column stretched across the
+  // screen (wish-atelier-leve-n-ytt-suunnitellaan-ja-taso-on-fine-ellei-k-ytt).
+  it('part `screens` decides the desktop from the tasks, and is read before any code', () => {
+    const screens = atelierPiece(full, 'screens', config.baseUrl)!.text;
+    for (const fact of ['Start from the tasks', 'Group by the moment of use', '`listDetail`', "span: 'main'", "nav: 'side'",
+      'ONE primary button per screen', '60 to 75 characters', 'An empty group takes one line', '1920×1080']) {
+      expect(screens, fact).toContain(fact);
+    }
+    const start = atelierPiece(full, 'start', config.baseUrl)!.text;
+    expect(start).toMatch(/- `screens` — REQUIRED before any code/);
   });
 });

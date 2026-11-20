@@ -12,6 +12,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-20 — below-level: the level is the finest unless the owner chose a lower one; it is not asked.
  *   2026-11-15 — track-drift says "the Atelier track", not "the Atelier road".
  *   2026-11-11 — +bundled-agent-block, +bundled-agent-permissions: how an app declares the agent it
  *     brings, and which permissions that agent gets (services/app-bundled-crews.ts names both in the publish hints).
@@ -192,7 +193,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'below-level',
     title: 'The app is not at the level its owner chose',
     symptom: 'The owner asked for an app and found out by looking at the result what kind of app they got: a bare stack of components where they expected something worth showing, or an hour of styling where they wanted to try one idea today. The builder chose the level, usually the one that was least work. Publishing warns (`app_hints`, pitfall `below-level`) when a page that states `aimeat-level` "proto" or "plain" carries a sheet of styles of its own, and refuses (`atelier-register`) a page that states "fine", or no level, and names no register.',
-    fix: 'Ask the level BEFORE any code, in plain words, and say what each one gets them: a quick prototype (the kit\'s components as they come, no styling), an ordinary page (a ready layout and look from the Design Book, following their theme), or the finest (a forked genre, the Book\'s proven parts, components of its own, each written down with its reason). All three are Atelier, in two languages, with the data on the owner\'s node, so raising the level later is a change of look and never a rewrite. State it in the head: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. A page that states none is held to the finest. Never pick a lower level on the owner\'s behalf.',
+    fix: 'The level is the finest unless the owner chose a lower one in their own words: do not ask it, say in the proposal that you build the finest and that the lower two are theirs to pick. In plain words, what each one gets them: a quick prototype (the kit\'s components as they come, no styling), an ordinary page (a ready layout and look from the Design Book, following their theme), or the finest (a forked genre, the Book\'s proven parts, components of its own, each written down with its reason). All three are Atelier, in two languages, with the data on the owner\'s node, so raising the level later is a change of look and never a rewrite. State it in the head: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. A page that states none is held to the finest. Never pick a lower level on the owner\'s behalf.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',

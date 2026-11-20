@@ -18,6 +18,8 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './publish-next-steps.js';
  * @version-history
+ *   v1.6.0 — 2026-11-20 — `screens` on every Atelier level but `proto`: the phone and the desktop
+ *     looked at, and what the report says about the desktop; the acceptance names 1920×1080.
  *   v1.5.0 — 2026-11-20 — `ai_path` and `ai_path_tools_count` (ai-path-step.ts): how the person's own
  *     AI uses the app, the app tools it has and what the bound skill holds. Quiet for a quick
  *     prototype and a declared presentation.
@@ -172,10 +174,17 @@ export async function buildPublishNextSteps(
     return {
       ...(size ? { size } : {}),
       ...(track === 'atelier' && level ? { level } : {}),
+      // The phone and the desktop (atelier-screens.ts), on every level but a quick prototype: the
+      // desktop is where builds fail, and a plain page is not judged beside a genre.
+      ...(track === 'atelier' && !(html && declaredLevel(html) === 'proto') ? {
+        screens: 'Look at the app at 390×844 (the phone) and at 1280×900 and 1920×1080 (the desktop), and say in your report which task is primary and where it is, '
+          + 'what each desktop column holds and why, and what the first, empty visit shows. A desktop that is the phone column stretched across the screen, '
+          + 'cards with empty room inside them, or empty cards before the work, is not finished: aimeat_handbook_get { tier: "build-app-atelier/screens" }.',
+      } : {}),
       ...(track === 'atelier' && !level ? {
         acceptance: 'Accept this app from screenshots at 390×844 and 1280×900, in both themes, placed '
           + `beside the genre it forked (${genreAddress}), and ask while looking: would this pass `
-          + 'beside the genre? Measure alongside it, at 390×844, 1280×900 and 1280×460 (the one size matrix '
+          + 'beside the genre? Measure alongside it, at 390×844, 1280×900, 1280×460 and 1920×1080 (the one size matrix '
           + 'of the skill and the spec): page width equal to the viewport, nothing '
           + 'past the viewport edge (including inside a box that clips), no text under 11 px, no '
           + 'control under 40 px at 390, contrast 4.5 for body text, no animation still running '

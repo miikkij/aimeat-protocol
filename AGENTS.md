@@ -66,11 +66,14 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
   "build-app-atelier" }`, in parts: `genre`, `libraries`, `book` and `patterns` before any code, and
   the platform sections the app needs. The Classic track was retired on 2026-11-19: an app built on
   it is changed with the Atelier specification and moved with its section `from-classic`.
-- **Ask the level first.** A quick prototype (the kit as it comes, no styling), an ordinary page
-  (a ready layout and look from the Design Book), or the finest (a forked genre, the Book's parts,
-  components of its own, each written down with its reason). All three are Atelier and
+- **The level is the finest unless the owner chose a lower one.** Do not ask it: say you build the
+  finest (a forked genre, the Book's parts, components of its own, each written down with its
+  reason), and that a quick prototype (the kit as it comes, no styling) or an ordinary page (a
+  ready layout and look from the Design Book) is theirs to pick. All three are Atelier and
   bilingual, so a prototype is raised later without starting over. The page states it in
-  `<meta name="aimeat-level" content="proto|plain|fine">`. Never pick a lower level silently.
+  `<meta name="aimeat-level" content="proto|plain|fine">`. Never pick a lower level yourself.
+- **The phone and the desktop are two layouts of one app**, decided from the person's tasks: part
+  `screens` of the Atelier specification. A desktop that is the phone column stretched is not done.
 - **Propose before you build, and wait.** On the finest level: two or three genres by name with why each fits, the
   languages, who signs in, the first screen in a sentence. Jouni chooses. He must not find out what
   you chose by looking at the result.

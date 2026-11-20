@@ -17,6 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-11-20 — 17c: the parts include `screens` (the phone and the desktop).
  *   2026-11-19 — 15-17, 17e, 17f, 18, 19: the Classic specification and shells are retired; its
  *     addresses answer with the Atelier text behind a notice, and the shell read is shell-atelier.
  *   2026-11-19 — 17p: the Atelier platform index and its sections, the same over MCP and REST, 404 for an unknown one, and ?delivery=paste.
@@ -473,7 +474,7 @@ async function main() {
         await test('15b. a Classic part or section id answers with its Atelier place; the list is the Atelier one', async () => {
             const list = await json('/v1/prompts/build-app/sections');
             assert(list.body.data.retired === true, 'the list says the specification is retired');
-            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,book,patterns,look,motion', `the Atelier parts: ${JSON.stringify(list.body.data.parts)}`);
+            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,book,patterns,screens,look,motion', `the Atelier parts: ${JSON.stringify(list.body.data.parts)}`);
             assert(list.body.data.sections.some((s: any) => s.id === 'group'), 'the platform sections are listed');
             const data = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app/data' } }, 410)).body);
             const storage = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/data-storage?format=txt`).then(r => r.text());
@@ -515,14 +516,15 @@ async function main() {
             assert(start.length < 24_000, `one tool result carries it: ${start.length} characters`);
             const full = await json('/v1/prompts/build-app-atelier');
             assert(start.includes(full.body.data.spec_token), 'it names the Atelier spec token');
-            // By level since 2026-11-08 (B): `libraries` and `patterns` always, `genre` and `book` on `fine`.
-            assert(/Read `libraries` and `patterns` BEFORE you write any code, and on `fine` `genre` and `book` too/.test(start), 'it says which parts come before code');
+            // By level since 2026-11-08 (B): `libraries` and `patterns` always, `genre` and `book` on `fine`;
+            // `screens` (the phone and the desktop) beside them since 2026-11-20.
+            assert(/Read `libraries`, `patterns` and `screens` BEFORE you write any code, and on `fine` `genre` and `book` too/.test(start), 'it says which parts come before code');
         });
 
         await test('17c. the Atelier parts each arrive whole, and between them carry the whole specification', async () => {
             const fullTxt = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(r => r.text());
             const list = await json('/v1/prompts/build-app-atelier/sections');
-            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,book,patterns,look,motion', `the parts in order: ${JSON.stringify(list.body.data.parts)}`);
+            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,book,patterns,screens,look,motion', `the parts in order: ${JSON.stringify(list.body.data.parts)}`);
             let carried = 0;
             for (const p of list.body.data.parts) {
                 const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/' + p.id } }, 404);
@@ -585,7 +587,7 @@ async function main() {
         await test('17d. an Atelier part that does not exist is an error that names the ones there are', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');
-            assert(/start, genre, libraries, book, patterns, look, motion/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
+            assert(/start, genre, libraries, book, patterns, screens, look, motion/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
         });
 
         // The platform sections (services/builder/atelier-platform.ts): what only some apps need, once

@@ -24,6 +24,8 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './atelier-people.js';
  * @version-history
+ *   v1.10.0 — 2026-11-20 — The level is the finest unless the owner chose a lower one in their own
+ *     words; it is not asked (wish-atelier-leve-n-ytt-suunnitellaan-ja-taso-on-fine-ellei-k-ytt).
  *   v1.9.0 — 2026-11-09 — The fork says the genre's masthead is the only top bar and the node's pill
  *     sits in it as it comes (look and functions kept, restyled only when the owner asks).
  *   v1.8.0 — 2026-11-08 — The proposal repeats the level the interview asked first; the Design Book
@@ -112,12 +114,12 @@ export const ATELIER_MOSAIC_IN_GENRE = '## The Design Book in a genre fork: the 
 /** After the interview, before the body. Not part of the spec token: it is about the conversation. */
 export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answer\n\n'
   + 'Before any code, show the owner what you are about to build, in their words, and wait. They decide from this; they must not find out what you chose by looking at the result.\n\n'
-  + '- **FIRST, THE LEVEL (question 0; repeat it). It is the owner\'s choice and never yours; ask it in these words or plainer ones, and say what each one gets them.** '
+  + '- **FIRST, THE LEVEL: THE FINEST, unless the owner chose a lower one in their own words.** Do not ask it; say you build the finest, and that the lower two are theirs to pick. In these words or plainer ones: '
   + '(1) **A quick prototype**: a working draft to try one idea, the kit\'s components as they come, no styling. Fast, and plain to look at. '
   + '(2) **An ordinary page**: works and looks tidy, with a ready layout and a ready look from the Design Book, following their light and dark theme. Not distinctive. '
   + '(3) **The finest**: a committed look forked from a genre, proven parts from the Design Book, components of its own where the book has none. It takes the longest and is the one worth showing. '
   + 'All three are built the same way underneath, in two languages, with the data kept on their node, so a prototype can be raised to the finest later without starting over: say that, because it is what makes the quick one a safe choice. '
-  + 'If they do not answer, recommend one and say why; never pick a lower one silently because it is less work. '
+  + 'If they say nothing about it, the level is the finest. '
   + 'The page states the level: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. On `proto` the rest of this list shrinks to the languages, who signs in and the first screen, and on `plain` to those, the designs as looks and the introduction: no genre is forked, the page starts from the Atelier shell (`aimeat_app_template_get { id: "shell-atelier" }`), the publish asks for no register, and nothing is styled by hand (a publish warns when such a page carries a sheet of styles of its own). On `fine`, everything below applies, and so does writing down why you took, passed over and made each thing (the build notes, part `book`). A page that states no level is held to `fine`.\n'
   + ATELIER_DESIGNS_PROPOSAL_LINE
   + '- **Fixed colours or following their theme?** Ask it, or recommend one and say why. A fixed genre keeps its own colours in light and dark; a following page changes with the person\'s theme and palette. Part `genre` says which each genre is and gives an address for each (`See it`), and the whole shelf is one link: send the owner the links so they choose by looking. If they want a genre that is fixed and want it to follow the theme, say that it means moving its colours to the theme\'s tokens, and that you will show it in both modes before they decide.\n'

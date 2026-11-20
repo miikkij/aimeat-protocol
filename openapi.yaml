@@ -17210,7 +17210,7 @@ paths:
       operationId: listBuildAppAtelierPromptParts
       summary: The parts the Atelier build specification comes in
       description: >-
-        The parts of the Atelier specification (start, genre, libraries, book, patterns, look, motion) with what each
+        The parts of the Atelier specification (start, genre, libraries, book, patterns, screens, look, motion) with what each
         covers and its size. The whole text is larger than one MCP tool result can carry, so a chat
         reads it part by part. `sections` lists the platform sections only some apps need (a team,
         files, AI, intake, server-side work), each with the situation in which it is read; they are
@@ -17256,7 +17256,7 @@ paths:
       operationId: getBuildAppAtelierPromptPart
       summary: One part of the Atelier build specification
       description: >-
-        One of start, genre, libraries, book, patterns, look or motion, byte for byte as the whole specification
+        One of start, genre, libraries, book, patterns, screens, look or motion, byte for byte as the whole specification
         carries it; part `start` also names the others and says which are read before any code. Also
         `platform`, the index of the platform sections, and each platform section by its id (`kind`
         section). The MCP tool aimeat_handbook_get serves `start` for tier "build-app-atelier" and this
@@ -17268,7 +17268,7 @@ paths:
           in: path
           required: true
           schema: { type: string, example: genre }
-          description: A part (start, genre, libraries, book, patterns, look, motion), `platform`, or a platform section id
+          description: A part (start, genre, libraries, book, patterns, screens, look, motion), `platform`, or a platform section id
         - name: mode
           in: query
           schema: { type: string, enum: [new, improve], default: new }

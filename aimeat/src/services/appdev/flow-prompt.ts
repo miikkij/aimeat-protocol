@@ -10,6 +10,7 @@
  * @structure buildAppdevFlowPrompt(config) → string
  * @usage import { buildAppdevFlowPrompt } from './flow-prompt.js';
  * @version-history
+ *   (2026-11-20) The level is the finest unless the person chose a lower one; it is not asked.
  *   (2026-11-19) Atelier is the only build guide: the flow names the Atelier skill and spec for every
  *     app, the level and the genre or shell in the frame, the platform sections, and section
  *     from-classic for a Classic app. No tier, no Classic spec.
@@ -34,7 +35,7 @@ export function buildAppdevFlowPrompt(config: AimeatConfig): string {
     p += `- Get the big picture in ONE call: \`${FLOW_TOOLS.overview}\` (pass your own model id). It returns my existing apps and template proposals (often the fastest correct starting point — fork or copy patterns), library packs with per-model proofs, the Atelier shells and genres a build starts from, and the pitfalls (curated + learned) for the areas you will touch.\n`;
     p += `- Fetch the build spec and treat it as law: \`GET ${nodeUrl}/v1/prompts/build-app-atelier\` (over MCP, \`aimeat_handbook_get { tier: "build-app-atelier" }\`, in parts) — it always wins on any conflict. Its part \`platform\` lists the sections only some apps need (a team, files, AI, intake, server-side work); read the ones this app is in. An app built on the retired Classic track is moved with its section \`from-classic\`.\n\n`;
     p += '## 2. Frame\n';
-    p += 'Ask me the level first (a quick prototype, an ordinary page or the finest). On the finest a new app forks a genre; on the other two it starts from shell-atelier. Pick the platform sections the app needs, the capability packs, the starting point (fork a prior app / a template proposal / a genre), and whether the app needs its OWN users: the aimeat-iam pack for the gate plus AIMEAT.iam for the panel, decided NOW, not retrofitted. A role belongs to the PERSON, so the agents of a member inherit it.\n\n';
+    p += 'Build at the finest level unless I chose a quick prototype or an ordinary page. On the finest a new app forks a genre; on the other two it starts from shell-atelier. Pick the platform sections the app needs, the capability packs, the starting point (fork a prior app / a template proposal / a genre), and whether the app needs its OWN users: the aimeat-iam pack for the gate plus AIMEAT.iam for the panel, decided NOW, not retrofitted. A role belongs to the PERSON, so the agents of a member inherit it.\n\n';
     p += '## 3. Propose\n';
     p += 'Give me the frame in 3-5 lines (level, genre or shell, packs, start point, iam yes/no, anything you will reuse) and wait for my go-ahead or corrections.\n\n';
     p += '## 4. Build\n';

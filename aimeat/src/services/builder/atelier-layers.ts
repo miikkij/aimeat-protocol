@@ -22,6 +22,8 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.9.0 — 2026-11-20 — Part `screens` (atelier-screens.ts): the phone and the desktop, read
+ *     before any code beside `libraries` and `patterns`.
  *   v1.8.1 — 2026-11-20 — "How the person's own AI uses the app" goes to part `libraries`.
  *   v1.8.0 — 2026-11-19 — The platform sections (atelier-platform.ts): part `start` names the index
  *     `platform` in one line, and atelierPiece answers `platform` and each section id with text cut
@@ -56,7 +58,7 @@
 import { MAX_PART_CHARS } from './app-layers.js';
 import { ATELIER_PLATFORM_PART_LINE, atelierPlatformIds, atelierPlatformPiece } from './atelier-platform.js';
 
-export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns' | 'look' | 'motion';
+export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns' | 'screens' | 'look' | 'motion';
 
 /** In reading order. `what` is the line the first part shows for each of the others. */
 export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
@@ -65,6 +67,7 @@ export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
   { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for, AI inside the app, data (personal, team and public) and what the review always catches. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist. It also says how to start the app\'s structure page, the link you give the person first, and how an introduction is built when the owner asked for one. And how to finish and publish: the size matrix, the spec token and the four things every app owes.' },
   { id: 'book', what: 'REQUIRED before any code on `fine`: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, how a kit component that is nearly right is customised instead of copied, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
   { id: 'patterns', what: 'How the code is written: six patterns to copy, the living record, and the mosaic that arranges a screen from outside the file.' },
+  { id: 'screens', what: 'REQUIRED before any code on `plain` and `fine`: the phone and the desktop as two layouts decided from the person\'s tasks, and the desktop rules.' },
   { id: 'look', what: 'The look presets, the pattern shelf (backgrounds), the one ambient layer, effects and imagery. Read it before you change anything the genre did not decide for you.' },
   { id: 'motion', what: 'What already moves, the attention gesture, and the controls that answer the hand. Read it before you make anything move.' },
 ];
@@ -118,6 +121,8 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'A LIVING DOCUMENT: A SHEET WHOSE NUMBERS STAND ON EACH OTHER IS A RECORD': 'patterns',
   'Six patterns to copy': 'patterns',
   'The mosaic: the arrangement lives outside your file': 'patterns',
+  // Since 2026-11-20 (atelier-screens.ts): a part of its own, because the desktop is where builds fail.
+  'The phone and the desktop: two layouts of one app': 'screens',
 
   'The look': 'look',
   'The ambient: the one layer allowed to move at idle': 'look',
@@ -155,7 +160,7 @@ function partsIndex(nodeUrl: string, specToken: string | null): string {
   // a publish that sends it proves the build read this specification.
   if (specToken) out += 'Publish with `spec_token: ' + specToken + '`; section "Finishing" (part `libraries`) says what is owed after it.\n';
   out += 'You are reading part `start`. The others belong to the same specification and carry the same authority. '
-    + 'Read `libraries` and `patterns` BEFORE you write any code, and on `fine` `genre` and `book` too: on `fine` an Atelier app is forked from a genre and the publish refuses one that names no register (a `proto` or `plain` app starts from `shell-atelier`), a mechanism you write by hand is usually one this node already serves, and a piece of page you make by hand is often one the Design Book already holds. '
+    + 'Read `libraries`, `patterns` and `screens` BEFORE you write any code, and on `fine` `genre` and `book` too: on `fine` an Atelier app is forked from a genre and the publish refuses one that names no register (a `proto` or `plain` app starts from `shell-atelier`), a mechanism you write by hand is usually one this node already serves, and a piece of page you make by hand is often one the Design Book already holds. '
     + 'Over MCP: `aimeat_handbook_get { tier: "build-app-atelier/<id>" }`. Over HTTP the whole text in one piece: `GET ' + nodeUrl + '/v1/prompts/build-app-atelier?format=txt`.\n';
   for (const p of ATELIER_PARTS.filter(x => x.id !== 'start')) out += '- `' + p.id + '` — ' + p.what + '\n';
   out += ATELIER_PLATFORM_PART_LINE;

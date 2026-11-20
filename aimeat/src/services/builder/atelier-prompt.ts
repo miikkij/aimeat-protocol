@@ -28,6 +28,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.50.0 — 2026-11-20 — The level is the finest unless the owner chose a lower one (item 0 is no
+ *     longer a question). "The phone and the desktop" (atelier-screens.ts, part `screens`): the two
+ *     layouts decided from the tasks. Finishing's size matrix gains 1920×1080.
  *   v1.49.0 — 2026-11-20 — "How the person's own AI uses the app" (atelier-ai-path.ts) after "Data,
  *     in short": the build style the proposal recommends, the path into the app, what the bound
  *     skill holds. The text named no app tools and no skill content until now.
@@ -204,6 +207,7 @@ import { KIT_PROMPT_PARAGRAPH } from '../design-book/kit.js';
 import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
 import { atelierPasteDelivery } from './atelier-platform.js';
 import { ATELIER_AI_PATH_SECTION } from './atelier-ai-path.js';
+import { ATELIER_SCREENS_SECTION } from './atelier-screens.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -508,6 +512,8 @@ function composeBody(config: AimeatConfig): string {
     + 'value with the app\'s own words and source names, and use it as the fallback — and as the '
     + 'first stored layout when the owner wants one.\n\n';
 
+  body += ATELIER_SCREENS_SECTION;
+
   // THE GENRES — rendered from the template registry, never hand-listed (the surface-layout
   // lesson: a hand-written menu drifts and the builder reads the refusal as a broken AI).
   const genres = getAppTemplateIndex().filter((t) => t.kind === 'genre');
@@ -775,7 +781,7 @@ function composeBody(config: AimeatConfig): string {
   body += ATELIER_AI_PATH_SECTION;
 
   body += '## Finishing\n\n';
-  body += 'Before you call it done: open the app at 390×844, 1280×900 and 1280×460 in BOTH '
+  body += 'Before you call it done: open the app at 390×844, 1280×900, 1280×460 and 1920×1080 in BOTH '
     + 'themes; `document.body.scrollWidth === document.documentElement.clientWidth` at every '
     + 'width; every state (loading, empty, error, signed-out) reached through `a.status(...)`; '
     + 'no console errors. Publish with `aimeat_app_publish` and pass `spec_token: '
@@ -839,7 +845,7 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
   full += '## First, a short interview\n\n'
     + MODEL_QUALITY_ADVICE + '\n'
     + 'Ask, in one message, and wait for answers:\n'
-    + '0. Which level: a quick prototype, an ordinary page or the finest ("Then propose" says what each gets)? If their first words say it ("just quick"), that is the answer.\n'
+    + '0. Do NOT ask the level: it is the finest unless the owner chose a lower one in their own words ("just quick", "plain is enough"); "Then propose" says how to say it.\n'
     + '1. What should the app do, in one or two sentences?\n'
     + '2. Who uses it — just you, or others too (shared data)?\n'
     + '3. How should it look and FEEL? (Map the answer to a look from the table below.)\n'

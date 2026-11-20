@@ -10,6 +10,7 @@
  * @structure FLOW_* string constants + buildResearchStep()/buildFinishChecklist() fragments
  * @usage import { FLOW_SKIP_PHRASE, buildResearchStep } from './flow-constants.js';
  * @version-history
+ *   (2026-11-20) The level is the finest unless the owner chose a lower one.
  *   (2026-11-19) The research step loads the Atelier skill and frames by level, genre or shell and
  *     platform sections; no tier. It is served as the Atelier platform section `research`.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -41,7 +42,7 @@ export function buildResearchStep(): string {
     let s = '## Step 0 — Research first (agents with AIMEAT MCP tools)\n';
     s += `If you have \`aimeat_*\` MCP tools, follow the ${FLOW_PHASES} flow — it is the promise an MCP connection makes: a better result than building cold.\n`;
     s += `1. RESEARCH: load \`${FLOW_TOOLS.atelierSkill}\` (\`${FLOW_TOOLS.skillGet}\`), then call \`${FLOW_TOOLS.overview}\` (pass your OWN model id — self-identify from your own configuration, never ask the user) — the owner's existing apps and template proposals are usually the fastest correct starting point; read the pitfalls for the areas you will touch.\n`;
-    s += '2. FRAME: the level first (a quick prototype, an ordinary page or the finest), then the genre or the shell, the platform sections the app needs, the capability packs, and whether the app needs its OWN users (the aimeat-iam pack for the gate + AIMEAT.iam for the panel) — decide this NOW, not after the data model exists.\n';
+    s += '2. FRAME: the level first (the finest, unless the owner chose a quick prototype or an ordinary page), then the genre or the shell, the platform sections the app needs, the capability packs, and whether the app needs its OWN users (the aimeat-iam pack for the gate + AIMEAT.iam for the panel) — decide this NOW, not after the data model exists.\n';
     s += '3. PROPOSE the frame to the user in 3-5 lines, in their words (level, design, start point: fork/template/scratch, who signs in) and adjust to their answer.\n';
     s += `SKIP CLAUSE: if the user says "${FLOW_SKIP_PHRASE}" (or equivalent), skip the research and the framing and build directly — the flow is a default, never a gate. Without MCP tools, go straight to the interview.\n\n`;
     return s;

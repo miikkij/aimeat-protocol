@@ -187,7 +187,7 @@
         "aimeat/src/services/app/size-health.ts",
         "aimeat/src/services/app/publish-next-steps.ts"
       ],
-      "digest": "sha256:cc10940baf1bd0c88fa8ada5"
+      "digest": "sha256:d11712706562afa3ea87fdb9"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-19",
@@ -207,7 +207,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:7449bf17adfdf1c659f09023"
+      "digest": "sha256:f44c48174429c4d1e161b205"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -543,7 +543,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:82d011b2868652cfe76d3a10",
+      "digest": "sha256:8e53aa61a380162182d1ea39",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -709,7 +709,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app/size-health.ts": "e20ea2e295dcdd51",
-      "aimeat/src/services/app/publish-next-steps.ts": "2b6b1926991469a8"
+      "aimeat/src/services/app/publish-next-steps.ts": "94127f6f0c64a3c8"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
@@ -717,8 +717,8 @@
       "aimeat/src/services/app/spec-gate.ts": "b414412b238a5b98"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/builder/atelier-prompt.ts": "cf79e0e13d69310d",
-      "aimeat/src/services/builder/atelier-layers.ts": "f44b8e64c53c5fe9",
+      "aimeat/src/services/builder/atelier-prompt.ts": "23bb81893ca47096",
+      "aimeat/src/services/builder/atelier-layers.ts": "859bc9cb1c06a27a",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "7cca5c1ee7fc64f9",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
@@ -830,7 +830,7 @@
     "project:aimeat-app-building": {
       "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
       "aimeat/src/routes/app-templates.ts": "960dd944924d2601",
-      "aimeat/src/services/builder/atelier-prompt.ts": "cf79e0e13d69310d",
+      "aimeat/src/services/builder/atelier-prompt.ts": "23bb81893ca47096",
       "aimeat/src/services/builder/app-prompt.ts": "785fc0f78cc3040f",
       "aimeat/src/services/app/publish.ts": "5187be36e9d0aed7",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",

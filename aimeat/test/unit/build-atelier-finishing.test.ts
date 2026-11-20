@@ -18,7 +18,7 @@ const finishing = body.slice(body.indexOf('## Finishing'));
 
 describe('the Atelier build spec, Finishing', () => {
   it('keeps the checks it had', () => {
-    expect(finishing).toContain('open the app at 390×844, 1280×900 and 1280×460 in BOTH themes');
+    expect(finishing).toContain('open the app at 390×844, 1280×900, 1280×460 and 1920×1080 in BOTH themes');
     expect(finishing).toContain('`document.body.scrollWidth === document.documentElement.clientWidth` at every width');
     expect(finishing).toContain('no console errors');
   });

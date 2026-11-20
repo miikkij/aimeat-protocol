@@ -282,8 +282,9 @@ moved under you says so.
 
 ## The shape of the work
 
-1. **Interview** — FIRST THE LEVEL (a quick prototype, an ordinary page or the finest; when the
-   owner's first words already say it, "just quick", that is the answer), then what the app does,
+1. **Interview** — THE LEVEL IS THE FINEST unless the owner chose a quick prototype or an
+   ordinary page in their own words ("just quick", "plain is enough"); do not ask it, say it in
+   the proposal. Then ask what the app does,
    who uses it, how it should FEEL (this picks the look preset), which languages, what it must not
    do. **The level decides the rest of this step.** On \`proto\`: ask what it does, who uses it and
    the languages, draw no layouts, no introduction, the data map only for shared data, and read the
@@ -315,8 +316,8 @@ moved under you says so.
    sells or announces, such as a landing page. The specification's part \`libraries\` says how it
    is built.
    **PROPOSE, THEN WAIT.** Before any code, show the owner what you are about to build and let
-   them choose. FIRST THE LEVEL they gave (ask it here if they did not), which is theirs to choose
-   and never yours: **a quick prototype**
+   them choose. FIRST THE LEVEL: the finest, unless they chose a lower one; say which you build
+   and that the lower two are theirs to pick: **a quick prototype**
    (a working draft to try one idea, the kit as it comes, no styling), **an ordinary page** (a
    ready layout and look from the Design Book, tidy and not distinctive), or **the finest** (a
    forked genre, the Book's proven parts, components of its own). All three are Atelier, in two
@@ -512,7 +513,9 @@ moved under you says so.
 6. **Imagery** — generate at most ONE hero and ONE empty-state image without asking
    (\`aimeat_image_generate\` → storage URL; the spec carries the style-word tables). Check the
    \`atelier.img.*\` cache first; never inline a data: URI. Zero images still looks finished.
-7. **Verify** — 390×844, 1280×900 and 1280×460, both themes, no horizontal scroll, every state
+7. **Verify** — 390×844, 1280×900, 1280×460 and 1920×1080, both themes, and the phone and the
+   desktop each as the layout the specification's part \`screens\` asks for (the desktop is never
+   the phone column stretched), no horizontal scroll, every state
    reachable, no console errors. Read the console with the browser's own warnings as well, for
    several seconds while the app works, and run an app that computes every frame once with the
    JavaScript compiler off (\`--js-flags=--jitless\`): the specification's "Finishing" says how
@@ -528,8 +531,8 @@ moved under you says so.
    the owner asked for and did not get.
 8. **Accept it beside the genre it forked.** (A \`proto\` or \`plain\` page forked no genre: the
    seven measured checks below are its acceptance.) ONE SIZE MATRIX holds for every check here and
-   in step 7, the specification's "Finishing" included: 390×844, 1280×900 and 1280×460, in both
-   themes. An Atelier app is finished when its screenshots at 390×844 and 1280×900, in both themes,
+   in step 7, the specification's "Finishing" included: 390×844, 1280×900, 1280×460 and
+   1920×1080, in both themes. An Atelier app is finished when its screenshots at 390×844 and 1280×900, in both themes,
    hold up NEXT TO the genre page it came from (open the genre at
    \`GET /v1/app-templates/genre-<id>\`, or the Design Book's genre shelf at
    \`GET /v1/designbook?kind=genre\`). Put the two pictures side by side and ask one question
