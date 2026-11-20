@@ -654,6 +654,7 @@ const ALL_SUITES = [
     'test/e2e-app-draft-edit.ts',
     'test/e2e-app-screenshot-capture.ts',
     'test/e2e-app-publish-gate.ts',
+    'test/e2e-app-ai-path.ts',
     'test/e2e-app-publish-scopes.ts',
     'test/e2e-app-playtest.ts',
     'test/e2e-app-ui.ts',

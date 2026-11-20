@@ -52,7 +52,7 @@ An app is not done when it is published and works. It is done when these six exi
 | Record | What it says | How it is written | The publish answer shows it as |
 |---|---|---|---|
 | **Agent face** | what the app does, for an agent that opens its address | `AIMEATAgentFace.publish` in the app | `next_steps.agent_face_present` |
-| **Bound skill** | how to USE the app | `aimeat_skill_publish`, `metadata.binding: app:{owner}/{file}` | `next_steps.bound_skills_count` |
+| **Bound skill** | how to USE the app through the person's own AI: where the data lives, the record shape, the rules, what the person confirms, the app tools | `aimeat_skill_publish`, `metadata.binding: app:{owner}/{file}` (Atelier section `ai-path`; an app that enforces a rule also gets app tools, section `app-tools`) | `next_steps.bound_skills_count`, `next_steps.ai_path` |
 | **Data map** | what the app is for, and per family of keys or files where it lives, who owns and reads it, and why there | `aimeat_datamap_set { app, data_map }` | `next_steps.data_map_present` |
 | **Design spec** | purpose, screens, data, decisions and why, AI and agents, open questions, traps | `aimeat_app_manage { action: "spec_set", filename, markdown }` (`spec` answers the outline) | `next_steps.design_spec_present` |
 | **Text about the app** | for a person who finds the app: what it does, for whom, how it is used; 150 to 400 words of checkable facts, no instructions to an AI | `aimeat_app_manage { action: "settings", filename, about, about_lang }` | `own_words` in the `seo` answer |

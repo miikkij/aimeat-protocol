@@ -929,7 +929,7 @@
   },
   "test/e2e-core-jobs.ts": {
    "ownHarness": 1,
-   "lines": 811
+   "lines": 810
   },
   "test/e2e-cortex-board-ownership.ts": {
    "ownHarness": 1
@@ -2197,7 +2197,7 @@
   },
   "test/e2e-skills.ts": {
    "ownHarness": 1,
-   "lines": 1719,
+   "lines": 1718,
    "lintErrors": 2
   },
   "test/e2e-sse-revocation.ts": {

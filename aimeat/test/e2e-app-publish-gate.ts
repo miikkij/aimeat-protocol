@@ -27,8 +27,6 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
- *   (2026-11-20) `ai_path`: an app with no skill and no tools is told so, a tool manifest is counted,
- *     and a quick prototype and a declared presentation get no line.
  *   (2026-11-19) One track: build-app hands out the Atelier token, a new non-Atelier page is warned
  *     whatever token it carried, and an update of a Classic app stays quiet.
  *   (2026-11-15) Audit M276: DOOR 3 asserts the refused draft left no catalogue row and no version.
@@ -514,29 +512,6 @@ const publish = (token: string, body: Record<string, unknown>) =>
             `a spec the app moved past is named with both versions: ${JSON.stringify(s2.design_spec)}`);
     });
 
-    await test('the publish answer says how the person\'s own AI uses the app, counts its tools, and goes quiet for a presentation', async () => {
-        const f = `gateaipath${Date.now()}.html`;
-        const body = { filename: f, mime_type: 'text/html', content: b64(app(f)), name: 'AI path app', description: 'An app the person works in through their AI.' };
-        const first = await publish(o.token, body);
-        assert(first.status === 201, `publish: ${first.status} ${JSON.stringify(first.body?.error)}`);
-        const s1 = first.body.data.next_steps ?? {};
-        assert(s1.ai_path_tools_count === 0 && /No bound skill/.test(String(s1.ai_path)) && String(s1.ai_path).includes('build-app-atelier/app-tools'),
-            `an app with no skill and no tools is told no AI can work in it, and where app tools are: ${JSON.stringify(s1.ai_path)}`);
-
-        const tool = { name: 'note_add', description: 'Adds one note', inputSchema: { type: 'object', properties: { text: { type: 'string' } } }, outputSchema: { type: 'object' } };
-        const w = await json('/v1/memory', { method: 'POST', headers: auth(o.token), body: JSON.stringify({ key: `apps.${f}.tools`, visibility: 'public', value: { version: 1, tools: [tool] } }) });
-        assert(w.status === 200 || w.status === 201, `tool manifest: ${w.status} ${JSON.stringify(w.body?.error)}`);
-        const second = await publish(o.token, body);
-        const s2 = second.body.data.next_steps ?? {};
-        assert(s2.ai_path_tools_count === 1 && /1 app tool\(s\)/.test(String(s2.ai_path)), `the tool is counted: ${JSON.stringify(s2)}`);
-
-        const shown = app(f).replace('</head>', '<meta name="aimeat-ai-path" content="none"></head>');
-        const third = await publish(o.token, { ...body, content: b64(shown) });
-        assert(third.status === 201, `publish: ${third.status} ${JSON.stringify(third.body?.error)}`);
-        const s3 = third.body.data.next_steps ?? {};
-        assert(s3.ai_path === undefined && s3.ai_path_tools_count === undefined, `a declared presentation gets no ai_path line: ${JSON.stringify(s3.ai_path)}`);
-    });
-
     await test('the same registerless app publishes when its owner chose a quick prototype, is told its level, and is warned once it is styled by hand', async () => {
         const f = `gateproto${Date.now()}.html`;
         const level = (html: string, l: string) => html.replace('<meta name="aimeat-track"', `<meta name="aimeat-level" content="${l}">\n<meta name="aimeat-track"`);
@@ -545,7 +520,6 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(r.status === 201, `a prototype owes no register: ${r.status} ${JSON.stringify(r.body?.error)}`);
         assert(/QUICK PROTOTYPE/.test(r.body.data.next_steps?.level ?? ''), `the publish says the level back: ${JSON.stringify(r.body.data.next_steps)}`);
         assert(!r.body.data.next_steps?.acceptance && !r.body.data.next_steps?.design_book, 'a prototype is not judged beside a genre and owes the Design Book nothing');
-        assert(r.body.data.next_steps?.ai_path === undefined, `a quick prototype is not asked for an AI path: ${JSON.stringify(r.body.data.next_steps?.ai_path)}`);
         assert(hintsOf(r, 'below-level').length === 0, `a bare prototype is at its level: ${JSON.stringify(hintsOf(r, 'below-level'))}`);
 
         const sheet = Array.from({ length: 30 }, (_, i) => `.own-piece-${i} { margin: ${i}px; }`).join('\n');
