@@ -9,10 +9,14 @@
  *   for moving on) and the model policy (open, the recommended models, or the owner's own list, and
  *   whose calls it covers). Pure render over ctx.pv (ai/use-providers.js), on the page's existing
  *   components.
- * @structure secProviders · offLines · providerRow · providerOpen · addForm · classifierOptions · classifierRow · regionRows ·
- *   secRouting · secPolicy
+ * @structure secProviders · offLines · providerRow · providerOpen · modelControl · capEditor · addForm · classifierOptions ·
+ *   classifierRow · regionRows · secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.10.0 — 2026-11-20 — A capability's model is chosen from a list (modelControl, the Model picker):
+ *     the models the person may use for it, searchable while typing, with their prices, and a field
+ *     for an id the list lacks; a chosen model outside the list is marked; a line says when the
+ *     operator locks the models. A local, OpenAI-compatible or extension provider keeps the typed id.
  *   v1.9.0 — 2026-11-01 — The routing rules name the server's AI region choice (ai.region_mode) and
  *     what it means; on the own-key choice the line asks for one's own key until it is there.
  *   v1.8.0 — 2026-10-31 — The routing rules end with where OpenRouter processes the server's-key calls
@@ -67,7 +71,8 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line, Space } from '/components/Layout.js';
 import { HelpLabel } from '/components/HelpTip.js';
 import { x, dateWord } from './frame.js';
-import { CAPS, PROVIDER_TYPES, slug, capPatchOf, testableCapOf, untestedIn } from './use-providers.js';
+import { CAPS, CATALOGUED, PROVIDER_TYPES, slug, capPatchOf, testableCapOf, untestedIn } from './use-providers.js';
+import { ModelPicker } from '/components/ModelPicker.js';
 import { t } from '/js/i18n.js';
 
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
@@ -237,6 +242,31 @@ function providerOpen(ctx, p) {
 }
 
 const STT_LANGS = ['', 'fi', 'en', 'sv', 'de', 'fr', 'es', 'et'];
+/** The picker's modality for a capability (components/ModelPicker.js ranks and prices by it). */
+const PICKER_MODALITY = { vision: 'vision', speech: 'speech', transcription: 'transcription' };
+
+/**
+ * A capability's model. A provider type the model catalogue lists gets the picker: the models this
+ * person may use for the capability (pv.models, GET /v1/ai/models with allowed=true, so the
+ * operator's list and the owner's model policy decide), searchable while typing, with their prices,
+ * and a field for an id the list lacks. A chosen model outside that list is marked. A local,
+ * OpenAI-compatible or extension provider's models are its own, so its model stays a typed id.
+ * While the operator locks the models, the line says the choice here is not used.
+ */
+function modelControl(pv, p, c, d, set) {
+  const label = x('pv.modelFor', { cap: x('cap.' + c) });
+  const locked = !!pv.policy?.operator?.locked;
+  const lockLine = locked ? html`<${Note} kind="state" tone="attention">${x('pv.modelsLocked')}<//>` : null;
+  if (!CATALOGUED.includes(p.type)) {
+    return html`${lockLine}<${TextField} value=${d.model ?? ''} placeholder=${x('pv.modelPlaceholder')} ariaLabel=${label} onInput=${(v) => set({ model: v })} />`;
+  }
+  const list = pv.models[`${p.type}:${c}`];
+  if (!list) return html`${lockLine}<${Note} kind="loading">${x('pv.modelsLoading')}<//>`;
+  return html`${lockLine}<${ModelPicker} ariaLabel=${label} value=${(d.model ?? '').trim()} onChange=${(id) => set({ model: id })}
+    models=${list} modality=${PICKER_MODALITY[c] || 'chat'} allowCustom isOpenRouter=${p.type === 'openrouter'}
+    disabled=${pv.busy === 'cap'} searchLabel=${x('pv.modelSearch', { n: list.length })}
+    notInListLabel=${x('pv.modelNotAllowed')} customLabel=${x('pv.modelCustom')} customHint=${x('pv.modelCustomHint')} />`;
+}
 
 /**
  * One capability's editor: its model, and the settings its kind takes (the speech voice, the
@@ -250,14 +280,14 @@ function capEditor(pv, p, c) {
   const num = (key, min, max, step) => html`
     <${TextField} label=${x('param.' + key)} help=${'ai.' + key} type="number" size="short" min=${min} max=${max} step=${step} value=${d[key] ?? ''} placeholder=${x('default')} onInput=${(v) => set({ [key]: v })} />`;
   return html`
-    <${Line} wrap gap="small">
-      <${TextField} value=${d.model ?? ''} placeholder=${x('pv.modelPlaceholder')} ariaLabel=${x('pv.modelFor', { cap: x('cap.' + c) })} onInput=${(v) => set({ model: v })} />
+    ${modelControl(pv, p, c, d, set)}
+    ${c === 'speech' || c === 'transcription' || (c === 'files' && p.type === 'openrouter') ? html`<${Line} wrap gap="small">
       ${c === 'speech' ? html`<${TextField} value=${d.voice ?? ''} placeholder=${x('pv.voicePlaceholder')} ariaLabel=${x('pv.voice')} onInput=${(v) => set({ voice: v })} />` : null}
       ${c === 'transcription' ? html`<${Select} fit ariaLabel=${x('pv.language')} value=${d.language ?? ''} onChange=${(v) => set({ language: v })}
           options=${STT_LANGS.map((code) => [code, code ? t('profile.openrouter.stt.lang_' + code) : x('sttLangDetect')])} />` : null}
       ${c === 'files' && p.type === 'openrouter' ? html`<${Select} fit label=${x('pv.parser')} help="ai.pdf_engine" value=${d.parser ?? ''} onChange=${(v) => set({ parser: v })}
           options=${[['', x('pv.parserNone')], ['native', x('pv.parserNative')], ['mistral-ocr', 'Mistral OCR'], ['cloudflare-ai', 'Cloudflare AI']]} />` : null}
-    <//>
+    <//>` : null}
     ${tuning ? html`
       <${Note} kind="meta">${x('pv.tuning')}<//>
       <${Line} wrap gap="medium">

@@ -13,6 +13,9 @@
  *   askedFor · testableCapOf · untestedIn
  * @usage const pv = useProviders(); … renderProviders(ctx) reads ctx.pv
  * @version-history
+ *   v1.6.0 — 2026-11-20 — pv.models: the models an opened provider's capability may use (GET
+ *     /v1/ai/models with allowed=true, so the operator's list and the owner's policy decide), per
+ *     `<type>:<capability>`, for the model picker; CATALOGUED names the types the catalogue lists.
  *   v1.5.0 — 2026-10-02 — untestedIn: the providers of one capability's routing list that "Only tested
  *     providers" skips (an owner's, on, never tested), for the routing row's warning and its Test now.
  *   v1.4.0 — 2026-10-02 — The way to a test (Jouni: the person was not led to it): a settingsUrl
@@ -34,6 +37,7 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { swallowed } from '/js/swallowed.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
+import { listingOf } from '/js/services/ai-connection.js';
 import { readPolicy, writePolicy } from '/js/services/classification.js';
 import { x } from './frame.js';
 
@@ -75,6 +79,11 @@ export const PROVIDER_TYPES = {
   'openai-compatible': ['text', 'vision', 'image', 'speech', 'transcription', 'embed'],
   extension: CAPS,
 };
+
+/** The provider types whose models the node's catalogue lists (services/ai/catalog/types.ts
+ *  CATALOG_TYPES that an owner's provider can have). A local, OpenAI-compatible or extension
+ *  provider's models are its own, so its model stays a typed id. */
+export const CATALOGUED = ['openrouter', 'openai', 'anthropic', 'mistral', 'xai'];
 
 /** A provider id from a name: lower-case letters, digits and '-', 2 to 63 characters. */
 export function slug(title) {
@@ -244,6 +253,25 @@ export function useProviders({ confirm, toast }) {
   const providers = view?.providers || [];
   const owned = providers.filter((p) => p.source === 'owner');
   const find = (id) => providers.find((p) => p.id === id);
+
+  // The models an opened provider's capability may use (GET /v1/ai/models ... allowed=true: the
+  // operator's list and the owner's policy, on a provider that serves it), per `<type>:<capability>`,
+  // for the model picker. Fetched once per key while the page is open; a saved policy drops them.
+  const [models, setModels] = useState({});
+  const asking = useRef(new Set());
+  useEffect(() => {
+    const p = openId ? (view?.providers || []).find((x) => x.id === openId) : null;
+    if (!p || !CATALOGUED.includes(p.type)) return;
+    for (const c of CAPS) {
+      const key = `${p.type}:${c}`;
+      if (!p.capabilities?.[c]?.enabled || models[key] || asking.current.has(key)) continue;
+      asking.current.add(key);
+      apiGet(`/v1/ai/models?type=${encodeURIComponent(p.type)}&capability=${encodeURIComponent(c)}&allowed=true`)
+        .then((r) => setModels((m) => ({ ...m, [key]: Array.isArray(r?.data?.models) ? r.data.models.map(listingOf) : [] })))
+        .catch((e) => { swallowed('ai: models', e); setModels((m) => ({ ...m, [key]: [] })); })
+        .finally(() => asking.current.delete(key));
+    }
+  }, [openId, view, models]);
 
   const toggle = (id) => {
     setOpenId((cur) => (cur === id ? null : id));
@@ -467,6 +495,8 @@ export function useProviders({ confirm, toast }) {
       const r = await apiPut('/v1/ai/policy', { policy: { mode: policyDraft.mode, ...(policyDraft.mode === 'custom' ? { allow } : {}), appliesTo: policyDraft.appliesTo } });
       if (r?.ok === false) throw r;
       editPolicy(false);
+      // The models each capability may use follow the policy: the pickers ask again.
+      setModels({});
       flash(x('pol.saved'));
       await load();
     } catch (e) { flash(errText(e, x('saveFailed')), true); }
@@ -477,7 +507,7 @@ export function useProviders({ confirm, toast }) {
   const testNow = (p, cap) => { openAt(p, cap); test(p, false, cap); };
 
   return {
-    view, policy, classifier, decideProviders, ccDraft, setCcDraft, error, providers, owned, openId, adding, draft, keyDraft, modelDraft, testCap,
+    view, policy, classifier, decideProviders, ccDraft, setCcDraft, error, providers, owned, openId, adding, draft, keyDraft, modelDraft, testCap, models,
     routeDraft, rulesDraft, policyDraft, busy, msg, addMsg, routeMsg, policyMsg, off, failing,
     load, toggle, setAdding, setDraft, toggleDraftCap, add, setKeyDraft, saveKey, removeKey,
     setModelDraft: (c, patch) => setModelDraft((d) => ({ ...d, [c]: { ...(d[c] || capDraftOf(null)), ...patch } })), saveCap, setTestCap, test, testNow, remove, find,

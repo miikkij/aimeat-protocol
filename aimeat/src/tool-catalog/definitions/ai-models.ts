@@ -7,6 +7,8 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   2026-11-20 — aimeat_ai_provider_model_set: one capability's model of the owner's own provider,
+ *     propose-then-confirm, checked against the operator's lock, the catalogue and the model rules.
  *   2026-11-02 — aimeat_ai_gen_rules_set: an exception may name an ecosystem app, eco:<name> (secaudit2026nov02d round 13).
  *   2026-11-07 — aimeat_ai_routing_set names routing.model, an agent's own text model (the chat's is agent "chat").
  *   2026-10-31 — aimeat_ai_routing_set names rules.openrouterRegion and rules.openrouterRegionFallback, and
@@ -164,6 +166,32 @@ export const aiModelTools = [
       + 'A model is refused (AI_MODELS_LOCKED) when the operator locks the models. A named capability\'s list replaces the old one.',
     input: {
       routing: { type: 'object', description: '{ defaults?: {capability: [provider ids]}, rules?: {...}, agent?: name, model?: model id or null (with agent) }. Omit to read.' },
+      confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
+    },
+  },
+  {
+    name: 'aimeat_ai_provider_model_set',
+    caller: 'agent',
+    visibility: agentEverywhere,
+        annotations: { title: 'Set an AI Provider\'s Model (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // The model a provider's capability uses is the owner's setting, and the owner's money: the same
+        // words as the routing, which decides the same kind of thing.
+        scope: ['memory:write-reserved', 'ai:use'],
+        surfaces: ['agent', 'admin'],
+    description: 'Change the model one capability of the owner\'s OWN provider uses (the model every call on that '
+      + 'provider gets when it names none), with PROPOSE-THEN-CONFIRM. Without confirm_token: changes NOTHING and '
+      + 'returns the current and the proposed model with their prices per million tokens, any warnings, and a '
+      + 'single-use token (10 min) bound to exactly that change; show it to the owner. With the token: applies it. '
+      + 'Refused when the operator locks the models (AI_MODELS_LOCKED), when the catalogue says the model does not '
+      + 'serve the capability (INVALID_PROVIDER), and when the model rules (the operator\'s list and the owner\'s '
+      + 'policy) allow it for nobody (AI_MODEL_NOT_ALLOWED, with the allowed models). A model some callers may not use '
+      + 'is saved with a warning naming them. Find the models with aimeat_ai_models { capability, type, allowed: true }. '
+      + 'The provider\'s key stays on the AI settings page; this tool never sees it. Test the new model with '
+      + 'aimeat_ai_provider_test.',
+    input: {
+      provider: { type: 'string', description: 'The id of one of the owner\'s own providers, from aimeat_ai_providers.', required: true },
+      capability: { type: 'string', description: 'text (default) | vision | files | image | speech | transcription | embed.' },
+      model: { type: 'string', description: 'The model id, e.g. deepseek/deepseek-v4.1-flash, or a ref from aimeat_ai_models (openrouter:deepseek/deepseek-v4.1-flash).', required: true },
       confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
     },
   },

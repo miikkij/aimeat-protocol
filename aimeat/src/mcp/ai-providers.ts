@@ -3,20 +3,23 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The MCP tools for the owner's AI providers and routing (System 2 plan, V3):
- *   aimeat_ai_providers, aimeat_ai_provider_test and aimeat_ai_routing_set.
+ *   aimeat_ai_providers, aimeat_ai_provider_test, aimeat_ai_provider_model_set and aimeat_ai_routing_set.
  *
- *   They do no work of their own: aiProvidersView(), testProvider() and setRouting() are the functions
- *   GET /v1/ai/providers, POST /v1/ai/providers/:id/test and PUT /v1/ai/routing call
- *   (services/ai/provider-store.ts, provider-test.ts, routing.ts). There is deliberately no tool that
- *   sets a key or adds a provider: a key typed into a chat stays in that chat's history on a service
- *   the node does not control, so the owner sets it on the web page. A routing change over MCP is a
- *   proposal first, whoever is connected.
+ *   They do no work of their own: aiProvidersView(), testProvider(), setProviderModel() and setRouting()
+ *   are the functions GET /v1/ai/providers, POST /v1/ai/providers/:id/test,
+ *   PUT /v1/ai/providers/:id/model and PUT /v1/ai/routing call (services/ai/provider-store.ts,
+ *   provider-test.ts, provider-model.ts, routing.ts). There is deliberately no tool that sets a key or
+ *   adds a provider: a key typed into a chat stays in that chat's history on a service the node does
+ *   not control, so the owner sets it on the web page. A routing change or a provider's model change
+ *   over MCP is a proposal first, whoever is connected.
  *
  *   The AI roles live here too: aimeat_ai_roles and aimeat_ai_role_set call aiRolesView() and
  *   setRoles() (services/ai/roles-view.ts, roles.ts), the functions GET and PUT /v1/ai/roles call. A
  *   change to the roles or a binding of an app's role is a proposal the owner confirms, as the routing is.
  * @structure registerAiProviderTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-11-20 — aimeat_ai_provider_model_set: one capability's model of the owner's own provider,
+ *     propose-then-confirm (services/ai/provider-model.ts).
  *   2026-11-07 — aimeat_ai_routing_set passes the operator's model lock, so an agent's own model is refused while it holds.
  *   2026-11-04 — The payer is the session principal's caller facts (`principalCaller(gaii).payer`), the
  *     answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
@@ -39,6 +42,7 @@ import { AiCompletionError } from '../services/ai/errors.js';
 import { aiProvidersView, knownProviderIds } from '../services/ai/provider-store.js';
 import { testProvider } from '../services/ai/provider-test.js';
 import { setRouting } from '../services/ai/routing.js';
+import { setProviderModel } from '../services/ai/provider-model.js';
 import { modelsLocked } from '../services/ai/node-model-rules.js';
 import { setRoles } from '../services/ai/roles.js';
 import { aiRolesView, knownRoleProviders } from '../services/ai/roles-view.js';
@@ -99,6 +103,25 @@ export function registerAiProviderTools(
         return text(await setRouting(storage, payer, routing, await knownProviderIds(storage, config, payer), {
           kind: 'agent', principal, ...(confirm_token ? { confirmToken: confirm_token } : {}),
         }, { modelsLocked: modelsLocked(config) }));
+      } catch (e) { return refusal(e); }
+    },
+  );
+
+  mcp.registerTool(
+    'aimeat_ai_provider_model_set',
+    {
+        description: descriptionFor('aimeat_ai_provider_model_set'),
+        inputSchema: zodShapeFor('aimeat_ai_provider_model_set'),
+        annotations: annotationsFor('aimeat_ai_provider_model_set'),
+    },
+    async ({ provider, capability, model, confirm_token }) => {
+      // Over MCP a change is a proposal first, whoever is connected, as for the routing above.
+      const principal = getAgentGaii();
+      const { payer } = principalCaller(principal).payer;
+      try {
+        return text(await setProviderModel(storage, config, payer, { provider, capability, model }, {
+          kind: 'agent', principal, ...(confirm_token ? { confirmToken: confirm_token } : {}),
+        }));
       } catch (e) { return refusal(e); }
     },
   );

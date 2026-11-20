@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.81.0 -- 2026-11-20 -- Which provider answers: aimeat_ai_provider_model_set, a provider's model by proposal.
  *   v1.80.0 -- 2026-11-20 -- What you may do without asking: aimeat_ai_standing_get, the owner's "Allow
  *     always" setting (services/ai-standing/).
  *   v1.79.0 -- 2026-11-19 -- Customer due diligence in an obliged organism: aimeat_kyc_customer,
@@ -638,7 +639,11 @@ Mistral, xAI or OpenRouter account, a model on their own machine) beside the nod
 \`aimeat_ai_providers\` lists them with what each serves and whether it is working; name one in a call
 with \`provider\`, or let the owner's routing choose and fall back. \`aimeat_ai_provider_test\` checks
 one (an image test costs a picture: ask first). \`aimeat_ai_routing_set\` proposes which provider comes
-first per capability and the fallback rules; the owner confirms. A key is set only by the owner on
+first per capability and the fallback rules; the owner confirms. \`aimeat_ai_provider_model_set\`
+proposes the model one capability of an owner's own provider uses, with the current and the new
+model's price; the owner confirms, and the node refuses a model their model policy or the operator's
+list allows nobody. Find the models first with \`aimeat_ai_models { capability, type, allowed: true }\`.
+A key is set only by the owner on
 the web page: never ask for one in chat. A refusal \`AI_CAPABILITY_UNAVAILABLE\` lists each provider
 with the reason it was left out; tell your owner its \`fix\` (their sentence) and give them its
 \`settingsUrl\`, which opens their AI settings where it is fixed; \`agentFix\` is for you. When the

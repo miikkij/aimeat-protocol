@@ -16,6 +16,10 @@
  *              test spends like a call and shows no key.
  *     change the routing   the owner applies at once; an agent with memory:write-reserved proposes
  *              and confirms with the token, the model policy's pattern; an app never.
+ *     change one capability's model of a provider   the same as the routing: the owner applies at
+ *              once, an agent with memory:write-reserved proposes and confirms, an app never. The
+ *              checks (the operator's lock, the catalogue, the model rules) are setProviderModel's
+ *              (services/ai/provider-model.ts), which aimeat_ai_provider_model_set calls too.
  * @structure
  *   aiProvidersRouter(config, storage)
  *     GET    /v1/ai/providers
@@ -23,10 +27,14 @@
  *     DELETE /v1/ai/providers/:id
  *     PUT    /v1/ai/providers/:id/key
  *     DELETE /v1/ai/providers/:id/key
+ *     PUT    /v1/ai/providers/:id/model
  *     POST   /v1/ai/providers/:id/test
  *     GET    /v1/ai/routing
  *     PUT    /v1/ai/routing
  * @version-history
+ *   v1.5.0 — 2026-11-20 — PUT /v1/ai/providers/:id/model: one capability's model, by the owner or by an
+ *     agent's confirmed proposal, checked against the operator's lock, the catalogue and the model rules.
+ *     PUT /v1/ai/providers/:id answers the model rules' warnings beside the catalogue's.
  *   v1.4.0 — 2026-11-07 — PUT /v1/ai/routing takes `model` with `agent` (an agent's own text model, the
  *     chat's is agent "chat") and refuses it while the operator locks the models (Jouni, 2026-11-07).
  *   v1.3.1 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
@@ -57,6 +65,7 @@ import {
 import { providerView } from '../services/ai/providers.js';
 import { testProvider } from '../services/ai/provider-test.js';
 import { setRouting } from '../services/ai/routing.js';
+import { setProviderModel, providerModelWarnings } from '../services/ai/provider-model.js';
 import { modelsLocked } from '../services/ai/node-model-rules.js';
 import type { AiCapability } from '../services/ai/types.js';
 import { aiCallerOf } from './ai-policy.js';
@@ -97,11 +106,42 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
   router.put('/v1/ai/providers/:id', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
     try {
       const p = await putOwnerAiProvider(storage, config, owner(req), req.params.id as string, req.body ?? {});
-      const { warnings } = catalogCheck(p);
+      // The catalogue's warnings, then the model rules' (the operator's list and the owner's policy).
+      const warnings = [...catalogCheck(p).warnings, ...await providerModelWarnings(storage, config, owner(req), p)];
       res.json(success(config.nodeId, { provider: providerView(p), ...(warnings.length ? { warnings } : {}) }, [
         { description: 'Set its key', method: 'PUT', url: `/v1/ai/providers/${p.id}/key` },
         { description: 'Test it', method: 'POST', url: `/v1/ai/providers/${p.id}/test` },
       ]));
+    } catch (e) { fail(res, e); }
+  });
+
+  // ── PUT /v1/ai/providers/:id/model ── one capability's model; the owner applies, an agent proposes
+  // and then confirms, as for the routing below.
+  router.put('/v1/ai/providers/:id/model', requireAuth(), requireScope(ROUTING_WRITE_SCOPE), async (req: Request, res: Response) => {
+    const auth = req.auth!;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    // One shape, the one the MCP twins send: { capability, model, confirm_token }, the provider in the path.
+    const input = { provider: req.params.id as string, capability: body.capability, model: body.model };
+    try {
+      if (isOwnerPrincipal(auth)) {
+        return res.json(success(config.nodeId, await setProviderModel(storage, config, owner(req), input, { kind: 'owner' }), [
+          { description: 'Test the new model', method: 'POST', url: `/v1/ai/providers/${req.params.id as string}/test` },
+        ]));
+      }
+      const caller = callerOf(req, config.nodeId, storage);
+      const { payer, agent } = caller.payer;
+      if (isForeignPrincipal(auth) || auth.roles.includes('app') || !agent) {
+        return res.status(403).json(error(config.nodeId, 'OWNER_ONLY',
+          'Only the owner, or an agent of theirs proposing a change the owner confirms, may change a provider\'s model.'));
+      }
+      if (!scopeIsCovered(auth.scopes ?? [], ROUTING_WRITE_SCOPE)) {
+        return res.status(403).json(error(config.nodeId, 'SCOPE_DENIED',
+          `Proposing a model change needs the ${ROUTING_WRITE_SCOPE} permission, which the owner grants to an agent that administers the account.`));
+      }
+      const token = typeof body.confirm_token === 'string' && body.confirm_token ? body.confirm_token : undefined;
+      res.json(success(config.nodeId, await setProviderModel(storage, config, payer, input, {
+        kind: 'agent', principal: caller.principal, ...(token ? { confirmToken: token } : {}),
+      })));
     } catch (e) { fail(res, e); }
   });
 

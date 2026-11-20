@@ -9,6 +9,7 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY · AI_GEN_RULES_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-11-20 — configure-routing: a provider's own model, aimeat_ai_provider_model_set (propose-then-confirm).
  *   2026-11-19 — configure-routing, aimeat-ai-model-policy, aimeat-gen-rules: an applied change leaves
  *     an ai_settings_changed account event naming who applied it (services/ai/settings-trail.ts).
  *   2026-11-08 — ai-transparency: what a receiver writes is said as what an incoming webhook writes
@@ -216,6 +217,16 @@ Three separate "routing" layers — identify which one the owner means:
    follow the owner's again. The built-in chat's model is agent \`chat\`, and the chat page sets it
    the same way; \`routing.agent_model\` on the read says which one is set. While the operator locks
    the models, setting one is refused with 403 \`AI_MODELS_LOCKED\`.
+   **A provider's own model** (the model every call on one of the owner's providers gets when it
+   names none, per capability) is \`aimeat_ai_provider_model_set { provider, capability, model }\`
+   (\`PUT /v1/ai/providers/{id}/model\`), propose-then-confirm like the routing: the proposal shows the
+   current and the new model with their prices per million tokens, show both to the owner. The node
+   refuses a model that does not serve the capability (\`INVALID_PROVIDER\`), one the model policy and
+   the operator's list allow nobody (\`AI_MODEL_NOT_ALLOWED\`, with the allowed ones), and any while
+   the operator locks the models (\`AI_MODELS_LOCKED\`); a model some callers may not use is saved
+   with a warning. Pick from \`aimeat_ai_models { capability, type, allowed: true }\`, and test the
+   new model with \`aimeat_ai_provider_test\` afterwards. Asked why the AI costs so much, read the
+   spend per model (\`aimeat_usage_report\`) and compare the provider's model with cheaper ones there.
    **Where OpenRouter processes a call** is the owner's to choose when the operator allows it:
    \`openrouterRegion\` eu (eu.openrouter.ai: servers in the EU or the EEA, the UK or Switzerland), us
    (us.openrouter.ai) or any (openrouter.ai, any country), and \`openrouterRegionFallback\`: what

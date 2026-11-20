@@ -22472,6 +22472,67 @@ paths:
         '404':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/ai/providers/{id}/model:
+    put:
+      operationId: setAiProviderModel
+      summary: Change the model one capability of the owner's own provider uses
+      description: >
+        Changes only that capability's model; the provider's key, address and other capabilities stay.
+        Checked before anything is written: the operator's lock (`ai.models_locked`, AI_MODELS_LOCKED),
+        the model catalogue (a model that does not serve the capability, INVALID_PROVIDER) and the model
+        rules for the owner's own calls, the chat, agents and apps (allowed for none of them,
+        AI_MODEL_NOT_ALLOWED; allowed for some, saved with a warning naming the others). The owner in
+        person applies at once. An agent of theirs holding `memory:write-reserved` proposes first: the
+        answer is the current and the proposed model with their prices and a confirm token bound to
+        exactly that change for ten minutes; the same body plus `confirm_token` applies it. An app
+        never. A model whose capability was tested before is untested again.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: 'The id of one of the owner''s own providers.' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model]
+              properties:
+                capability: { type: string, enum: [text, vision, files, image, speech, transcription, embed], description: 'Default text.' }
+                model: { type: string, maxLength: 200, description: 'A model id, or a ref <type>:<model id> of the provider''s own type.' }
+                confirm_token: { type: string, description: 'An agent only: the token of its proposal.' }
+      responses:
+        '200':
+          description: >
+            data { mode: applied, provider, capability, previous, model, warnings }, or for an agent's first
+            call data { mode: proposal, provider, capability, current, proposed, warnings, confirm_token,
+            expires_in_seconds, instructions }. A model is { model, name?, status?, price?: { in_per_mtok, out_per_mtok } }.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: INVALID_INPUT, or INVALID_PROVIDER (the provider's type or the model does not serve the capability).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          description: AI_MODELS_LOCKED, AI_MODEL_NOT_ALLOWED, OWNER_ONLY, SCOPE_DENIED, or a confirm token that does not match.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '404':
+          description: NOT_FOUND, no provider of the owner's own has that id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/ai/providers/{id}/test:
     post:
       operationId: testAiProvider

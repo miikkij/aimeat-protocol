@@ -7,6 +7,7 @@
  *   test/unit/cli-tool-param-forwarding.test.ts proves each one leaves the process.
  * @structure aiModelCliTools[] — registered by tool-dispatch/index.ts
  * @version-history
+ *   v1.6.0 — 2026-11-20 — aimeat_ai_provider_model_set over PUT /v1/ai/providers/:id/model.
  *   v1.5.0 — 2026-10-31 — aimeat_ai_gen_rules and aimeat_ai_gen_rules_set over GET and PUT /v1/ai/gen-rules.
  *   v1.4.0 — 2026-10-05 — Each definition writes its `name` literally beside the catalog spread, so
  *     check:field-reach's CodeQL query sees these tools; the connector serves them through here now
@@ -83,6 +84,19 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
       const token = optionalString(input, 'confirm_token');
       if (!routing && token === undefined) return client.get('/v1/ai/routing');
       return client.put('/v1/ai/routing', { ...(routing ? { routing } : {}), ...(token !== undefined ? { confirm_token: token } : {}) });
+    },
+  },
+  {
+    ...def('aimeat_ai_provider_model_set'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_provider_model_set',
+    handler: ({ client }, input) => {
+      const capability = optionalString(input, 'capability');
+      const token = optionalString(input, 'confirm_token');
+      return client.put(`/v1/ai/providers/${encodeURIComponent(requiredString(input, 'provider'))}/model`, {
+        model: requiredString(input, 'model'),
+        ...(capability !== undefined ? { capability } : {}), ...(token !== undefined ? { confirm_token: token } : {}),
+      });
     },
   },
   {

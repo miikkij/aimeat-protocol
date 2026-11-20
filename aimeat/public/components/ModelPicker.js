@@ -34,6 +34,9 @@
  *          searchLabel=${x('searchModels', { n: pool.length })} … />`
  *        html`<${ModelPicker} label=${t('profile.openrouter.model.default')} value=${model} onChange=${setModel} models=${models} />`
  * @version-history
+ *   v1.1.0 — 2026-11-20 — ModelPicker takes `notInListLabel`, `customLabel` and `customHint`: a page
+ *     whose list is the models the person may use says so (the AI page's provider models). Without
+ *     them the words are the classic settings' as before.
  *   v1.0.0 — 2026-09-26 — Initial: the three pickers of Settings (views/profile/openrouter/model-picker.js
  *     v1.12.0, the AI page's roleOpen and a calibration's picker) as one list with the rows as data
  *     (component plan C5).
@@ -131,11 +134,12 @@ function priceLabelFor(model, modality) {
 /**
  * The classic AI settings' model control. value: the chosen id ('' none); onChange(id); models: the
  * catalogue for this modality ('chat' | 'vision' | 'transcription' | 'speech'); allowNone; allowCustom;
- * isOpenRouter (rows link to openrouter.ai); disabled; noneLabel.
+ * isOpenRouter (rows link to openrouter.ai); disabled; noneLabel; notInListLabel (the mark on a chosen
+ * model the list lacks); customLabel and customHint (the typed id's field and the line under it).
  */
 export function ModelPicker(props) {
   const { value, onChange, models, modality = 'chat', allowNone = false, allowCustom = false,
-    isOpenRouter = true, disabled = false, noneLabel } = props;
+    isOpenRouter = true, disabled = false, noneLabel, notInListLabel, customLabel, customHint } = props;
   const [custom, setCustom] = useState('');
   // Vision is the chat catalogue filtered by what each model declares it accepts.
   const pool = useMemo(() => {
@@ -159,18 +163,19 @@ export function ModelPicker(props) {
     <div class="model-picker-head">
       <span class="model-picker-picked">
         ${value ? html`<${Code}>${value}<//>` : html`<${Note} kind="quiet" inline>${none}<//>`}
-        ${value && !known ? html`<${Mark} kind="status" tone="attention">${t('profile.openrouter.model.notInList')}<//>` : null}
+        ${value && !known ? html`<${Mark} kind="status" tone="attention">${notInListLabel || t('profile.openrouter.model.notInList')}<//>` : null}
       </span>
       ${value && allowNone ? html`<${Action} small disabled=${disabled} onClick=${() => onChange('')}>${t('profile.openrouter.model.clear')}<//>` : null}
     </div>`;
+  const customWords = customLabel || t('profile.openrouter.model.customIdPlaceholder');
   const foot = allowCustom ? html`
     <div class="model-picker-custom">
-      <${TextField} value=${custom} disabled=${disabled} placeholder=${t('profile.openrouter.model.customIdPlaceholder')}
-        ariaLabel=${t('profile.openrouter.model.customIdPlaceholder')} onInput=${setCustom}
+      <${TextField} value=${custom} disabled=${disabled} placeholder=${customWords}
+        ariaLabel=${customWords} onInput=${setCustom}
         onEnter=${(v) => { if (v.trim()) { onChange(v.trim()); setCustom(''); } }} />
       <${Action} small disabled=${disabled || !custom.trim()} onClick=${() => { onChange(custom.trim()); setCustom(''); }}>${t('profile.openrouter.model.customIdUse')}<//>
     </div>
-    <${Note}>${t('profile.openrouter.model.customIdHint')}<//>` : null;
+    <${Note}>${customHint || t('profile.openrouter.model.customIdHint')}<//>` : null;
 
   return html`<${ModelList} ...${props} models=${pool} recommended=${recommended} value=${value} off=${disabled}
     disabled=${disabled} match=${matchesQuery} onPick=${(m) => onChange(m.id)} head=${head} foot=${foot}

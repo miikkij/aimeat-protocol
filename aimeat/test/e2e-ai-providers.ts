@@ -19,9 +19,14 @@
  *   - the node under test: the runner's backend, its own port, a node key, the fixed-type overrides
  *   - 1-9: the nine cases of 09 section 3 (4 is in test/unit/ai-providers.test.ts: a public node)
  *   - F1-F9: the cases of 11 section 13 that run over HTTP (F3, F7 and F10 are unit or V5)
+ *   - M1-M2: one capability's model, by the owner and by an agent's confirmed proposal, and its refusals
  *   - R1-R3: the routing endpoint, the MCP tools and the deprecated routes
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-providers.ts
  * @version-history
+ *   v1.4.0 -- 2026-11-20 -- M1-M2: one capability's model (PUT /v1/ai/providers/:id/model and
+ *     aimeat_ai_provider_model_set): the owner applies, an agent proposes and applies only with the token
+ *     bound to that model, the account events name it; refused for a model the rules allow nobody, a
+ *     model without the capability, another owner, an app and an agent without the permission.
  *   v1.3.0 -- 2026-10-25 -- R1b: the routing shows the free model as the last resort (free_model) and the
  *     owner's own word on it, freeModelLastResort, set, refused when malformed, and set back to the
  *     node's default (secaudit2026oct22 follow-up).
@@ -586,6 +591,62 @@ const toolText = (r: any) => String(r?.result?.content?.[0]?.text ?? '');
       assert(applied.mode === 'applied', `applied: ${JSON.stringify(applied).slice(0, 200)}`);
       const after = await json('/v1/ai/routing', { headers: auth(d.token) });
       assert(JSON.stringify(after.body.data.routing.defaults.text) === JSON.stringify(['p-two']), `in force: ${JSON.stringify(after.body.data.routing.defaults)}`);
+    });
+
+    // ── one capability's model: PUT /v1/ai/providers/:id/model and aimeat_ai_provider_model_set ──
+    const m = await setupOwner('m');
+    const setModel = (token: string, id: string, body: Record<string, unknown>) =>
+      json(`/v1/ai/providers/${id}/model`, { method: 'PUT', headers: auth(token), body: JSON.stringify(body) });
+    const textModelOf = async (o: Owner, id: string) =>
+      ((await json('/v1/ai/providers', { headers: auth(o.token) })).body.data.providers.find((p: any) => p.id === id)?.capabilities?.text?.model as string | undefined);
+
+    await test('M1. the owner changes a provider\'s text model at once; an agent over MCP proposes with both prices and applies only with the token bound to that model', async () => {
+      const p = await put(m, 'my-or', { title: 'My OpenRouter', type: 'openrouter', capabilities: { text: { enabled: true, model: 'deepseek/deepseek-v4-pro-0813', pool: true } } });
+      assert(p.status === 200, `put ${p.status}: ${JSON.stringify(p.body?.error)}`);
+      const own = await setModel(m.token, 'my-or', { capability: 'text', model: 'deepseek/deepseek-v4.1-flash' });
+      assert(own.status === 200 && own.body.data.mode === 'applied', `owner ${own.status}: ${JSON.stringify(own.body?.error ?? own.body.data).slice(0, 300)}`);
+      assert(own.body.data.previous.model === 'deepseek/deepseek-v4-pro-0813' && typeof own.body.data.model.price?.out_per_mtok === 'number', `facts: ${JSON.stringify(own.body.data.model)}`);
+      assert(await textModelOf(m, 'my-or') === 'deepseek/deepseek-v4.1-flash', 'stored');
+
+      const agent = await connectAgent(m, `aiprovmodel${Date.now()}`, ['ai:use', 'memory:write-reserved']);
+      const proposal = JSON.parse(toolText(await mcpCall(agent, 'aimeat_ai_provider_model_set', { provider: 'my-or', model: 'openrouter:deepseek/deepseek-v4-flash-0731' })));
+      assert(proposal.mode === 'proposal' && typeof proposal.confirm_token === 'string', `proposal: ${JSON.stringify(proposal).slice(0, 300)}`);
+      assert(proposal.current.model === 'deepseek/deepseek-v4.1-flash' && proposal.proposed.model === 'deepseek/deepseek-v4-flash-0731', `the two models: ${JSON.stringify([proposal.current, proposal.proposed])}`);
+      assert(await textModelOf(m, 'my-or') === 'deepseek/deepseek-v4.1-flash', 'nothing changed before the confirmation');
+      const other = toolText(await mcpCall(agent, 'aimeat_ai_provider_model_set', { provider: 'my-or', model: 'deepseek/deepseek-v4-pro', confirm_token: proposal.confirm_token }));
+      assert(!other.includes('"applied"') && await textModelOf(m, 'my-or') === 'deepseek/deepseek-v4.1-flash', `a token for another model applies nothing: ${other.slice(0, 200)}`);
+      const proposal2 = JSON.parse(toolText(await mcpCall(agent, 'aimeat_ai_provider_model_set', { provider: 'my-or', model: 'openrouter:deepseek/deepseek-v4-flash-0731' })));
+      const applied = JSON.parse(toolText(await mcpCall(agent, 'aimeat_ai_provider_model_set', { provider: 'my-or', model: 'openrouter:deepseek/deepseek-v4-flash-0731', confirm_token: proposal2.confirm_token })));
+      assert(applied.mode === 'applied', `applied: ${JSON.stringify(applied).slice(0, 200)}`);
+      assert(await textModelOf(m, 'my-or') === 'deepseek/deepseek-v4-flash-0731', 'in force');
+      const events = await json('/v1/account/events?limit=10', { headers: auth(m.token) });
+      const trail = (events.body.data?.events ?? []).filter((e: any) => e.kind === 'ai_settings_changed' && e.data?.changed === 'provider model');
+      assert(trail.some((e: any) => String(e.data.by ?? '').startsWith('aiprovmodel')), `the agent is named on the account events: ${JSON.stringify(trail)}`);
+    });
+
+    await test('M2. a model change is refused for a model the rules allow nobody, a model without the capability, another owner\'s provider, an app and an agent without the permission; the page\'s save warns', async () => {
+      const pol = await json('/v1/ai/policy', { method: 'PUT', headers: auth(m.token), body: JSON.stringify({ policy: { mode: 'custom', allow: ['openrouter:deepseek/deepseek-v4.1-flash'], appliesTo: { owner: true, chat: true, agents: true, apps: true } } }) });
+      assert(pol.status === 200, `policy ${pol.status}: ${JSON.stringify(pol.body?.error)}`);
+      const denied = await setModel(m.token, 'my-or', { model: 'deepseek/deepseek-v4-pro' });
+      assert(denied.status === 403 && denied.body.error?.code === 'AI_MODEL_NOT_ALLOWED', `not allowed: ${denied.status} ${JSON.stringify(denied.body?.error)}`);
+      assert(JSON.stringify(denied.body.error.details?.allowed) === JSON.stringify(['openrouter:deepseek/deepseek-v4.1-flash']), `names the allowed: ${JSON.stringify(denied.body.error.details)}`);
+      const allowedList = await json('/v1/ai/models?type=openrouter&capability=text&allowed=true', { headers: auth(m.token) });
+      assert(allowedList.body.data.models.map((x: any) => x.id).join() === 'deepseek/deepseek-v4.1-flash', `the picker's list follows the policy: ${allowedList.body.data.models.length}`);
+      const saved = await put(m, 'my-or', { title: 'My OpenRouter', type: 'openrouter', capabilities: { text: { enabled: true, model: 'deepseek/deepseek-v4-pro', pool: true } } });
+      assert(saved.status === 200 && (saved.body.data.warnings ?? []).some((w: string) => w.includes('not allowed')), `the page's save warns: ${JSON.stringify(saved.body.data?.warnings)}`);
+      assert((await json('/v1/ai/policy', { method: 'PUT', headers: auth(m.token), body: JSON.stringify({ policy: { mode: 'open' } }) })).status === 200, 'policy open again');
+
+      const noImage = await setModel(m.token, 'my-or', { capability: 'image', model: 'deepseek/deepseek-v4.1-flash' });
+      assert(noImage.status === 400 && noImage.body.error?.code === 'INVALID_PROVIDER', `no image: ${noImage.status} ${JSON.stringify(noImage.body?.error)}`);
+      const cross = await setModel(b.token, 'my-or', { model: 'deepseek/deepseek-v4.1-flash' });
+      assert(cross.status === 404, `another owner: ${cross.status}`);
+      const appToken = await appGrantToken(m, `provmodel${Date.now()}.html`);
+      const byApp = await setModel(appToken, 'my-or', { model: 'deepseek/deepseek-v4.1-flash' });
+      assert(byApp.status === 403, `an app: ${byApp.status}`);
+      const weak = await connectAgent(m, `aiprovweak${Date.now()}`, ['ai:use']);
+      const byWeak = await setModel(weak, 'my-or', { model: 'deepseek/deepseek-v4.1-flash' });
+      assert(byWeak.status === 403, `an agent without memory:write-reserved: ${byWeak.status}`);
+      assert(await textModelOf(m, 'my-or') === 'deepseek/deepseek-v4-pro', 'none of them changed the model');
     });
 
     await test('R3. the settings routes from before providers say they are deprecated, with their successor and removal; on 4.0.0 they answer 410 GONE naming the successor', async () => {

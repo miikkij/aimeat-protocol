@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description The account event an applied change to the person's AI settings writes: the routing
  *   (routing.ts setRouting), the model rules (policy-store.ts setOwnerAiPolicy), the roles (roles.ts
- *   setRoles) and the image rules (gen-rules-store.ts setOwnerGenRules).
+ *   setRoles), the image rules (gen-rules-store.ts setOwnerGenRules) and a provider's model
+ *   (provider-model.ts setProviderModel).
  *
  *   WHY. An agent proposes such a change and applies it with a confirm token the client holds, so the
  *   owner's confirmation happens in the chat, outside the node. Without a row the person could not
@@ -15,13 +16,14 @@
  * @structure AiSettingsChange · recordAiSettingsApplied(storage, ownerGhii, actor, changed)
  * @usage await recordAiSettingsApplied(storage, gaii, actor.kind === 'agent' ? actor.principal : null, 'routing');
  * @version-history
+ *   v1.1.0 — 2026-11-20 — 'provider model': the model of one capability of an owner's provider.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, report 2.3).
  */
 import type { Storage } from '../../storage/interface.js';
 import { recordAccountEvent } from '../account/events.js';
 
 /** Which AI setting changed, as the feed line names it. */
-export type AiSettingsChange = 'routing' | 'model rules' | 'roles' | 'image rules';
+export type AiSettingsChange = 'routing' | 'model rules' | 'roles' | 'image rules' | 'provider model';
 
 /**
  * Write the account event of an applied change. `by` is the agent's or app's identity when one
