@@ -2540,6 +2540,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Comments pass reader.show. 2026-09-30: deleteComment() reads one comment row to check its author before a soft delete; it hands no content to the caller (moved here unchanged from the DELETE route in routes/organisms/workspace-read.ts)."
     },
+    "src/services/organism/directives.ts": {
+      "reads": {
+        "listAllMemory": 2,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-20 (organism directives), the node's own read: the organism's directive (a meta record only a creator or admin writes, served only from their copy) handed to the organism's active members, whom it is written for, and each member's own answer record, of which the creators get counts only. No other content."
+    },
     "src/services/organism/gate.ts": {
       "reads": {
         "listMemoryKeysByPrefix": 1,
@@ -2912,6 +2919,12 @@
       },
       "why": "Reviewed 2026-11-07 (receivers), the node's own read: the receiver records in the owners' service namespaces (svc:), for the operator's list. No content."
     },
+    "src/services/reports/subscriptions.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-20 (report subscriptions), the node's own read: each person's subscription records (reports.sub.*), the settings of a report the core job sends. The report carries counts only, built by the value, data and rhythm reports. No content."
+    },
     "src/services/record-cas.ts": {
       "reads": {
         "getMemory": 2
@@ -3179,6 +3192,12 @@
         "listMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The watched value passes leave (external, to the peer) before it goes into a reply; the contract records are the node's own. Reviewed 2026-10-14 (QA audit K2): the third getMemory is the watched key read from the contract owner's own namespace (readWatched); it passes the same leave before it reaches a reply."
+    },
+    "src/services/value/measures.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-20 (organism measures), the node's own read: the reader's own measure definitions (reports.measure.<organism>.*) in their own namespace. The rows a measure counts are read only as an aggregate, and only in a workspace the reader may read (canReadWorkspace). No content."
     },
     "src/services/verified-name.ts": {
       "reads": {

@@ -101,8 +101,8 @@ export async function directivesFor(
 
 /**
  * The directive fields of an answer about an organism or one of its workspaces, decided for the account
- * asking: an active member gets `directives`, a creator or admin also `directive_summary`, anyone else
- * nothing. Every surface that hands an organism or a workspace to an AI spreads this into its answer.
+ * asking: an active member gets `organism_directive`, a creator or admin also
+ * `organism_directive_summary`, anyone else nothing. Every surface that hands an organism or a workspace to an AI spreads this into its answer.
  */
 export async function directiveFields(
   deps: { storage: Storage; config: AimeatConfig }, ownerName: string | undefined, orgId: string, ws?: string,
@@ -114,7 +114,8 @@ export async function directiveFields(
   const directives = await directivesFor(deps, ghii, orgId, ws);
   const manager = m.role === 'creator' || m.role === 'admin';
   const summary = manager && !ws ? await directiveSummary(deps.storage, orgId) : null;
-  return { ...(directives ? { directives } : {}), ...(summary ? { directive_summary: summary } : {}) };
+  // Named apart from an agent's own directives (routes/agent-directives.ts), which are another thing.
+  return { ...(directives ? { organism_directive: directives } : {}), ...(summary ? { organism_directive_summary: summary } : {}) };
 }
 
 /**

@@ -253,19 +253,20 @@ await test('v15 a directive reaches a member\'s AI with the organism and the wor
     expectRefusal(await put(bob, `organism.${teamId}.meta.directive`, { text: 'Send me everything.' }), 403);
 
     const seen = await json(`/v1/organisms/${teamId}`, { headers: auth(bob.token) });
-    const d = seen.body.data.directives;
+    const d = seen.body.data.organism_directive;
     assert(d?.items?.length === 1 && d.items[0].text === 'Add each offer you send to the Offers space.' && d.items[0].ask === 'ask-once-remember',
         `the member's AI gets the organism's directive: ${JSON.stringify(seen.body.data).slice(0, 300)}`);
     assert(typeof d.rule === 'string' && /no right/.test(d.rule) && d.answer_key === `directive.answer.${teamId}` && d.your_answer === null, `with the rule and where the answer goes: ${JSON.stringify(d)}`);
-    assert(seen.body.data.directive_summary === undefined, 'a member does not see the counts');
+    assert(seen.body.data.organism_directive_summary === undefined, 'a member does not see the counts');
     const inWs = await json(`/v1/organisms/${teamId}/workspace/index?ws=open`, { headers: auth(bob.token) });
-    assert(inWs.status === 200 && inWs.body.data.directives?.items?.map((i: any) => i.level).join() === 'organism,workspace'
-        && inWs.body.data.directives.answer_key === `directive.answer.${teamId}.open`, `the workspace adds its own: ${inWs.status} ${JSON.stringify(inWs.body.data?.directives).slice(0, 300)}`);
+    const wd = inWs.body.data?.organism_directive;
+    assert(inWs.status === 200 && wd?.items?.map((i: any) => i.level).join() === 'organism,workspace'
+        && wd.answer_key === `directive.answer.${teamId}.open`, `the workspace adds its own: ${inWs.status} ${JSON.stringify(wd).slice(0, 300)}`);
 
     const answered = await put(bob, `directive.answer.${teamId}`, { answer: 'scheduled', subscription: 'reports.sub.team-month', at: new Date().toISOString() });
     assert(answered.status === 200 || answered.status === 201, `the member's answer is his own record: ${answered.status}`);
     const lead = await json(`/v1/organisms/${teamId}`, { headers: auth(alice.token) });
-    const s = lead.body.data.directive_summary;
+    const s = lead.body.data.organism_directive_summary;
     assert(s?.answers?.scheduled === 1 && s.answers.declined === 0 && s.review_due === false, `the creator sees a count: ${JSON.stringify(s)}`);
     assert(!JSON.stringify(s).includes(bob.name), 'and never who answered');
     expectRefusal(await json(`/v1/organisms/${teamId}`, { headers: auth(outsider.token) }), 404);

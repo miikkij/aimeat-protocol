@@ -30,8 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
- *   2026-11-20 — readWorkspaceOp carries the organism's and the workspace's directive for a member
- *     (services/organism/directives.ts).
+ *   2026-11-20 — readWorkspaceOp's index carries the organism's and the workspace's directive for a
+ *     member (services/organism/directives.ts); a batch open does not, so it reads only what it opens.
  *   2026-11-20 — readWorkspaceOp records each record it opens by id for the value signals (services/value/signal-buffer.ts).
  *   2026-11-13 — readWorkspaceOp takes `archived` ('only' reads the archived content alone), as
  *     GET /v1/organisms/:id/workspace does (structure programme 2026-11, unit 3b).
@@ -326,8 +326,6 @@ export async function readWorkspaceOp(
         }
         return { ok: true, data: { organism_id: organismId, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}),
             ...(got.truncated ? { truncated: true } : {}),
-            // What the organism's creators ask a member's AI to do here (services/organism/directives.ts).
-            ...await directiveFields(deps, caller.ownerName, organismId, ws),
             ...(args.reader.warnings.length ? { classification_warnings: args.reader.warnings } : {}) } };
     }
 
@@ -362,6 +360,9 @@ export async function readWorkspaceOp(
     const schemas = await readWorkspaceSchemas(storage, organismId, ws);
 
     return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest, apps, rules, counts, index,
+        // What the organism's creators ask a member's AI to do here (services/organism/directives.ts).
+        // On the index only: a batch open reads nothing but the records it opens (C7), and the AI
+        // reads the index before it opens records.
         ...await directiveFields(deps, caller.ownerName, organismId, ws),
         // More rows than one read loads: the index is not the whole workspace (services/workspace/content.ts).
         ...(got.truncated ? { truncated: true } : {}),

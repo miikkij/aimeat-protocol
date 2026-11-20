@@ -121,7 +121,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       setGraph(g);
       setReadme(full?.data?.readme || '');
       setYourMembership(full?.data?.your_membership ?? null);
-      setDirective({ directives: full?.data?.directives ?? null, summary: full?.data?.directive_summary ?? null });
+      setDirective({ directives: full?.data?.organism_directive ?? null, summary: full?.data?.organism_directive_summary ?? null });
       setTocSeed(toc || '');
       setTimeline(rows);
     };
