@@ -32,7 +32,8 @@ import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { List, Row, Name, Cell, Doors } from '/components/List.js';
 import { Mark, Marks } from '/components/Mark.js';
-import { Action } from '/components/Action.js';
+import { Action, Actions } from '/components/Action.js';
+import { showLoginModal } from '/js/services/auth.js';
 import { Modal } from '/components/Modal.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { ModeTabs, ModeTab } from '/components/ModeTabs.js';
@@ -75,6 +76,7 @@ export function OrgWall({ owner }) {
   const [wall, setWall] = useState(null);
   const [failed, setFailed] = useState(false);
   const [denied, setDenied] = useState(false);
+  const [expired, setExpired] = useState(false);
   const [asking, setAsking] = useState(null);
   const stage = useRef(null);
 
@@ -96,15 +98,24 @@ export function OrgWall({ owner }) {
       setWall(res?.data ?? null);
       setFailed(false);
       setDenied(false);
+      setExpired(false);
     } catch (err) {
       // A link to an organism the person is not in is a refusal to say so, not a fault to retry.
       if (err?.status === 403 || err?.status === 404) { setDenied(true); setFailed(false); return; }
+      // A sign-in that ended (api.js already tried to refresh it) asks for a new sign-in, not a retry.
+      if (err?.status === 401) { setExpired(true); setFailed(false); return; }
       swallowed('org-wall: load', err);
       setFailed(true);
     }
   }, [org]);
 
-  useEffect(() => { setWall(null); setDenied(false); load(); }, [load]);
+  useEffect(() => { setWall(null); setDenied(false); setExpired(false); load(); }, [load]);
+  // After a sign-in anywhere on the page, ask again.
+  useEffect(() => {
+    const again = () => load();
+    window.addEventListener('aimeat-auth-change', again);
+    return () => window.removeEventListener('aimeat-auth-change', again);
+  }, [load]);
   useEffect(() => onLiveUpdate(['apps'], () => load()), [load]);
   // The capability titles and team names come in the page's language: a switch asks again.
   useEffect(() => onLocaleChange(() => load()), [load]);
@@ -115,7 +126,15 @@ export function OrgWall({ owner }) {
     if (ask && typeof ask.catch === 'function') ask.catch((err) => swallowed('org-wall: full screen', err));
   };
 
-  if (!owner) return html`<${Note} kind="lead">${w('signIn')}<//>`;
+  const signIn = () => {
+    const opened = showLoginModal({ onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')) });
+    if (!opened) location.href = '/v1/profile';
+  };
+  if (!owner || expired) {
+    return html`
+      <${Note} kind="lead">${w(owner ? 'expired' : 'signIn')}<//>
+      <${Actions}><${Action} onClick=${signIn}>${w('signInAction')}<//><//>`;
+  }
   if (orgs && orgs.length === 0) return html`<${Note} kind="lead">${w('noOrgs')}<//>`;
 
   const apps = wall?.apps || [];

@@ -12967,6 +12967,8 @@
   "goalStart.team.msgOrg": "El organismo de nuestro equipo en AIMEAT es {org}.",
   "appcat.orgWall.view": "Apps de la organización",
   "appcat.orgWall.signIn": "Inicia sesión para ver las apps que hicieron tus colegas.",
+  "appcat.orgWall.expired": "Tu sesión ha terminado. Inicia sesión de nuevo para ver las apps que hicieron tus colegas.",
+  "appcat.orgWall.signInAction": "Iniciar sesión",
   "appcat.orgWall.noOrgs": "Todavía no perteneces a ningún organismo. Cuando te unas al organismo de tu empresa o de una formación, las apps que tus colegas abran para él aparecerán aquí.",
   "appcat.orgWall.pickOrg": "Organismo",
   "appcat.orgWall.title": "{org}: apps de los colegas",

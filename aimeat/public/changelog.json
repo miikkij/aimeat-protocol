@@ -4,6 +4,50 @@
     {
       "date": "2026-11-20",
       "kind": "feature",
+      "id": "2026-11-20-your-organisations-apps-in-one-place",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your organisation's apps in one place",
+        "fi": "Organisaation omat apit yhdessä paikassa"
+      },
+      "body": {
+        "en": "Apps your colleagues open to your organisation now have their own page in My Apps: newest, by team, by capability, and today's training on a full screen. Each app has a prompt that asks your own AI how the app was made and what you could build with the same capabilities.",
+        "fi": "Apit, jotka kollegasi avaavat organisaatiollenne, näkyvät nyt omalla sivullaan Omissa sovelluksissa: uusimmat, tiimeittäin, kyvyn mukaan ja tämän päivän koulutus koko näytöllä. Jokaisessa apissa on kehote. Se kysyy omalta AI:ltasi, miten appi on tehty ja mitä sinä voisit rakentaa samoilla kyvyillä."
+      },
+      "summary": {
+        "en": "See the apps your colleagues made, and ask your AI how each one was built.",
+        "fi": "Näe kollegoidesi tekemät apit ja kysy AI:ltasi, miten kukin on tehty."
+      }
+    },
+    {
+      "date": "2026-11-20",
+      "kind": "feature",
+      "id": "2026-11-20-start-something-bigger",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Start something bigger",
+        "fi": "Aloita jotain isompaa"
+      },
+      "body": {
+        "en": "Say in your own words what you want AIMEAT to do for you, alone or with your team, and copy one message to your own AI. Your AI names the capabilities it needs before it builds, and you can change them.",
+        "fi": "Kerro omin sanoin, mitä haluat AIMEATin tekevän, yksin tai tiimin kanssa, ja kopioi yksi viesti omalle AI:llesi. Se kertoo tarvittavat kyvyt ennen kuin alkaa rakentaa, ja sinä voit muuttaa niitä."
+      },
+      "summary": {
+        "en": "Tell your AI what you want built; it names the capabilities first and you decide.",
+        "fi": "Kerro AI:llesi, mitä haluat rakentaa. Se kertoo ensin tarvittavat kyvyt, ja sinä päätät."
+      }
+    },
+    {
+      "date": "2026-11-20",
+      "kind": "feature",
       "id": "2026-11-20-reports-on-your-rhythm-and-what-ai-gave-you",
       "highlight": true,
       "audience": [

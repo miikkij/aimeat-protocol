@@ -13505,6 +13505,8 @@
   "goalStart.team.msgOrg": "Our team's organism on AIMEAT is {org}.",
   "appcat.orgWall.view": "Organisation's apps",
   "appcat.orgWall.signIn": "Sign in to see the apps your colleagues made.",
+  "appcat.orgWall.expired": "Your sign-in has ended. Sign in again to see the apps your colleagues made.",
+  "appcat.orgWall.signInAction": "Sign in",
   "appcat.orgWall.noOrgs": "You do not belong to an organism yet. When you join your company's or a training's organism, the apps colleagues open to it show here.",
   "appcat.orgWall.pickOrg": "Organism",
   "appcat.orgWall.title": "{org}: colleagues' apps",

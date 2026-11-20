@@ -14272,6 +14272,8 @@
   "goalStart.team.msgOrg": "Tiimimme organismi AIMEATissa on {org}.",
   "appcat.orgWall.view": "Organisaation apit",
   "appcat.orgWall.signIn": "Kirjaudu, niin näet kollegoidesi tekemät apit.",
+  "appcat.orgWall.expired": "Kirjautumisesi on päättynyt. Kirjaudu uudelleen, niin näet kollegoidesi tekemät apit.",
+  "appcat.orgWall.signInAction": "Kirjaudu",
   "appcat.orgWall.noOrgs": "Et vielä kuulu yhteenkään organismiin. Kun liityt yrityksesi tai koulutuksen organismiin, kollegoiden sille avaamat apit näkyvät tässä.",
   "appcat.orgWall.pickOrg": "Organismi",
   "appcat.orgWall.title": "{org}: kollegoiden apit",
