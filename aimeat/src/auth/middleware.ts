@@ -16,7 +16,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
- *   2026-11-13 — hasSession(req): the question requireAuth() asks of a request optionalAuth() has
+ *   2026-11-20 — requireScope notes the words it admitted an agent for in services/ai-standing/use.ts,
+ *     which writes one owner's feed line per agent, word the person gives by name, and day.
+ *   2026-11-13 —hasSession(req): the question requireAuth() asks of a request optionalAuth() has
  *     read, exported so the request-body guard asks the same one (middleware/openapi-body-guard.ts).
  *     requireAuth() calls it; its answers are unchanged.
  *   2026-11-08 — The refusal of a receiver key off its address says incoming webhook and API key
@@ -165,6 +167,7 @@ import { credentialRevoked } from './credential-revoked.js';
 import { withCurrentScopes } from './effective-scopes.js';
 import { noteVerifiedJwt } from './verified-on-request.js';
 import { noteScopeUse } from '../services/scope/use.js';
+import { noteStandingUse } from '../services/ai-standing/use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
 import { PARTY_TOKEN_PREFIX, takesPartyToken } from '../services/parties/contract.js';
 import { RECEIVER_KEY_PREFIX, takesReceiverKey } from '../services/receivers/contract.js';
@@ -759,6 +762,9 @@ export function requireScope(...requiredScopes: string[]) {
     }
     // A `*` agent's admitted words feed the narrowing its owner is offered (services/scope/use.ts).
     if (req.auth.roles.includes('agent') && agentScopes.includes('*')) noteScopeUse(req.auth.sub, requiredScopes);
+    // An agent admitted on a word the person gives by name acted without asking: one line on the
+    // owner's feed per agent, word and day (services/ai-standing/use.ts).
+    if (req.auth.roles.includes('agent')) noteStandingUse(req.auth.sub, requiredScopes, `${req.method} ${req.baseUrl}${typeof req.route?.path === 'string' ? req.route.path : req.path}`);
 
     next();
   };

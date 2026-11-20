@@ -46,6 +46,8 @@
  * @usage defaultScopes: await applyPlaceDefault(storage, config, gaii, requested)   // a door that approves
  *   await givePlaceDefaultToEveryAgent(storage, config)                             // the boot step
  * @version-history
+ *   2026-11-20 — applyPlaceDefault also gives the owner's "Allow always" words, on every node, through
+ *     services/ai-standing/settings.ts withStandingWords, bounded by `within` like the place's default.
  *   2026-11-05 — The default is given at approval and to every existing agent by givePlaceDefaultToEveryAgent
  *     (at start and when the plan is set); widenForPlace, the mint's widening, is removed (codebase
  *     analysis 2026-11-03, decision 8b of 2026-11-05).
@@ -67,6 +69,7 @@ import { isSharedAnonymous } from './rest-scope-gates-migration.js';
 import { emitToolListChanged } from './resource-events.js';
 import { nodeContext } from './node/context.js';
 import { logger } from '../utils/logger.js';
+import { withStandingWords } from './ai-standing/settings.js';
 
 /** The setting that makes a node a store place. */
 export const PLACE_PLAN_PATH = 'site.purchase_plan';
@@ -113,6 +116,14 @@ const parseApplied = (v: unknown): Record<string, string> =>
  * place-agent-scopes/agent-approved-sibling-widened-at-first-mint).
  */
 export async function applyPlaceDefault(
+    storage: Storage, config: AimeatConfig, gaii: string, held: readonly string[], within?: readonly string[],
+): Promise<string[]> {
+    // Every door that approves a new agent comes here, so the owner's "Allow always" words are given
+    // here too, on any node, after the place's default (services/ai-standing/settings.ts).
+    return withStandingWords(storage, config, gaii, await placeDefaultOf(storage, config, gaii, held, within), within);
+}
+
+async function placeDefaultOf(
     storage: Storage, config: AimeatConfig, gaii: string, held: readonly string[], within?: readonly string[],
 ): Promise<string[]> {
     const place = placeAgentScopes(config);

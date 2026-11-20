@@ -20,7 +20,9 @@
  * @usage
  *   patchable.tool = wrapToolHandler(gatedTool, () => agentGaii);
  * @version-history
- *   2026-11-04 — actorKindOf reads usageActorOfPrincipal (services/caller-facts.ts), the one test of a
+ *   2026-11-20 — A tool an agent ran notes its words in services/ai-standing/use.ts, for the owner's
+ *     feed line when the word is one the person gives by name.
+ *   2026-11-04 —actorKindOf reads usageActorOfPrincipal (services/caller-facts.ts), the one test of a
  *     principal's shape, with the same answers (codebase analysis 2026-11-03, item B1).
  *   2026-10-28 — A refusal's `Held: [...]` list is not read as words the agent lacks: a refused
  *     provenance declaration asked the owner for every word the agent held.
@@ -35,6 +37,7 @@
 import { recordUsageCall } from '../services/usage/usage-buffer.js';
 import { noteAgentRefusal } from '../services/agent/refusals.js';
 import { noteScopeUse } from '../services/scope/use.js';
+import { noteStandingUse } from '../services/ai-standing/use.js';
 import { requiredScopesForTool } from '../tool-catalog/scopes.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import type { UsageActorKind } from '../storage/interface.js';
@@ -122,6 +125,8 @@ export function wrapToolHandler(register: AnyFn, principal: () => string): AnyFn
           // (services/scope/use.ts decides at flush whether the agent holds `*`).
           const words = requiredScopesForTool(name);
           if (words.length) noteScopeUse(gaii, words);
+          // A tool on a word the person gives by name ran without asking (services/ai-standing/use.ts).
+          if (words.length) noteStandingUse(gaii, words, `tool ${name}`);
         }
         return result;
       } catch (err) {

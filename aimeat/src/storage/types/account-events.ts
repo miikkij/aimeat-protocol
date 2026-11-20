@@ -15,7 +15,8 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
- *   v1.12.0 — 2026-10-29 — agent_permissions_added: one of your agents added permissions to another
+ *   v1.13.0 — 2026-11-20 — ai_acted_without_asking and ai_standing_changed (services/ai-standing/).
+ *   v1.12.0 — 2026-10-29 —agent_permissions_added: one of your agents added permissions to another
  *     (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   v1.11.0 — 2026-10-25 — agent_device_takeover: an existing agent approved for a device that did not
  *     prove it is the agent coming back (secaudit2026oct22).
@@ -176,6 +177,16 @@ export type AccountEventKind =
   // (services/agent/scope-add.ts): `data.by` the agent that added, `data.name` the agent that got
   // them, `data.words` the words. The actor is the adding agent's GAII.
   | 'agent_permissions_added'
+  // One of the owner's agents did something without asking, on a permission the person gives by name
+  // (services/ai-standing/use.ts): `data.name` the agent, `data.word` the permission and `data.words`
+  // it in plain English, `data.call` the route or tool, `data.via` `standing` (the owner's "Allow
+  // always" setting, with `data.setAt` and `data.setBy`) or `agent` (the agent's own page). At most
+  // one line per agent, permission and day.
+  | 'ai_acted_without_asking'
+  // The account holder changed their "Allow always" setting (routes/agents/ai-standing.ts):
+  // `data.added` and `data.removed` the permissions in plain English, `data.agents` how many agents'
+  // lists changed.
+  | 'ai_standing_changed'
   | 'consent_granted'
   | 'consent_revoked'
   | 'app_granted'

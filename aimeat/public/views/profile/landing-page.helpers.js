@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Time, tab-navigation, and number/byte format helpers. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.5.2 — 2026-11-20 — syncTabHistory also keeps `word`: the permissions a notice names for the Agents
+ *     page's "Allow always" section, which it reads after the tab loads.
  *   v1.5.1 — 2026-11-19 — syncTabHistory also keeps `token`: the identify link of customer due
  *     diligence (?tab=identify&token=…) lost its token before the tab read it.
  *   v1.5.0 — 2026-11-15 — syncTabHistory also keeps `agent`, `package` and a fragment that names
@@ -120,8 +122,9 @@ export function syncTabHistory(tabId, replace) {
       // org, ws and joined: a link into one organism (?tab=organisms&org=…&ws=…) and the invitation
       // accept's ?joined=1, which the organisms tab reads after it loads. agent and package: a
       // notification's link to one agent or one package. token: a firm's identify link
-      // (?tab=identify&token=…), which views/profile/kyc/identify.js reads after it loads.
-      for (const k of ['open', 'test', 'section', 'product', 'party', 'agent', 'org', 'ws', 'joined', 'package', 'token']) if (here.get(k)) q.set(k, here.get(k));
+      // (?tab=identify&token=…), which views/profile/kyc/identify.js reads after it loads. word: the
+      // permissions a notice names for the Agents page's "Allow always" section (?section=allow-always&word=…).
+      for (const k of ['open', 'test', 'section', 'product', 'party', 'agent', 'org', 'ws', 'joined', 'package', 'token', 'word']) if (here.get(k)) q.set(k, here.get(k));
     }
     if (arrived) replace = true;
     const qs = q.toString();

@@ -44,7 +44,7 @@
       "digest": "sha256:3922ecaa3f06685b3b074dcb"
     },
     "3. Agents and machine identity": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/agents/rekey.ts",
@@ -64,7 +64,7 @@
         "aimeat/src/routes/docsign.ts",
         "aimeat/src/routes/docsign-wallet.ts"
       ],
-      "digest": "sha256:1635bb69d1ebeba808ce18a7"
+      "digest": "sha256:734e451d2601300d0e3fe0a4"
     },
     "4. Access, consent and sharing": {
       "reviewedOn": "2026-11-19",
@@ -565,7 +565,7 @@
       "aimeat/src/routes/agents/avatar.ts": "3763b0fbaf724693",
       "aimeat/src/routes/agents/permission-allow.ts": "66eac8b49cd632fc",
       "aimeat/src/services/agent/refusals.ts": "f8353846562df23f",
-      "aimeat/src/services/place-agent-scopes.ts": "0c1e9e8f9a79bcc1",
+      "aimeat/src/services/place-agent-scopes.ts": "ccb441241558cfe4",
       "aimeat/src/routes/ecosystem-apps.ts": "4de20cfc792c45e2",
       "aimeat/src/routes/ecosystem-apps-reconnect.ts": "fe3694c59c04e72b",
       "aimeat/src/services/ecosystem/access.ts": "5116793e3d6ff610",

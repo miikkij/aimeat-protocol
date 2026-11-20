@@ -12,7 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
- *   2026-11-19 — auth.app_origin_sign_in_refuse no longer says to turn it on once the log is quiet:
+ *   2026-11-20 — scopes.standing_enabled, scopes.standing_money and scopes.standing_delete: the node's
+ *     ceiling for an owner's "Allow always" setting (services/ai-standing/words.ts).
+ *   2026-11-19 —auth.app_origin_sign_in_refuse no longer says to turn it on once the log is quiet:
  *     the default stays off, because the SDK's sign-in window signs in from the app's own address.
  *   2026-11-19 — eudiw.enabled takes true or false: the boot and runtime refusals went with holder binding, nonce and audience checks (config/eudiw-guard.ts).
  *   2026-11-15 — The three login tarpit limits say "the node" and sso.enabled says "endpoints", not door.
@@ -573,6 +575,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Scoped Agent Capabilities (mutable) ──
   { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Default agent capability scopes, one per line (comma-separated in the environment; default memory:read, memory:write, memory:delete, catalogue:read, organism:read, agent:read, messages:send, storage:write)' },
   { key: 'maxAgentScopes', dotPath: 'scopes.max_agent_scopes', envVar: 'AIMEAT_MAX_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'The most scopes an agent can be given, one per line (comma-separated in the environment; * = all)' },
+  { key: 'standingEnabled', dotPath: 'scopes.standing_enabled', envVar: 'AIMEAT_STANDING_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'An owner may give a permission to every one of their AIs at once ("Allow always"), so their AIs act without asking each time. Each act an AI does on such a permission is written to the owner\'s feed. Account security, operator and permission-changing words are never given this way. On by default' },
+  { key: 'standingMoney', dotPath: 'scopes.standing_money', envVar: 'AIMEAT_STANDING_MONEY', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'An owner may also give the money permissions to every AI at once: writing the payment provider keys and marking a beneficiary payable. Off by default, so a money permission is given one agent at a time' },
+  { key: 'standingDelete', dotPath: 'scopes.standing_delete', envVar: 'AIMEAT_STANDING_DELETE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'An owner may also give the delete permissions to every AI at once: purging memory, deleting an agent and deleting the owner\'s mail. Off by default, so a delete permission is given one agent at a time' },
 
   // ── Enterprise SSO (BR-04; mutable — an organisation node's host seals these) ──
   { key: 'ssoEnabled', dotPath: 'sso.enabled', envVar: 'AIMEAT_SSO_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable organisation sign-in (SAML) and provisioning (SCIM) endpoints' },

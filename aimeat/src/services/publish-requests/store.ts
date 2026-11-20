@@ -32,7 +32,10 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
- *   2026-11-16 — The publish request notice and the notice of an agent's decision lead to the thing
+ *   2026-11-20 — An agent's publish request notice carries "Allow always, for all my AIs", the link to the
+ *     setting that gives publish:public to every AI of the person (services/ai-standing/), when the node
+ *     lets that word stand.
+ *   2026-11-16 —The publish request notice and the notice of an agent's decision lead to the thing
  *     the request is about (request-link.ts), not to the notifications page.
  *   2026-11-02 — The kind `mcp-capability-use`: another account's capability over a remote MCP server where
  *     each person signs in with their own account runs with the caller's sign-in once the caller's
@@ -124,6 +127,15 @@ import { logger } from '../../utils/logger.js';
 import { PUBLISH_REQUEST_DAYS, publishRequestExpired } from './policy.js';
 import { announcePart } from './parts.js';
 import { publishRequestLink } from './request-link.js';
+import { mayStand } from '../ai-standing/words.js';
+import { standingPageUrl } from '../ai-standing/page.js';
+import { PUBLISH_PUBLIC_SCOPE } from '../../utils/scope-coverage.js';
+
+/** The path of the "Allow always" section for publish:public, as a notice's link. */
+const standingLinkPath = (baseUrl: string): string => {
+  const url = standingPageUrl(baseUrl, PUBLISH_PUBLIC_SCOPE);
+  return url.slice(url.indexOf('/v1/'));
+};
 
 /** Where one request lives. The prefix is listable, so the owner's list finds them all. */
 export const PUBLISH_REQUEST_PREFIX = 'publish.requests.';
@@ -517,6 +529,11 @@ async function announcePublish(ctx: PublishStoreCtx, ownerGhii: string, request:
     actions: [
       { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve' }, style: 'primary' },
       { id: 'decline', label: 'Decline', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'decline' }, style: 'default' },
+      // An agent's request: the setting that lets every AI of the person make things public without
+      // asking each time (services/ai-standing/; Jouni, 2026-11-20), when the node lets it stand.
+      ...(request.requested_by.kind === 'agent' && mayStand(ctx.config, PUBLISH_PUBLIC_SCOPE)
+        ? [{ id: 'always', label: 'Allow always, for all my AIs', kind: 'navigate' as const, link: standingLinkPath(ctx.config.baseUrl), style: 'default' as const, i18n: { key: 'publish_request.always' } }]
+        : []),
     ],
   });
   emitChange('open-items', ownerGhii);

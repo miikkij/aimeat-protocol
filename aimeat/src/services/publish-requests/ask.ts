@@ -20,6 +20,8 @@
  *   ... store at the level it had ...
  *   if (ask.kind === 'ask') { const filed = await fileAsk(ctx, caller.owner, ask.requester, draft); ... 202 }
  * @version-history
+ *   2026-11-20 — publishAskOf notes an agent that made something public on publish:public past the
+ *     node's gate, for the owner's feed (services/ai-standing/use.ts).
  *   2026-10-25 — requesterOf(), and publishRequestedBody answers a request that makes nothing public
  *     with who answers it, what it asks and why, and pending until then (secaudit2026oct22, the
  *     developer's approval standard).
@@ -42,6 +44,8 @@ import {
 } from './store.js';
 import { userSkillContent, cortexContentDigest } from './content-digests.js';
 import { logger } from '../../utils/logger.js';
+import { noteStandingUse } from '../ai-standing/use.js';
+import { PUBLISH_PUBLIC_SCOPE } from '../../utils/scope-coverage.js';
 
 export type PublishAsk =
   | { kind: 'allowed' }
@@ -59,7 +63,13 @@ export function accountGhii(owner: string, nodeId: string): string {
  */
 export function publishAskOf(ctx: PublishStoreCtx, caller: CallerContext, app?: string): PublishAsk {
   const d = publishGateDecision(ctx.config, caller);
-  if (d.allowed) return { kind: 'allowed' };
+  if (d.allowed) {
+    // An agent that makes something public on publish:public, where the node's gate would otherwise
+    // have asked the owner, acted without asking: one line on the owner's feed per day
+    // (services/ai-standing/use.ts).
+    if (caller.kind === 'agent' && (ctx.config.publishGate ?? 'off') !== 'off') noteStandingUse(caller.principal, [PUBLISH_PUBLIC_SCOPE], 'make public');
+    return { kind: 'allowed' };
+  }
   if (d.ask === null) return { kind: 'refused', status: d.status, code: d.code, message: d.message };
   // An app is named eco:<app>#<owner>@<node> (callerPrincipal); an agent by its GAII.
   const principal = d.ask === 'app'

@@ -7,6 +7,8 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.26.0 -- 2026-11-20 -- Section 06, "Allow always, for all my AIs" (agents/allow-always-section.js):
+ *     what every AI of the person may do without asking. A permission notice opens it with section=allow-always.
  *   v4.25.0 -- 2026-11-09 -- PageStart gets the page's title and concept, for "Explain this page to me".
  *   v4.24.0 -- 2026-10-31 -- While a proposal waits, its panel (with Approve and Decline) comes first on the page, not third (v31 K49).
  *   v4.23.1 -- 2026-10-28 -- The list no longer names the agents holding all permissions: the node no longer narrows them, so the owner is not asked to; each agent's card offers the narrowing.
@@ -159,6 +161,7 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
+import { AllowAlwaysSection } from './agents/allow-always-section.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Code } from '/components/Mark.js';
@@ -600,6 +603,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
     { id: 'agp-new', num: '03', label: t('profile.agents.new.title'), count: waitingCount || null },
     { id: 'agp-connect', num: '04', label: p('secConnect'), count: null },
     { id: 'agp-list', num: '05', label: p('secAgents'), count: agents.length },
+    { id: 'agp-always', num: '06', label: t('profile.agents.always.title'), count: null },
   ];
 
   // One panel element, placed first while a proposal waits and third otherwise (v31 K49). The same
@@ -772,6 +776,12 @@ export default function AgentsTab({ session, showToast, onStats }) {
                   groupDnd,
                 })}
               `}
+          <//>
+
+          ${/* What every AI of the person may do without asking (agents/allow-always-section.js). A
+                permission notice links here with section=allow-always. */''}
+          <${Section} id="agp-always" num="06" title=${t('profile.agents.always.title')}>
+            <${AllowAlwaysSection} showToast=${showToast} />
           <//>
     <//>
   `;

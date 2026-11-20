@@ -97,6 +97,7 @@ import { exposureCliTools } from './tool-call-defs-exposure.js';
 import { internetOpeningCliTools } from './tool-call-defs-internet-opening.js';
 import { fileStoreCliTools } from './tool-call-defs-file-store.js';
 import { publishCliTools } from './tool-call-defs-publish.js';
+import { aiStandingCliTools } from './tool-call-defs-ai-standing.js';
 import { accountRightsCliTools } from './tool-call-defs-account-rights.js';
 import { dmGroupCliTools } from './tool-call-defs-dm-groups.js';
 import { dmReactionCliTools } from './tool-call-defs-dm-reactions.js';
@@ -169,6 +170,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...internetOpeningCliTools,
     ...fileStoreCliTools,
     ...publishCliTools,
+    ...aiStandingCliTools,
     ...accountRightsCliTools,
     ...dmGroupCliTools,
     ...dmReactionCliTools,

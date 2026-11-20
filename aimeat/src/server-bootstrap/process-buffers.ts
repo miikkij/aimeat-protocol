@@ -18,7 +18,9 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
- *   2026-11-19 — startNodeTotalsLive: the watcher that emits `node-totals` when a public counter moves,
+ *   2026-11-20 — initStandingUse and its shutdown flush: the owner's feed line when an agent acts
+ *     without asking (services/ai-standing/use.ts).
+ *   2026-11-19 —startNodeTotalsLive: the watcher that emits `node-totals` when a public counter moves,
  *     stopped at shutdown (feature audit 2026-11-19, 4.6).
  *   2026-11-15 — configureSiem: security events to the organisation's monitoring (team setup T10).
  *   2026-11-04 — The running AI job service is read from nodeContext() (services/node-context.ts) in place of
@@ -67,6 +69,7 @@ import { initClassificationAudit } from '../services/classification/audit.js';
 import { initAgentRefusals } from '../services/agent/refusals.js';
 import { sendPermissionAsk } from '../services/permission-ask-notice.js';
 import { initScopeUse } from '../services/scope/use.js';
+import { initStandingUse } from '../services/ai-standing/use.js';
 import { startBuildWithYou } from '../services/builder/with-you.js';
 import { startNodeTotalsLive } from '../services/live/node-totals.js';
 import { logger } from '../utils/logger.js';
@@ -106,6 +109,9 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // Which permissions each `*` agent uses, for the narrowing its owner is offered and for when `*`
   // starts to hold its tasks (services/scope/use.ts). Like the tally, it fills only from now on.
   initScopeUse(storage);
+  // The feed line when an agent acts without asking on a permission the person gives by name
+  // (services/ai-standing/use.ts).
+  initStandingUse(storage, config);
   // "Build it with you": the usage listener that opens the place's one build offer on an outside AI's
   // first MCP call, and the sweep that asks the build queue where the request stands.
   startBuildWithYou(storage, config);
@@ -162,6 +168,8 @@ export async function flushProcessBuffers(): Promise<void> {
   await shutdownUsageBuffer();
   const { shutdownScopeUse } = await import('../services/scope/use.js');
   await shutdownScopeUse();
+  const { shutdownStandingUse } = await import('../services/ai-standing/use.js');
+  await shutdownStandingUse();
   const { shutdownWriteTallyBuffer } = await import('../services/data-map/write-tally-buffer.js');
   await shutdownWriteTallyBuffer();
   const { shutdownConsentAuditBuffer } = await import('../services/consent/audit-buffer.js');

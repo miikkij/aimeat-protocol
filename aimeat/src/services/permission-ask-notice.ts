@@ -31,6 +31,8 @@
  *   tellPermissionAnswer(deps, agent, words, outcome, by) · sendPermissionAsk(deps, ownerGhii, agent, words, call?)
  * @usage initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
  * @version-history
+ *   2026-11-20 — The page notice and its email offer "Allow always, for all my AIs" when the node lets
+ *     every word of the question stand (services/ai-standing/), a link to that setting.
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The mail goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
@@ -68,6 +70,8 @@ import { escapeHtml as esc } from '../utils/html-escape.js';
 import { logger } from '../utils/logger.js';
 import { tellAsker, closeQuestion } from './approval-standard.js';
 import { WITHHELD_DM_CALL } from './connect-tunnel/dm-reach.js';
+import { mayStand } from './ai-standing/words.js';
+import { standingPageUrl } from './ai-standing/page.js';
 
 export const PERMISSION_ASK_TYPE = 'agent_permission_ask';
 /** The i18n key of the notice whose permission is given on the agent's page, not with one press. */
@@ -122,8 +126,14 @@ export function permissionAskNotice(agent: AgentRecord, words: readonly string[]
  * The bell notice for a permission one press does not give: Don't allow on the notice itself, and the
  * agent's page, where the person gives it with its own tick, instead of an Allow button.
  */
-export function permissionPageNotice(agent: AgentRecord, words: readonly string[], baseUrl: string): NotifyInput {
+export function permissionPageNotice(agent: AgentRecord, words: readonly string[], baseUrl: string, always = false): NotifyInput {
   const path = pathOf(agentPageUrl(baseUrl, agent.name));
+  // "Allow always": the settings section where the person gives these words to every one of their AIs,
+  // so none of them asks again (services/ai-standing/; Jouni, 2026-11-20). Only when the node lets
+  // every word of the question stand.
+  const alwaysAction = always
+    ? [{ id: 'always', label: 'Allow always, for all my AIs', kind: 'navigate' as const, link: pathOf(standingPageUrl(baseUrl, words.join(','))), style: 'default' as const, i18n: { key: `${PAGE_KEY}.always` } }]
+    : [];
   const name = agentLabel(agent);
   const what = asks(words, 'en');
   return {
@@ -144,7 +154,7 @@ export function permissionPageNotice(agent: AgentRecord, words: readonly string[
       body: { needed: [...words] },
       style: 'default',
       i18n: { key: `${PAGE_KEY}.deny` },
-    }, { id: 'open', label: "Open the agent's page", kind: 'navigate', link: path, style: 'primary', i18n: { key: `${PAGE_KEY}.open` } }],
+    }, ...alwaysAction, { id: 'open', label: "Open the agent's page", kind: 'navigate', link: path, style: 'primary', i18n: { key: `${PAGE_KEY}.open` } }],
   };
 }
 
@@ -170,7 +180,7 @@ export function withheldDmNotice(agent: AgentRecord, words: readonly string[], b
 }
 
 /** The email: the same question in the person's language, and a button to the page where they decide. */
-function permissionAskEmail(agent: AgentRecord, words: readonly string[], baseUrl: string, locale: Locale, onePress: boolean) {
+function permissionAskEmail(agent: AgentRecord, words: readonly string[], baseUrl: string, locale: Locale, onePress: boolean, always = false) {
   const t = createT(locale);
   const page = onePress ? allowUrl(baseUrl, agent.name, words) : agentPageUrl(baseUrl, agent.name);
   const prefix = onePress ? 'agentAllow.email' : 'agentAllowPage.email';
@@ -180,6 +190,9 @@ function permissionAskEmail(agent: AgentRecord, words: readonly string[], baseUr
   const what = words.map((w) => plainPermission(w, locale) ?? w);
   const button = t(`${prefix}.button`);
   const after = t(`${prefix}.after`);
+  // The small link to the setting that gives these words to every AI of the person (services/ai-standing/).
+  const alwaysUrl = always ? standingPageUrl(baseUrl, words.join(',')) : '';
+  const alwaysText = always ? t('agentAllowPage.email.always') : '';
   // The subject carries the agent's display name, which the device requester chose: text, never
   // HTML, in the heading as in the body (secaudit2026oct26).
   const html = wrapHtml(esc(subject), `
@@ -187,9 +200,11 @@ function permissionAskEmail(agent: AgentRecord, words: readonly string[], baseUr
     <ul>${what.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
     <p style="text-align: center;"><a href="${esc(page)}" class="btn">${esc(button)}</a></p>
     <p>${esc(after)}</p>
+    ${always ? `<p><a href="${esc(alwaysUrl)}">${esc(alwaysText)}</a></p>` : ''}
     <p class="url-fallback">${esc(page)}</p>
   `, locale);
-  const text = [subject, '', lead, '', ...what.map((s) => `- ${s}`), '', `${button}: ${page}`, '', after].join('\n');
+  const text = [subject, '', lead, '', ...what.map((s) => `- ${s}`), '', `${button}: ${page}`, '', after,
+    ...(always ? ['', `${alwaysText}: ${alwaysUrl}`] : [])].join('\n');
   return { subject, html, text };
 }
 
@@ -255,8 +270,10 @@ export async function sendPermissionAsk(
     const onePress = oneClickWords(refused);
     const words = onePress ? [...refused] : await wordsToTell(deps.storage, ownerGhii, refused);
     if (words.length === 0) return;
+    // "Allow always" is offered when every word of the question may stand for all of the person's AIs.
+    const always = !onePress && words.every((w) => mayStand(deps.config, w));
     const notice = !onePress
-      ? permissionPageNotice(agent, words, deps.config.baseUrl)
+      ? permissionPageNotice(agent, words, deps.config.baseUrl, always)
       : call === WITHHELD_DM_CALL
         ? withheldDmNotice(agent, words, deps.config.baseUrl)
         : permissionAskNotice(agent, words, deps.config.baseUrl);
@@ -268,7 +285,7 @@ export async function sendPermissionAsk(
     if (!ghii || !to) return;
     const prefs = await readNotificationSettings(deps.storage, ownerGhii);
     if (prefs.email.agentAsks === false) return;
-    const mail = permissionAskEmail(agent, words, deps.config.baseUrl, toLocale(ghii.locale), onePress);
+    const mail = permissionAskEmail(agent, words, deps.config.baseUrl, toLocale(ghii.locale), onePress, always);
     const sent = await sendMail(email, { kind: 'owner', account: ghii }, { form: 'html', subject: mail.subject, html: mail.html, text: mail.text }) === 'sent';
     if (sent) await appendMailLog(deps.storage, ownerGhii, { kind: 'agent_ask', subject: mail.subject });
   } catch (err) {

@@ -15,7 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
- *   2026-11-19 — The EUDIW boot refusal (assertEudiwNotHalfBuilt) is no longer called: holder binding, nonce and audience checks exist (config/eudiw-guard.ts).
+ *   2026-11-20 — standingEnabled, standingMoney, standingDelete: what an owner may give every AI at once.
+ *   2026-11-19 —The EUDIW boot refusal (assertEudiwNotHalfBuilt) is no longer called: holder binding, nonce and audience checks exist (config/eudiw-guard.ts).
  *   2026-11-14 — helpDefaults(): the settings of Ask someone who knows (config/help.ts, AIMEAT_HELP_*).
  *   2026-11-08 — memoryMaxArchivedKeysPerAgent (AIMEAT_MEMORY_MAX_ARCHIVED_KEYS, default 10000): archived memory keys get a ceiling of their own (secaudit2026nov08b round 15b).
  *   v1.40.0 — 2026-11-07 — microservicesCentralUrl (AIMEAT_MSC_CENTRAL_URL, default none): a Microservices Central the app-building guidance names (services/appdev/microservices.ts).
@@ -628,6 +629,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // Scoped Agent Capabilities (REQ-006)
     defaultAgentScopes: (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? SHIPPED_DEFAULT_AGENT_SCOPES).split(',').map(s => s.trim()),
     maxAgentScopes: (process.env.AIMEAT_MAX_AGENT_SCOPES ?? '*').split(',').map(s => s.trim()),
+    // What an owner may give every one of their AIs at once (services/ai-standing/words.ts).
+    standingEnabled: process.env.AIMEAT_STANDING_ENABLED !== 'false',
+    standingMoney: process.env.AIMEAT_STANDING_MONEY === 'true',
+    standingDelete: process.env.AIMEAT_STANDING_DELETE === 'true',
     // Same-owner device-auth auto-approval (Agent-Bundled Apps): a device-authorize call
     // authenticated as the SAME owner it registers for (owner session, or one of that owner's
     // agents — e.g. crew-forge spawning a deployed sibling) is approved without the manual

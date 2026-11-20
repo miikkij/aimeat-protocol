@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.80.0 -- 2026-11-20 -- What you may do without asking: aimeat_ai_standing_get, the owner's "Allow
+ *     always" setting (services/ai-standing/).
  *   v1.79.0 -- 2026-11-19 -- Customer due diligence in an obliged organism: aimeat_kyc_customer,
  *     aimeat_kyc_suspicion_mark and aimeat_kyc_settings, and the decisions a person makes on the card.
  *   v1.78.0 -- 2026-11-19 -- Prompt calibration: aimeat_calibrator.
@@ -236,6 +238,12 @@ HELP_DISABLED.
 not hold publish:public, a write that makes something public answers with \`publish_request\`: it is
 stored as it was (a new one private). Tell your owner in one sentence what you asked to make public
 and give them the \`approve_url\`. \`aimeat_publish_requests\` lists the requests and their state.
+
+**What you may do without asking.** \`aimeat_ai_standing_get\` reads your owner's "Allow always"
+setting: the permissions every one of their AIs holds. When your owner asks you to do something such
+a permission covers, do it and do not ask them again; each such act is a line on their feed. When you
+need one that is off, tell them in one sentence what you would do and give them the \`page\` from that
+answer, where they can allow it for all of their AIs. Only your owner, signed in themselves, changes it.
 
 **Adult content, subscriptions and exported files.** \`aimeat_adult_status\` says whether your owner
 is a verified adult (yes or no, the method, the time; never a birth date): ask it before you buy or

@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-20 -- e2e-ai-standing.ts joins the list (not the guard tier): the owner's "Allow always" setting
+ *     (wish-ai-toimii-itsen-isesti-omistajan-asetuksella-salli-aina-ja-k).
  *   2026-11-19 -- `--retry-red`: a red suite runs once more, alone; one that passes alone is read as timing and printed with the [e2e-flaky] mark (test/run-e2e-retry.ts). pnpm ready's sweep passes it, the nightly does not.
  *   2026-11-19 -- test/e2e-owner-erasure-logs.ts joins ALL_SUITES (feature audit 2026-11-19, part 2 of agent G).
  *   2026-11-19 -- test/e2e-calibrator-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 5).
@@ -1245,6 +1247,9 @@ const ALL_SUITES = [
     // agent:permissions-add: an agent adds the permissions it holds to another of the owner's agents,
     // and the owner reads each addition on the feed and in the bell (services/agent/scope-add.ts).
     'test/e2e-agent-scope-add.ts',
+    // "Allow always": the owner gives a permission to every one of their AIs, the agents' lists follow,
+    // and each act without asking is a line on the owner's feed (services/ai-standing/).
+    'test/e2e-ai-standing.ts',
     // An agent's own picture at agent.avatar: the list and profile field, the picture address, what is
     // refused, who may set it, the onboarding step and the Design Book templates.
     'test/e2e-agent-avatar.ts',

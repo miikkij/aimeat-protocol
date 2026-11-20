@@ -11,6 +11,7 @@
  * @usage
  *   app.use(agentsRouter(config, storage));
  * @version-history
+ *   2026-11-20 -- registerAiStandingRoutes: GET and PUT /v1/ai-standing (routes/agents/ai-standing.ts).
  *   v1.0.0 -- 2026-03-15 -- Initial agent routes
  *   v1.x -- 2026-07-03 -- Add GET /v1/agents/:name/engagements (same-owner contract-engagement list)
  *   v1.1.0 -- 2026-05-28 -- Expose owner-managed shared-memory tags
@@ -49,6 +50,7 @@ import { registerOffersRoutes } from './agents/offers.js';
 import { registerPurchaseLimitRoutes } from './agents/purchase-limit.js';
 import { registerStopStartRoutes } from './agents/stop-start.js';
 import { registerPermissionAllowRoutes } from './agents/permission-allow.js';
+import { registerAiStandingRoutes } from './agents/ai-standing.js';
 import { registerClearanceRoutes } from './agents/clearance.js';
 import { registerAvatarRoutes } from './agents/avatar.js';
 
@@ -66,6 +68,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   registerPurchaseLimitRoutes(router, config, storage);
   registerStopStartRoutes(router, config, storage);
   registerPermissionAllowRoutes(router, config, storage);
+  registerAiStandingRoutes(router, config, storage);
   registerClearanceRoutes(router, config, storage);
 
   return router;

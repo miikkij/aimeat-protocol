@@ -11,6 +11,9 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · shownLine · shownAmount · isBookkeeping · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-11-20: ai_acted_without_asking (what an AI did without asking, on which permission, and since
+ *     when the "Allow always" setting or the agent's page allowed it) and ai_standing_changed, both
+ *     filed under access (services/ai-standing/).
  *   2026-11-19: ai_settings_changed with `by` names the agent that applied the change ("{who} changed
  *     your AI settings with your confirmation"), not "You changed".
  *   2026-11-15: The agent-request line's fallback says "Your agent is asking to connect.", as en.json does.
@@ -202,6 +205,22 @@ export function line(item) {
           .replace('{name}', d.names || '').replace('{words}', d.words || '')
         : tr('home.feed.scopeWordsKeptMany', '{names} keep working as before after the AIMEAT update: they got the permissions the update now asks for ({words}). You can take them away in each one\'s settings.')
           .replace('{names}', d.names || '').replace('{words}', d.words || '');
+    case 'ai_acted_without_asking':
+      // What the AI did without asking, on which permission, and who gave that permission when.
+      return d.via === 'standing'
+        ? tr('home.feed.aiActedStanding', '{name} acted without asking you: {words} ({call}). It may, because your "Allow always" setting has allowed it since {date}.')
+          .replace('{name}', d.name || '').replace('{words}', d.words || d.word || '').replace('{call}', d.call || '').replace('{date}', d.setAt ? date(d.setAt) : '')
+        : tr('home.feed.aiActedAgent', '{name} acted without asking you: {words} ({call}). It may, because you gave it this permission on its page.')
+          .replace('{name}', d.name || '').replace('{words}', d.words || d.word || '').replace('{call}', d.call || '');
+    case 'ai_standing_changed':
+      // Only the half that changed: a line that says "No longer: –" says nothing.
+      if (d.added && d.removed) {
+        return tr('home.feed.aiStandingChanged', 'You changed what all of your AIs may do without asking. Allowed always now: {added}. No longer: {removed}.')
+          .replace('{added}', d.added).replace('{removed}', d.removed);
+      }
+      return d.added
+        ? tr('home.feed.aiStandingAdded', 'All of your AIs may now do this without asking: {added}.').replace('{added}', d.added)
+        : tr('home.feed.aiStandingRemoved', 'Your AIs ask you again before this: {removed}.').replace('{removed}', d.removed || '');
     case 'agent_permissions_added':
       return tr('home.feed.agentPermissionsAdded', '{by} gave {name} new permissions: {words}. You can take them away on {name}\'s page.')
         .replace('{by}', d.by || '').replace(/\{name\}/g, d.name || '').replace('{words}', d.words || '');
@@ -395,7 +414,7 @@ export function kindCategory(kind) {
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'dataspace_request', 'app_granted', 'app_revoked', 'organism_joined',
     'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
-    'passkey_added', 'passkey_removed', 'password_changed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept', 'app_scope_words_kept', 'agent_permissions_added'].includes(k)) return 'access';
+    'passkey_added', 'passkey_removed', 'password_changed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept', 'app_scope_words_kept', 'agent_permissions_added', 'ai_acted_without_asking', 'ai_standing_changed'].includes(k)) return 'access';
   return 'system';
 }
 

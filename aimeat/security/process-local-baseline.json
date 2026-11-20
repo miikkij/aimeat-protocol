@@ -1317,6 +1317,38 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/ai-standing/use.ts :: interval :: initStandingUse": {
+      "count": 1,
+      "reason": "Each process flushes the acts its own requests noted; the day mark that keeps one feed line per agent, word and day is in storage, so two processes write the line once."
+    },
+    "src/services/ai-standing/use.ts :: let :: candidates": {
+      "count": 1,
+      "reason": "The list of words the setting can name, computed from code once; every process computes the same list."
+    },
+    "src/services/ai-standing/use.ts :: let :: configRef": {
+      "count": 1,
+      "reason": "The config this process builds the feed lines' links from, bound at start; every process binds its own."
+    },
+    "src/services/ai-standing/use.ts :: let :: inFlight": {
+      "count": 1,
+      "reason": "This process's flush in progress, so an erasure in this process waits for it; another process's erasure hold covers its own buffer."
+    },
+    "src/services/ai-standing/use.ts :: let :: pending": {
+      "count": 1,
+      "reason": "The acts this process's requests noted since its last flush; a crash before the flush loses at most a minute of feed lines, and a second process keeps its own."
+    },
+    "src/services/ai-standing/use.ts :: let :: soon": {
+      "count": 1,
+      "reason": "The early flush of this process's first act after a flush; a second process schedules its own."
+    },
+    "src/services/ai-standing/use.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "The storage this process writes the feed lines with, bound at start; every process binds its own."
+    },
+    "src/services/ai-standing/use.ts :: let :: timer": {
+      "count": 1,
+      "reason": "This process's flush timer; the day mark is in storage, so two processes write one line."
+    },
     "src/services/scope/use.ts :: interval :: initScopeUse": {
       "count": 1,
       "reason": "DEBT"

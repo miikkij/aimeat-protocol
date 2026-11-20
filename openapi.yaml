@@ -16640,6 +16640,63 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/ai-standing:
+    get:
+      operationId: aiStandingRead
+      summary: What every one of your AIs may do without asking ("Allow always")
+      description: >-
+        The owner's "Allow always" setting: each permission it can name (the words a person gives by
+        name: no wildcard carries them, or the node calls them powerful), in plain words in `lang`,
+        whether it is on (`on`, with `set_at` and `set_by`), its `class` (money, delete or other), and
+        whether this node lets it stand now (`allowed`, with `refusal_code` when not). `enabled`,
+        `money_allowed` and `delete_allowed` are the node's settings scopes.standing_enabled,
+        scopes.standing_money and scopes.standing_delete. `page` is the Agents page section where the
+        account holder changes it. The account holder and each of their agents holding agent:read read
+        it (the MCP tool aimeat_ai_standing_get answers the same); an app, a visitor and the anonymous
+        identity are refused with 403.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: query, name: lang, required: false, schema: { type: string, enum: [en, fi, es] }, description: The language of the plain words. Default en. }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: aiStandingSet
+      summary: Change what every one of your AIs may do without asking
+      description: >-
+        Replaces the "Allow always" words with `scopes`. Each word added is written into the permission
+        list of every agent of the account that has not had it from this setting, and given to every
+        agent approved later; each word taken out is taken off the agents that got it from this setting,
+        and only those (an agent that held it before keeps it). A word the owner took off one agent's
+        page afterwards stays off. The agents' open MCP sessions and live connectors are told, so they
+        fetch a fresh token. From then on each act an agent does on such a word, without the owner
+        being asked, is one line on the owner's feed (`ai_acted_without_asking`, at most one per agent,
+        word and day); the change itself is the line `ai_standing_changed`. A word the node does not let
+        stand answers 400 with STANDING_OFF, STANDING_WORD_NOT_GIVEN, STANDING_MONEY_OFF,
+        STANDING_DELETE_OFF or STANDING_OVER_CEILING and `details.scope`, before anything is written.
+        The account holder in person only: an agent or an app can never change it.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: query, name: lang, required: false, schema: { type: string, enum: [en, fi, es] }, description: The language of the plain words in the answer. Default en. }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scopes]
+              properties:
+                scopes: { type: array, maxItems: 60, items: { type: string }, description: Every permission that is to be on; an empty list turns all of them off. }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/agents/{name}/read-through:
     post:
       operationId: agentAllowReadThrough

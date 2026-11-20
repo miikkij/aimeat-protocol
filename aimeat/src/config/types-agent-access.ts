@@ -9,7 +9,8 @@
  *   mcpCapabilityUseApprovalFrom · AgentAccessConfig
  * @usage import type { AgentAccessConfig } from './types-agent-access.js';
  * @version-history
- *   2026-11-04 — CAPABILITY_USE_APPROVAL_LABEL moved here from services/mcp-client/capability-use-setting.ts
+ *   2026-11-20 — standingEnabled, standingMoney, standingDelete (services/ai-standing/words.ts).
+ *   2026-11-04 —CAPABILITY_USE_APPROVAL_LABEL moved here from services/mcp-client/capability-use-setting.ts
  *     unchanged, which re-exports it (codebase analysis 2026-11-03, item B4).
  *   v1.1.0 — 2026-11-03 — mcpCapabilityUseApproval (AIMEAT_MCP_CAPABILITY_USE_APPROVAL: off, operators,
  *     ask; default operators), secaudit2026nov02d round 13b.
@@ -42,6 +43,13 @@ export interface AgentAccessConfig {
   // Scoped Agent Capabilities (REQ-006)
   defaultAgentScopes: string[];
   maxAgentScopes: string[];
+  /** An owner may give permissions to every one of their AIs at once, so the AIs act without asking
+   *  each time (services/ai-standing/). Default true. */
+  standingEnabled: boolean;
+  /** An owner may give the money permissions that way too (payment keys, payable beneficiaries). Default false. */
+  standingMoney: boolean;
+  /** An owner may give the delete permissions that way too (purge memory, delete an agent, delete mail). Default false. */
+  standingDelete: boolean;
   /** Same-owner device-auth auto-approval (owner or same-owner agent; no cross-owner, no scope escalation). Default true. */
   sameOwnerAutoApprove: boolean;
   /** Refuse sign-in and registration from an app (middleware/app-origin-sign-in.ts). Default false:
