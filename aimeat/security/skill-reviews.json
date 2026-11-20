@@ -87,7 +87,7 @@
         "aimeat/src/services/app/organism-wall.ts",
         "aimeat/public/views/goal-start.js"
       ],
-      "digest": "sha256:473a49f04801a6cc6cba0601"
+      "digest": "sha256:207a0b453ee9449422db58cd"
     },
     "node:aimeat-find-my-app": {
       "reviewedOn": "2026-11-20",
@@ -1084,7 +1084,7 @@
       "aimeat/src/tool-catalog/definitions/goals.ts": "d1d14a000c53a6ea",
       "aimeat/src/services/journey-state.ts": "a0df915b520b7710",
       "aimeat/src/services/ai-standing/view.ts": "4745ec5c41af7335",
-      "aimeat/src/services/app/organism-wall.ts": "472a6177b34b9573",
+      "aimeat/src/services/app/organism-wall.ts": "268a8b1bfaaedd24",
       "aimeat/public/views/goal-start.js": "5dcc5bff67bc1750"
     }
   }
