@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-11-20 — Seed core:report-subscriptions (every 15 minutes): the due report subscriptions.
  *   2026-11-20 — Seed core:value-fold (03:45): the value signals' old day counts become week counts.
  *   2026-11-19 — Seed core:kyc-lists (05:10) and core:kyc-daily (06:20): customer due diligence.
  *   2026-11-14 — Seed core:team-weekly (Fridays 14:05): the team's week to its leads.
@@ -173,6 +174,8 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   jobs.push({ id: 'core:team-weekly', name: 'Team Weekly Report', coreHandler: 'team-weekly', cron: '5 14 * * 5' });
   // The value signals' day rows past 400 days become week rows (services/value/fold.ts), nightly at 03:45.
   jobs.push({ id: 'core:value-fold', name: 'Value Signals Fold', coreHandler: 'value-fold', cron: '45 3 * * *' });
+  // The report subscriptions (services/reports/subscriptions.ts), every 15 minutes at :07, :22, :37, :52.
+  jobs.push({ id: 'core:report-subscriptions', name: 'Report Subscriptions', coreHandler: 'report-subscriptions', cron: '7,22,37,52 * * * *' });
   // The Content Classifier's queue (TARGET-082 V3), hourly at :25. Seeded on every node, because
   // seeding is create-if-absent and an operator may turn classification on later; the handler reads
   // nothing while AIMEAT_CLASSIFICATION is off.

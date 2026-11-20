@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-20 — report-subscriptions: the due report subscriptions are built and sent (services/reports/).
  *   2026-11-20 — value-fold: the value signals' old day counts become week counts (services/value/fold.ts).
  *   2026-11-19 — kyc-lists and kyc-daily: customer due diligence (services/kyc/jobs.ts).
  *   2026-11-16 — The notice of a timed-out dispute that waits for a ruling opens that dispute on the admin Work page.
@@ -200,6 +201,12 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('team-weekly', async () => {
     const { runTeamWeeklyReports } = await import('./team/weekly-report.js');
     await runTeamWeeklyReports(storage, config);
+  });
+  // The report subscriptions that are due (services/reports/subscriptions.ts). A node with none reads
+  // one key prefix and stops.
+  scheduler.registerCoreHandler('report-subscriptions', async () => {
+    const { runReportSubscriptions } = await import('./reports/subscriptions.js');
+    await runReportSubscriptions(storage, config);
   });
   // The value signals' day counts past their window become week counts (services/value/fold.ts).
   scheduler.registerCoreHandler('value-fold', async () => {
