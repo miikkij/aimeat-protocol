@@ -22,6 +22,7 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.8.1 — 2026-11-20 — "How the person's own AI uses the app" goes to part `libraries`.
  *   v1.8.0 — 2026-11-19 — The platform sections (atelier-platform.ts): part `start` names the index
  *     `platform` in one line, and atelierPiece answers `platform` and each section id with text cut
  *     from the build text. They are not in the full text, so the parts still rebuild it exactly.
@@ -98,6 +99,9 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   // the limit: "Data, in short" names aimeat-data, AIMEAT.organism and the kit's workspacePicker,
   // and the review list is mostly about the kit's components (listDetail, the shell's bar).
   'Data, in short': 'libraries',
+  // Since 2026-11-20 (atelier-ai-path.ts): how the person's own AI uses the app follows "Data, in
+  // short" and comes before "Finishing", whose bound skill it describes.
+  'How the person\'s own AI uses the app': 'libraries',
   // Since 2026-10-29: part `start` has no room for it (build-structure-step.ts).
   'The structure page: the person follows the build': 'libraries',
   'What the review always catches': 'libraries',

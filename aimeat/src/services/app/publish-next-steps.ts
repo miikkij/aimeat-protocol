@@ -18,6 +18,9 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './publish-next-steps.js';
  * @version-history
+ *   v1.5.0 — 2026-11-20 — `ai_path` and `ai_path_tools_count` (ai-path-step.ts): how the person's own
+ *     AI uses the app, the app tools it has and what the bound skill holds. Quiet for a quick
+ *     prototype and a declared presentation.
  *   v1.4.0 — 2026-11-13 — `balancing_test`, for an app whose register rests on legitimate interests,
  *     whose data others can see, and that has no approved balancing test. Every other app gets no key.
  *   v1.3.2 — 2026-11-11 — `acceptance` says how the console is read (with the browser's own
@@ -60,7 +63,22 @@ import { listSkillsByBinding } from '../skills.js';
 import { appSizeHealth, type AppSizeHealth } from './size-health.js';
 import { logger } from '../../utils/logger.js';
 import { designBookStep } from './genre-fork.js';
-import { levelStep } from './build-level.js';
+import { levelStep, declaredLevel } from './build-level.js';
+import { aiPathStep, declaresNoAiPath } from './ai-path-step.js';
+import { appToolsKey } from '../../models/app-tool-schemas.js';
+
+/** How many tools a stored manifest names: the value is the manifest object or its JSON text. */
+function toolsCountOf(value: unknown): number {
+  let v = value;
+  if (typeof v === 'string') {
+    try { v = JSON.parse(v); } catch (err) {
+      logger.warn('buildPublishNextSteps: the tool manifest is not JSON, counted as no tools', { error: String(err) });
+      return 0;
+    }
+  }
+  const tools = (v as { tools?: unknown } | null | undefined)?.tools;
+  return Array.isArray(tools) ? tools.length : 0;
+}
 import { legalReadiness } from '../app-build/legal-readiness.js';
 import { balancingTestStep } from '../compliance/lia-write.js';
 
@@ -109,12 +127,14 @@ export async function buildPublishNextSteps(
     // Resolve the face across the owner's whole keyspace (GHII + the owner's agents), matching what
     // the anonymous serve path serves — so an agent that published the face under its own GAII still
     // reports agent_face_present:true here.
-    const [faceRec, boundSkills, appRec] = await Promise.all([
+    const [faceRec, boundSkills, appRec, toolsRec] = await Promise.all([
       getOwnerScopePublicMemory(storage, config.nodeId, ownerName, agentFaceKey(filename))
         .catch(err => { logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) }); return null; }),
       listSkillsByBinding(storage, config, `app:${ownerName}/${filename}`, { ownerName })
         .catch(err => { logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) }); return []; }),
       storage.getAppByOwnerName(ownerName, filename)
+        .catch(err => { logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) }); return null; }),
+      getOwnerScopePublicMemory(storage, config.nodeId, ownerName, appToolsKey(filename))
         .catch(err => { logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) }); return null; }),
     ]);
     // The legal pages the app's structure page reports as open, said here first. A real build met
@@ -179,6 +199,14 @@ export async function buildPublishNextSteps(
       bound_skill: boundSkills.length > 0
         ? `${boundSkills.length} skill(s) bound to this app. Keep them current with what the app does.`
         : `No skill bound yet. Write the operating guide as a skill with metadata.binding "app:${ownerName}/${filename}" (aimeat_skill_publish) — that is how anyone's AI learns to USE this app rather than guess at it.`,
+      // How the person's own AI uses the app (ai-path-step.ts): a recommendation, quiet for a quick
+      // prototype and a presentation.
+      ...aiPathStep({
+        level: html ? declaredLevel(html) : undefined,
+        noAiPath: declaresNoAiPath(html),
+        toolsCount: toolsCountOf(toolsRec?.value),
+        boundSkillsCount: boundSkills.length,
+      }),
       // The other two things an app owes, stated the same way. Until 2026-10-10 this answer named
       // the face and the skill and stayed silent on these, and a builder who had read "next_steps
       // is the node's list of what this app still owes" shipped four versions without either.

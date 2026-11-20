@@ -24,6 +24,9 @@
  *   atelierPlatformIds() · ATELIER_PLATFORM_PART_LINE
  * @usage const piece = atelierPlatformPiece('group', config.baseUrl);   // null for an unknown id
  * @version-history
+ *   v1.2.0 — 2026-11-20 — The sections `ai-path` and `app-tools` (atelier-ai-path.ts): the path the
+ *     person's own AI takes into the app, and an action it calls, backed by an extension, with the
+ *     space it guards closed.
  *   v1.1.0 — 2026-11-19 — The section `other-owners` (atelier-other-owners.ts): an app whose shared
  *     data other accounts' AI agents read and write. The served `group` and `row-spaces` end with a
  *     line pointing at it.
@@ -35,6 +38,7 @@ import { splitBuildAppSpec } from './app-layers.js';
 import { AFTER_PUBLISH_SECTION, DATES_NUMBERS_SECTION, PUBLISH_CHECKS_SECTION } from '../../data/builtin-skills.app-builder-common.js';
 import { buildCapabilityPackLines } from '../../data/library-packs.js';
 import { OTHER_OWNERS_SECTION, OTHER_OWNERS_POINTER } from './atelier-other-owners.js';
+import { AI_PATH_SECTION, APP_TOOLS_SECTION } from './atelier-ai-path.js';
 
 /** The cut sections that end with the pointer to `other-owners`: the two a shared app is built from. */
 const POINTS_TO_OTHER_OWNERS = new Set(['group', 'row-spaces']);
@@ -75,6 +79,8 @@ export const ATELIER_PLATFORM: Array<{ id: string; from?: string; when: string }
   { id: 'notify', when: 'The app finishes something the person waits for and should tell them.' },
   { id: 'legal', when: "The app sells something or handles other people's personal data." },
   { id: 'realtime', when: 'People see each other live: presence, a shared board, a two-player game.' },
+  { id: 'ai-path', when: 'Every AI-accelerated app (the default build style): the path the person\'s own AI takes into the app, what people keep for their own hands, and what the bound skill holds.' },
+  { id: 'app-tools', when: 'The person\'s AI or an agent should act in the app through a rule the app enforces (a calculation, a limit, money, a permission), on data several people share, or on content the app produces: an app tool backed by an extension action.' },
   { id: 'agent-face', when: 'Other AI agents should be able to read or operate the published app.' },
   { id: 'install', when: 'The app is installed on a phone: the home-screen icon.' },
   { id: 'dates-numbers', when: 'The app shows a date, a time, a number, money or morsels: they follow the person\'s own format and clock, never the app\'s language.' },
@@ -160,6 +166,8 @@ export function atelierPlatformPiece(id: string, baseUrl: string): { id: string;
   const nodeUrl = baseUrl.replace(/\/+$/, '');
   if (id === 'platform') return { id, text: platformIndex(nodeUrl) };
   if (id === 'server-side') return { id, text: SERVER_SIDE_SECTION };
+  if (id === 'app-tools') return { id, text: APP_TOOLS_SECTION };
+  if (id === 'ai-path') return { id, text: AI_PATH_SECTION };
   if (id === 'from-classic') return { id, text: FROM_CLASSIC_SECTION };
   if (id === 'other-owners') return { id, text: OTHER_OWNERS_SECTION };
   const moved = MOVED_FROM_CLASSIC_SKILL[id];

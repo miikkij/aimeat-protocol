@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-20 — FINISH names the publish answer's `ai_path` line and the sections ai-path and app-tools.
  *   2026-11-19 — The research-first flow names one guide, the Atelier specification, its part
  *     `platform` and section `from-classic`; the Classic spec, skill and tiers are gone from it.
  *   2026-11-15 — "Installing the app, and its icon": who can install, action icon_upload, and that an
@@ -284,7 +285,9 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
 5. FINISH: the four things every app owes — agent face, bound skill (\`metadata.binding\`), data map
    (\`aimeat_datamap_set\`) and design spec (\`aimeat_app_manage { action: "spec_set" }\`) — then
    \`aimeat_app_template_propose\` and \`aimeat_appdev_pitfall_report\`; the publish response's
-   \`next_steps\` shows what is missing.
+   \`next_steps\` shows what is missing. Its \`ai_path\` line says how the person's own AI uses the
+   app: the bound skill names the keys, the record shape, the rules and what the person confirms,
+   and an app that enforces a rule gets app tools (\`build-app-atelier/ai-path\`, \`/app-tools\`).
 The user can always say "just build it the usual way" — then skip the proposal in 3. The research in
 1 still runs: it is how you find what already exists.
 

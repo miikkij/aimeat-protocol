@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-20 — The proposal recommends a build style (AI-accelerated by default, a quick trial, a
+ *     presentation), and step 9's bound skill is written for the person who operates the app
+ *     through their AI, with `ai_path` in the publish answer.
  *   2026-11-19 — A genre grown out of an app open to some people only is listed and given only to
  *     those people (services/node/templates.ts, the app's read gate); the line moved here from the
  *     retired Classic skill.
@@ -327,8 +330,10 @@ moved under you says so.
    blue where the node has it; on the finest it names \`custom:clean\` as its register). The others
    are genres on the finest and looks on plain (look at their own Atelier apps first,
    \`aimeat_app_list\`). Then the languages, which are English and Finnish unless they say
-   otherwise; who signs in; the introduction or none; the first screen in a sentence. Say which
-   design you would take. The language you are talking in is not the app's language list, and one
+   otherwise; who signs in; the introduction or none; the first screen in a sentence; and the
+   BUILD STYLE: AI-accelerated (the default), a quick trial or a presentation, recommended from
+   what the app is for (the specification's "How the person's own AI uses the app"; no extra
+   questions). Say which design you would take. The language you are talking in is not the app's language list, and one
    language is the owner's decision. If they said "just build it", still name the design and the
    languages in one line so they can stop you.
    **Fixed colours or following their theme** is part of that choice, and both are right: a
@@ -546,7 +551,8 @@ moved under you says so.
    words. Read \`next_steps\` in the answer: it is the node's list of what this app still owes.
    Read the WHOLE answer and keep it whole. Four of its lines are owed by every app, and the app
    is not finished while one is missing: the **agent face** (\`agent_face_present\`), the **bound
-   skill** (\`bound_skills_count\` above zero), the **data map** (\`data_map_present\`: write it
+   skill** (\`bound_skills_count\` above zero; written for the person who operates the app through
+   their AI, and \`ai_path\` says what it holds and when an app tool is owed), the **data map** (\`data_map_present\`: write it
    with \`aimeat_datamap_set\` \`{ app: "{owner}/{filename}", data_map }\`, what the app is for and,
    for each family of keys or files, where it lives, who owns and reads it and one sentence on why
    there) and the **design spec** (\`design_spec_present\`: \`aimeat_app_manage\`

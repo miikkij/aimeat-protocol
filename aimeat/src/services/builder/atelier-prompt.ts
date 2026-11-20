@@ -28,6 +28,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.49.0 — 2026-11-20 — "How the person's own AI uses the app" (atelier-ai-path.ts) after "Data,
+ *     in short": the build style the proposal recommends, the path into the app, what the bound
+ *     skill holds. The text named no app tools and no skill content until now.
  *   v1.48.0 — 2026-11-19 — "The Atelier track" and "Never" say this is the one build guide and the
  *     Classic one is retired, with section from-classic for an app built on it.
  *   v1.48.0 — 2026-11-19 — `delivery: 'paste'` (atelier-platform.ts atelierPasteDelivery): the text an
@@ -200,6 +203,7 @@ import { ornamentsPromptPart } from '../../data/atelier-ornaments.js';
 import { KIT_PROMPT_PARAGRAPH } from '../design-book/kit.js';
 import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
 import { atelierPasteDelivery } from './atelier-platform.js';
+import { ATELIER_AI_PATH_SECTION } from './atelier-ai-path.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -768,6 +772,7 @@ function composeBody(config: AimeatConfig): string {
     + 'opens as a unit, never one key per field; read back after writing. Declare the scopes the '
     + 'app uses in `<meta name="aimeat-scopes">`.\n\n';
   body += ATELIER_DATA_MAP_STEER + ATELIER_INTRODUCTION_SECTION;
+  body += ATELIER_AI_PATH_SECTION;
 
   body += '## Finishing\n\n';
   body += 'Before you call it done: open the app at 390×844, 1280×900 and 1280×460 in BOTH '
