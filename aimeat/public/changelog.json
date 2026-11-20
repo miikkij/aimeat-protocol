@@ -4,6 +4,28 @@
     {
       "date": "2026-11-20",
       "kind": "feature",
+      "id": "2026-11-20-allow-always-for-all-your-ais",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "Allow always, for all your AIs",
+        "fi": "Salli aina kaikille AI:llesi"
+      },
+      "body": {
+        "en": "Tick a permission once, and every one of your AIs does that work without asking you again. Each such act is a line in What has happened on your home.",
+        "fi": "Valitse oikeus kerran, niin kaikki AI:si tekevät sen työn kysymättä sinulta uudelleen. Jokaisesta tällaisesta teosta tulee rivi Homen kohtaan Mitä on tapahtunut."
+      },
+      "summary": {
+        "en": "Tick a permission once, and all your AIs stop asking for it; each act is logged on your home.",
+        "fi": "Valitse oikeus kerran, niin AI:si lakkaavat kysymästä sitä; jokainen teko kirjataan Homeesi."
+      }
+    },
+    {
+      "date": "2026-11-20",
+      "kind": "feature",
       "id": "2026-11-20-apps-your-own-ai-can-work-in",
       "highlight": true,
       "audience": [
