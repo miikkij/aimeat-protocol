@@ -71,8 +71,8 @@ export type WallResult =
   | { ok: false; status: 403 | 404; code: 'ACCESS_DENIED' | 'NOT_FOUND'; message: string };
 
 /**
- * The wall of `organismId` for `who` (a session's `{ sub, owner }`: the owner's account name, and the
- * principal itself, so an agent attached to the organism reads it too). Refused for a non-member.
+ * The wall of `organismId` for `who`: `sub` is the resolved principal (resolveIdentity, so an agent
+ * attached to the organism reads it too) and `owner` the owner's account name. Refused for a non-member.
  */
 export async function organismWall(
   deps: { storage: Storage; config: AimeatConfig },

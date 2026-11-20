@@ -16,11 +16,13 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { organismWall } from '../../services/app/organism-wall.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 
 export function registerOrganismAppsWallRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/organisms/:id/apps?lang= — the apps opened to this organism, for its members.
   router.get('/v1/organisms/:id/apps', requireAuth(), requireScope('organism:read'), async (req, res) => {
-    const out = await organismWall({ storage, config }, { sub: req.auth!.sub, owner: req.auth!.owner },
+    // The resolved principal, as the MCP tool passes it: an owner session's bare `sub` would not match a membership.
+    const out = await organismWall({ storage, config }, { sub: resolveIdentity(req.auth!, config.nodeId), owner: req.auth!.owner },
       req.params.id as string, String(req.query.lang ?? 'en'));
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
