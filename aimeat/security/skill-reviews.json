@@ -318,12 +318,12 @@
       "digest": "sha256:ea57b1e0ef07d535dda87497"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:437d6954dea782a13ebb65a2"
+      "digest": "sha256:e2e7c41ed63260d533c0db66"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -427,7 +427,7 @@
       "digest": "sha256:23485dcd6f01e1da985ab862"
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-11-18",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -437,7 +437,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:6737809fb5a17180a03ad88c"
+      "digest": "sha256:3a410746cb9aab832aa99569"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-20",
@@ -451,7 +451,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:6c36b7976adfd659c3af3dc1",
+      "digest": "sha256:2af7013ded92225bddb14895",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -631,7 +631,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:cb84de2b61fecc9095e929ec",
+      "digest": "sha256:f62f406806ec498c5fd1ad3d",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -648,7 +648,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:cb84de2b61fecc9095e929ec",
+      "digest": "sha256:f62f406806ec498c5fd1ad3d",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -789,8 +789,8 @@
       "aimeat/src/mcp/core-admin.ts": "8049e6509cfa6655"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "70605320b76c2a13",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "6ebe664306f2c089"
+      "aimeat/src/mcp/core.ts": "368e60f7fb07a395",
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "059e5ae30d927052"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "de90c22e1cf64e0a"
@@ -939,13 +939,13 @@
     },
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "2df6f6444c486365",
-      "aimeat/src/routes/memory/key.ts": "68aa87147c323b2f",
+      "aimeat/src/routes/memory/key.ts": "b1373b7ac0433e98",
       "aimeat/src/services/memory/bin.ts": "073bd69ddaab0c80",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
       "aimeat/src/routes/owners/export.ts": "c7913eda009f7f9a",
-      "aimeat/src/services/owner/erasure.ts": "4741b135d89ca887",
+      "aimeat/src/services/owner/erasure.ts": "c8b31a7f7fa97987",
       "aimeat/src/services/archive.ts": "6ddbae831830e2e9",
-      "aimeat/src/mcp/organisms.ts": "f7b6e5497c38f531"
+      "aimeat/src/mcp/organisms.ts": "8d8b0f69653bde7e"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "d52a31eafc176cab",
@@ -972,7 +972,7 @@
       "aimeat/src/commerce/app-tool-catalog.ts": "997e99370b2cfc6c",
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
       "aimeat/src/services/connect-tunnel/push.ts": "b828b403c0ce83a5",
-      "aimeat/src/services/workspace-rows/row-service.ts": "49298be1c9a26910",
+      "aimeat/src/services/workspace-rows/row-service.ts": "7185deaddfafe624",
       "aimeat/src/services/refinery/pipeline.ts": "8e6289116821f229",
       "aimeat/src/routes/outbound.ts": "bdb77e334bc4bd61"
     },
@@ -1046,14 +1046,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "56c0df56c7edee0a"
+      "aimeat/test/run-e2e-ci.ts": "b250474de597fe27"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "56c0df56c7edee0a"
+      "aimeat/test/run-e2e-ci.ts": "b250474de597fe27"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
