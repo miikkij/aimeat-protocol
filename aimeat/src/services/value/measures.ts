@@ -17,7 +17,10 @@
  *
  *   WHAT IT COSTS. One aggregate over the space's rows for the window, plus one per period when `per` is
  *   set. A space holds at most quota.ws_rows_max_per_workspace rows (default 50 000); a median past
- *   WORKSPACE_ROW_MEDIAN_CAP numbers is refused and the measure says so rather than run slow.
+ *   WORKSPACE_ROW_MEDIAN_CAP numbers is refused and the measure says so rather than run slow. Measured
+ *   on 2026-11-20: at 50 000 rows the slowest aggregate took 37 ms on PostgreSQL and 59 ms on SQLite, at
+ *   200 000 rows 147 ms and 275 ms; on aimeat.io the largest space then held about 17 500 rows, the
+ *   limit was the default, and a filtered count over it took 13 ms.
  *
  *   HOW IT GOES STALE. A measure whose workspace or space is gone, or that its reader can no longer
  *   read, answers with the reason and no number; the person or their AI removes the record.
@@ -60,6 +63,8 @@ export interface MeasureResult {
   id: string;
   name: string;
   ws_id: string;
+  /** The workspace's name from its manifest, when it has one. */
+  ws_name?: string;
   op: OrganismMeasure['op'];
   unit?: string;
   /** The window's answer; null when no row had a number, or when `problem` says why it was not counted. */
@@ -138,13 +143,17 @@ export async function readMeasures(
     if (!readable.has(m.wsId)) readable.set(m.wsId, await canReadWorkspace(storage, config, organism, name, name, readerGhii, m.wsId));
     if (!readable.get(m.wsId)) { out.push({ ...base, value: null, rows: 0, problem: 'no-read' }); continue; }
     let namespace: string;
+    let wsName: string | undefined;
     try {
       const manifest = await readWorkspaceManifest(storage, orgId, m.wsId, config.nodeId);
+      wsName = typeof manifest?.name === 'string' && manifest.name.trim() ? manifest.name.trim() : undefined;
       namespace = resolveRowSpace(manifest?.objectTypes as RowObjectType[] | undefined, m.space).namespace;
     } catch (err) {
       out.push({ ...base, value: null, rows: 0, problem: 'no-space', detail: err instanceof Error ? err.message : String(err) });
       continue;
     }
+    // The workspace's own name, for a reader who should not have to know its id.
+    if (wsName) Object.assign(base, { ws_name: wsName });
     const query: WorkspaceRowAggregateQuery = {
       organismId: orgId, wsId: m.wsId, namespace, op: m.op,
       ...(m.field ? { field: m.field } : {}), ...(m.where ? { where: m.where } : {}),

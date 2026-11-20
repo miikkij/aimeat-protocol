@@ -205,6 +205,7 @@ await test('v12 the organism is measured from its own rows: how many offers went
     assert(r.status === 200, `report: ${r.status}`);
     const byId = Object.fromEntries((r.body.data.measures as any[]).map(m => [m.id, m]));
     assert(byId['offers-sent']?.value === 3 && byId['offers-sent'].series?.length >= 1, `count: ${JSON.stringify(byId['offers-sent'])}`);
+    assert(byId['offers-sent'].ws_name === 'deals', `with the workspace's own name: ${JSON.stringify(byId['offers-sent'])}`);
     assert(byId['mean-offer']?.value === 2000, `mean: ${JSON.stringify(byId['mean-offer'])}`);
     assert(byId.broken?.problem === 'invalid' && byId.broken.value === null, `a measure without its field says so: ${JSON.stringify(byId.broken)}`);
 });

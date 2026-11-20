@@ -13,6 +13,7 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.14.0 -- 2026-11-20 -- A folded section "Measures" for the creators and admins (measures-panel.js): the organism's own measures with their numbers, read when the section opens.
  *   v3.13.0 -- 2026-11-20 -- A folded section "Directive for members' AI" (directive-panel.js): the organism's directive, and for its creators the answers as counts and the sentence to make or change it. The folded sections with a detail line (06, 08, 09) take FoldSection's `wrap`: at 390 px the detail ran past the edge and was cut off.
  *   v3.12.0 -- 2026-11-14 -- A team's page opens with what waits for you, the team context and skill, and you in this team (team-sections.js, team setup T14, T15); the organism's sections follow, numbered on.
  *   v3.11.1 -- 2026-11-14 -- A team's title, crumb and description are in the reader's language (orgName, orgDescription, team setup T24).
@@ -56,6 +57,7 @@ import { fmtDate, orgName, orgDescription, exportOrganismZip } from '/views/prof
 import { StructureOverview } from '/views/profile/organisms/widgets.js';
 import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
 import { DirectivePanel } from '/views/profile/organisms/directive-panel.js';
+import { MeasuresPanel } from '/views/profile/organisms/measures-panel.js';
 import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
 import { TimelinePanel, TimelineRecent, loadTimelineRows } from '/views/profile/organisms/timeline-panel.js';
 import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
@@ -86,6 +88,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const [openMap, setOpenMap] = useState(false);
   const [openAi, setOpenAi] = useState(false);
   const [openDirective, setOpenDirective] = useState(false);
+  const [openMeasures, setOpenMeasures] = useState(false);
   const [directive, setDirective] = useState({ directives: null, summary: null });
   const [fullTimeline, setFullTimeline] = useState(false);
   const [timeline, setTimeline] = useState(null);
@@ -197,13 +200,15 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     { id: 'og-map', num: num(7), label: tr('organisms.mapAndToc', 'Map and table of contents'), count: '→', open: () => setOpenMap(true) },
     { id: 'og-ai', num: num(8), label: tr('organisms.forAi', 'For your AI'), count: '→', open: () => setOpenAi(true) },
     ...(showDirective ? [{ id: 'og-directive', num: num(9), label: t('organisms.directive.title'), count: directive.summary?.review_due ? '!' : '→', open: () => setOpenDirective(true) }] : []),
+    // The organism's own measures: its creators and admins read the organism's report, so only they see them.
+    ...(canEdit ? [{ id: 'og-measures', num: num(10), label: t('organisms.measures.title'), count: '→', open: () => setOpenMeasures(true) }] : []),
   ].map((s) => ({ ...s, href: '#' + s.id }));
   const railTitle = tr('organisms.railTitle', 'In this organism');
   const rail = {
     title: railTitle,
     groups: [
       { label: railTitle, items: sections.map(railSection) },
-      { items: [{ key: 'settings', mark: num(showDirective ? 10 : 9), label: tr('organisms.settings', 'Settings'), count: '→', onClick: () => setView('settings') }] },
+      { items: [{ key: 'settings', mark: num(9 + (showDirective ? 1 : 0) + (canEdit ? 1 : 0)), label: tr('organisms.settings', 'Settings'), count: '→', onClick: () => setView('settings') }] },
     ],
   };
   const visWord = t(`organisms.vis${(org.visibility || 'public')[0].toUpperCase()}${(org.visibility || 'public').slice(1)}`) || org.visibility;
@@ -287,6 +292,13 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
         <${Section} fold wrap id="og-directive" num=${num(9)} title=${t('organisms.directive.title')} sub=${t('organisms.directive.sub')}
           open=${openDirective} onToggle=${() => setOpenDirective(o => !o)}>
           <${DirectivePanel} org=${org} directives=${directive.directives} summary=${directive.summary} canEdit=${canEdit} />
+        <//>` : null}
+
+      ${canEdit ? html`
+        <${Section} fold wrap id="og-measures" num=${num(10)} title=${t('organisms.measures.title')} sub=${t('organisms.measures.sub')}
+          open=${openMeasures} onToggle=${() => setOpenMeasures(o => !o)}>
+          ${/* Read when opened: the organism's report is counted on demand, never on every page load. */''}
+          ${openMeasures ? html`<${MeasuresPanel} org=${org} />` : null}
         <//>` : null}
     <//>`;
 }
