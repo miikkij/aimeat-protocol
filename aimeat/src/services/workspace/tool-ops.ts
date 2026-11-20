@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-20 — readWorkspaceOp carries the organism's and the workspace's directive for a member
+ *     (services/organism/directives.ts).
  *   2026-11-20 — readWorkspaceOp records each record it opens by id for the value signals (services/value/signal-buffer.ts).
  *   2026-11-13 — readWorkspaceOp takes `archived` ('only' reads the archived content alone), as
  *     GET /v1/organisms/:id/workspace does (structure programme 2026-11, unit 3b).
@@ -167,6 +169,7 @@ import { instanceFromKey, recordAt, isNodeReservedWorkspaceKey } from './record-
 import { logger } from '../../utils/logger.js';
 import { normalizeHtmlPageValue, isHtmlPageValue, schemaViewOfDocument } from '../html-page.js';
 import { isPageStale } from './opened.js';
+import { directiveFields } from '../organism/directives.js';
 
 /** What the index says of a page's life: an HTML page's kind, the day it was last opened, and whether it went stale. */
 const pageLifeOf = (cur: MemoryRecord, lastOpened: string | undefined): Record<string, unknown> => ({
@@ -323,6 +326,8 @@ export async function readWorkspaceOp(
         }
         return { ok: true, data: { organism_id: organismId, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}),
             ...(got.truncated ? { truncated: true } : {}),
+            // What the organism's creators ask a member's AI to do here (services/organism/directives.ts).
+            ...await directiveFields(deps, caller.ownerName, organismId, ws),
             ...(args.reader.warnings.length ? { classification_warnings: args.reader.warnings } : {}) } };
     }
 
@@ -357,6 +362,7 @@ export async function readWorkspaceOp(
     const schemas = await readWorkspaceSchemas(storage, organismId, ws);
 
     return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest, apps, rules, counts, index,
+        ...await directiveFields(deps, caller.ownerName, organismId, ws),
         // More rows than one read loads: the index is not the whole workspace (services/workspace/content.ts).
         ...(got.truncated ? { truncated: true } : {}),
         // Every warning-classified record this read showed, the manifest and meta records included.

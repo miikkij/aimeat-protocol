@@ -51794,6 +51794,12 @@ paths:
         tier, `organism.members`/`organism.agentGaiis` come back as `[]` and
         `members_hidden: true` is set. `your_membership` ({ role, status } or null)
         always answers "am I a member" for the caller; `member_count` stays.
+
+        Directive: for an active member, `directives` ({ rule, items, answer_key, your_answer })
+        carries what the organism's creators ask every member's AI to do (the meta record
+        organism.{id}.meta.directive, written by a creator or admin); the AI shows it as written and
+        acts only on the person's yes. A creator or admin also gets `directive_summary`: the members'
+        answers as counts, never by name, and `review_due` after 60 days with no answer.
       tags: [Organisms]
       parameters:
         - name: id
@@ -52902,7 +52908,8 @@ paths:
         size, plus the manifest, the pinned apps, the locked schemas, the member change rule and the
         section indexes. With `ids`, the full value of only those records (an id, or a record's full
         memory key inside this workspace). Version history is never returned. A session from another
-        node is refused.
+        node is refused. For an active member, `directives` carries the organism's directive and this
+        workspace's own (organism.{id}.w.{ws}.meta.directive), as on GET /v1/organisms/{id}.
       tags: [Organisms]
       security:
         - BearerAuth: []

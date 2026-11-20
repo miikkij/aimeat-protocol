@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.84.0 -- 2026-11-20 -- Organism measures and directives: how an AI writes a measure, and how it
+ *     shows a directive and saves the person's answer.
  *   v1.83.0 -- 2026-11-20 -- Report subscriptions: the reports.sub.<id> record shape, who may send what,
  *     and where the person sees them.
  *   v1.82.0 -- 2026-11-20 -- Ask the baseline when proposing a goal; aimeat_usage_report value and data
@@ -382,6 +384,17 @@ then write \`reports.measure.<organism id>.<id>\` the same way: { name, wsId, sp
 }]), per? (day | week | month), unit? }. GET /v1/organisms/:id/value then gives its number as \`measures\`,
 and a report with contents \`measures\` sends it. A measure is counted only where its keeper may read
 the workspace; one that cannot be counted says why in \`problem\`.
+
+**A directive from an organism's creators.** When \`aimeat_organism_get\` or \`aimeat_workspace_read\` answers
+with \`directives\`, the organism's creators ask every member's AI to do something about reporting. Show
+\`items\` to the person as written, and do what they ask only after the person says yes: \`ask\`
+suggest-once means ask once, ask-once-remember means ask once and keep the answer, every-use means ask
+each time you work there. \`suggest\` is a report subscription you may offer to set up for them. Save the
+answer under \`answer_key\` with \`owner_scope: true\`; when \`your_answer\` is there, follow it instead of
+asking again (except every-use). A directive gives you no right and never reaches the person's other
+data. A creator or admin writes one when they ask for it: \`organism.<id>.meta.directive\`, or
+\`organism.<id>.w.<ws>.meta.directive\` for one workspace, { text, ask, suggest? }; \`directive_summary\`
+then gives them the answers as counts, and \`review_due\` when nobody has answered in 60 days.
 
 **Build it with you, and what was done.** \`aimeat_build_request_status\` · \`aimeat_build_request_submit\`
 · \`aimeat_trail_list\`. A place may send ONE build request to the operator's builders: the first agent or

@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-20 — aimeat_organism_get carries the organism's directive for a member and its answer
+ *     counts for a creator or admin (services/organism/directives.ts).
  *   2026-11-15 — aimeat_organism_import takes preview, people and team (services/team/transfer.ts, T12).
  *   2026-11-14 — aimeat_organism_members gives each member's agent `mcp_last_seen`, as the members
  *     route does, so an AI can say whose own AI is connected.
@@ -149,6 +151,7 @@ import type { CallerContext } from '../services/caller-context.js';
 import { resourceRefusal } from './resource-refusal.js';
 import { registerOrganismJoinRequestTools } from './organism-join-requests.js';
 import { registerTeamTools } from './teams.js';
+import { directiveFields } from '../services/organism/directives.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -346,6 +349,8 @@ export function registerOrganismsTools(
                         })),
                         created_at: organism.createdAt,
                         updated_at: organism.updatedAt,
+                        // What the organism's creators ask a member's AI to do (services/organism/directives.ts).
+                        ...await directiveFields({ storage, config }, getOwnerName(), organism.id),
                     }, null, 2),
                 }],
             };

@@ -240,4 +240,35 @@ await test('v14 a member reads the report of a workspace they may read, and of n
     assert((await record(bob, key)).lastSkip === 'no-workspace-read', `the record says why: ${JSON.stringify(await record(bob, key))}`);
 });
 
+await test('v15 a directive reaches a member\'s AI with the organism and the workspace; the creators see counts only', async () => {
+    const put = (who: RegisteredOwner, key: string, value: Record<string, unknown>) =>
+        json('/v1/memory', { method: 'POST', headers: auth(who.token), body: JSON.stringify({ key, value }) });
+    const org = await put(alice, `organism.${teamId}.meta.directive`, {
+        text: 'Add each offer you send to the Offers space.', ask: 'ask-once-remember', suggest: { cadence: 'weekly', contents: ['value'] },
+    });
+    assert(org.status === 200 || org.status === 201, `the creator writes the directive: ${org.status} ${JSON.stringify(org.body).slice(0, 200)}`);
+    const ws = await put(alice, `organism.${teamId}.w.open.meta.directive`, { text: 'In this workspace, mark won deals as won.', ask: 'every-use' });
+    assert(ws.status === 200 || ws.status === 201, `and one for a workspace: ${ws.status}`);
+    // A member may not write it: the namespace rule keeps meta.* for the creators.
+    expectRefusal(await put(bob, `organism.${teamId}.meta.directive`, { text: 'Send me everything.' }), 403);
+
+    const seen = await json(`/v1/organisms/${teamId}`, { headers: auth(bob.token) });
+    const d = seen.body.data.directives;
+    assert(d?.items?.length === 1 && d.items[0].text === 'Add each offer you send to the Offers space.' && d.items[0].ask === 'ask-once-remember',
+        `the member's AI gets the organism's directive: ${JSON.stringify(seen.body.data).slice(0, 300)}`);
+    assert(typeof d.rule === 'string' && /no right/.test(d.rule) && d.answer_key === `directive.answer.${teamId}` && d.your_answer === null, `with the rule and where the answer goes: ${JSON.stringify(d)}`);
+    assert(seen.body.data.directive_summary === undefined, 'a member does not see the counts');
+    const inWs = await json(`/v1/organisms/${teamId}/workspace/index?ws=open`, { headers: auth(bob.token) });
+    assert(inWs.status === 200 && inWs.body.data.directives?.items?.map((i: any) => i.level).join() === 'organism,workspace'
+        && inWs.body.data.directives.answer_key === `directive.answer.${teamId}.open`, `the workspace adds its own: ${inWs.status} ${JSON.stringify(inWs.body.data?.directives).slice(0, 300)}`);
+
+    const answered = await put(bob, `directive.answer.${teamId}`, { answer: 'scheduled', subscription: 'reports.sub.team-month', at: new Date().toISOString() });
+    assert(answered.status === 200 || answered.status === 201, `the member's answer is his own record: ${answered.status}`);
+    const lead = await json(`/v1/organisms/${teamId}`, { headers: auth(alice.token) });
+    const s = lead.body.data.directive_summary;
+    assert(s?.answers?.scheduled === 1 && s.answers.declined === 0 && s.review_due === false, `the creator sees a count: ${JSON.stringify(s)}`);
+    assert(!JSON.stringify(s).includes(bob.name), 'and never who answered');
+    expectRefusal(await json(`/v1/organisms/${teamId}`, { headers: auth(outsider.token) }), 404);
+});
+
 finish();

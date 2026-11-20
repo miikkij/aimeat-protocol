@@ -13,6 +13,7 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.13.0 -- 2026-11-20 -- A folded section "Directive for members' AI" (directive-panel.js): the organism's directive, and for its creators the answers as counts and the sentence to make or change it.
  *   v3.12.0 -- 2026-11-14 -- A team's page opens with what waits for you, the team context and skill, and you in this team (team-sections.js, team setup T14, T15); the organism's sections follow, numbered on.
  *   v3.11.1 -- 2026-11-14 -- A team's title, crumb and description are in the reader's language (orgName, orgDescription, team setup T24).
  *   v3.11.0 -- 2026-10-31 -- "Show in the overview" under the map: the Overview page opened on this organism (views/home/overview.js).
@@ -54,6 +55,7 @@ import { recordRecent } from '/js/recents.js';
 import { fmtDate, orgName, orgDescription, exportOrganismZip } from '/views/profile/organisms/helpers.js';
 import { StructureOverview } from '/views/profile/organisms/widgets.js';
 import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
+import { DirectivePanel } from '/views/profile/organisms/directive-panel.js';
 import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
 import { TimelinePanel, TimelineRecent, loadTimelineRows } from '/views/profile/organisms/timeline-panel.js';
 import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
@@ -83,6 +85,8 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const [openReadme, setOpenReadme] = useState(false);
   const [openMap, setOpenMap] = useState(false);
   const [openAi, setOpenAi] = useState(false);
+  const [openDirective, setOpenDirective] = useState(false);
+  const [directive, setDirective] = useState({ directives: null, summary: null });
   const [fullTimeline, setFullTimeline] = useState(false);
   const [timeline, setTimeline] = useState(null);
   const team = useTeam(org);
@@ -117,6 +121,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       setGraph(g);
       setReadme(full?.data?.readme || '');
       setYourMembership(full?.data?.your_membership ?? null);
+      setDirective({ directives: full?.data?.directives ?? null, summary: full?.data?.directive_summary ?? null });
       setTocSeed(toc || '');
       setTimeline(rows);
     };
@@ -170,6 +175,8 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const agentCount = (org.agentGaiis || []).length;
   const openAiSection = () => { setOpenAi(true); setTimeout(() => scrollToSection('og-ai'), 30); };
   const readmeTitle = (readme.match(/^#\s+(.+)$/m) || [])[1] || '';
+  // The directive section: for a member when there is one, and always for its creators, who make it.
+  const showDirective = canEdit || !!directive.directives;
   // A team's page opens with its three sections (team-sections.js), and the organism's own follow.
   const shift = team ? 3 : 0;
   const num = (i) => String(i + shift).padStart(2, '0');
@@ -189,13 +196,14 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     { id: 'og-readme', num: num(6), label: tr('organisms.readmeFold', 'README'), count: '→', open: () => setOpenReadme(true) },
     { id: 'og-map', num: num(7), label: tr('organisms.mapAndToc', 'Map and table of contents'), count: '→', open: () => setOpenMap(true) },
     { id: 'og-ai', num: num(8), label: tr('organisms.forAi', 'For your AI'), count: '→', open: () => setOpenAi(true) },
+    ...(showDirective ? [{ id: 'og-directive', num: num(9), label: t('organisms.directive.title'), count: directive.summary?.review_due ? '!' : '→', open: () => setOpenDirective(true) }] : []),
   ].map((s) => ({ ...s, href: '#' + s.id }));
   const railTitle = tr('organisms.railTitle', 'In this organism');
   const rail = {
     title: railTitle,
     groups: [
       { label: railTitle, items: sections.map(railSection) },
-      { items: [{ key: 'settings', mark: num(9), label: tr('organisms.settings', 'Settings'), count: '→', onClick: () => setView('settings') }] },
+      { items: [{ key: 'settings', mark: num(showDirective ? 10 : 9), label: tr('organisms.settings', 'Settings'), count: '→', onClick: () => setView('settings') }] },
     ],
   };
   const visWord = t(`organisms.vis${(org.visibility || 'public')[0].toUpperCase()}${(org.visibility || 'public').slice(1)}`) || org.visibility;
@@ -274,5 +282,11 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
         <${Note} kind="lead">${tr('organisms.instrBlockLead', 'Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure.')}<//>
         <${InstructionBlock} orgId=${org.id} />
       <//>
+
+      ${showDirective ? html`
+        <${Section} fold id="og-directive" num=${num(9)} title=${t('organisms.directive.title')} sub=${t('organisms.directive.sub')}
+          open=${openDirective} onToggle=${() => setOpenDirective(o => !o)}>
+          <${DirectivePanel} org=${org} directives=${directive.directives} summary=${directive.summary} canEdit=${canEdit} />
+        <//>` : null}
     <//>`;
 }
