@@ -12,6 +12,7 @@
  * @structure GoalInputSchema · GoalPatchSchema · roundsFrom() · buildGoal() · applyPatch() · previewPatch()
  * @usage const goal = buildGoal(access, GoalInputSchema.parse(body), now);
  * @version-history
+ *   v1.3.0 — 2026-11-20 — baseline: what the work costs without AI, on create and change (value signals).
  *   v1.2.1 — 2026-11-20 — GoalPatchSchema is built with patchOf() (utils/zod-patch.ts); check:partial-defaults refuses .partial().
  *   v1.2.0 — 2026-11-08 — A change to the rounds keeps what it does not name: the Settings page's save
  *     (trigger and cron only) had removed the goal's time zone and its works per round. A clock round
@@ -64,6 +65,18 @@ const RoundsSchema = z.object({
   works: z.array(WorkSpecSchema).max(20).optional(),
 }).strict();
 
+/**
+ * What the work costs a person without AI, asked when the goal is made (value signals): minutes per
+ * result, per week or per month, and optionally the number the goal should move. The value report
+ * (services/value/report.ts) counts the saving from it.
+ */
+export const BaselineSchema = z.object({
+  minutes: z.number().int().min(1).max(100_000),
+  per: z.enum(['result', 'week', 'month']),
+  note: z.string().trim().max(TEXT_MAX).optional(),
+  measure: z.string().trim().max(TEXT_MAX).optional(),
+}).strict();
+
 export const GoalInputSchema = z.object({
   statement: z.string().trim().min(1).max(TEXT_MAX),
   title: z.string().trim().min(1).max(TITLE_MAX).optional(),
@@ -83,6 +96,8 @@ export const GoalInputSchema = z.object({
   works: z.array(WorkSpecSchema).max(50).optional(),
   reactions: z.array(ReactionSchema).max(MAX_REACTIONS).optional(),
   rounds: RoundsSchema.nullable().optional(),
+  /** What the work costs without AI; null removes it. */
+  baseline: BaselineSchema.nullable().optional(),
   parent_goal_id: z.string().max(64).optional(),
   reason: z.string().max(TEXT_MAX).optional(),
   /** The goal waits as a proposal for the owner's yes; nothing in it moves before that. */
@@ -177,6 +192,11 @@ function limitsFrom(l: z.infer<typeof LimitsSchema> | undefined, base = DEFAULT_
   };
 }
 
+/** The stored baseline: the caller's numbers and when they were given. */
+function baselineFrom(b: z.infer<typeof BaselineSchema>, at: string): NonNullable<GoalRecord['baseline']> {
+  return { minutes: b.minutes, per: b.per, ...(b.note ? { note: b.note } : {}), ...(b.measure ? { measure: b.measure } : {}), setAt: at };
+}
+
 /** The record a new goal starts as. Its works are made here; nothing runs until it is written. */
 export function buildGoal(access: GoalAccess, input: GoalInput, now = new Date()): GoalRecord {
   const iso = now.toISOString();
@@ -205,6 +225,7 @@ export function buildGoal(access: GoalAccess, input: GoalInput, now = new Date()
     subgoals: [],
     rounds: madeRounds,
     reactions: (input.reactions ?? []).map(reactionFrom),
+    ...(input.baseline ? { baseline: baselineFrom(input.baseline, iso) } : {}),
     material: [], works: [], log: [], changes: [],
     spent: { usd: 0, tasks: 0, day: iso.slice(0, 10), dayTasks: 0 },
     plannedBy: access.who, createdBy: access.who, createdAt: iso, updatedAt: iso,
@@ -287,6 +308,10 @@ export function applyPatch(goal: GoalRecord, patch: GoalPatch, access: GoalAcces
   if (patch.workplace !== undefined) { next.workplace = patch.workplace ? { organismId: patch.workplace.organism_id, workspaceId: patch.workplace.workspace_id } : null; what.push('where the results show'); }
   if (patch.plan_workflow_id !== undefined) { next.planWorkflowId = patch.plan_workflow_id; what.push('the plan'); }
   if (patch.reactions) { next.reactions = patch.reactions.map(reactionFrom); what.push('the reactions'); }
+  if (patch.baseline !== undefined) {
+    next.baseline = patch.baseline ? baselineFrom(patch.baseline, new Date().toISOString()) : null;
+    what.push('the baseline');
+  }
   // A change to the rounds merges into the rounds the goal has: what the caller leaves out stays
   // (roundsFrom), so a save that names only the trigger and the cron keeps the time zone and the works.
   if (patch.rounds !== undefined) {

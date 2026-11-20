@@ -9,6 +9,7 @@
  * @structure goalTools — the four definitions · GOAL_SET_ACTIONS · GOAL_WORK_ACTIONS
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-11-20 — aimeat_goal_set takes baseline, what the work costs without AI (value signals).
  *   v1.2.0 — 2026-11-08 — The `rounds` field says that an update keeps what it leaves out, and that a
  *     clock round needs a cron (group k3-goalrounds).
  *   v1.1.0 — 2026-10-25 — aimeat_goal_set and aimeat_goal_work take the goal's and the work's fields at
@@ -31,7 +32,7 @@ export const GOAL_WORK_ACTIONS = ['available', 'claim', 'release', 'add', 'leave
 export const GOAL_INPUT_FIELDS = [
   'statement', 'title', 'done_when', 'done_kind', 'mode', 'coordinator', 'substitute', 'agents', 'skills',
   'any_agent', 'limits', 'ends_at', 'workplace', 'plan_workflow_id', 'parent_goal_id', 'works', 'reactions',
-  'rounds', 'this_round_only', 'kind', 'ref',
+  'rounds', 'this_round_only', 'kind', 'ref', 'baseline',
 ] as const;
 
 /** A work's fields aimeat_goal_work takes at the top level for add and leave, as POST /v1/goals/{id}/works reads them; `work` wins on a clash. */
@@ -86,6 +87,7 @@ export const goalTools = [
       reactions: { type: 'array', description: 'When this is done, which work starts, as listed in the description.' },
       rounds: { type: 'object', description: '{ trigger manual|clock|condition, cron?, timezone?, condition?, works? }. On update, a field you leave out keeps its value ("" or [] clears it); a clock round needs a cron.' },
       this_round_only: { type: 'boolean', description: 'For update of a round goal: the change holds for this round only.' },
+      baseline: { type: 'object', description: 'For propose, create and update: what the work costs the person without AI, as they told you: { minutes, per: result|week|month, note?, measure? } (measure: the number the goal should move). Ask it when you propose a goal. null removes it.' },
       kind: { type: 'string', enum: ['file', 'memory', 'link', 'text'], description: 'For attach: what the material is.' },
       ref: { type: 'string', description: 'For attach: the storage key, the record key, the address or the text.' },
       input: { type: 'object', description: 'The same fields as one object, as earlier clients send them; a field here wins over the same field above.' },

@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-20 — aimeat_admin_usage names the node-wide reports value and rhythm.
  *   2026-11-19 — aimeat_admin_hook_set takes `when_missing` (pass | refuse), and `actions` may be left out to change only it.
  *   2026-11-15 — aimeat_admin_hooks and aimeat_admin_hook_set call a pre_ hook a blocking hook (kind gate).
  *   2026-11-14 — aimeat_discover and aimeat_invoke name route capabilities: every REST route of the
@@ -726,7 +727,7 @@ export const discoveryWorkBoardsTools = [
             from: { type: 'string', required: false, description: 'First day of the period, inclusive, as YYYY-MM-DD. On the cost page give `to` as well or neither is used; in a report it defaults to 30 days ago.' },
             to: { type: 'string', required: false, description: 'Last day of the period, inclusive, as YYYY-MM-DD. On the cost page give `from` as well or neither is used; in a report it defaults to today.' },
             ask_provider: { type: 'boolean', required: false, description: 'Ask the provider what the node\'s own house and chat keys have spent. One outbound call per key. Off by default. Cost page only: refused beside a report.' },
-            report: { type: 'string', required: false, description: `Read this usage report instead of the cost page. Across the node: ${Object.keys(NODE_REPORTS).join(', ')}. With owner: ${Object.keys(OWNER_REPORTS).join(', ')}. Defaults to day when another report parameter is given.`, zod: z.string().max(INPUT_LIMITS.name) },
+            report: { type: 'string', required: false, description: `Read this usage report instead of the cost page. Across the node: ${Object.keys(NODE_REPORTS).join(', ')}. With owner: ${Object.keys(OWNER_REPORTS).join(', ')}. Defaults to day when another report parameter is given. value (node-wide only): what AI made on the node and what happened to it, per feature, a feature with fewer than five owners left out. rhythm (node-wide only): calls per feature against the period before, and the bursts, week and season of the node's use.`, zod: z.string().max(INPUT_LIMITS.name) },
             owner: { type: 'string', required: false, description: 'Read this one person\'s slice of the report: an account name or a full owner identity (alice@node-id). Leave it out for the whole node.' },
             grain: { type: 'string', required: false, enum: ['day', 'hour'], description: 'Bucket size of the report, where the report has one. Defaults to day.' },
             series: { type: 'boolean', required: false, description: 'Include the per-bucket series of the report. Defaults to true; false leaves it out.' },

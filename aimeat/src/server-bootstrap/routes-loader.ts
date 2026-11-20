@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-20 — valueRouter mounted: GET /v1/organisms/:id/value, the organism's value report.
  *   2026-11-19 — The SiteService built here is registered as the node's one (registerNodeSiteService),
  *     which the MCP tool aimeat_site_template uses.
  *   2026-11-19 — /.well-known/did.json is registered at mount time and waits for the node key; it
@@ -164,6 +165,7 @@ import { scimRouter } from '../routes/scim.js';
 import { federationRouter } from '../routes/federation.js';
 import { organismsRouter } from '../routes/organisms.js';
 import { teamsRouter } from '../routes/organisms/teams.js';
+import { valueRouter } from '../routes/value.js';
 import { notificationsRouter } from '../routes/notifications.js';
 import { adminSecurityRouter } from '../routes/admin/security.js';
 import { adminCorsRouter } from '../routes/admin/cors.js';
@@ -603,6 +605,8 @@ export async function mountRoutes(
   app.use(scimRouter(config, storage));
   app.use(organismsRouter(config, storage));
   app.use(teamsRouter(config, storage));
+  // The organism's value report (routes/value.ts); the person's and the node's ride the usage reports.
+  app.use(valueRouter(config, storage));
   app.use(notificationsRouter(config, storage));
   app.use(adminSecurityRouter(config, storage));
   app.use(adminCorsRouter(config, storage));

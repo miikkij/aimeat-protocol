@@ -27745,6 +27745,20 @@ paths:
                 works: { type: array, items: { type: object } }
                 reactions: { type: array, items: { type: object } }
                 rounds: { type: object, nullable: true }
+                baseline:
+                  type: object
+                  nullable: true
+                  description: >-
+                    What the work costs the person without AI, as they said when the goal was made.
+                    The value report (GET /v1/usage/summary?report=value) counts the goal's saving
+                    from it: minutes per result times the results still standing, or minutes per week
+                    or month times the weeks or months that had one.
+                  required: [minutes, per]
+                  properties:
+                    minutes: { type: integer, minimum: 1, maximum: 100000 }
+                    per: { type: string, enum: [result, week, month] }
+                    note: { type: string }
+                    measure: { type: string, description: The number the goal should move, in the person's words. }
                 parent_goal_id: { type: string }
                 reason: { type: string }
                 propose: { type: boolean, description: 'The goal waits as a proposal for the owner''s yes.' }
@@ -27825,14 +27839,16 @@ paths:
         change would end and what they cost so far. `this_round_only` makes a change for the current
         round of a round goal. Taken works the change ends are told so in their tasks. A change to
         `rounds` keeps the fields it leaves out (an empty string or an empty list clears one); a field the
-        new trigger does not use is dropped, and a `clock` round without a cron is refused. `task:write`.
+        new trigger does not use is dropped, and a `clock` round without a cron is refused. `baseline`
+        ({ minutes, per: result|week|month, note?, measure? }, or null to remove it) is what the work
+        costs without AI, the same object POST /v1/goals takes. `task:write`.
       security:
         - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, properties: { preview: { type: boolean }, this_round_only: { type: boolean }, reason: { type: string } } }
+            schema: { type: object, properties: { preview: { type: boolean }, this_round_only: { type: boolean }, reason: { type: string }, baseline: { type: object, nullable: true } } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -51968,6 +51984,31 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/value:
+    get:
+      operationId: organismValueReport
+      summary: What AI made in an organism and what happened to it (creator and admins)
+      tags: [Organisms]
+      description: >-
+        The organism's value report: what an AI (an agent or a scheduled AI job) made in the
+        organism's workspaces, and what happened to it since (kept, corrected by someone else, deleted
+        within 14 days, opened by someone else), as sums per key family and per day, with the bursts,
+        week and season of the results. Never per member or per agent. With ws, one workspace. The
+        person's own report is GET /v1/usage/summary?report=value. Requires organism:read and the
+        caller to be the organism's creator or an admin; a member is refused.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: ws, in: query, required: false, schema: { type: string }, description: One workspace of the organism. }
+        - { name: from, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }, description: Inclusive start day. Defaults to 30 days ago. }
+        - { name: to, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }, description: Inclusive end day. Defaults to today. }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /v1/organisms/{id}/join:
     post:
@@ -77819,8 +77860,13 @@ paths:
           schema:
             type: string
             default: day
-            enum: [day, model, app, agent, tool, surface, apps-used, activity, sold]
-          description: Which report to read. GET /v1/usage/reports lists them with descriptions.
+            enum: [day, model, app, agent, tool, surface, apps-used, activity, sold, value]
+          description: >-
+            Which report to read. GET /v1/usage/reports lists them with descriptions. value is not a
+            usage cut: it answers what the owner's AI made and what happened to it (kept, corrected
+            by someone else, deleted within 14 days, opened by someone else), per agent, per key
+            family and per goal, with the cost and the saving counted from each goal's baseline, and
+            the rhythm (bursts, week, season) of the results.
         - in: query
           name: from
           schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
@@ -77915,7 +77961,12 @@ paths:
           schema:
             type: string
             default: day
-            enum: [day, model, app, app-model, agent, user, tool, surface, apps-used, activity, provider]
+            enum: [day, model, app, app-model, agent, user, tool, surface, apps-used, activity, provider, value, rhythm]
+          description: >-
+            value and rhythm are node-wide only (a named owner is refused). value: what AI made on
+            the node and what happened to it, per key family; a family with fewer than five owners
+            behind it is left out and counted in hidden_groups. rhythm: tool calls per feature against
+            the period before, and the bursts, week and season of the node's use.
         - in: query
           name: owner
           schema: { type: string }

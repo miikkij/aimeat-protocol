@@ -1,0 +1,130 @@
+/**
+ * @file test/e2e-value-signals.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The value report, driven the way a person's AI drives it: an agent makes a record, the
+ *   person corrects it and someone else opens it, and the person's own report says so
+ *   (aimeat_usage_report report=value, GET /v1/usage/summary); a goal carries the baseline the AI asked
+ *   (aimeat_goal_set baseline); the organism's report is for its creator and admins only (GET
+ *   /v1/organisms/:id/value, a member and an outsider refused); the operator's value and rhythm reports
+ *   are node-wide and refuse a named person (GET /v1/admin/usage/summary).
+ * @structure v01..v07 in order; each later test reads what the earlier ones made.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=value-signals
+ * @version-history
+ *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 2).
+ */
+import { registerOwner, setupOperator, type RegisteredOwner } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool, type McpSession, type McpAgent } from './helpers/mcp-session.js';
+
+const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
+const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
+let passed = 0, failed = 0;
+async function test(name: string, fn: () => Promise<void>) {
+    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
+    catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
+}
+function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
+async function json(path: string, opts: RequestInit = {}) {
+    for (let i = 0; ; i++) {
+        const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
+        if (res.status === 429 && i < 5) { await new Promise(r => setTimeout(r, 1000 * (i + 1))); continue; }
+        const ct = res.headers.get('content-type') ?? '';
+        return { status: res.status, body: ct.includes('json') ? await res.json() as any : { _raw: await res.text() } };
+    }
+}
+const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
+const stamp = Date.now().toString(36).slice(-5);
+
+console.log('\n=== Value signals E2E (made, corrected, opened; goal baseline; organism and node reports) ===\n');
+
+let operator!: RegisteredOwner, alice!: RegisteredOwner, bob!: RegisteredOwner, outsider!: RegisteredOwner;
+let writer!: McpAgent, writerAi!: McpSession, aliceAi!: McpSession;
+let teamId = '';
+
+await test('v01 an agent makes a record, the person corrects it and opens it', async () => {
+    operator = await setupOperator(BASE, ADMIN_PW, `vop${stamp}`);
+    alice = await registerOwner(BASE, `valice${stamp}`);
+    bob = await registerOwner(BASE, `vbob${stamp}`);
+    outsider = await registerOwner(BASE, `vout${stamp}`);
+    writer = await makeAgent(BASE, alice, ['memory:read', 'memory:write', 'wallet:read', 'task:write']);
+    writerAi = await openSession(BASE, writer.token, 'writer-ai');
+    const made = await callTool(writerAi, 'aimeat_memory_write', { key: 'report.november', value: { text: 'Sales grew in November.' } });
+    assert(!made.isError, `the agent writes: ${made.text.slice(0, 200)}`);
+    // The person corrects the agent's record in its namespace, then opens it.
+    const fixed = await json('/v1/memory', {
+        method: 'POST', headers: auth(alice.token),
+        body: JSON.stringify({ key: 'report.november', value: { text: 'Sales grew by 12 % in November, mostly in the north.' }, agent: writer.gaii }),
+    });
+    assert(fixed.status === 200 || fixed.status === 201, `the person corrects: ${fixed.status} ${JSON.stringify(fixed.body).slice(0, 200)}`);
+    const opened = await json(`/v1/memory/${encodeURIComponent('report.november')}?agent=${encodeURIComponent(writer.gaii)}`, { headers: auth(alice.token) });
+    assert(opened.status === 200, `the person opens it: ${opened.status}`);
+});
+
+await test('v02 the person\'s value report counts the result, the correction and the use, per agent', async () => {
+    const r = await callTool(writerAi, 'aimeat_usage_report', { report: 'value' });
+    assert(!r.isError, `report: ${r.text.slice(0, 200)}`);
+    const v = r.data;
+    assert(v.report === 'value' && v.scope === 'own', `shape: ${JSON.stringify({ report: v.report, scope: v.scope })}`);
+    assert(v.signals.produced >= 1 && v.signals.corrected >= 1 && v.signals.used >= 1, `signals: ${JSON.stringify(v.signals)}`);
+    assert(v.by_producer.some((p: any) => p.producer === writer.gaii && p.produced >= 1), `per agent: ${JSON.stringify(v.by_producer)}`);
+    assert(v.rules.rejection_window_days === 14 && Array.isArray(v.rules.read_endpoints), 'the report says what it rests on');
+    const rest = await json('/v1/usage/summary?report=value', { headers: auth(alice.token) });
+    assert(rest.status === 200 && rest.body.data.signals.produced === v.signals.produced, `REST says the same: ${rest.status}`);
+});
+
+await test('v03 another person reading the same report sees only their own numbers', async () => {
+    const r = await json('/v1/usage/summary?report=value', { headers: auth(bob.token) });
+    assert(r.status === 200, `bob reads his own: ${r.status}`);
+    assert(r.body.data.signals.produced === 0 && (r.body.data.by_producer ?? []).length === 0, `bob sees nothing of alice: ${JSON.stringify(r.body.data.signals)}`);
+});
+
+await test('v04 a goal carries the baseline its AI asked for, and a bad one is refused', async () => {
+    const made = await callTool(writerAi, 'aimeat_goal_set', {
+        action: 'propose', statement: 'A customer report on the first day of every month.',
+        baseline: { minutes: 180, per: 'result', note: 'about three hours by hand' },
+    });
+    assert(!made.isError, `propose: ${made.text.slice(0, 200)}`);
+    const id = made.data.goal?.id ?? made.data.id;
+    const got = await json(`/v1/goals/${id}`, { headers: auth(alice.token) });
+    const baseline = got.body.data.goal?.baseline ?? got.body.data.baseline;
+    assert(baseline?.minutes === 180 && baseline?.per === 'result', `baseline: ${JSON.stringify(got.body.data).slice(0, 300)}`);
+    const bad = await callTool(writerAi, 'aimeat_goal_set', { action: 'propose', statement: 'x', baseline: { minutes: -5, per: 'year' } });
+    assert(bad.isError, 'a negative baseline in years is refused');
+    const report = await callTool(writerAi, 'aimeat_usage_report', { report: 'value' });
+    assert(report.data.goals.some((g: any) => g.goal_id === id && g.baseline?.minutes === 180), `the report lists the goal: ${JSON.stringify(report.data.goals).slice(0, 300)}`);
+});
+
+await test('v05 the organism\'s report is for its creator; a member and an outsider are refused', async () => {
+    aliceAi = await openSession(BASE, (await makeAgent(BASE, alice, ['organism:write', 'organism:read', 'organism:invite', 'memory:read', 'memory:write'])).token, 'alice-ai');
+    const made = await callTool(aliceAi, 'aimeat_team_setup', { dry_run: false, teams: [{ name: `Myynti ${stamp}`, members: [bob.name] }] });
+    assert(!made.isError, `team: ${made.text.slice(0, 200)}`);
+    teamId = made.data.teams[0].organism_id;
+    const accept = await json(`/v1/organisms/${teamId}/invitations/accept`, { method: 'POST', headers: auth(bob.token) });
+    assert(accept.status === 200, `bob joins: ${accept.status}`);
+    const asLead = await json(`/v1/organisms/${teamId}/value`, { headers: auth(alice.token) });
+    assert(asLead.status === 200 && asLead.body.data.scope === 'organism' && asLead.body.data.by_producer === undefined, `lead: ${asLead.status} ${JSON.stringify(asLead.body.data ?? asLead.body).slice(0, 200)}`);
+    const asMember = await json(`/v1/organisms/${teamId}/value`, { headers: auth(bob.token) });
+    assert(asMember.status === 403, `a member is refused: ${asMember.status}`);
+    const asOutsider = await json(`/v1/organisms/${teamId}/value`, { headers: auth(outsider.token) });
+    assert(asOutsider.status === 403, `an outsider is refused: ${asOutsider.status}`);
+    const bad = await json(`/v1/organisms/${teamId}/value?from=yesterday`, { headers: auth(alice.token) });
+    assert(bad.status === 400, `a bad day is refused: ${bad.status}`);
+});
+
+await test('v06 the operator reads the node\'s value and rhythm, never one person\'s', async () => {
+    const value = await json('/v1/admin/usage/summary?report=value', { headers: auth(operator.token) });
+    assert(value.status === 200 && value.body.data.scope === 'node' && value.body.data.by_producer === undefined, `node value: ${value.status} ${JSON.stringify(value.body).slice(0, 200)}`);
+    assert(typeof value.body.data.hidden_groups === 'number', 'a small feature is left out and counted');
+    const rhythm = await json('/v1/admin/usage/summary?report=rhythm', { headers: auth(operator.token) });
+    assert(rhythm.status === 200 && Array.isArray(rhythm.body.data.features) && rhythm.body.data.rhythm, `rhythm: ${rhythm.status} ${JSON.stringify(rhythm.body).slice(0, 200)}`);
+    const named = await json(`/v1/admin/usage/summary?report=value&owner=${alice.name}`, { headers: auth(operator.token) });
+    assert(named.status === 400, `one person's value report is refused to the operator: ${named.status}`);
+});
+
+await test('v07 a person who is not the operator does not read the node\'s report', async () => {
+    const r = await json('/v1/admin/usage/summary?report=value', { headers: auth(alice.token) });
+    assert(r.status === 403, `alice reads the node: ${r.status}`);
+});
+
+console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
+if (failed > 0) process.exit(1);

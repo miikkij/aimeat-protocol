@@ -24,9 +24,11 @@
  *   import { usageReportsRouter } from './routes/usage-reports.js';
  *   app.use(usageReportsRouter(config, storage));
  * @version-history
+ *   2026-11-20 — GET /v1/usage/summary answers report=value with the value report (services/value/reports.ts).
  *   v1.0.1 — 2026-11-14 — The apps-used line names last_bucket, the day each app was last used.
  *   v1.0.0 — 2026-08-14 — Initial: the owner-facing usage reports.
  */
+import { readOwnerReport } from '../services/value/reports.js';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -35,7 +37,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
-  readUsageReport, OWNER_REPORTS, UnknownReportError, dayNDaysAgo,
+  OWNER_REPORTS, UnknownReportError, dayNDaysAgo,
 } from '../services/usage/usage-read.js';
 
 /** One sentence per report, so a client (or an agent) can pick without reading this file. */
@@ -101,7 +103,7 @@ export function usageReportsRouter(config: AimeatConfig, storage: Storage): Rout
     const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
 
     try {
-      const data = await readUsageReport(storage, {
+      const data = await readOwnerReport({ storage, config }, {
         report, scope: 'owner', ownerGhii, from, to, grain,
         series: req.query.series !== 'false',
         limit: Number(req.query.limit) || undefined,

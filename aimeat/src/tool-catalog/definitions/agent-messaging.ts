@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-20 — aimeat_usage_report: report value, what the person's AI made and what happened to it.
  *   2026-11-19 — aimeat_handbook_get: the Atelier specification is the one build guide, with its
  *     platform sections; the Classic "build-app" tier is no longer offered.
  *   2026-11-19 — aimeat_dm_broadcast's description names aimeat_dm_broadcast_summary, which reads the results.
@@ -217,7 +218,7 @@ export const agentMessagingTools = [
         scope: 'wallet:read',
         surfaces: ['agent', 'service'],
         input: {
-            report: { type: 'string', required: true, enum: ['day', 'model', 'app', 'agent', 'tool', 'surface', 'apps-used', 'activity', 'sold'], description: 'Which report to read.', zod: z.enum(Object.keys(OWNER_REPORTS) as [string, ...string[]]).default('day') },
+            report: { type: 'string', required: true, enum: ['day', 'model', 'app', 'agent', 'tool', 'surface', 'apps-used', 'activity', 'sold', 'value'], description: 'Which report to read. value: what the person\'s AI made and what happened to it (kept, corrected by someone else, deleted within 14 days, opened by someone else), per agent and per goal, with the cost and the saving counted from each goal\'s baseline; read it when the person asks what AI has given them, and say what the numbers rest on.', zod: z.enum(Object.keys(OWNER_REPORTS) as [string, ...string[]]).default('day') },
             from: { type: 'string', description: 'Inclusive start day, YYYY-MM-DD. Defaults to 30 days ago.' },
             to: { type: 'string', description: 'Inclusive end day, YYYY-MM-DD. Defaults to today.' },
             grain: { type: 'string', enum: ['day', 'hour'], description: 'Bucket size, where the report has one.' },

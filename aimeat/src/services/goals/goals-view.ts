@@ -9,6 +9,7 @@
  * @structure goalSummary() · goalView() · waitingItems()
  * @usage res.json(success(nodeId, { goal: goalView(goal) }));
  * @version-history
+ *   v1.4.0 — 2026-11-20 — goalSummary carries the baseline (value signals).
  *   v1.3.0 — 2026-10-29 — A model work waiting for the owner's answer on spending the AI allowance
  *     shows `spend_request` (secaudit2026oct26 round 8c).
  *   v1.2.0 — 2026-10-27 — A model work waiting for the owner's answer on records shows `read_request`
@@ -65,6 +66,8 @@ export function goalSummary(goal: GoalRecord) {
     ends_at: goal.endsAt, renew_by: goal.renewBy,
     rounds: goal.rounds ? { trigger: goal.rounds.trigger, cron: goal.rounds.cron ?? null, count: goal.rounds.count, last_at: goal.rounds.lastAt ?? null, next_at: goal.rounds.nextAt ?? null } : null,
     parent_goal_id: goal.parentGoalId, subgoals: goal.subgoals,
+    // What the work costs without AI, as the person said (the value report counts the saving from it).
+    baseline: goal.baseline ? { minutes: goal.baseline.minutes, per: goal.baseline.per, note: goal.baseline.note ?? null, measure: goal.baseline.measure ?? null, set_at: goal.baseline.setAt } : null,
     updated_at: goal.updatedAt, created_at: goal.createdAt,
   };
 }

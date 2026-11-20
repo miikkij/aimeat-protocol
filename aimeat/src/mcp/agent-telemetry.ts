@@ -11,6 +11,7 @@
  *   import { registerAgentTelemetryTools } from './agent-telemetry.js';
  *   registerAgentTelemetryTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, caller);
  * @version-history
+ *   2026-11-20 — aimeat_usage_report answers report=value with the value report (services/value/reports.ts).
  *   2026-11-13 — aimeat_agent_telemetry_report calls services/agent/telemetry-append.ts, the gate, the
  *     agent read and the append POST /v1/agents/:name/telemetry runs (structure programme 2026-11, unit 2b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -31,6 +32,7 @@
  *                            priced, append-only usage event via services/usage-metering.js.
  */
 
+import { readOwnerReport } from '../services/value/reports.js';
 import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -38,7 +40,7 @@ import type { CallerContext } from '../services/caller-context.js';
 import { telemetryTarget, appendAgentTelemetry } from '../services/agent/telemetry-append.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { readUsageReport, UnknownReportError } from '../services/usage/usage-read.js';
+import { UnknownReportError } from '../services/usage/usage-read.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
@@ -75,7 +77,7 @@ export function registerAgentTelemetryTools(
         // usage is asking about its owner's account, which is the only account it has.
         const ownerGhii = ownerGhiiOf(agentGaii);
         try {
-            const data = await readUsageReport(storage, {
+            const data = await readOwnerReport({ storage, config }, {
                 report, scope: 'owner', ownerGhii, from, to, grain, limit, series: true,
             });
             return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };

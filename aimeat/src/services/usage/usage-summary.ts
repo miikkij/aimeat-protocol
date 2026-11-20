@@ -11,9 +11,12 @@
  *   const r = await readUsageSummary(storage, config.nodeId, { report: 'tool', from, to });
  *   if (!r.ok) return res.status(400).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-11-20 — report value (the node's value report) and rhythm (use per feature and its rhythm); both node-wide only.
  *   v1.0.0 — 2026-11-14 — Initial: moved out of routes/admin/usage.ts so aimeat_admin_usage reads the
  *     same reports with the same validation.
  */
+import { readValueReport, type ValueReport } from '../value/report.js';
+import { readUsageRhythm, type UsageRhythm } from '../value/usage-rhythm.js';
 import type { Storage } from '../../storage/interface.js';
 import { readUsageReport, UnknownReportError, dayNDaysAgo, type UsageReport } from './usage-read.js';
 
@@ -37,7 +40,7 @@ export interface UsageSummaryInput {
 }
 
 export type UsageSummaryResult =
-  | { ok: true; data: UsageReport }
+  | { ok: true; data: UsageReport | ValueReport | UsageRhythm }
   | { ok: false; code: 'INVALID_INPUT'; message: string };
 
 /** Read one operator usage report. A bad day or an unknown report name is INVALID_INPUT. */
@@ -52,6 +55,14 @@ export async function readUsageSummary(
     return { ok: false, code: 'INVALID_INPUT', message: 'from and to must be YYYY-MM-DD' };
   }
   const grain = input.grain === 'hour' ? 'hour' : 'day';
+
+  // The value report and the rhythm are the node's, counted per feature and never per person: a
+  // person's own value report is theirs to read (GET /v1/usage/summary), not the operator's.
+  if (report === 'value' || report === 'rhythm') {
+    if (owner) return { ok: false, code: 'INVALID_INPUT', message: `The ${report} report is node-wide here; a person reads their own with aimeat_usage_report.` };
+    if (report === 'rhythm') return { ok: true, data: await readUsageRhythm(storage, { from, to }) };
+    return { ok: true, data: await readValueReport({ storage }, { kind: 'node' }, { from, to }) };
+  }
 
   try {
     const data = await readUsageReport(storage, {

@@ -15,6 +15,7 @@
  *   2026-11-20 -- e2e-ai-standing.ts joins the list (not the guard tier): the owner's "Allow always" setting
  *     (wish-ai-toimii-itsen-isesti-omistajan-asetuksella-salli-aina-ja-k).
  *   2026-11-19 -- `--retry-red`: a red suite runs once more, alone; one that passes alone is read as timing and printed with the [e2e-flaky] mark (test/run-e2e-retry.ts). pnpm ready's sweep passes it, the nightly does not.
+ *   2026-11-20 -- test/e2e-value-signals.ts joins ALL_SUITES (value signals, phase 2).
  *   2026-11-19 -- test/e2e-owner-erasure-logs.ts joins ALL_SUITES (feature audit 2026-11-19, part 2 of agent G).
  *   2026-11-19 -- test/e2e-calibrator-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 5).
  *   2026-11-19 -- test/e2e-living-author-mcp.ts joins ALL_SUITES (feature audit 2026-11-19, 4.4 item 5).
@@ -2013,6 +2014,7 @@ const ALL_SUITES = [
     'test/e2e-team-setup.ts',
     'test/e2e-team-changes.ts',
     'test/e2e-team-governance.ts',
+    'test/e2e-value-signals.ts',
     'test/e2e-mcp-workspace-content-tools.ts',
     'test/e2e-mcp-memory-misc-tools.ts',
     'test/e2e-mcp-operator-site-tools.ts',

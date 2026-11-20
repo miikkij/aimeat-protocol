@@ -15,6 +15,7 @@
  * @structure GoalRecord · GoalWork · GoalLogEntry · limits and caps · goalKey() · trackingCode() · parseTrackingCode()
  * @usage import { type GoalRecord, goalKey } from './goals-types.js';
  * @version-history
+ *   2026-11-20 — GoalRecord.baseline: what the work costs without AI (value signals).
  *   v1.3.0 — 2026-10-29 — GoalWork.spendAsk, GoalRecord.modelSpendAllowed and approvedAt: a model work
  *     an agent without ai:use asked for waits for the owner's one press (secaudit2026oct26 round 8c).
  *   v1.2.0 — 2026-10-27 — GoalWork.readAsk, readAllowed and readLeftOut: a model work waits for the
@@ -282,6 +283,11 @@ export interface GoalRecord {
   roundNote?: { round: number; text: string };
   /** The coordinator's last wake: when, and the task that carried it. */
   wake?: { at: string; taskId?: string };
+  /**
+   * What the work costs a person without AI, given when the goal was made: minutes per result, week or
+   * month, and the number it should move. The value report counts the saving from it.
+   */
+  baseline?: { minutes: number; per: 'result' | 'week' | 'month'; note?: string; measure?: string; setAt: string } | null;
   /** When the owner approved this goal as a proposal (goals-ops.ts goalActionOp 'approve'). */
   approvedAt?: string;
   /**

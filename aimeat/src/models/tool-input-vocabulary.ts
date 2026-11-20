@@ -10,6 +10,7 @@
  *   OVERVIEW_SECTIONS · BENEFICIARIES_MAX · MEMORY_LIST_MAX_LIMIT · FONT_KINDS
  * @usage import { FLAG_REASONS } from '../models/tool-input-vocabulary.js';
  * @version-history
+ *   2026-11-20 — OWNER_REPORTS gains value, NODE_REPORTS value and rhythm (value signals, phase 2).
  *   v1.1.0 — 2026-11-14 — NODE_REPORTS moved unchanged from services/usage/usage-read.ts, and
  *     USAGE_REPORT_PARAMS: aimeat_admin_usage states the node reports and reads them.
  *   v1.0.0 — 2026-10-05 — Moved from services/usage/usage-read.ts, services/moderation-flags.ts,
@@ -28,6 +29,8 @@ export const OWNER_REPORTS: Record<string, string> = {
   'apps-used': 'call.owner.app',
   activity: 'call.owner',
   sold: 'call.provider.coordinate',
+  /** What the person's AI made and what happened to it (services/value/report.ts); not a usage cut. */
+  value: 'value',
 };
 
 /** Reports across every owner. Operator-only: the calling route MUST gate on the operator role (services/usage/usage-read.ts). */
@@ -43,6 +46,10 @@ export const NODE_REPORTS: Record<string, string> = {
   'apps-used': 'call.app',
   activity: 'call.node',
   provider: 'call.provider.coordinate',
+  /** What the node's AI made and what happened to it, per feature (services/value/report.ts); not a usage cut. */
+  value: 'value',
+  /** What the node is used for and when: features, bursts, week, season (services/value/usage-rhythm.ts). */
+  rhythm: 'rhythm',
 };
 
 /**
