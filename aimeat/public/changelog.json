@@ -4,6 +4,28 @@
     {
       "date": "2026-11-20",
       "kind": "feature",
+      "id": "2026-11-20-reports-on-your-rhythm-and-what-ai-gave-you",
+      "highlight": true,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "Reports on your rhythm, and what AI gave you",
+        "fi": "Raportit omaan tahtiin ja tekoälyn hyöty näkyviin"
+      },
+      "body": {
+        "en": "AIMEAT now counts what happens to what AI makes: kept as it was, corrected by someone else, deleted within two weeks, or opened by someone else. Ask your AI, or open the Reports page, and get the counts as a report daily, weekly, monthly or when use comes in a burst. A goal shows the time it saves against the baseline you gave. An organism's creators can measure its own work from workspace rows, and can leave a directive that every member's AI shows its person. The AI acts on the directive only after the person says yes. The operator sees the rhythm of use and what kind of data passes through, never the data.",
+        "fi": "AIMEAT laskee nyt, mitä tekoälyn tekemälle tapahtuu: jäikö se ennalleen, korjasiko joku muu sitä, poistettiinko se kahden viikon sisällä vai avasiko joku muu sen. Kysy tekoälyltäsi tai avaa Raportit-sivu, niin saat luvut raporttina päivittäin, viikoittain, kuukausittain tai silloin, kun käytössä on purske. Tavoite näyttää säästetyn ajan antamaasi lähtötasoon verrattuna. Organismin luojat voivat mitata organismin omaa työtä työtilan riveistä. He voivat myös jättää ohjeen, jonka jokaisen jäsenen tekoäly näyttää ihmiselleen. Tekoäly toimii ohjeen mukaan vain, kun ihminen vastaa kyllä. Ylläpitäjä näkee käytön rytmin ja sen, millaista dataa kulkee läpi, mutta ei itse dataa."
+      },
+      "summary": {
+        "en": "Ask your AI what AI made and how much of it stayed, and get it as a report on the rhythm you choose.",
+        "fi": "Kysy tekoälyltäsi, mitä tekoäly teki ja kuinka paljon siitä jäi, ja saat sen raporttina valitsemaasi tahtiin."
+      }
+    },
+    {
+      "date": "2026-11-20",
+      "kind": "feature",
       "id": "2026-11-20-pick-your-ai-model-from-a-list-or-let-your-ai-change-it",
       "highlight": false,
       "audience": [
