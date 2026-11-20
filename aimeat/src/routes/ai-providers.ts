@@ -66,6 +66,9 @@ import { providerView } from '../services/ai/providers.js';
 import { testProvider } from '../services/ai/provider-test.js';
 import { setRouting } from '../services/ai/routing.js';
 import { setProviderModel, providerModelWarnings } from '../services/ai/provider-model.js';
+import { z } from 'zod';
+import { validateBody } from '../models/schemas.js';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import { modelsLocked } from '../services/ai/node-model-rules.js';
 import type { AiCapability } from '../services/ai/types.js';
 import { aiCallerOf } from './ai-policy.js';
@@ -73,6 +76,12 @@ import { aiCallerOf } from './ai-policy.js';
 /** The scope an agent needs to propose a routing change. Outside the `*` bundle. */
 const ROUTING_WRITE_SCOPE = 'memory:write-reserved';
 const NEXT_LIST = { description: 'List your AI providers', method: 'GET', url: '/v1/ai/providers' };
+/** PUT /v1/ai/providers/:id/model: what the MCP twins send. setProviderModel checks the values. */
+const ProviderModelBodySchema = z.object({
+  capability: z.enum(['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed']).optional(),
+  model: z.string().min(1).max(INPUT_LIMITS.name),
+  confirm_token: z.string().max(INPUT_LIMITS.line).optional(),
+});
 
 export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -117,9 +126,9 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
 
   // ── PUT /v1/ai/providers/:id/model ── one capability's model; the owner applies, an agent proposes
   // and then confirms, as for the routing below.
-  router.put('/v1/ai/providers/:id/model', requireAuth(), requireScope(ROUTING_WRITE_SCOPE), async (req: Request, res: Response) => {
+  router.put('/v1/ai/providers/:id/model', requireAuth(), requireScope(ROUTING_WRITE_SCOPE), validateBody(ProviderModelBodySchema, config.nodeId), async (req: Request, res: Response) => {
     const auth = req.auth!;
-    const body = (req.body ?? {}) as Record<string, unknown>;
+    const body = req.body as z.infer<typeof ProviderModelBodySchema>;
     // One shape, the one the MCP twins send: { capability, model, confirm_token }, the provider in the path.
     const input = { provider: req.params.id as string, capability: body.capability, model: body.model };
     try {

@@ -352,13 +352,13 @@
       "digest": "sha256:02a9d5f292d1dd36fcff63d7"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-20",
       "watches": [
         "aimeat/src/routes/ai.ts",
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:1ccfb0c14b1aa909fc12136d"
+      "digest": "sha256:be4045e104f0ba359950580d"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-11-19",
@@ -808,7 +808,7 @@
     },
     "node:configure-routing": {
       "aimeat/src/routes/ai.ts": "cd09968c390a97cf",
-      "aimeat/src/routes/ai-providers.ts": "ec0b2030cc66235b",
+      "aimeat/src/routes/ai-providers.ts": "223c9be9d18fb28c",
       "aimeat/src/services/ai/routing.ts": "2233dd201cd0cd90"
     },
     "node:use-app-bound-skills": {

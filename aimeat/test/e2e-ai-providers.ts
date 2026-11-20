@@ -641,7 +641,8 @@ const toolText = (r: any) => String(r?.result?.content?.[0]?.text ?? '');
       const cross = await setModel(b.token, 'my-or', { model: 'deepseek/deepseek-v4.1-flash' });
       assert(cross.status === 404, `another owner: ${cross.status}`);
       const appToken = await appGrantToken(m, `provmodel${Date.now()}.html`);
-      const byApp = await setModel(appToken, 'my-or', { model: 'deepseek/deepseek-v4.1-flash' });
+      // Written out, not through setModel, so check:denial-coverage ties this refusal to the route.
+      const byApp = await json('/v1/ai/providers/my-or/model', { method: 'PUT', headers: auth(appToken), body: JSON.stringify({ model: 'deepseek/deepseek-v4.1-flash' }) });
       assert(byApp.status === 403, `an app: ${byApp.status}`);
       const weak = await connectAgent(m, `aiprovweak${Date.now()}`, ['ai:use']);
       const byWeak = await setModel(weak, 'my-or', { model: 'deepseek/deepseek-v4.1-flash' });
