@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-21 -- e2e-skill-bound-public.ts joins the list (not the guard tier): a bound skill is public by default.
  *   2026-11-21 -- e2e-ext-person-decision.ts joins the list (not the guard tier): actions marked `decision: person`.
  *   2026-11-20 -- e2e-organism-app-wall.ts joins the list (not the guard tier): the organism's app wall and the new entry.
  *   2026-11-20 -- e2e-ai-standing.ts joins the list (not the guard tier): the owner's "Allow always" setting
@@ -1851,6 +1852,8 @@ const ALL_SUITES = [
     'test/e2e-memory-namespaces.ts',
     // An agent's write under an app's key prefix names the owner_scope fix; a bound skill is told at publish.
     'test/e2e-app-prefix-owner-scope.ts',
+    // A new skill bound to an app, published with no visibility, is public; an explicit one wins.
+    'test/e2e-skill-bound-public.ts',
     // An app grant with contract:spend opens, reads, changes and completes a checkout (routes/commerce.ts).
     'test/e2e-app-checkout-scope.ts',
     'test/e2e-presigned-meta.ts',

@@ -19,6 +19,8 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   2026-11-21 — POST /v1/skills: a new user skill bound to an app with no visibility named asks for
+ *     public (services/skill/publish-gate.ts boundSkillLevel), and the answer says so in visibility_default.
  *   2026-10-26 — Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss): POST
  *     /v1/skills takes a file as { content, encoding: "base64" } and `keep_files`, and its answer names
  *     the standard's rules SKILL.md breaks (`skill.standardIssues`); GET /v1/skills/:name takes
@@ -89,7 +91,7 @@ import { getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgen
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { requireScopeUnlessSelf } from '../auth/self-or-scope.js';
 import { callerOf } from '../middleware/caller.js';
-import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill/publish-gate.js';
+import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel, boundSkillLevel } from '../services/skill/publish-gate.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import type { PublishGateInput } from '../services/publish-requests/door.js';
 
@@ -213,8 +215,10 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       // Making a user skill public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4): on an ask
       // the skill keeps its level (`owner` when new) and the owner gets a request.
       const gate = publishGateOf(req);
+      // A new skill bound to an app, with no visibility named, asks for 'public' (the app's guide).
+      const bound = await boundSkillLevel({ storage, config }, gate, scope, level, accessor.ownerName, skill_md);
       // Before it, a closed node keeps a user skill asked as public at 'members' (plan V1.6).
-      const closed = await closedSkillLevel({ storage, config }, scope, level, accessor.ownerName, { skillMd: skill_md });
+      const closed = await closedSkillLevel({ storage, config }, scope, bound.visibility, accessor.ownerName, { skillMd: skill_md });
       const ask = skillPublishAsk({ storage, config }, gate, scope, closed.visibility);
       if (ask?.kind === 'refused') {
         res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
@@ -264,6 +268,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       // 202 when the skill kept its level and making it public waits for the owner.
       res.status(asked.publishRequest ? 202 : 201).json(success(config.nodeId, {
         skill: summary, ai_provenance_id: summary.aiProvenanceId ?? null,
+        ...(bound.note && summary.visibility === 'public' ? { visibility_default: bound.note } : {}),
         ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
         ...(asked.warnings ? { warnings: asked.warnings } : closedNodeWarnings(closed.warning)),
         ...(await provenanceWriteEcho(storage, config, {

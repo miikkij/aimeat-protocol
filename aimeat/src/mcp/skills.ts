@@ -14,6 +14,8 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-21 — aimeat_skill_publish: a new user skill bound to an app with no visibility named is
+ *     public (boundSkillLevel), and the answer says so in visibility_default; the ZIP upload too.
  *   2026-11-12 — aimeat_skill_delete: DELETE /v1/skills/:name had no tool, so an AI could publish a
  *     skill and hide it and never remove it (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  *   2026-11-01 — aimeat_skill_list and aimeat_skill_get read the shared anonymous principal as a reader
@@ -82,7 +84,7 @@ import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import type { PublishGateInput } from '../services/publish-requests/door.js';
-import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill/publish-gate.js';
+import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel, boundSkillLevel } from '../services/skill/publish-gate.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 
@@ -179,8 +181,10 @@ export function registerSkillsTools(
 
             // Making a user skill public asks the node's publish gate, as POST /v1/skills does.
             const gate = publishGate();
+            // A new skill bound to an app, with no visibility named, asks for 'public' (the app's guide).
+            const bound = await boundSkillLevel({ storage, config }, gate, targetScope, visibility, ownerName, skill_md);
             // Before it, a closed node keeps a user skill asked as public at 'members' (plan V1.6).
-            const closed = await closedSkillLevel({ storage, config }, targetScope, visibility, ownerName, { skillMd: skill_md });
+            const closed = await closedSkillLevel({ storage, config }, targetScope, bound.visibility, ownerName, { skillMd: skill_md });
             const ask = skillPublishAsk({ storage, config }, gate, targetScope, closed.visibility);
             if (ask?.kind === 'refused') return toolError(ask.code, ask.message);
 
@@ -213,6 +217,7 @@ export function registerSkillsTools(
                 const asked = ask ? await fileSkillAsk({ storage, config }, gate, ask, summary) : {};
                 return ok({
                     published: true, skill: summary, ...(await writeProvenanceEcho(storage, config, summary.aiProvenanceId)),
+                    ...(bound.note && summary.visibility === 'public' ? { visibility_default: bound.note } : {}),
                     ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
                     ...(asked.warnings ? { warnings: asked.warnings } : closedNodeWarnings(closed.warning)),
                 });

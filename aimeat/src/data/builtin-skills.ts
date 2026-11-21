@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-21 -- use-app-bound-skills: a new skill with a binding is public when no visibility is named.
  *   2026-11-20 -- aimeat-goal-recipes (builtin-skills.goal-recipes.ts): what a person wants, in their words, built after the AI names the capabilities.
  *   2026-11-19 -- "Build and publish apps" names the Atelier spec and its platform part; the Classic spec is retired.
  *   2026-11-14 -- +ask-someone-who-knows (builtin-skills.ask-someone.ts): asking and answering the people
@@ -557,7 +558,9 @@ Put the binding in the SKILL.md frontmatter so it travels with the skill:
     ---
 
 Publish with \`aimeat_skill_publish\`. A guide the app's public pages list needs
-\`visibility: "public"\`; when the node asks the owner before making something public, the answer
+\`visibility: "public"\`, and a NEW skill with a binding is public when you name no visibility (the
+answer's \`visibility_default\` says so; pass \`visibility: "owner"\` to keep it to your owner). When
+the node asks the owner before making something public, the answer
 carries \`publish_request\` and the skill becomes public once they approve at its \`approve_url\`.
 On a node that shows its content to its signed-in accounts only, the skill is saved for the
 signed-in accounts (\`members\`) and the answer's \`warnings\` say so (PUBLIC_IS_SIGNED_IN_HERE).

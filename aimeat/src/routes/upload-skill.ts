@@ -9,6 +9,8 @@
  * @structure SKILL_ZIP_LIMITS · handleSkillUpload(res, config, storage, sub, meta, data)
  * @usage await handleSkillUpload(res, config, storage, verified.sub, verified.meta, data);
  * @version-history
+ *   2026-11-21 — A new user skill bound to an app with no visibility named is public (boundSkillLevel),
+ *     and the answer says so in visibility_default.
  *   v1.5.0 — 2026-10-26 — Agent Skills standard: the ZIP may hold any file whose path stays inside the
  *     skill folder (LICENSE.txt, forms.md, templates/ …), a binary file is stored as its bytes
  *     (skill-files.ts), and the answer's skill names the standard's rules SKILL.md breaks.
@@ -37,7 +39,7 @@ import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../services/resource-events.js';
-import { skillPublishAsk, fileSkillAsk, closedSkillLevel } from '../services/skill/publish-gate.js';
+import { skillPublishAsk, fileSkillAsk, closedSkillLevel, boundSkillLevel } from '../services/skill/publish-gate.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 
@@ -109,7 +111,9 @@ export async function handleSkillUpload(
     const gate = await uploadPublishGate(storage, config.nodeId, sub);
     // Before it, a closed node keeps a user skill asked as public at 'members' (plan V1.6).
     const skillMd = files.get('SKILL.md');
-    const closed = await closedSkillLevel({ storage, config }, scope, visibility, ownerName, { skillMd: skillMd === undefined ? undefined : String(skillMd) });
+    // A new skill bound to an app, with no visibility named, asks for 'public' (the app's guide).
+    const bound = await boundSkillLevel({ storage, config }, gate, scope, visibility, ownerName, skillMd === undefined ? undefined : String(skillMd));
+    const closed = await closedSkillLevel({ storage, config }, scope, bound.visibility, ownerName, { skillMd: skillMd === undefined ? undefined : String(skillMd) });
     const ask = skillPublishAsk({ storage, config }, gate, scope, closed.visibility);
     if (ask?.kind === 'refused') {
         res.status(ask.status).json({ success: false, error: ask.code, message: ask.message });
@@ -140,6 +144,7 @@ export async function handleSkillUpload(
         const asked = ask && gate ? await fileSkillAsk({ storage, config }, gate, ask, summary) : {};
         res.status(asked.publishRequest ? 202 : 200).json({
             success: true, type: 'skill', skill: summary, ai_provenance_id: summary.aiProvenanceId ?? null,
+            ...(bound.note && summary.visibility === 'public' ? { visibility_default: bound.note } : {}),
             ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
             ...(asked.warnings ? { warnings: asked.warnings } : closedNodeWarnings(closed.warning)),
         });

@@ -139,6 +139,11 @@ public pages present a bound skill as that app's own guide). A node-scope skill 
 operator's and may name any app on the node; a workspace skill's binding is not checked,
 because no app listing reads workspace skills.
 
+A NEW user skill with a binding, published with no `visibility`, is `public` (since 2026-11-21): it is
+the app's guide, written for the people who use the app. It goes through the closed-node level and
+the publish gate like any public skill, and the answer's `visibility_default` says so when it was
+stored public. An explicit `visibility` wins, and a skill already in the registry keeps its level.
+
 **Owner shortcut:** in the profile **Apps tab**, every "My Apps" card shows its bound skills
 with an **Attach skill / detach** picker — attaching rewrites the chosen skill's frontmatter
 binding and republishes it (version bumps). The public **app catalog detail view** shows an

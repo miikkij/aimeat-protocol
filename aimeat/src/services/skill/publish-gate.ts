@@ -13,14 +13,17 @@
  *   skill is always read by its workspace.
  *
  *   Kept apart from skills.ts, which is close to the 800-line limit.
- * @structure SkillGateAsk · skillPublishAsk · closedSkillLevel · userSkillState · fileSkillAsk
+ * @structure SkillGateAsk · skillPublishAsk · boundSkillLevel · closedSkillLevel · userSkillState · fileSkillAsk
  * @usage
- *   const closed = await closedSkillLevel(ctx, scope, visibility, owner, { skillMd });  // closed node first
+ *   const bound = await boundSkillLevel(ctx, gate, scope, visibility, owner, skillMd);  // a bound skill's default
+ *   const closed = await closedSkillLevel(ctx, scope, bound.visibility, owner, { skillMd });  // closed node first
  *   const ask = skillPublishAsk(ctx, gate, scope, closed.visibility);  // before the first write
  *   if (ask?.kind === 'refused') → 403
  *   const summary = await publishSkill(..., { visibility: ask ? undefined : visibility });
  *   const asked = ask ? await fileSkillAsk(ctx, gate, ask, summary) : {};
  * @version-history
+ *   v1.2.0 — 2026-11-21 — boundSkillLevel: a new user skill bound to an app and published with no
+ *     visibility asks for 'public' (the app's guide is for its users), through the same gate.
  *   v1.1.0 — 2026-10-18 — closedSkillLevel: on a node that shows its content to signed-in accounts
  *     only, a user skill asked as public is stored at 'members' with PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
@@ -60,6 +63,37 @@ function declaredSkillName(skillMd: unknown): string | undefined {
     if (err instanceof SkillValidationError) return undefined;
     throw err;
   }
+}
+
+/** What a publish answer says when a bound skill took the public default. */
+export const BOUND_SKILL_PUBLIC_NOTE =
+  'This skill is bound to an app, so it is public: whoever uses the app, and their AI, can read it. To keep it to yourself, publish it with visibility "owner".';
+
+/**
+ * The level a publish asks for. A NEW user skill bound to an app (metadata.binding) and published
+ * with no visibility asks for 'public', because it is the app's operating guide and is written for the
+ * app's users. It then goes through the closed-node level and the publish gate like any 'public'. An
+ * explicit level, a skill already in the registry, a skill bound to no app and every other scope keep
+ * what they asked for (undefined: the registry's default). A caller the gate would refuse outright
+ * (nobody to ask) also keeps the default, so the default never refuses a publish that passed before.
+ */
+export async function boundSkillLevel<V>(
+  ctx: Ctx, gate: PublishGateInput | undefined, scope: string, requested: V | undefined,
+  owner: string | null | undefined, skillMd: unknown,
+): Promise<{ visibility: V | 'public' | undefined; note?: string }> {
+  if (requested !== undefined || scope !== 'user' || !owner || typeof skillMd !== 'string') return { visibility: requested };
+  let parsed: ReturnType<typeof parseSkillMd>;
+  try {
+    parsed = parseSkillMd(skillMd);
+  } catch (err) {
+    // An invalid SKILL.md: the publish that follows refuses it with its own 422.
+    if (err instanceof SkillValidationError) return { visibility: requested };
+    throw err;
+  }
+  if (typeof parsed.frontmatter.metadata?.binding !== 'string') return { visibility: requested };
+  if (await userSkillState(ctx, owner, parsed.frontmatter.name)) return { visibility: requested };
+  if (skillPublishAsk(ctx, gate, scope, 'public')?.kind === 'refused') return { visibility: requested };
+  return { visibility: 'public', note: BOUND_SKILL_PUBLIC_NOTE };
 }
 
 /**

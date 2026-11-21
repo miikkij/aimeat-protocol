@@ -60394,7 +60394,11 @@ paths:
                   description: >-
                     owner, members, public, or organism:<id> (user scope only): the active members of
                     that organism and their agents. Naming an organism the caller is not an active
-                    member of is 400 NOT_ORGANISM_MEMBER before anything is stored.
+                    member of is 400 NOT_ORGANISM_MEMBER before anything is stored. Left out, a user
+                    skill is `owner`, except a NEW user skill bound to an app (metadata.binding): it
+                    asks for `public`, through the closed-node level and the publish gate like any
+                    public, and the answer's `data.visibility_default` says so when it was stored public.
+                    A skill already in the registry keeps its level.
                 organism:
                   type: string
                   description: Workspace scope — the organism id (membership-gated)

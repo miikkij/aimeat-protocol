@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-21 — aimeat_skill_publish's visibility names the public default of a new skill bound to an app.
  *   2026-11-21 — aimeat_appdev_pitfall_report takes evidence, seen_version, tags, supersedes,
  *     confirm_new, kind and retired_by, and its description and category name the fixed list and the
  *     SIMILAR_ENTRY refusal; aimeat_appdev_overview and aimeat_appdev_pitfall_list take `areas`.
@@ -751,7 +752,7 @@ export const capabilitiesGroupsSkillsTools = [
             files: { type: 'object', description: 'The skill\'s other files as relative path -> content: the text of a text file, or { "content": "<base64>", "encoding": "base64" } for an image or other binary file. Any path inside the skill folder (scripts/, references/, assets/, LICENSE.txt …).', zod: z.record(z.string(), z.union([documentText(), z.object({ content: documentText(), encoding: z.literal('base64') })])) },
             keep_files: { type: 'boolean', description: 'Keep every file the skill already holds that `files` does not name (default false: a republish holds exactly SKILL.md plus `files`). Use it to change SKILL.md alone.' },
             scope: { type: 'string', enum: ['user', 'node', 'workspace'], description: 'Registry scope (default user).' },
-            visibility: { type: 'string', description: 'Registry visibility (node/user): owner, members, public, or organism:<organism id> (user scope only: the active members of one organisation your owner is a member of). Defaults: user->owner, node->members. public = federated.', zod: z.union([z.enum(['owner', 'members', 'public']), organismAudienceInput]) },
+            visibility: { type: 'string', description: 'Registry visibility (node/user): owner, members, public, or organism:<organism id> (user scope only: the active members of one organisation your owner is a member of). Defaults: user->owner, node->members; a NEW user skill bound to an app (metadata.binding) -> public, because it is the app\'s guide for its users (the answer\'s visibility_default says so; pass owner to keep it to yourself). public = federated.', zod: z.union([z.enum(['owner', 'members', 'public']), organismAudienceInput]) },
             organism_id: { type: 'string', description: 'Workspace scope: the organism id.' },
             workspace_id: { type: 'string', description: 'Workspace scope: the workspace id.' },
             ...aiProvenanceCatalogInput,

@@ -510,11 +510,11 @@
       "digest": "sha256:ce86bdb4139c2fb1414d178d"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:610b967a0e6d3cdcfc55cbbf"
+      "digest": "sha256:957bbe67c2dc6c08ee432c0a"
     },
     "node:install-skills-locally": {
       "reviewedOn": "2026-11-15",
@@ -642,7 +642,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:e26066385d04ead502e09217",
+      "digest": "sha256:fb5be08c43f183710c6118c8",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -659,7 +659,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:e26066385d04ead502e09217",
+      "digest": "sha256:fb5be08c43f183710c6118c8",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -823,7 +823,7 @@
       "aimeat/src/services/ai/routing.ts": "2233dd201cd0cd90"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "6da0eed218b80ba7"
+      "aimeat/src/routes/skills.ts": "ffebf48b466a8102"
     },
     "node:install-skills-locally": {
       "aimeat/src/cli/skill-install.ts": "767dd5a3aaf6fdb5"
@@ -1057,14 +1057,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "4837116affc6e7ae"
+      "aimeat/test/run-e2e-ci.ts": "d9a63b086f6d6729"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "4837116affc6e7ae"
+      "aimeat/test/run-e2e-ci.ts": "d9a63b086f6d6729"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"

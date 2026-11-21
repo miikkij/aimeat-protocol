@@ -87,7 +87,7 @@
       "digest": "sha256:f000d3fd757657f8134efc3a"
     },
     "07-security.md": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/config/posture.ts",
         "aimeat/src/middleware/cors.ts",
@@ -96,9 +96,10 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/mcp-client/capability-use-setting.ts",
         "aimeat/src/services/sd-jwt.ts",
-        "aimeat/src/services/eudiw.ts"
+        "aimeat/src/services/eudiw.ts",
+        "aimeat/src/services/skill/publish-gate.ts"
       ],
-      "digest": "sha256:a72e1abf13b769566dba9a4d"
+      "digest": "sha256:02d35fba7ef7594bbbe1d9f2"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-19",
@@ -354,7 +355,8 @@
       "aimeat/src/services/sign-in-policy.ts": "abdf689f004d2cac",
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec",
       "aimeat/src/services/sd-jwt.ts": "7c866bc79ebd9e48",
-      "aimeat/src/services/eudiw.ts": "b6f5af6030b3bcd3"
+      "aimeat/src/services/eudiw.ts": "b6f5af6030b3bcd3",
+      "aimeat/src/services/skill/publish-gate.ts": "cfe2a1e169bd6166"
     },
     "08-threat-model.md": {
       "docs/security/threat-model.md": "10cf3cf1952417f9",

@@ -1,6 +1,6 @@
 # 07 Security
 
-> Checked against AIMEAT node 4.3.1 (commit dd04ead96) on 2026-11-19. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 3e8f32b59) on 2026-11-21. Maintained with the code: see the README for how.
 
 This page is for the security officer and the architect who must approve AIMEAT. It says how the node separates principals, which settings are safe as shipped and which are not, how sign-in, input, CORS, secrets and dependencies are handled, how to report a vulnerability, and what security work has been done. The live state of one node is on its admin Security page; this page says what to look for there. Threats and their residual risk are in [08 Threat model](08-threat-model.md); the production checklist is in [09 Hardening guide](09-hardening-guide.md).
 
@@ -127,7 +127,7 @@ On a node that serves content only to signed-in accounts (`AIMEAT_CONTENT_ACCESS
 | An operator decides a request | `aimeat_admin_internet_opening_decide` | `aimeat/src/tool-catalog/definitions/internet-opening.ts` |
 | An operator lets one owner open without approval, until a date | `aimeat_admin_internet_opener_set` | `aimeat/src/tool-catalog/definitions/internet-opening.ts` |
 
-On a node with `AIMEAT_CONTENT_ACCESS=open` (the default) this approval does not apply: each owner decides what of theirs is public. `aimeat_exposure_report` lists what of a person's content others can read.
+On a node with `AIMEAT_CONTENT_ACCESS=open` (the default) this approval does not apply: each owner decides what of theirs is public. One default is public: a new skill bound to an app (the app's guide for its users) is public unless its author names another level, and it passes the publish gate like any public skill (`aimeat/src/services/skill/publish-gate.ts`). `aimeat_exposure_report` lists what of a person's content others can read.
 
 ## Federation default state
 
