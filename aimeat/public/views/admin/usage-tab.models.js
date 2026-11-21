@@ -5,8 +5,8 @@
  * @description Sections 02 and 03 of the Usage page: what the money went on, and what it did by day.
  *
  *   WHY THE MODELS ARE ROWS AND NOT A CHART. The old page drew one stacked bar series per model
- *   into components/UsageChart.js, whose palette is twelve colours and whose colorForIndex CYCLES
- *   with `%`. On a node running eighteen models, six of them wore a colour another model already
+ *   into components/UsageChart.js, whose palette is twelve colours and whose colorForIndex CYCLED
+ *   with `%` until 2026-11-21. On a node running eighteen models, six of them wore a colour another model already
  *   had — in a stacked bar, where two same-coloured segments inside one stack cannot be separated
  *   at all. The legend named eighteen models and could distinguish twelve.
  *

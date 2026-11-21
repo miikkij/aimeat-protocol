@@ -12,6 +12,9 @@
  *   - WorkspaceProvisionError: thrown for a malformed manifest (surfaces as 400/validation)
  * @usage const { ws } = await provisionWorkspace(storage, config, { orgId, ownerName, ownerGhii, name, manifest, schemas });
  * @version-history
+ *   v1.6.0 -- 2026-11-21 -- The answer names `ignored_fields`: a records space's schemaRef with no
+ *     schema under `schemas`, and a `schemas` entry that is not an object, both of which lock nothing;
+ *     `schemas_locked` lists only the namespaces a schema was locked for.
  *   v1.5.0 -- 2026-10-19 -- The registry entry is appended on the registry's version (updateRecord),
  *     and a rollback takes out only this workspace's entry, on the version too, instead of writing
  *     back the registry read before (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -85,6 +88,39 @@ export interface ProvisionWorkspaceInput {
   readme?: string;
 }
 
+/** A part of the request the node took no action on, and why: the caller would otherwise assume it did. */
+export interface IgnoredField { field: string; reason: string }
+
+/**
+ * What of a create request locks nothing. `schemaRef` is a label the node never resolves: the schema
+ * a records space is held to is the one given under `schemas[<namespace>]`, so a schemaRef with no
+ * such entry reads like a schema reference and locks nothing. A `schemas` entry that is not an
+ * object is skipped. Both used to pass without a word (registry entry
+ * data/workspace-create-schemaref-required), and the caller believed the space was schema-locked.
+ */
+export function ignoredProvisionFields(objectTypes: unknown[], schemas: Record<string, unknown> | undefined): IgnoredField[] {
+  const out: IgnoredField[] = [];
+  const map = schemas && typeof schemas === 'object' ? schemas : {};
+  objectTypes.forEach((raw, i) => {
+    const ot = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const isRecords = (ot.backing ?? 'memory') === 'memory' && ot.mode !== 'document' && ot.kind !== 'document';
+    const ns = typeof ot.namespace === 'string' ? ot.namespace : '';
+    const entry = ns ? map[ns] : undefined;
+    if (isRecords && typeof ot.schemaRef === 'string' && ot.schemaRef && !(entry && typeof entry === 'object')) {
+      out.push({
+        field: `manifest.objectTypes[${i}].schemaRef`,
+        reason: `"${ot.schemaRef}" is a label; no schema was locked for the space "${ns}" because \`schemas\` has no object under "${ns}". Pass the JSON Schema there to lock it.`,
+      });
+    }
+  });
+  for (const [ns, schema] of Object.entries(map)) {
+    if (!schema || typeof schema !== 'object') {
+      out.push({ field: `schemas.${ns}`, reason: 'not a JSON Schema object, so nothing was locked for this space.' });
+    }
+  }
+  return out;
+}
+
 /** Write a workspace-meta record under the owner GHII, version-aware (new = v1, existing = +1). */
 async function setMeta(storage: Storage, key: string, value: unknown, owner: string, now: string): Promise<void> {
   const prev = await storage.getMemory(owner, key);
@@ -104,7 +140,7 @@ export async function provisionWorkspace(
   storage: Storage,
   _config: AimeatConfig,
   input: ProvisionWorkspaceInput,
-): Promise<{ ws: string; types: string[]; schemas_locked: string[] }> {
+): Promise<{ ws: string; types: string[]; schemas_locked: string[]; ignored_fields?: IgnoredField[] }> {
   const man = input.manifest;
   if (!man || typeof man !== 'object' || !Array.isArray(man.objectTypes)) {
     throw new WorkspaceProvisionError('manifest must be an object with an objectTypes array.');
@@ -113,6 +149,8 @@ export async function provisionWorkspace(
   man.objectTypes = normalizeObjectTypes(man.objectTypes as Array<Record<string, unknown>>) as unknown[];
 
   const schemaMap = input.schemas ?? {};
+  // Read before the envelope backfill fills in a default schemaRef, so only what the caller wrote is named.
+  const ignored = ignoredProvisionFields(man.objectTypes, schemaMap);
   // Same shape as before (`ws-` + base-36 time + three base-36 characters), drawn from crypto.
   const wsId = 'ws-' + Date.now().toString(36) + randomInt(36 ** 3).toString(36).padStart(3, '0');
   const root = `organism.${input.orgId}.w.${wsId}`;
@@ -189,7 +227,11 @@ export async function provisionWorkspace(
     classifyContainerAfterWrite({ storage, config: _config }, workspaceTarget(input.orgId, wsId),
       String(input.name || man.name || ''), typeof summary === 'string' ? summary : null);
 
-    return { ws: wsId, types: (man.objectTypes as Array<{ name?: string }>).map(o => o.name || '').filter(Boolean), schemas_locked: Object.keys(schemaMap) };
+    return {
+      ws: wsId, types: (man.objectTypes as Array<{ name?: string }>).map(o => o.name || '').filter(Boolean),
+      schemas_locked: Object.keys(schemaMap).filter(ns => schemaMap[ns] && typeof schemaMap[ns] === 'object'),
+      ...(ignored.length ? { ignored_fields: ignored } : {}),
+    };
   } catch (err) {
     const orphans = await rollback();
     const reason = err instanceof Error ? err.message : String(err);

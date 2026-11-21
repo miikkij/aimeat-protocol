@@ -18,6 +18,8 @@
  * @structure default OverviewView({ navigate }) · DetailStrip · PhoneList
  * @usage routed at /v1/home?overview=1[&focus=<item id>] by spa.html
  * @version-history
+ *   v1.0.1 — 2026-11-21 — A count's short form comes from compact() (/js/format.js) in the reader's
+ *     own format; it was the Finnish "1,2 t." for every reader.
  *   v1.0.0 — 2026-10-31 — Initial (wish-kokonaiskuva-koneet-agentit-sovellukset-tieto-ja-tarjoukset-).
  */
 import { h } from 'preact';
@@ -28,7 +30,7 @@ import { apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { getSession } from '/js/services/auth.js';
 import { relayLiveUpdates } from '/lib/live-updates.js';
-import { ago } from '/js/format.js';
+import { ago, compact } from '/js/format.js';
 import { PageFrame } from '/components/PageFrame.js';
 import { BackLink } from '/components/BackLink.js';
 import { Spinner } from '/components/Spinner.js';
@@ -50,7 +52,9 @@ const LIVE = new Set(['agents', 'agent-tasks', 'apps', 'organisms', 'work', 'pac
 /** The help topic of each lane: `explain.overview.<topic>.*`. */
 const TOPIC = { machines: 'computers', agents: 'agents', apps: 'apps', knowledge: 'knowledge', offerings: 'offerings' };
 
-const fmt = (n) => (n >= 10000 ? `${Math.round(n / 1000)} t.` : n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')} t.` : String(n));
+// A count in the reader's own short form ("1,2 t." in Finnish, "1.2K" in English): /js/format.js
+// compact(). The Finnish form was written by hand here for every reader (docs/pitfalls.md §81).
+const fmt = (n) => compact(n);
 
 function unitWord(unit) {
   return unit === 'opens' ? o('unit.opens', 'opens') : unit === 'writes' ? o('unit.writes', 'writes') : o('unit.calls', 'calls');

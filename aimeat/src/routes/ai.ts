@@ -81,6 +81,8 @@
  *     aiPayerOf: an agent's call is paid by its owner, in the agent's name. Ruled by the developer;
  *     until now an agent paid from its own namespace, and its owner's key never paid for it.
  *   v1.x — 2026-09-19 — upsertMemory is services/private-record.ts, shared with services/decide/.
+ *   v1.x — 2026-11-21 — POST /v1/ai/complete answers `warnings` when the provider package changed
+ *     or left out part of the call (docs/pitfalls.md §98).
  *   v1.x — 2026-09-13 — POST /v1/ai/complete answers finish_reason and truncated beside content.
  *   v1.x — 2026-08-28 — /v1/ai/image answers with the service's fetchUrl: the anonymous /v1/pub/
  *     form for a public image, the owner-authenticated /v1/storage/ form for a private one. The
@@ -259,6 +261,9 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           // to arrive exactly like a finished one.
           finish_reason: r.finishReason,
           truncated: r.truncated,
+          // Additive: what the provider package changed or left out of the call (a setting the
+          // model does not take, an output cap it filled in). Absent when it said nothing.
+          ...(r.warnings ? { warnings: r.warnings } : {}),
           // Additive: the owner's model policy chose the model, because the one that would have
           // answered is not allowed or nobody chose one. Absent otherwise.
           ...(r.policyChoseModel ? { policy_chose_model: true } : {}),

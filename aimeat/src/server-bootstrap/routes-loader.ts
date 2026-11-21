@@ -9,6 +9,10 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-21 — The eight routers behind a feature flag (calibrator, portfolio, extensions, cortex,
+ *     packages with instances, templates, connector tunnel, personal nodes) mount through
+ *     flaggedMounts(): switched off, their paths answer 503 FEATURE_DISABLED naming the setting,
+ *     not 404 (retires docs/pitfalls.md §79). The site sync route keeps its 404 (test/api-full.ts).
  *   2026-11-20 — appRefPathMiddleware before the routers: an app named without `.html` in a
  *     `/v1/apps/<owner>/<name>` path reaches the app's routes.
  *   2026-11-20 — valueRouter mounted: GET /v1/organisms/:id/value, the organism's value report.
@@ -220,6 +224,7 @@ import { buildOidcProviders } from '../services/oidc-providers.js';
 import { knowledgeRouter } from '../routes/knowledge.js';
 import { siteRouter } from '../routes/site.js';
 import { mountRealtime } from './realtime-mount.js';
+import { flaggedMounts } from './flagged-mount.js';
 import { sseRouter } from '../routes/sse.js';
 import { presenceRouter } from '../routes/presence.js';
 import { adminFeaturesRouter } from '../routes/admin/features.js';
@@ -362,6 +367,9 @@ export async function mountRoutes(
   // cache-invalidation listener. None of it mounts a route, which is why it lives in a sibling; it
   // stays AHEAD of route mounting because the refusal log has to exist before anything can refuse.
   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
+  // A router behind a feature flag goes through this, so a switched-off feature answers 503 with
+  // its setting's name instead of 404 (flagged-mount.ts).
+  const flagged = flaggedMounts(app, config);
 
   // Prometheus metrics registry (opt-in)
   // The per-request middleware mounts HERE, before any route, or the
@@ -544,9 +552,8 @@ export async function mountRoutes(
   app.use(librarianRouter(config, storage));  // Tier-1 fan-across full-text retrieval
   app.use(discoverRouter(config, storage));   // Master directory — unified cross-domain discovery
   app.use(livingRouter(config, storage));     // Living Documents — AI template author
-  if (config.calibratorEnabled) {
-    app.use(calibratorRouter(config, storage));  // Prompt calibration tool
-  }
+  flagged.mount({ on: config.calibratorEnabled, setting: 'AIMEAT_CALIBRATOR_ENABLED', feature: 'the prompt calibrator',
+    paths: ['/v1/calibrator'] }, () => calibratorRouter(config, storage));
   mountAiRouters(app, config, storage);          // openrouter, ai, ai-policy, ai-providers (routes-loader-ai.ts)
   // The same key and the same budget, with a handle instead of a held request: a model call that
   // may take half an hour cannot be an HTTP request anybody waits on.
@@ -628,7 +635,8 @@ export async function mountRoutes(
   app.use(mcpRouter(config, storage, peers));
   app.use(siteRouter(config, storage, siteService, provenance));    // Portal settings; bootstrap owns GET /
 
-  // Site LB sync — manual trigger endpoint + background job
+  // Site LB sync — manual trigger endpoint + background job. Not a flagged mount: off, the route
+  // answers 404, and test/api-full.ts asserts exactly that, so it keeps its bare `if`.
   if (config.siteLbEnabled && config.siteLbOriginUrl) {
     app.post('/v1/admin/site/sync', requireAuth(), requireOperator(storage), async (_req, res) => {
       try {
@@ -640,9 +648,8 @@ export async function mountRoutes(
     });
     startSiteSyncJob(config, storage, siteService);
   }
-  if (config.portfolioEnabled) {
-    app.use(portfolioRouter(config, storage));
-  }
+  flagged.mount({ on: config.portfolioEnabled, setting: 'AIMEAT_PORTFOLIO', feature: 'portfolios',
+    paths: ['/v1/portfolio'] }, () => portfolioRouter(config, storage));
 
   // The KOTI (home) routes — the remake's onboarding path. Additive: mounted beside the profile
   // routes, which are untouched, and a person moves between the two with a switch.
@@ -743,27 +750,27 @@ export async function mountRoutes(
   app.use(appsRouter(config, storage, peers));
   app.use(appStoreRouter(config, storage));
   // Node Extensions (Sandboxed)
-  if (config.extensionsEnabled) {
-    app.use(extensionsRouter(config, storage, scheduler, emailService));
+  flagged.mount({ on: config.extensionsEnabled, setting: 'AIMEAT_EXTENSIONS_ENABLED', feature: 'node extensions',
+    paths: ['/v1/extensions', '/v1/ext', '/v1/ext-hash'] }, () => {
     logger.info('Extension system enabled');
-  }
+    return extensionsRouter(config, storage, scheduler, emailService);
+  });
 
   // Cortex Extensions (Manifest-based)
-  if (config.cortexEnabled) {
-    app.use(cortexRouter(config, storage));
+  flagged.mount({ on: config.cortexEnabled, setting: 'AIMEAT_CORTEX_ENABLED', feature: 'cortex extensions',
+    paths: ['/v1/cortex'] }, () => {
     logger.info('Cortex extension system enabled');
-  }
+    return cortexRouter(config, storage);
+  });
 
-  // Packages, Instances & Templates
-  if (config.packagesEnabled) {
-    // peers: the import door checks a signature on an uploaded ZIP against the key of the node that
-    // signed it, when that node is a peer this one knows.
-    app.use(packagesRouter(config, storage, peers));
-    app.use(instancesRouter(config, storage, scheduler, peers));
-  }
-  if (config.packagesEnabled && config.templatesEnabled) {
-    app.use(templatesRouter(config, storage));
-  }
+  // Packages, Instances & Templates. peers: the import route checks a signature on an uploaded ZIP
+  // against the key of the node that signed it, when that node is a peer this one knows.
+  flagged.mount({ on: config.packagesEnabled, setting: 'AIMEAT_PACKAGES_ENABLED', feature: 'packages',
+    paths: ['/v1/packages', '/v1/instances', '/v1/install-sets', '/v1/package-install-requests'] },
+  () => [packagesRouter(config, storage, peers), instancesRouter(config, storage, scheduler, peers)]);
+  flagged.mount({ on: config.packagesEnabled && config.templatesEnabled,
+    setting: config.packagesEnabled ? 'AIMEAT_TEMPLATES_ENABLED' : 'AIMEAT_PACKAGES_ENABLED', feature: 'package templates',
+    paths: ['/v1/templates'] }, () => templatesRouter(config, storage));
 
   // Capability Layer
   app.use(capabilitiesRouter(config, storage));
@@ -822,14 +829,16 @@ export async function mountRoutes(
   app.use(connectInstallRouter(config));
 
   // Connector forward tunnel — operator-only stats route (WS upgrade is in index.ts)
-  if (config.connectTunnelEnabled) {
-    app.use(connectTunnelRouter(config, storage));
-  }
+  flagged.mount({ on: config.connectTunnelEnabled, setting: 'AIMEAT_CONNECT_TUNNEL_ENABLED', feature: 'the connector tunnel',
+    paths: ['/v1/connect/tunnel'] }, () => connectTunnelRouter(config, storage));
 
   // Personal node management routes
-  if (config.personalNodesEnabled) {
-    app.use(personalRouter(config, storage, tunnelManager, mailboxNotificationService));
-  }
+  flagged.mount({ on: config.personalNodesEnabled, setting: 'AIMEAT_PERSONAL_NODES_ENABLED', feature: 'personal nodes',
+    paths: ['/v1/personal'] }, () => personalRouter(config, storage, tunnelManager, mailboxNotificationService));
+
+  // A switched-off feature's paths answer 503 FEATURE_DISABLED, registered after every other router
+  // so that only what would have been a 404 under those paths changes (flagged-mount.ts).
+  flagged.finish();
 
   // Realtime P2P rooms — Phase 0. The router is mounted either way and the manager comes back null
   // when the feature is off; realtime-mount.ts says why both halves are like that.

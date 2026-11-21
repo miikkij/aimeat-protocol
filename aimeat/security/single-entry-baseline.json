@@ -832,6 +832,321 @@
         "count": 2,
         "why": "A verifiable credential: holders and verifiers outside the node check it against the node's DID key, so it is signed and verified with the node key."
       }
+    },
+    "task-create": {
+      "src/commerce/fulfillment.ts": {
+        "count": 1,
+        "why": "A paid order's task, written beside the purchase; the file sends its own connector wake (emitDelivery). No webhook and no offer-ordered workflow trigger, which createTask would add."
+      },
+      "src/services/app/agent-deploy.ts": {
+        "count": 1,
+        "why": "An app's deploy task for its tied agent; the file sends its own wake (emitDelivery) and notifyTaskWaiting."
+      },
+      "src/services/living/pulse.ts": {
+        "count": 1,
+        "why": "A living document's pulse task; the file sends its own wake (emitDelivery)."
+      },
+      "src/services/onboarding/test-task.ts": {
+        "count": 1,
+        "why": "The Hello Integration test task, created with the agent's onboarding record before the agent has connected; the onboarding step tells the agent to read its queue, so no wake is sent."
+      },
+      "src/services/schedule/agent-task.ts": {
+        "count": 2,
+        "why": "A scheduled run's task (two code paths); the file dispatches its own webhook and wake (dispatchWebhookEvent, emitDelivery)."
+      },
+      "src/services/work/task-bridge.ts": {
+        "count": 1,
+        "why": "The work-market bridge's task for an accepted offer; the file sends its own wake (emitDelivery)."
+      },
+      "src/services/workflow/engine-inspector.ts": {
+        "count": 1,
+        "why": "The workflow engine's inspector task; the file dispatches its own webhook and wake. The engine's tasks use their own scope, so they must not fire the offer-ordered trigger createTask fires."
+      },
+      "src/services/workflow/engine-steps.ts": {
+        "count": 1,
+        "why": "A workflow step's dispatched task; the file dispatches its own webhook and wake. Same reason as engine-inspector.ts for not going through createTask."
+      }
+    },
+    "flag-mount": {
+      "src/server-bootstrap/routes-loader.ts": {
+        "count": 2,
+        "why": "The site sync route (siteLbEnabled), which test/api-full.ts holds to 404 while LB mode is off, and the FTN client (ftnEnabled), which builds an OIDC client and mounts no router."
+      }
+    },
+    "app-record-key": {
+      "src/tool-dispatch/tool-call-defs-commerce.ts": {
+        "count": 2,
+        "why": "The CLI dispatch of aimeat_app_tools_publish and _get builds the key it sends to the REST memory route; the read tries each name the app can be stored under (appFilenameCandidates), the publish uses the filename the caller gives, which keeps .html as appToolsKey does."
+      }
+    },
+    "child-env": {
+      "src/services/content/extract-video.ts": {
+        "count": 1,
+        "why": "ffprobe/ffmpeg through execFile with no `env`: it inherits the unit's LD_PRELOAD, MALLOC_CONF and NODE_OPTIONS. Not seen to fail; if it does under systemd, give it browserLaunchEnv(process.env)."
+      },
+      "src/services/content/media-read-bounded.ts": {
+        "count": 2,
+        "why": "Its own spawn() function starts a ContainedWorker (services/isolation/contained-worker.ts), which removes NODE_OPTIONS; no child process is started here."
+      },
+      "src/services/goose/acp.ts": {
+        "count": 1,
+        "why": "The goose agent starts with gooseChildEnv() (services/goose/env.ts): only what the agent needs, never the node's whole environment."
+      },
+      "src/services/headless/browser-install.ts": {
+        "count": 1,
+        "why": "The pinned browser installer runs with the environment its caller passes, browserLaunchEnv(process.env), so it writes where the launch reads."
+      },
+      "src/services/isolation/contained-worker.ts": {
+        "count": 1,
+        "why": "A plain node child: a copy of the environment with NODE_OPTIONS removed, so no loader or heap flag of the parent reaches it."
+      }
+    },
+    "long-ai-call": {
+      "public/views/profile/decide-card.js": {
+        "count": 1,
+        "why": "UNREVIEWED: POST /v1/ai/decide, a decision model call under apiPost's 30 s timeout. Move to api(path, { timeoutMs: 1_800_000, retries: 0 }) when a decision is seen to take longer."
+      },
+      "public/views/profile/decide-rules.js": {
+        "count": 3,
+        "why": "UNREVIEWED: the rule test and run calls under /v1/ai/decide, under apiPost's 30 s timeout. Same answer as decide-card.js."
+      },
+      "public/views/profile/openrouter-settings.js": {
+        "count": 1,
+        "why": "UNREVIEWED: POST /v1/ai/transcribe of a short test recording from the settings page, under apiPost's 30 s timeout."
+      }
+    },
+    "closed-node-fetch": {
+      "public/components/ExplainDialog.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/components/TextPrint.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/contact-picker.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/cortex-bundled/aimeat-i18n.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/dev/calendar-print.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/front-demo.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/front-demo2.js": {
+        "count": 3,
+        "why": "UNREVIEWED"
+      },
+      "public/front-os.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/js/app-news.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/js/services/admin.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/js/services/appdev.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/js/services/balancing-test.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/js/services/packages.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/js/services/skills.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/js/services/unfurl.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/js/sign-in-return.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/views/admin/security-tab.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/aimeat-os.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/views/appcat/dialogs/app-io.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/appcat/dialogs/backup-import.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/appcat/dialogs/backup.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/appcat/dialogs/generate.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/appcat/masthead.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/appcat/sections/datamap.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/appcat/sections/marks.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/appcat/tools.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/build-story.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/business.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/design-lab/demos-page.js": {
+        "count": 3,
+        "why": "UNREVIEWED"
+      },
+      "public/views/design-lab/demos-views-knowledge.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/glossary.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/help.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/home/status-parts.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/how-it-works.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/landing-activity.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/landing-builder.js": {
+        "count": 3,
+        "why": "UNREVIEWED"
+      },
+      "public/views/landing-node-totals.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/landing-showroom-rooms.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/landing-v2-cards.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/landing-v2-projector.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/landing-wall.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/views/portal-classic.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/views/portal-dev.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/views/portfolio.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/portfolio/builder.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/profile/agents-tab.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/views/profile/calibrator/engine.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/profile/libraries-tab.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/views/profile/organisms-tab.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/profile/organisms/helpers.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/profile/organisms/workspace-list.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/views/public-knowledge-library.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "public/views/public-workspace-viewer.js": {
+        "count": 3,
+        "why": "UNREVIEWED"
+      },
+      "public/views/transparency.js": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "public/views/use-with-ai.js": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      }
+    },
+    "locale-format": {},
+    "palette-cycle": {
+      "public/cortex-bundled/aimeat-charts.js": {
+        "count": 2,
+        "why": "The charts library an app loads runs on the app's own origin, where colorForIndex is not served; its default colours still cycle past the theme palette for a dataset or slice with no colour of its own. An app that draws more series than the palette holds passes its own colours."
+      },
+      "public/cortex-bundled/aimeat-ui-motion.js": {
+        "count": 1,
+        "why": "The twelve confetti pieces of a celebration, coloured in turn from the theme: decoration, not a data series, so a repeated colour identifies nothing."
+      }
     }
   }
 }

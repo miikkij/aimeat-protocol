@@ -263,6 +263,7 @@
   var { authFetch: authFetch2 } = makeSession("aimeat-agents.js");
   var DEDUPE_MS = 6e4;
   var enc = encodeURIComponent;
+  var CREATE_TASK_FIELDS = ["title", "description", "status", "scope", "verification", "rules", "resources"];
   function unwrap(r, action) {
     if (!r || !r.ok) {
       var err = (
@@ -347,6 +348,9 @@
       }
       if (task.rules) body.rules = task.rules;
       if (task.resources) body.resources = task.resources;
+      var notSent = Object.keys(task).filter(function(k) {
+        return CREATE_TASK_FIELDS.indexOf(k) === -1;
+      }).sort();
       var o = opts || {};
       if (o.idempotencyKey) body.idempotency_key = o.idempotencyKey;
       if (o.allowDuplicate) body.allow_duplicate = true;
@@ -371,6 +375,11 @@
         if (data.deduplicated && data.task) {
           data.task.deduplicated = true;
           data.task.deduplicated_reason = data.deduplicated_reason;
+        }
+        var ignored = notSent.concat(Array.isArray(data.ignored_fields) ? data.ignored_fields : []);
+        if (ignored.length && data.task) {
+          data.task.ignored_fields = ignored;
+          console.warn("[aimeat-agents] createTask: not stored on the task: " + ignored.join(", "));
         }
         return data.task;
       };

@@ -8,6 +8,8 @@
  *   also checked against the workspace manifest's write guards (services/write-guards.ts)
  *   here, so one call site covers the REST, MCP and publish surfaces alike.
  * @version-history
+ *   2026-11-21 — explainStrictClose(): a refused extra field under a strict lock whose schema says
+ *     additionalProperties: true says the lock closed it, on the write path and the batch publish.
  *   2026-11-08 — validateMemoryWrite takes the writer: the lock row a CSM owns does not govern a writer
  *     the CSM's visibility refuses, so the answer neither names the CSM's lock nor lists its fields
  *     (secaudit2026nov08b round 15, memory-write-violations-describe-unreadable-csm-lock).
@@ -253,6 +255,28 @@ export function effectiveSchemaOf(lock: { schemaJson: Record<string, unknown>; s
   return schema;
 }
 
+/**
+ * A strict lock over an object schema that itself says `additionalProperties: true`. The lock wins
+ * (effectiveSchemaOf), so a field the schema does not list is refused although the schema reads as
+ * open. The refusal names that, rather than leaving the writer to compare the schema they wrote with
+ * an answer that contradicts it (services/organism/gate.ts, the batch publish, and the write path).
+ */
+function strictClosesOpenSchema(lock: { schemaJson: Record<string, unknown>; schemaMode?: string }): boolean {
+  return lock.schemaMode === 'strict' && lock.schemaJson.type === 'object' && lock.schemaJson.additionalProperties === true;
+}
+
+const STRICT_CLOSES = ' (the lock on this key is strict, which closes the object to fields its schema does not list, '
+  + 'although the schema says additionalProperties: true; list the field in the schema, or lock it with schemaMode "open")';
+
+/** The violations, with a top-level extra-field refusal explained when a strict lock closed an open schema. */
+export function explainStrictClose<V extends { path?: string; message: string; schema_rule?: string }>(
+  violations: V[], lock: { schemaJson: Record<string, unknown>; schemaMode?: string },
+): V[] {
+  if (!strictClosesOpenSchema(lock)) return violations;
+  return violations.map(v => (v.schema_rule === 'additionalProperties' && (v.path ?? '/') === '/'
+    ? { ...v, message: v.message + STRICT_CLOSES } : v));
+}
+
 export interface ValidationResult {
   valid: boolean;
   errors?: SchemaViolation[];
@@ -316,7 +340,7 @@ export async function validateMemoryWrite(
 
   return {
     valid: false,
-    errors: toViolations(validate.errors),
+    errors: explainStrictClose(toViolations(validate.errors), schemaRecord),
     schemaKey: schemaRecord.keyPattern,
   };
 }

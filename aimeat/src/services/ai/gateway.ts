@@ -29,6 +29,8 @@
  *   - openAiChat() / speaksOpenAiChat — an OpenAI chat answer from a provider that does not speak it
  *   - GatewayError — the error shape callers map to their own codes
  * @version-history
+ *   v1.5.0 — 2026-11-21 — text() reads the AI SDK's call warnings: logged, and carried on the result as
+ *     `warnings` (warningLines), so a call the package capped or changed says so (docs/pitfalls.md §98).
  *   v1.4.1 -- 2026-10-27 -- text() keeps the usage of each attempt that answered nothing (`emptyAttempts`
  *     on the result and on the empty failure), so the caller records and debits them (secaudit2026oct26).
  *   v1.4.0 — 2026-10-18 — image() takes reference pictures and a mask, passed to the AI SDK as the
@@ -182,6 +184,27 @@ export interface TextResult {
   /** The attempts before this one that answered nothing and were asked again: each was a provider
    *  call, so the caller records and debits them (ai/failed-attempts.ts). Absent when there were none. */
   emptyAttempts?: EmptyAttempt[];
+  /**
+   * What the AI SDK's provider package said it changed or left out of this call, one sentence each
+   * (warningLines): a setting the model does not support, a default it filled in. The call answered
+   * 200 either way; an Anthropic package that does not know the model id caps the answer at 4096
+   * tokens and says so only here (docs/pitfalls.md §98). Absent when the package said nothing.
+   */
+  warnings?: string[];
+}
+
+type SdkWarning =
+  | { type: 'unsupported' | 'compatibility'; feature: string; details?: string }
+  | { type: 'deprecated'; setting: string; message: string }
+  | { type: 'other'; message: string };
+
+/** The AI SDK's call warnings as one sentence each, in the order the package gave them. */
+export function warningLines(warnings: readonly SdkWarning[] | undefined): string[] {
+  return (warnings ?? []).map((w) => {
+    if (w.type === 'deprecated') return `deprecated: ${w.setting}. ${w.message}`;
+    if (w.type === 'other') return `other: ${w.message}`;
+    return `${w.type}: ${w.feature}${w.details ? `. ${w.details}` : ''}`;
+  });
 }
 
 /** One attempt that answered nothing: the model the provider says answered, and what it used. */
@@ -266,6 +289,16 @@ export async function text(req: TextRequest): Promise<TextResult> {
         costUsd: reportedCost(r.providerMetadata, r.response.body),
       },
     };
+    // The package's own account of what it changed or dropped. It prints it to the console and the
+    // call answers 200, so without this the only trace of a capped or altered call was a console
+    // line nobody reads (docs/pitfalls.md §98).
+    const warnings = warningLines(r.warnings as SdkWarning[] | undefined);
+    if (warnings.length) {
+      out.warnings = warnings;
+      logger.warn('[ai] the provider package changed or left out part of the call', {
+        type: req.target.type, model: out.model, finish: out.finishReason, warnings,
+      });
+    }
     logger.info(`[ai] text: type=${req.target.type} model=${out.model} finish=${out.finishReason} `
       + `promptTokens=${out.usage.promptTokens} completionTokens=${out.usage.completionTokens}`);
     return out;

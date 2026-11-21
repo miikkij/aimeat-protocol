@@ -23,6 +23,9 @@
  *     (DELETE /v1/agents/:name) and no agent tool does its job. Until 2026-11-12 such a route was
  *     never measured, which is how removing an agent, an agent's task or a skill had a REST route
  *     and no MCP tool with no gate saying so.
+ *   - `unread:<field> <surface>:<tool>`: a connector or CLI tool declares the parameter and no
+ *     handler of the route it calls reads it (field-reach.ts unreadParams, docs/pitfalls.md §44).
+ *     This kind only shrinks: under --strict an entry that is no longer true fails too.
  *   - `unnamed:<file>#<n>` and `unrouted:<file>#<n>`: reads the measurement cannot place (a key
  *     CodeQL cannot name; a request no route registration names). A file gaining one fails too,
  *     because a field read that way is a field this gate cannot see.
@@ -86,6 +89,8 @@
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts          # report only, never fails
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts --seed   # rewrite the exemption file
  * @version-history
+ *   v2.4.0 — 2026-11-21 — `unread:` joins the ratchet: a tool parameter no handler of its route reads
+ *     (docs/pitfalls.md §44). Its entries only shrink; a stale one fails under --strict.
  *   v2.3.2 — 2026-11-21 — The header says what the measurement cannot see, and a new finding's
  *     message points there (moved from docs/pitfalls.md §90).
  *   v2.3.1 — 2026-11-14 — A route that admits an agent on an operator word or account:security is
@@ -104,7 +109,7 @@
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { recordFields, doorReach, type AgentSurface, type Finding } from './inventory/field-reach.js';
+import { recordFields, doorReach, unreadParams, type AgentSurface, type Finding, type UnreadParam } from './inventory/field-reach.js';
 import { srcProgram, AIMEAT } from './inventory/program.js';
 import { loadFacts } from './inventory/field-reach-facts.js';
 import { captureServer, captureConnector, captureCliDispatch, type CapturedTool } from './inventory/mcp-capture.js';
@@ -132,6 +137,10 @@ function describe(f: Finding): string {
     return f.kind === 'no-twin'
         ? `the door reads record fields (${f.fields!.join(', ')}) and no agent tool does the same job`
         : 'the writing route reads no record field and no agent tool does the same job';
+}
+
+function describeUnread(u: UnreadParam): string {
+    return `the tool declares ${u.field} and no handler of ${u.routes.join(', ')} reads it, so a caller who sets it gets an answer as if it had not`;
 }
 
 /** `GET /v1/agents/:name/telemetry` → the key the route capabilities are known by. */
@@ -197,6 +206,7 @@ function main(): void {
         .flatMap(s => [...declared[s].keys()].map(t => `${s}:${t}`)).filter(t => !found.has(t));
 
     const m = doorReach(recordFields(srcProgram().files), facts, declared);
+    const unread = unreadParams(facts, declared);
     // A route an agent reaches as a route capability through aimeat_invoke has an agent path: the
     // finding needs no entry. One the file still holds stays held, because the route itself refuses
     // an agent (or an agent without a word no wildcard carries), and the entry says so.
@@ -209,6 +219,7 @@ function main(): void {
         ...m.findings.filter(f => !reached.has(f.key)).map((f): [string, string] => [f.key, describe(f)]),
         ...blindKeys('unnamed', m.blind.unnamed).map(([k, w]): [string, string] => [k, `a read CodeQL could not name, so the field it reads is invisible to this gate: ${w}`]),
         ...blindKeys('unrouted', m.blind.unrouted).map(([k, w]): [string, string] => [k, `a read of a request no route registration names, so its door is unknown: ${w}`]),
+        ...unread.map((u): [string, string] => [u.key, describeUnread(u)]),
     ];
 
     if (seed) {
@@ -230,6 +241,8 @@ function main(): void {
                 + '`no-twin:<route>`: the route reads record fields and no agent tool does the same job. '
                 + '`no-twin-write:<route>`: a POST, PUT, PATCH or DELETE route that reads no record field, '
                 + 'and no agent tool does the same job. '
+                + '`unread:<field> <surface>:<tool>`: a connector or CLI tool declares the parameter and no '
+                + 'handler of the route it calls reads it; this list only shrinks. '
                 + '`unnamed:` and `unrouted:` hold, per file, the reads the measurement cannot place. Seeded so '
                 + `the gate fails only on a NEW entry. "${PLACEHOLDER}" is a question nobody has answered, `
                 + 'not a clearance; an answered entry says why only a person with a browser is meant to reach it. '
@@ -259,6 +272,7 @@ function main(): void {
     console.log(`  writing routes with no agent tool       ${String(count('no-twin-write:')).padStart(4)}   (of ${m.writes.length} that read no record field)`);
     console.log(`  reached through aimeat_invoke           ${String(reached.size).padStart(4)}   (a route capability; no entry needed)`);
     console.log(`  of those routes, still held by an entry ${String(heldViaInvoke.length).padStart(4)}   (an answer, e.g. "ROUTE REFUSES AN AGENT")`);
+    console.log(`  tool parameters no route reads          ${String(count('unread:')).padStart(4)}   (connector and CLI tools)`);
     console.log(`  reads CodeQL could not name             ${String(count('unnamed:')).padStart(4)}`);
     console.log(`  reads on no known route                 ${String(count('unrouted:')).padStart(4)}`);
     console.log(`  exempt, not yet reviewed                ${String(unreviewed).padStart(4)}`);
@@ -274,6 +288,11 @@ function main(): void {
         console.log('  passes it: the call answers ok and the field is gone. Declare it on the twin and forward');
         console.log('  it; give a door or a writing route without a twin its tool; or add an entry to');
         console.log(`  ${relative(AIMEAT, EXEMPTIONS)} saying why only a person may reach it.`);
+        console.log('  An `unread:` finding is the other direction: a tool declares a parameter and the route');
+        console.log('  it calls never reads it, so the call answers as if the parameter had not been sent');
+        console.log('  (limit=1 and no limit gave the same answer on aimeat_memory_list). Make the route read it');
+        console.log('  under the name the tool sends, take the parameter off the tool, or answer the entry with');
+        console.log('  what the tool does with it itself.');
         console.log('');
         console.log('  A finding on a door nobody touched usually means the measurement lost sight of something');
         console.log('  (this file\'s header, WHAT THE MEASUREMENT CANNOT SEE): a new *Record type whose field name');
@@ -288,8 +307,12 @@ function main(): void {
         console.log('');
     }
 
-    if (strict && fresh.length) {
-        console.error(`✖ ${fresh.length} new field-reach finding(s).`);
+    // The unread-parameter list only shrinks: an entry whose parameter is now read, or whose tool is
+    // gone, is taken out in the same change, so the file cannot hold room for the next one.
+    const staleUnread = stale.filter(k => k.startsWith('unread:'));
+    if (strict && (fresh.length || staleUnread.length)) {
+        if (fresh.length) console.error(`✖ ${fresh.length} new field-reach finding(s).`);
+        if (staleUnread.length) console.error(`✖ ${staleUnread.length} unread-parameter entr${staleUnread.length === 1 ? 'y is' : 'ies are'} no longer true: remove ${staleUnread.length === 1 ? 'it' : 'them'} from ${relative(AIMEAT, EXEMPTIONS)} (${staleUnread.slice(0, 3).join(', ')}${staleUnread.length > 3 ? ', …' : ''}).`);
         process.exit(1);
     }
     console.log(fresh.length

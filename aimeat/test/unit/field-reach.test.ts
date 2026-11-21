@@ -16,15 +16,18 @@
  *   no-twin-write finding, no `writes` list). The seventh, a writing route that reads a field, pins
  *   the behaviour that did not change and passed before and after.
  * @usage cd aimeat && pnpm exec vitest run test/unit/field-reach.test.ts
+ *   The unread-parameter cases (2026-11-21) failed first on an import of unreadParams, which did not
+ *   exist; the "stops reporting" case also fails when the read of `limit` is removed from its facts.
  * @version-history
+ *   v1.3.0 — 2026-11-21 — unreadParams: a connector or CLI parameter no handler of its route reads.
  *   v1.2.0 — 2026-11-12 — A writing route that reads no record field is measured: no-twin-write when
  *     no agent tool does its job, by the same two twin rules; a GET is not measured.
  *   v1.1.0 — 2026-09-14 — A service lookup by name is plumbing (requireOwnCompany).
  *   v1.0.0 — 2026-09-14 — Written with field-reach.ts v2 (wish-kenttien-tavoitettavuus-portiksi).
  */
 import { describe, it, expect } from 'vitest';
-import { doorReach, pathMatches, canonical, isPlumbing, GENERIC_CALLERS } from '../../scripts/inventory/field-reach.js';
-import { factsFromCsv, parseCsv } from '../../scripts/inventory/field-reach-facts.js';
+import { doorReach, pathMatches, canonical, isPlumbing, unreadParams, GENERIC_CALLERS } from '../../scripts/inventory/field-reach.js';
+import { factsFromCsv, parseCsv, type Facts } from '../../scripts/inventory/field-reach-facts.js';
 
 const csv = (header: string, rows: string[][]): string =>
     [header, ...rows.map(r => r.map(c => /^\d+$/.test(c) ? c : `"${c.replace(/"/g, '""')}"`).join(','))].join('\n') + '\n';
@@ -258,5 +261,56 @@ describe('the CodeQL CSV', () => {
     });
     it('treats spellings as one field', () => {
         expect(canonical('organism_id')).toBe(canonical('organismId'));
+    });
+});
+
+describe('a tool parameter no route reads (docs/pitfalls.md §44)', () => {
+    const LIST = 'src/routes/memory/crud.ts:400:40';
+    const ONE = 'src/routes/memory/crud.ts:600:40';
+    const CLI_LIST = 'src/tool-dispatch/tool-call-defs-core.ts:50:20';
+    const CLI_READ = 'src/tool-dispatch/tool-call-defs-core.ts:80:20';
+    const base = (reads: Facts['reads'] = []): Facts => ({
+        reads: [{ kind: 'query', field: 'prefix', naming: 'constant', file: 'src/routes/memory/crud.ts', line: 410, handler: LIST }, ...reads],
+        routes: [
+            { handler: LIST, method: 'GET', path: '/v1/memory' },
+            { handler: ONE, method: 'GET', path: '/v1/memory/:key' },
+        ],
+        tools: [
+            { surface: 'cli.dispatch', name: 'aimeat_memory_list', handler: CLI_LIST },
+            { surface: 'cli.dispatch', name: 'aimeat_memory_read', handler: CLI_READ },
+            { surface: 'mcp.node', name: 'aimeat_memory_list', handler: 'src/mcp/memory.ts:10:1' },
+        ],
+        calls: [],
+        http: [
+            { unit: CLI_LIST, method: 'GET', path: '/v1/memory*' },
+            { unit: CLI_READ, method: 'GET', path: '/v1/memory/*' },
+        ],
+    });
+    const tools = {
+        'cli.dispatch': new Map([
+            ['aimeat_memory_list', ['prefix', 'limit']],
+            ['aimeat_memory_read', ['memory_key']],
+        ]),
+        'mcp.node': new Map([['aimeat_memory_list', ['prefix', 'limit', 'nobody_reads']]]),
+    };
+
+    it('reports a declared parameter the route never reads: limit on aimeat_memory_list', () => {
+        const keys = unreadParams(base(), tools).map(u => u.key);
+        expect(keys).toEqual(['unread:limit cli.dispatch:aimeat_memory_list']);
+    });
+
+    it('stops reporting it once the route reads the field', () => {
+        const read = base([{ kind: 'query', field: 'limit', naming: 'constant', file: 'src/routes/memory/crud.ts', line: 412, handler: LIST }]);
+        expect(unreadParams(read, tools)).toEqual([]);
+    });
+
+    it('counts a parameter that fills a path segment as read (memory_key → :key)', () => {
+        expect(unreadParams(base(), tools).map(u => u.tool)).not.toContain('cli.dispatch:aimeat_memory_read');
+    });
+
+    it('does not judge a tool whose route reads a key it cannot name, nor a node MCP tool', () => {
+        const blind = base([{ kind: 'query', field: '', naming: 'unnamed', file: 'src/routes/memory/crud.ts', line: 420, handler: LIST }]);
+        expect(unreadParams(blind, tools)).toEqual([]);
+        expect(unreadParams(base(), tools).some(u => u.tool.startsWith('mcp.node:'))).toBe(false);
     });
 });

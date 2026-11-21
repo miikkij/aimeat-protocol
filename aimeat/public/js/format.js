@@ -26,7 +26,7 @@
  *   with its own rails. A formatter that accepted both would print "625 €" over a morsel balance
  *   inside a month, because the two are numbers of the same size sitting next to each other on the
  *   same pages. `morsels()` is the one that formats them, and it never attaches a currency symbol.
- * @structure num · dt · date · time · dateTime · relative · money · morsels · pacingOf ·
+ * @structure num · dt · date · time · dateTime · relative · money · percent · compact · morsels · pacingOf ·
  *   moneyPriceOf · priceAndPacing · fmtUp · fmtBytes
  * @usage import { num, dt, money, morsels } from '/js/format.js';
  *   num(1234)                    → "1 234"      in the reader's own format
@@ -35,6 +35,9 @@
  *   morsels(625)                 → "625 morsels" — never a currency symbol
  *   priceAndPacing(offer, t)     → "Free · pacing 5 morsels" / "1,00 € · pacing 5 morsels"
  * @version-history
+ *   v2.10.0 — 2026-11-21 — percent(): a percentage in the reader's own format, for the economy
+ *     page, which picked its decimal comma by the page's language (docs/pitfalls.md §81); compact():
+ *     a short count, for the home overview, which wrote "1,2 t." for every reader.
  *   v2.9.0 — 2026-11-02 — A reader with no region of their own gets the format of the PAGE's
  *     language before the node's and the browser's (Jouni, 2026-11-02). The reader's region still
  *     beats it, so the three settings of 2026-09-12 stay separate for anyone who sets one.
@@ -420,6 +423,38 @@ export function money(n, currency = 'USD', opts) {
     }).format(n);
   } catch {
     return `${num(n)} ${code}`;
+  }
+}
+
+/**
+ * A percentage given in percent (`3.25` is 3.25 %), written the way this reader writes one: the
+ * decimal sign and the space before the sign are the locale's own ("3,25 %" in Finnish, "3.25%" in
+ * English). Picking the decimal comma by the page's language was the economy page's own copy of the
+ * defect this module exists to end (docs/pitfalls.md §81). Not a number: an em dash.
+ */
+export function percent(n, opts) {
+  const v = typeof n === 'string' ? Number.parseFloat(n) : n;
+  if (typeof v !== 'number' || !Number.isFinite(v)) return '—';
+  try {
+    return new Intl.NumberFormat(tag(), { style: 'percent', maximumFractionDigits: 2, ...opts }).format(v / 100);
+  } catch (err) {
+    swallowed('format: percent() fell back to num() and a plain sign', err);
+    return `${num(v)} %`;
+  }
+}
+
+/**
+ * A count in the reader's own short form: "1,2 t." in Finnish, "1.2K" in English, the number as it
+ * is below a thousand. The home overview wrote the Finnish form by hand for every reader.
+ */
+export function compact(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return String(n ?? '—');
+  if (Math.abs(n) < 1000) return String(n);
+  try {
+    return new Intl.NumberFormat(tag(), { notation: 'compact', maximumFractionDigits: Math.abs(n) >= 10000 ? 0 : 1 }).format(n);
+  } catch (err) {
+    swallowed('format: compact() fell back to the full number', err);
+    return num(n);
   }
 }
 

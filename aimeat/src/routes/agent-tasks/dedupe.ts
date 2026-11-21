@@ -12,6 +12,7 @@
  * @structure respondDeduplicated() · commissionFingerprint() and isUniqueViolation(), re-exported
  * @usage import { respondDeduplicated } from './dedupe.js';
  * @version-history
+ *   2026-11-21 — The deduplicated answer names `ignored_fields` too.
  *   2026-11-13 — commissionFingerprint and isUniqueViolation moved unchanged to
  *     services/agent-tasks/commission-dedupe.ts and are re-exported here, so the task write service
  *     no longer imports a route file (structure programme 2026-11, unit 4).
@@ -31,7 +32,7 @@ export { commissionFingerprint, isUniqueViolation } from '../../services/agent-t
  * `task` stays exactly where it was, so a caller written before this existed reads it unchanged.
  */
 export function respondDeduplicated(
-  res: Response, config: AimeatConfig, agentName: string, existing: AgentTaskRecord,
+  res: Response, config: AimeatConfig, agentName: string, existing: AgentTaskRecord, ignoredFields?: string[],
 ): void {
   const ageSeconds = Math.max(0, Math.round((Date.now() - new Date(existing.createdAt).getTime()) / 1000));
   res.status(200).json(success(config.nodeId, {
@@ -40,6 +41,8 @@ export function respondDeduplicated(
     existing_task_id: existing.id,
     deduplicated_reason: `an identical commission for '${agentName}' is already ${existing.status}`
       + ` (created ${ageSeconds}s ago) — it was not queued a second time`,
+    // The request's fields the task takes nowhere (services/agent/task-write.ts ignoredCreateFields).
+    ...(ignoredFields?.length ? { ignored_fields: ignoredFields } : {}),
   }, [
     { description: 'View the running task', method: 'GET', url: `/v1/agents/${agentName}/tasks/${existing.id}` },
     { description: 'Cancel it', method: 'DELETE', url: `/v1/agents/${agentName}/tasks/${existing.id}` },

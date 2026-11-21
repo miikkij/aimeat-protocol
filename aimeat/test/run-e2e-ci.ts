@@ -12,6 +12,10 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-21 -- e2e-no-silent-drops.ts joins the list (not the guard tier): ignored_fields on a task and a
+ *     workspace create, and a strict lock's refusal that names the lock.
+ *   2026-11-21 -- e2e-feature-flag-off.ts joins the list (not the guard tier): a switched-off feature's
+ *     router answers 503 FEATURE_DISABLED with its setting (flagged-mount.ts).
  *   2026-11-21 -- e2e-skill-bound-public.ts joins the list (not the guard tier): a bound skill is public by default.
  *   2026-11-21 -- e2e-ext-person-decision.ts joins the list (not the guard tier): actions marked `decision: person`.
  *   2026-11-20 -- e2e-organism-app-wall.ts joins the list (not the guard tier): the organism's app wall and the new entry.
@@ -1578,6 +1582,12 @@ const ALL_SUITES = [
     // The one read the Realtime page is folded from: all eight counters, the documents living per
     // room rather than under a key nothing sends, and the switched-off answer on a node of its own.
     'test/e2e-admin-realtime-page.ts',
+    // A router behind a feature flag on a node with the feature off: 503 FEATURE_DISABLED with the
+    // setting's name, not 404 (flagged-mount.ts), on a node of its own booted in process.
+    'test/e2e-feature-flag-off.ts',
+    // Three routes that dropped part of a request and answered success now name it: a task's unknown
+    // field, a workspace schemaRef that locked nothing, a strict lock closing an open schema.
+    'test/e2e-no-silent-drops.ts',
     // The new-version check behind the operator's header notice: against a stub registry, the
     // diff of the change logs, the registry failing, and the switch that stops the requests.
     'test/e2e-node-update.ts',

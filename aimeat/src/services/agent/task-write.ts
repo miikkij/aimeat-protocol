@@ -42,6 +42,8 @@
  *   const r = await createTask({ storage, config, webhook }, { agent, agentGaii, agentName, creator, body, actor });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-11-21 — createTask() names the body's fields the create schema does not take (ignoredFields),
+ *     which the parse had stripped without a word.
  *   2026-11-13 — commissionFingerprint and isUniqueViolation come from services/agent-tasks/commission-dedupe.ts,
  *     not from a route file (structure programme 2026-11, unit 4).
  *   2026-11-12 — applyProposedPlan tells the owner once that a task waits: a plan proposed again on a
@@ -141,8 +143,20 @@ export interface CreateTaskArgs {
 
 export type CreateTaskResult =
     | TaskWriteRefusal
-    | { ok: true; deduplicated: true; task: AgentTaskRecord }
-    | { ok: true; deduplicated: false; task: AgentTaskRecord; autoActivated: boolean; decision: TaskStartDecision };
+    | { ok: true; deduplicated: true; task: AgentTaskRecord; ignoredFields?: string[] }
+    | { ok: true; deduplicated: false; task: AgentTaskRecord; autoActivated: boolean; decision: TaskStartDecision; ignoredFields?: string[] };
+
+const CREATE_FIELDS: ReadonlySet<string> = new Set(Object.keys(AgentTaskCreateSchema.shape));
+
+/**
+ * The top-level fields of a create body that AgentTaskCreateSchema does not take. The parse strips
+ * them, so `tags` on a task was dropped and the create answered 201 as if it had been kept
+ * (registry entry app/createtask-has-no-tags-field). The answer names them as `ignored_fields`.
+ */
+export function ignoredCreateFields(body: unknown): string[] {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return [];
+    return Object.keys(body).filter(k => !CREATE_FIELDS.has(k)).sort();
+}
 
 /**
  * Create a task for `agent`.
@@ -157,6 +171,9 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
     const parsed = AgentTaskCreateSchema.safeParse(args.body);
     if (!parsed.success) return invalidInput(parsed.error.issues);
     const body = parsed.data;
+    // What the schema does not take is stripped by the parse without a word; the answer names it.
+    const ignored = ignoredCreateFields(args.body);
+    const ignoredOf = ignored.length ? { ignoredFields: ignored } : {};
 
     // Refuse before anything is written: a task asking to start on its own from a caller who could
     // not have set that for the agent would be a way round the owner's setting.
@@ -182,7 +199,7 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
         : commissionFingerprint(args.agentGaii, body.idempotency_key, body.title, body.description);
     if (dedupeKey) {
         const live = await storage.findLiveTaskByDedupeKey(args.agentGaii, dedupeKey);
-        if (live) return { ok: true, deduplicated: true, task: live };
+        if (live) return { ok: true, deduplicated: true, task: live, ...ignoredOf };
     }
 
     const now = new Date().toISOString();
@@ -251,7 +268,7 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
     } catch (err) {
         if (dedupeKey && isUniqueViolation(err)) {
             const live = await storage.findLiveTaskByDedupeKey(args.agentGaii, dedupeKey);
-            if (live) return { ok: true, deduplicated: true, task: live };
+            if (live) return { ok: true, deduplicated: true, task: live, ...ignoredOf };
         }
         throw err;
     }
@@ -298,7 +315,7 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
             .catch(e => logger.error('workflow event trigger (offer.ordered) failed', { offerId: orderedOfferId, error: String(e) }));
     }
 
-    return { ok: true, deduplicated: false, task: created, autoActivated, decision };
+    return { ok: true, deduplicated: false, task: created, autoActivated, decision, ...ignoredOf };
 }
 
 // ── Event ───────────────────────────────────────────────────────────────────────────────────────

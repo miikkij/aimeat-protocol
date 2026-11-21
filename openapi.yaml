@@ -9211,7 +9211,10 @@ components:
                           how_to_fix: { type: string }
 
     FeatureDisabled:
-      description: Feature is disabled on this node
+      description: |
+        Feature is disabled on this node. A route behind a feature flag the operator switched off
+        answers this rather than 404, and `error.details.setting` names the setting that switches it
+        (for example AIMEAT_CORTEX_ENABLED), with `error.details.feature` saying what the feature is.
       content:
         application/json:
           schema:
@@ -21916,6 +21919,9 @@ paths:
             data.content, data.model, data.usage and data.budget, plus data.finish_reason (why the
             provider stopped: stop, length, content_filter…, or null when it did not say) and
             data.truncated (true when finish_reason is length: the answer was cut at a token limit).
+            data.warnings (string[], present only when there are any) is what the provider package
+            changed or left out of the call, one sentence each: a setting the model does not take,
+            or an output cap it filled in for a model id it does not know.
             data.policy_chose_model is true when the owner's model policy chose the model. data.route
             is { capability, chosenBy, answeredBy: { provider, model, region?, regionWanted? }, attempts:
             [{ provider, model, region?, regionWanted?, ok | error, costUsd }], fellBack }. On an
@@ -53756,6 +53762,20 @@ paths:
                         type: object
                         properties:
                           created: { type: boolean }
+                          ws: { type: string }
+                          types: { type: array, items: { type: string } }
+                          schemas_locked: { type: array, items: { type: string }, description: The namespaces a schema was locked for. }
+                          ignored_fields:
+                            type: array
+                            description: |
+                              Present only when part of the request locked nothing: a records space's
+                              `schemaRef` with no JSON Schema under `schemas[<namespace>]` (schemaRef is a
+                              label the node does not resolve), or a `schemas` entry that is not an object.
+                            items:
+                              type: object
+                              properties:
+                                field: { type: string, example: 'manifest.objectTypes[0].schemaRef' }
+                                reason: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -59326,6 +59346,8 @@ paths:
           description: data.name, data.current, data.versions[] (version, created_at, created_by, bytes, call_url), data.total
         '404':
           description: No such extension
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}/versions:
     get:
@@ -59346,6 +59368,8 @@ paths:
           description: data.name, data.current, data.versions[] (version, created_at, created_by, bytes, lib_url), data.total. created_by is the principal that wrote the version (the account holder's name, or the agent's GAII).
         '404':
           description: No such cortex
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/dependencies:
     get:
@@ -59430,6 +59454,8 @@ paths:
                                   type: array
                                   items:
                                     type: string
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
     post:
       operationId: installExtension
@@ -59521,6 +59547,8 @@ paths:
             install a new extension under it.
         '422':
           $ref: '#/components/responses/OdpsFieldTooLong'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/extensions/{name}:
     get:
@@ -59562,6 +59590,8 @@ paths:
                         $ref: '#/components/schemas/ExtensionRecord'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
     put:
       operationId: upsertExtension
@@ -59625,6 +59655,8 @@ paths:
           $ref: '#/components/responses/OdpsFieldTooLong'
         '429':
           description: Per-owner extension limit exceeded.
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
     delete:
       operationId: uninstallExtension
@@ -59651,6 +59683,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/extensions/{name}/activate:
     post:
@@ -59692,6 +59726,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           description: AWAITING_OPERATOR, the extension's code waits for an operator's approval (error.details.request_id).
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/extensions/{name}/config:
     patch:
@@ -59753,6 +59789,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: 'SCOPE_DENIED: the caller does not hold ext:write.' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/extensions/{name}/unattended-reader:
     get:
@@ -59784,6 +59822,8 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     patch:
       operationId: setExtensionUnattendedReader
       summary: Choose what an extension may read when it runs with nobody present
@@ -59823,6 +59863,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/extensions/{name}/deactivate:
     post:
@@ -59859,6 +59901,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/ext/{extName}/{actionId}:
     post:
@@ -60092,6 +60136,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     patch:
       operationId: updateExtensionAction
       summary: Update extension action
@@ -60147,6 +60193,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           description: VERSION_EXISTS. The version named is the current one, or is already kept with other code.
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/extensions/{name}/instances:
     post:
@@ -60182,6 +60230,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     get:
       x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0', orScope: 'ext:write' }
       operationId: listExtensionInstances
@@ -60198,6 +60248,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/extensions/{name}/instances/{instanceId}:
     get:
@@ -60223,6 +60275,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     patch:
       operationId: updateExtensionInstance
       summary: Update extension instance
@@ -60251,6 +60305,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     delete:
       operationId: deleteExtensionInstance
       summary: Delete extension instance
@@ -60273,6 +60329,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/extensions/{name}/instances/{instanceId}/translations:
     get:
@@ -60293,6 +60351,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   # ── Skills Registry ─────────────────────────────────────────
   /v1/skills:
@@ -61446,6 +61506,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     post:
       operationId: createCortexModel
       summary: Create cortex model
@@ -61484,6 +61546,8 @@ paths:
           description: >-
             CONFLICT, a cortex of that name is already installed; or NAME_RESERVED, the name is a
             library this node ships, or starts with aimeat-, and only an operator may install it.
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}:
     get:
@@ -61504,6 +61568,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     put:
       operationId: upsertCortexModel
       summary: Upsert (redeploy) a cortex model
@@ -61572,6 +61638,8 @@ paths:
             operator may create it.
         '413':
           description: Manifest, lib, or quota limit exceeded.
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     delete:
       operationId: deleteCortexModel
       summary: Delete cortex model
@@ -61596,6 +61664,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}/activate:
     post:
@@ -61630,6 +61700,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           description: BOARD_ID_TAKEN, a board-template's board id is a board of another account.
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}/deactivate:
     post:
@@ -61660,6 +61732,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}/visibility:
     post:
@@ -61689,6 +61763,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '202':
           $ref: '#/components/responses/PublishRequested'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}/prompts:
     get:
@@ -61707,6 +61783,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}/prompts/{promptName}:
     get:
@@ -61732,6 +61810,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}/ontology:
     get:
@@ -61757,6 +61837,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}/export:
     get:
@@ -61776,6 +61858,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{name}/libs/{libFile}:
     get:
@@ -61807,6 +61891,8 @@ paths:
           description: Library file content
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/cortex/{owner}/{name}/libs/{libFile}:
     get:
@@ -61826,6 +61912,8 @@ paths:
           description: Library file content
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   # ── Organisms (missing admin routes) ────────────────────────
   /v1/organisms/{id}/admins:
@@ -63700,6 +63788,8 @@ paths:
                         enum: [SIZE_EXCEEDED, COMPONENT_LIMIT_EXCEEDED, QUOTA_EXCEEDED]
                       message:
                         type: string
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     get:
       operationId: listPackages
       summary: List packages
@@ -63736,6 +63826,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/compose:
     post:
@@ -63832,6 +63924,8 @@ paths:
           description: A cortex could not be read back for packaging
         '413':
           description: Package exceeds size, component count or per-author limit
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/{groupId}/versions/{version}/withdraw:
     post:
@@ -63871,6 +63965,8 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/compose-set:
     post:
@@ -63938,6 +64034,8 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/{groupId}/entitlements:
     get:
@@ -65073,6 +65171,8 @@ paths:
           description: The source is answering with a signature that does not check out against the pinned key
         '502':
           description: The source node could not be reached
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/{groupId}/status:
     patch:
@@ -65113,6 +65213,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/import:
     post:
@@ -65162,6 +65264,8 @@ paths:
                         enum: [SIZE_EXCEEDED, COMPONENT_LIMIT_EXCEEDED, QUOTA_EXCEEDED]
                       message:
                         type: string
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/{groupId}:
     delete:
@@ -65200,6 +65304,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     get:
       operationId: getLatestPackage
       summary: Get latest published package
@@ -65286,6 +65392,8 @@ paths:
                                   expects: { type: object }
         '404':
           description: Package not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     patch:
       operationId: updatePackageGroup
       summary: Update package group metadata
@@ -65320,6 +65428,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/{groupId}/versions:
     post:
@@ -65386,6 +65496,8 @@ paths:
                         enum: [SIZE_EXCEEDED, COMPONENT_LIMIT_EXCEEDED, QUOTA_EXCEEDED]
                       message:
                         type: string
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     get:
       operationId: listPackageVersions
       summary: List package versions
@@ -65408,6 +65520,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/{groupId}/versions/{version}:
     get:
@@ -65440,6 +65554,8 @@ paths:
                         $ref: '#/components/schemas/PackageRecord'
         '404':
           description: Version not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     patch:
       operationId: updatePackageVersionStatus
       summary: Update version status
@@ -65472,6 +65588,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     delete:
       operationId: archivePackageVersion
       summary: Archive version
@@ -65495,6 +65613,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/{groupId}/export:
     get:
@@ -65534,6 +65654,8 @@ paths:
               description: 'attachment; filename="name-version.zip"'
         '404':
           description: Package not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/packages/{groupId}/propose:
     post:
@@ -65559,6 +65681,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Package not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   # ── Instances ─────────────────────────────────────────────
   /v1/packages/{groupId}/install:
@@ -65717,6 +65841,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Package not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/package-install-requests:
     get:
@@ -65752,6 +65878,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/package-install-requests/{id}:
     get:
@@ -65787,6 +65915,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: No such request on this account, or one an app did not file.
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/package-install-requests/{id}/decision:
     post:
@@ -65855,6 +65985,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/instances:
     get:
@@ -65883,6 +66015,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/instances/{id}:
     get:
@@ -65917,6 +66051,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Instance not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     patch:
       operationId: setInstance
       summary: Change an install's label or auto-update
@@ -65958,6 +66094,8 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
           description: Instance not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     delete:
       operationId: removeInstance
       summary: Remove instance
@@ -65984,6 +66122,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Instance not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/instances/{id}/fork:
     post:
@@ -66027,6 +66167,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/instances/check-updates:
     post:
@@ -66054,6 +66196,8 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/install-sets/apply:
     post:
@@ -66141,6 +66285,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/install-sets:
     get:
@@ -66162,6 +66308,8 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/instances/{id}/status:
     get:
@@ -66184,6 +66332,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Instance not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/instances/{id}/check-update:
     get:
@@ -66223,6 +66373,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Instance not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/instances/{id}/migration-prompt:
     post:
@@ -66258,6 +66410,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Instance not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/instances/{id}/apply-migration:
     post:
@@ -66331,6 +66485,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Instance or target version not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/instances/{id}/update:
     post:
@@ -66423,6 +66579,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Instance not found, or the package has no published version
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   # ── Templates ─────────────────────────────────────────────
   /v1/templates:
@@ -66458,6 +66616,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     get:
       operationId: listTemplates
       summary: Gallery listing
@@ -66495,6 +66655,8 @@ paths:
           description: status is not one of the four a listing can have
         '403':
           description: a non-operator asked for listings that are not listed
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}:
     get:
@@ -66521,6 +66683,8 @@ paths:
                         $ref: '#/components/schemas/TemplateListingRecord'
         '404':
           description: Listing not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     patch:
       operationId: updateTemplateListing
       summary: Update listing
@@ -66552,6 +66716,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     delete:
       operationId: deleteTemplateListing
       summary: Delete listing
@@ -66571,6 +66737,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}/review:
     get:
@@ -66594,6 +66762,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Template not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     post:
       operationId: addTemplateReview
       summary: Add review
@@ -66638,6 +66808,8 @@ paths:
                         enum: [DISABLED, FORBIDDEN]
                       message:
                         type: string
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}/reviews:
     get:
@@ -66659,6 +66831,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}/discussion:
     post:
@@ -66705,6 +66879,8 @@ paths:
                         enum: [DISABLED, FORBIDDEN]
                       message:
                         type: string
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}/discussions:
     get:
@@ -66726,6 +66902,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}/featured:
     patch:
@@ -66756,6 +66934,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   # ── Template Moderation ──────────────────────────────────────
   /v1/templates/pending:
@@ -66773,6 +66953,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}/approve:
     post:
@@ -66803,6 +66985,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Template not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}/reject:
     post:
@@ -66835,6 +67019,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Template not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}/suspend:
     post:
@@ -66867,6 +67053,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Template not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/templates/{id}/relist:
     post:
@@ -66903,6 +67091,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Template not found
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   # ── Federation Templates ─────────────────────────────────────
   /v1/federation/templates:
@@ -69172,6 +69362,12 @@ paths:
                             $ref: '#/components/schemas/AgentTask'
                           start:
                             $ref: '#/components/schemas/TaskStartAnswer'
+                          ignored_fields:
+                            type: array
+                            items: { type: string }
+                            description: >-
+                              Present only when the body carried top-level fields a task does not take
+                              (for example `tags`): they were not stored, and this names them.
         '200':
           description: >
             Nothing was created — an identical commission for this agent is already open (draft,
@@ -69196,6 +69392,10 @@ paths:
                           deduplicated_reason:
                             type: string
                             description: Human-readable explanation, safe to show to the user.
+                          ignored_fields:
+                            type: array
+                            items: { type: string }
+                            description: As on a 201, the body's fields a task does not take.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -80528,6 +80728,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/calibrator:
     get:
       operationId: listCalibratorProjects
@@ -80570,6 +80772,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     post:
       operationId: createCalibratorProject
       tags: [Calibrator]
@@ -80613,6 +80817,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/calibrator/{id}:
     get:
       operationId: getCalibratorProject
@@ -80651,6 +80857,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     put:
       operationId: updateCalibratorProject
       tags: [Calibrator]
@@ -80706,6 +80914,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     delete:
       operationId: deleteCalibratorProject
       tags: [Calibrator]
@@ -80736,6 +80946,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/calibrator/{id}/detail:
     get:
       operationId: getCalibratorProjectDetail
@@ -80782,6 +80994,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/calibrator/{id}/versions:
     get:
       operationId: listCalibratorVersions
@@ -80820,6 +81034,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     post:
       operationId: createCalibratorVersion
       tags: [Calibrator]
@@ -80875,6 +81091,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/calibrator/{id}/versions/{v}:
     get:
       operationId: getCalibratorVersion
@@ -80912,6 +81130,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/calibrator/{id}/batches:
     get:
       operationId: listCalibratorBatches
@@ -80968,6 +81188,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     post:
       operationId: createCalibratorBatch
       tags: [Calibrator]
@@ -81014,6 +81236,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/calibrator/{id}/batches/{batchId}:
     get:
       operationId: getCalibratorBatch
@@ -81051,6 +81275,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     put:
       operationId: updateCalibratorBatch
       tags: [Calibrator]
@@ -81102,6 +81328,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     delete:
       operationId: deleteCalibratorBatch
       tags: [Calibrator]
@@ -81138,6 +81366,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   # ── Personal Anchor ──────────────────────────
   /v1/personal/anchor:
     post:
@@ -81202,6 +81432,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/personal/status:
     get:
       operationId: getPersonalNodeStatus
@@ -81252,6 +81484,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/personal/nodes:
     get:
       operationId: listPersonalNodes
@@ -81302,6 +81536,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/personal/anchor/{nodeId}:
     patch:
       operationId: updatePersonalNode
@@ -81350,6 +81586,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     delete:
       operationId: deregisterPersonalNode
       tags: [Owner]
@@ -81387,6 +81625,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/personal/mailbox/{nodeId}:
     get:
       operationId: getPersonalMailboxStats
@@ -81431,6 +81671,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/personal/push/subscribe:
     post:
       operationId: createPersonalPushSubscription
@@ -81486,6 +81728,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/personal/push/subscribe/{id}:
     delete:
       operationId: deletePersonalPushSubscription
@@ -81522,6 +81766,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/personal/push/subscriptions/{nodeId}:
     get:
       operationId: listPersonalPushSubscriptions
@@ -81569,6 +81815,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/personal/push/test/{nodeId}:
     post:
       operationId: sendPersonalPushTest
@@ -81608,6 +81856,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/personal/anchor/{nodeId}/notifications:
     get:
       operationId: getPersonalNotificationPrefs
@@ -81660,6 +81910,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     patch:
       operationId: updatePersonalNotificationPrefs
       tags: [Notifications]
@@ -81736,6 +81988,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   # ── Admin Comms ──────────────────────────
   /v1/admin/email/status:
     get:
@@ -83298,6 +83552,8 @@ paths:
                                 preview: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/portfolio/members:
     get:
       operationId: getPortfolioMembers
@@ -83330,6 +83586,8 @@ paths:
                                 avatar: { type: string }
                                 bio: { type: string }
                           total: { type: integer }
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/portfolio/config:
     get:
       operationId: getPortfolioConfig
@@ -83377,6 +83635,8 @@ paths:
                               stored_at: { type: string, format: date-time }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     put:
       operationId: putPortfolioConfig
       tags: [Owner]
@@ -83427,6 +83687,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/portfolio/upload:
     put:
       operationId: putPortfolioUpload
@@ -83514,6 +83776,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/portfolio/me:
     get:
       operationId: getPortfolioMe
@@ -83594,6 +83858,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/portfolio/{username}/open:
     post:
       operationId: openPortfolioPage
@@ -83628,6 +83894,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   /v1/portfolio/{username}/access-request:
     get:
       operationId: getPortfolioAccessRequestState
@@ -83659,6 +83927,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
     post:
       operationId: requestPortfolioAccess
       tags: [Owner]
@@ -83696,6 +83966,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
   # ── Admin Federation ──────────────────────────
   /v1/admin/federation:
     get:
@@ -91141,6 +91413,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   /v1/scheduler/tab:
     get:
@@ -91974,6 +92248,8 @@ paths:
                               properties:
                                 input: { type: string }
                                 output: { type: string }
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
 
   # ── OData ─────────────────────────────────────────────────────
   /v1/odata:

@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-21: check:single-entry reads public/ too and holds eight silent-drop rules (docs/pitfalls.md §9, 76 and 79 deleted; §12, 58, 81, 107 and 124 shrunk); check:field-reach reports a connector or CLI parameter no route reads (`unread:`, §44 shrunk).
  *  - 2026-11-21: check:scope-words, a scope word added to an MCP tool or REST route that already exists needs a keep-working step new in the same change, or a written reason (docs/pitfalls.md §119, now deleted).
  *  - 2026-11-21: check:overrides, a dependency override's value stays inside one major (docs/pitfalls.md §59, now deleted).
  *  - 2026-11-21: check:no-nul, no raw NUL byte in tracked source text under src/, test/, scripts/ and public/ (docs/pitfalls.md §69, now deleted).
@@ -149,7 +150,7 @@ export const FAST_CHECKS = [
     { script: 'check:datapackage-pointer-reads', label: 'A data package\'s audience is read from the service\'s record, never from latest.json, beyond the listed reads' },
     // Secaudit 2026-10, C1, C2 and C7: a security decision with a function of its own is made only
     // through it; the hand copies left are counted per file and may only fall.
-    { script: 'check:single-entry', label: 'A password check, an account deletion and an operator check each go through their one function' },
+    { script: 'check:single-entry', label: 'A password check, an account deletion and an operator check each go through their one function, and nothing new drops part of the work without a word (a second task writer, a router missing when its flag is off, a request without the session)' },
     // Codebase analysis 2026-11-03, B4: the writing verbs of one route path name the same guards, or
     // the difference is listed with its reason (d1f37bb4a: PUT refused what DELETE allowed).
     { script: 'check:verb-parity', label: 'The writing verbs of one route path name the same guards, or the difference is listed with its reason' },
@@ -197,7 +198,7 @@ export const FAST_CHECKS = [
     { script: 'check:doc-links', label: 'Served text links no repository file the node does not serve' },
     // Built on 2026-09-03 for exactly this axis and wired into nothing until 2026-09-14, when an
     // agent's company update dropped organism_id in silence: REST took the field and MCP did not.
-    { script: 'check:field-reach', label: 'A record field REST can set, an agent can set too', slow: true, githubOnly: true },
+    { script: 'check:field-reach', label: 'A record field REST can set, an agent can set too, and a tool parameter is read by its route', slow: true, githubOnly: true },
     { script: 'check:liaison-surface', label: 'Published surfaces match, and neither needs a release' },
     // The whole-tree silent-exception pass, which until 2026-09-13 ran nowhere: the hook sees only
     // staged files and nothing else called it, so the three cleaned shapes were held at zero by

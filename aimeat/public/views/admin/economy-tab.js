@@ -9,6 +9,8 @@
  *   the daily cap is. Every policy row carries a sentence about what it does.
  * @structure EconomyTab — strip · morsels · trade · money · grant form
  * @version-history
+ *   v3.2.1 — 2026-11-21 — The inflation figure is written by percent() (/js/format.js) in the
+ *     reader's own format, not with a decimal comma picked by the page's language (§81).
  *   v3.2.0 — 2026-10-29 — Under the money section, the beneficiary payouts whose settlement did not
  *     answer, each with a reference field and Mark as arrived (economy-tab.payouts.js; secaudit2026oct26
  *     round 8c).
@@ -31,8 +33,9 @@ import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
 import { fmtMoney } from '/js/utils.js';
+import { percent } from '/js/format.js';
 import { num, Spinner } from './shared.js';
 import { mintMorsels } from '/js/services/admin.js';
 import { Section } from '/components/Section.js';
@@ -81,8 +84,9 @@ export default function EconomyTab({ data, reload }) {
 
   const c = e.commerce;
   const inflHigh = parseFloat(e.inflation_rate_30d_percent) >= 10;
-  // Finnish writes decimals with a comma and a space before the percent sign (Kielitoimisto).
-  const pct = (getLocale() === 'fi' ? String(e.inflation_rate_30d_percent).replace('.', ',') : String(e.inflation_rate_30d_percent)) + ' %';
+  // The reader's own format writes the decimal sign and the space before the percent sign
+  // (/js/format.js percent()); the page's language does not decide it (docs/pitfalls.md §81).
+  const pct = percent(e.inflation_rate_30d_percent);
   const unit = (n) => num(n) + ' ' + t('dashboard.morselUnit');
 
   return html`

@@ -9,12 +9,15 @@
  *   spend-over-time bars. Axis/grid/legend colors are dark-theme tokens.
  * @structure
  *   - UsageChart({ type, labels, datasets, stacked, height, legend, yFormat }) — the component
- *   - APP_PALETTE / colorForIndex(i) — stable, distinct data-series colors (cycled for N apps)
+ *   - APP_PALETTE / colorForIndex(i) — stable data-series colors, never one colour for two series
+ *     (/js/series-colors.js)
  *   - ensureChartJs() — one-shot vendored-script loader
  * @usage
  *   import { UsageChart, colorForIndex } from '/components/UsageChart.js';
  *   html`<${UsageChart} stacked labels=${days} datasets=${series} yFormat=${usd} />`
  * @version-history
+ *   v1.1.0 — 2026-11-21 — colorForIndex no longer cycles: past twelve series it gives a colour no
+ *     earlier series has (/js/series-colors.js; retires docs/pitfalls.md §76). The first twelve are unchanged.
  *   v1.0.0 — 2026-07-05 — Initial: shared chart primitive for the AI-spend charts
  *     (Generator panel, profile home card, admin AI Apps Usage tab).
  */
@@ -22,6 +25,7 @@ import { h } from 'preact';
 import { useRef, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { swallowed } from '/js/swallowed.js';
+import { SERIES_PALETTE, seriesColor } from '/js/series-colors.js';
 const html = htm.bind(h);
 
 let chartJsPromise = null;
@@ -41,12 +45,11 @@ function ensureChartJs() {
 }
 
 // Distinct DATA-SERIES colors (not UI chrome) — Chart.js needs concrete strings and N apps
-// can't map onto a few theme tokens. Follows the existing chart-color precedent in stats-tab.js.
-export const APP_PALETTE = [
-  '#E8564A', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4',
-  '#ec4899', '#84cc16', '#eab308', '#14b8a6', '#f97316', '#a78bfa',
-];
-export const colorForIndex = (i) => APP_PALETTE[((i % APP_PALETTE.length) + APP_PALETTE.length) % APP_PALETTE.length];
+// can't map onto a few theme tokens. The palette and the colour past it live in /js/series-colors.js,
+// which never gives two series one colour (check:single-entry rule palette-cycle); the names here
+// stay for callers.
+export const APP_PALETTE = SERIES_PALETTE;
+export const colorForIndex = seriesColor;
 
 const AXIS = '#94a3b8';
 const GRID = 'rgba(148,163,184,0.15)';

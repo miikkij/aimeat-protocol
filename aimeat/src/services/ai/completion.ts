@@ -21,6 +21,7 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   2026-11-21 — The result carries the provider package's `warnings` from the gateway (docs/pitfalls.md §98).
  *   2026-11-19 — CompleteForOwnerOptions.requires.local passes on to prepareAiCall (customer due diligence data, AIMEAT_KYC_AI=local).
  *   v3.19.0 -- 2026-11-07 -- An agent's own text model (the chat's model) comes first; under the operator's lock (ai.models_locked) the owner's model choices, roles and a named model are set aside (Jouni, 2026-11-07).
  *   v3.18.0 -- 2026-11-02 -- An ecosystem app's call: the record names the app as who asked (aiAskerOf), and its modelRole is not an app role it never declared (secaudit2026nov02d round 13).
@@ -281,6 +282,12 @@ export interface CompleteForOwnerResult {
    * `content`, which is what the public hash lookup is keyed on.
    */
   provenance?: AiProvenanceRecordRow;
+  /**
+   * What the provider package changed or left out of the call, one sentence each (gateway.ts
+   * warningLines): a setting the model does not take, an output cap it filled in. Absent when it
+   * said nothing. The answer came back either way, so a caller that reads only `content` cannot tell.
+   */
+  warnings?: string[];
   /**
    * Which pocket paid, and — on the node's key — what is left. A caller showing a person their spend
    * has to be able to tell "you spent your own money" from "you used the node's allowance", and the
@@ -794,6 +801,7 @@ export async function completeForOwner(
       remainingUsd: Math.max(0, plan.dailyBudgetUsd - settled.usage.total_cost_usd),
     },
     provenance: settled.provenance,
+    ...(result.warnings?.length ? { warnings: result.warnings } : {}),
     keySource: answered.keyScope,
     ...(settled.allowanceRemainingUsd !== undefined
       ? { allowanceRemainingUsd: settled.allowanceRemainingUsd }

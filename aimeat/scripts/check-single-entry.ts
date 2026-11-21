@@ -11,10 +11,21 @@
  *   without its agents and records on another, the operator's agent admitted on MCP and refused on
  *   REST. Each copy was right the day it was written. A machine can count them; a reviewer cannot.
  *
+ *   SILENT DROPS (2026-11-21). The rules after token-key are not security decisions but traps that
+ *   docs/pitfalls.md used to describe in prose: a part of the work that is dropped without a word
+ *   (a task created past its wake, a router that is not there when its flag is off, an app record
+ *   read under the other name, a child process under the unit's environment) or a page that writes
+ *   the wrong thing (a long model call under a 30 s timeout, a request without the session on a
+ *   signed-in-only node, a format from the language, a colour that repeats). Each label carries what
+ *   the pitfalls entry explained.
+ *
  *   WHAT IT READS. Every `.ts` file under src/ except src/static and src/generated, tokenised with
  *   the compiler's scanner so comments are not findings, and each line rebuilt from its tokens with a
  *   space only between two words, so `roles ?.includes( 'operator' )` and `roles?.includes('operator')`
  *   are the same text.
+ *   A rule with `tree: 'public'` reads the browser code instead: every `.js` and `.mjs` file under
+ *   public/ except public/lib (vendored), through the same scanner. `onlyDirs` narrows a rule to
+ *   the files under the directories it names.
  *   Each RULE is a pattern on that text and the files where it may appear, with a ceiling per file
  *   and the sentence that says why the file is right. The ceilings live in
  *   security/single-entry-baseline.json.
@@ -29,6 +40,11 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.14.0 — 2026-11-21 — A public/ mode (`tree: 'public'`) and `onlyDirs`; eight rules from the
+ *     pitfall analysis of 2026-11-21: task-create (§58), flag-mount (§79), app-record-key (§107),
+ *     child-env (§12), and in public/ long-ai-call (§9), closed-node-fetch (§124), locale-format
+ *     (§81, the hand decimal comma and the language-picked tag the ESLint rule cannot see) and
+ *     palette-cycle (§76).
  *   2026-11-05 — Rule scope-widen-at-mint also counts the step for the existing agents
  *     (givePlaceDefaultToEveryAgent, placeDefaultAfterSettings); the four mints are off the baseline and the
  *     approval doors are on it (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
@@ -81,8 +97,12 @@ interface Rule {
   label: string;
   /** Matched against each line rebuilt from its tokens, with no spaces. */
   pattern: RegExp;
-  /** Directories under src/ the rule does not read: the function's own layer. */
+  /** Directories (or files) the rule does not read: the function's own layer. */
   skipDirs?: string[];
+  /** Which tree the rule reads: the node's TypeScript under src/ (the default), or the browser code under public/. */
+  tree?: 'src' | 'public';
+  /** When set, the rule reads only files under these directories. */
+  onlyDirs?: string[];
 }
 
 export const RULES: Rule[] = [
@@ -272,6 +292,65 @@ export const RULES: Rule[] = [
     pattern: /\bjwtVerify\(|\.setProtectedHeader\(/,
     skipDirs: ['src/auth/node-signer.ts'],
   },
+  // ── Silent drops (pitfall analysis 2026-11-21). Each rule below replaces or shrinks a
+  // docs/pitfalls.md entry (§9, 76 and 79 are gone; §12, 58, 81, 107 and 124 point here), and its
+  // label carries what the entry explained. ──
+  {
+    id: 'task-create',
+    label: 'An agent task is created through createTask (services/agent/task-write.ts), which validates the body, dedupes, and then wakes the agent (webhook, connector tunnel, live view); a second writer that calls storage.createAgentTask itself inherits none of that, and a nightly workflow ran 0 of 6 steps with everything reporting healthy (docs/pitfalls.md §58). A file listed here sends its own wake',
+    pattern: /\.createAgentTask\(/,
+    skipDirs: ['src/storage/', 'src/services/agent/task-write.ts'],
+  },
+  {
+    id: 'flag-mount',
+    label: 'A router behind a feature flag is mounted with flaggedMounts() (server-bootstrap/flagged-mount.ts), so a switched-off feature answers 503 FEATURE_DISABLED with its setting; a bare `if (config.xEnabled)` around a mount leaves no router, the caller gets 404, and every refusal the router documents is dead code; the realtime page drew the same zeros for "switched off" as for "quiet"',
+    // The `if` that opens such a block: `if(config.calibratorEnabled){`. A negated test is a guard, not a mount.
+    pattern: /^if\(config\.\w+Enabled\b/,
+    // The files that mount the routers; the service start-up beside them switches services, not routes.
+    onlyDirs: ['src/server-bootstrap/routes-loader'],
+  },
+  {
+    id: 'app-record-key',
+    label: 'A record beside an app is addressed by its own store\'s key builder: appToolsKey(filename) (models/app-tool-schemas.ts) for the tool list, which keeps `.html`, and appDataMapKey(appId) (services/data-map/data-map-types.ts) for the data map, which does not. A hand-built `apps.${…}.tools` or `.datamap` key with the other name reads nothing, and a missing record looks like an app without one (docs/pitfalls.md §107)',
+    pattern: /`apps\.\$\{[^`]*\}\.(tools|datamap)`/,
+    skipDirs: ['src/models/app-tool-schemas.ts', 'src/services/data-map/data-map-types.ts'],
+  },
+  {
+    id: 'child-env',
+    label: 'A program the node starts inherits the environment the systemd unit gives node itself (LD_PRELOAD for jemalloc, MALLOC_CONF, NODE_OPTIONS) unless the launch names its own `env`; with them the headless browser died on every launch under the unit and worked from a shell, so a shell is no stand-in for the unit (deploy/aimeat.service; docs/pitfalls.md §12). Each file listed here says what environment its child gets; browserLaunchEnv() (services/screenshot-capture.ts) is the one that drops the three',
+    pattern: /(^|[^.\w$])(spawn|spawnSync|execFile|execFileSync|fork|execSync)\(/,
+    // src/cli is the connector: a process of its own on the person's machine, not under the unit.
+    // src/data holds app code shipped as data, which runs in a browser or an extension sandbox.
+    skipDirs: ['src/cli/', 'src/data/'],
+  },
+  {
+    id: 'long-ai-call',
+    tree: 'public',
+    label: 'A call from the SPA that waits for a model goes through api(path, { method, body, timeoutMs: 1_800_000, retries: 0 }) (public/js/api.js); apiPost aborts it at 30 s, so a long completion, transcription or decision fails mid-flight while the provider still bills it (an app\'s way is AIMEAT.ai.job, registry entry long-ai-calls-timeout)',
+    pattern: /\bapiPost\(['"`]\/v1\/ai\/(complete|transcribe|image|decide|embed)\b/,
+  },
+  {
+    id: 'closed-node-fetch',
+    tree: 'public',
+    label: 'On a signed-in-only node a request the browser makes on its own carries no session: a view reads with apiGet or closedNodeFetch (public/js/closed-node-fetch.js) and draws an API picture with sessionSrc (public/js/session-src.js). A plain fetch(\'/v1/…\') or an <img src="/v1/…"> answers 401 SIGN_IN_REQUIRED to a person who is signed in, and every test that sends a Bearer token stays green (docs/pitfalls.md §124)',
+    // The global fetch, not a session's own (`session.fetch(` adds the credential), and a picture whose
+    // address is an API path written into the template.
+    pattern: /(^|[^.\w$])fetch\(['"`]\/v1\/|\bsrc=["']\/v1\//,
+    skipDirs: ['public/js/closed-node-fetch.js', 'public/js/session-src.js', 'public/js/api.js'],
+  },
+  {
+    id: 'locale-format',
+    tree: 'public',
+    label: 'A number, date or time on a page is written by public/js/format.js (num, date, time, dateTime, money, percent, compact), which follows the reader\'s regional format and time zone. A decimal comma put in by hand (`.replace(\'.\', \',\')`) or a locale tag picked from the UI language (`getLocale() === \'fi\' ? \'fi-FI\' : …`) writes the format of the language, not the reader\'s; language, format and zone are three separate settings (docs/pitfalls.md §81). A raw Intl or toLocale*String call is the ESLint rule aimeat/no-raw-locale-format',
+    pattern: /replace\(['"]\.['"],['"],['"]\)|getLocale\(\)===?['"][a-z]{2}['"]\?['"][a-z]{2}-[A-Z]{2}['"]/,
+    skipDirs: ['public/js/format.js'],
+  },
+  {
+    id: 'palette-cycle',
+    tree: 'public',
+    label: 'A data series takes its colour from colorForIndex (public/components/UsageChart.js), which never repeats one; a palette indexed with `i % palette.length` gives the thirteenth series the first one\'s colour, and in a stacked chart two segments of one colour cannot be told apart. Past a dozen series, fold the rest into "Other" or draw rows with a bar, which need no colour at all',
+    pattern: /%[\w$.]*(PALETTE|COLORS|COLOURS|INK|palette|colors|colours|ink)[\w$]*\.length\]/,
+  },
 ];
 
 interface FileEntry { count: number; why: string }
@@ -337,15 +416,42 @@ export function lineTexts(source: string): string[] {
   return lines.map((l) => l ?? '');
 }
 
+/**
+ * The browser code under public/: every `.js` and `.mjs` file except public/lib, which holds vendored
+ * libraries, and the cortex libraries' build output. Each is read with the same scanner, so a comment
+ * or a string that names the pattern is not a finding, and template text is (an `<img src="/v1/…">`).
+ */
+function walkPublic(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const full = path.join(dir, name);
+    if (statSync(full).isDirectory()) {
+      if (name === 'node_modules' || full === path.join(ROOT, 'public', 'lib')) continue;
+      walkPublic(full, out);
+    } else if (name.endsWith('.js') || name.endsWith('.mjs')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
 function countAll(): Record<string, Record<string, number>> {
   const out: Record<string, Record<string, number>> = Object.fromEntries(RULES.map((r) => [r.id, {}]));
-  for (const file of walk(path.join(ROOT, 'src'))) {
-    const rel = path.relative(ROOT, file).split(path.sep).join('/');
-    const lines = lineTexts(readFileSync(file, 'utf-8'));
-    for (const rule of RULES) {
-      if (rule.skipDirs?.some((d) => rel.startsWith(d))) continue;
-      const n = lines.filter((l) => rule.pattern.test(l)).length;
-      if (n > 0) out[rule.id]![rel] = n;
+  const trees: Array<['src' | 'public', string[]]> = [
+    ['src', walk(path.join(ROOT, 'src'))],
+    ['public', walkPublic(path.join(ROOT, 'public'))],
+  ];
+  for (const [tree, files] of trees) {
+    const rules = RULES.filter((r) => (r.tree ?? 'src') === tree);
+    for (const file of files) {
+      const rel = path.relative(ROOT, file).split(path.sep).join('/');
+      const applicable = rules.filter((r) => !r.skipDirs?.some((d) => rel.startsWith(d))
+        && (!r.onlyDirs || r.onlyDirs.some((d) => rel.startsWith(d))));
+      if (applicable.length === 0) continue;
+      const lines = lineTexts(readFileSync(file, 'utf-8'));
+      for (const rule of applicable) {
+        const n = lines.filter((l) => rule.pattern.test(l)).length;
+        if (n > 0) out[rule.id]![rel] = n;
+      }
     }
   }
   return out;

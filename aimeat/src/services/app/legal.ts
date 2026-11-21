@@ -37,6 +37,8 @@
  * @usage
  *   const out = await applyOwnerLegalUpdate(storage, { ownerGaii, filename }, { legal: body.legal, actor });
  * @version-history
+ *   v1.2.4 — 2026-11-21 — appSellsForMoney reads the tools document by appToolsKey(), not a hand-built
+ *     key (check:single-entry rule app-record-key); the key is the same.
  *   v1.2.3 — 2026-11-08 — legalReadiness and LegalReadiness moved to ./app-build/legal-readiness.ts
  *     unchanged and are re-exported here.
  *   v1.2.2 — 2026-10-07 — appSellsForMoney reads a tool's money prices with toolMoneyPrices, the
@@ -60,7 +62,7 @@ import { emitChange } from '../event-bus.js';
 import { recordAppAudit } from './audit.js';
 import { renderMarkdownLite } from '../../utils/markdown-lite.js';
 import { appDisplayName } from './agent-surfaces.js';
-import { AppToolsDocSchema, toolMoneyPrices } from '../../models/app-tool-schemas.js';
+import { AppToolsDocSchema, toolMoneyPrices, appToolsKey } from '../../models/app-tool-schemas.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, ProvenanceScopeError, type DeclaredProvenance } from '../ai/provenance.js';
 import { logger } from '../../utils/logger.js';
 import { escapeHtml as esc } from '../../utils/html-escape.js';
@@ -206,7 +208,7 @@ export function stripLegalContent(manifest: AppManifest): AppManifest {
  */
 export async function appSellsForMoney(storage: Storage, app: Pick<AppRecord, 'ownerGaii' | 'filename'>): Promise<boolean> {
   try {
-    const rec = await storage.getMemory(app.ownerGaii, `apps.${app.filename}.tools`);
+    const rec = await storage.getMemory(app.ownerGaii, appToolsKey(app.filename));
     if (!rec) return false;
     const parsed = AppToolsDocSchema.safeParse(rec.value);
     if (!parsed.success) return false;

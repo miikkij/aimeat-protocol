@@ -11,6 +11,9 @@
  * @structure createOrganismGate(config, storage) · OrganismGate · BatchPublishItemResult
  * @usage const H = createOrganismGate(config, storage); await H.writeDecision(organismId, by, summary, refs);
  * @version-history
+ *   2026-11-21 — The batch publish applies the lock's mode through effectiveSchemaOf, its hand copy
+ *     gone, and a strict lock over a schema that says additionalProperties: true names that in the
+ *     refusal (explainStrictClose), as the single write does.
  *   2026-11-20 — The published value's size goes to recordMemoryTouch, so the value signals tell a publish
  *     of a draft as it was from a correction (services/value/signal-buffer.ts).
  *   2026-11-08 — publishDraft and publishDraftsBatch keep the holder's `status` when a publisher of
@@ -119,7 +122,7 @@ import { isSameOwner, isGEAI, localAccountName } from '../../utils/gaii.js';
 import { isNodeAccount } from '../audience.js';
 import { authorizeRead } from '../access-guard.js';
 import { ecoMayReadKey } from '../ecosystem/access.js';
-import { validateMemoryWrite, validateValueAgainstSchema } from '../schema-validator.js';
+import { validateMemoryWrite, validateValueAgainstSchema, effectiveSchemaOf, explainStrictClose } from '../schema-validator.js';
 import { validateArchiveTarget } from './archive-op.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../workspace/roles.js';
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../workspace/versions.js';
@@ -387,11 +390,9 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
       ? { createOnly: pubOt.create_only === true, requiresExpectedVersion: pubOt.requires_expected_version === true }
       : null;
     const schemaRec = instances.length ? await storage.findApplicableSchema(`${nsPrefix}${instances[0]}.latest`) : null;
-    let schemaToValidate: Record<string, unknown> | null = null;
-    if (schemaRec) {
-      schemaToValidate = { ...(schemaRec.schemaJson as Record<string, unknown>) };
-      if (schemaRec.schemaMode === 'strict' && schemaToValidate.type === 'object') schemaToValidate.additionalProperties = false;
-    }
+    // The lock's mode applied by the one function the single write uses (effectiveSchemaOf), so a
+    // batch and a single publish refuse the same fields and explain a strict lock the same way.
+    const schemaToValidate: Record<string, unknown> | null = schemaRec ? effectiveSchemaOf(schemaRec) : null;
 
     const now = new Date().toISOString();
     const toUpsert: MemoryRecord[] = [];
@@ -483,7 +484,10 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
       if (schemaToValidate) {
         // An HTML page is checked without the node's own page fields (services/html-page.ts).
         const sv = validateValueAgainstSchema(schemaViewOfDocument(draftValue, docSpace), schemaToValidate);
-        if (!sv.ok) { results.push({ instance, ok: false, code: 'INVALID', violations: sv.violations ?? (sv.errors ?? []).map(m => ({ message: m })) }); continue; }
+        if (!sv.ok) {
+          const violations = sv.violations ? explainStrictClose(sv.violations, schemaRec!) : (sv.errors ?? []).map(m => ({ message: m }));
+          results.push({ instance, ok: false, code: 'INVALID', violations }); continue;
+        }
       }
       const n = maxN + 1;
       if (versioned) {

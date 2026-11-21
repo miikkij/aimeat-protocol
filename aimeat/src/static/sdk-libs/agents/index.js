@@ -11,6 +11,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-agents.js"></script>
  *   const { task, deliverable } = await AIMEAT.agents.run('my-agent', { description: '…' });
  * @version-history
+ *   v1.3.0 — 2026-11-21 — createTask names what it did not store as task.ignored_fields: the fields
+ *     of `task` this library does not send (tags, for one) and the ones the node answered it did not
+ *     take, with one console warning. Before, both were dropped and the call succeeded.
  *   v1.0.1 — 2026-10-04 — runTask resolves on a declined task too: it has ended.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-agents.ts (SDK-libs migration Phase 1).
  *   v1.2.1 — 2026-07-31 — Forward idempotencyKey/allowDuplicate to the node's own live-commission
@@ -33,6 +36,10 @@ import { once, keyOf, confirmSpend, cancelledError, attachSpend } from '../_core
 var DEDUPE_MS = 60000;
 
 var enc = encodeURIComponent;
+
+// The fields of createTask's `task` argument this library sends. Any other is named on the returned
+// task as `ignored_fields`, beside the ones the node itself did not take.
+var CREATE_TASK_FIELDS = ['title', 'description', 'status', 'scope', 'verification', 'rules', 'resources'];
 
 // session.fetch returns the parsed AIMEAT envelope { ok, data, error }.
 function unwrap(r, action) {
@@ -115,6 +122,7 @@ var agents = {
     }
     if (task.rules) body.rules = task.rules;
     if (task.resources) body.resources = task.resources;
+    var notSent = Object.keys(task).filter(function (k) { return CREATE_TASK_FIELDS.indexOf(k) === -1; }).sort();
     var o = opts || {};
     if (o.idempotencyKey) body.idempotency_key = o.idempotencyKey;
     if (o.allowDuplicate) body.allow_duplicate = true;
@@ -138,6 +146,13 @@ var agents = {
       if (data.deduplicated && data.task) {
         data.task.deduplicated = true;
         data.task.deduplicated_reason = data.deduplicated_reason;
+      }
+      // A field this library does not send, or one the node did not take, is named on the task
+      // rather than dropped without a word: `tags` here used to vanish and the call still succeeded.
+      var ignored = notSent.concat(Array.isArray(data.ignored_fields) ? data.ignored_fields : []);
+      if (ignored.length && data.task) {
+        data.task.ignored_fields = ignored;
+        console.warn('[aimeat-agents] createTask: not stored on the task: ' + ignored.join(', '));
       }
       return data.task;
     };

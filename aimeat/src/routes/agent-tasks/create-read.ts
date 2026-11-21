@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-11-21 — POST /v1/agents/:name/tasks answers `ignored_fields`: the body's fields a
+ *     task does not take, which the parse dropped without a word.
  *   v1.9.2 — 2026-11-14 — A sibling agent's read of the list is fenced by ownerCoordinate(), the
  *     owner GHII behind the resolved identity, instead of the raw token subject (Semgrep
  *     owner-data-must-resolve-identity, code scanning 1792-1793). Same value for an agent token.
@@ -145,7 +147,7 @@ export function registerTaskCreateReadRoutes(
       return;
     }
     if (result.deduplicated) {
-      respondDeduplicated(res, config, agentName, result.task);
+      respondDeduplicated(res, config, agentName, result.task, result.ignoredFields);
       return;
     }
 
@@ -157,6 +159,9 @@ export function registerTaskCreateReadRoutes(
     res.status(201).json(success(config.nodeId, {
       task: created,
       start: startAnswer(agent.displayName || agentName, result.decision, created.status),
+      // Fields of the request a task takes nowhere (`tags`, a misspelt name): the parse strips them,
+      // so the answer names them rather than letting the caller believe they were kept.
+      ...(result.ignoredFields ? { ignored_fields: result.ignoredFields } : {}),
     }, [
       { description: 'View task', method: 'GET', url: `/v1/agents/${agentName}/tasks/${created.id}` },
       { description: 'Start task', method: 'POST', url: `/v1/agents/${agentName}/tasks/${created.id}/start` },

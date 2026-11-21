@@ -39,6 +39,17 @@
  *   by name every agent surface "takes" it. Both errors are in the permissive direction, and the
  *   reason the unit is now the door and not the name.
  *
+ *   A PARAMETER NOBODY READS (v2.3, 2026-11-21). The other direction: a connector or CLI tool declares
+ *   a parameter, sends its request to a route, and no handler of that route reads the field. On
+ *   2026-09-04 aimeat_memory_list declared `limit`, the CLI forwarded it as a query string, and
+ *   GET /v1/memory never read req.query.limit, so limit=1 and no limit gave the same answer. A key
+ *   counts as read when a matched route's handler reads it from body or query, or when it fills a
+ *   path parameter (`task_id` fills `:id`, `target_agent_name` fills `:name`: the key's canonical
+ *   name ends with the parameter's). A tool whose route reads a key CodeQL cannot name is not
+ *   judged. A key the tool uses itself (an `action` selector, a filter applied to the answer) is a
+ *   finding the exemption file answers. These are `unreadParams()`, kept apart from the door
+ *   findings because they are about a tool, not a route.
+ *
  *   WHAT IT STILL DOES NOT CLAIM. Measured 2026-09-14:
  *   - Reads, recall: all 1364 syntactically direct reads (`req.body.x`, `const { x } = req.body`)
  *     and all 197 same-file aliased reads are in the CodeQL answer; 30 further-away reads sampled at
@@ -56,9 +67,12 @@
  *   - Twins, strict: a node tool that reaches the route's service one call deeper than the route
  *     does is not a twin, so the door is reported. That is the safe direction.
  * @structure recordFields(files) · canonical(name) · isPlumbing(callee) · pathMatches(toolPath, routePath) ·
- *   WRITE_METHODS · doorReach(fields, facts, declared)
+ *   WRITE_METHODS · doorReach(fields, facts, declared) · unreadParams(facts, declared)
  * @usage const m = doorReach(recordFields(files), loadFacts({ build: true }).facts, declaredInputs);
+ *   const unread = unreadParams(facts, declaredInputs);
  * @version-history
+ *   v2.3.0 — 2026-11-21 — unreadParams(): a parameter a connector or CLI tool declares that no handler
+ *     of the route it calls reads (docs/pitfalls.md §44), as `unread:<field> <surface>:<tool>`.
  *   v2.2.0 — 2026-11-12 — A writing route that reads no record field is measured too: its twins by the
  *     same two rules, `no-twin-write:<route>` when it has none, in `Measurement.writes` beside `doors`.
  *   v2.1.0 — 2026-09-14 — A service lookup (`require*`, `get*`, `resolve*` …) no longer pairs a route
@@ -357,4 +371,61 @@ export function doorReach(
         doors, writes, blind, generic,
         findings: [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key)),
     };
+}
+
+/** A parameter a connector or CLI tool declares and no handler of the routes it calls reads. */
+export interface UnreadParam {
+    /** The exemption key: `unread:<field> <surface>:<tool>`. */
+    key: string;
+    /** `cli.dispatch:aimeat_memory_list` */
+    tool: string;
+    field: string;
+    /** The routes the tool's requests match, `GET /v1/memory`. */
+    routes: string[];
+}
+
+/**
+ * The parameters each connector and CLI tool declares that the routes it calls never read
+ * (docs/pitfalls.md §44). A node MCP tool calls the service directly, so it is not measured here.
+ *
+ * A key is read when a handler of a matched route reads it from body or query (any key, not only
+ * the record vocabulary), or when it fills a path parameter: its canonical name equals or ends with
+ * the parameter's (`task_id` → `:id`). A tool is not judged when it makes no request CodeQL sees, or
+ * when a matched route reads a key CodeQL cannot name, since that route may read anything.
+ */
+export function unreadParams(
+    facts: Facts,
+    declared: Readonly<Partial<Record<AgentSurface, ReadonlyMap<string, readonly string[]>>>>,
+): UnreadParam[] {
+    const readsBy = new Map<string, Set<string>>();
+    const blindHandlers = new Set<string>();
+    for (const r of facts.reads) {
+        if (r.naming === 'unnamed') { blindHandlers.add(r.handler); continue; }
+        readsBy.set(r.handler, (readsBy.get(r.handler) ?? new Set()).add(canonical(r.field)));
+    }
+    const httpBy = new Map<string, { method: string; path: string }[]>();
+    for (const h of facts.http) httpBy.set(h.unit, [...(httpBy.get(h.unit) ?? []), h]);
+
+    const out = new Map<string, UnreadParam>();
+    for (const t of facts.tools) {
+        if (t.surface === 'mcp.node') continue;
+        const keys = declared[t.surface]?.get(t.name) ?? [];
+        const calls = httpBy.get(t.handler) ?? [];
+        if (keys.length === 0 || calls.length === 0) continue;
+        const routes = facts.routes.filter(r => calls.some(c =>
+            (r.method === 'ALL' || r.method === 'USE' || r.method === c.method) && pathMatches(c.path, r.path)));
+        if (routes.length === 0 || routes.some(r => blindHandlers.has(r.handler))) continue;
+        const read = new Set(routes.flatMap(r => [...(readsBy.get(r.handler) ?? [])]));
+        const params = routes.flatMap(r => r.path.split('/')
+            .filter(s => s.startsWith(':')).map(s => canonical(s.slice(1).replace(/\?$/, ''))));
+        const routeNames = [...new Set(routes.map(r => `${r.method} ${r.path}`))].sort();
+        for (const field of keys) {
+            const k = canonical(field);
+            if (read.has(k) || params.some(p => k.endsWith(p))) continue;
+            const tool = `${t.surface}:${t.name}`;
+            const key = `unread:${field} ${tool}`;
+            out.set(key, { key, tool, field, routes: routeNames });
+        }
+    }
+    return [...out.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
