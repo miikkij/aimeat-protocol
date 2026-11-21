@@ -7,6 +7,8 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-overview).
  * @version-history
+ *   v1.6.1 — 2026-11-21 — areas=mobile is proven by what it keeps and drops, not by a count of one: a
+ *     second curated entry for phones (offline-parts-other-origin) is enforced at publish too.
  *   v1.6.0 — 2026-11-21 — Curated entries a publish check enforces are listed under enforced (and
  *     narrowed by areas), and a publish names grid-track-blowout with its address in app_hints.
  *   v1.4.2 — 2026-11-15 — Audit M051: B's include_shared list is read before A shares the entry.
@@ -166,7 +168,10 @@ await test('curated pitfalls a publish check enforces are listed apart under enf
     assert(one.status === 200 && one.body.data.pitfall.enforcedBy === 'artifact-lint:checkInlineScripts', `entry: ${JSON.stringify(one.body.data?.pitfall?.enforcedBy)}`);
     const mobile = await json('/v1/appdev/overview?sections=pitfalls_curated&areas=mobile', { headers: { Authorization: `Bearer ${tokenA}` } });
     const me = mobile.body.data.pitfalls_curated.enforced as Array<{ id: string }>;
-    assert(me.length === 1 && me[0].id === 'grid-track-blowout', `areas=mobile enforced: ${JSON.stringify(me)}`);
+    // Narrowed, not counted: the curated registry grows, so the proof is a mobile entry kept, an
+    // app-only entry (leaflet-l-shadowed applies to 'app' alone) dropped, and a shorter list.
+    assert(me.some(e => e.id === 'grid-track-blowout') && !me.some(e => e.id === 'leaflet-l-shadowed') && me.length < enforced.length,
+        `areas=mobile enforced: ${JSON.stringify(me)}`);
 });
 
 await test('a publish names the curated pitfall a finding enforces, with its address; a safe grid gets none', async () => {
