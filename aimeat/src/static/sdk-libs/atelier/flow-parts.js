@@ -541,7 +541,7 @@ export function facets(spec) {
     defs.forEach(function (facet) {
       const row = el('div', { class: 'ak-facets__chips', role: 'group', 'aria-label': String(facet.label || facet.id) });
       (Array.isArray(facet.options) ? facet.options : []).filter(function (o) { return o && o.id; }).forEach(function (option) {
-        const key = facet.id + ' ' + option.id;
+        const key = facet.id + '\0' + option.id;
         live[key] = 1;
         let rec = chips.get(key);
         if (!rec) { chips.set(key, rec = buildChip(facet, option)); } else { rec.facet = facet; rec.option = option; }

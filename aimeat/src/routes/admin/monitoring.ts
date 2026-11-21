@@ -333,21 +333,21 @@ export function adminMonitoringRouter(
         // within a week so the path under evaluation reads first.
         const byWeekTrack = new Map<string, typeof rows>();
         for (const r of rows) {
-            const k = `${weekOf(r.createdAt)} ${r.track}`;
+            const k = `${weekOf(r.createdAt)}\0${r.track}`;
             const list = byWeekTrack.get(k) ?? [];
             list.push(r);
             byWeekTrack.set(k, list);
         }
         const cohorts = [...byWeekTrack.entries()]
             .sort((a, b) => {
-                const [wa, ta] = a[0].split(' ');
-                const [wb, tb] = b[0].split(' ');
+                const [wa, ta] = a[0].split('\0');
+                const [wb, tb] = b[0].split('\0');
                 // Within a week the remake reads above legacy: the remake is the thing being
                 // judged, and the legacy row is the comparison it is judged against.
                 return wb.localeCompare(wa) || (ta === tb ? 0 : ta === 'remake' ? -1 : 1);
             })
             .map(([key, list]) => {
-                const [week, track] = key.split(' ');
+                const [week, track] = key.split('\0');
                 const activated = list.filter(r => !!r.activatedAt);
                 const ttfvs = activated.map(r => r.ttfvMinutes).filter((n): n is number => typeof n === 'number');
                 return {

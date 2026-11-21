@@ -168,7 +168,7 @@ export function validateRows(
             }
         }
         if (required.size > 0) {
-            const composite = [...required].map(k => String(row[k] ?? '')).join(' ');
+            const composite = [...required].map(k => String(row[k] ?? '')).join('\0');
             if (seenKeys.has(composite)) {
                 push({ resource, row: rowNo, field: [...required].join('+'), code: 'duplicate-key',
                     message: `another row already has this primary key` });

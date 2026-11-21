@@ -176,7 +176,7 @@ function diagram(group: string[], graph: Map<string, string[]>, collapse: boolea
             if (!inside.has(to) || to === from) continue;
             const b = bucketOf(to, depth);
             if (a === b) continue;
-            const key = `${a} ${b}`;
+            const key = `${a}\0${b}`;
             weight.set(key, (weight.get(key) ?? 0) + 1);
         }
     }
@@ -184,7 +184,7 @@ function diagram(group: string[], graph: Map<string, string[]>, collapse: boolea
         lines.push(`    ${id(bucket)}["${bucket}<br/>${n} tiedostoa"]`);
     }
     for (const [key, n] of [...weight].sort((x, y) => y[1] - x[1])) {
-        const [a, b] = key.split(' ');
+        const [a, b] = key.split('\0');
         lines.push(`    ${id(a)} -->|${n}| ${id(b)}`);
     }
     lines.push('```');

@@ -147,12 +147,12 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
     // Every agent's offers record in one IN query (was getMemory per agent). Each agent stores its
     // offers under its own gaii at agents.<name>.offers, so index by gaii+key.
     const offerRecs = await storage.listMemoryForOwners(agents.map(a => a.gaii), { prefix: 'agents.' });
-    const offerByGaiiKey = new Map(offerRecs.map(r => [`${r.ownerGaii} ${r.key}`, r]));
+    const offerByGaiiKey = new Map(offerRecs.map(r => [`${r.ownerGaii}\0${r.key}`, r]));
 
     const out: Array<Record<string, unknown>> = [];
     let total = 0;
     for (const a of agents) {
-      const rec = offerByGaiiKey.get(`${a.gaii} agents.${a.name}.offers`);
+      const rec = offerByGaiiKey.get(`${a.gaii}\0agents.${a.name}.offers`);
       const offers = ((rec?.value as { offers?: Offer[] } | undefined)?.offers) ?? [];
       if (!offers.length) continue;
       const online = !!(a.lastSeen && (now - new Date(a.lastSeen).getTime()) < 10 * 60 * 1000);

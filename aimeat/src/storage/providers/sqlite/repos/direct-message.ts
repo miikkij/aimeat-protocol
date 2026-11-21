@@ -380,7 +380,7 @@ export function listConversationsForOwners(
      ) WHERE rn = 1`,
   ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; senderGhii: string; recipientGhii: string; createdAt: string; kind: string | null }>;
 
-  const ck = (o: string, c: string) => `${o} ${c}`;
+  const ck = (o: string, c: string) => `${o}\0${c}`;
   const lastBy = new Map(lasts.map(l => [ck(l.ownerGhii, l.conversationId), l]));
   const subjBy = new Map(subjects.map(s => [ck(s.ownerGhii, s.conversationId), s.subject]));
   const openBy = new Map(opens.map(o => [ck(o.ownerGhii, o.conversationId), o]));

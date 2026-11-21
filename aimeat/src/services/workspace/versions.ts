@@ -193,7 +193,7 @@ export async function compactWorkspaceVersions(
   const manifests = new Map<string, Manifest | null>();
   const skippedWs = new Set<string>();
   const readManifest = async (orgId: string, ws: string): Promise<Manifest | null> => {
-    const cacheKey = `${orgId} ${ws}`;
+    const cacheKey = `${orgId}\0${ws}`;
     if (manifests.has(cacheKey)) return manifests.get(cacheKey) ?? null;
     let man: Manifest | null;
     try {
