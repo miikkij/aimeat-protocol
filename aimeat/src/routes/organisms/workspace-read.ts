@@ -6,9 +6,9 @@
  *   OKF overviews, structure graphs, dangling-refs scan, structure timeline, content search, and the
  *   comments/threads endpoints. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
- *   2026-11-22 — ?format=md on the two overviews sets its text/markdown content type with res.set and
- *     nosniff before the body; res.type was not read as a content type by CodeQL's
- *     reflected-XSS query (alert 1832).
+ *   2026-11-22 — ?format=md on the two overviews and ?format=txt on the instruction block set their
+ *     text content type with res.set and nosniff before the body; res.type was not read as a content
+ *     type by CodeQL's reflected-XSS query (alert 1832).
  *   2026-11-21 — GET /v1/organisms/:id/overview answers the organism's own `objectives` beside the
  *     Markdown, which now opens with them (services/structure/overview.ts).
  *   2026-11-21 — POST /comments hands the config to addComment (content risk marks at the shared-write
@@ -375,7 +375,12 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       });
     }
     const blocks = buildInstructionBlocks(config, { orgId: id, orgName: organism.name || id, workspaces }, { lang });
-    if (req.query.format === 'txt') { res.type('text/plain; charset=utf-8').send(blocks.chatInstructions); return; }
+    if (req.query.format === 'txt') {
+      res.set('Content-Type', 'text/plain; charset=utf-8');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.send(blocks.chatInstructions);
+      return;
+    }
     res.json(success(config.nodeId, {
       organism_id: id,
       organism_name: organism.name || id,
