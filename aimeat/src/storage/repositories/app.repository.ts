@@ -14,6 +14,7 @@
  * @usage Implemented by SqliteStorage / MongoStorage; consumed by routes/apps.ts
  *   and mcp/apps.ts.
  * @version-history
+ *   2026-11-22 — updateAppMeta takes `tourInviteOff`, the owner's switch for the tour's invitation.
  *   2026-11-20 — appFilenamesAmong(): which candidate filenames an owner has, apps and drafts, without
  *     the payload, for the app reference resolver (wish-sovelluksen-nimi-ilman-html-p-tett-kaikkialla).
  *   v1.0.0 — pre-2026-06 — Initial app repository contract
@@ -189,6 +190,11 @@ export interface AppRepository {
              * true sets it; false or null takes it off (the screenshot follows who may open the app).
              */
             screenshotPublic?: boolean | null;
+            /**
+             * The owner switched the tour's invitation off. true sets it; false or null takes it off
+             * (the invitation shows again when the app has a tour).
+             */
+            tourInviteOff?: boolean | null;
             /** The owner's text about the app: replaced whole, null takes it off (TARGET-093). */
             about?: import('../interface.js').AppAbout | null;
         },

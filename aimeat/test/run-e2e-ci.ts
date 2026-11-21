@@ -124,6 +124,8 @@
  *     a workspace index unreadable (secaudit2026oct31w2 round 10).
  *   2026-10-31 -- e2e-datapackage-trusted-reads.ts joins the list (not the guard tier): what a data package
  *     read trusts (secaudit2026oct31w2 round 10, W2-14, W2-15, W2-20).
+ *   2026-11-22 -- e2e-app-tour.ts joins the list (not the guard tier): an app's guided tour at publish and
+ *     the owner's switch for its invitation in the served page.
  *   2026-10-31 -- e2e-app-screenshot-access.ts joins the list (not the guard tier): an access-limited app's screenshot follows who may open it, and the owner's screenshot_public (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-31 -- e2e-flag-counting.ts joins the list (not the guard tier): a board hide counts one person once, a memory flag hides only on review or the threshold (secaudit2026oct31w2 round 10, W2-8 and W2-9).
  *   2026-10-31 -- e2e-ai-openrouter-region.ts joins the list (not the guard tier): its own node on 28494,
@@ -2110,6 +2112,9 @@ const ALL_SUITES = [
     // The screenshot of an app that opens for fewer people follows who may open it, unless its owner
     // shows it to everyone (secaudit2026oct31w2 round 10, W2-12).
     'test/e2e-app-screenshot-access.ts',
+    // An app's guided tour: publish reads and checks its aimeat-tour block, and the owner's switch for
+    // the one-time invitation reaches the served page (wish-opastettu-kierros-sovelluksiin-monikielinen-tutorial-ja-oma-).
+    'test/e2e-app-tour.ts',
     // An agent sets its owner's app icon over MCP from a file it stored, and marks answers who can
     // install the app (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
     'test/e2e-app-icon-upload.ts',

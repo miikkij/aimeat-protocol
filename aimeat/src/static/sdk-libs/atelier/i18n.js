@@ -18,6 +18,8 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.16.0 — 2026-11-22 — aideShowAgain and aideSuggests (en/fi/es): the aide lights the places it
+ *     tells the person to press, and the button that does what it proposes (tour.js point()).
  *   v0.15.0 — 2026-11-21 — use(dict, { kit: false }) keeps an app's words to the app: i18n.t() reads
  *     them and the kit's components never do, so an app key named like a kit word ("chosen") no
  *     longer replaces it. A plain use() that rewords a kit word warns once per word, and
@@ -120,6 +122,8 @@ const BASE = {
     aideNoAi: 'AI is not set up on this account yet. Connect a key under Profile, and the aide wakes up.',
     aideFailed: 'That did not go through. Try again.',
     aideRun: 'Run it',
+    aideShowAgain: 'Show me again',
+    aideSuggests: 'The aide suggests this. This button does the same.',
     aideUnknownAction: 'The model proposed something this app does not declare — nothing was run.',
     explainTitle: 'What this screen holds',
     delegateGo: 'Let AI handle it',
@@ -264,6 +268,8 @@ const BASE = {
     aideNoAi: 'Tälle tilille ei ole vielä kytketty tekoälyä. Liitä avain profiilissa, niin apuri herää.',
     aideFailed: 'Se ei mennyt läpi. Yritä uudelleen.',
     aideRun: 'Aja',
+    aideShowAgain: 'Näytä uudelleen',
+    aideSuggests: 'Avustaja ehdottaa tätä. Tämä painike tekee saman.',
     aideUnknownAction: 'Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.',
     explainTitle: 'Mitä tällä näytöllä on',
     delegateGo: 'Anna tekoälyn hoitaa',
@@ -408,6 +414,8 @@ const BASE = {
     aideNoAi: 'Esta cuenta aún no tiene IA configurada. Conecta una clave en el perfil y el ayudante despierta.',
     aideFailed: 'No ha funcionado. Inténtalo otra vez.',
     aideRun: 'Ejecutar',
+    aideShowAgain: 'Muéstramelo otra vez',
+    aideSuggests: 'El asistente sugiere esto. Este botón hace lo mismo.',
     aideUnknownAction: 'El modelo propuso algo que esta app no declara — no se ejecutó nada.',
     explainTitle: 'Qué hay en esta pantalla',
     delegateGo: 'Deja que la IA lo haga',

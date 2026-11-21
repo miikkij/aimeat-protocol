@@ -22,6 +22,8 @@
  *   goes and whether the document can take it is decided once, in services/app/serve-marks.ts.
  * @usage import { agentDiscoverySnippet, appRefSnippet } from '../utils/app-agent-discovery.js';
  * @version-history
+ *   v3.1.0 — 2026-11-22 — #aimeat-app-ref carries `tour_invite: false` when the owner switched the
+ *     guided tour's invitation off (AppDiscoverySpec.tourInvite); otherwise the block is unchanged.
  *   v3.0.0 — 2026-11-06 — The noscript block is one statement and four links (?format=md, webmcp,
  *     skills, /.well-known/mcp.json), at most 30 words, with no heading and no instruction
  *     (TARGET-092, Jouni's decision of 2026-11-06). The two links, the WebMCP bridge and
@@ -82,6 +84,12 @@ export interface AppDiscoverySpec {
    * apps that carry their own bridge call, and for those that opt out.
    */
   webmcp?: boolean;
+  /**
+   * False when the owner switched the guided tour's invitation off (manifest.tourInviteOff). The
+   * #aimeat-app-ref block then carries `tour_invite: false`, which the Atelier kit reads before it
+   * invites a first-time visitor (atelier/tour.js). Absent or true: nothing is written.
+   */
+  tourInvite?: boolean;
 }
 
 /** Present in a document that already carries the block — what makes a re-serve idempotent. */
@@ -146,10 +154,11 @@ export const APP_REF_MARK = 'id="aimeat-app-ref"';
  * from closing the element early and parse back to the same characters.
  */
 export function appRefSnippet(spec: AppDiscoverySpec): string {
-  const ref = {
+  const ref: Record<string, unknown> = {
     owner: spec.owner, app_id: spec.filename, app: `${spec.owner}/${spec.filename}`,
     tools: (spec.toolNames ?? []).filter(Boolean),
   };
+  if (spec.tourInvite === false) ref.tour_invite = false;
   const json = JSON.stringify(ref)
     .replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
   return `<script type="application/json" ${APP_REF_MARK}>${json}</script>`;

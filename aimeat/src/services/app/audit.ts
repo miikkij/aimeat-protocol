@@ -43,6 +43,7 @@
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-01 — `party.stopped`, `party.resumed`: a person registered to the app stopped or let in again (WP9d).
  *   2026-10-31 — `screenshot_public`: the owner's "show the screenshot to everyone" (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-11-22 — `tour_invite`: the owner's switch for the guided tour's one-time invitation.
  *   v1.11.1 — 2026-10-31 — A move between the active record and the archive (the roll on append, the
  *     owner's archive-before and limit actions) writes the active record's compare-and-swap first and
  *     the archive after it, in one transaction. A move that lost the swap had already written the
@@ -105,6 +106,7 @@ export type AppAuditAction =
   | 'access'
   // The owner showed the screenshot of an app that opens for fewer people to everyone, or stopped.
   | 'screenshot_public'
+  | 'tour_invite'
   | 'protection'
   | 'name' | 'description'
   // The owner's longer text about the app, shown on the app page (TARGET-093): set or taken off.

@@ -35,6 +35,9 @@
  *     that was not public at its publish was not announced then (Jouni's ruling, plan doc-mvcn6c7e4e5q).
  *   2026-10-31 — `screenshot_public` (boolean): the owner shows the screenshot of an app that opens
  *     for fewer people to everyone; the answer carries it (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-11-22 — `tour_invite` (boolean, a presentation field): false switches off the one-time
+ *     invitation to the app's guided tour, true lets it show again; the answer carries `tour_invite`
+ *     and `has_tour` (wish-opastettu-kierros-sovelluksiin-monikielinen-tutorial-ja-oma-).
  *   2026-11-06 — `about` (markdown, at most 8000 characters, empty removes it) and `about_lang` (the
  *     language it is written in): the owner's longer text about the app, shown on the app page under
  *     the description; the answer carries both (TARGET-093).
@@ -52,7 +55,7 @@ import { classifyContainerAfterWrite } from '../classify-on-write.js';
 import { appTarget } from '../classification/containers.js';
 
 /** How an app presents itself: a rung that stops at `presentation` may write these. */
-export const SETTINGS_PRESENTATION_FIELDS = ['name', 'description', 'descriptions', 'about', 'about_lang'] as const;
+export const SETTINGS_PRESENTATION_FIELDS = ['name', 'description', 'descriptions', 'about', 'about_lang', 'tour_invite'] as const;
 
 /** The longest text about an app, in characters: room for the 150 to 400 words it is meant for, and more. */
 export const APP_ABOUT_MAX_CHARS = 8000;
@@ -107,6 +110,8 @@ export interface ParsedAppSettings {
     access?: { store: string | null };
     /** Present when `screenshot_public` was in the body: show the screenshot to everyone. */
     screenshotPublic?: boolean;
+    /** Present when `tour_invite` was in the body: false switches the tour's invitation off. */
+    tourInvite?: boolean;
     /** From `listing`, or from the older `parked` boolean (true = unlisted, false = listed). */
     listing?: AppListing;
     forkable?: boolean;
@@ -132,6 +137,13 @@ export interface AppSettingsState {
      * (an app anyone may open shows it to everyone either way).
      */
     screenshot_public: boolean;
+    /** True when the app has a guided tour (its aimeat-tour block, services/app/tour.ts). */
+    has_tour: boolean;
+    /**
+     * Whether a first-time visitor is invited to the tour once. False when the owner switched it off;
+     * true otherwise, also while the app has no tour (nothing is shown then).
+     */
+    tour_invite: boolean;
     /** True for community and unlisted: the app is off every public surface. */
     parked: boolean;
     forkable: boolean;
@@ -215,6 +227,10 @@ export function parseOwnerSettingsInput(
     if ('screenshot_public' in body) {
         if (typeof body.screenshot_public !== 'boolean') return bad('screenshot_public must be a boolean');
         settings.screenshotPublic = body.screenshot_public;
+    }
+    if ('tour_invite' in body) {
+        if (typeof body.tour_invite !== 'boolean') return bad('tour_invite must be a boolean');
+        settings.tourInvite = body.tour_invite;
     }
     if ('listing' in body) {
         if (typeof body.listing !== 'string' || !APP_LISTINGS.includes(body.listing as AppListing)) {
@@ -382,6 +398,18 @@ export async function applyOwnerSettingsUpdate(
             : 'The app\'s screenshot is shown to the people who can open the app.');
     }
 
+    if (settings.tourInvite !== undefined) {
+        await storage.updateAppMeta(ownerGaii, filename, { tourInviteOff: !settings.tourInvite });
+        await audit('tour_invite', { on: settings.tourInvite });
+        const current = await storage.getApp(ownerGaii, filename);
+        const hasTour = !!current?.manifest?.tour?.tours?.length;
+        notes.push(settings.tourInvite
+            ? (hasTour
+                ? 'A person who opens the app for the first time is invited to its tour once.'
+                : 'The app has no tour yet. When a version declares one, a first-time visitor is invited to it once.')
+            : 'Nobody is invited to the tour. The tour button stays in the app\'s header.');
+    }
+
     if (settings.listing !== undefined) {
         await storage.setAppListing(ownerGaii, filename, settings.listing);
         await audit(settings.listing === 'listed' ? 'unparked' : settings.listing === 'community' ? 'community' : 'parked');
@@ -436,6 +464,8 @@ export function appSettingsState(app: AppRecord | null | undefined, filename: st
         listing: appListingOf(app ?? {}),
         open_to: appAccessOf(app),
         screenshot_public: app?.manifest?.screenshotPublic === true,
+        has_tour: !!app?.manifest?.tour?.tours?.length,
+        tour_invite: app?.manifest?.tourInviteOff !== true,
         parked: !!app?.parked,
         forkable: !!app?.forkable,
         protection: app?.manifest?.protection ?? null,

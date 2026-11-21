@@ -9,6 +9,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-11-22 — The served app's #aimeat-app-ref carries `tour_invite: false` when the owner switched
+ *     the guided tour's invitation off.
  *   2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead of a regex of
  *     this file's own; no change in behaviour.
  *   2026-11-15 — The app, its draft and its screenshot answer a browser's navigation to a missing or
@@ -726,6 +728,8 @@ export function registerReadRoutes(
                     baseUrl: config.baseUrl,
                     toolNames: await appToolNames(storage, app.ownerGaii, app.filename),
                     webmcp: wantsWebmcpBridge(app.data),
+                    // The owner's switch for the guided tour's invitation (atelier/tour.js reads it).
+                    tourInvite: app.manifest?.tourInviteOff ? false : undefined,
                 },
             })
             : app.data;

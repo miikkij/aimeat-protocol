@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-22 — AppManifest.tour (the app's guided tour, parsed at publish) and tourInviteOff (the
+ *     owner switched its invitation off). In the manifest JSON, so no column on either backend.
  *   2026-11-07 — CsmRecord gains `visibility` (public | members | private | organism:<id>) and `version`;
  *     CsmVersionRecord is one replaced version of a CSM. Postgres 0127, SQLite schema-csm-versions.ts.
  *   2026-11-06 — AppManifest.about (AppAbout): the owner's longer text about the app, shown on the app
@@ -206,6 +208,19 @@ export interface AppManifest {
    * every publish. No effect on an app anyone may open.
    */
   screenshotPublic?: boolean;
+  /**
+   * The app's guided tour (services/app/tour.ts), parsed from its
+   * `<script type="application/json" id="aimeat-tour">` block at every publish and never carried
+   * forward: a version without the block has no tour. The Atelier kit draws it from the same block;
+   * App Catalog shows the invitation switch only while this is present, and an AI reads the steps here.
+   */
+  tour?: { tours: Array<{ id: string; title?: string | Record<string, string>; version: number; steps: Array<Record<string, unknown>> }>; languages: string[] };
+  /**
+   * The owner switched the tour's one-time invitation off (settings `tour_invite: false`). Absent:
+   * the invitation shows to a first-time visitor when the app has a tour. Copied forward by every
+   * publish, and written into the served app's #aimeat-app-ref block as `tour_invite: false`.
+   */
+  tourInviteOff?: boolean;
   /**
    * The owner's longer text about the app, for people: what it does, for whom and how it is used
    * (markdown, written in `lang`). The app page opens with it under the name and the description, in

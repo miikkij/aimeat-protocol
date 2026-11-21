@@ -56,6 +56,9 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.72.0 — 2026-11-22 — tour.css: the app's guided tour (spotlight, step card or bottom sheet,
+ *     invitation, header button); the tour's rules left parts.css for it
+ *     (wish-opastettu-kierros-sovelluksiin-monikielinen-tutorial-ja-oma-).
  *   v0.71.0 — 2026-11-21 — No CSS change here: the imported aimeat-theme.css 2.5.1 lets pre and code
  *     break a long token. The kit's JavaScript adds kanban onOpen and a side navigation built on the
  *     first nav.set({ items }); the version moves with it.
@@ -431,6 +434,7 @@
 @import url('./aimeat-atelier/workbench.css');
 @import url('./aimeat-atelier/board.css');
 @import url('./aimeat-atelier/handbook.css');
+@import url('./aimeat-atelier/tour.css');
 @import url('./aimeat-atelier/controls.css');
 @import url('./aimeat-atelier/menu.css');
 @import url('./aimeat-atelier/island.css');

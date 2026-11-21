@@ -14,6 +14,10 @@
  * @structure meta · ManageSection({ d }) · AccessCode({ d, onSaved, onCancel }) · OpenTo({ d, raw, onSet, busy })
  * @usage const mod = await import('./sections/manage.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   2026-11-22 — The invitation to the tour, under who sees the screenshot, only for an app whose
+ *     published version has a guided tour: invite a first-time visitor, or not (`tour_invite` on
+ *     PATCH /v1/apps/:filename), with the sentence that says it
+ *     (wish-opastettu-kierros-sovelluksiin-monikielinen-tutorial-ja-oma-).
  *   2026-10-31 — Who sees its screenshot, under who can open it, while the app opens for fewer people
  *     than anyone: the people who can open it, or everyone (`screenshot_public` on PATCH
  *     /v1/apps/:filename), with the sentence that says it (secaudit2026oct31w2 round 10, W2-12).
@@ -159,17 +163,20 @@ export default function ManageSection({ d }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => { setLocal({}); setEditing(0); }, [d.ref]);
   // A fresh listing row is the truth again once it has come.
-  useEffect(() => { setLocal({}); }, [app.listing, app.parked, app.forkable, app.protected, app.open_to, app.screenshot_public]);
+  useEffect(() => { setLocal({}); }, [app.listing, app.parked, app.forkable, app.protected, app.open_to, app.screenshot_public, app.tour_invite]);
 
   const listing = 'listing' in local ? local.listing : stateOf(app);
   const openTo = 'open_to' in local ? local.open_to : app.open_to;
   const forkable = 'forkable' in local ? local.forkable : !!app.forkable;
   const shotPublic = 'screenshot_public' in local ? local.screenshot_public : !!app.screenshot_public;
+  // The tour's invitation: the switch exists only for an app whose published version has a tour.
+  const hasTour = !!(app.manifest && app.manifest.tour && app.manifest.tour.tours && app.manifest.tour.tours.length);
+  const tourInvite = 'tour_invite' in local ? local.tour_invite : app.tour_invite !== false;
   const hasCode = 'protected' in local ? local.protected : !!app.protected;
   const prot = (app.manifest && app.manifest.protection) || {};
   const anyProt = !!(prot.obfuscate || prot.domainLock || prot.watermark || prot.noRawDownload);
 
-  /** Set one switch on the record (listing, open_to, screenshot_public or forkable). */
+  /** Set one switch on the record (listing, open_to, screenshot_public, tour_invite or forkable). */
   const flip = async (key, value) => {
     if (busy || (key === 'listing' && value === listing)) return;
     if (!getSession()?.jwt) { const t = x('common.loginRequired'); d.notice(t, noticeKind(t)); return; }
@@ -201,6 +208,13 @@ export default function ManageSection({ d }) {
           options=${['access', 'everyone'].map((v) => [v, x('manage.shot.' + v)])} />
       <//>
       <${Note} kind="quiet" chapter>${x('manage.shotHint.' + (shotPublic ? 'everyone' : 'access'))}<//>` : null}
+    ${hasTour ? html`
+      <${Fields} plain chapter>
+        <${Choice} label=${x('manage.tourLabel')} value=${tourInvite ? 'on' : 'off'}
+          onChange=${(v) => { if ((v === 'on') !== tourInvite) flip('tour_invite', v === 'on'); }}
+          options=${['on', 'off'].map((v) => [v, x('manage.tour.' + v)])} />
+      <//>
+      <${Note} kind="quiet" chapter>${x('manage.tourHint.' + (tourInvite ? 'on' : 'off'))}<//>` : null}
     <${Fields} plain chapter>
       <${Space} below="medium">
         <${ContainerLabel} kind="app" app=${d.filename} canSet chapter showToast=${(m, kind) => d.notice(m, kind === 'success' || kind === 'error' ? kind : noticeKind(m))} />

@@ -42,6 +42,7 @@
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-31 — settings takes `screenshot_public`: show the screenshot of an app that opens for fewer
  *     people to everyone (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-11-22 — settings takes `tour_invite`: the one-time invitation to the app's guided tour.
  *   2026-10-25 — subdomain_list and subdomain_delete say what a held address is and that deleting it
  *     releases it (secaudit2026oct22, app-label-recycled-after-delete).
  *   2026-10-25 — subdomain_set takes `origin` (operator | publisher), the operator's decision
@@ -142,6 +143,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     access_code: { type: 'string', description: 'For settings: a code visitors must type to open the app. An empty string removes it. Never read back.' },
     open_to: { type: 'string', description: 'For settings: who may OPEN the app (listing is only who sees it in a list). "anyone": the link opens it. "signed-in": only people signed in to this node; others are asked to sign in first. "organism:<organism id>": only the members of that organism (you must be a member). Ask the person which one they want before setting it.' },
     screenshot_public: { type: 'boolean', description: 'For settings: true shows the app\'s screenshot to everyone, also to people the app does not open for. false (the default) shows it only to the people who may open the app. It changes nothing for an app anyone may open. The app\'s icon is always public.' },
+    tour_invite: { type: 'boolean', description: 'For settings: for an app whose published version has a guided tour (its aimeat-tour block), true (the default) invites a person who opens the app for the first time to the tour, once; false invites nobody. The tour button stays in the app\'s header either way. The answer carries tour_invite and has_tour.' },
     protection: { type: 'object', description: 'For settings: copy protection { obfuscate, domainLock, watermark, noRawDownload }, each true or false.', zod: z.record(z.string(), z.boolean()) },
     // screenshot_upload
     screenshot: { type: 'string', description: 'For screenshot_upload: the image as base64, at most 2 MB.' },
@@ -212,7 +214,7 @@ export interface AppManageAction {
 const F = (required: string[], optional: string[] = []): Record<string, boolean> =>
     Object.fromEntries([...required.map(f => [f, true] as const), ...optional.map(f => [f, false] as const)]);
 
-const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'about', 'about_lang', 'listing', 'parked', 'forkable', 'access_code', 'open_to', 'screenshot_public', 'protection'];
+const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'about', 'about_lang', 'listing', 'parked', 'forkable', 'access_code', 'open_to', 'screenshot_public', 'tour_invite', 'protection'];
 
 /**
  * The member roster. Each action is one route of routes/app-members.ts and names the word that route

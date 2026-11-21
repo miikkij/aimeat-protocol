@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-22 — The app's `aimeat-tour` block is parsed into `manifest.tour` (services/app/tour.ts), a
+ *     broken one refused with APP_TOUR_INVALID; a new version keeps the owner's `tourInviteOff`.
  *   2026-11-21 — A publish that names no display version takes the page's <meta name="aimeat-app-version">;
  *     with neither, a label carried over changed bytes is a warning in artifactWarnings (services/app/version-label.ts).
  *   2026-11-21 — artifactWarnings also carries the grid-track mobile hint as a finding with its curated pitfall.
@@ -177,6 +179,7 @@ import { logger } from '../../utils/logger.js';
 import { refreshAppDependencies } from '../dependency-map.js';
 import { managedChangeRefusal } from '../packages/install/package-managed.js';
 import { parseAppConfigSchema } from './config.js';
+import { parseAppTour } from './tour.js';
 import { parseAppWorkspaces, checkAppWorkspaces } from './workspaces.js';
 import { intakeDeclarationOf } from './intake-forms.js';
 import { decideBundledCrews } from './bundled-crews.js';
@@ -321,6 +324,12 @@ export async function publishApp(
   if (configDecl && 'error' in configDecl) {
     return { refusal: { status: 422, code: 'APP_CONFIG_SCHEMA_INVALID', message: `The app's config declaration cannot be used: ${configDecl.error}.` } };
   }
+  // The guided tour the app declares (services/app/tour.ts), refused here when it does not parse:
+  // the kit would draw no tour from it, and the owner would see a switch for a tour that is not there.
+  const tourDecl = isHtml ? parseAppTour(html) : null;
+  if (tourDecl && 'error' in tourDecl) {
+    return { refusal: { status: 422, code: 'APP_TOUR_INVALID', message: `The app's guided tour (the aimeat-tour block) cannot be used: ${tourDecl.error}.` } };
+  }
   // The app's own answer to ?format=md (services/app/format-md.ts): an action of the owner's own
   // extension. Refused here, before anything is written, when it names an extension the owner did
   // not install or an action it lacks; otherwise every ?format=md would quietly fall back.
@@ -463,6 +472,8 @@ export async function publishApp(
   if (cortex) manifest.cortex = cortex;
   // The config declaration is read from these bytes and never carried forward.
   if (configDecl) manifest.configSchema = configDecl.schema as unknown as Record<string, unknown>;
+  // So is the guided tour: a version that stops declaring it has none.
+  if (tourDecl && 'tour' in tourDecl) manifest.tour = tourDecl.tour as unknown as NonNullable<AppManifest['tour']>;
   // So is the workspace declaration.
   if (workspaceDecl && 'workspaces' in workspaceDecl) manifest.workspaces = workspaceDecl.workspaces;
   // And the intake forms.
@@ -502,6 +513,8 @@ export async function publishApp(
   if (prev?.legal) manifest.legal = prev.legal;
   // The owner's "show the screenshot to everyone" is a settings choice no publish door carries.
   if (prev?.screenshotPublic) manifest.screenshotPublic = true;
+  // And the owner's switch for the tour's invitation: a new version does not invite again unasked.
+  if (prev?.tourInviteOff) manifest.tourInviteOff = true;
   // So is the owner's text about the app (TARGET-093): a new build does not unsay it.
   if (prev?.about) manifest.about = prev.about;
 

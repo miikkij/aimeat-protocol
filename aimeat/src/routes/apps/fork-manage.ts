@@ -22,6 +22,8 @@
  *   2026-11-06 — `seo: { index: true }` on an app not yet in search is refused before the first write
  *     when the page would carry fewer than 150 words of the app's own text, counting the text the same
  *     request writes (TARGET-093, Jouni 2026-11-06).
+ *   2026-11-22 — PATCH takes `tour_invite` (a presentation field) through services/app/settings.ts, and the
+ *     answer carries it with `has_tour`; the "at least one field" message names it.
  *   2026-11-06 — PATCH takes `about` and `about_lang` through services/app-settings.ts (presentation
  *     fields), and the answer carries both (TARGET-093).
  *   2026-10-31 — PATCH takes `screenshot_public` through services/app-settings.ts, and the answer
@@ -526,7 +528,7 @@ export function registerForkManageRoutes(
         if (gate.kind === 'ask') notes.push(appAskedNote(gate.change));
 
         if (notes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, about, about_lang, access_code, open_to, screenshot_public, listing, parked, forkable, protection, seo, marks, author or legal).'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, about, about_lang, tour_invite, access_code, open_to, screenshot_public, listing, parked, forkable, protection, seo, marks, author or legal).'));
             return;
         }
 

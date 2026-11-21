@@ -428,6 +428,14 @@ export const PARTS = {
     fork: "",
     file: "menu.js",
   },
+  "tour": {
+    parts: ["card","counter","title","text","hint","close","spot","invite","button"],
+    slots: [],
+    variants: [],
+    tokens: [],
+    fork: "Write the steps into a dialog of your own; you give up the spotlight, the phone's bottom sheet, the page's #aimeat-tour block (which the node reads too), the languages, the invitation and the owner's switch for it.",
+    file: "tour.js",
+  },
   "verbs": {
     parts: ["(none: it renders nothing of its own; the words it writes go into the element the card names)"],
     slots: [],

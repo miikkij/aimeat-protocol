@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-22 — The proposal asks whether the owner wants a guided tour (built only on a yes), and the
+ *     kit paragraph points to the tour's format (the aimeat-tour block, the kit's TOUR text). Two lines,
+ *     because SKILL.md stays under the standard's 500.
  *   2026-11-21 — Step 7 names the verification checklist, the Atelier platform section `verify`.
  *   2026-11-20 — The proposal recommends a build style (AI-accelerated by default, a quick trial, a
  *     presentation), and step 9's bound skill is written for the person who operates the app
@@ -332,7 +335,7 @@ moved under you says so.
    blue where the node has it; on the finest it names \`custom:clean\` as its register). The others
    are genres on the finest and looks on plain (look at their own Atelier apps first,
    \`aimeat_app_list\`). Then the languages, which are English and Finnish unless they say
-   otherwise; who signs in; the introduction or none; the first screen in a sentence; and the
+   otherwise; who signs in; the introduction or none; a GUIDED TOUR or none (ask, build it only on a yes); the first screen in a sentence; and the
    BUILD STYLE: AI-accelerated (the default), a quick trial or a presentation, recommended from
    what the app is for (the specification's "How the person's own AI uses the app"; no extra
    questions). Say which design you would take. The language you are talking in is not the app's language list, and one
@@ -461,7 +464,8 @@ moved under you says so.
    chapter with a \`target\` a "Show me" that marks that place in the app (\`onGo\` lets the app bring
    it on screen first). It also collects every element carrying \`data-ak-help="<id>"\` with
    \`data-ak-help-title\` and \`data-ak-help-text\`, so help written on the control is a chapter that
-   points at it. \`app({ help: book })\` puts its button in the header.
+   points at it. \`app({ help: book })\` puts its button in the header. A guided tour (on a yes) is the
+   page's \`#aimeat-tour\` block, 3–5 steps over the same help ids: its format is in the kit's TOUR text.
    What kind of material a document is, the node's fingerprint of it, is \`fingerprint({ target,
    view: 'panel'|'row'|'seal'|'barcode', data: { profile, sections }, onSection })\`: coloured
    stripes per section with the marks + ~ ? x, the seal, the trust bar and three quadrants. The app

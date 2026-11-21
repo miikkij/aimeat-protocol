@@ -1,0 +1,145 @@
+/*
+ * @file aimeat-atelier/tour.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The tour (tour.js): the spotlight on the lit place, the step card beside it (from
+ *   640px of window) or as a sheet at the bottom of the screen (narrower), the card in the middle
+ *   for a step without a place, the one-time invitation in a corner, and the header's button. The
+ *   dim layer takes no clicks, so the page stays usable under it. Every colour is a kit token, so
+ *   the tour follows the look, the palette and the theme; the kit's reduced-motion block takes the
+ *   spotlight's travel away.
+ * @structure .ak-tour__spot · .ak-tour__note (--sheet, --center) · .ak-tour__nav · .ak-tour__invite ·
+ *   .ak-tour__button · .ak-tour__mark
+ * @version-history
+ *   v0.72.0 — 2026-11-22 — Initial: the rules moved from parts.css and the tour grew its card,
+ *     spotlight, sheet, invitation and button (wish-opastettu-kierros-sovelluksiin-monikielinen-tutorial-ja-oma-).
+ */
+
+/* ── The lit place: a ring round it, the rest of the page dimmed, no click taken ─────────── */
+.ak-tour__mark { outline: 3px solid var(--ak-accent); outline-offset: 4px; border-radius: var(--ak-radius-sm); }
+.ak-tour__spot {
+  position: fixed;
+  z-index: 95;
+  border-radius: var(--ak-radius-sm);
+  box-shadow: 0 0 0 100vmax color-mix(in oklab, var(--ak-ink) 38%, transparent);
+  pointer-events: none;
+  transition: top var(--ak-motion) ease, left var(--ak-motion) ease, width var(--ak-motion) ease, height var(--ak-motion) ease;
+}
+/* The ink is light in the dark theme, so the dim layer there darkens with its own value. */
+:where(:root[data-theme='dark']) .ak-tour__spot { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.55); }
+.ak-tour__spot[hidden] { display: none; }
+
+/* ── The step card: beside its place, in the middle, or the bottom sheet ──────────────────── */
+.ak-tour__note {
+  position: fixed;
+  z-index: 97;
+  box-sizing: border-box;
+  width: min(22rem, calc(100vw - 16px));
+  padding: 14px 16px 12px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  color: var(--ak-ink);
+  line-height: 1.5;
+  box-shadow: var(--ak-elev-2);
+}
+.ak-tour__note--center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+/* The sheet stands above the node's own bottom strip (its badge and info buttons), as the toasts do. */
+.ak-tour__note--sheet {
+  top: auto;
+  left: 8px;
+  right: 8px;
+  bottom: calc(var(--ak-chrome-bottom, 0px) + 8px + env(safe-area-inset-bottom, 0px));
+  width: auto;
+  max-height: 55dvh;
+  display: flex;
+  flex-direction: column;
+}
+/* A sheet held short scrolls its words; its buttons stay in reach at its foot. */
+.ak-tour__note--sheet .ak-tour__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.ak-tour__note--sheet .ak-tour__nav { flex: none; }
+/* A place the sheet would cover and that cannot scroll clear of it: the sheet goes to the top. */
+.ak-tour__note--sheet-top { top: calc(8px + env(safe-area-inset-top, 0px)); bottom: auto; }
+/* Margin, not padding: the words' own scrollbar (a short sheet) then stands left of the ✕, never on it.
+   The ✕ is touch-min wide and 4px in from the card's edge; the card pads 16px, so the words stop at its left edge. */
+.ak-tour__body { margin-right: calc(var(--ak-touch-min, 36px) - 12px); }
+.ak-tour__close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: var(--ak-touch-min, 36px);
+  min-height: var(--ak-touch-min, 36px);
+  padding: 0;
+}
+.ak-tour__step {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-micro);
+  letter-spacing: .04em;
+  color: var(--ak-accent-text, var(--ak-accent));
+}
+.ak-tour__title { margin: 0 0 6px; font-family: var(--ak-font-display); font-size: calc(var(--ak-text-title) * 0.8); line-height: 1.25; }
+.ak-tour__text p { margin: 0 0 8px; }
+.ak-tour__text p:last-child { margin-bottom: 0; }
+.ak-tour__hint { font-weight: 600; color: var(--ak-accent-text, var(--ak-ink)); }
+
+/* The first button in the markup is Next (it takes the focus); it stands at the right end. */
+.ak-tour__nav { display: flex; flex-wrap: wrap; flex-direction: row-reverse; gap: 8px; margin-top: 12px; }
+.ak-tour__nav .ak-btn { min-height: var(--ak-touch-min, 36px); }
+.ak-tour__nav--list { flex-direction: column; align-items: stretch; }
+.ak-tour__nav--list .ak-btn { justify-content: flex-start; text-align: left; }
+
+/* ── The invitation: once, in a corner, never over the work ───────────────────────────────── */
+.ak-tour__invite {
+  position: fixed;
+  z-index: 96;
+  right: 16px;
+  bottom: calc(var(--ak-chrome-bottom, 0px) + 16px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  width: min(20rem, calc(100vw - 32px));
+  padding: 14px 16px 12px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  color: var(--ak-ink);
+  line-height: 1.5;
+  box-shadow: var(--ak-elev-2);
+}
+.ak-tour__invite .ak-tour__text { margin: 0; }
+@media (max-width: 640px) {
+  .ak-tour__invite { left: 8px; right: 8px; bottom: calc(var(--ak-chrome-bottom, 0px) + 8px + env(safe-area-inset-bottom, 0px)); width: auto; }
+}
+
+/* ── The header's button: a compass and the word, beside the guide's question mark ──────── */
+.ak-tour__button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: var(--ak-touch-min, 36px);
+  min-height: var(--ak-touch-min, 36px);
+  padding: 0 12px;
+  border-radius: var(--ak-radius-pill);
+  border: var(--ak-line-w) solid var(--ak-line);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ak-tour__button:hover { border-color: var(--ak-accent); }
+.ak-tour__button[aria-pressed="true"] { background: var(--ak-accent); border-color: var(--ak-accent); color: var(--ak-accent-ink, var(--ak-surface)); }
+.ak-tour__button[hidden] { display: none; }
+.ak-tour__icon { display: inline-flex; }
+@media (max-width: 640px) {
+  .ak-tour__button { padding: 0; justify-content: center; }
+  .ak-tour__buttonword { display: none; }
+}
+/* In the shell's bar it takes the push to the right that the guide's button or the motion switch otherwise takes. */
+.ak-app__bar > .ak-tour__button { flex: none; margin-left: auto; }
+.ak-app__bar > .ak-tour__button ~ .ak-handbook__button,
+.ak-app__bar > .ak-tour__button ~ .ak-app__motion,
+.ak-app__bar > .ak-tour__button ~ .ak-app__weather { margin-left: 0; }

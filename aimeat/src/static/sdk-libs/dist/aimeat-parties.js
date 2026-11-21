@@ -32,7 +32,10 @@
       } catch {
         parsed = JSON.parse(raw.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
       }
-      return parsed && parsed.owner && parsed.app_id ? { owner: String(parsed.owner), filename: String(parsed.app_id) } : null;
+      if (!parsed || !parsed.owner || !parsed.app_id) return null;
+      const ref = { owner: String(parsed.owner), filename: String(parsed.app_id) };
+      if (parsed.tour_invite === false) ref.tourInvite = false;
+      return ref;
     } catch {
       return null;
     }

@@ -41,6 +41,10 @@
  *     ends in a Menu entry that opens every page in a sheet, grouped as the column groups them,
  *     whenever the bar leaves an entry out; a bar the app gave nothing gets the first three
  *     entries. An app that carries its own `more` entry in the bar keeps it, and gets no second.
+ *   v0.72.0 — 2026-11-22 — `tour` takes a tour (tour.js); without one, a page that declares
+ *     `#aimeat-tour` gets one made here. Its button stands in the bar before the guide's, and its
+ *     invitation comes once, after the first onReady (`tour: false` for neither). The handle's
+ *     `tour` is that tour, or null.
  *   v0.68.0 — 2026-10-03 — `help` takes a handbook (handbook.js): its button stands in the bar.
  *   v0.67.0 — 2026-10-01 — The tab row scrolls ITSELF so the chosen tab is fully in view: at the
  *     first draw, on a pick and on set({ value }), smoothly on a change unless motion is reduced
@@ -100,6 +104,10 @@ import { section, tabs, bottomNav } from './shell-parts.js';
 export { section, tabs, bottomNav };
 import { margins } from './margins.js';
 import { motionLabel, motionIcon, motionIsLess } from './shell-motion.js';
+import { tour, hasTourBlock } from './tour.js';
+
+/** How long after the first screen the tour's invitation waits, so it does not land on a moving page. */
+const TOUR_INVITE_MS = 700;
 
 /** The longest inline logo drawn: a 64px WebP is 1 to 3 kB of base64, a photograph is not a logo. */
 const LOGO_INLINE_MAX = 8192;
@@ -174,7 +182,13 @@ const MODE_BUTTON = '#aimeat-mode-switch button[data-mode]';
  * @property {{ set: (patch: { value?: string, items?: any[] }) => void }|null} nav  the navigation, when navItems were given or nav is 'side'
  * @property {import('./ambient.js').AmbientHandle|null} ambient  the layer behind the frame (null after `ambient: false`)
  * @property {{ el: HTMLElement }|null} weather  the bar's weather switch
+ * @property {AppTourHandle|null} tour  the app's tour (tour.js), handed over or made from #aimeat-tour
  * @property {() => void} destroy
+ */
+
+/**
+ * What the shell needs of a tour: its header button, its invitation and its end.
+ * @typedef {{ button: () => HTMLElement|null, invite: () => boolean, destroy?: () => void }} AppTourHandle
  */
 
 /**
@@ -206,6 +220,7 @@ function ambientSpec(want) {
  * @param {{
  *   target?: string|Element, title: string, tagline?: string, look?: string, footer?: string,
  *   logo?: string, help?: { button: () => HTMLElement },
+ *   tour?: false | AppTourHandle,
  *   navItems?: Array<{ id: string, label: string, count?: number|string, tone?: string,
  *     group?: string, bottom?: boolean, onPick?: (item: any) => void }>,
  *   nav?: 'bottom'|'side', navValue?: string, navLabel?: string,
@@ -266,7 +281,20 @@ export function app(spec) {
   const brand = logo ? el('span', { class: 'ak-app__brand' }, [logo, heading]) : heading;
   // The app's handbook, when it has one (handbook.js): its button stands before the motion switch.
   const helpBtn = spec.help && typeof spec.help.button === 'function' ? spec.help.button() : null;
-  const bar = el('header', { class: 'ak-app__bar' }, [brand, helpBtn, motionBtn, pill]);
+  // The app's tour (tour.js): the one the app hands over, else the one its page declares in
+  // #aimeat-tour, so writing that block is all an app does to have the button and the invitation.
+  // `tour: false` is the way out.
+  const appTour = spec.tour === false ? null
+    : (spec.tour && typeof spec.tour.button === 'function' ? spec.tour : (hasTourBlock() ? tour() : null));
+  const tourBtn = appTour ? appTour.button() : null;
+  const bar = el('header', { class: 'ak-app__bar' }, [brand, tourBtn, helpBtn, motionBtn, pill]);
+  // The invitation comes once the app has drawn its first screen, never over the sign-in card.
+  let invited = false;
+  function offerTour() {
+    if (invited || !appTour) return;
+    invited = true;
+    setTimeout(function () { appTour.invite(); }, TOUR_INVITE_MS);
+  }
 
   // THE THEME OPENS AS AN IRIS. The light/dark control is not the shell's: it travels inside
   // the account pill and flips <html data-theme> the instant it is clicked, which is one frame
@@ -507,6 +535,7 @@ export function app(spec) {
       root.classList.remove('ak-app--gate');
       status('none');
       if (spec.onReady) spec.onReady(session);
+      offerTour();
     }
   }
 
@@ -548,6 +577,7 @@ export function app(spec) {
       status('none');
       if (spec.onReady) spec.onReady(a && a.getSession ? a.getSession() : null);
       readySaid = true;
+      offerTour();
       return;
     }
     status('loading');
@@ -651,9 +681,14 @@ export function app(spec) {
     },
     get ambient() { return sky; },
     get weather() { return weatherCtl; },
+    /** The app's tour (tour.js): the one it handed over or the one its #aimeat-tour made; null without. */
+    get tour() { return appTour; },
 
     destroy() {
       stopLang();
+      // A tour the shell made is the shell's to end; one the app handed over stays the app's.
+      if (appTour && appTour !== spec.tour && typeof appTour.destroy === 'function') appTour.destroy();
+      else if (tourBtn) tourBtn.remove();
       window.removeEventListener('ak-motion', syncMotion);
       root.removeEventListener('ak-ambient-preset', syncWeather);
       if (sky) sky.destroy();

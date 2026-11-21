@@ -1253,6 +1253,8 @@
       aideNoAi: "AI is not set up on this account yet. Connect a key under Profile, and the aide wakes up.",
       aideFailed: "That did not go through. Try again.",
       aideRun: "Run it",
+      aideShowAgain: "Show me again",
+      aideSuggests: "The aide suggests this. This button does the same.",
       aideUnknownAction: "The model proposed something this app does not declare — nothing was run.",
       explainTitle: "What this screen holds",
       delegateGo: "Let AI handle it",
@@ -1425,6 +1427,8 @@
       aideNoAi: "Tälle tilille ei ole vielä kytketty tekoälyä. Liitä avain profiilissa, niin apuri herää.",
       aideFailed: "Se ei mennyt läpi. Yritä uudelleen.",
       aideRun: "Aja",
+      aideShowAgain: "Näytä uudelleen",
+      aideSuggests: "Avustaja ehdottaa tätä. Tämä painike tekee saman.",
       aideUnknownAction: "Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.",
       explainTitle: "Mitä tällä näytöllä on",
       delegateGo: "Anna tekoälyn hoitaa",
@@ -1597,6 +1601,8 @@
       aideNoAi: "Esta cuenta aún no tiene IA configurada. Conecta una clave en el perfil y el ayudante despierta.",
       aideFailed: "No ha funcionado. Inténtalo otra vez.",
       aideRun: "Ejecutar",
+      aideShowAgain: "Muéstramelo otra vez",
+      aideSuggests: "El asistente sugiere esto. Este botón hace lo mismo.",
       aideUnknownAction: "El modelo propuso algo que esta app no declara — no se ejecutó nada.",
       explainTitle: "Qué hay en esta pantalla",
       delegateGo: "Deja que la IA lo haga",
@@ -4738,7 +4744,7 @@
     const mark = el("span", { class: "ak-ink" + (o.className ? " " + o.className : ""), "data-ak-part": "ink", "aria-hidden": "true" });
     let cross = { pos: 0, size: 0 };
     let placed = false;
-    let visible = false;
+    let visible2 = false;
     function measure() {
       const found = typeof o.active === "function" ? o.active(container) : o.active ? container.querySelector(o.active) : null;
       if (!found || found === mark) return null;
@@ -4775,8 +4781,8 @@
       if (mark.parentNode !== container) container.appendChild(mark);
     }
     function show(on2) {
-      if (on2 === visible) return;
-      visible = on2;
+      if (on2 === visible2) return;
+      visible2 = on2;
       mark.hidden = !on2;
       container.toggleAttribute("data-ak-ink", on2);
     }
@@ -6455,7 +6461,7 @@
     const R2 = 88;
     const STROKE = 26;
     const C = 2 * Math.PI * R2;
-    const GAP2 = 4;
+    const GAP3 = 4;
     const wrap2 = el("div", { class: "ak-chart__donutwrap" });
     const node = svg("svg", { viewBox: "0 0 230 230", class: "ak-chart__svg ak-chart__svg--donut", "aria-hidden": "true" });
     node.appendChild(svg("circle", { cx: 115, cy: 115, r: R2, class: "ak-chart__ring", "stroke-width": STROKE }));
@@ -6470,7 +6476,7 @@
         style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
         "stroke-width": STROKE,
         "stroke-linecap": slices.length > 1 ? "round" : "butt",
-        "stroke-dasharray": `${Math.max(frac * C - GAP2, 0.5)} ${C}`,
+        "stroke-dasharray": `${Math.max(frac * C - GAP3, 0.5)} ${C}`,
         "stroke-dashoffset": String(-offset * C),
         transform: "rotate(-90 115 115)"
       });
@@ -6514,9 +6520,9 @@
     const spanDays = Math.round((days[days.length - 1].date.getTime() - start.getTime()) / 864e5) + 1;
     const weeks = Math.min(Math.ceil(spanDays / 7), 53);
     const CELL = 13;
-    const GAP2 = 3;
-    const width = weeks * (CELL + GAP2) + GAP2;
-    const height = 7 * (CELL + GAP2) + GAP2 + 16;
+    const GAP3 = 3;
+    const width = weeks * (CELL + GAP3) + GAP3;
+    const height = 7 * (CELL + GAP3) + GAP3 + 16;
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + days.length + " d");
     const byKey = /* @__PURE__ */ new Map();
     for (const d of days) byKey.set(d.date.toISOString().slice(0, 10), d.value);
@@ -6529,8 +6535,8 @@
         const value = byKey.get(key);
         if (cursor.getDate() === 1) monthAt.push({ w, m: cursor.getMonth() });
         const cell = svg("rect", {
-          x: GAP2 + w * (CELL + GAP2),
-          y: GAP2 + dow * (CELL + GAP2),
+          x: GAP3 + w * (CELL + GAP3),
+          y: GAP3 + dow * (CELL + GAP3),
           width: CELL,
           height: CELL,
           rx: 3,
@@ -6545,7 +6551,7 @@
     }
     const MONTHS = [t("m1"), t("m2"), t("m3"), t("m4"), t("m5"), t("m6"), t("m7"), t("m8"), t("m9"), t("m10"), t("m11"), t("m12")];
     for (const mark of monthAt) {
-      const label = svg("text", { x: GAP2 + mark.w * (CELL + GAP2), y: height - 4, class: "ak-chart__tick" });
+      const label = svg("text", { x: GAP3 + mark.w * (CELL + GAP3), y: height - 4, class: "ak-chart__tick" });
       label.textContent = MONTHS[mark.m];
       node.appendChild(label);
     }
@@ -6644,16 +6650,16 @@
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + steps2.map((s) => s.label + " " + s.value).join(", "));
     const W7 = 460;
     const STEP_H = 44;
-    const GAP2 = 7;
+    const GAP3 = 7;
     const BAND = 340;
     const CX = 195;
-    const H4 = steps2.length * (STEP_H + GAP2) - GAP2 + 8;
+    const H4 = steps2.length * (STEP_H + GAP3) - GAP3 + 8;
     const first = steps2[0].value;
     const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     const still2 = ctx.still();
     const half = (v) => Math.max(v / first * BAND, 18) / 2;
     steps2.forEach((s, i) => {
-      const y = 4 + i * (STEP_H + GAP2);
+      const y = 4 + i * (STEP_H + GAP3);
       const topHalf = half(s.value);
       const nxt = steps2[i + 1];
       const botHalf = nxt ? half(nxt.value) : topHalf;
@@ -8626,7 +8632,10 @@
       } catch {
         parsed = JSON.parse(raw.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
       }
-      return parsed && parsed.owner && parsed.app_id ? { owner: String(parsed.owner), filename: String(parsed.app_id) } : null;
+      if (!parsed || !parsed.owner || !parsed.app_id) return null;
+      const ref = { owner: String(parsed.owner), filename: String(parsed.app_id) };
+      if (parsed.tour_invite === false) ref.tourInvite = false;
+      return ref;
     } catch {
       return null;
     }
@@ -8675,11 +8684,1152 @@
     return out;
   }
 
+  // src/static/sdk-libs/atelier/handbook.js
+  var VARIANTS = ["dense"];
+  var MARK_MS = 2600;
+  var STRINGS = {
+    en: {
+      title: "Guide",
+      open: "Open the guide",
+      close: "Close",
+      contents: "Contents",
+      search: "Search the guide",
+      show: "Show me",
+      back: "Contents",
+      empty: "Nothing in the guide matches.",
+      none: "This app has no guide yet.",
+      away: "That place is not on the screen right now.",
+      group: "General"
+    },
+    fi: {
+      title: "Opas",
+      open: "Avaa opas",
+      close: "Sulje",
+      contents: "Sisällys",
+      search: "Hae oppaasta",
+      show: "Näytä missä",
+      back: "Sisällys",
+      empty: "Oppaasta ei löydy tällaista.",
+      none: "Tällä appilla ei ole vielä opasta.",
+      away: "Se kohta ei ole nyt näkyvissä.",
+      group: "Yleistä"
+    },
+    es: {
+      title: "Guía",
+      open: "Abrir la guía",
+      close: "Cerrar",
+      contents: "Contenido",
+      search: "Buscar en la guía",
+      show: "Muéstrame dónde",
+      back: "Contenido",
+      empty: "Nada en la guía coincide.",
+      none: "Esta app aún no tiene guía.",
+      away: "Ese lugar no está en la pantalla ahora.",
+      group: "General"
+    }
+  };
+  function hb(key) {
+    const hosted = t("handbook." + key);
+    if (hosted !== "handbook." + key) return hosted;
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS[
+        /** @type {'en'|'fi'|'es'} */
+        i18n.lang()
+      ] || STRINGS.en
+    );
+    return table2[key] || STRINGS.en[key] || key;
+  }
+  function wordsOf(v) {
+    if (v == null) return "";
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (s.charAt(0) === "{") {
+        try {
+          return wordsOf(JSON.parse(s));
+        } catch {
+          return v;
+        }
+      }
+      return v;
+    }
+    if (typeof v === "object") {
+      const lang2 = i18n.lang();
+      return String(v[lang2] || v.en || v[Object.keys(v)[0]] || "");
+    }
+    return String(v);
+  }
+  function collect(root) {
+    const out = [];
+    const scope = root || document;
+    if (!scope || typeof scope.querySelectorAll !== "function") return out;
+    Array.prototype.forEach.call(scope.querySelectorAll("[data-ak-help]"), function(n) {
+      const id = n.getAttribute("data-ak-help");
+      if (!id) return;
+      out.push({
+        id,
+        title: n.getAttribute("data-ak-help-title") || n.getAttribute("aria-label") || n.textContent || id,
+        body: n.getAttribute("data-ak-help-text") || "",
+        group: n.getAttribute("data-ak-help-group") || "",
+        from: n
+      });
+    });
+    return out;
+  }
+  function sampleChapters() {
+    return [
+      {
+        id: "s-ask",
+        group: { en: "Start", fi: "Aloitus" },
+        title: { en: "Ask for something", fi: "Pyydä jotain" },
+        body: { en: "Type what you want in your own words. The app shows its plan before it does anything.", fi: "Kirjoita omin sanoin, mitä haluat. Appi näyttää suunnitelmansa ennen kuin tekee mitään." }
+      },
+      {
+        id: "s-data",
+        group: { en: "Start", fi: "Aloitus" },
+        title: { en: "Add from your data", fi: "Lisää omasta datasta" },
+        body: { en: "Pick a memory key or a workspace, and a panel is built from its real fields.", fi: "Valitse muistiavain tai työtila, niin paneeli rakentuu sen oikeista kentistä." }
+      },
+      {
+        id: "s-move",
+        group: { en: "The board", fi: "Lauta" },
+        title: { en: "Move and Use", fi: "Siirrä ja Käytä" },
+        body: { en: "Move drags frames; Use lets you click inside them.", fi: "Siirrä raahaa kehyksiä, Käytä päästää klikkaamaan niiden sisällä." }
+      },
+      {
+        id: "s-share",
+        group: { en: "Together", fi: "Yhdessä" },
+        title: { en: "Share a board", fi: "Jaa lauta" },
+        body: { en: "Invite people to the workspace the board lives in.", fi: "Kutsu ihmisiä työtilaan, jossa lauta on." }
+      }
+    ];
+  }
+  function handbook(spec) {
+    const s = spec || {};
+    const sample = s.sample === true;
+    const mode = s.mode === "dialog" ? "dialog" : "side";
+    const side = s.side === "left" ? "left" : "right";
+    const parts = s.parts || {};
+    let own = sample ? sampleChapters() : (s.chapters || []).slice();
+    let shown = [];
+    let current2 = null;
+    let query = "";
+    let marked = null;
+    let markTimer = null;
+    let destroyed = false;
+    const buttons = [];
+    const root = (
+      /** @type {HTMLDialogElement} */
+      el("dialog", {
+        class: "ak-root ak-handbook ak-handbook--" + mode + " ak-handbook--" + side,
+        "data-ak-part": "root",
+        "data-ak-view": "toc"
+      })
+    );
+    applyVariant(root, s, VARIANTS);
+    const titleEl = el("h2", { class: "ak-handbook__title", "data-ak-part": "title" });
+    const closeBtn = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--ghost ak-handbook__close",
+      "data-ak-part": "close",
+      "data-ak-noguard": true,
+      on: { click: function() {
+        close();
+      } }
+    }, "✕");
+    const head = el("div", { class: "ak-handbook__head", "data-ak-part": "head" }, [titleEl, closeBtn]);
+    const find = s.search === false ? null : searchBar({
+      placeholder: hb("search"),
+      label: hb("search"),
+      onChange: function(q) {
+        query = String(q || "").trim().toLowerCase();
+        draw();
+      }
+    });
+    if (find) find.el.setAttribute("data-ak-part", "search");
+    const toc = el("nav", { class: "ak-handbook__toc", "data-ak-part": "toc" });
+    const article = el("article", { class: "ak-handbook__article", "data-ak-part": "article", "aria-live": "polite" });
+    const panel = el(
+      "div",
+      { class: "ak-handbook__panel", "data-ak-part": "panel" },
+      [head, find ? find.el : null, el("div", { class: "ak-handbook__cols" }, [toc, article])]
+    );
+    root.appendChild(panel);
+    root.addEventListener("cancel", function(ev) {
+      ev.preventDefault();
+      close();
+    });
+    root.addEventListener("click", function(ev) {
+      if (ev.target === root) close();
+    });
+    function chapters() {
+      const page = s.collect === false || sample && !s.collect ? [] : collect(s.collect && s.collect !== true ? s.collect : document);
+      const byId = /* @__PURE__ */ new Map();
+      own.forEach(function(c) {
+        byId.set(c.id, Object.assign({}, c));
+      });
+      page.forEach(function(c) {
+        const have = byId.get(c.id);
+        if (have) {
+          if (!have.target && !have.from) have.from = c.from;
+          return;
+        }
+        byId.set(c.id, c);
+      });
+      return Array.from(byId.values());
+    }
+    function textOf(c) {
+      return [wordsOf(c.title), wordsOf(c.body), wordsOf(c.group), c.keywords || ""].join(" ").toLowerCase();
+    }
+    function placeOf(c) {
+      let t2 = c.target;
+      if (typeof t2 === "function") {
+        try {
+          t2 = t2();
+        } catch {
+          t2 = null;
+        }
+      }
+      if (typeof t2 === "string") t2 = document.querySelector(t2);
+      return (
+        /** @type {Element|null} */
+        t2 || c.from || null
+      );
+    }
+    function fill3(host, v) {
+      clear(host);
+      if (v == null || v === false) return;
+      if (typeof v === "function") {
+        v(host);
+        return;
+      }
+      if (v instanceof Node) {
+        host.appendChild(v);
+        return;
+      }
+      wordsOf(v).split(/\n{2,}/).forEach(function(para) {
+        if (para.trim()) host.appendChild(el("p", { text: para.trim() }));
+      });
+    }
+    function drawToc() {
+      clear(toc);
+      const hits = query ? shown.filter(function(c) {
+        return textOf(c).indexOf(query) >= 0;
+      }) : shown;
+      if (!shown.length || !hits.length) {
+        toc.appendChild(el("p", { class: "ak-handbook__empty", "data-ak-part": "empty", text: hb(shown.length ? "empty" : "none") }));
+        return;
+      }
+      let group = null, list3 = null;
+      hits.forEach(function(c) {
+        const g = wordsOf(c.group) || hb("group");
+        if (g !== group || !list3) {
+          group = g;
+          list3 = el(
+            "div",
+            { class: "ak-handbook__group", "data-ak-part": "group", role: "group", "aria-label": g },
+            [el("div", { class: "ak-handbook__groupname", text: g, "aria-hidden": "true" })]
+          );
+          toc.appendChild(list3);
+        }
+        list3.appendChild(el("button", {
+          type: "button",
+          class: "ak-handbook__entry",
+          "data-ak-part": "entry",
+          "data-ak-id": c.id,
+          "data-ak-noguard": true,
+          "aria-current": current2 === c.id ? "true" : null,
+          on: { click: function() {
+            read(c.id);
+          } }
+        }, wordsOf(c.title)));
+      });
+    }
+    function drawArticle() {
+      clear(article);
+      const c = shown.filter(function(x) {
+        return x.id === current2;
+      })[0];
+      article.appendChild(el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost ak-handbook__back",
+        "data-ak-part": "back",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          setView("toc");
+        } }
+      }, "← " + hb("back")));
+      if (!c) return;
+      article.appendChild(el("h3", { class: "ak-handbook__heading", "data-ak-part": "heading", text: wordsOf(c.title) }));
+      const body = el("div", { class: "ak-handbook__text", "data-ak-part": "text" });
+      fill3(body, parts.body ? parts.body(c) : c.body);
+      article.appendChild(body);
+      if (c.target || c.from) {
+        const note = el("p", { class: "ak-handbook__note", "data-ak-part": "note", hidden: true, text: hb("away") });
+        article.appendChild(el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--primary ak-handbook__go",
+          "data-ak-part": "go",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            if (!go(c)) note.hidden = false;
+          } }
+        }, hb("show") + " →"));
+        article.appendChild(note);
+      }
+    }
+    function draw() {
+      if (destroyed) return;
+      titleEl.textContent = wordsOf(s.title) || hb("title");
+      closeBtn.setAttribute("aria-label", hb("close"));
+      root.setAttribute("aria-label", wordsOf(s.title) || hb("title"));
+      toc.setAttribute("aria-label", hb("contents"));
+      if (find) {
+        const box = find.el.querySelector("input");
+        if (box) {
+          box.setAttribute("placeholder", hb("search"));
+          box.setAttribute("aria-label", hb("search"));
+        }
+      }
+      drawToc();
+      drawArticle();
+      buttons.forEach(paintButton);
+    }
+    function setView(v) {
+      root.setAttribute("data-ak-view", v);
+    }
+    function read(id) {
+      current2 = id;
+      setView("read");
+      draw();
+    }
+    function mark(node) {
+      unmark();
+      marked = /** @type {HTMLElement} */
+      node;
+      marked.classList.add("ak-handbook__mark");
+      if (typeof marked.scrollIntoView === "function") marked.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
+      attention(marked, "flash");
+      markTimer = setTimeout(unmark, MARK_MS);
+    }
+    function unmark() {
+      if (markTimer) {
+        clearTimeout(markTimer);
+        markTimer = null;
+      }
+      if (marked) marked.classList.remove("ak-handbook__mark");
+      marked = null;
+    }
+    function go(c) {
+      let node = placeOf(c);
+      if (s.onGo) {
+        try {
+          s.onGo(c, node);
+        } catch {
+        }
+        node = placeOf(c);
+      }
+      if (!node || !node.isConnected || /** @type {HTMLElement} */
+      node.offsetParent === null) return false;
+      if (mode === "dialog" || panel.offsetWidth >= window.innerWidth * 0.75) close();
+      mark(node);
+      return true;
+    }
+    function isOpen() {
+      return !!root.open;
+    }
+    function open(id) {
+      if (destroyed) return;
+      if (!root.isConnected) document.body.appendChild(root);
+      root.removeAttribute("data-ak-look");
+      wearLook(root, document.activeElement);
+      shown = chapters();
+      if (id && shown.some(function(c) {
+        return c.id === id;
+      })) {
+        current2 = id;
+        setView("read");
+      } else if (!current2 || !shown.some(function(c) {
+        return c.id === current2;
+      })) {
+        current2 = shown[0] ? shown[0].id : null;
+        setView("toc");
+      }
+      draw();
+      if (!root.open) {
+        if (mode === "dialog" || typeof root.show !== "function") root.showModal();
+        else root.show();
+        if (!reducedMotion() && typeof panel.animate === "function") {
+          const from = mode === "dialog" ? "translateY(10px)" : side === "left" ? "translateX(-100%)" : "translateX(100%)";
+          panel.animate([{ transform: from, opacity: mode === "dialog" ? 0 : 1 }, { transform: "none", opacity: 1 }], { duration: 240, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" });
+        }
+        buttons.forEach(paintButton);
+        if (s.onOpen) s.onOpen();
+      }
+    }
+    function close() {
+      if (!root.open) return;
+      root.close();
+      buttons.forEach(paintButton);
+      if (s.onClose) s.onClose();
+    }
+    function toggle2() {
+      if (isOpen()) close();
+      else open();
+    }
+    function paintButton(b) {
+      b.setAttribute("aria-label", hb("open"));
+      b.setAttribute("title", hb("open"));
+      b.setAttribute("aria-expanded", isOpen() ? "true" : "false");
+    }
+    function button2() {
+      const b = el("button", {
+        type: "button",
+        class: "ak-handbook__button",
+        "data-ak-part": "button",
+        "data-ak-noguard": true,
+        "aria-haspopup": "dialog",
+        on: { click: function() {
+          toggle2();
+        } }
+      }, "?");
+      buttons.push(b);
+      paintButton(b);
+      return b;
+    }
+    const stopLang = i18n.onChange(function() {
+      if (isOpen()) {
+        shown = chapters();
+        draw();
+      } else buttons.forEach(paintButton);
+    });
+    return {
+      el: root,
+      open,
+      close,
+      toggle: toggle2,
+      isOpen,
+      /** @param {{ chapters?: Chapter[], title?: any }} patch */
+      set: function(patch) {
+        if (!patch || destroyed) return;
+        if (patch.chapters) own = patch.chapters.slice();
+        if (patch.title !== void 0) s.title = patch.title;
+        if (isOpen()) {
+          shown = chapters();
+          draw();
+        }
+      },
+      /** @param {Chapter|Chapter[]} more */
+      add: function(more) {
+        (Array.isArray(more) ? more : [more]).forEach(function(c) {
+          own = own.filter(function(x) {
+            return x.id !== c.id;
+          }).concat([c]);
+        });
+        if (isOpen()) {
+          shown = chapters();
+          draw();
+        }
+      },
+      /** Every chapter the book would show now, the page's included: for an agent or a test. */
+      scan: function() {
+        return chapters().map(function(c) {
+          return { id: c.id, title: wordsOf(c.title), group: wordsOf(c.group), place: !!placeOf(c) };
+        });
+      },
+      button: button2,
+      destroy: function() {
+        destroyed = true;
+        unmark();
+        if (typeof stopLang === "function") stopLang();
+        if (root.open) root.close();
+        root.remove();
+        buttons.forEach(function(b) {
+          b.remove();
+        });
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/tour.js
+  var NARROW_PX = 640;
+  var GAP = 12;
+  var EDGE = 8;
+  var SPOT_PAD = 6;
+  var SEEN_KEY = "ak-tour-seen:";
+  var DO_EVENTS = ["click", "input", "change"];
+  var STRINGS2 = {
+    en: {
+      button: "Tour",
+      open: "Start the tour",
+      choose: "Pick a tour",
+      close: "Close",
+      step: "Step {n} of {total}",
+      tryIt: "Try it: press the lit place.",
+      gotIt: "Got it",
+      inviteTitle: "New here?",
+      inviteText: "Take a short tour of this app: {n} steps.",
+      inviteStart: "Start the tour",
+      inviteLater: "Not now"
+    },
+    fi: {
+      button: "Kierros",
+      open: "Aloita kierros",
+      choose: "Valitse kierros",
+      close: "Sulje",
+      step: "Vaihe {n}/{total}",
+      tryIt: "Kokeile: paina korostettua kohtaa.",
+      gotIt: "Selvä",
+      inviteTitle: "Uusi täällä?",
+      inviteText: "Katso lyhyt kierros tässä sovelluksessa: {n} vaihetta.",
+      inviteStart: "Aloita kierros",
+      inviteLater: "Ei nyt"
+    },
+    es: {
+      button: "Recorrido",
+      open: "Empezar el recorrido",
+      choose: "Elige un recorrido",
+      close: "Cerrar",
+      step: "Paso {n} de {total}",
+      tryIt: "Pruébalo: pulsa el lugar resaltado.",
+      gotIt: "Entendido",
+      inviteTitle: "¿Eres nuevo aquí?",
+      inviteText: "Haz un recorrido corto por esta aplicación: {n} pasos.",
+      inviteStart: "Empezar el recorrido",
+      inviteLater: "Ahora no"
+    }
+  };
+  function tw(key, vars) {
+    const hosted = i18n.t("tour." + key, vars);
+    if (hosted !== "tour." + key) return hosted;
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS2[
+        /** @type {'en'|'fi'|'es'} */
+        i18n.lang()
+      ] || STRINGS2.en
+    );
+    let s = table2[key] || STRINGS2.en[key] || key;
+    for (const k in vars || {}) s = s.split("{" + k + "}").join(String(vars[k]));
+    return s;
+  }
+  function readTourBlock(doc2) {
+    const d = doc2 || (typeof document !== "undefined" ? document : null);
+    const node = d && typeof d.getElementById === "function" ? d.getElementById("aimeat-tour") : null;
+    if (!node) return [];
+    try {
+      const parsed = JSON.parse(node.textContent || "");
+      return normalTours(parsed);
+    } catch (err) {
+      console.warn("aimeat-atelier: the #aimeat-tour block is not JSON, so the app has no tour.", err);
+      return [];
+    }
+  }
+  function normalTours(v) {
+    if (!v || typeof v !== "object") return [];
+    const list3 = Array.isArray(v.tours) ? v.tours : Array.isArray(v.steps) ? [{ id: "main", steps: v.steps }] : [];
+    return list3.filter(function(x) {
+      return x && Array.isArray(x.steps) && x.steps.length;
+    }).map(function(x, i) {
+      return { id: String(x.id || "tour-" + (i + 1)), title: x.title, version: Number(x.version) || 1, steps: x.steps.slice() };
+    });
+  }
+  function seenKey() {
+    const ref = appRef();
+    return SEEN_KEY + (ref ? ref.owner + "/" + ref.filename : typeof location !== "undefined" ? location.pathname : "");
+  }
+  function tourSeen(def) {
+    try {
+      const map2 = JSON.parse(localStorage.getItem(seenKey()) || "{}");
+      return Number(map2[def.id] || 0) >= (def.version || 1);
+    } catch (err) {
+      console.warn("aimeat-atelier: the tour could not read what this browser has seen", err);
+      return false;
+    }
+  }
+  function markTourSeen(def) {
+    try {
+      const map2 = JSON.parse(localStorage.getItem(seenKey()) || "{}");
+      map2[def.id] = def.version || 1;
+      localStorage.setItem(seenKey(), JSON.stringify(map2));
+    } catch (err) {
+      console.warn("aimeat-atelier: the tour could not remember it was seen; the invitation may come again", err);
+    }
+  }
+  function ownerAllowsInvite() {
+    const ref = (
+      /** @type {any} */
+      appRef()
+    );
+    return !(ref && ref.tourInvite === false);
+  }
+  function findPlace(selector) {
+    try {
+      return document.querySelector(selector);
+    } catch (err) {
+      console.warn('aimeat-atelier: a tour step names "' + selector + '", which is not a CSS selector; the step is passed', err);
+      return null;
+    }
+  }
+  function callPlace(fn) {
+    try {
+      return fn();
+    } catch (err) {
+      console.warn("aimeat-atelier: a tour step's place function failed; the step is passed", err);
+      return null;
+    }
+  }
+  function resolveStep(raw) {
+    const st = typeof raw === "string" ? { help: raw } : Object.assign({}, raw || {});
+    let place2 = null;
+    let t0 = st.target;
+    if (typeof t0 === "function") t0 = callPlace(t0);
+    if (typeof t0 === "string") t0 = findPlace(t0);
+    if (t0 && typeof t0 === "object") place2 = /** @type {Element} */
+    t0;
+    if (!place2 && st.help) {
+      const all = document.querySelectorAll("[data-ak-help]");
+      for (let i = 0; i < all.length; i++) if (all[i].getAttribute("data-ak-help") === st.help) {
+        place2 = all[i];
+        break;
+      }
+    }
+    const title = st.title != null ? st.title : place2 && st.help ? place2.getAttribute("data-ak-help-title") : null;
+    const text = st.text != null ? st.text : st.body != null ? st.body : place2 && st.help ? place2.getAttribute("data-ak-help-text") : null;
+    const named = !!(st.target || st.help);
+    return { step: st, place: place2, named, title: wordsOf(title), text: wordsOf(text) };
+  }
+  function visible(node) {
+    if (!node || !node.isConnected) return false;
+    const r = node.getBoundingClientRect();
+    return !!r && (r.width > 0 || r.height > 0 || /** @type {HTMLElement} */
+    node.offsetParent !== null);
+  }
+  function tour(spec) {
+    const s = spec || {};
+    let tours = s.tours ? normalTours({ tours: s.tours }) : s.steps ? normalTours({ steps: s.steps }) : s.block === false ? [] : readTourBlock();
+    let current2 = null;
+    let i = -1;
+    let card = null;
+    let spot = null;
+    let marked = null;
+    let frame2 = 0;
+    let before = null;
+    let doOff = null;
+    let inviteCard = null;
+    let destroyed = false;
+    let pointing = null;
+    const buttons = [];
+    function L() {
+      return Object.assign({ next: t("next"), done: t("done"), skip: t("tourSkip"), back: t("back") }, s.labels || {});
+    }
+    function narrow() {
+      return (window.innerWidth || 1024) < NARROW_PX;
+    }
+    function follow(e) {
+      if (frame2) return;
+      if (e && card && e.target && typeof card.contains === "function" && card.contains(e.target)) return;
+      frame2 = requestAnimationFrame(function() {
+        frame2 = 0;
+        place2();
+      });
+    }
+    function place2() {
+      if (!card) return;
+      const root = document.documentElement;
+      const vw = root && root.clientWidth || window.innerWidth;
+      const vh = root && root.clientHeight || window.innerHeight;
+      if (narrow() || !marked) {
+        card.style.top = "";
+        card.style.left = "";
+        card.classList.toggle("ak-tour__note--sheet", narrow());
+        card.classList.toggle("ak-tour__note--center", !narrow() && !marked);
+        card.classList.remove("ak-tour__note--sheet-top");
+        card.style.maxHeight = "";
+        if (narrow() && marked) {
+          const r = marked.getBoundingClientRect();
+          const below = card.getBoundingClientRect();
+          if (below.height && r.bottom + SPOT_PAD > below.top) {
+            card.classList.add("ak-tour__note--sheet-top");
+            let at3 = card.getBoundingClientRect();
+            if (r.top - SPOT_PAD < at3.bottom && at3.bottom - r.top > r.bottom - below.top) {
+              card.classList.remove("ak-tour__note--sheet-top");
+              at3 = below;
+              const room = below.bottom - (r.bottom + SPOT_PAD + EDGE);
+              if (room > 0 && room < at3.height) card.style.maxHeight = room + "px";
+            } else if (r.top - SPOT_PAD < at3.bottom) {
+              const room = r.top - SPOT_PAD - EDGE - at3.top;
+              if (room > 0 && room < at3.height) card.style.maxHeight = room + "px";
+            }
+          }
+        }
+      } else {
+        card.classList.remove("ak-tour__note--sheet", "ak-tour__note--sheet-top", "ak-tour__note--center");
+        const r = marked.getBoundingClientRect();
+        const w = card.offsetWidth || 300;
+        const h = card.offsetHeight || 0;
+        const top = r.bottom + GAP;
+        const left = Math.max(EDGE, Math.min(r.left, vw - w - EDGE));
+        card.style.top = (top + h > vh ? Math.max(EDGE, r.top - h - GAP) : top) + "px";
+        card.style.left = left + "px";
+      }
+      if (spot) {
+        if (!marked) {
+          spot.hidden = true;
+          return;
+        }
+        const r = marked.getBoundingClientRect();
+        spot.hidden = false;
+        spot.style.top = r.top - SPOT_PAD + "px";
+        spot.style.left = r.left - SPOT_PAD + "px";
+        spot.style.width = r.width + 2 * SPOT_PAD + "px";
+        spot.style.height = r.height + 2 * SPOT_PAD + "px";
+      }
+    }
+    function listen() {
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("resize", place2);
+      window.addEventListener("scroll", follow, { capture: true, passive: true });
+    }
+    function unlisten() {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", place2);
+      window.removeEventListener("scroll", follow, true);
+      if (frame2) {
+        cancelAnimationFrame(frame2);
+        frame2 = 0;
+      }
+    }
+    function bring(node) {
+      if (typeof node.scrollIntoView !== "function") return;
+      const behavior = reducedMotion() ? "auto" : "smooth";
+      if (narrow() && card) {
+        const hn = (
+          /** @type {HTMLElement} */
+          node
+        );
+        const keepTop = hn.style.scrollMarginTop, keepBottom = hn.style.scrollMarginBottom;
+        hn.style.scrollMarginTop = EDGE * 2 + "px";
+        hn.style.scrollMarginBottom = (card.offsetHeight || 200) + GAP * 2 + "px";
+        node.scrollIntoView({ block: "nearest", behavior });
+        hn.style.scrollMarginTop = keepTop;
+        hn.style.scrollMarginBottom = keepBottom;
+      } else {
+        node.scrollIntoView({ block: "center", behavior });
+      }
+    }
+    function drawCard(opts) {
+      const titleId = uid("ak-tour-title");
+      const kids = [];
+      if (opts.counter) kids.push(el("span", { class: "ak-tour__step", "data-ak-part": "counter" }, opts.counter));
+      if (opts.title) kids.push(el("h2", { class: "ak-tour__title", id: titleId, "data-ak-part": "title", text: opts.title }));
+      const textBox = el("div", { class: "ak-tour__text", "data-ak-part": "text" });
+      if (opts.text) String(opts.text).split(/\n{2,}/).forEach(function(para) {
+        if (para.trim()) textBox.appendChild(el("p", { text: para.trim() }));
+      });
+      if (opts.hint) textBox.appendChild(el("p", { class: "ak-tour__hint", "data-ak-part": "hint", text: opts.hint }));
+      kids.push(textBox);
+      const close = el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost ak-tour__close",
+        "data-ak-part": "close",
+        "data-ak-noguard": true,
+        "aria-label": tw("close"),
+        title: tw("close"),
+        on: { click: opts.onClose }
+      }, "✕");
+      const node = el("div", {
+        class: "ak-root ak-tour__note",
+        role: "dialog",
+        "aria-modal": "false",
+        "data-ak-part": "card",
+        "aria-labelledby": opts.title ? titleId : null,
+        "aria-label": opts.title ? null : opts.label || tw("button")
+      }, [close, el("div", { class: "ak-tour__body", "aria-live": "polite" }, kids), opts.nav]);
+      return node;
+    }
+    function clearStep() {
+      if (doOff) {
+        doOff();
+        doOff = null;
+      }
+      if (marked) marked.classList.remove("ak-tour__mark");
+      if (card && card.parentNode) card.parentNode.removeChild(card);
+      if (spot && spot.parentNode) spot.parentNode.removeChild(spot);
+      marked = null;
+      card = null;
+      spot = null;
+      pointing = null;
+    }
+    function show(n, dir) {
+      clearStep();
+      const steps2 = current2 ? current2.steps : [];
+      const raw = steps2[n];
+      if (raw === void 0) {
+        finish(n >= steps2.length);
+        return;
+      }
+      let r = resolveStep(raw);
+      if (s.onStep) {
+        try {
+          s.onStep(r.step, n, r.place);
+        } catch (err) {
+          console.warn("aimeat-atelier: the app's onStep failed at step " + (n + 1), err);
+        }
+        r = resolveStep(raw);
+      }
+      if (r.named && !visible(r.place)) {
+        show(n + (dir || 1), dir || 1);
+        return;
+      }
+      i = n;
+      const total = steps2.length;
+      const last = n === total - 1;
+      const words = L();
+      const nav = el("div", { class: "ak-tour__nav" }, [
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--primary",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            if (last) finish(true);
+            else show(n + 1, 1);
+          } }
+        }, last ? words.done : words.next),
+        n > 0 ? el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            show(n - 1, -1);
+          } }
+        }, words.back) : null,
+        last ? null : el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            finish(false);
+          } }
+        }, words.skip)
+      ].filter(Boolean));
+      const doKind = r.step.do === true ? "click" : DO_EVENTS.indexOf(String(r.step.do)) >= 0 ? String(r.step.do) : "";
+      card = drawCard({
+        counter: tw("step", { n: n + 1, total }),
+        title: r.title,
+        text: r.text,
+        hint: doKind && r.place ? tw("tryIt") : "",
+        nav,
+        onClose: function() {
+          finish(false);
+        }
+      });
+      open(r.place);
+      if (doKind && r.place) {
+        const onDo = function() {
+          setTimeout(function() {
+            if (current2 && i === n) show(n + 1, 1);
+          }, 0);
+        };
+        r.place.addEventListener(doKind, onDo);
+        const at3 = r.place;
+        doOff = function() {
+          at3.removeEventListener(doKind, onDo);
+        };
+      }
+      const first = nav.querySelector("button");
+      if (first) first.focus({ preventScroll: true });
+    }
+    function open(node) {
+      marked = node ? (
+        /** @type {HTMLElement} */
+        node
+      ) : null;
+      if (marked) {
+        marked.classList.add("ak-tour__mark");
+        spot = el("div", { class: "ak-root ak-tour__spot", "data-ak-part": "spot", "aria-hidden": "true" });
+        document.body.appendChild(wearLook(spot, marked));
+      }
+      document.body.appendChild(wearLook(card, marked || document.activeElement));
+      if (marked) bring(marked);
+      place2();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        if (current2) finish(false);
+        else if (pointing) pointing.close();
+        return;
+      }
+      if (!current2 || !card || !card.contains(document.activeElement)) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        show(i + 1, 1);
+      }
+      if (e.key === "ArrowLeft" && i > 0) {
+        e.preventDefault();
+        show(i - 1, -1);
+      }
+    }
+    function finish(finished) {
+      const def = current2;
+      clearStep();
+      unlisten();
+      if (before && before.isConnected && typeof before.focus === "function") before.focus({ preventScroll: true });
+      before = null;
+      current2 = null;
+      const wasAt = i;
+      i = -1;
+      buttons.forEach(paintButton);
+      if (def) {
+        if (def.id !== "__adhoc") markTourSeen(def);
+        if (wasAt >= 0 && s.onDone) s.onDone(def.id, !!finished);
+      }
+    }
+    function start(which) {
+      if (destroyed) return false;
+      const def = which && typeof which === "object" ? { id: String(which.id || "__adhoc"), title: which.title, version: 1, steps: (which.steps || []).slice() } : typeof which === "number" ? tours[which] || null : typeof which === "string" ? tours.filter(function(x) {
+        return x.id === which;
+      })[0] || null : tours[0] || null;
+      if (!def || !def.steps.length) return false;
+      if (current2) finish(false);
+      else if (pointing) pointing.close();
+      closeInvite();
+      if (def.id !== "__adhoc") markTourSeen(def);
+      current2 = def;
+      before = document.activeElement;
+      listen();
+      buttons.forEach(paintButton);
+      show(0, 1);
+      return true;
+    }
+    function point(target, opts) {
+      if (destroyed) return null;
+      const o = opts || {};
+      let node = null;
+      if (target && typeof target === "object") node = /** @type {Element} */
+      target;
+      else if (typeof target === "string") {
+        node = resolveStep({ help: target }).place;
+        if (!node) node = findPlace(target);
+      }
+      if (!visible(node)) return null;
+      if (current2) finish(false);
+      clearStep();
+      let closed = false;
+      const handle2 = {
+        close: function() {
+          if (closed) return;
+          closed = true;
+          if (pointing === handle2) {
+            clearStep();
+            unlisten();
+          }
+          if (o.onClose) o.onClose();
+        }
+      };
+      const acts = (o.actions && o.actions.length ? o.actions : [{ label: tw("gotIt"), primary: true }]).map(function(a) {
+        return el("button", {
+          type: "button",
+          class: "ak-btn " + (a.primary ? "ak-btn--primary" : "ak-btn--ghost"),
+          "data-ak-noguard": true,
+          on: { click: function() {
+            handle2.close();
+            if (a.run) a.run();
+          } }
+        }, a.label);
+      });
+      card = drawCard({ title: wordsOf(o.title), text: wordsOf(o.text), nav: el("div", { class: "ak-tour__nav" }, acts), onClose: handle2.close });
+      pointing = handle2;
+      listen();
+      open(node);
+      return handle2;
+    }
+    function closeInvite() {
+      if (inviteCard && inviteCard.parentNode) inviteCard.parentNode.removeChild(inviteCard);
+      inviteCard = null;
+    }
+    function invite() {
+      const def = tours[0];
+      if (destroyed || !def || current2 || inviteCard || s.invite === false || !ownerAllowsInvite() || tourSeen(def)) return false;
+      const later = el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          markTourSeen(def);
+          closeInvite();
+        } }
+      }, tw("inviteLater"));
+      const go = el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--primary",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          start(def.id);
+        } }
+      }, tw("inviteStart"));
+      const titleId = uid("ak-tour-invite");
+      inviteCard = el("div", { class: "ak-root ak-tour__invite", role: "dialog", "aria-modal": "false", "aria-labelledby": titleId, "data-ak-part": "invite" }, [
+        el("h2", { class: "ak-tour__title", id: titleId, text: tw("inviteTitle") }),
+        el("p", { class: "ak-tour__text", text: (wordsOf(def.title) ? wordsOf(def.title) + ". " : "") + tw("inviteText", { n: def.steps.length }) }),
+        el("div", { class: "ak-tour__nav ak-tour__nav--invite" }, [go, later])
+      ]);
+      document.body.appendChild(wearLook(inviteCard, document.querySelector(".ak-app") || document.body));
+      return true;
+    }
+    function paintButton(b) {
+      b.setAttribute("aria-label", tw("open"));
+      b.setAttribute("title", tw("open"));
+      b.setAttribute("aria-pressed", current2 ? "true" : "false");
+      const label = b.querySelector(".ak-tour__buttonword");
+      if (label) label.textContent = tw("button");
+    }
+    function choose(from) {
+      const list3 = el("div", { class: "ak-tour__nav ak-tour__nav--list" }, tours.map(function(def) {
+        return el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            start(def.id);
+          } }
+        }, wordsOf(def.title) || def.id);
+      }));
+      clearStep();
+      card = drawCard({ title: tw("choose"), nav: list3, onClose: function() {
+        clearStep();
+        unlisten();
+      }, label: tw("choose") });
+      pointing = { close: function() {
+        clearStep();
+        unlisten();
+      } };
+      listen();
+      open(null);
+      const first = list3.querySelector("button");
+      if (first) first.focus({ preventScroll: true });
+      before = from;
+    }
+    function button2() {
+      if (!tours.length) return null;
+      const icon3 = el("span", { class: "ak-tour__icon", "aria-hidden": "true" }, [compassIcon()]);
+      const b = el("button", {
+        type: "button",
+        class: "ak-tour__button",
+        "data-ak-part": "button",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          if (current2) {
+            finish(false);
+            return;
+          }
+          if (tours.length > 1) choose(b);
+          else start(0);
+        } }
+      }, [icon3, el("span", { class: "ak-tour__buttonword" })]);
+      buttons.push(b);
+      paintButton(b);
+      return b;
+    }
+    const stopLang = i18n.onChange(function() {
+      buttons.forEach(paintButton);
+      if (current2 && i >= 0) show(i, 1);
+    });
+    return {
+      start,
+      end: function() {
+        if (current2) finish(false);
+        else if (pointing) pointing.close();
+      },
+      next: function() {
+        if (current2) show(i + 1, 1);
+      },
+      back: function() {
+        if (current2 && i > 0) show(i - 1, -1);
+      },
+      point,
+      invite,
+      button: button2,
+      /** The tours this handle holds, in the language in force: for the aide, an agent or a test. */
+      list: function() {
+        return tours.map(function(def) {
+          return { id: def.id, title: wordsOf(def.title), version: def.version || 1, steps: def.steps.length, seen: tourSeen(def) };
+        });
+      },
+      /** Every place a step of any tour names, with its words: what the aide may point at. */
+      places: function() {
+        const out = [];
+        tours.forEach(function(def) {
+          def.steps.forEach(function(raw) {
+            const r = resolveStep(raw);
+            if (r.step.help && r.place) out.push({ id: r.step.help, title: r.title, text: r.text });
+          });
+        });
+        return out;
+      },
+      /** @param {{ tours?: TourDef[], steps?: Array<Step|string> }} patch */
+      set: function(patch) {
+        if (!patch || destroyed) return;
+        if (patch.tours) tours = normalTours({ tours: patch.tours });
+        else if (patch.steps) tours = normalTours({ steps: patch.steps });
+        buttons.forEach(function(b) {
+          b.hidden = !tours.length;
+        });
+      },
+      isRunning: function() {
+        return !!current2;
+      },
+      destroy: function() {
+        destroyed = true;
+        if (current2) finish(false);
+        clearStep();
+        unlisten();
+        closeInvite();
+        if (typeof stopLang === "function") stopLang();
+        buttons.forEach(function(b) {
+          b.remove();
+        });
+      }
+    };
+  }
+  function hasTourBlock(doc2) {
+    return readTourBlock(doc2).length > 0;
+  }
+  function compassIcon() {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg6 = document.createElementNS(ns, "svg");
+    [
+      ["viewBox", "0 0 24 24"],
+      ["width", "18"],
+      ["height", "18"],
+      ["fill", "none"],
+      ["stroke", "currentColor"],
+      ["stroke-width", "2"],
+      ["stroke-linecap", "round"],
+      ["stroke-linejoin", "round"],
+      ["aria-hidden", "true"]
+    ].forEach(function(a) {
+      svg6.setAttribute(a[0], a[1]);
+    });
+    const ring2 = document.createElementNS(ns, "circle");
+    ring2.setAttribute("cx", "12");
+    ring2.setAttribute("cy", "12");
+    ring2.setAttribute("r", "9");
+    const needle = document.createElementNS(ns, "path");
+    needle.setAttribute("d", "M15.5 8.5l-2 5-5 2 2-5z");
+    svg6.appendChild(ring2);
+    svg6.appendChild(needle);
+    return svg6;
+  }
+
   // src/static/sdk-libs/atelier/aide.js
   var SOURCE_CHARS_MAX = 2e3;
   var CONTEXT_CHARS_MAX = 8e3;
   var PANEL_BLOCKS_MAX = 8;
   var HISTORY_TURNS = 12;
+  var PLACES_MAX = 40;
+  var PLACES_CHARS_MAX = 3e3;
+  var SHOW_MAX = 5;
   var ANSWER_SCHEMA = {
     type: "object",
     properties: {
@@ -8689,7 +9839,8 @@
         properties: { id: { type: "string" }, params: { type: "object" } },
         required: ["id"]
       },
-      panel: { type: "object" }
+      panel: { type: "object" },
+      show: { type: "array", items: { type: "string" }, maxItems: SHOW_MAX }
     },
     required: ["reply"]
   };
@@ -8697,6 +9848,12 @@
     const s = spec || {};
     const history = [];
     let firstSend = true;
+    let ownPointer = null;
+    function pointer() {
+      if (s.tour && typeof s.tour.point === "function") return s.tour;
+      if (!ownPointer) ownPointer = tour({ block: false, invite: false });
+      return ownPointer;
+    }
     const log = el("div", { class: "ak-aide__log", role: "log", "aria-live": "polite" });
     const input = (
       /** @type {HTMLTextAreaElement} */
@@ -8790,6 +9947,47 @@
         return '- id "' + a.id + '": ' + a.summary + params;
       }).join("\n");
     }
+    function places() {
+      const seen = /* @__PURE__ */ new Set();
+      const out = [];
+      const add = function(p) {
+        if (!p || !p.id || seen.has(p.id) || out.length >= PLACES_MAX) return;
+        seen.add(p.id);
+        out.push({ id: String(p.id), title: String(p.title || ""), text: String(p.text || "") });
+      };
+      Array.prototype.forEach.call(document.querySelectorAll("[data-ak-help]"), function(n) {
+        add({
+          id: n.getAttribute("data-ak-help"),
+          title: wordsOf(n.getAttribute("data-ak-help-title") || n.getAttribute("aria-label") || n.textContent || ""),
+          text: wordsOf(n.getAttribute("data-ak-help-text") || "")
+        });
+      });
+      if (s.tour && typeof s.tour.places === "function") {
+        try {
+          s.tour.places().forEach(add);
+        } catch (err) {
+          console.warn("aimeat-atelier: the aide could not read the tour's places", err);
+        }
+      }
+      return out;
+    }
+    function placesText(list3) {
+      if (!list3.length) return 'This screen names no places: do not answer with "show".';
+      let text = 'PLACES on the screen you may light with "show" (ids exactly as written):\n';
+      for (const p of list3) {
+        const line2 = '- "' + p.id + '": ' + p.title + (p.text ? " (" + p.text.replace(/\s+/g, " ").slice(0, 160) + ")" : "") + "\n";
+        if (text.length + line2.length > PLACES_CHARS_MAX) break;
+        text += line2;
+      }
+      return text;
+    }
+    function showPlaces(ids) {
+      const p = pointer();
+      const steps2 = ids.map(function(id) {
+        return { help: id };
+      });
+      return !!p.start({ id: "__adhoc", steps: steps2 });
+    }
     async function send2() {
       const text = input.value.trim();
       if (!text) return;
@@ -8808,11 +10006,14 @@
       bubble2("user", text, null);
       history.push({ who: "user", text });
       const thinking = bubble2("assistant", "…", null);
+      const onScreen = places();
       const prompt2 = [
         'You are the in-app aide of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
         "You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.",
-        'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: { "blocks": [...] } when a visual answer helps }.',
+        'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: { "blocks": [...] } when a visual answer helps, "show"?: ["<place id>", ...] }.',
         'A panel block is exactly { "id": "<short-slug>", "component": "<one of: list, statRow, table, timeline, figure, cardGrid>", "props": { "source": "<one of the SOURCE names below>", "title": "<a heading>" } } — no other component names, and only source names that appear below.',
+        'When the person asks how or where to do something on this screen, answer with "show": the place ids they press, in the order they press them (at most ' + SHOW_MAX + "). The app lights each place on the screen. Use only ids from the PLACES list.",
+        placesText(onScreen),
         actionsText(),
         "DATA the screen shows right now:",
         await contextText(),
@@ -8843,8 +10044,29 @@
       const reply = answer && typeof answer.reply === "string" ? answer.reply : t("aideFailed");
       const b = bubble2("assistant", reply, body && body.provenance || out && out.provenance || null);
       history.push({ who: "assistant", text: reply });
+      if (answer && Array.isArray(answer.show)) offerPlaces(answer.show, onScreen, b);
       if (answer && answer.action && answer.action.id) offerAction(answer.action, b);
       if (answer && answer.panel) renderPanel(answer.panel, b);
+    }
+    function offerPlaces(ids, onScreen, into) {
+      const known3 = new Set(onScreen.map(function(p) {
+        return p.id;
+      }));
+      const valid = ids.filter(function(id) {
+        return typeof id === "string" && known3.has(id);
+      }).slice(0, SHOW_MAX);
+      if (!valid.length) return;
+      if (!showPlaces(valid)) return;
+      into.appendChild(el("div", { class: "ak-aide__confirm" }, [
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            showPlaces(valid);
+          } }
+        }, t("aideShowAgain"))
+      ]));
     }
     function offerAction(proposed, into) {
       const declared2 = (s.actions || []).find(function(a) {
@@ -8854,34 +10076,52 @@
         into.appendChild(el("p", { class: "ak-aide__text", text: t("aideUnknownAction") }));
         return;
       }
+      let decided = false;
+      let lit = null;
+      const run = async function() {
+        if (decided) return;
+        decided = true;
+        if (lit) {
+          lit.close();
+          lit = null;
+        }
+        clear(row);
+        row.appendChild(el("span", { text: "…" }));
+        try {
+          const result = await Promise.resolve(declared2.run ? declared2.run(proposed.params || {}) : null);
+          clear(row);
+          row.appendChild(el("span", { text: typeof result === "string" ? result : t("ready") }));
+        } catch (err) {
+          clear(row);
+          row.appendChild(el("span", { text: t("aideFailed") + " " + String(err && /** @type {any} */
+          err.message || "") }));
+        }
+      };
+      const cancel = function() {
+        if (decided) return;
+        decided = true;
+        if (lit) {
+          lit.close();
+          lit = null;
+        }
+        row.remove();
+      };
       const row = el("div", { class: "ak-aide__confirm" }, [
         el("span", { text: declared2.summary }),
-        el("button", {
-          type: "button",
-          class: "ak-btn ak-btn--primary",
-          on: { click: async function() {
-            clear(row);
-            row.appendChild(el("span", { text: "…" }));
-            try {
-              const result = await Promise.resolve(declared2.run ? declared2.run(proposed.params || {}) : null);
-              clear(row);
-              row.appendChild(el("span", { text: typeof result === "string" ? result : t("ready") }));
-            } catch (err) {
-              clear(row);
-              row.appendChild(el("span", { text: t("aideFailed") + " " + String(err && /** @type {any} */
-              err.message || "") }));
-            }
-          } }
-        }, t("aideRun")),
-        el("button", {
-          type: "button",
-          class: "ak-btn ak-btn--ghost",
-          on: { click: function() {
-            row.remove();
-          } }
-        }, t("cancel"))
+        el("button", { type: "button", class: "ak-btn ak-btn--primary", on: { click: run } }, t("aideRun")),
+        el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: cancel } }, t("cancel"))
       ]);
       into.appendChild(row);
+      if (declared2.target) {
+        lit = pointer().point(declared2.target, {
+          title: declared2.summary,
+          text: t("aideSuggests"),
+          actions: [{ label: t("aideRun"), primary: true, run }, { label: t("cancel"), run: cancel }],
+          onClose: function() {
+            lit = null;
+          }
+        });
+      }
     }
     function renderPanel(panel, into) {
       if (!panel || !Array.isArray(panel.blocks) || panel.blocks.length === 0 || panel.blocks.length > PANEL_BLOCKS_MAX) return;
@@ -8908,6 +10148,7 @@
         input.focus();
       },
       destroy() {
+        if (ownPointer) ownPointer.destroy();
         root.dispatchEvent(new Event("ak-destroy"));
         if (root.parentNode) root.parentNode.removeChild(root);
       }
@@ -11132,7 +12373,7 @@
   }
 
   // src/static/sdk-libs/atelier/ai-task-i18n.js
-  var STRINGS = {
+  var STRINGS3 = {
     en: {
       "aiTask.title": "Ask the AI",
       "aiTask.inputLabel": "Your text",
@@ -11293,12 +12534,12 @@
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS[
+      STRINGS3[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS.en
+      ] || STRINGS3.en
     );
-    const text = table2[key] || STRINGS.en[key] || key;
+    const text = table2[key] || STRINGS3.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -13670,7 +14911,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/commercial-i18n.js
-  var STRINGS2 = {
+  var STRINGS4 = {
     en: {
       "legal.title": "The pages this app answers with",
       "legal.intro": "These pages are the app’s own, written by its owner. The app answers for what it does; the node it runs on has its own terms, which cover the node and not this app.",
@@ -13855,12 +15096,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS2[
+      STRINGS4[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS2.en
+      ] || STRINGS4.en
     );
-    const text = table2[key] || STRINGS2.en[key] || key;
+    const text = table2[key] || STRINGS4.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -14331,7 +15572,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/members-i18n.js
-  var STRINGS3 = {
+  var STRINGS5 = {
     en: {
       "members.title": "Members",
       "members.intro": "Who may use this app, and with which role. A role belongs to the person, so their agents have it too.",
@@ -14666,12 +15907,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS3[
+      STRINGS5[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS3.en
+      ] || STRINGS5.en
     );
-    const text = table2[key] || STRINGS3.en[key] || key;
+    const text = table2[key] || STRINGS5.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -14876,7 +16117,7 @@ Known schemas:
     function button2(label, tone, run, disabled) {
       return el("button", { type: "button", class: "ak-btn ak-btn--" + tone, disabled: disabled ? true : null, on: { click: run } }, label);
     }
-    function visible(rows, text) {
+    function visible2(rows, text) {
       const q = query.trim().toLowerCase();
       const hit = q ? rows.filter(function(r) {
         return text(r).toLowerCase().indexOf(q) !== -1;
@@ -15058,7 +16299,7 @@ Known schemas:
       function drawBody() {
         clear(body);
         if (tab === "asked") {
-          const v = visible(asked, function(q) {
+          const v = visible2(asked, function(q) {
             return q.owner + " " + (q.displayName || "") + " " + (q.email || "") + " " + (q.note || "");
           });
           body.appendChild(list3("asked", v.rows.map(function(q) {
@@ -15077,7 +16318,7 @@ Known schemas:
             ]);
           }), tm("members.askedNone"), v.more));
         } else if (tab === "seen") {
-          const v = visible(seen, function(s) {
+          const v = visible2(seen, function(s) {
             return s.owner + " " + (s.displayName || "") + " " + (s.email || "");
           });
           body.appendChild(list3("seen", v.rows.map(function(s) {
@@ -15098,7 +16339,7 @@ Known schemas:
           }), tm("members.seenNone"), v.more));
         } else if (tab === "members") {
           body.appendChild(addPanel());
-          const v = visible(roster, function(m) {
+          const v = visible2(roster, function(m) {
             return m.owner + " " + (m.displayName || "") + " " + (m.email || "") + " " + m.role;
           });
           const rows = v.rows.map(function(m) {
@@ -15134,7 +16375,7 @@ Known schemas:
           body.appendChild(variant === "table" ? table2(v.rows, rows, v.more) : list3("roster", rows, tm("members.rosterNone"), v.more));
         } else if (tab === "invites") {
           body.appendChild(addPanel());
-          const v = visible(invites, function(i) {
+          const v = visible2(invites, function(i) {
             return (i.emailShown || "") + " " + i.role;
           });
           body.appendChild(list3("invites", v.rows.map(function(i) {
@@ -15556,7 +16797,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/workspace-i18n.js
-  var STRINGS4 = {
+  var STRINGS6 = {
     en: {
       "sample.note": "A sample. Nothing here is sent or changed.",
       "failed": "That did not go through: {why}",
@@ -15825,18 +17066,18 @@ Known schemas:
       "follow.private": "Esta aplicación guarda tus registros en privado, así que aquí no hay nada que compartir."
     }
   };
-  function tw(key, vars) {
+  function tw2(key, vars) {
     const hosted = t("workspace." + key, vars);
     if (hosted !== "workspace." + key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS4[
+      STRINGS6[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS4.en
+      ] || STRINGS6.en
     );
-    const text = table2[key] || STRINGS4.en[key] || key;
+    const text = table2[key] || STRINGS6.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -15903,7 +17144,7 @@ Known schemas:
     function line2(key) {
       clear(root);
       root.appendChild(el("section", { class: "ak-root ak-mem ak-ws", "data-ak-part": "root" }, [
-        el("p", { class: "ak-mem__none", role: "status", "data-ak-part": key === "follow.wait" ? "wait" : "private" }, tw(key))
+        el("p", { class: "ak-mem__none", role: "status", "data-ak-part": key === "follow.wait" ? "wait" : "private" }, tw2(key))
       ]));
     }
     function waiting() {
@@ -16042,9 +17283,9 @@ Known schemas:
       /** @type {HTMLSelectElement} */
       el(
         "select",
-        { class: "ak-input ak-mem__role", "aria-label": tw("team.role"), "data-ak-part": "role" },
+        { class: "ak-input ak-mem__role", "aria-label": tw2("team.role"), "data-ak-part": "role" },
         list3.map(function(r) {
-          return el("option", { value: r, selected: r === value ? true : null }, tw("role." + r));
+          return el("option", { value: r, selected: r === value ? true : null }, tw2("role." + r));
         })
       )
     );
@@ -16079,7 +17320,7 @@ Known schemas:
         return x.ws === ws;
       })[0];
       if (t2 && t2.label) return t2.label;
-      return ws === spec.ws ? tw("team.thisWorkspace") : ws;
+      return ws === spec.ws ? tw2("team.thisWorkspace") : ws;
     }
     async function act(work, done) {
       failure = "";
@@ -16095,10 +17336,10 @@ Known schemas:
     }
     function outsideNotice(r, who) {
       if (!r || r.organism_member !== false) return "";
-      if (r.invitation === "sent") return tw("team.grantedInvited", { who });
-      if (r.invitation === "pending") return tw("team.grantedPending", { who });
-      if (r.invitation === "needs_admin") return tw("team.grantedNeedsAdmin", { who });
-      return tw("team.grantedRefused", { who, why: String(r.invitation_refusal || "") });
+      if (r.invitation === "sent") return tw2("team.grantedInvited", { who });
+      if (r.invitation === "pending") return tw2("team.grantedPending", { who });
+      if (r.invitation === "needs_admin") return tw2("team.grantedNeedsAdmin", { who });
+      return tw2("team.grantedRefused", { who, why: String(r.invitation_refusal || "") });
     }
     function button2(label, tone, run2, disabled) {
       return el("button", { type: "button", class: "ak-btn ak-btn--" + tone, disabled: disabled ? true : null, on: { click: run2 } }, label);
@@ -16133,19 +17374,19 @@ Known schemas:
       root.appendChild(el(
         "h3",
         { class: "ak-mem__title", "data-ak-part": "title" },
-        [spec.title || tw("team.title"), sample ? sampleBadge2() : null].filter(Boolean)
+        [spec.title || tw2("team.title"), sample ? sampleBadge2() : null].filter(Boolean)
       ));
-      root.appendChild(el("p", { class: "ak-mem__intro", "data-ak-part": "intro" }, sample ? tw("sample.note") : tw("team.intro")));
+      root.appendChild(el("p", { class: "ak-mem__intro", "data-ak-part": "intro" }, sample ? tw2("sample.note") : tw2("team.intro")));
       const lib = sample ? null : orgLib();
       let data = SAMPLE2;
       let open = sample ? { list: [Object.assign({ workspaces: [{ ws: spec.ws || "", role: SAMPLE_INVITATION.role }] }, SAMPLE_INVITATION)], refused: "" } : null;
       if (!sample) {
         if (!lib) {
-          root.appendChild(el("p", { class: "ak-mem__none" }, tw("noLib")));
+          root.appendChild(el("p", { class: "ak-mem__none" }, tw2("noLib")));
           return;
         }
         if (!signedIn()) {
-          root.appendChild(el("p", { class: "ak-mem__none" }, tw("team.signIn")));
+          root.appendChild(el("p", { class: "ak-mem__none" }, tw2("team.signIn")));
           return;
         }
         const invited = typeof lib.invitations === "function" ? Promise.resolve().then(function() {
@@ -16164,7 +17405,7 @@ Known schemas:
           open = both[1];
         } catch (e) {
           if (mine !== drawing2) return;
-          root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: refusal(e) || String(e) })));
+          root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw2("failed", { why: refusal(e) || String(e) })));
           return;
         }
         if (mine !== drawing2) return;
@@ -16180,7 +17421,7 @@ Known schemas:
       const count = { requests: requests.length, people: people.length, invitations: open ? open.list.length : 0 };
       const tabs2 = open ? ["requests", "people", "invite", "invitations"] : ["requests", "people", "invite"];
       if (!tab || tabs2.indexOf(tab) === -1) tab = count.requests ? "requests" : "people";
-      if (failure) root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: failure })));
+      if (failure) root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw2("failed", { why: failure })));
       if (notice) root.appendChild(el("p", { class: "ak-mem__notice", role: "status", "data-ak-part": "notice" }, notice));
       root.appendChild(el("div", { class: "ak-mem__tabs", role: "tablist", "data-ak-part": "tabs" }, tabs2.map(function(g) {
         const n = count[g];
@@ -16193,7 +17434,7 @@ Known schemas:
             tab = g;
             render();
           } }
-        }, tw("tab." + g) + (typeof n === "number" && n ? " (" + n + ")" : ""));
+        }, tw2("tab." + g) + (typeof n === "number" && n ? " (" + n + ")" : ""));
       })));
       function changeRole(m, sel) {
         const next = sel.value;
@@ -16204,7 +17445,7 @@ Known schemas:
               return lib.grant(spec.org, spec.ws, m.account, next);
             },
             function() {
-              return tw("team.granted", { who: nameOf2(m), role: tw("role." + next) });
+              return tw2("team.granted", { who: nameOf2(m), role: tw2("role." + next) });
             }
           );
         };
@@ -16212,7 +17453,7 @@ Known schemas:
           go();
           return;
         }
-        ask({ title: tw("team.raise", { who: nameOf2(m) }), text: tw("team.raiseText"), confirmLabel: tw("team.raiseYes") }).then(function(yes) {
+        ask({ title: tw2("team.raise", { who: nameOf2(m) }), text: tw2("team.raiseText"), confirmLabel: tw2("team.raiseYes") }).then(function(yes) {
           if (yes) go();
           else sel.value = m.role;
         });
@@ -16221,36 +17462,36 @@ Known schemas:
         return list3("requests", requests.map(function(q) {
           const sel = roleSel("viewer");
           sel.disabled = sample;
-          const meta = [q.message || "", q.at ? tw("team.asked", { d: day2(q.at) }) : ""].filter(Boolean).join(" · ");
+          const meta = [q.message || "", q.at ? tw2("team.asked", { d: day2(q.at) }) : ""].filter(Boolean).join(" · ");
           return row(person2(q.account, q.displayName), meta, [
             sel,
-            button2(tw("team.approve"), "primary", sample ? noop : function() {
+            button2(tw2("team.approve"), "primary", sample ? noop : function() {
               const role = sel.value;
               act(
                 function() {
                   return lib.decide(spec.org, spec.ws, q.account, "approve", role);
                 },
                 function() {
-                  return tw("team.granted", { who: nameOf2(q), role: tw("role." + role) });
+                  return tw2("team.granted", { who: nameOf2(q), role: tw2("role." + role) });
                 }
               );
             }, sample),
-            button2(tw("team.decline"), "ghost", sample ? noop : function() {
+            button2(tw2("team.decline"), "ghost", sample ? noop : function() {
               act(
                 function() {
                   return lib.decide(spec.org, spec.ws, q.account, "decline");
                 },
                 function() {
-                  return tw("team.declined", { who: nameOf2(q) });
+                  return tw2("team.declined", { who: nameOf2(q) });
                 }
               );
             }, sample)
           ]);
-        }), tw("team.requestsNone"));
+        }), tw2("team.requestsNone"));
       }
       function peopleRows() {
         return people.map(function(m) {
-          const since = m.since ? tw("team.since", { d: day2(m.since) }) : "";
+          const since = m.since ? tw2("team.since", { d: day2(m.since) }) : "";
           const own = (spec.actions || []).map(function(a) {
             return button2(a.label, a.tone || "ghost", sample ? noop : function() {
               Promise.resolve(a.run(m)).then(function() {
@@ -16259,7 +17500,7 @@ Known schemas:
             }, sample);
           });
           if (m.role === "creator") {
-            const chip = el("span", { class: "ak-ws__chip", "data-ak-part": "chip", title: tw("team.creatorHint") }, tw("role.creator"));
+            const chip = el("span", { class: "ak-ws__chip", "data-ak-part": "chip", title: tw2("team.creatorHint") }, tw2("role.creator"));
             return row(person2(m.account, m.displayName), since, own.concat([chip]), columnsOf(m));
           }
           const sel = roleSel(m.role || "viewer");
@@ -16269,17 +17510,17 @@ Known schemas:
           });
           return row(person2(m.account, m.displayName), since, own.concat([
             sel,
-            button2(tw("team.remove"), "ghost", sample ? noop : function() {
+            button2(tw2("team.remove"), "ghost", sample ? noop : function() {
               ask({
-                title: tw("team.confirmRemove", { who: nameOf2(m) }),
-                text: tw("team.confirmRemoveText"),
-                confirmLabel: tw("team.remove"),
+                title: tw2("team.confirmRemove", { who: nameOf2(m) }),
+                text: tw2("team.confirmRemoveText"),
+                confirmLabel: tw2("team.remove"),
                 tone: "danger"
               }).then(function(yes) {
                 if (yes) act(function() {
                   return lib.revoke(spec.org, spec.ws, m.account);
                 }, function() {
-                  return tw("team.removed", { who: nameOf2(m) });
+                  return tw2("team.removed", { who: nameOf2(m) });
                 });
               });
             }, sample)
@@ -16288,13 +17529,13 @@ Known schemas:
       }
       function peopleTab() {
         const rows = peopleRows();
-        if (variant !== "table" || !rows.length) return list3("people", rows, tw("team.peopleNone"));
+        if (variant !== "table" || !rows.length) return list3("people", rows, tw2("team.peopleNone"));
         return el("div", { class: "ak-mem__group ak-mem__table-wrap", "data-ak-part": "people" }, [
           el("table", { class: "ak-mem__table" }, [
             el("thead", {}, [el("tr", {}, [
-              el("th", { scope: "col" }, tw("team.colName")),
-              el("th", { scope: "col" }, tw("team.colSince")),
-              el("th", { scope: "col" }, tw("team.colActions"))
+              el("th", { scope: "col" }, tw2("team.colName")),
+              el("th", { scope: "col" }, tw2("team.colSince")),
+              el("th", { scope: "col" }, tw2("team.colActions"))
             ])]),
             el("tbody", {}, rows.map(function(r) {
               const cells = Array.prototype.slice.call(r.children);
@@ -16311,8 +17552,8 @@ Known schemas:
           el("input", {
             type: "text",
             class: "ak-input ak-mem__name",
-            placeholder: tw("team.invitePlaceholder"),
-            "aria-label": tw("team.invitePlaceholder"),
+            placeholder: tw2("team.invitePlaceholder"),
+            "aria-label": tw2("team.invitePlaceholder"),
             disabled: sample ? true : null,
             autocomplete: "off"
           })
@@ -16321,7 +17562,7 @@ Known schemas:
         if (targets) return inviteIntoTab(input);
         const sel = roleSel(typedRole);
         sel.disabled = sample;
-        const go = button2(EMAIL_RE2.test(typed) ? tw("team.invite") : tw("team.add"), "primary", sample ? noop : function() {
+        const go = button2(EMAIL_RE2.test(typed) ? tw2("team.invite") : tw2("team.add"), "primary", sample ? noop : function() {
           const value = input.value.trim();
           const role = sel.value;
           typed = value;
@@ -16329,27 +17570,27 @@ Known schemas:
           if (!value) return;
           if (EMAIL_RE2.test(value)) {
             act(function() {
-              if (typeof lib.inviteByEmail !== "function") throw new Error(tw("noLib"));
+              if (typeof lib.inviteByEmail !== "function") throw new Error(tw2("noLib"));
               return lib.inviteByEmail(spec.org, value, { ws: spec.ws, role });
             }, function(r) {
               typed = "";
-              return r && r.email_sent === false && r.accept_url ? tw("team.inviteLink", { url: r.accept_url }) : tw("team.inviteSent", { email: value });
+              return r && r.email_sent === false && r.accept_url ? tw2("team.inviteLink", { url: r.accept_url }) : tw2("team.inviteSent", { email: value });
             });
           } else {
             act(function() {
               return lib.grant(spec.org, spec.ws, value, role);
             }, function(r) {
               typed = "";
-              return outsideNotice(r, value) || tw("team.granted", { who: value, role: tw("role." + role) });
+              return outsideNotice(r, value) || tw2("team.granted", { who: value, role: tw2("role." + role) });
             });
           }
         }, sample);
         input.addEventListener("input", function() {
-          go.textContent = EMAIL_RE2.test(input.value.trim()) ? tw("team.invite") : tw("team.add");
+          go.textContent = EMAIL_RE2.test(input.value.trim()) ? tw2("team.invite") : tw2("team.add");
         });
         return el("div", { class: "ak-mem__group", "data-ak-part": "invite" }, [
           el("div", { class: "ak-mem__add" }, [el("div", { class: "ak-mem__field" }, [input]), sel, go]),
-          el("p", { class: "ak-mem__hint" }, tw("team.inviteHint"))
+          el("p", { class: "ak-mem__hint" }, tw2("team.inviteHint"))
         ]);
       }
       function inviteIntoTab(input) {
@@ -16378,7 +17619,7 @@ Known schemas:
             el("span", { class: "ak-mem__acts", "data-ak-part": "acts" }, [sel])
           ]);
         });
-        const go = button2(EMAIL_RE2.test(typed) ? tw("team.invite") : tw("team.add"), "primary", sample ? noop : function() {
+        const go = button2(EMAIL_RE2.test(typed) ? tw2("team.invite") : tw2("team.add"), "primary", sample ? noop : function() {
           const value = input.value.trim();
           typed = value;
           if (!value) return;
@@ -16388,18 +17629,18 @@ Known schemas:
             return { ws: t2.ws, role: picked[t2.ws].role };
           });
           if (!into.length) {
-            failure = tw("team.pickOne");
+            failure = tw2("team.pickOne");
             notice = "";
             render();
             return;
           }
           if (EMAIL_RE2.test(value)) {
             act(function() {
-              if (typeof lib.inviteByEmail !== "function") throw new Error(tw("noLib"));
+              if (typeof lib.inviteByEmail !== "function") throw new Error(tw2("noLib"));
               return lib.inviteByEmail(spec.org, value, { workspaces: into });
             }, function(r) {
               typed = "";
-              return r && r.email_sent === false && r.accept_url ? tw("team.inviteLink", { url: r.accept_url }) : tw("team.inviteSent", { email: value });
+              return r && r.email_sent === false && r.accept_url ? tw2("team.inviteLink", { url: r.accept_url }) : tw2("team.inviteSent", { email: value });
             });
           } else {
             act(async function() {
@@ -16410,50 +17651,50 @@ Known schemas:
               typed = "";
               const outside2 = outsideNotice(r, value);
               if (outside2) return outside2;
-              return into.length === 1 ? tw("team.granted", { who: value, role: tw("role." + into[0].role) }) : tw("team.grantedMany", { who: value, n: into.length });
+              return into.length === 1 ? tw2("team.granted", { who: value, role: tw2("role." + into[0].role) }) : tw2("team.grantedMany", { who: value, n: into.length });
             });
           }
         }, sample);
         go.setAttribute("data-ak-part", "inviteGo");
         input.addEventListener("input", function() {
-          go.textContent = EMAIL_RE2.test(input.value.trim()) ? tw("team.invite") : tw("team.add");
+          go.textContent = EMAIL_RE2.test(input.value.trim()) ? tw2("team.invite") : tw2("team.add");
         });
         return el("div", { class: "ak-mem__group", "data-ak-part": "invite" }, [
           el("div", { class: "ak-mem__add" }, [el("div", { class: "ak-mem__field" }, [input]), go]),
-          el("h4", { class: "ak-mem__group-title", "data-ak-part": "targetsTitle" }, tw("team.inviteInto")),
+          el("h4", { class: "ak-mem__group-title", "data-ak-part": "targetsTitle" }, tw2("team.inviteInto")),
           el("ul", { class: "ak-mem__rows", "data-ak-part": "targets" }, rows),
-          el("p", { class: "ak-mem__hint", "data-ak-part": "hint" }, tw("team.inviteIntoHint"))
+          el("p", { class: "ak-mem__hint", "data-ak-part": "hint" }, tw2("team.inviteIntoHint"))
         ]);
       }
       function invitationsTab() {
         if (open && open.refused) {
           return el("div", { class: "ak-mem__group", "data-ak-part": "invitations" }, [
-            el("p", { class: "ak-mem__none", "data-ak-part": "refused" }, tw("failed", { why: open.refused }))
+            el("p", { class: "ak-mem__none", "data-ak-part": "refused" }, tw2("failed", { why: open.refused }))
           ]);
         }
         return list3("invitations", (open && open.list || []).map(function(inv) {
           const into = (inv.workspaces || []).map(function(w) {
-            return tw("team.wsRole", { ws: wsLabel(w.ws), role: tw("role." + w.role) });
+            return tw2("team.wsRole", { ws: wsLabel(w.ws), role: tw2("role." + w.role) });
           }).join(", ");
-          const meta = [into, inv.expiresAt ? tw("team.expires", { d: day2(inv.expiresAt) }) : ""].filter(Boolean).join(" · ");
-          const cancel = button2(tw("team.cancelInvite"), "ghost", sample ? noop : function() {
+          const meta = [into, inv.expiresAt ? tw2("team.expires", { d: day2(inv.expiresAt) }) : ""].filter(Boolean).join(" · ");
+          const cancel = button2(tw2("team.cancelInvite"), "ghost", sample ? noop : function() {
             act(function() {
-              if (typeof lib.cancelInvitation !== "function") throw new Error(tw("noLib"));
+              if (typeof lib.cancelInvitation !== "function") throw new Error(tw2("noLib"));
               return lib.cancelInvitation(spec.org, inv.id);
             }, function() {
-              return tw("team.inviteCancelled", { email: inv.email });
+              return tw2("team.inviteCancelled", { email: inv.email });
             });
           }, sample);
           cancel.setAttribute("data-ak-part", "cancel");
           return row(person2(inv.email, null), meta, [cancel]);
-        }), tw("team.invitationsNone"));
+        }), tw2("team.invitationsNone"));
       }
       const draw = { requests: requestsTab, invite: inviteTab, invitations: invitationsTab, people: peopleTab };
       root.appendChild(el("div", { class: "ak-mem__body" }, [(draw[tab] || peopleTab)()]));
     }
     function run() {
       return render().catch(function(e) {
-        root.appendChild(el("p", { class: "ak-mem__failure", role: "alert" }, tw("failed", { why: refusal(e) || String(e) })));
+        root.appendChild(el("p", { class: "ak-mem__failure", role: "alert" }, tw2("failed", { why: refusal(e) || String(e) })));
       });
     }
     const ready0 = run().then(function() {
@@ -16597,25 +17838,25 @@ Known schemas:
       root.appendChild(el(
         "h3",
         { class: "ak-mem__title", "data-ak-part": "title" },
-        [spec.title || tw("picker.title"), sample ? sampleBadge2() : null].filter(Boolean)
+        [spec.title || tw2("picker.title"), sample ? sampleBadge2() : null].filter(Boolean)
       ));
-      root.appendChild(el("p", { class: "ak-mem__intro ak-ws__explain", "data-ak-part": "intro" }, tw(multiple ? "picker.introMany" : "picker.intro")));
+      root.appendChild(el("p", { class: "ak-mem__intro ak-ws__explain", "data-ak-part": "intro" }, tw2(multiple ? "picker.introMany" : "picker.intro")));
     }
     function failureLine() {
-      if (failure) root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: failure })));
+      if (failure) root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw2("failed", { why: failure })));
     }
     function drawList() {
-      root.appendChild(el("h3", { class: "ak-mem__title", "data-ak-part": "title" }, tw("picker.listTitle")));
+      root.appendChild(el("h3", { class: "ak-mem__title", "data-ak-part": "title" }, tw2("picker.listTitle")));
       failureLine();
       const rows = kept.map(function(c) {
         const now2 = !priv && same(choice, c);
         return el("li", { class: "ak-mem__row ak-ws__entry", "data-ak-part": "entry", "data-ak-current": now2 ? "true" : null }, [
-          el("span", { class: "ak-ws__entry-text", "data-ak-part": "entryText" }, tw("picker.entry", { ws: c.name || wsName, org: c.orgName || c.orgId })),
+          el("span", { class: "ak-ws__entry-text", "data-ak-part": "entryText" }, tw2("picker.entry", { ws: c.name || wsName, org: c.orgName || c.orgId })),
           el("span", { class: "ak-mem__acts", "data-ak-part": "acts" }, [
-            now2 ? el("span", { class: "ak-ws__chip", "data-ak-part": "current" }, tw("picker.current")) : button2(tw("picker.switch"), "ghost", "switch", function() {
+            now2 ? el("span", { class: "ak-ws__chip", "data-ak-part": "current" }, tw2("picker.current")) : button2(tw2("picker.switch"), "ghost", "switch", function() {
               switchTo(c);
             }),
-            button2(tw("picker.remove"), "ghost", "remove", function() {
+            button2(tw2("picker.remove"), "ghost", "remove", function() {
               removeEntry(c);
             })
           ])
@@ -16623,17 +17864,17 @@ Known schemas:
       });
       if (allowPrivate) {
         rows.push(el("li", { class: "ak-mem__row ak-ws__entry", "data-ak-part": "entry", "data-ak-current": priv ? "true" : null, "data-ak-private": "true" }, [
-          el("span", { class: "ak-ws__entry-text", "data-ak-part": "entryText" }, tw("picker.privateEntry")),
+          el("span", { class: "ak-ws__entry-text", "data-ak-part": "entryText" }, tw2("picker.privateEntry")),
           el("span", { class: "ak-mem__acts", "data-ak-part": "acts" }, [
-            priv ? el("span", { class: "ak-ws__chip", "data-ak-part": "current" }, tw("picker.current")) : button2(tw("picker.switch"), "ghost", "switch", function() {
+            priv ? el("span", { class: "ak-ws__chip", "data-ak-part": "current" }, tw2("picker.current")) : button2(tw2("picker.switch"), "ghost", "switch", function() {
               choosePrivate();
             })
           ])
         ]));
       }
       root.appendChild(el("ul", { class: "ak-mem__rows ak-ws__list", "data-ak-part": "list" }, rows));
-      if (kept.length) root.appendChild(el("p", { class: "ak-mem__hint", "data-ak-part": "hint" }, tw("picker.listHint")));
-      root.appendChild(button2(tw("picker.add"), "primary", "add", function() {
+      if (kept.length) root.appendChild(el("p", { class: "ak-mem__hint", "data-ak-part": "hint" }, tw2("picker.listHint")));
+      root.appendChild(button2(tw2("picker.add"), "primary", "add", function() {
         change();
       }));
     }
@@ -16646,8 +17887,8 @@ Known schemas:
       if (mode === "using" && priv) {
         failureLine();
         root.appendChild(el("p", { class: "ak-ws__using", "data-ak-part": "using" }, [
-          el("span", { class: "ak-ws__using-text" }, tw("picker.usingPrivate")),
-          button2(tw("picker.change"), "ghost", "change", function() {
+          el("span", { class: "ak-ws__using-text" }, tw2("picker.usingPrivate")),
+          button2(tw2("picker.change"), "ghost", "change", function() {
             change();
           })
         ]));
@@ -16656,11 +17897,11 @@ Known schemas:
       if (mode === "using" && choice) {
         failureLine();
         root.appendChild(el("p", { class: "ak-ws__using", "data-ak-part": "using" }, [
-          el("span", { class: "ak-ws__using-text" }, tw("picker.using", {
+          el("span", { class: "ak-ws__using-text" }, tw2("picker.using", {
             ws: choice.name || wsName,
             org: choice.orgName || choice.orgId
           })),
-          button2(tw("picker.change"), "ghost", "change", function() {
+          button2(tw2("picker.change"), "ghost", "change", function() {
             change();
           })
         ]));
@@ -16668,31 +17909,31 @@ Known schemas:
       }
       head();
       if (mode === "noLib") {
-        root.appendChild(el("p", { class: "ak-mem__none" }, tw("noLib")));
+        root.appendChild(el("p", { class: "ak-mem__none" }, tw2("noLib")));
         return;
       }
       if (mode === "signedOut") {
-        root.appendChild(el("p", { class: "ak-mem__none" }, tw("picker.signIn")));
+        root.appendChild(el("p", { class: "ak-mem__none" }, tw2("picker.signIn")));
         return;
       }
       if (mode === "loading" || mode === "working") {
         root.appendChild(el(
           "p",
           { class: "ak-mem__none", role: "status", "data-ak-part": "working" },
-          mode === "working" ? tw("picker.working") : tw("loading")
+          mode === "working" ? tw2("picker.working") : tw2("loading")
         ));
         return;
       }
       failureLine();
-      if (sample) root.appendChild(el("p", { class: "ak-mem__hint" }, tw("sample.note")));
+      if (sample) root.appendChild(el("p", { class: "ak-mem__hint" }, tw2("sample.note")));
       if (multiple) {
         const wsIn = (
           /** @type {HTMLInputElement} */
           el("input", {
             type: "text",
             class: "ak-input ak-mem__name",
-            placeholder: tw("picker.wsName"),
-            "aria-label": tw("picker.wsName"),
+            placeholder: tw2("picker.wsName"),
+            "aria-label": tw2("picker.wsName"),
             disabled: sample ? true : null,
             autocomplete: "off",
             maxlength: "120",
@@ -16704,33 +17945,33 @@ Known schemas:
           typedWs = wsIn.value;
         });
         root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "wsName" }, [
-          el("h4", { class: "ak-mem__group-title" }, tw("picker.wsName")),
+          el("h4", { class: "ak-mem__group-title" }, tw2("picker.wsName")),
           el("div", { class: "ak-mem__field" }, [wsIn])
         ]));
       }
       const list3 = orgs || [];
       root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "orgs" }, [
-        el("h4", { class: "ak-mem__group-title" }, tw("picker.choose")),
-        el("p", { class: "ak-mem__hint" }, tw("picker.wsWill", { name: multiple ? typedWs.trim() || wsName : wsName })),
+        el("h4", { class: "ak-mem__group-title" }, tw2("picker.choose")),
+        el("p", { class: "ak-mem__hint" }, tw2("picker.wsWill", { name: multiple ? typedWs.trim() || wsName : wsName })),
         list3.length ? el("ul", { class: "ak-mem__rows" }, list3.map(function(o) {
           return el("li", { class: "ak-mem__row", "data-ak-part": "row" }, [
             person2(o.name, null),
-            el("span", { class: "ak-mem__meta" }, [el("span", { class: "ak-ws__chip", "data-ak-part": "chip" }, tw("orgRole." + o.role))]),
+            el("span", { class: "ak-mem__meta" }, [el("span", { class: "ak-ws__chip", "data-ak-part": "chip" }, tw2("orgRole." + o.role))]),
             el("span", { class: "ak-mem__acts" }, [
-              button2(tw("picker.use"), "primary", "use", sample ? noop : function() {
+              button2(tw2("picker.use"), "primary", "use", sample ? noop : function() {
                 pick(o);
               }, sample)
             ])
           ]);
-        })) : el("p", { class: "ak-mem__none" }, tw("picker.none"))
+        })) : el("p", { class: "ak-mem__none" }, tw2("picker.none"))
       ]));
       const input = (
         /** @type {HTMLInputElement} */
         el("input", {
           type: "text",
           class: "ak-input ak-mem__name",
-          placeholder: tw("picker.orgName"),
-          "aria-label": tw("picker.orgName"),
+          placeholder: tw2("picker.orgName"),
+          "aria-label": tw2("picker.orgName"),
           disabled: sample ? true : null,
           autocomplete: "off",
           maxlength: "120"
@@ -16738,10 +17979,10 @@ Known schemas:
       );
       if (typedOrg) input.value = typedOrg;
       root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "create" }, [
-        el("h4", { class: "ak-mem__group-title" }, tw("picker.create")),
+        el("h4", { class: "ak-mem__group-title" }, tw2("picker.create")),
         el("div", { class: "ak-mem__add" }, [
           el("div", { class: "ak-mem__field" }, [input]),
-          button2(tw("picker.createGo"), "primary", "createGo", sample ? noop : function() {
+          button2(tw2("picker.createGo"), "primary", "createGo", sample ? noop : function() {
             const n = input.value.trim();
             typedOrg = n;
             if (n) pick({ name: n });
@@ -16750,15 +17991,15 @@ Known schemas:
       ]));
       if (allowPrivate) {
         root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "private" }, [
-          el("h4", { class: "ak-mem__group-title" }, tw("picker.privateTitle")),
-          el("p", { class: "ak-mem__hint" }, tw("picker.privateHint")),
-          button2(tw("picker.privateGo"), "ghost", "privateGo", sample ? noop : function() {
+          el("h4", { class: "ak-mem__group-title" }, tw2("picker.privateTitle")),
+          el("p", { class: "ak-mem__hint" }, tw2("picker.privateHint")),
+          button2(tw2("picker.privateGo"), "ghost", "privateGo", sample ? noop : function() {
             choosePrivate();
           }, sample)
         ]));
       }
       if (choice || priv || kept.length) {
-        root.appendChild(button2(tw("picker.cancel"), "ghost", "cancel", function() {
+        root.appendChild(button2(tw2("picker.cancel"), "ghost", "cancel", function() {
           failure = "";
           mode = "using";
           draw();
@@ -17057,7 +18298,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/intake-connect-i18n.js
-  var STRINGS5 = {
+  var STRINGS7 = {
     en: {
       "intake.title": "Send us a message",
       "intake.send": "Send",
@@ -17405,9 +18646,9 @@ Known schemas:
     }
   };
   var TI_KEYS = {
-    en: Object.keys(STRINGS5.en),
-    fi: Object.keys(STRINGS5.fi),
-    es: Object.keys(STRINGS5.es)
+    en: Object.keys(STRINGS7.en),
+    fi: Object.keys(STRINGS7.fi),
+    es: Object.keys(STRINGS7.es)
   };
   function ti(key, vars) {
     const hosted = t(key, vars);
@@ -17415,12 +18656,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS5[
+      STRINGS7[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS5.en
+      ] || STRINGS7.en
     );
-    const text = table2[key] || STRINGS5.en[key] || key;
+    const text = table2[key] || STRINGS7.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -18720,7 +19961,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/workflow-i18n.js
-  var STRINGS6 = {
+  var STRINGS8 = {
     en: {
       "wf.title": "Waiting for your answer",
       "wf.intro": "A workflow stops at each of these steps until you answer. When you answer, the run goes on.",
@@ -18842,12 +20083,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS6[
+      STRINGS8[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS6.en
+      ] || STRINGS8.en
     );
-    const text = table2[key] || STRINGS6.en[key] || key;
+    const text = table2[key] || STRINGS8.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -19329,20 +20570,20 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/menu.js
-  var GAP = 6;
-  var EDGE = 8;
+  var GAP2 = 6;
+  var EDGE2 = 8;
   function placeAt(box, at3, o) {
     const opts = o || {};
     const w = box.offsetWidth;
     const h = box.offsetHeight;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    let top = opts.placement === "above" ? at3.top - GAP - h : at3.bottom + GAP;
-    if (top + h > vh - EDGE && at3.top - GAP - h >= EDGE) top = at3.top - GAP - h;
-    if (top < EDGE && at3.bottom + GAP + h <= vh - EDGE) top = at3.bottom + GAP;
+    let top = opts.placement === "above" ? at3.top - GAP2 - h : at3.bottom + GAP2;
+    if (top + h > vh - EDGE2 && at3.top - GAP2 - h >= EDGE2) top = at3.top - GAP2 - h;
+    if (top < EDGE2 && at3.bottom + GAP2 + h <= vh - EDGE2) top = at3.bottom + GAP2;
     let left = opts.align === "end" ? at3.right - w : opts.align === "center" ? (at3.left + at3.right) / 2 - w / 2 : at3.left;
-    left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
-    top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
+    left = Math.max(EDGE2, Math.min(left, vw - w - EDGE2));
+    top = Math.max(EDGE2, Math.min(top, vh - h - EDGE2));
     box.style.left = Math.round(left) + "px";
     box.style.top = Math.round(top) + "px";
     const ox = Math.max(0, Math.min(w, (at3.left + at3.right) / 2 - left));
@@ -19504,7 +20745,7 @@ Known schemas:
       if (box) return;
       box = build();
       document.body.appendChild(wearLook(box, anchor));
-      const r = at3 ? { left: at3.x, right: at3.x, top: at3.y, bottom: at3.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
+      const r = at3 ? { left: at3.x, right: at3.x, top: at3.y, bottom: at3.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE2, right: EDGE2, top: EDGE2, bottom: EDGE2 };
       const origin = placeAt(box, r, { align: s.align });
       mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
       openMotion(box, origin);
@@ -19817,8 +21058,8 @@ Known schemas:
         return;
       }
       const from = box.getBoundingClientRect();
-      const tw2 = Math.min(360, window.innerWidth - 32);
-      const to = { left: window.innerWidth - tw2 - 16, top: window.innerHeight - 72, width: tw2, height: 56 };
+      const tw3 = Math.min(360, window.innerWidth - 32);
+      const to = { left: window.innerWidth - tw3 - 16, top: window.innerHeight - 72, width: tw3, height: 56 };
       const dx = to.left - from.left;
       const dy = to.top - from.top;
       const sx = to.width / Math.max(from.width, 1);
@@ -20051,97 +21292,9 @@ Known schemas:
       if (root.parentNode) root.parentNode.removeChild(root);
     } };
   }
-  function tour(spec) {
-    const s = spec || { steps: [] };
-    let i = -1;
-    let note = null;
-    let marked = null;
-    let frame2 = 0;
-    let before = null;
-    function follow() {
-      if (frame2) return;
-      frame2 = requestAnimationFrame(function() {
-        frame2 = 0;
-        place2();
-      });
-    }
-    function place2() {
-      if (!note || !marked) return;
-      const r = marked.getBoundingClientRect();
-      const w = note.offsetWidth || 260;
-      const top = r.bottom + 12;
-      const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
-      note.style.top = (top + (note.offsetHeight || 0) > window.innerHeight ? Math.max(8, r.top - (note.offsetHeight || 0) - 12) : top) + "px";
-      note.style.left = left + "px";
-    }
-    function show(n) {
-      clearStep();
-      const step = s.steps[n];
-      if (!step) {
-        end();
-        return;
-      }
-      i = n;
-      const target = typeof step.target === "string" ? document.querySelector(step.target) : step.target;
-      if (!target) {
-        show(n + 1);
-        return;
-      }
-      marked = /** @type {HTMLElement} */
-      target;
-      marked.classList.add("ak-tour__mark");
-      if (!reducedMotion()) marked.scrollIntoView({ block: "center", behavior: "smooth" });
-      const last = n === s.steps.length - 1;
-      const L = Object.assign({ next: t("next"), done: t("done"), skip: t("tourSkip") }, s.labels || {});
-      note = el("div", { class: "ak-root ak-tour__note", role: "dialog", "aria-live": "polite" }, [
-        el("div", {}, [el("span", { class: "ak-tour__step" }, n + 1 + "/" + s.steps.length), el("span", {}, step.text)]),
-        el("div", { class: "ak-tour__nav" }, [
-          el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: function() {
-            if (last) end();
-            else show(n + 1);
-          } } }, last ? L.done : L.next),
-          last ? null : el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: end } }, L.skip)
-        ].filter(Boolean))
-      ]);
-      document.body.appendChild(wearLook(note, marked));
-      place2();
-      note.querySelector("button").focus({ preventScroll: true });
-    }
-    function clearStep() {
-      if (marked) marked.classList.remove("ak-tour__mark");
-      if (note && note.parentNode) note.parentNode.removeChild(note);
-      marked = null;
-      note = null;
-    }
-    function onKey(e) {
-      if (e.key === "Escape") end();
-    }
-    function end() {
-      clearStep();
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", place2);
-      window.removeEventListener("scroll", follow, true);
-      if (frame2) {
-        cancelAnimationFrame(frame2);
-        frame2 = 0;
-      }
-      if (before && before.isConnected && typeof before.focus === "function") before.focus({ preventScroll: true });
-      before = null;
-      if (i >= 0 && s.onDone) s.onDone();
-      i = -1;
-    }
-    function start() {
-      before = document.activeElement;
-      window.addEventListener("keydown", onKey);
-      window.addEventListener("resize", place2);
-      window.addEventListener("scroll", follow, { capture: true, passive: true });
-      show(0);
-    }
-    return { start, end };
-  }
 
   // src/static/sdk-libs/atelier/copy-upload-i18n.js
-  var STRINGS7 = {
+  var STRINGS9 = {
     en: {
       "drop.label": "Drop the file, or press to pick",
       "drop.tooBig": "{name} is over {mb} MB.",
@@ -20185,12 +21338,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS7[
+      STRINGS9[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS7.en
+      ] || STRINGS9.en
     );
-    const text = table2[key] || STRINGS7.en[key] || key;
+    const text = table2[key] || STRINGS9.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -21199,7 +22352,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/decision-i18n.js
-  var STRINGS8 = {
+  var STRINGS10 = {
     en: {
       "doc.empty.title": "Nothing written here yet",
       "doc.empty.hint": "The text appears here when there is some.",
@@ -21546,12 +22699,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS8[
+      STRINGS10[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS8.en
+      ] || STRINGS10.en
     );
-    const text = table2[key] || STRINGS8.en[key] || key;
+    const text = table2[key] || STRINGS10.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -21561,9 +22714,9 @@ Known schemas:
     return td(key) !== key;
   }
   var DECISION_KEYS = {
-    en: Object.keys(STRINGS8.en),
-    fi: Object.keys(STRINGS8.fi),
-    es: Object.keys(STRINGS8.es)
+    en: Object.keys(STRINGS10.en),
+    fi: Object.keys(STRINGS10.fi),
+    es: Object.keys(STRINGS10.es)
   };
 
   // src/static/sdk-libs/atelier/doc.js
@@ -23640,7 +24793,7 @@ Known schemas:
     }
     let io = null;
     if (typeof IntersectionObserver === "function") {
-      const visible = /* @__PURE__ */ new Set();
+      const visible2 = /* @__PURE__ */ new Set();
       io = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
           const i = sections.indexOf(
@@ -23648,10 +24801,10 @@ Known schemas:
             entry.target
           );
           if (i < 0) return;
-          if (entry.isIntersecting) visible.add(i);
-          else visible.delete(i);
+          if (entry.isIntersecting) visible2.add(i);
+          else visible2.delete(i);
         });
-        const open = Array.from(visible).sort(function(a, b) {
+        const open = Array.from(visible2).sort(function(a, b) {
           return a - b;
         });
         if (open.length) markCurrent(open[0]);
@@ -25444,13 +26597,13 @@ Known schemas:
           tokenHost.__akTokens.push(name);
         }
       }
-      const visible = layout.blocks.filter(function(b) {
+      const visible2 = layout.blocks.filter(function(b) {
         return !b.hidden;
       });
       const band = el("div", { class: "ak-mosaic__band" });
       const units = [];
       const fills = [];
-      for (const block of visible) {
+      for (const block of visible2) {
         const entry = {
           id: String(block.id),
           component: String(block.component),
@@ -25926,6 +27079,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/shell.js
+  var TOUR_INVITE_MS = 700;
   var LOGO_INLINE_MAX = 8192;
   function logoEl(src) {
     if (typeof src !== "string" || !src.trim()) return null;
@@ -25993,7 +27147,17 @@ Known schemas:
     const logo = logoEl(spec.logo);
     const brand = logo ? el("span", { class: "ak-app__brand" }, [logo, heading]) : heading;
     const helpBtn = spec.help && typeof spec.help.button === "function" ? spec.help.button() : null;
-    const bar2 = el("header", { class: "ak-app__bar" }, [brand, helpBtn, motionBtn, pill]);
+    const appTour = spec.tour === false ? null : spec.tour && typeof spec.tour.button === "function" ? spec.tour : hasTourBlock() ? tour() : null;
+    const tourBtn = appTour ? appTour.button() : null;
+    const bar2 = el("header", { class: "ak-app__bar" }, [brand, tourBtn, helpBtn, motionBtn, pill]);
+    let invited = false;
+    function offerTour() {
+      if (invited || !appTour) return;
+      invited = true;
+      setTimeout(function() {
+        appTour.invite();
+      }, TOUR_INVITE_MS);
+    }
     let replaying = false;
     const onBarClick = function(ev) {
       if (replaying) return;
@@ -26204,6 +27368,7 @@ Known schemas:
         root.classList.remove("ak-app--gate");
         status("none");
         if (spec.onReady) spec.onReady(session);
+        offerTour();
       }
     }
     function startBoot() {
@@ -26246,6 +27411,7 @@ Known schemas:
         status("none");
         if (spec.onReady) spec.onReady(a && a.getSession ? a.getSession() : null);
         readySaid = true;
+        offerTour();
         return;
       }
       status("loading");
@@ -26347,8 +27513,14 @@ Known schemas:
       get weather() {
         return weatherCtl;
       },
+      /** The app's tour (tour.js): the one it handed over or the one its #aimeat-tour made; null without. */
+      get tour() {
+        return appTour;
+      },
       destroy() {
         stopLang();
+        if (appTour && appTour !== spec.tour && typeof appTour.destroy === "function") appTour.destroy();
+        else if (tourBtn) tourBtn.remove();
         window.removeEventListener("ak-motion", syncMotion);
         root.removeEventListener("ak-ambient-preset", syncWeather);
         if (sky) sky.destroy();
@@ -28742,7 +29914,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/board-i18n.js
-  var STRINGS9 = {
+  var STRINGS11 = {
     en: {
       "move": "Move",
       "use": "Use",
@@ -28927,12 +30099,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS9[
+      STRINGS11[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS9.en
+      ] || STRINGS11.en
     );
-    const text = table2[key] || STRINGS9.en[key] || key;
+    const text = table2[key] || STRINGS11.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -28940,7 +30112,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/board.js
-  var VARIANTS = ["fill", "plain"];
+  var VARIANTS2 = ["fill", "plain"];
   var FRAME_W = 480;
   var FRAME_MIN_W = 160;
   var FRAME_MIN_H = 120;
@@ -28990,7 +30162,7 @@ Known schemas:
       role: "application",
       "aria-label": spec.label || tb("frame")
     });
-    applyVariant(root, spec, VARIANTS);
+    applyVariant(root, spec, VARIANTS2);
     if (spec.target) resolve(spec.target).appendChild(root);
     const ns = (
       /** @type {any} */
@@ -29127,10 +30299,10 @@ Known schemas:
           f2.x = Math.round(start.x + dx);
           f2.y = Math.round(start.y + dy);
           place2(entry);
-          towed.forEach(function(tw2) {
-            tw2.entry.frame.x = Math.round(tw2.x0 + dx);
-            tw2.entry.frame.y = Math.round(tw2.y0 + dy);
-            place2(tw2.entry);
+          towed.forEach(function(tw3) {
+            tw3.entry.frame.x = Math.round(tw3.x0 + dx);
+            tw3.entry.frame.y = Math.round(tw3.y0 + dy);
+            place2(tw3.entry);
           });
           drawRings();
         },
@@ -29139,8 +30311,8 @@ Known schemas:
           dropCheck(entry, wasIn);
           if (spec.onMove) {
             spec.onMove(f2, rectOf(entry));
-            towed.forEach(function(tw2) {
-              spec.onMove(tw2.entry.frame, rectOf(tw2.entry));
+            towed.forEach(function(tw3) {
+              spec.onMove(tw3.entry.frame, rectOf(tw3.entry));
             });
           }
         }
@@ -29233,16 +30405,16 @@ Known schemas:
       if (f2.tone) entry.el.setAttribute("data-ak-tone", String(f2.tone));
       else entry.el.removeAttribute("data-ak-tone");
       entry.el.classList.toggle("ak-board__frame--borrowed", !!f2.borrowed);
-      const visible = actions.filter(function(a) {
+      const visible2 = actions.filter(function(a) {
         return !a.when || a.when(f2);
       });
-      const sig = visible.map(function(a) {
+      const sig = visible2.map(function(a) {
         return a.id + (a.pressed && a.pressed(f2) ? "*" : "");
       }).join("|");
       if (sig !== entry.sig) {
         entry.sig = sig;
         clear(entry.acts);
-        visible.forEach(function(a) {
+        visible2.forEach(function(a) {
           const b = el("button", {
             type: "button",
             class: "ak-board__act",
@@ -29501,475 +30673,8 @@ Known schemas:
     };
   }
 
-  // src/static/sdk-libs/atelier/handbook.js
-  var VARIANTS2 = ["dense"];
-  var MARK_MS = 2600;
-  var STRINGS10 = {
-    en: {
-      title: "Guide",
-      open: "Open the guide",
-      close: "Close",
-      contents: "Contents",
-      search: "Search the guide",
-      show: "Show me",
-      back: "Contents",
-      empty: "Nothing in the guide matches.",
-      none: "This app has no guide yet.",
-      away: "That place is not on the screen right now.",
-      group: "General"
-    },
-    fi: {
-      title: "Opas",
-      open: "Avaa opas",
-      close: "Sulje",
-      contents: "Sisällys",
-      search: "Hae oppaasta",
-      show: "Näytä missä",
-      back: "Sisällys",
-      empty: "Oppaasta ei löydy tällaista.",
-      none: "Tällä appilla ei ole vielä opasta.",
-      away: "Se kohta ei ole nyt näkyvissä.",
-      group: "Yleistä"
-    },
-    es: {
-      title: "Guía",
-      open: "Abrir la guía",
-      close: "Cerrar",
-      contents: "Contenido",
-      search: "Buscar en la guía",
-      show: "Muéstrame dónde",
-      back: "Contenido",
-      empty: "Nada en la guía coincide.",
-      none: "Esta app aún no tiene guía.",
-      away: "Ese lugar no está en la pantalla ahora.",
-      group: "General"
-    }
-  };
-  function hb(key) {
-    const hosted = t("handbook." + key);
-    if (hosted !== "handbook." + key) return hosted;
-    const table2 = (
-      /** @type {Record<string, string>} */
-      STRINGS10[
-        /** @type {'en'|'fi'|'es'} */
-        i18n.lang()
-      ] || STRINGS10.en
-    );
-    return table2[key] || STRINGS10.en[key] || key;
-  }
-  function wordsOf(v) {
-    if (v == null) return "";
-    if (typeof v === "string") {
-      const s = v.trim();
-      if (s.charAt(0) === "{") {
-        try {
-          return wordsOf(JSON.parse(s));
-        } catch {
-          return v;
-        }
-      }
-      return v;
-    }
-    if (typeof v === "object") {
-      const lang2 = i18n.lang();
-      return String(v[lang2] || v.en || v[Object.keys(v)[0]] || "");
-    }
-    return String(v);
-  }
-  function collect(root) {
-    const out = [];
-    const scope = root || document;
-    if (!scope || typeof scope.querySelectorAll !== "function") return out;
-    Array.prototype.forEach.call(scope.querySelectorAll("[data-ak-help]"), function(n) {
-      const id = n.getAttribute("data-ak-help");
-      if (!id) return;
-      out.push({
-        id,
-        title: n.getAttribute("data-ak-help-title") || n.getAttribute("aria-label") || n.textContent || id,
-        body: n.getAttribute("data-ak-help-text") || "",
-        group: n.getAttribute("data-ak-help-group") || "",
-        from: n
-      });
-    });
-    return out;
-  }
-  function sampleChapters() {
-    return [
-      {
-        id: "s-ask",
-        group: { en: "Start", fi: "Aloitus" },
-        title: { en: "Ask for something", fi: "Pyydä jotain" },
-        body: { en: "Type what you want in your own words. The app shows its plan before it does anything.", fi: "Kirjoita omin sanoin, mitä haluat. Appi näyttää suunnitelmansa ennen kuin tekee mitään." }
-      },
-      {
-        id: "s-data",
-        group: { en: "Start", fi: "Aloitus" },
-        title: { en: "Add from your data", fi: "Lisää omasta datasta" },
-        body: { en: "Pick a memory key or a workspace, and a panel is built from its real fields.", fi: "Valitse muistiavain tai työtila, niin paneeli rakentuu sen oikeista kentistä." }
-      },
-      {
-        id: "s-move",
-        group: { en: "The board", fi: "Lauta" },
-        title: { en: "Move and Use", fi: "Siirrä ja Käytä" },
-        body: { en: "Move drags frames; Use lets you click inside them.", fi: "Siirrä raahaa kehyksiä, Käytä päästää klikkaamaan niiden sisällä." }
-      },
-      {
-        id: "s-share",
-        group: { en: "Together", fi: "Yhdessä" },
-        title: { en: "Share a board", fi: "Jaa lauta" },
-        body: { en: "Invite people to the workspace the board lives in.", fi: "Kutsu ihmisiä työtilaan, jossa lauta on." }
-      }
-    ];
-  }
-  function handbook(spec) {
-    const s = spec || {};
-    const sample = s.sample === true;
-    const mode = s.mode === "dialog" ? "dialog" : "side";
-    const side = s.side === "left" ? "left" : "right";
-    const parts = s.parts || {};
-    let own = sample ? sampleChapters() : (s.chapters || []).slice();
-    let shown = [];
-    let current2 = null;
-    let query = "";
-    let marked = null;
-    let markTimer = null;
-    let destroyed = false;
-    const buttons = [];
-    const root = (
-      /** @type {HTMLDialogElement} */
-      el("dialog", {
-        class: "ak-root ak-handbook ak-handbook--" + mode + " ak-handbook--" + side,
-        "data-ak-part": "root",
-        "data-ak-view": "toc"
-      })
-    );
-    applyVariant(root, s, VARIANTS2);
-    const titleEl = el("h2", { class: "ak-handbook__title", "data-ak-part": "title" });
-    const closeBtn = el("button", {
-      type: "button",
-      class: "ak-btn ak-btn--ghost ak-handbook__close",
-      "data-ak-part": "close",
-      "data-ak-noguard": true,
-      on: { click: function() {
-        close();
-      } }
-    }, "✕");
-    const head = el("div", { class: "ak-handbook__head", "data-ak-part": "head" }, [titleEl, closeBtn]);
-    const find = s.search === false ? null : searchBar({
-      placeholder: hb("search"),
-      label: hb("search"),
-      onChange: function(q) {
-        query = String(q || "").trim().toLowerCase();
-        draw();
-      }
-    });
-    if (find) find.el.setAttribute("data-ak-part", "search");
-    const toc = el("nav", { class: "ak-handbook__toc", "data-ak-part": "toc" });
-    const article = el("article", { class: "ak-handbook__article", "data-ak-part": "article", "aria-live": "polite" });
-    const panel = el(
-      "div",
-      { class: "ak-handbook__panel", "data-ak-part": "panel" },
-      [head, find ? find.el : null, el("div", { class: "ak-handbook__cols" }, [toc, article])]
-    );
-    root.appendChild(panel);
-    root.addEventListener("cancel", function(ev) {
-      ev.preventDefault();
-      close();
-    });
-    root.addEventListener("click", function(ev) {
-      if (ev.target === root) close();
-    });
-    function chapters() {
-      const page = s.collect === false || sample && !s.collect ? [] : collect(s.collect && s.collect !== true ? s.collect : document);
-      const byId = /* @__PURE__ */ new Map();
-      own.forEach(function(c) {
-        byId.set(c.id, Object.assign({}, c));
-      });
-      page.forEach(function(c) {
-        const have = byId.get(c.id);
-        if (have) {
-          if (!have.target && !have.from) have.from = c.from;
-          return;
-        }
-        byId.set(c.id, c);
-      });
-      return Array.from(byId.values());
-    }
-    function textOf(c) {
-      return [wordsOf(c.title), wordsOf(c.body), wordsOf(c.group), c.keywords || ""].join(" ").toLowerCase();
-    }
-    function placeOf(c) {
-      let t2 = c.target;
-      if (typeof t2 === "function") {
-        try {
-          t2 = t2();
-        } catch {
-          t2 = null;
-        }
-      }
-      if (typeof t2 === "string") t2 = document.querySelector(t2);
-      return (
-        /** @type {Element|null} */
-        t2 || c.from || null
-      );
-    }
-    function fill3(host, v) {
-      clear(host);
-      if (v == null || v === false) return;
-      if (typeof v === "function") {
-        v(host);
-        return;
-      }
-      if (v instanceof Node) {
-        host.appendChild(v);
-        return;
-      }
-      wordsOf(v).split(/\n{2,}/).forEach(function(para) {
-        if (para.trim()) host.appendChild(el("p", { text: para.trim() }));
-      });
-    }
-    function drawToc() {
-      clear(toc);
-      const hits = query ? shown.filter(function(c) {
-        return textOf(c).indexOf(query) >= 0;
-      }) : shown;
-      if (!shown.length || !hits.length) {
-        toc.appendChild(el("p", { class: "ak-handbook__empty", "data-ak-part": "empty", text: hb(shown.length ? "empty" : "none") }));
-        return;
-      }
-      let group = null, list3 = null;
-      hits.forEach(function(c) {
-        const g = wordsOf(c.group) || hb("group");
-        if (g !== group || !list3) {
-          group = g;
-          list3 = el(
-            "div",
-            { class: "ak-handbook__group", "data-ak-part": "group", role: "group", "aria-label": g },
-            [el("div", { class: "ak-handbook__groupname", text: g, "aria-hidden": "true" })]
-          );
-          toc.appendChild(list3);
-        }
-        list3.appendChild(el("button", {
-          type: "button",
-          class: "ak-handbook__entry",
-          "data-ak-part": "entry",
-          "data-ak-id": c.id,
-          "data-ak-noguard": true,
-          "aria-current": current2 === c.id ? "true" : null,
-          on: { click: function() {
-            read(c.id);
-          } }
-        }, wordsOf(c.title)));
-      });
-    }
-    function drawArticle() {
-      clear(article);
-      const c = shown.filter(function(x) {
-        return x.id === current2;
-      })[0];
-      article.appendChild(el("button", {
-        type: "button",
-        class: "ak-btn ak-btn--ghost ak-handbook__back",
-        "data-ak-part": "back",
-        "data-ak-noguard": true,
-        on: { click: function() {
-          setView("toc");
-        } }
-      }, "← " + hb("back")));
-      if (!c) return;
-      article.appendChild(el("h3", { class: "ak-handbook__heading", "data-ak-part": "heading", text: wordsOf(c.title) }));
-      const body = el("div", { class: "ak-handbook__text", "data-ak-part": "text" });
-      fill3(body, parts.body ? parts.body(c) : c.body);
-      article.appendChild(body);
-      if (c.target || c.from) {
-        const note = el("p", { class: "ak-handbook__note", "data-ak-part": "note", hidden: true, text: hb("away") });
-        article.appendChild(el("button", {
-          type: "button",
-          class: "ak-btn ak-btn--primary ak-handbook__go",
-          "data-ak-part": "go",
-          "data-ak-noguard": true,
-          on: { click: function() {
-            if (!go(c)) note.hidden = false;
-          } }
-        }, hb("show") + " →"));
-        article.appendChild(note);
-      }
-    }
-    function draw() {
-      if (destroyed) return;
-      titleEl.textContent = wordsOf(s.title) || hb("title");
-      closeBtn.setAttribute("aria-label", hb("close"));
-      root.setAttribute("aria-label", wordsOf(s.title) || hb("title"));
-      toc.setAttribute("aria-label", hb("contents"));
-      if (find) {
-        const box = find.el.querySelector("input");
-        if (box) {
-          box.setAttribute("placeholder", hb("search"));
-          box.setAttribute("aria-label", hb("search"));
-        }
-      }
-      drawToc();
-      drawArticle();
-      buttons.forEach(paintButton);
-    }
-    function setView(v) {
-      root.setAttribute("data-ak-view", v);
-    }
-    function read(id) {
-      current2 = id;
-      setView("read");
-      draw();
-    }
-    function mark(node) {
-      unmark();
-      marked = /** @type {HTMLElement} */
-      node;
-      marked.classList.add("ak-handbook__mark");
-      if (typeof marked.scrollIntoView === "function") marked.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
-      attention(marked, "flash");
-      markTimer = setTimeout(unmark, MARK_MS);
-    }
-    function unmark() {
-      if (markTimer) {
-        clearTimeout(markTimer);
-        markTimer = null;
-      }
-      if (marked) marked.classList.remove("ak-handbook__mark");
-      marked = null;
-    }
-    function go(c) {
-      let node = placeOf(c);
-      if (s.onGo) {
-        try {
-          s.onGo(c, node);
-        } catch {
-        }
-        node = placeOf(c);
-      }
-      if (!node || !node.isConnected || /** @type {HTMLElement} */
-      node.offsetParent === null) return false;
-      if (mode === "dialog" || panel.offsetWidth >= window.innerWidth * 0.75) close();
-      mark(node);
-      return true;
-    }
-    function isOpen() {
-      return !!root.open;
-    }
-    function open(id) {
-      if (destroyed) return;
-      if (!root.isConnected) document.body.appendChild(root);
-      root.removeAttribute("data-ak-look");
-      wearLook(root, document.activeElement);
-      shown = chapters();
-      if (id && shown.some(function(c) {
-        return c.id === id;
-      })) {
-        current2 = id;
-        setView("read");
-      } else if (!current2 || !shown.some(function(c) {
-        return c.id === current2;
-      })) {
-        current2 = shown[0] ? shown[0].id : null;
-        setView("toc");
-      }
-      draw();
-      if (!root.open) {
-        if (mode === "dialog" || typeof root.show !== "function") root.showModal();
-        else root.show();
-        if (!reducedMotion() && typeof panel.animate === "function") {
-          const from = mode === "dialog" ? "translateY(10px)" : side === "left" ? "translateX(-100%)" : "translateX(100%)";
-          panel.animate([{ transform: from, opacity: mode === "dialog" ? 0 : 1 }, { transform: "none", opacity: 1 }], { duration: 240, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" });
-        }
-        buttons.forEach(paintButton);
-        if (s.onOpen) s.onOpen();
-      }
-    }
-    function close() {
-      if (!root.open) return;
-      root.close();
-      buttons.forEach(paintButton);
-      if (s.onClose) s.onClose();
-    }
-    function toggle2() {
-      if (isOpen()) close();
-      else open();
-    }
-    function paintButton(b) {
-      b.setAttribute("aria-label", hb("open"));
-      b.setAttribute("title", hb("open"));
-      b.setAttribute("aria-expanded", isOpen() ? "true" : "false");
-    }
-    function button2() {
-      const b = el("button", {
-        type: "button",
-        class: "ak-handbook__button",
-        "data-ak-part": "button",
-        "data-ak-noguard": true,
-        "aria-haspopup": "dialog",
-        on: { click: function() {
-          toggle2();
-        } }
-      }, "?");
-      buttons.push(b);
-      paintButton(b);
-      return b;
-    }
-    const stopLang = i18n.onChange(function() {
-      if (isOpen()) {
-        shown = chapters();
-        draw();
-      } else buttons.forEach(paintButton);
-    });
-    return {
-      el: root,
-      open,
-      close,
-      toggle: toggle2,
-      isOpen,
-      /** @param {{ chapters?: Chapter[], title?: any }} patch */
-      set: function(patch) {
-        if (!patch || destroyed) return;
-        if (patch.chapters) own = patch.chapters.slice();
-        if (patch.title !== void 0) s.title = patch.title;
-        if (isOpen()) {
-          shown = chapters();
-          draw();
-        }
-      },
-      /** @param {Chapter|Chapter[]} more */
-      add: function(more) {
-        (Array.isArray(more) ? more : [more]).forEach(function(c) {
-          own = own.filter(function(x) {
-            return x.id !== c.id;
-          }).concat([c]);
-        });
-        if (isOpen()) {
-          shown = chapters();
-          draw();
-        }
-      },
-      /** Every chapter the book would show now, the page's included: for an agent or a test. */
-      scan: function() {
-        return chapters().map(function(c) {
-          return { id: c.id, title: wordsOf(c.title), group: wordsOf(c.group), place: !!placeOf(c) };
-        });
-      },
-      button: button2,
-      destroy: function() {
-        destroyed = true;
-        unmark();
-        if (typeof stopLang === "function") stopLang();
-        if (root.open) root.close();
-        root.remove();
-        buttons.forEach(function(b) {
-          b.remove();
-        });
-      }
-    };
-  }
-
   // src/static/sdk-libs/atelier/fingerprint-i18n.js
-  var STRINGS11 = {
+  var STRINGS12 = {
     en: {
       "genre.F": "Fact",
       "genre.A": "Analysis",
@@ -30164,9 +30869,9 @@ Known schemas:
     }
   };
   var FINGERPRINT_KEYS = {
-    en: Object.keys(STRINGS11.en),
-    fi: Object.keys(STRINGS11.fi),
-    es: Object.keys(STRINGS11.es)
+    en: Object.keys(STRINGS12.en),
+    fi: Object.keys(STRINGS12.fi),
+    es: Object.keys(STRINGS12.es)
   };
   function tf(key, vars) {
     const hosted = t("fingerprint." + key, vars);
@@ -30174,13 +30879,13 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS11[
+      STRINGS12[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS11.en
+      ] || STRINGS12.en
     );
     const text = table2[key] || /** @type {Record<string, string>} */
-    STRINGS11.en[key] || key;
+    STRINGS12.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -34873,6 +35578,14 @@ Known schemas:
       fork: "",
       file: "menu.js"
     },
+    "tour": {
+      parts: ["card", "counter", "title", "text", "hint", "close", "spot", "invite", "button"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      fork: "Write the steps into a dialog of your own; you give up the spotlight, the phone's bottom sheet, the page's #aimeat-tour block (which the node reads too), the languages, the invitation and the owner's switch for it.",
+      file: "tour.js"
+    },
     "verbs": {
       parts: ["(none: it renders nothing of its own; the words it writes go into the element the card names)"],
       slots: [],
@@ -34914,7 +35627,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.71.0",
+    version: "0.72.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

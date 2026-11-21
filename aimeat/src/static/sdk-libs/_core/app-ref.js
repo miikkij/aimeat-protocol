@@ -6,6 +6,8 @@
  * @structure appRef()
  * @usage import { appRef } from '../_core/app-ref.js';
  * @version-history
+ *   v1.1.0 — 2026-11-22 — `tourInvite: false` when the block says the owner switched the guided tour's
+ *     invitation off; absent otherwise.
  *   v1.0.0 — 2026-09-28 — Moved from atelier/mosaic-layout.js (v0.53.2), unchanged.
  */
 
@@ -13,7 +15,7 @@
  * The app's own identity, from the `#aimeat-app-ref` block the node injects into the head of every
  * served app, so it is readable from the app's first line of script. Null when absent (a raw file
  * open, a test page), and the mosaic then renders the fallback.
- * @returns {{ owner: string, filename: string }|null}
+ * @returns {{ owner: string, filename: string, tourInvite?: false }|null}
  */
 export function appRef() {
   try {
@@ -29,9 +31,12 @@ export function appRef() {
       parsed = JSON.parse(raw
         .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
     }
-    return parsed && parsed.owner && parsed.app_id
-      ? { owner: String(parsed.owner), filename: String(parsed.app_id) }
-      : null;
+    if (!parsed || !parsed.owner || !parsed.app_id) return null;
+    /** @type {{ owner: string, filename: string, tourInvite?: false }} */
+    const ref = { owner: String(parsed.owner), filename: String(parsed.app_id) };
+    // The owner switched the guided tour's invitation off (atelier/tour.js); written only then.
+    if (parsed.tour_invite === false) ref.tourInvite = false;
+    return ref;
   } catch {
     return null;
   }

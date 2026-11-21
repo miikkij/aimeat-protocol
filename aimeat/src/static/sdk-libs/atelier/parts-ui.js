@@ -6,13 +6,15 @@
  *     toast    the stacked confirmation with an undo, finite by timer
  *     palette  the command palette — one keystroke to every declared action
  *     compare  two states under one handle (pointer or arrow keys)
- *     tour     a few steps over the real screen, then gone
+ *     tour     a few steps over the real screen, then gone (now tour.js, re-exported here)
  *   Nothing here fetches; every part renders what it is given and reports what happens.
- * @structure toast · palette · compare · tour
+ * @structure toast · palette · compare · tour (re-export of tour.js)
  * @usage
  *   AIMEAT.atelier.toast({ title: 'Part adopted', sub: 'shop.html', action: { label: 'Undo', onPick } });
  *   AIMEAT.atelier.palette({ items: [{ id: 'adopt', label: 'Adopt…', run() {} }], hotkey: 'k' });
  * @version-history
+ *   v0.72.0 — 2026-11-22 — tour() moved to its own module, tour.js, where it became the app's guided
+ *     tour; this file re-exports it, so imports of parts-ui.js are unchanged.
  *   v0.63.1 — 2026-10-02 — The tour's note follows its element on every scroll (once a frame, in
  *     capture, so a scrolling container counts too): it was placed once, before the step's smooth
  *     scroll, and on a phone it covered the element and stayed behind when the reader scrolled.
@@ -33,7 +35,7 @@
  *     reads as a bug rather than as a message ending.
  *   v0.42.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 3).
  */
-import { el, resolve, enter, reducedMotion, motionOff, wearLook } from './dom.js';
+import { el, resolve, enter, motionOff, wearLook } from './dom.js';
 import { fadeIn, paceOf, settle } from './arrive.js';
 import { springFrames } from './motion.js';
 import { ink } from './ink.js';
@@ -313,87 +315,6 @@ export function compare(spec) {
   return { el: root, set, destroy() { if (root.parentNode) root.parentNode.removeChild(root); } };
 }
 
-/**
- * The tour: each step marks one element on the real screen and says one thing beside it;
- * Next walks on, Escape or Done ends it, and nothing of it remains afterwards. The note follows
- * its element while the page scrolls, holds the keyboard focus for its step, and gives the focus
- * back to where it was when the tour ends.
- * @param {{ steps: Array<{ target: string|Element, text: string }>, onDone?: () => void,
- *   labels?: { next?: string, done?: string, skip?: string } }} spec
- * @returns {{ start: () => void, end: () => void }}
- */
-export function tour(spec) {
-  const s = spec || { steps: [] };
-  let i = -1;
-  let note = null;
-  let marked = null;
-  let frame = 0;
-  let before = null;
-  // Once per frame however many scroll events arrive: the step's own smooth scroll sends one a
-  // frame. Capture, so a scroll inside any container that holds the element counts too.
-  function follow() {
-    if (frame) return;
-    frame = requestAnimationFrame(function () { frame = 0; place(); });
-  }
-
-  function place() {
-    if (!note || !marked) return;
-    const r = marked.getBoundingClientRect();
-    const w = note.offsetWidth || 260;
-    const top = r.bottom + 12;
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
-    note.style.top = (top + (note.offsetHeight || 0) > window.innerHeight ? Math.max(8, r.top - (note.offsetHeight || 0) - 12) : top) + 'px';
-    note.style.left = left + 'px';
-  }
-  function show(n) {
-    clearStep();
-    const step = s.steps[n];
-    if (!step) { end(); return; }
-    i = n;
-    const target = typeof step.target === 'string' ? document.querySelector(step.target) : step.target;
-    if (!target) { show(n + 1); return; }
-    marked = /** @type {HTMLElement} */ (target);
-    marked.classList.add('ak-tour__mark');
-    if (!reducedMotion()) marked.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    const last = n === s.steps.length - 1;
-    // Read per step, so a language change during the tour reaches the next note.
-    const L = Object.assign({ next: t('next'), done: t('done'), skip: t('tourSkip') }, s.labels || {});
-    note = el('div', { class: 'ak-root ak-tour__note', role: 'dialog', 'aria-live': 'polite' }, [
-      el('div', {}, [el('span', { class: 'ak-tour__step' }, (n + 1) + '/' + s.steps.length), el('span', {}, step.text)]),
-      el('div', { class: 'ak-tour__nav' }, [
-        el('button', { type: 'button', class: 'ak-btn ak-btn--ghost', on: { click: function () { if (last) end(); else show(n + 1); } } }, last ? L.done : L.next),
-        last ? null : el('button', { type: 'button', class: 'ak-btn ak-btn--ghost', on: { click: end } }, L.skip),
-      ].filter(Boolean)),
-    ]);
-    document.body.appendChild(wearLook(note, marked));
-    place();
-    // The step's own button holds the focus, so Enter walks on and a screen reader is in the note.
-    // preventScroll: the note is fixed, and the smooth scroll above is already moving the page.
-    note.querySelector('button').focus({ preventScroll: true });
-  }
-  function clearStep() {
-    if (marked) marked.classList.remove('ak-tour__mark');
-    if (note && note.parentNode) note.parentNode.removeChild(note);
-    marked = null; note = null;
-  }
-  function onKey(e) { if (e.key === 'Escape') end(); }
-  function end() {
-    clearStep();
-    window.removeEventListener('keydown', onKey);
-    window.removeEventListener('resize', place);
-    window.removeEventListener('scroll', follow, true);
-    if (frame) { cancelAnimationFrame(frame); frame = 0; }
-    if (before && before.isConnected && typeof before.focus === 'function') before.focus({ preventScroll: true });
-    before = null;
-    if (i >= 0 && s.onDone) s.onDone();
-    i = -1;
-  }
-  function start() {
-    before = document.activeElement;
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('resize', place);
-    window.addEventListener('scroll', follow, { capture: true, passive: true });
-    show(0);
-  }
-  return { start, end };
-}
+// The tour grew into the app's guided tour and lives in its own module (tour.js, v0.72.0); this
+// file keeps exporting it, so every import of parts-ui.js still finds it.
+export { tour } from './tour.js';

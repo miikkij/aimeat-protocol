@@ -8,6 +8,7 @@
  * @version-history
  *   2026-11-19 — DELETE /v1/admin/apps/:owner/:filename removes what the app leaves, through the same
  *     removeAppLeftovers the owner's delete runs (services/app/delete-sweep.ts), and its dependency edges.
+ *   2026-11-22 — An owner's row carries `tour_invite`, the switch for the guided tour's invitation.
  *   2026-11-14 — GET /v1/apps reads its page, the counts and the own/building refusal through
  *     catalogueAppPage (services/app/catalogue-page.ts), which aimeat_app_list now asks too
  *     (structure programme 2026-11, unit 2b, B7).
@@ -245,6 +246,9 @@ export function registerCatalogueAdminRoutes(
                 open_to: isOwn ? appAccessOf(app) : appAccessLevelOf(app),
                 // The owner's "show the screenshot to everyone" (PATCH `screenshot_public`), the owner's to read.
                 ...(isOwn ? { screenshot_public: app.manifest?.screenshotPublic === true } : {}),
+                // The owner's switch for the guided tour's invitation (PATCH `tour_invite`); the tour
+                // itself is in the manifest (manifest.tour), as public as the app's HTML that declares it.
+                ...(isOwn ? { tour_invite: app.manifest?.tourInviteOff !== true } : {}),
                 // Opened to everyone on a closed node (services/internet-opening/).
                 open_to_internet: isAppOpenToInternet(app.ownerName, app.filename),
                 parked: !!app.parked,

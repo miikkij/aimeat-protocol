@@ -15,6 +15,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.41.0 — 2026-11-22 — The served app's #aimeat-app-ref carries `tour_invite: false` when the owner
+ *     switched the guided tour's invitation off.
  *   v1.40.1 — 2026-11-20 — The app host's path form `/<owner>/<name>` serves `<name>.html` too
  *     (services/app/app-ref.ts); it took only `/<owner>/<name>.html`.
  *   v1.40.0 — 2026-11-15 — A draft link whose draft is gone answers a browser with the not-found page
@@ -341,6 +343,8 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
             appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
             baseUrl: discover.baseUrl, toolNames: discover.toolNames,
             webmcp: wantsWebmcpBridge(relaxed),
+            // The owner's switch for the guided tour's invitation (atelier/tour.js reads it).
+            tourInvite: app.manifest?.tourInviteOff ? false : undefined,
           }
         : undefined,
       // The app's name and description, visible in the document as sent (TARGET-089). Only for an
