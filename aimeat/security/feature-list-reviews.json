@@ -106,7 +106,7 @@
       "digest": "sha256:983adfede3987480bd533f35"
     },
     "6. Organisms, workspaces and knowledge": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts",
         "aimeat/src/tool-catalog/definitions/workspace-spaces.ts",
@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:5da5741ca94981ae16689baf"
+      "digest": "sha256:bc1c08564839574c9df5b872"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-20",
@@ -638,7 +638,7 @@
       "aimeat/src/services/open-items.ts": "7f41fc9dab8fd03a"
     },
     "6. Organisms, workspaces and knowledge": {
-      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "f1b48df2e1da166a",
+      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "ac99f40b039581cd",
       "aimeat/src/tool-catalog/definitions/workspace-spaces.ts": "a1a3d7cca99de61a",
       "aimeat/src/services/organism-join-requests/access-targets.ts": "e65a66f0ad193e20",
       "aimeat/src/services/organism-join-requests/requests.ts": "c4fb930994ce6968",

@@ -672,8 +672,14 @@ export async function afterMemoryWrite(
     // emitters in and the MCP tools did not, so an agent's own new key never reached its own
     // listen stream. The bus is the default; a caller may still pass its own (a test does). Who
     // hears it is decided per stream by the stream's principal (mcp/modern-endpoint.ts, core.ts).
-    (deps.emitResourceUpdated ?? emitResourceUpdated)(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
-    if (!existed) (deps.emitResourceListChanged ?? emitResourceListChanged)(gaii);
+    // A listener that throws (a session that went away) must not fail a write that is already stored,
+    // which is how every route guards the same call.
+    try {
+        (deps.emitResourceUpdated ?? emitResourceUpdated)(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
+        if (!existed) (deps.emitResourceListChanged ?? emitResourceListChanged)(gaii);
+    } catch (err) {
+        logger.warn('memory write: an MCP change notification failed, the write stands', { key, error: String(err) });
+    }
 
     // The directory refreshes on the two profile keys it indexes.
     if (deps.onDirectoryChange && /^profile\.[^.]+\.(interests|location)$/.test(key)) deps.onDirectoryChange();
