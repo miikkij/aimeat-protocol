@@ -48,7 +48,7 @@ dialog.dlg {
   /* A native <dialog> is drawn in the top layer but inherits from its DOM parent, and the SPA has no
      portal: a dialog opened from a label, a column head or a heading took that element's capitals,
      spacing and colour. The root sets the body's text values itself (page-base.css body), so where it
-     is called from no longer shows (docs/pitfalls.md §109 until 2026-11-21). line-height is left to
+     is called from no longer shows (pitfall §109 of the platform list until 2026-11-21). line-height is left to
      inherit: the SPA's body has 1.6 and the app catalog's has none, and one value here would move
      the dialogs of one of the two. */
   font-size: 1rem; font-weight: 400; font-style: normal;

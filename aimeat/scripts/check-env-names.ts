@@ -15,6 +15,8 @@
  *   cd aimeat && pnpm check:env-names          # refuses when the list is out of date
  *   cd aimeat && pnpm check:env-names --write  # writes it
  * @version-history
+ *   v1.0.1 — 2026-11-21 — The generated set is an array of string literals, a constant table to
+ *     check:process-local, not a split template string.
  *   v1.0.0 — 2026-11-21 — Initial.
  */
 import { execFileSync } from 'node:child_process';
@@ -41,10 +43,14 @@ export function repoEnvNames(repo: string = REPO): string[] {
     return [...names].sort();
 }
 
-/** The generated module's text. Eight names a line keeps it far under the file length limit. */
+/**
+ * The generated module's text. Six names a line keeps it far under the file length limit. The set
+ * is built from an array of string literals, which check:process-local reads as a constant table
+ * rather than module-level state.
+ */
 export function render(names: string[]): string {
     const rows: string[] = [];
-    for (let i = 0; i < names.length; i += 8) rows.push(`  ${names.slice(i, i + 8).join(' ')}`);
+    for (let i = 0; i < names.length; i += 6) rows.push(`  ${names.slice(i, i + 6).map(n => `'${n}',`).join(' ')}`);
     return `/**
  * @file src/config/known-env-names.ts
  * @author Jouni Miikki
@@ -55,9 +61,9 @@ export function render(names: string[]): string {
  * @version-history
  *   v1.0.0 — 2026-11-21 — Initial.
  */
-export const KNOWN_ENV_NAMES: ReadonlySet<string> = new Set(\`
+export const KNOWN_ENV_NAMES: ReadonlySet<string> = new Set([
 ${rows.join('\n')}
-\`.split(/\\s+/).filter(Boolean));
+]);
 `;
 }
 
@@ -75,8 +81,8 @@ function main(): void {
         console.log('  ✓ src/config/known-env-names.ts lists every AIMEAT_* name the repository mentions');
         return;
     }
-    const listed = /new Set\(`([\s\S]*?)`/.exec(strip(current))?.[1] ?? '';
-    const have = new Set(listed.split(/\s+/).filter(w => /^AIMEAT_/.test(w)));
+    const listed = /new Set\(([\s\S]*?)\);/.exec(strip(current))?.[1] ?? '';
+    const have = new Set([...listed.matchAll(/\bAIMEAT_[A-Z0-9_]*[A-Z0-9]\b/g)].map(m => m[0]));
     const want = repoEnvNames();
     const added = want.filter(n => !have.has(n));
     const gone = [...have].filter(n => !want.includes(n));

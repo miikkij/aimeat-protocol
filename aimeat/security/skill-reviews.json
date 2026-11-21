@@ -198,7 +198,7 @@
         "aimeat/src/services/app/size-health.ts",
         "aimeat/src/services/app/publish-next-steps.ts"
       ],
-      "digest": "sha256:39e2196434534770f8c7ddef"
+      "digest": "sha256:8d5d1ea7f3a8108a728be499"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-19",
@@ -571,14 +571,14 @@
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/scripts/sandbox.ts",
         "aimeat/scripts/sandbox-machines.ts",
         "aimeat/scripts/ui-compare.ts",
         "aimeat/src/services/builder/app-prompt.ts"
       ],
-      "digest": "sha256:e05641bd19a2bff41ec7d630",
+      "digest": "sha256:b632e05ad1f1756962dc2879",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -642,15 +642,15 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:f09fbd96f0e70d2dc0668d67",
+      "digest": "sha256:50985adbf72a650808b45242",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:090dc651e1e3c033c2adcff3",
+      "digest": "sha256:be48f4918a8883dc664cb457",
       "note": "It checks pages on the session's sandbox node; its viewports follow skill aimeat-frontend-verify."
     },
     "agent:gatekeeper": {
@@ -659,7 +659,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:f09fbd96f0e70d2dc0668d67",
+      "digest": "sha256:50985adbf72a650808b45242",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -676,24 +676,24 @@
         "docs/pitfalls.md",
         ".claude/skills/aimeat-organism-records/SKILL.md"
       ],
-      "digest": "sha256:896f09889c02269b08822046",
+      "digest": "sha256:745c6d91f10ce26f527c8b0d",
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:090dc651e1e3c033c2adcff3",
+      "digest": "sha256:be48f4918a8883dc664cb457",
       "note": "It checks pages on the session's sandbox node against the decisions the lead points it at."
     },
     "agent:ui-design-review": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/scripts/sandbox.ts",
         ".claude/rules/page-guidance.md"
       ],
-      "digest": "sha256:c07a88ff72b969ec39b53272",
+      "digest": "sha256:bffece6a93d91a80eb297e26",
       "note": "It looks at pages on the session's sandbox node and judges them by the page-guidance rule and skill aimeat-design-language."
     }
   },
@@ -720,7 +720,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app/size-health.ts": "e20ea2e295dcdd51",
-      "aimeat/src/services/app/publish-next-steps.ts": "089340c767e929cb"
+      "aimeat/src/services/app/publish-next-steps.ts": "421418207ab29eed"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
@@ -858,7 +858,7 @@
       "aimeat/src/services/themes/tiilitaivas.ts": "5b4513bcfaeaa121"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
+      "aimeat/scripts/sandbox.ts": "c10876b1bf2ae198",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
       "aimeat/scripts/ui-compare.ts": "a9f4b0a0d091a9ee",
       "aimeat/src/services/builder/app-prompt.ts": "629ec165cf96f41e"
@@ -1056,28 +1056,28 @@
       "aimeat/src/services/help/report.ts": "6f23f8121715ce27"
     },
     "project:security-audit": {
-      "aimeat/scripts/gate.ts": "db6436dad36fefa4",
+      "aimeat/scripts/gate.ts": "06be512fde3bde50",
       "aimeat/test/run-e2e-ci.ts": "02046899c45525f2"
     },
     "agent:browser-verifier": {
-      "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
+      "aimeat/scripts/sandbox.ts": "c10876b1bf2ae198"
     },
     "agent:gatekeeper": {
-      "aimeat/scripts/gate.ts": "db6436dad36fefa4",
+      "aimeat/scripts/gate.ts": "06be512fde3bde50",
       "aimeat/test/run-e2e-ci.ts": "02046899c45525f2"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
     "agent:note-writer": {
-      "docs/pitfalls.md": "d8ce4f699b633016",
+      "docs/pitfalls.md": "e8cafda01ef53bc5",
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {
-      "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
+      "aimeat/scripts/sandbox.ts": "c10876b1bf2ae198"
     },
     "agent:ui-design-review": {
-      "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
+      "aimeat/scripts/sandbox.ts": "c10876b1bf2ae198",
       ".claude/rules/page-guidance.md": "2d641d98bbc4a1e5"
     },
     "node:aimeat-goal-recipes": {
