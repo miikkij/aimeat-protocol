@@ -6,6 +6,8 @@
  *   column) and full-bleed public viewer (.portfolio-viewer-full).
  * @usage Loaded by spa.html; classes consumed by public/views/portfolio.js.
  * @version-history
+ *   v1.4.1 -- 2026-11-21 -- The paste divider's line reads --border (the hairline token); it named
+ *     --border-dim, which no sheet declares, so no line was drawn.
  *   v1.4.0 -- 2026-09-13 -- Let shared B1 section titles own the builder headings.
  *   v1.3.0 -- 2026-09-13 -- Compose poster rules and own the builder's inline presentation.
  *   v1.2.0 — 2026-08-29 — The two monospace rules read var(--font-mono) instead of naming a family.
@@ -441,7 +443,7 @@
 .portfolio-auth-label { color: var(--text-dim); font-size: .9rem; margin-bottom: .75rem; }
 .portfolio-upload-hint { margin: 0; color: var(--text-dim); }
 .portfolio-paste-divider { display: flex; align-items: center; gap: .75rem; margin: 1rem 0; color: var(--text-dim); font-size: .9rem; }
-.portfolio-paste-divider hr { flex: 1; border: none; border-top: 1px solid var(--border-dim); }
+.portfolio-paste-divider hr { flex: 1; border: none; border-top: 1px solid var(--border); }
 .portfolio-upload-status { margin-top: .75rem; padding: .5rem 1rem; border-radius: 8px; background: rgba(255,80,80,.08); border: 1px solid rgba(255,80,80,.2); color: #ff5050; }
 .portfolio-upload-status[data-ok="true"] { background: rgba(80,200,120,.08); border-color: rgba(80,200,120,.2); color: #50c878; }
 .portfolio-back { margin-top: 2rem; }

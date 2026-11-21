@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.10.1 — 2026-11-21 — The bell's "Clear all" turns coral (--accent) on hover; it named --brand,
+ *     which no sheet declares, so the hover kept the grey.
  *   v1.10.0 — 2026-11-10 — A bell notice is no longer a button, so its text can be selected; it shows
  *     the pointer and the hover only when it has a link, its title is a plain-looking button, and its
  *     text keeps its line breaks.
@@ -132,7 +134,7 @@
 .notif-dropdown { position: absolute; right: 0; top: calc(100% + 6px); width: 320px; max-height: 60vh; overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); z-index: 1200; }
 .notif-dropdown-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-weight: var(--weight-bold); font-size: var(--text-body-sm); color: var(--text); padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--border-subtle); position: sticky; top: 0; background: var(--card); z-index: 1; }
 .notif-clear-all { font-weight: var(--weight-semibold); font-size: 0.78rem; color: var(--muted); background: none; border: none; padding: 0.15rem 0.35rem; border-radius: 6px; cursor: pointer; }
-.notif-clear-all:hover:not(:disabled) { color: var(--brand); background: var(--bg-dim); }
+.notif-clear-all:hover:not(:disabled) { color: var(--accent); background: var(--bg-dim); }
 .notif-clear-all:disabled { opacity: 0.6; cursor: default; }
 .notif-empty { padding: 1rem 0.85rem; color: var(--muted); font-size: var(--text-note); }
 .notif-item { display: block; border-bottom: 1px solid var(--border-subtle); }
