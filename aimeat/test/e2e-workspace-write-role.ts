@@ -21,28 +21,15 @@
  *
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @version-history
+ *   v1.0.1 — 2026-11-22 — Runs on the shared harness (test/helpers/harness.ts).
  *   v1.0.0 — 2026-11-21 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-write-role
 
+import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpSession } from './helpers/mcp-session.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit = {}) {
-    const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-    const ct = res.headers.get('content-type') ?? '';
-    const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
-    return { status: res.status, body };
-}
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 const post = (path: string, token: string, body: unknown) => json(path, { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
 
@@ -171,8 +158,7 @@ await test('Guard: bob publishes into the member space and his agent writes its 
 await test('Row space marked owner: alice and carol append, bob is refused', async () => {
     assertWritten(await appendRow(alice.token, 'r-alice'), 'alice row');
     assertWritten(await appendRow(carol.token, 'r-carol'), 'carol row (an admin who is not the organism\'s creator)');
-    const r = await appendRow(bob.token, 'r-bob');
-    assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED', `bob row: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    expectRefusal(await appendRow(bob.token, 'r-bob'), 403, 'ACCESS_DENIED');
 });
 
 // ── owner means the WORKSPACE's creator: a plain member's own workspace. ──
@@ -204,5 +190,4 @@ await test('Cleanup', async () => {
     for (const who of [alice, bob, carol]) if (who) await json(`/v1/owners/${who.name}`, { method: 'DELETE', headers: auth(who.token) });
 });
 
-console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
-process.exit(failed > 0 ? 1 : 0);
+finish();

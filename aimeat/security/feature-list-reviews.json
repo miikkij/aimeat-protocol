@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:dd8d8a18c6a38622cf64439e"
+      "digest": "sha256:a2bf5b3cc29781cad843276f"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-21",
@@ -353,7 +353,7 @@
       "digest": "sha256:f364292a0c6231d193e89389"
     },
     "19. Operating a node": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/node-admin",
         "aimeat/src/routes/admin/security.ts",
@@ -369,7 +369,7 @@
         "aimeat/src/services/prometheus.ts",
         "aimeat/src/services/consul-config.ts"
       ],
-      "digest": "sha256:42c04794caddca320ce23c72"
+      "digest": "sha256:a51772d1f9c7992521bd94c0"
     },
     "20. Security": {
       "reviewedOn": "2026-11-19",
@@ -654,7 +654,7 @@
       "aimeat/src/tool-catalog/definitions/organism-approvals.ts": "5644a92e75ef5b49",
       "aimeat/src/services/workspace-rows/row-revisions.ts": "2f605de731f5cceb",
       "aimeat/src/services/workspace-rows/row-schema.ts": "31e80cbaff854066",
-      "aimeat/src/services/workspace-rows/row-service.ts": "4dffe20841bdf7ea",
+      "aimeat/src/services/workspace-rows/row-service.ts": "d11d68697a4264cd",
       "aimeat/src/services/workspace-rows/row-space.ts": "81e86a414994de22",
       "aimeat/src/services/knowledge/audience.ts": "dc0306b7688d848a",
       "aimeat/src/services/knowledge/link-owner-keep.ts": "7006435a8a84cdcf",
@@ -965,7 +965,7 @@
       "aimeat/src/services/node-admin/setup-secret.ts": "7c37998e518e50ba",
       "aimeat/src/services/node-admin/siem-export.ts": "36297d5eba7c1438",
       "aimeat/src/services/node-admin/teams-view.ts": "54307d42939f63cb",
-      "aimeat/src/routes/admin/security.ts": "3d978a63caf6a974",
+      "aimeat/src/routes/admin/security.ts": "d25fa18e477713ad",
       "aimeat/src/routes/health.ts": "446cf4b85eb807bf",
       "aimeat/src/routes/admin/config.ts": "e45163e637c797b1",
       "aimeat/src/routes/admin/key-reencrypt.ts": "1bfbc050258279cf",

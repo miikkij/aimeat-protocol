@@ -959,6 +959,13 @@
       },
       "why": "Reviewed 2026-11-21, the node's own read: an app's public data-map declaration, read for the key families of its rows; only those prefixes are used, to word an advisory warning. No content is shown."
     },
+    "src/services/app/delete-sweep.ts": {
+      "reads": {
+        "listMemoryKeysByPrefix": 2,
+        "getMemory": 1
+      },
+      "why": "Written 2026-11-19, the node's own read: the app delete finds the keys of the records only the deleted app used, and reads a legacy record's appId to decide whether it is this app's, in order to delete them. No value is shown to anyone or sent to a model."
+    },
     "src/services/app/dev-grant.ts": {
       "reads": {
         "getMemory": 2
@@ -1121,6 +1128,13 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists federation cache entries only to delete expired ones. From 2026-10-20 the listing is listAllMemoryMeta, by key prefix across every owner principal instead of a walk of the local agents table, because a replica sits under the SENDING node's principal and the walk visited none of them (secaudit 2026-10, replica retention). It is the value-free META projection, read to compare an updatedAt against the TTL and delete; nothing is served to anyone. The getMemory (2026-10-27, secaudit2026oct26) reads a row dated ahead of this node's clock only to write it back unchanged but for updatedAt, on the version read; nothing is served to anyone."
+    },
+    "src/services/calibrator/projects.ts": {
+      "reads": {
+        "listMemory": 5,
+        "getMemory": 7
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Projects, dimensions, versions and batches pass presentMemories/presentMemory; the rest are read-to-update, delete cascades and existence checks. 2026-11-19: moved unchanged from src/routes/calibrator.ts, so the MCP tool aimeat_calibrator runs the same reads with the caller's reader."
     },
     "src/services/call-timing.ts": {
       "reads": {
@@ -1920,6 +1934,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The subscription index and inbound log, read to append. 2026-11-01 (secaudit2026oct31w2 round 12): the one read left is the owner's own subscription list under the node's system identity; the writes go through record-cas."
     },
+    "src/services/ecosystem/owner-apps.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Written 2026-11-19, the node's own read: moved from routes/ecosystem-apps.ts; lists the owner's pending advisories of a removed app only to delete them. Nothing of them is shown to anyone or sent to a model."
+    },
     "src/services/ecosystem/subscriptions-by-owner.ts": {
       "reads": {
         "getMemory": 1
@@ -2346,6 +2366,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's link-invite records."
     },
+    "src/services/live/node-totals.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1
+      },
+      "why": "Written 2026-11-19, the node's own read: the metadata of public package manifests, moved from routes/public-stats.ts, counted for the front page; no value is loaded and only the number leaves."
+    },
     "src/services/living/pulse-spend.ts": {
       "reads": {
         "getMemory": 2
@@ -2462,6 +2488,13 @@
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Entitlement, grant and history records."
+    },
+    "src/services/moderation/review.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemoryKeysByPrefix": 1
+      },
+      "why": "Written 2026-11-19, the node's own read: moved from routes/appeals.ts; finds the record a flag names only to resolve its owner for an appeal. No value is shown to anyone or sent to a model."
     },
     "src/services/network-policy.ts": {
       "reads": {
@@ -2612,6 +2645,12 @@
         "searchText": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+    },
+    "src/services/organism/write-role.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-11-21 (writeRole on every write path), the node's own read: the node's system record of record spaces held on the earlier writeRole behaviour, read only when a write would be refused, to decide whether the refusal stands. No content."
     },
     "src/services/outbound/outbound-service.ts": {
       "reads": {
@@ -2958,12 +2997,6 @@
       },
       "why": "Reviewed 2026-11-07 (receivers), the node's own read: the receiver records in the owners' service namespaces (svc:), for the operator's list. No content."
     },
-    "src/services/reports/subscriptions.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-11-20 (report subscriptions), the node's own read: each person's subscription records (reports.sub.*), the settings of a report the core job sends. The report carries counts only, built by the value, data and rhythm reports. No content."
-    },
     "src/services/record-cas.ts": {
       "reads": {
         "getMemory": 2
@@ -2993,6 +3026,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The refinery config record, read for its connection id."
+    },
+    "src/services/reports/subscriptions.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-20 (report subscriptions), the node's own read: each person's subscription records (reports.sub.*), the settings of a report the core job sends. The report carries counts only, built by the value, data and rhythm reports. No content."
     },
     "src/services/rest-scope-keep-working-migration.ts": {
       "reads": {
@@ -3238,17 +3277,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The watched value passes leave (external, to the peer) before it goes into a reply; the contract records are the node's own. Reviewed 2026-10-14 (QA audit K2): the third getMemory is the watched key read from the contract owner's own namespace (readWatched); it passes the same leave before it reaches a reply."
     },
-    "src/services/value/per-member.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-11-20 (value report per member), the node's own read: the organism's setting record organism.<id>.meta.valuereport, of which only a current creator's copy counts, read to decide whether the per-member numbers are shown. No content."
-    },
     "src/services/value/measures.ts": {
       "reads": {
         "listMemory": 1
       },
       "why": "Reviewed 2026-11-20 (organism measures), the node's own read: the reader's own measure definitions (reports.measure.<organism>.*) in their own namespace. The rows a measure counts are read only as an aggregate, and only in a workspace the reader may read (canReadWorkspace). No content."
+    },
+    "src/services/value/per-member.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-20 (value report per member), the node's own read: the organism's setting record organism.<id>.meta.valuereport, of which only a current creator's copy counts, read to decide whether the per-member numbers are shown. No content."
     },
     "src/services/verified-name.ts": {
       "reads": {
@@ -3493,6 +3532,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest object types for a write. 2026-10-18: resolveSpaceNamespace reads the same manifest copies to turn a space's name into its namespace; nothing from it reaches a reader."
     },
+    "src/services/workspace/write-role-hold.ts": {
+      "reads": {
+        "listAllMemoryPages": 1
+      },
+      "why": "Written 2026-11-21 (writeRole on every write path), the node's own read: the boot step lists a record space's records only for each record's writer identity, to find members the space's writeRole would now refuse; the space then goes on the operator's Security page. No value is shown to anyone or sent to a model."
+    },
     "src/services/workspace/write.ts": {
       "reads": {
         "listAllMemory": 3
@@ -3504,39 +3549,6 @@
         "listAllMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest namespace policy and the latest version for write guards."
-    },
-    "src/services/app/delete-sweep.ts": {
-      "reads": {
-        "listMemoryKeysByPrefix": 2,
-        "getMemory": 1
-      },
-      "why": "Written 2026-11-19, the node's own read: the app delete finds the keys of the records only the deleted app used, and reads a legacy record's appId to decide whether it is this app's, in order to delete them. No value is shown to anyone or sent to a model."
-    },
-    "src/services/calibrator/projects.ts": {
-      "reads": {
-        "listMemory": 5,
-        "getMemory": 7
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Projects, dimensions, versions and batches pass presentMemories/presentMemory; the rest are read-to-update, delete cascades and existence checks. 2026-11-19: moved unchanged from src/routes/calibrator.ts, so the MCP tool aimeat_calibrator runs the same reads with the caller's reader."
-    },
-    "src/services/ecosystem/owner-apps.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Written 2026-11-19, the node's own read: moved from routes/ecosystem-apps.ts; lists the owner's pending advisories of a removed app only to delete them. Nothing of them is shown to anyone or sent to a model."
-    },
-    "src/services/live/node-totals.ts": {
-      "reads": {
-        "listAllMemoryMeta": 1
-      },
-      "why": "Written 2026-11-19, the node's own read: the metadata of public package manifests, moved from routes/public-stats.ts, counted for the front page; no value is loaded and only the number leaves."
-    },
-    "src/services/moderation/review.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listMemoryKeysByPrefix": 1
-      },
-      "why": "Written 2026-11-19, the node's own read: moved from routes/appeals.ts; finds the record a flag names only to resolve its owner for an appeal. No value is shown to anyone or sent to a model."
     }
   }
 }
