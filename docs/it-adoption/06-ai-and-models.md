@@ -115,7 +115,18 @@ Each provider carries a sentence that says where its data goes ("The prompt goes
 
 ## Data kept to a local model
 
-When classification is on, content at a level with `externalAi: refused` (every TL and NATO class, and health, biometric, defence and export-controlled data domains) goes only into a call whose model reference is `local:<model id>`. Any other model is refused with `CLASSIFIED` (`aimeat/src/services/classification/external-ai.ts`). A role can also require a local provider (`requires-local` in `aimeat/src/services/ai/route-plan.ts`). Detail: [Data classification](../data-classification.md), [05 Data protection](05-data-protection.md).
+When classification is on, content at a level with `externalAi: refused` (every TL and NATO class) goes only into a call whose model reference is `local:<model id>`. Any other model is refused with `CLASSIFIED` (`aimeat/src/services/classification/external-ai.ts`). A role can also require a local provider (`requires-local` in `aimeat/src/services/ai/route-plan.ts`). Detail: [Data classification](../data-classification.md), [05 Data protection](05-data-protection.md).
+
+Content of a regulated data domain (a register of processing names the domain and the organism, workspace or app the content sits in) follows the operator's setting `AIMEAT_COMPLIANCE_REGULATED_AI_MODES`, whether classification is on or off. Entries are `domain=mode`, such as `health=local,export-controlled=block`. The default is empty, and that changes nothing for the AI: every domain is `notify`, so the content goes to an outside model as before, and each send writes a `regulated` row to the classification audit.
+
+| Mode | What a model outside this server gets |
+|---|---|
+| `notify` (default) | the content; each send is marked in the audit |
+| `protect` | the content with names in name fields, Finnish personal identity codes, phone numbers, e-mail and street addresses and IBANs replaced by stand-ins (an HMAC under a key the server keeps, never sent). An AI call path that cannot replace them first is refused. Names inside free text are not found, and a stored file is refused, not protected |
+| `local` | nothing: only a `local:` model, or an agent whose runtime report says its model is local (the agent's claim, not checked), reads it |
+| `block` | nothing; a local model neither. A person still reads it on screen |
+
+A register's own `aiMode` can only make its data stricter. A Data Wallet exception opens `protect` and `local` for one item, and each use is marked; it never opens `block`, and an attempt is marked as exceptional. An AI credential may only make the setting stricter (`PERSON_REQUIRED` otherwise). Section 14 of the compliance report (`regulated_ai`) shows the modes, suggests `local` for health, biometric and genetic, defence-classified and export-controlled data while their mode is more open, and counts what was sent, held back and exceptional (`aimeat/src/services/compliance/regulated-ai.ts`, `aimeat/src/services/compliance/regulated-ai-report.ts`).
 
 `local` is checked: a provider record of type `local` is accepted only at a loopback address (`localhost`, `::1`, a literal `127.x.x.x`), or, for the operator's own record, at an origin in `AIMEAT_AI_PROVIDER_EGRESS`. A host name that only starts with "127." is not loopback. A person's provider at another host is `openai-compatible` and counts as outside (`aimeat/src/services/ai/types.ts` `adapterTypeOf`, `aimeat/src/services/ai/providers.ts` `parseAiProvider`).
 

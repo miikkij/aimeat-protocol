@@ -13,6 +13,8 @@
  *   make it stricter. The answers of the five settings that had the rule are config-tighten-only.test.ts.
  * @usage cd aimeat && pnpm exec vitest run test/unit/config-strictness.test.ts
  * @version-history
+ *   v1.1.0 -- 2026-11-21 -- compliance.regulated_ai_modes joins the settings with the rule; it judges a
+ *     change by its own `loosens` (a list of per-domain orders), so its `order` is empty.
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, item B4).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -36,7 +38,7 @@ const ORDER = ['on', 'apps-ask', 'off'];
 describe('the rule is on the setting\'s row', () => {
   it('the five settings that have it say so on their rows, and their order names every value they take', () => {
     const marked = CONFIG_FIELDS.filter(f => f.aiMayOnlyTighten).map(f => f.dotPath).sort();
-    expect(marked).toEqual(['auth.password_sign_in', 'auth.sign_in_lockout', 'auth.two_step_required', 'classification.mode', 'mcp.capability_use_approval']);
+    expect(marked).toEqual(['auth.password_sign_in', 'auth.sign_in_lockout', 'auth.two_step_required', 'classification.mode', 'compliance.regulated_ai_modes', 'mcp.capability_use_approval']);
     for (const f of CONFIG_FIELDS.filter(f => f.aiMayOnlyTighten)) {
       expect([...f.aiMayOnlyTighten!.order].sort(), f.dotPath).toEqual([...(f.choices ?? [])].sort());
     }

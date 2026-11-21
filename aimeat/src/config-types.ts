@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   2026-11-21 — regulatedAiModes (AIMEAT_COMPLIANCE_REGULATED_AI_MODES): an outside model and a regulated domain.
  *   2026-11-19 — extensionHookWhenMissing: per blocking hook, let through or refuse when its action is missing.
  *   2026-11-14 — HelpConfig mixed in (config/help.ts): the settings of Ask someone who knows.
  *   v1.34.0 — 2026-11-14 — balancingTest (AIMEAT_COMPLIANCE_BALANCING_TEST: required | optional | off).
@@ -517,6 +518,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   dataIntermediation: DataIntermediationMode;
   /** Whether the node asks for the balancing test of an app on legitimate interests (services/compliance/lia-need.ts). */
   balancingTest: BalancingTestMode;
+  /** The operator's mode per regulated domain for an outside AI model, as `domain=mode` entries (services/compliance/regulated-ai.ts). */
+  regulatedAiModes: string[];
   /** Whether this node or its owners do anti-money-laundering obliged work, and who (services/aml/). */
   amlMode: AmlMode;
   /** Where the KYC sanctions lists come from: empty = the EU and UN lists, `none`, or `eu-fsf=<url>,un=<url>` (services/kyc/). */

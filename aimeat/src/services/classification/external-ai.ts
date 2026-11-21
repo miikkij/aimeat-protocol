@@ -27,6 +27,8 @@
  *   if (await external.refuses(label)) { … hidden, audited 'refused' … }
  *   if (modelRefuses(label, use.model)) { … the AI call is refused … }
  * @version-history
+ *   v1.1.0 — 2026-11-21 — isOutside(): whether the reader is a model elsewhere at all, for the mode of a
+ *     regulated data domain (compliance/regulated-ai.ts, feature audit item 1.3).
  *   v1.0.1 — 2026-10-27 — The shared anonymous agent is an outside reader whatever runtime its record
  *     reports (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C3.4).
@@ -43,6 +45,8 @@ const ANONYMOUS_ACCOUNT = 'anonymous';
 export interface ExternalAiCheck {
   /** True when content with `label` may not reach this reader, because the reader is a model elsewhere. */
   refuses(label: Pick<ClassificationLabel, 'externalAi'>): Promise<boolean>;
+  /** True when this reader is a model outside this server: an AI or anonymous reader that did not report a local model. */
+  isOutside(): Promise<boolean>;
 }
 
 /** A model reference that names a provider on this machine (`local:<model id>`). */
@@ -60,7 +64,7 @@ export function externalAiFor(
   deps: { storage: Pick<Storage, 'getAgent'> },
   who: { kind: string; principal: string },
 ): ExternalAiCheck {
-  if (who.kind === 'human' || who.kind === 'system') return { refuses: async () => false };
+  if (who.kind === 'human' || who.kind === 'system') return { refuses: async () => false, isOutside: async () => false };
   let local: Promise<boolean> | null = null;
   const agentIsLocal = () => (local ??= (who.kind === 'ai' && who.principal && isValidGAII(who.principal)
     ? deps.storage.getAgent(who.principal)
@@ -74,6 +78,9 @@ export function externalAiFor(
   return {
     async refuses(label) {
       if (!refusesExternalAi(label)) return false;
+      return !(await agentIsLocal());
+    },
+    async isOutside() {
       return !(await agentIsLocal());
     },
   };

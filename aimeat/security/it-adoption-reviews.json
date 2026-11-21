@@ -64,7 +64,7 @@
       "digest": "sha256:6d20877c35d3b36f0cb7a757"
     },
     "05-data-protection.md": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/classification/defaults.ts",
         "aimeat/src/services/classification/levels.ts",
@@ -73,7 +73,7 @@
         "aimeat/src/services/context/history-keys.ts",
         "aimeat/src/routes/owners/export-records.ts"
       ],
-      "digest": "sha256:70273b5832ba5c63bdb0a2dc"
+      "digest": "sha256:11258fbd6312d7d8be0d5e5b"
     },
     "06-ai-and-models.md": {
       "reviewedOn": "2026-11-19",
@@ -166,12 +166,12 @@
       "digest": "sha256:84b1bd8345c09365c309a3ef"
     },
     "14-compliance-mapping.md": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/compliance/derived.ts",
         "aimeat/src/tool-catalog/definitions/compliance.ts"
       ],
-      "digest": "sha256:c53ff13c17bea7c803cef28e"
+      "digest": "sha256:2d02d2169ad65ff6f116f94c"
     },
     "15-operations-runbook.md": {
       "reviewedOn": "2026-11-15",
@@ -329,7 +329,7 @@
     "05-data-protection.md": {
       "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
       "aimeat/src/services/classification/levels.ts": "fdec7ded5eb8b0a5",
-      "docs/data-classification.md": "6f07c519b849b178",
+      "docs/data-classification.md": "bae71b217c64edca",
       "aimeat/src/services/connections/drive-files.ts": "d539958a587e4811",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
       "aimeat/src/routes/owners/export-records.ts": "a151c3e4aa88ab66"
@@ -407,7 +407,7 @@
     },
     "14-compliance-mapping.md": {
       "aimeat/src/services/compliance/derived.ts": "13efac8102e1d5c9",
-      "aimeat/src/tool-catalog/definitions/compliance.ts": "c8384bbcf2a9e64e"
+      "aimeat/src/tool-catalog/definitions/compliance.ts": "7d0a0af3db0f9ac9"
     },
     "15-operations-runbook.md": {
       "docs/operations/production-deployment.md": "e8f08bb52e1c9426",

@@ -20419,7 +20419,7 @@ paths:
         - { name: level, in: query, schema: { type: string, enum: [node, owner, organism], default: owner } }
         - { name: organism_id, in: query, schema: { type: string } }
         - { name: since, in: query, schema: { type: string, format: date-time } }
-        - { name: action, in: query, schema: { type: string, enum: [shown, used, refused, changed, exception] }, description: 'exception: an entry of the exceptions list made, used or withdrawn; its purpose names the exception, the act and the reason.' }
+        - { name: action, in: query, schema: { type: string, enum: [shown, used, refused, changed, exception, regulated] }, description: 'exception: an entry of the exceptions list made, used or withdrawn; its purpose names the exception, the act and the reason. regulated: content of a regulated data domain that went to an AI model outside the server, or an exception that opened it; its label names the domains.' }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
       responses:
         '200': { description: '{ level, subject, rows, note? }.' }
@@ -25075,7 +25075,16 @@ paths:
         and reports what is in one and not the other.
 
         Response `data`: `{ scope, not_covered, derived, register, gaps, unlabelled_detail,
-        data_intermediation, aml }`.
+        data_intermediation, aml, regulated_ai }`.
+
+        `regulated_ai` is section 14 (regulated data domains and AI models outside this server):
+        `{ setting: { path, modes: [{ domain, name, mode, law_suggests_local }], suggestions },
+        marks: { from, to, sent, held, exceptional, recent, exceptional_rows, truncated }, note }`.
+        `mode` is notify, protect, local or block (setting compliance.regulated_ai_modes, tightened
+        by a register's `aiMode`). `exceptional` counts attempts on block content while an exception
+        was in force: an exception does not open block, and such an attempt is marked as exceptional.
+        Each row of `recent` and `exceptional_rows` is `{ at, action, domains, reader, reader_kind,
+        scope, key, count, what }`.
 
         `aml` is section 13 (anti-money-laundering, Regulation (EU) 2024/1624): `{ section, mode,
         mode_code, mode_text, declarations, findings, totals, obligations, regulation, edit, note }`.

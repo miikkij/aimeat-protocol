@@ -6,6 +6,7 @@
  *   reads as an array and `allowed.includes(origin)` became a substring test.
  * @usage pnpm test -- config-list-settings
  * @version-history
+ *   v1.1.5 — 2026-11-21 — compliance.regulated_ai_modes, a list row whose entries are domain=mode.
  *   v1.1.4 — 2026-11-14 — help.report_recipients, a list row that takes account names only.
  *   v1.1.3 — 2026-11-08 — file_store.kinds, a list row whose entries come from a fixed set.
  *   v1.1.2 — 2026-10-29 — file_store.owner_private_origins, a list row of the file stores.
@@ -43,6 +44,8 @@ const IMMUTABLE_LIST_PATHS = ['ai.provider_allowlist'];
 const ENUM_LIST_PATHS: Record<string, string> = {
     // The kinds of file the node's store takes at any size (config-schema-file-store.ts).
     'file_store.kinds': 'video',
+    // What an AI model outside the server gets of a regulated data domain, as domain=mode (schema-data-access.ts).
+    'compliance.regulated_ai_modes': 'health=local',
 };
 
 describe('the list helpers', () => {

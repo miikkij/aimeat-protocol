@@ -11,6 +11,7 @@
  *   CLASSIFICATION_ACTIONS · checkClassificationInput()
  * @usage imported by catalog/definitions.ts and src/tool-dispatch/classification-call.ts
  * @version-history
+ *   2026-11-21 — AUDIT_ACTIONS takes `regulated`: regulated data domain content sent to an outside model.
  *   2026-11-15 — exception_set names a board (board_id) or an app (app) for an audience exception,
  *     as the service and POST /v1/classification/exceptions take it.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -85,7 +86,7 @@ export const CLASSIFICATION_ACTION_FIELDS: Record<string, string[]> = {
 export const CLASSIFICATION_ACTIONS = ['get', 'set', 'review', 'policy_get', 'policy_set', 'audit', 'scan', 'explorer', 'switch_set', 'exception_list', 'exception_set', 'pack_list', 'pack_set'] as const;
 
 /** The audit log's row kinds, for audit_action on all three surfaces. */
-export const AUDIT_ACTIONS = ['shown', 'used', 'refused', 'changed', 'exception'] as const;
+export const AUDIT_ACTIONS = ['shown', 'used', 'refused', 'changed', 'exception', 'regulated'] as const;
 
 /** An exception's act, for exception_action on all three surfaces. A person makes leave, ai-send or audience. */
 export const EXCEPTION_ACTION_VALUES = ['leave', 'ai-send', 'audience', 'lower', 'policy', 'review'] as const;
@@ -130,7 +131,7 @@ export const classificationTools = [
             keys: { type: 'array', description: 'scan: memory keys to classify.', zod: z.array(z.string().max(INPUT_LIMITS.key)).max(500) },
             prefix: { type: 'string', description: 'scan: classify every memory key under this prefix (queued).' },
             since: { type: 'string', description: 'audit, exception_list: only rows from this ISO time on.' },
-            audit_action: { type: 'string', enum: [...AUDIT_ACTIONS], description: 'audit: only this kind of row. exception: an exception made, used or withdrawn.' },
+            audit_action: { type: 'string', enum: [...AUDIT_ACTIONS], description: 'audit: only this kind of row. exception: an exception made, used or withdrawn. regulated: content of a regulated data domain that went to an AI model outside the server.' },
             exception_action: { type: 'string', enum: [...EXCEPTION_ACTION_VALUES], description: 'exception_list: only exceptions of this act (audience: the owner let one item be shown wider than its classification allows). exception_set: leave (the item may leave) or ai-send (an AI may send it out).' },
             until: { type: 'string', description: 'exception_set: when the exception ends, ISO. Absent: until it is withdrawn.' },
             limit: { type: 'number', description: 'audit, exception_list: at most this many rows, default 200. explorer: items per page, default 50, at most 200.', zod: z.number().int().min(1).max(1000) },

@@ -16767,6 +16767,7 @@
     "cfg_consent_party_purchases_per_hour": "Purchases one address may start an hour",
     "cfg_consent_data_intermediation": "Data intermediation service (EU 2022/868)",
     "cfg_compliance_balancing_test": "Balancing test for apps (legitimate interests)",
+    "cfg_compliance_regulated_ai_modes": "Regulated data and outside AI models",
     "cfg_consent_party_self_registration": "People register to apps without an account",
     "cfg_consent_app_party_signups_per_hour": "Signups to apps from one address in an hour",
     "cfg_consent_app_party_pending_hours": "Hours an unconfirmed signup keeps its place",
@@ -16982,6 +16983,7 @@
     "cfgDesc_consent_data_intermediation": "Whether this server passes data between others as a service. \"Report only\" changes nothing: it shows what it finds on the Compliance page.",
     "cfgDesc_consent_party_self_registration": "Whether an app may let people register without an account on this server. Always off on a server that shows its content to signed-in accounts only.",
     "cfgDesc_compliance_balancing_test": "Whether this server asks for the balancing test of an app whose register names legitimate interests. Optional by default: the test is there to use, and nothing asks for it.",
+    "cfgDesc_compliance_regulated_ai_modes": "What an AI model outside this server gets of regulated data, one domain=mode entry per data domain, such as health=local. Empty by default: every domain is notify, so the content goes as before and each send is marked in the classification audit.",
     "cfgDesc_consent_app_party_signups_per_hour": "How many times one network address may sign up to this server's apps in an hour. 0 means no limit.",
     "cfgDesc_consent_app_party_pending_hours": "How long a person who signed up to an app and never opened the mailed link stays on the app's list. After that the place is free again, and the person can sign up again. 0 keeps them until the app's owner removes them.",
     "cfgDesc_consent_app_party_max": "The most people who can register to one app without an account, counting the signups still waiting for their link. When an app is full, a new signup is refused and the app's owner sees it on the app's page. A lower value removes nobody: it stops new signups until the app holds fewer. 1 to 1 000 000, 10 000 by default.",
@@ -32689,6 +32691,18 @@
           "ex2": "Optional: a public or shared server where an app's owner writes the test when they want it.",
           "ex3": "Off: a closed environment that keeps its records of processing elsewhere.",
           "tip": "An agent with the compliance:write permission may approve a test in every mode, unless the app's owner has asked to approve that test themselves. This is a help for the assessment, not legal advice."
+        },
+        "regulated_ai_modes": {
+          "title": "Regulated data and outside AI models",
+          "short": "What an AI model outside this server gets of regulated data, per data domain. By default the content goes as before, and each send is marked.",
+          "what": "A register of processing names the data domains its data falls under, such as health, children or export control, and the organisms, workspaces and apps the data is in. Content in those places is regulated data. This setting decides what an AI model outside this server gets of it. Write one entry per domain, domain=mode. Four modes, from open to strict. notify: the content goes as before, and each send writes a mark to the classification audit. protect: before the content goes, names in name fields, Finnish personal identity codes, phone numbers, e-mail and street addresses and IBANs are replaced with stand-ins such as [phone-3f9a2c1b]. The same value in the same place gets the same stand-in, so the model can still see that two records are about the same person. A stand-in cannot be turned back into the value without a key that only this server keeps. An AI call that cannot replace the details first is refused. local: only a model on this machine reads the content. block: no model reads it, a local one neither; a person still reads it on their own screen. A register can set its own mode, and the stricter of the two holds. An exception in the Data Wallet lets one item go unprotected or to an outside model, and its use is marked. An exception does not open block: the attempt is marked as exceptional. The setting holds whether classification is on or off.",
+          "range": "A list of domain=mode entries. The domains: health, special-category, biometric-genetic, children, criminal, employment, payment-financial, public-authority, defence-classified, export-controlled, privileged-trade-secret. The modes: notify, protect, local, block. Empty (the default): every domain is notify.",
+          "low": "notify: nothing changes for the AI, and the compliance report lists what went out.",
+          "high": "block: no AI reads the domain's content, and the people who own it work on it without AI.",
+          "ex1": "health=local: a clinic's server with a model of its own, where patient data may not leave the machine.",
+          "ex2": "employment=protect: an HR workspace where an outside model may help with the text but must not see who the people are.",
+          "ex3": "export-controlled=block: a defence supplier keeps controlled technical data away from every model.",
+          "tip": "Section 14 of the compliance report suggests local for health, biometric and genetic data, defence information and export-controlled data while their mode is more open. Protect does not find a name inside free text, and a stored file sent to an AI under protect is refused. An AI may make this setting only stricter; a person makes it more open. This is a help for compliance, not legal advice."
         }
       },
       "visibility": {

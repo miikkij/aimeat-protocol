@@ -88,6 +88,12 @@ export const RegisterSchema = z.object({
   subjects: list().optional(),
   dataCategories: list().optional(),
   domains: z.array(z.string().max(60)).max(20).optional(),
+  /**
+   * What an outside AI model gets of the data of this register's containers, when the register is
+   * stricter than the operator's mode for its domains (data/compliance-domains.ts RegulatedAiMode).
+   * The strictest of the two holds, so a register can only tighten. Read only while `domains` names one.
+   */
+  aiMode: z.enum(['notify', 'protect', 'local', 'block']).optional(),
   recipients: list().optional(),
   processors: z.array(z.string().max(120)).max(50).optional(),
   transfers: z.array(z.object({ country: z.string().max(60), basis: z.enum(['adequacy', 'scc', 'dpf', 'bcr', 'derogation', 'none']) })).max(30).optional(),

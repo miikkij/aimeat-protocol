@@ -322,7 +322,7 @@
       "digest": "sha256:f5b19d329d4d9a6013a89455"
     },
     "17. AI transparency and compliance": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/data/compliance-domains.ts",
         "aimeat/src/services/compliance/domain-floor.ts",
@@ -336,7 +336,7 @@
         "aimeat/src/services/data-intermediation",
         "aimeat/src/services/provenance-embed"
       ],
-      "digest": "sha256:c03891e3f8adeb962ba69489"
+      "digest": "sha256:c4fe7f622f176f7078f18b85"
     },
     "18. Federation and your own node": {
       "reviewedOn": "2026-11-19",
@@ -415,7 +415,7 @@
       "digest": "sha256:e5e051b90b29888d43b64f05"
     },
     "24. Data classification": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/classification/defaults.ts",
         "aimeat/src/services/classification/levels.ts",
@@ -426,7 +426,7 @@
         "aimeat/src/tool-catalog/definitions/classification.ts",
         "aimeat/src/services/classify-on-write.ts"
       ],
-      "digest": "sha256:cbdc800e920ef79f3b907d14"
+      "digest": "sha256:c13fedde093f3210bcccbb0e"
     }
   },
   "promises": [
@@ -919,9 +919,9 @@
       "aimeat/src/tool-catalog/definitions/site-template.ts": "a93389ae61e054b8"
     },
     "17. AI transparency and compliance": {
-      "aimeat/src/data/compliance-domains.ts": "3671999359e598ed",
-      "aimeat/src/services/compliance/domain-floor.ts": "f25a30a0b00a9fa9",
-      "aimeat/src/tool-catalog/definitions/compliance.ts": "c8384bbcf2a9e64e",
+      "aimeat/src/data/compliance-domains.ts": "af2bee638c6d09c9",
+      "aimeat/src/services/compliance/domain-floor.ts": "f8ed5d1f6183ffa0",
+      "aimeat/src/tool-catalog/definitions/compliance.ts": "7d0a0af3db0f9ac9",
       "aimeat/src/routes/owners/export-sections.ts": "e13ba3d2a3b0f831",
       "aimeat/src/services/mydata-receipt.ts": "5c067e160c40e46c",
       "aimeat/src/routes/ai-provenance.ts": "0f53e7e4d0e5b99a",
@@ -1010,14 +1010,14 @@
     "24. Data classification": {
       "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
       "aimeat/src/services/classification/levels.ts": "fdec7ded5eb8b0a5",
-      "aimeat/src/services/classification/external-ai.ts": "3cdeffee6d124bf7",
+      "aimeat/src/services/classification/external-ai.ts": "6ce3e98eb475a54e",
       "aimeat/src/data/classification-packs.ts": "ffbb4b6a6349fce1",
       "aimeat/src/services/classification-run/audience-settle.ts": "4d48f95d6b426f0d",
       "aimeat/src/services/classification-run/classifier.ts": "3671d4a417649d32",
       "aimeat/src/services/classification-run/scan.ts": "4a1961275529658a",
       "aimeat/src/services/classification-run/switch.ts": "a2b6b4c5d5c7ecfa",
       "aimeat/src/routes/classification.ts": "aa8c8aed96e44932",
-      "aimeat/src/tool-catalog/definitions/classification.ts": "fd8a3543b796d9e7",
+      "aimeat/src/tool-catalog/definitions/classification.ts": "9ebc999456d3b8a6",
       "aimeat/src/services/classify-on-write.ts": "7de28fba83f7644f"
     }
   }

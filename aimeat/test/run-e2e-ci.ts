@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-21 -- e2e-regulated-ai-modes.ts joins the list (not the guard tier): a regulated data domain's
+ *     mode for an outside AI model (feature audit item 1.3).
  *   2026-11-20 -- e2e-organism-app-wall.ts joins the list (not the guard tier): the organism's app wall and the new entry.
  *   2026-11-20 -- e2e-ai-standing.ts joins the list (not the guard tier): the owner's "Allow always" setting
  *     (wish-ai-toimii-itsen-isesti-omistajan-asetuksella-salli-aina-ja-k).
@@ -1270,6 +1272,9 @@ const ALL_SUITES = [
     // The records of processing, data domains, requests, breaches, frameworks and processors of the
     // node, an organism and an app, over REST and MCP, and their refusals (plan doc-mvlftkh9zmc9).
     'test/e2e-compliance-records.ts',
+    // What an AI model outside the server gets of a regulated data domain: notify, protect, local and
+    // block, an exception that opens local and is marked exceptional on block (feature audit item 1.3).
+    'test/e2e-regulated-ai-modes.ts',
     // Data processing agreements: the draft from the node's data, the Commission's text word for word,
     // signing in the AIMEAT app, a returned PDF and scan, an announced change, end and deletion, and
     // who may do what (plan doc-mvmr4i2wdk0p).

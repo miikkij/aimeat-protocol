@@ -16,6 +16,7 @@
  *   ClassificationAuditFilter
  * @usage import type { ClassificationAuditRow } from '../storage/interface.js';
  * @version-history
+ *   v1.3.0 — 2026-11-21 — The action `regulated` (feature audit item 1.3; a text column, no migration).
  *   v1.2.0 — 2026-11-10 — ClassificationAuditFilter.ownerGaiis: many identities' rows in one read.
  *   v1.1.0 — 2026-09-30 — The action `exception`: the exceptions list in the audit (a text column,
  *     so neither provider needs a migration).
@@ -30,9 +31,11 @@ export type ClassificationAuditReaderKind = 'human' | 'ai' | 'system' | 'anonymo
  * What happened. `shown` and `used` are recorded only for a label with `audit: true`; `refused`
  * (hidden from or refused to a reader) and `changed` (a label set or moved) are always recorded.
  * `exception` is an entry of the exceptions list being made, used or withdrawn (decided 2026-09-30);
- * `purpose` names the exception, the act and its reason.
+ * `purpose` names the exception, the act and its reason. `regulated` is content of a regulated data
+ * domain that went to an AI model outside the server, or an exception that opened it
+ * (services/compliance/regulated-ai.ts); its label column names the domains (`domain:health`).
  */
-export type ClassificationAuditAction = 'shown' | 'used' | 'refused' | 'changed' | 'exception';
+export type ClassificationAuditAction = 'shown' | 'used' | 'refused' | 'changed' | 'exception' | 'regulated';
 
 /** One stored audit row. */
 export interface ClassificationAuditRow {

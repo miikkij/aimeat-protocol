@@ -55,6 +55,8 @@
  *   recordClassificationAudit({ scope, ownerGaii, kind: 'memory', key, label: 'luottamuksellinen',
  *     reader: 'claude#alice@node', readerKind: 'ai', action: 'used', purpose: 'chat:anthropic/claude' });
  * @version-history
+ *   v1.6.0 -- 2026-11-21 -- The action `regulated` is evidence: a mark of regulated content that went to
+ *     an outside model is never evicted (feature audit item 1.3, compliance/regulated-ai.ts).
  *   v1.5.0 -- 2026-11-13 -- A flush, a storage delete of audit rows and the merged read are ordered:
  *     removeWithClassificationAudit, and flushClassificationAudit answers when the rows are stored. A
  *     delete during a write had been followed by the write, and a read during it missed the batch.
@@ -167,7 +169,7 @@ let evidence = new Map<string, ClassificationAuditRow>();
 let dropped = 0;
 let refusedEvidence = 0;
 
-const isEvidence = (a: ClassificationAuditAction) => a === 'refused' || a === 'changed' || a === 'exception';
+const isEvidence = (a: ClassificationAuditAction) => a === 'refused' || a === 'changed' || a === 'exception' || a === 'regulated';
 /** An event recorded to the millisecond and never merged into another (a change, an exception). */
 const isEvent = (a: ClassificationAuditAction) => a === 'changed' || a === 'exception';
 const waitingRows = (): ClassificationAuditRow[] => [...evidence.values(), ...routine.values()];

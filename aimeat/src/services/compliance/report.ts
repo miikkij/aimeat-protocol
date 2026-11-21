@@ -35,6 +35,8 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.7.0 — 2026-11-21 — `regulated_ai`, section 14: the mode per regulated data domain for an outside
+ *     AI model, what the law row suggests, and the period's marks (feature audit item 1.3).
  *   v1.6.0 — 2026-11-19 — `aml`, section 13 (Regulation (EU) 2024/1624): the setting, the declarations,
  *     the findings and the obligations, in both rings (services/aml/report.ts).
  *   v1.5.1 — 2026-11-05 — Moved unchanged from src/services/compliance-report.ts to src/services/compliance/report.ts (codebase analysis 2026-11-03, item D-h).
@@ -71,6 +73,7 @@ import { appAiGaps } from './app-ai-gaps.js';
 import type { ScopeGap } from './scope-gaps.js';
 import { buildDataIntermediationSection, type DataIntermediationSection } from '../data-intermediation/report.js';
 import { buildAmlSection, type AmlSection } from '../aml/report.js';
+import { buildRegulatedAiSection, type RegulatedAiSection } from './regulated-ai-report.js';
 
 /** How far back the rollup's hot window reaches before rows move to the archive. */
 const USAGE_HOT_WINDOW_DAYS = 90;
@@ -175,6 +178,11 @@ export interface ComplianceReport {
    * declarations, the findings and the obligations. Both rings (services/aml/report.ts).
    */
   aml: AmlSection;
+  /**
+   * Section 14, regulated data domains and AI models outside this server: the mode per domain, what
+   * the law row suggests, and the marks of the period. Both rings (regulated-ai-report.ts).
+   */
+  regulated_ai: RegulatedAiSection;
 }
 
 export interface ComplianceReportOptions {
@@ -504,6 +512,8 @@ export async function buildComplianceReport(
   const dataIntermediation = await buildDataIntermediationSection({ storage, config }, owner ? { ownerGhii: owner } : {});
   // Section 13, anti-money-laundering (services/aml/): both rings, the owner's own in a slice.
   const aml = await buildAmlSection({ storage, config }, owner ? { ownerGhii: owner } : {});
+  // Section 14, regulated data domains and outside AI models: both rings, the owner's own marks in a slice.
+  const regulatedAi = await buildRegulatedAiSection({ storage, config }, { from: window.from, to: window.to, ...(owner ? { ownerGhii: owner } : {}) });
 
   return {
     scope: {
@@ -523,6 +533,7 @@ export async function buildComplianceReport(
     gaps: [...findGaps(usecases, usage, transparency), ...appGaps, ...fontGaps],
     data_intermediation: dataIntermediation,
     aml,
+    regulated_ai: regulatedAi,
   };
 }
 

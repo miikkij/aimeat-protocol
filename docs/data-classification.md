@@ -181,8 +181,39 @@ biometric and genetic, children, criminal, employment, payments, public authorit
 security-classified, export-controlled, legal privilege and trade secrets
 (`aimeat/src/data/compliance-domains.ts`). Each has a floor label, and writing a register raises the
 classification of every workspace, organism or app it names to that floor, never lower; a label a
-person set lower waits for them as a suggestion. Health, biometric, defence and export-controlled
-data refuse an outside model, and a domain that needs an impact assessment makes a missing one a gap.
+person set lower waits for them as a suggestion. A domain that needs an impact assessment makes a
+missing one a gap. What an AI model outside this server gets of a domain's content is the
+operator's mode for that domain, in the next section; the floor alone refuses no model.
+
+**Regulated data and outside AI models.** Content is regulated when a register names a domain and
+the content sits in a container the register names (an organism, a workspace, an app). The
+operator's setting `compliance.regulated_ai_modes` (`AIMEAT_COMPLIANCE_REGULATED_AI_MODES`) gives
+each domain a mode, as `domain=mode` entries such as `health=local,export-controlled=block`. A domain
+no entry names is `notify`, and the setting is empty by default.
+
+| Mode | What an AI model outside this server gets |
+|---|---|
+| `notify` (default) | the content, as before; each send writes a `regulated` row to the classification audit |
+| `protect` | the content with names in name fields (`name`, `firstName`, `etunimi`, `sukunimi` and the like), Finnish personal identity codes, phone numbers, e-mail and street addresses and IBANs replaced by stand-ins such as `[phone-3f9a2c1b]`: an HMAC under a key the server keeps, the same for the same value in the same container. The audit row counts what was replaced. An AI call path that cannot replace the details first is refused |
+| `local` | nothing: only a `local:` model, or an agent whose runtime report says its model is local, reads it |
+| `block` | nothing, and a local model neither; a person still reads it on their own screen |
+
+A register can set its own `aiMode`, and the stricter of the operator's and the register's mode
+holds, so a register can tighten and never loosen. An `ai-send` exception in the Data Wallet
+(`POST /v1/classification/exceptions`) opens `protect` (the item goes unprotected) and `local` for its
+item, and its use is recorded. It does not open `block`: an attempt on block content while an
+exception is in force is written as an `exception` row. The modes hold whether classification is on
+or off. An AI credential may make the setting only stricter (a looser value answers 403
+`PERSON_REQUIRED`). Section 14 of the compliance report (`regulated_ai`) shows the mode per domain,
+suggests `local` for health, biometric and genetic, defence-classified and export-controlled data
+while their mode is more open, and counts the period's marks: sent, held back and exceptional. The
+rows read with `GET /v1/classification/audit?action=regulated` or `aimeat_classification`
+(`action: "audit"`, `audit_action: "regulated"`).
+
+Limits: a name inside free text is not found; an app's data is covered in its own namespace
+(`eco:<app>#<owner>@<node>`), not what a hosted app writes into its owner's namespace, the same reach
+as the floor; a stored file sent to an AI under `protect` is refused, not protected; a local model an
+agent reports is the agent's claim, which the server cannot check.
 
 **What an app's users see.** An app's data map read (`GET /v1/datamap/apps/{owner}/{filename}`,
 `aimeat_datamap_get`) carries `records_of_processing`, each register's title, type, purpose, legal

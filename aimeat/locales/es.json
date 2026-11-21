@@ -15898,6 +15898,7 @@
     "cfg_consent_party_purchases_per_hour": "Compras que una dirección puede iniciar por hora",
     "cfg_consent_data_intermediation": "Servicio de intermediación de datos (UE 2022/868)",
     "cfg_compliance_balancing_test": "Prueba de ponderación de las aplicaciones (interés legítimo)",
+    "cfg_compliance_regulated_ai_modes": "Datos regulados y modelos de IA externos",
     "cfg_consent_party_self_registration": "Registro en aplicaciones sin una cuenta",
     "cfg_consent_app_party_signups_per_hour": "Registros en aplicaciones desde una dirección en una hora",
     "cfg_consent_app_party_pending_hours": "Horas que un registro sin confirmar conserva su plaza",
@@ -16113,6 +16114,7 @@
     "cfgDesc_consent_data_intermediation": "Si este servidor intermedia datos entre otros como servicio. El modo «Solo informe» no cambia nada: muestra lo que encuentra en la página de Compliance.",
     "cfgDesc_consent_party_self_registration": "Si una aplicación puede dejar que la gente se registre sin una cuenta en este servidor. Siempre desactivado en un servidor que solo muestra su contenido a las cuentas con sesión iniciada.",
     "cfgDesc_compliance_balancing_test": "Si este servidor pide la prueba de ponderación de una aplicación cuyo registro indica el interés legítimo. Opcional por defecto: la prueba está disponible y nada la pide.",
+    "cfgDesc_compliance_regulated_ai_modes": "Qué recibe de los datos regulados un modelo de IA que no corre en este servidor. Escribe una línea por cada tipo de datos regulados con la forma tipo=modo, por ejemplo health=local. Vacío por defecto: cada tipo está en notify, así que el contenido sale como antes y cada envío deja una anotación en el registro de clasificación.",
     "cfgDesc_consent_app_party_signups_per_hour": "Cuántas veces una misma dirección de red puede registrarse en las aplicaciones de este servidor en una hora. 0 significa sin límite.",
     "cfgDesc_consent_app_party_pending_hours": "Cuánto tiempo sigue en la lista de la aplicación una persona que se registró y no abrió el enlace del correo. Después la plaza queda libre y la persona puede registrarse de nuevo. 0: sigue en la lista hasta que el propietario de la aplicación la quite.",
     "cfgDesc_consent_app_party_max": "Cuántas personas pueden registrarse en una aplicación sin cuenta, contando los registros que aún esperan a que se abra su enlace. Cuando la aplicación está llena, se rechaza el registro nuevo y el propietario lo ve en la página de la aplicación. Un valor más bajo no quita a nadie: impide registros nuevos hasta que haya menos personas. De 1 a 1 000 000; 10 000 por defecto.",
@@ -31061,6 +31063,18 @@
           "ex2": "Opcional: un servidor público o compartido donde el propietario de una aplicación hace la prueba cuando quiere.",
           "ex3": "Desactivada: un entorno cerrado que lleva sus registros de actividades de tratamiento en otro lugar.",
           "tip": "Un agente con el permiso compliance:write puede aprobar una prueba en cualquier modo, salvo que el propietario de la aplicación haya pedido aprobar esa prueba personalmente. Es una ayuda para la evaluación, no asesoría legal."
+        },
+        "regulated_ai_modes": {
+          "title": "Datos regulados y modelos de IA externos",
+          "short": "Qué recibe un modelo de IA que no corre en este servidor de cada tipo de datos regulados. Por defecto el contenido sale como antes, y cada envío deja una anotación.",
+          "what": "Un registro de actividades de tratamiento indica a qué datos regulados pertenecen sus datos, como datos de salud, datos de menores o datos sujetos a control de exportaciones, y en qué organismos, espacios de trabajo y aplicaciones están. El contenido de esos lugares son datos regulados. Este ajuste decide qué recibe de ellos un modelo de IA que no corre en este servidor. Escribe una línea por tipo con la forma tipo=modo. Hay cuatro modos, del más abierto al más estricto. notify (Notificar): el contenido sale como antes, y cada envío deja una anotación en el registro de clasificación. protect (Proteger): antes de que el contenido salga, el servidor cambia los nombres que están en campos de nombre, los números de identidad personal finlandeses, los números de teléfono, los correos, las direcciones postales y los IBAN por identificadores sustitutos como [phone-3f9a2c1b]. El mismo valor en el mismo lugar recibe siempre el mismo sustituto, así que el modelo todavía ve que dos entradas hablan de la misma persona. Nadie puede volver del sustituto al valor sin una clave que solo este servidor conoce. Si una llamada a la IA no puede cambiar los datos antes, el servidor la rechaza. local (Modelo local): solo un modelo en esta máquina lee el contenido. block (Bloquear): ningún modelo lo lee, ni siquiera uno local. Una persona todavía lo lee en su propia pantalla. Un registro puede fijar su propio modo, y vale el más estricto de los dos. Una excepción en la Billetera de datos deja que un elemento salga a un modelo externo o sin protección, y su uso queda anotado. Una excepción no abre el modo block: el intento queda anotado como excepcional. El ajuste vale tanto con la clasificación activada como desactivada.",
+          "range": "Una lista de líneas tipo=modo. Los tipos: health, special-category, biometric-genetic, children, criminal, employment, payment-financial, public-authority, defence-classified, export-controlled, privileged-trade-secret. Los modos: notify, protect, local, block. Vacío (por defecto): cada tipo está en notify.",
+          "low": "notify: para la IA nada cambia, y el informe de cumplimiento muestra lo que salió.",
+          "high": "block: ninguna IA lee el contenido de ese tipo, y sus propietarios trabajan con él sin IA.",
+          "ex1": "health=local: el servidor de una clínica con su propio modelo, donde los datos de pacientes no pueden salir de la máquina.",
+          "ex2": "employment=protect: un espacio de trabajo de recursos humanos donde un modelo externo puede ayudar con el texto, pero no debe ver de quién se trata.",
+          "ex3": "export-controlled=block: un proveedor de defensa mantiene los datos técnicos controlados lejos de todos los modelos.",
+          "tip": "La sección 14 del informe de cumplimiento sugiere local para los datos de salud, los datos biométricos y genéticos, la información de defensa y los datos sujetos a control de exportaciones mientras su modo sea más abierto. El modo protect no encuentra un nombre dentro de un texto libre, y un archivo guardado que se envía a la IA en modo protect se rechaza. Una IA solo puede hacer este ajuste más estricto; una persona lo hace más abierto. Es una ayuda para el cumplimiento, no asesoría legal."
         }
       },
       "visibility": {

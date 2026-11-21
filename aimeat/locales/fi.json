@@ -17534,6 +17534,7 @@
     "cfg_consent_party_purchases_per_hour": "Yhdestä osoitteesta aloitetut ostot tunnissa",
     "cfg_consent_data_intermediation": "Datan välityspalvelu (EU 2022/868)",
     "cfg_compliance_balancing_test": "Sovellusten tasapainotesti (oikeutettu etu)",
+    "cfg_compliance_regulated_ai_modes": "Säännelty tieto ja ulkopuoliset tekoälymallit",
     "cfg_consent_party_self_registration": "Sovelluksiin rekisteröidytään ilman tiliä",
     "cfg_consent_app_party_signups_per_hour": "Rekisteröitymiset sovelluksiin samasta osoitteesta tunnissa",
     "cfg_consent_app_party_pending_hours": "Vahvistamaton rekisteröityminen pitää paikkansa (tuntia)",
@@ -17749,6 +17750,7 @@
     "cfgDesc_consent_data_intermediation": "Välittääkö tämä palvelin dataa muiden puolesta. Seuranta ei muuta mitään, vaan näyttää havainnot Compliance-sivulla.",
     "cfgDesc_consent_party_self_registration": "Saako sovellus päästää käyttäjiä rekisteröitymään ilman tiliä tällä palvelimella. Aina pois, jos palvelin näyttää sisältönsä vain kirjautuneille.",
     "cfgDesc_compliance_balancing_test": "Pyytääkö palvelin tasapainotestin sovellukselta, jonka rekisterin käsittelyperuste on oikeutettu etu. Oletuksena vapaaehtoinen: testi on käytettävissä, mutta palvelin ei pyydä sitä.",
+    "cfgDesc_compliance_regulated_ai_modes": "Mitä palvelimen ulkopuolinen tekoälymalli saa säännellystä tiedosta. Kirjoita kullekin säännellyn tiedon lajille oma rivi muodossa laji=tila, esimerkiksi health=local. Oletuksena tyhjä: jokainen laji on notify-tilassa, eli sisältö lähtee kuten ennenkin, ja jokaisesta lähetyksestä tehdään kirjaus luokittelun lokiin.",
     "cfgDesc_consent_app_party_signups_per_hour": "Montako kertaa samasta verkko-osoitteesta voi rekisteröityä tämän palvelimen sovelluksiin tunnin aikana. 0 tarkoittaa, ettei rajaa ole.",
     "cfgDesc_consent_app_party_pending_hours": "Kuinka kauan henkilö pysyy sovelluksen listalla, jos hän rekisteröityi mutta ei avannut sähköpostin linkkiä. Sen jälkeen paikka vapautuu, ja hän voi rekisteröityä uudelleen. 0: hän pysyy listalla, kunnes sovelluksen omistaja poistaa hänet.",
     "cfgDesc_consent_app_party_max": "Kuinka monta henkilöä voi rekisteröityä yhteen sovellukseen ilman tiliä. Määrään lasketaan myös ne, joiden linkki odottaa vielä avaamista. Kun sovellus on täynnä, uusi rekisteröityminen hylätään, ja sovelluksen omistaja näkee sen sovelluksen sivulla. Pienempi arvo ei poista ketään: se estää uudet rekisteröitymiset, kunnes henkilöitä on vähemmän. 1–1 000 000, oletus 10 000.",
@@ -33456,6 +33458,18 @@
           "ex2": "Vapaaehtoinen: julkinen tai jaettu palvelin, jossa sovelluksen omistaja tekee testin silloin, kun haluaa.",
           "ex3": "Pois: suljettu ympäristö, joka pitää käsittelytoimien selosteet muualla.",
           "tip": "Agentti, jolla on compliance:write-oikeus, saa hyväksyä testin kaikissa tiloissa, ellei sovelluksen omistaja ole pyytänyt hyväksymään juuri sitä testiä itse. Asetus on apu arviointiin, ei oikeudellista neuvontaa."
+        },
+        "regulated_ai_modes": {
+          "title": "Säännelty tieto ja ulkopuoliset tekoälymallit",
+          "short": "Mitä palvelimen ulkopuolinen tekoälymalli saa kustakin säännellyn tiedon lajista. Oletuksena sisältö lähtee kuten ennenkin, ja jokaisesta lähetyksestä tehdään kirjaus.",
+          "what": "Käsittelytoimien rekisteri kertoo, mihin säänneltyyn tietoon sen tiedot kuuluvat, esimerkiksi terveystietoihin, lasten tietoihin tai vientivalvonnan alaisiin tietoihin. Rekisteri nimeää myös organismit, työtilat ja sovellukset, joissa tiedot ovat. Näissä paikoissa oleva sisältö on säänneltyä tietoa. Tämä asetus määrää, mitä palvelimen ulkopuolinen tekoälymalli saa siitä. Kirjoita kullekin lajille oma rivi muodossa laji=tila. Tiloja on neljä, avoimimmasta tiukimpaan. notify (Ilmoita): sisältö lähtee kuten ennenkin, ja jokaisesta lähetyksestä tehdään kirjaus luokittelun lokiin. protect (Suojaa): ennen kuin sisältö lähtee, palvelin korvaa nimikentissä olevat nimet, henkilötunnukset, puhelinnumerot, sähköposti- ja katuosoitteet sekä IBAN-tilinumerot korvaavilla tunnisteilla, kuten [phone-3f9a2c1b]. Sama arvo samassa paikassa saa aina saman tunnisteen, joten malli näkee yhä, että kaksi tietuetta koskee samaa ihmistä. Tunnistetta ei saa muutettua takaisin arvoksi ilman avainta, jonka vain tämä palvelin tietää. Jos tekoälykutsu ei pysty korvaamaan tietoja ensin, palvelin hylkää kutsun. local (Paikallinen malli): sisällön lukee vain tällä koneella toimiva malli. block (Estä): mikään malli ei lue sisältöä, ei paikallinenkaan. Ihminen lukee sen yhä omalla näytöllään. Rekisteri voi asettaa oman tilansa, ja kahdesta tiukempi on voimassa. Tietolompakon poikkeus päästää yhden kohteen ulkopuoliselle mallille tai ilman suojausta, ja poikkeuksen käytöstä tehdään kirjaus. Poikkeus ei avaa Estä-tilaa, vaan yritys kirjataan poikkeukselliseksi. Asetus on voimassa, oli luokittelu päällä tai pois.",
+          "range": "Luettelo rivejä muodossa laji=tila. Lajit: health, special-category, biometric-genetic, children, criminal, employment, payment-financial, public-authority, defence-classified, export-controlled, privileged-trade-secret. Tilat: notify, protect, local, block. Tyhjä (oletus): jokainen laji on notify-tilassa.",
+          "low": "notify: tekoälylle mikään ei muutu, ja vaatimustenmukaisuusraportti kertoo, mitä lähti.",
+          "high": "block: mikään tekoäly ei lue lajin sisältöä, ja sisällön omistajat käsittelevät sitä ilman tekoälyä.",
+          "ex1": "health=local: klinikan palvelin, jolla on oma malli ja josta potilastiedot eivät saa lähteä.",
+          "ex2": "employment=protect: henkilöstöhallinnon työtila, jossa ulkopuolinen malli saa auttaa tekstissä mutta ei saa nähdä, keistä on kyse.",
+          "ex3": "export-controlled=block: puolustusalan toimittaja pitää vientivalvonnan alaiset tekniset tiedot poissa kaikilta malleilta.",
+          "tip": "Vaatimustenmukaisuusraportin kohta 14 ehdottaa local-tilaa terveystiedoille, biometrisille ja geneettisille tiedoille, puolustuksen tiedoille ja vientivalvonnan alaisille tiedoille, kun niiden tila on avoimempi. Suojaa-tila ei löydä nimeä vapaasta tekstistä, ja tallennetun tiedoston lähetys tekoälylle hylätään Suojaa-tilassa. Tekoäly saa tehdä asetuksesta vain tiukemman, ja avoimemmaksi sen muuttaa ihminen. Asetus on apu vaatimustenmukaisuuteen, ei oikeudellista neuvontaa."
         }
       },
       "visibility": {
