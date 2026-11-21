@@ -35,6 +35,8 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-node-key-metering
  * @version-history
+ *   v1.0.2 -- 2026-11-21 -- U6 asserts the provider is cut off when the caller leaves: the proxy's abort
+ *     listens on the response's close since llm-proxy.ts v1.14.2; settled once, as before.
  *   v1.0.1 -- 2026-10-28 -- Port 40465 -> 28465, main's move of fixed suite ports out of the claims range.
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26).
  */
@@ -243,9 +245,10 @@ const frame = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
       assert(sent.json?.model === 'openrouter/auto', `the named model, got ${sent.json?.model}`);
     });
 
-    await test('U6. a client that hangs up mid-stream: the provider is not cut off and the call is settled once', async () => {
-      // On Node 24 the proxy's req 'close' listener, added after the body was read, never fires, so
-      // the provider's answer runs to its end and is settled (the lead's other outcome).
+    await test('U6. a client that hangs up mid-stream: the provider is cut off and the call is settled once', async () => {
+      // The proxy listens on the response's close (routes/llm-proxy.ts v1.14.2), so a caller that
+      // leaves aborts the provider call; what came before is still settled, once (the lead's first
+      // outcome; until 2026-11-21 the listener sat on the request and never fired on Node 24).
       const t = await owner('u6');
       const before = await usage(t);
       const head = frame({ id: 'c', model: NODE_MODEL, choices: [{ index: 0, delta: { content: 'part one ' } }] });
@@ -266,7 +269,7 @@ const frame = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
       const after = await until(() => usage(t), (u) => u.total_calls > before.total_calls);
       assert(after.total_calls === before.total_calls + 1, `the call is settled once: ${before.total_calls} -> ${after.total_calls}`);
       const sent = stub.requestsFor('chat').filter(marked('U6HANGUP')).at(-1)!;
-      assert(sent.aborted !== true, 'the provider was not cut off');
+      assert(sent.aborted === true, 'the provider was cut off when the caller left');
     });
 
     await test('U7. pictures on the node key within the allowance answer as before', async () => {
