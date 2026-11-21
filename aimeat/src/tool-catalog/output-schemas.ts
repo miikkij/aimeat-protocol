@@ -50,25 +50,11 @@ export const walletBalanceOutput = {
 };
 
 /**
- * The content risk marks beside a read item (services/content/risk-types.ts ContentRisk, openapi
- * components.schemas.ContentRisk). A marked item (`use: prepare-only`) may only produce a preparation.
+ * The content risk marks beside a read item. Declared loose here, so the tool list the chat surface
+ * sends stays inside its budget (e2e-mcp-v2); the shape is the public contract openapi.yaml
+ * components.schemas.ContentRisk states (services/content/risk-types.ts ContentRisk).
  */
-export const contentRiskOutput = z.object({
-    v: z.literal(1),
-    marked: z.boolean(),
-    use: z.enum(['prepare-only', 'normal']),
-    kinds: z.array(z.string()),
-    marks: z.array(z.object({
-        kind: z.string(), rule: z.string(), by: z.enum(['rules', 'model']), start: z.number(), end: z.number(),
-        excerpt: z.string(), why: z.string().optional(),
-    })),
-    content_hash: z.string(),
-    detect: z.enum(['rules', 'rules+ai']),
-    checked_at: z.string(),
-    point: z.enum(['intake', 'shared-write', 'read', 'request']),
-    warning: z.string().optional(),
-    held: z.object({ since: z.string(), release_with: z.string() }).optional(),
-}).optional();
+export const contentRiskOutput = looseRecord.optional();
 
 /** aimeat_memory_read (single entry) */
 export const memoryEntryOutput = {

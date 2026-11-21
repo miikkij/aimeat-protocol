@@ -2623,6 +2623,11 @@ components:
             told which.
         classificationWarning:
           $ref: '#/components/schemas/ClassificationWarning'
+        content_risk:
+          $ref: '#/components/schemas/ContentRisk'
+        content_risk_warning:
+          type: string
+          description: One line for the reading AI when the value carries content risk marks and the reader's setting warns. Only for an AI reader.
         also_under:
           type: array
           items:

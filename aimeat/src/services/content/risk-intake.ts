@@ -161,8 +161,8 @@ export function contentRiskTextOf(value: unknown): string {
 }
 
 /** The words of a message (a direct message, a post, a message to an agent): its subject, then its body. */
-export function contentRiskMessageText(subject: string | null | undefined, body: string | null | undefined): string {
-  return [subject ?? '', body ?? ''].filter((s) => s.trim()).join('\n\n');
+export function contentRiskMessageText(subject: string | null | undefined, words: string | null | undefined): string {
+  return [subject ?? '', words ?? ''].filter((s) => s.trim()).join('\n\n');
 }
 
 /** Resolves when every queued item has been marked. For tests and an orderly shutdown. */
