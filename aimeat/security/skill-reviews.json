@@ -65,7 +65,7 @@
         "aimeat/src/services/content/shared-profile.ts",
         "aimeat/src/services/content/shared-profile-settings.ts"
       ],
-      "digest": "sha256:5b1302a7e58feffba41f1034"
+      "digest": "sha256:b6ee458c6d631fcc933942fc"
     },
     "node:aimeat-context": {
       "reviewedOn": "2026-11-15",
@@ -334,7 +334,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:1fe1c6486e48a00aad6c0953"
+      "digest": "sha256:48ea23c809e918f3108dd17a"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -448,7 +448,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:07c019eb16838c031ee9f0b0"
+      "digest": "sha256:b9cf4d0dbe95d058fea0e0c4"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-21",
@@ -462,7 +462,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:a8a6135d55900d98086236de",
+      "digest": "sha256:e340342612697c8d89dd3c20",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -800,7 +800,7 @@
       "aimeat/src/mcp/core-admin.ts": "8049e6509cfa6655"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "a890dfe4d533b77d",
+      "aimeat/src/mcp/core.ts": "23f14d15b917e6c3",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "059e5ae30d927052"
     },
     "node:manage-my-profile-data": {
@@ -950,7 +950,7 @@
     },
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "2120a326ccf3b05b",
-      "aimeat/src/routes/memory/key.ts": "eb64829d7d62f332",
+      "aimeat/src/routes/memory/key.ts": "bf3cfef1d609da32",
       "aimeat/src/services/memory/bin.ts": "edad9406121f44e5",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
       "aimeat/src/routes/owners/export.ts": "c7913eda009f7f9a",
@@ -983,7 +983,7 @@
       "aimeat/src/commerce/app-tool-catalog.ts": "997e99370b2cfc6c",
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
       "aimeat/src/services/connect-tunnel/push.ts": "b828b403c0ce83a5",
-      "aimeat/src/services/workspace-rows/row-service.ts": "c145b961471136e0",
+      "aimeat/src/services/workspace-rows/row-service.ts": "4dffe20841bdf7ea",
       "aimeat/src/services/refinery/pipeline.ts": "717c2d366eba5792",
       "aimeat/src/routes/outbound.ts": "bdb77e334bc4bd61"
     },
@@ -1002,7 +1002,7 @@
     "node:aimeat-content-classes": {
       "aimeat/src/services/content/pipeline.ts": "4a4de30f3d30123d",
       "aimeat/src/services/content/ai-stages.ts": "96d3366e8f153380",
-      "aimeat/src/services/content/service.ts": "4f37c2e3a4ae2646",
+      "aimeat/src/services/content/service.ts": "7eb4c0aee1fbf62a",
       "aimeat/src/services/content/settings.ts": "88f590eac833c17c",
       "aimeat/src/data/content-classes.ts": "9c81bbcf83c62949",
       "aimeat/src/services/content/shared-profile.ts": "b8dd9094c864d784",

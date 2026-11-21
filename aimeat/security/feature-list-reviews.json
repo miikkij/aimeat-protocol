@@ -103,7 +103,7 @@
         "aimeat/src/routes/content.ts",
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:b19427cf490bded0afa956c7"
+      "digest": "sha256:0b11ef282dc50d643551993f"
     },
     "6. Organisms, workspaces and knowledge": {
       "reviewedOn": "2026-11-21",
@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:3e9ba60f962eaadd2e55232c"
+      "digest": "sha256:dd8d8a18c6a38622cf64439e"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-21",
@@ -634,7 +634,7 @@
       "aimeat/src/services/schema-lock-rule.ts": "cdd24287062eb450",
       "aimeat/src/services/librarian.ts": "f30c7e684987a818",
       "aimeat/src/routes/file-store.ts": "82a5937b81b7ad97",
-      "aimeat/src/routes/content.ts": "d038677ef4e833b0",
+      "aimeat/src/routes/content.ts": "d08ccb790176e192",
       "aimeat/src/services/open-items.ts": "7f41fc9dab8fd03a"
     },
     "6. Organisms, workspaces and knowledge": {
@@ -654,7 +654,7 @@
       "aimeat/src/tool-catalog/definitions/organism-approvals.ts": "5644a92e75ef5b49",
       "aimeat/src/services/workspace-rows/row-revisions.ts": "2f605de731f5cceb",
       "aimeat/src/services/workspace-rows/row-schema.ts": "31e80cbaff854066",
-      "aimeat/src/services/workspace-rows/row-service.ts": "c145b961471136e0",
+      "aimeat/src/services/workspace-rows/row-service.ts": "4dffe20841bdf7ea",
       "aimeat/src/services/workspace-rows/row-space.ts": "81e86a414994de22",
       "aimeat/src/services/knowledge/audience.ts": "dc0306b7688d848a",
       "aimeat/src/services/knowledge/link-owner-keep.ts": "7006435a8a84cdcf",
