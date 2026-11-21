@@ -13,6 +13,8 @@
  * @version-history
  *   2026-11-21 — aimeat_organism_get carries the organism's own `objectives` for a member, with level,
  *     serves, until and their KPIs (services/structure/organism-objectives.ts).
+ *   2026-11-21 — aimeat_workspace_comment hands the config to addComment (content risk marks);
+ *     aimeat_workspace_comments carries each comment's content_risk and leaves a held one's body out.
  *   2026-11-20 — aimeat_organism_get carries `value_per_member` for a member while the creators see the
  *     value report per member (services/value/per-member.ts).
  *   2026-11-20 — aimeat_organism_get carries the organism's directive for a member and its answer
@@ -133,7 +135,8 @@ import { registerOrganismNameInviteTools } from './organisms-name-invites.js';
 import { registerOrganismEmailInviteTools } from './organisms-email-invites.js';
 import { searchOrganismContent } from '../services/organism/search.js';
 import { organismArchiveOp } from '../services/organism/archive-op.js';
-import { addComment, listComments } from '../services/organism/comments.js';
+import { addComment, listComments, commentPrefix } from '../services/organism/comments.js';
+import { riskForRead, commentRiskItems, withRisk } from '../services/content/risk-read.js';
 import { commentWorkspace, deleteCommentIn } from '../services/organism-read/comments.js';
 import { organismMemberGate, organismForActiveMember, organismShownTo, organismRosterFor, organismToJoin } from '../services/organism-read/member.js';
 import { organismForManager } from '../services/organism-read/manager.js';
@@ -582,8 +585,12 @@ export function registerOrganismsTools(
             // GET /v1/organisms/:id/comments asks too.
             const gate = await commentWorkspace({ storage, config }, organism_id, { sub: agentGaii, owner: getOwnerName(), gaii: agentGaii }, ws);
             if (!gate.ok) return { content: [{ type: 'text' as const, text: gate.code === 'NOT_FOUND' ? 'Organism not found' : 'You cannot read this workspace' }], isError: true };
-            const comments = await listComments(storage, readerForAgent({ storage, config }, agentGaii), organism_id, ws, space, instance_id);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ comments, total: comments.length }, null, 2) }] };
+            const listed = await listComments(storage, readerForAgent({ storage, config }, agentGaii), organism_id, ws, space, instance_id);
+            // The content risk marks travel with each comment; a held one's body is left out
+            // (services/content/risk-read.ts).
+            const rr = await riskForRead({ storage, config }, caller(), commentRiskItems(organism_id, ws, commentPrefix(organism_id, ws, space, instance_id), listed));
+            const comments = listed.map((c, i) => withRisk(c as unknown as Record<string, unknown>, rr.items[i] ?? null, ['body']));
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ ...(rr.warning ? { content_risk_warning: rr.warning } : {}), comments, total: comments.length }, null, 2) }] };
         },
     );
 

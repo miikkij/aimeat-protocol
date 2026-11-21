@@ -71,6 +71,7 @@ import {
   AI_STAGES, type ContentFacts, type ContentSource, type ContentSettings, type StageName, type SettingStage, type ClassProposal,
 } from './types.js';
 import { markText } from './risk-core.js';
+import { riskTextOf } from './risk-text.js';
 import type { RiskPoint } from './risk-types.js';
 import { createHash } from 'node:crypto';
 import { notify } from '../notify.js';
@@ -132,6 +133,8 @@ interface LoadedItem {
   bytes: Buffer | null;
   /** A memory record's text; null for a file. */
   memoryText: string | null;
+  /** A memory record's value as shown to the reader, for the risk stage's words (risk-text.ts). */
+  memoryValue?: unknown;
   aiProvenanceId: string | null;
   target: ReturnType<typeof fileTarget>;
   tooLarge: boolean;
@@ -193,7 +196,7 @@ async function loadItem(deps: Deps, reader: ContentReader, source: ContentSource
   const text = memoryValueText(shown.value);
   return {
     owner: source.owner, key: source.key, mimeType: typeof shown.value === 'string' ? 'text/plain' : 'application/json',
-    filename: source.key, size: Buffer.byteLength(text, 'utf8'), bytes: null, memoryText: text,
+    filename: source.key, size: Buffer.byteLength(text, 'utf8'), bytes: null, memoryText: text, memoryValue: shown.value,
     aiProvenanceId: (shown as { aiProvenanceId?: string | null }).aiProvenanceId ?? null, target, tooLarge: false,
   };
 }
@@ -320,8 +323,12 @@ export async function inspectSource(
   // ── risk ── marks beside the item, written by risk-core.ts into these same facts after them.
   if (stages.includes('risk')) {
     try {
+      // A memory record is marked on its words as every point reads them (risk-text.ts), hashed the
+      // same way; a file on the text its technical read took out, bound to its bytes.
+      const memory = item.memoryValue !== undefined;
       const marks = await markText(deps, {
-        subject: { kind: source.kind, owner: source.owner, key: source.key }, text: text ?? '', hash,
+        subject: { kind: source.kind, owner: source.owner, key: source.key },
+        text: memory ? riskTextOf(item.memoryValue) : text ?? '', ...(memory ? {} : { hash }),
         point: opts.riskPoint ?? 'request', measure: { mimeType: item.mimeType, size: item.size },
       });
       if (marks) facts.risk = marks; else delete facts.risk;

@@ -137,6 +137,7 @@ function placeOf(subject: RiskSubject): string {
     case 'dm': return 'a message to you';
     case 'board': return `a post on board ${subject.boardId}`;
     case 'agent-message': return `a message to your agent ${subject.agent}`;
+    case 'external': return 'content read from a connected service';
   }
 }
 

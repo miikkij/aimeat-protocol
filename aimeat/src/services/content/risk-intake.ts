@@ -12,7 +12,7 @@
  *   the rules' marks (risk-read.ts). With content_risk.mode off the call returns before reading anything.
  *
  *   WHAT IS READ. The hook passes the text when it has it (a comment, a message, a post, a row). A memory
- *   record is read as its words (pipeline.ts memoryValueText); a stored file whose type is text is read
+ *   record is read as its words (risk-text.ts riskTextOf); a stored file whose type is text is read
  *   whole up to MAX_TEXT_FILE_BYTES; any other file (a PDF, a picture with words) goes through the content
  *   pipeline's technical read with the `risk` stage, which marks the text that read took out of it.
  *
@@ -30,7 +30,8 @@ import type { AimeatConfig } from '../../config.js';
 import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { callerFromAuth } from '../caller-context.js';
-import { inspectSource, memoryValueText } from './pipeline.js';
+import { inspectSource } from './pipeline.js';
+import { riskTextOf } from './risk-text.js';
 import { markText, isApprover } from './risk-core.js';
 import { homeOf, type RiskSubject } from './risk-store.js';
 import type { RiskPoint } from './risk-types.js';
@@ -76,7 +77,7 @@ async function markOne(item: Pending): Promise<void> {
   if (subject.kind === 'memory') {
     const rec = await deps.storage.getMemory(subject.owner, subject.key);
     if (!rec) return;
-    const text = memoryValueText(rec.value);
+    const text = riskTextOf(rec.value);
     await markText(deps, { subject, text, point, ...(writer ? { writer } : {}), measure: { mimeType: typeof rec.value === 'string' ? 'text/plain' : 'application/json', size: Buffer.byteLength(text, 'utf8') } });
     return;
   }
@@ -149,11 +150,11 @@ export function contentRiskAfterWrite(
 }
 
 /**
- * The words of a value as the marks read them: a string as it is, a document's title and markdown, any
- * other value as JSON. The read helper reads the same words, so a row's or a message's hash matches.
+ * The words of a value as the marks read them (risk-text.ts): a string as it is, a document's title and
+ * markdown, any other value as its string values. The read helper reads the same words, so the hash matches.
  */
 export function contentRiskTextOf(value: unknown): string {
-  return memoryValueText(value);
+  return riskTextOf(value);
 }
 
 /** The words of a message (a direct message, a post, a message to an agent): its subject, then its body. */

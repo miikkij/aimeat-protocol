@@ -11,6 +11,8 @@
  *   import { memoryEntryOutput } from './output-schemas.js';
  *   mcp.registerTool('aimeat_memory_read', { description, inputSchema, outputSchema: memoryEntryOutput, annotations }, handler)
  * @version-history
+ *   v1.4.0 -- 2026-11-21 -- contentRiskOutput, and memoryEntryOutput declares content_risk and
+ *     content_risk_warning (the content risk marks), or the schema would strip them.
  *   v1.3.0 -- 2026-10-19 -- agentProfileOutput declares `avatar` (nullable, loose) and `avatar_problem`
  *     (services/agent-avatar.ts), or the schema would strip them. agentsListOutput rows are loose already.
  *   v1.2.0 -- 2026-09-29 -- memoryEntryOutput declares classification_warning (TARGET-082 V4), or the
@@ -47,8 +49,31 @@ export const walletBalanceOutput = {
     available: z.number().optional(),
 };
 
+/**
+ * The content risk marks beside a read item (services/content/risk-types.ts ContentRisk, openapi
+ * components.schemas.ContentRisk). A marked item (`use: prepare-only`) may only produce a preparation.
+ */
+export const contentRiskOutput = z.object({
+    v: z.literal(1),
+    marked: z.boolean(),
+    use: z.enum(['prepare-only', 'normal']),
+    kinds: z.array(z.string()),
+    marks: z.array(z.object({
+        kind: z.string(), rule: z.string(), by: z.enum(['rules', 'model']), start: z.number(), end: z.number(),
+        excerpt: z.string(), why: z.string().optional(),
+    })),
+    content_hash: z.string(),
+    detect: z.enum(['rules', 'rules+ai']),
+    checked_at: z.string(),
+    point: z.enum(['intake', 'shared-write', 'read', 'request']),
+    warning: z.string().optional(),
+    held: z.object({ since: z.string(), release_with: z.string() }).optional(),
+}).optional();
+
 /** aimeat_memory_read (single entry) */
 export const memoryEntryOutput = {
+    /** One line for the reading AI when the value carries risk marks and the reader's setting warns. */
+    content_risk_warning: z.string().optional(),
     key: z.string(),
     value: z.unknown().optional(),
     visibility: z.string().optional(),
@@ -58,6 +83,8 @@ export const memoryEntryOutput = {
     ai_provenance: aiProvenanceOutput,
     /** TARGET-082: the content is classified with a warning label: use it only for the task. */
     classification_warning: z.object({ label: z.string(), name: z.string(), says: z.string() }).optional(),
+    /** The content risk marks beside the value; with `held`, the value is withheld from this reader. */
+    content_risk: contentRiskOutput,
 };
 
 /** aimeat_memory_list — { items, count } plus the Phase 2 truncation markers and the

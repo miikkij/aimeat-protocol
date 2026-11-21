@@ -169,6 +169,8 @@
  *   2026-10-21 -- PURPOSE_SUITES and --purpose: the purpose tier, eleven suites that prove what AIMEAT
  *     is for still works, five of them new (test/e2e-purpose-*.ts); pnpm gate runs it with the guard
  *     tier, and a skipped test in it is red as in the guard tier (docs/pitfalls.md §126).
+ *   2026-11-21 -- e2e-content-risk.ts joins the list (not the guard tier): the content risk marks on the
+ *     runner's server (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  *   2026-10-21 -- e2e-content-class.ts joins the list (not the guard tier): content classes on their
  *     own node on 28451, against the sandbox's decision and completion stand-ins.
  *   2026-10-20 -- e2e-mcp-modern.ts joins the list (not the guard tier): MCP 2026-07-28 on the
@@ -1184,6 +1186,9 @@ const ALL_SUITES = [
     // ephemeral port answering the content class prompts, so the class an item lands in is the
     // pipeline's doing. Follows the runner's backend.
     'test/e2e-content-class.ts',
+    // The content risk marks: intake, shared write and read, the layers, the hold and its release, on
+    // the runner's server (rules only, no model).
+    'test/e2e-content-risk.ts',
     // The model policy (System 2, V2): its own node on 28438 with a recommended list set the way an
     // operator sets it, and the OpenAI-compatible stub on an ephemeral port, so the model the node
     // sent is read from what arrived. Follows the runner's backend.

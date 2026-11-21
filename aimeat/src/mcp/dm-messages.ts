@@ -12,6 +12,8 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes, caller)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-11-21 — aimeat_dm_inbox and aimeat_dm_thread carry each message's content_risk, and leave a held
+ *     message's words out (services/content/risk-read.ts).
  *   2026-11-19 — aimeat_dm_broadcast_summary: the results of a broadcast the agent sent (feature audit 2026-11-19, 4.4 item 5).
  *   2026-11-15 — aimeat_dm_send, aimeat_dm_ask and aimeat_dm_send_as_owner ask the team approval gate
  *     before the send turn (services/team/action-gate.ts, T7).
@@ -109,6 +111,7 @@ import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { teamAgentGate } from '../services/team/action-gate.js';
+import { riskForRead, messageRiskItems, withRisk } from '../services/content/risk-read.js';
 
 /**
  * How ONE attachment is shown to the agent reading its inbox. `ref` is the point: the descriptor used
@@ -642,11 +645,15 @@ export function registerDmMessageTools(
             const agentGaii = getAgentGaii();
             const mailboxOwnerGhii = ownerGhiiOf(agentGaii);
             const { messages, total } = await readAgentDmInbox(storage, agentGaii, { page: page ?? 1, perPage: per_page ?? 20 });
+            // The content risk marks travel with each message; a held one's words are left out
+            // (services/content/risk-read.ts).
+            const rr = await riskForRead({ storage, config }, caller(), messageRiskItems(messages));
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        messages: messages.map(m => ({
+                        ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
+                        messages: messages.map((m, i) => withRisk({
                             id: m.id,
                             conversation_id: m.conversationId,
                             subject: m.subject ?? null,
@@ -657,7 +664,7 @@ export function registerDmMessageTools(
                             attachments: m.attachments?.map(a => attachmentView(a, mailboxOwnerGhii)) ?? [],
                             interactive: m.interactive ?? null,
                             created_at: m.createdAt,
-                        })),
+                        } as Record<string, unknown>, rr.items[i] ?? null, ['subject', 'body', 'attachments', 'interactive'])),
                         total,
                     }, null, 2),
                 }],
@@ -685,11 +692,13 @@ export function registerDmMessageTools(
             // read half of the phase was written for — an agent summarising a conversation for the
             // person who owns the mailbox has to be able to say which turns a model wrote.
             const provFor = await readProvenanceMany(storage, config, ordered.map(m => m.aiProvenanceId));
+            const rr = await riskForRead({ storage, config }, caller(), messageRiskItems(ordered));
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        messages: ordered.map(m => ({
+                        ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
+                        messages: ordered.map((m, i) => withRisk({
                             id: m.id,
                             direction: m.direction,
                             from: m.senderGhii,
@@ -702,7 +711,7 @@ export function registerDmMessageTools(
                             interactive: m.interactive ?? null,
                             created_at: m.createdAt,
                             ...provFor(m.aiProvenanceId),
-                        })),
+                        } as Record<string, unknown>, rr.items[i] ?? null, ['subject', 'body', 'attachments', 'interactive'])),
                         total,
                         ...withheldOwnerMessagesFields(config.baseUrl, agentGaii, 'aimeat_dm_thread', ownerMessagesWithheld),
                     }, null, 2),

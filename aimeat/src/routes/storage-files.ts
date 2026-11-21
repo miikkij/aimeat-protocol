@@ -11,6 +11,8 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-21 -- GET /v1/pub answers a file held for its content risk marks as absent to another person's
+ *     AI; GET /v1/storage/{key}?mode=inline carries content_risk (services/content/risk-read.ts).
  *   2026-11-08 -- GET and HEAD /v1/storage/{key} ask the labels a data package version keeps, as GET /v1/pub
  *     does, through the one ask (datapackage/source-labels.ts storedFileShownTo) (secaudit2026nov08b round 15b).
  *   2026-11-08 -- GET /v1/pub asks about every label of a data package version's source items, not only
@@ -219,6 +221,7 @@ import { ownExtensionFileKey } from '../services/component/address.js';
 import { storageFilesListRouter, storePlaceOf } from './storage-files-list.js';
 import { storageDeleteRouter } from './storage-files-delete.js';
 import { partyPubReader } from './pub-party-read.js';
+import { riskForRead, fileRiskItem, heldFromReader } from '../services/content/risk-read.js';
 
 export function storageFilesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -497,8 +500,12 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // (TARGET-082 review). A file the admitted caller may not see answers as absent.
         // A data package version built from labelled content keeps the labels of its source items
         // (services/datapackage/source-labels.ts), asked beside the file's own.
+        // A file held for its content risk marks is absent to another person's AI too
+        // (services/content/risk-read.ts heldFromReader); a caller with no credential is not asked.
         const hiddenFromCaller = async (): Promise<boolean> =>
-            !(await storedFileShownTo({ storage, config }, contentReaderFor({ storage, config }, req.auth), gaii, key, file));
+            !(await storedFileShownTo({ storage, config }, contentReaderFor({ storage, config }, req.auth), gaii, key, file))
+            || (!!req.auth?.sub && !isAnonymousPrincipal(req.auth)
+                && await heldFromReader({ storage, config }, callerOf(req, config.nodeId, storage), { kind: 'file', owner: gaii, key }));
 
         // ?mode=handle — answer an ALLOWED read with a presigned URL + metadata instead of the bytes.
         // Same access decision as the byte path (this runs only after it passes); the caller just gets
@@ -785,10 +792,14 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                     res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found in your namespace: ${key}`));
                     return;
                 }
+                // The content risk marks travel with the text to an AI reader (services/content/risk-read.ts).
+                const [risk] = (await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage), [fileRiskItem(gaii, file.key, whole.data, file.mimeType)])).items;
                 res.json(success(config.nodeId, {
+                    ...(risk?.warning ? { content_risk_warning: risk.warning } : {}),
                     key: file.key, mime_type: file.mimeType, size: file.size, mode: 'inline',
                     content_text: whole.data.toString('utf8'), resource_uri: resourceUri,
                     ...provenanceItemBlock(prov),
+                    ...(risk ? { content_risk: risk } : {}),
                 }));
                 return;
             }

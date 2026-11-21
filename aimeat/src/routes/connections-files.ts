@@ -21,6 +21,7 @@
  * @structure connectionFilesRouter(config, storage)
  * @usage app.use(connectionFilesRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-11-21 — /files/text carries content_risk to an AI reader (services/content/risk-read.ts).
  *   v1.1.0 — 2026-11-02 — /files/store hands its caller to the storage write, so the company page key
  *     asks company:write or the owner's one press as POST /v1/storage does (secaudit2026nov02d round 13,
  *     drive-files.ts:storeDriveFile:company-page-key-unfenced-no-page-writer).
@@ -48,6 +49,7 @@ import { writeResource, loadStoredBytes, type WritePayload } from '../services/c
 import { readerFor } from '../services/classification/reader.js';
 import { explainReadThrough } from './connections-read-through.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
+import { riskForRead } from '../services/content/risk-read.js';
 
 /** The most text a write may carry inline; anything larger is a stored file (from_key). */
 const MAX_INLINE_TEXT = 4 * 1024 * 1024;
@@ -115,7 +117,10 @@ export function connectionFilesRouter(config: AimeatConfig, storage: Storage): R
       const { drive_id, item_id } = req.body as FileBody;
       const out = await driveFileText(opened.ctx, opened.connectionId, { drive_id, item_id });
       if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
-      res.json(success(config.nodeId, { text: out.text, ...(out.note ? { note: out.note } : {}), source: out.source }));
+      // A drive file is content from outside, read live: its content risk marks travel with it to an AI reader.
+      const who = callerOf(req, config.nodeId, storage);
+      const [risk] = (await riskForRead({ storage, config }, who, [{ subject: { kind: 'external', owner: who.ownerGhii, ref: `${opened.connectionId}:${out.source.item_id}` }, text: out.text }])).items;
+      res.json(success(config.nodeId, { ...(risk?.warning ? { content_risk_warning: risk.warning } : {}), text: out.text, ...(out.note ? { note: out.note } : {}), source: out.source, ...(risk ? { content_risk: risk } : {}) }));
     });
 
   router.post('/v1/connections/:id/files/store', requireAuth(), explainReadThrough, requireScope('connections:read-through'),

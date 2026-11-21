@@ -51,7 +51,9 @@ export type RiskSubject =
   | { kind: 'row'; org: string; ws: string; space: string; id: string }
   | { kind: 'dm'; owner: string; id: string }
   | { kind: 'board'; owner: string; boardId: string; id: string }
-  | { kind: 'agent-message'; owner: string; agent: string; id: string };
+  | { kind: 'agent-message'; owner: string; agent: string; id: string }
+  /** Content read live from an outside service (a mail, a drive file) and not stored here: marked on the read only. */
+  | { kind: 'external'; owner: string; ref: string };
 
 export type RiskHome = { kind: 'person'; owner: string } | { kind: 'workspace'; org: string; ws: string };
 
@@ -87,6 +89,7 @@ export function subjectIdOf(subject: RiskSubject): string {
     case 'dm': return `dm:${subject.id}`;
     case 'board': return `board:${subject.boardId}:${subject.id}`;
     case 'agent-message': return `agent-message:${subject.agent}:${subject.id}`;
+    case 'external': return `external:${subject.ref}`;
   }
 }
 

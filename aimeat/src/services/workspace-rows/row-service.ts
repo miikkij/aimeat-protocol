@@ -34,7 +34,8 @@
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
  *   2026-11-21 — appendRows answers the space's namespace; a deleted, cut or swept row's content risk
- *     marks go with it (content/risk-keys.ts).
+ *     marks go with it (content/risk-keys.ts); readRows carries each row's content_risk to an AI reader
+ *     and leaves a held row's body out.
  *   2026-11-20 — Appended rows are counted in the data counts by their size (services/value/data-buffer.ts).
  *   2026-11-15 — deleteRow and deleteRowsBefore ask the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-07 — A row space's JSON Schema binds every writer: appendRows checks every body of a
@@ -114,6 +115,9 @@ import {
 import { lockedRowSchema, checkRowBodies } from './row-schema.js';
 import { teamDeleteGate } from '../team/action-gate.js';
 import { dropWorkspaceRiskEntry, pruneRowRiskEntries } from '../content/risk-keys.js';
+import { riskForRead, riskReaderOf, withRisk } from '../content/risk-read.js';
+import { contentRiskTextOf } from '../content/risk-intake.js';
+import type { ContentRisk } from '../content/risk-types.js';
 
 export { WorkspaceRowError } from './row-space.js';
 export { ROW_SCHEMA_REFUSAL } from './row-schema.js';
@@ -194,9 +198,12 @@ export interface RowRevisionView {
 }
 
 export interface ReadRowsResult {
+  /** One line for an AI reader when a row on the page carries risk marks and its setting warns. */
+  content_risk_warning?: string;
   space: string;
   namespace: string;
-  rows: Array<Omit<WorkspaceRowRecord, 'id' | 'k1' | 'k2' | 'k3' | 'organismId' | 'wsId'>>;
+  /** Each row, with `content_risk` beside it for an AI reader (services/content/risk-read.ts). */
+  rows: Array<Omit<WorkspaceRowRecord, 'id' | 'k1' | 'k2' | 'k3' | 'organismId' | 'wsId'> & { content_risk?: ContentRisk }>;
   cursor: string | null;
   /** The fields this space can be filtered by, so a caller learns it from the answer. */
   indexed: string[];
@@ -647,10 +654,16 @@ export async function readRows(
 
   // A row this reader may not see is not on the page. The cursor still names where the page ended.
   const shown = await input.reader.show(page.rows, r => rowTarget(input.organismId, input.wsId, space.name, r.rowId));
+  // The content risk marks travel with each row to an AI reader; a held row's body is not on the page
+  // (services/content/risk-read.ts).
+  const ownerGhii = caller.owner.includes('@') ? caller.owner : `${caller.owner}@${deps.config.nodeId}`;
+  const rr = await riskForRead(deps, riskReaderOf({ principal: caller.principal, ownerGhii, roles: caller.app ? [...caller.roles, 'app'] : caller.roles, ...(caller.extension ? { extension: caller.extension } : {}) }),
+    shown.map(r => ({ subject: { kind: 'row' as const, org: input.organismId, ws: input.wsId, space: space.namespace, id: r.rowId }, text: contentRiskTextOf(r.body) })));
   return {
+    ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
     space: space.name,
     namespace: space.namespace,
-    rows: shown.map(publicRow),
+    rows: shown.map((r, i) => withRisk(publicRow(r) as unknown as Record<string, unknown>, rr.items[i] ?? null, ['body']) as unknown as ReadRowsResult['rows'][number]),
     cursor: page.cursor,
     indexed: space.indexOn,
   };

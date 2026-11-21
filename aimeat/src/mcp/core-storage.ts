@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-21 — aimeat_storage_download carries content_risk inline and with a handle, and hands out
+ *     neither for a file held from this reader (services/content/risk-read.ts).
  *   2026-11-13 — aimeat_storage_upload hands federate to writeStorageFile on an inline upload and
  *     answers the stored mark, as POST /v1/storage does (structure programme 2026-11, unit 3b).
  *   2026-11-06 — aimeat_storage_download opens an attachment of the owner's mailbox for an agent holding
@@ -64,7 +66,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
-import { localAccountName } from '../utils/gaii.js';
+import { localAccountName, ownerGhiiOf } from '../utils/gaii.js';
 import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/stored-files/write.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
@@ -83,6 +85,7 @@ import { parseBlobRef } from '../storage/blob/blob-types.js';
 import { directUploadFields } from '../services/direct-upload-answer.js';
 import { delegateReaderFor, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner/mailbox-reads.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { riskForRead, fileRiskItem } from '../services/content/risk-read.js';
 
 /** The refusals of a named store (services/stored-files/write.ts StoreChoiceRefusalCode), answered as `CODE: message`. */
 const STORE_CODES = new Set<string>(['UNKNOWN_STORE', 'STORE_NOT_SELECTABLE', 'STORE_NOT_TAKING_FILES', 'STORE_NOT_REACHABLE', 'NO_OWN_STORAGE']);
@@ -263,13 +266,22 @@ export function registerCoreStorageTools(
 
             const file = resolved.file;
             const resourceUri = `aimeat://storage/${encodeURIComponent(resolved.key)}`;
+            // The content risk marks travel with the file, inline or as a handle; a held file is neither
+            // inlined nor handed out (services/content/risk-read.ts).
+            const reader = caller ? caller() : { inPerson: false, ownerGhii: ownerGhiiOf(agentGaii), principal: agentGaii };
+            const [risk] = (await riskForRead({ storage, config }, reader, [fileRiskItem(resolved.ownerGaii, file.key, file.data, file.mimeType)])).items;
+            if (risk?.held) {
+                return jsonContent({ content_risk_warning: risk.warning ?? null, ref: resolved.ref, owner_gaii: resolved.ownerGaii, key: file.key, mime_type: file.mimeType, size: file.size, mode: 'held', content_risk: risk });
+            }
 
             // Inline only for small text files — keeps binaries (images/video/large blobs) out of context.
             if (inline && file.size <= STORAGE_INLINE_MAX_BYTES && isInlineableMime(file.mimeType)) {
                 return jsonContent({
+                    ...(risk?.warning ? { content_risk_warning: risk.warning } : {}),
                     ref: resolved.ref, owner_gaii: resolved.ownerGaii,
                     key: file.key, mime_type: file.mimeType, size: file.size,
                     mode: 'inline', content_text: file.data.toString('utf8'), resource_uri: resourceUri,
+                    ...(risk ? { content_risk: risk } : {}),
                 });
             }
 
@@ -288,10 +300,12 @@ export function registerCoreStorageTools(
                     {
                         type: 'text' as const,
                         text: JSON.stringify({
+                            ...(risk?.warning ? { content_risk_warning: risk.warning } : {}),
                             ...handle, mode: 'handle', download_method: 'GET', resource_uri: resourceUri,
                             note: inline
                                 ? 'inline refused (file too large or not text) — returning a handle instead'
                                 : 'Binary content is not inlined. GET download_url to fetch the bytes out-of-band.',
+                            ...(risk ? { content_risk: risk } : {}),
                         }, null, 2),
                     },
                 ],

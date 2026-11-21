@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — GET /v1/memory/:key carries content_risk to an AI reader and withholds a held value
+ *     (services/content/risk-read.ts).
  *   2026-11-20 — GET /v1/memory/:key records the open for the value signals (services/value/signal-buffer.ts).
  *   2026-11-09 — GET /v1/memory/:key with owner_scope or ?agent= shows a caller a same-owner record kept
  *     at organism:<id> when that organism admits it (ownerScopeViewAdmitting).
@@ -108,6 +110,8 @@ import { recordOperatorAccess } from '../../services/operator/access-audit.js';
 import { readsAsOwner, ownerScopeViewAdmitting, hiddenRecordRelabel, READ_AS_OWNER_SCOPE } from '../../services/owner/scope-read.js';
 import { callerOf } from '../../middleware/caller.js';
 import { denyScope403 } from '../../auth/deny.js';
+import { riskForRead } from '../../services/content/risk-read.js';
+import { contentRiskTextOf } from '../../services/content/risk-intake.js';
 
 /** How many times PUT /v1/memory/cors/:key reads the record again after another write of it. */
 const CORS_ATTEMPTS = 10;
@@ -237,14 +241,19 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // record: provenance travels with content a caller is entitled to.
     const prov = await loadServedProvenance(storage, config, record.aiProvenanceId, { full: true });
     setProvenanceHeaders(res, prov);
+    // The content risk marks travel with the value to an AI reader (a token, not the person in
+    // person); a value held from this reader is not in the answer (services/content/risk-read.ts).
+    const [risk] = (await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage),
+      [{ subject: { kind: 'memory', owner: record.ownerGaii, key: record.key }, text: contentRiskTextOf(record.value) }])).items;
 
     res.json(success(config.nodeId, {
+      ...(risk?.warning ? { content_risk_warning: risk.warning } : {}),
       key: record.key,
       // Always present, both ways. The soft-miss branch above returns exists:false, and a HIT used
       // to return no `exists` field at all — so a caller written as `if (!data.exists)` read every
       // successful read as a miss, silently, and only on the path where the data WAS there.
       exists: true,
-      value: record.value,
+      value: risk?.held ? null : record.value,
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),
       tags: record.tags,
@@ -256,6 +265,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       ai_provenance_id: record.aiProvenanceId ?? null,
       // TARGET-082: an AI shown a warning-classified record is told so, on this door as on MCP.
       ...warningField(record),
+      ...(risk ? { content_risk: risk } : {}),
       _ddc: {
         flagCount: record.flagCount ?? 0,
         version: record.version,

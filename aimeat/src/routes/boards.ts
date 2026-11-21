@@ -13,7 +13,8 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
- *   2026-11-21 — A deleted post's content risk marks go with it (services/content/risk-keys.ts).
+ *   2026-11-21 — A deleted post's content risk marks go with it (services/content/risk-keys.ts); GET
+ *     /v1/boards/:id/posts carries each post's content_risk to an AI reader (services/content/risk-read.ts).
  *   2026-11-14 — PATCH /v1/boards/:boardId/members passes its caller object (callerOf) to setBoardMembersAs.
  *   2026-11-14 — PATCH /v1/boards/:boardId/members calls services/boards/board-members.ts, which
  *     aimeat_board_members calls too: an agent of the board's owner holding social:members changes the
@@ -124,6 +125,7 @@ import { callerOf } from '../middleware/caller.js';
 import { operatorOverride, rolesWithOperator } from '../services/operator/override.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { dropPersonRiskEntry } from '../services/content/risk-keys.js';
+import { riskForRead, boardRiskItems, withRisk } from '../services/content/risk-read.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai/provenance-marks.js';
@@ -394,9 +396,15 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // the board read gate above, which is the authorization argument — provenance travels with the
     // content it describes. A page of human-written posts costs an empty map.
     const provById = await loadServedProvenanceMany(storage, config, posts.map(p => p.aiProvenanceId));
+    // The content risk marks travel with each post to an AI reader (a credential that is not the person
+    // in person); a held post's words are left out (services/content/risk-read.ts).
+    const rr = gaii
+      ? await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage), boardRiskItems(read.board, posts))
+      : { items: posts.map(() => null), warning: null };
 
     res.json(success(config.nodeId, {
-      posts: posts.map(p => ({
+      ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
+      posts: posts.map((p, i) => withRisk({
         id: p.id,
         author_gaii: p.authorGaii,
         title: p.title,
@@ -409,7 +417,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         ttl_expires_at: p.ttlExpiresAt,
         created_at: p.createdAt,
         ...provenanceItemBlock(p.aiProvenanceId ? provById.get(p.aiProvenanceId) : undefined),
-      })),
+      } as Record<string, unknown>, rr.items[i] ?? null, ['title', 'body'])),
       total: posts.length,
       cursor: page.length === limit ? page[page.length - 1]?.id : undefined,
       authors,

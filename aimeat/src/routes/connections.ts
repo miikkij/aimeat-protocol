@@ -29,6 +29,7 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   2026-11-21 — POST /v1/connections/:id/read/:resource carries content_risk to an AI reader.
  *   2026-10-31 — A round started in the owner's browser over https is bound with the `__Host-` cookie (browserRoundBinding; secaudit2026oct31w2 round 10, W2-19).
  *   2026-10-29 — A delegation is bound to one author's app (bound_app on its view); an app by another author on one named by file name alone answers 202 with the channel owner's pending question (secaudit2026oct26 round 8c, delegated-publish/app-id-not-bound-to-caller).
  *   2026-10-27 — A delegated publish passes only for the delegation's app (its signed grant or eco id), a person who uses that app or their agents, and the channel owner; any other caller is 403 DELEGATION_NOT_FOR_CALLER naming the app to use (secaudit2026oct26, delegated-publish/app-id-not-bound-to-caller).
@@ -104,6 +105,8 @@ import { listPublishHistory } from '../services/connections/history.js';
 import { readerFor } from '../services/classification/reader.js';
 import { fileTarget } from '../services/classification/labels.js';
 import type { ConnectionMode, ModerationMode } from '../models/connection-schemas.js';
+import { riskForRead } from '../services/content/risk-read.js';
+import { contentRiskTextOf } from '../services/content/risk-intake.js';
 
 // The projection and the two access sentences live in services/connections/access.ts, so the MCP
 // door cannot carry a second copy of them. `toPublic` stays as the local name every handler below
@@ -787,7 +790,10 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       return res.status(status).json(error(config.nodeId, out.code, out.message));
     }
 
-    res.json(success(config.nodeId, { provider: out.provider, resource: out.resource, data: out.data }));
+    // Mail is content from outside, read live: its content risk marks travel with it to an AI reader.
+    const who = callerOf(req, config.nodeId, storage);
+    const [risk] = (await riskForRead({ storage, config }, who, [{ subject: { kind: 'external', owner: who.ownerGhii, ref: `${req.params.id as string}:${out.resource}` }, text: contentRiskTextOf(out.data) }])).items;
+    res.json(success(config.nodeId, { ...(risk?.warning ? { content_risk_warning: risk.warning } : {}), provider: out.provider, resource: out.resource, data: out.data, ...(risk ? { content_risk: risk } : {}) }));
   });
 
   return router;

@@ -6035,6 +6035,103 @@ components:
           description: >
             Connected accounts created with this app. They can only be renewed by it, so this is
             also how many would stop renewing if it were removed.
+    ContentRiskMark:
+      type: object
+      description: One possible risk in an item's words. Offsets are UTF-16 code units in the text the reader got.
+      required: [kind, rule, by, start, end, excerpt]
+      properties:
+        kind: { type: string, enum: [ai-instruction, hidden-text, false-role, exfil-link, other-person-data, encoded-block] }
+        rule: { type: string, description: 'The rule that matched, such as ai-instruction.ignore-previous, or `model`.' }
+        by: { type: string, enum: [rules, model] }
+        start: { type: integer }
+        end: { type: integer }
+        excerpt: { type: string, description: 'At most 160 characters around the match, invisible characters written as \u{...}. Empty in stored marks (facts.risk); a read builds it from the words it answers.' }
+        why: { type: string, description: 'A model''s reason, in one sentence.' }
+    ContentRisk:
+      type: object
+      description: >
+        The content risk marks beside an item an AI reads (src/services/content/risk-types.ts
+        ContentRisk), in the `content_risk` field of every read answer that carries content to an AI:
+        GET /v1/memory/{key}, GET /v1/memory/search, the workspace read, row reads, GET
+        /v1/storage/{key}?mode=inline, the comment, board, direct message and agent message reads, the
+        mail and drive reads, and the matching MCP tools. A caller that is the account holder in person
+        gets no field. The item itself is never changed by a mark. A marked item (`marked: true`,
+        `use: prepare-only`) may only produce a preparation for a person, never an act of its own: an
+        outside service that reads AIMEAT content (the SituatedAI Engine, an agent framework) relies on
+        this. A field is added to this shape, never renamed or removed. A list answer also carries
+        `content_risk_warning`, one line, when any item is marked and the reader's setting warns.
+      required: [v, marked, use, kinds, marks, content_hash, detect, checked_at, point]
+      properties:
+        v: { type: integer, enum: [1] }
+        marked: { type: boolean }
+        use: { type: string, enum: [prepare-only, normal] }
+        kinds: { type: array, items: { type: string } }
+        marks: { type: array, items: { $ref: '#/components/schemas/ContentRiskMark' } }
+        content_hash: { type: string, description: 'sha256:<hex> of the words (or of a file''s bytes) the marks belong to.' }
+        detect: { type: string, enum: [rules, rules+ai] }
+        checked_at: { type: string, format: date-time }
+        point: { type: string, enum: [intake, shared-write, read, request], description: Where the marks were made. }
+        warning: { type: string, description: One line for the reading AI, present when the item is marked and the reader's setting is mark+warn. }
+        held:
+          type: object
+          description: The item is held from this reader; its content fields are null in this answer. Nothing was changed or deleted.
+          properties:
+            since: { type: string, format: date-time }
+            release_with: { type: string }
+    ContentRiskMarks:
+      type: object
+      description: The marks kept beside one item (facts.risk of a person's file or memory record), bound to its hash.
+      properties:
+        v: { type: integer, enum: [1] }
+        contentHash: { type: string }
+        detect: { type: string, enum: [rules, rules+ai] }
+        point: { type: string, enum: [intake, shared-write, read, request] }
+        at: { type: string, format: date-time }
+        marks: { type: array, items: { $ref: '#/components/schemas/ContentRiskMark' } }
+        kinds: { type: array, items: { type: string } }
+        truncatedAt: { type: integer }
+        model: { type: string }
+        modelSkipped: { type: string }
+        hold:
+          type: object
+          properties:
+            status: { type: string, enum: [held, released] }
+            since: { type: string, format: date-time }
+            decidedBy: { type: string }
+            decidedAt: { type: string, format: date-time }
+        writtenBy: { type: string }
+        expiresAt: { type: string, format: date-time }
+    ContentRiskSettings:
+      type: object
+      description: >
+        One layer of the content risk settings (a person's, an organism's or a workspace's). Every field
+        is optional; a missing one follows the layer above. The content's home decides: a person's item
+        takes the node and that person, a workspace's item the node, the organism and the workspace; a
+        reading AI's person is added for on_read. A locked layer's values are a floor the layers under it
+        may only tighten (off < mark < mark+warn < hold); the operator's floors hold for everyone.
+      properties:
+        enabled: { type: boolean }
+        detect: { type: string, enum: [rules, rules+ai], description: rules+ai spends the AI allowance of whoever chose it. }
+        on_intake: { type: string, enum: [off, mark, mark+warn, hold] }
+        on_shared_write: { type: string, enum: [off, mark, mark+warn, hold] }
+        on_read: { type: string, enum: [off, mark, mark+warn] }
+        kinds:
+          type: object
+          additionalProperties: { type: boolean }
+          description: Each of ai-instruction, hidden-text, false-role, exfil-link, other-person-data, encoded-block on or off.
+        locked: { type: boolean, description: An organism or a workspace only. }
+    ResolvedContentRisk:
+      type: object
+      description: What is in force for an item of a home, and the layer each value comes from (node, floor, organism, workspace, person).
+      properties:
+        enabled: { type: boolean }
+        detect: { type: string, enum: [rules, rules+ai] }
+        on_intake: { type: string }
+        on_shared_write: { type: string }
+        on_read: { type: string }
+        kinds: { type: array, items: { type: string } }
+        aiPayer: { type: string, nullable: true }
+        from: { type: object, additionalProperties: { type: string } }
     ContentSharedFingerprint:
       type: object
       description: >
@@ -74896,7 +74993,9 @@ paths:
         stage makes its one shared fingerprint, on the caller's AI key, and the answer carries
         `shared` (ContentSharedFingerprint): anyone who may read the document makes a missing or
         stale one; a current one is answered as it is (`skipped.profile` says so), and making it
-        again with `force` needs the right to edit the document (403 ACCESS_DENIED otherwise).
+        again with `force` needs the right to edit the document (403 ACCESS_DENIED otherwise). The
+        `risk` stage marks possible risks in the item's words beside it (`facts.risk`, ContentRiskMarks):
+        it never changes the item, and it needs ai:use only when the rules in force say rules+ai.
       tags: [ContentClasses]
       security:
         - BearerAuth: []
@@ -74917,7 +75016,7 @@ paths:
                     owner: { type: string }
                 stages:
                   type: array
-                  items: { type: string, enum: [technical, describe, classify, extract, propose, profile] }
+                  items: { type: string, enum: [technical, describe, classify, extract, propose, profile, risk] }
                 force:
                   type: boolean
                   description: Run the asked stages again even when they ran on the same bytes.
@@ -75090,7 +75189,9 @@ paths:
         organism or workspace get their shared fingerprint (`auto_profile`, this level's own choice or
         null; `effective` and `from`, workspace, organism or default off). It spends nobody's key by
         itself: a document gets it on the publisher's key, and only when the publisher's own settings
-        run the profile step. Any member who may read the workspace reads it.
+        run the profile step. Any member who may read the workspace reads it. Both answers carry the
+        content risk marks: `risk` (this level's own layer, ContentRiskSettings, or absent/null) and
+        `risk_in_force` (ResolvedContentRisk: what is in force and where each value comes from).
       tags: [ContentClasses]
       security:
         - BearerAuth: []
@@ -75111,10 +75212,15 @@ paths:
       summary: Change your content class settings
       description: >
         A partial patch, merged onto the current settings; an unknown key is refused with its name.
-        Needs memory:write-reserved, because the settings decide what spends your AI key. With
-        `organism_id` (and `ws`) the body is `{ autoProfile: true | false | null }` (null follows the
-        level above), changed by the workspace's creator or an organism creator or admin
-        (403 ACCESS_DENIED otherwise).
+        Needs memory:write-reserved, because the settings decide what spends your AI key. `risk`
+        (ContentRiskSettings) is your own layer of the content risk marks, for your own content and
+        your own AIs' reads; a field set to null follows the layer above, and `locked` is refused (a
+        person's choice is a floor for nobody). With `organism_id` (and `ws`) the body takes
+        `autoProfile: true | false | null` (null follows the level above) and `risk`, the organism's
+        or workspace's layer for its shared spaces, where `locked: true` makes its values a floor;
+        changed by the workspace's creator or an organism creator or admin (403 ACCESS_DENIED otherwise).
+        The node's own layer (default, floors, whether rules+ai may be chosen) is the operator's
+        config, content_risk.*.
       tags: [ContentClasses]
       security:
         - BearerAuth: []
@@ -75141,6 +75247,65 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: A token without memory:write-reserved.
+  /v1/content/risk/held:
+    get:
+      operationId: listHeldContent
+      summary: Marked content held from other people's AIs, which you decide
+      description: >
+        Content marked for possible risks at intake or at a shared write, under a layer whose behaviour
+        is `hold`, is kept from other people's AIs: they get its `content_risk` with `held` and not its
+        content, until the owner (for a person's item) or the workspace's creator or an organism admin
+        (for a workspace's item) releases it. Nothing is changed or deleted. This lists your own held
+        items and those of every workspace you decide for. 404 when content risk marks are off on the node.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`items`: each with `ref` (for the release), `where`, `subject_id`, `since`, `kinds`, `marks` (how many), `written_by` and `point`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Content risk marks are off on this node.
+  /v1/content/risk/release:
+    post:
+      operationId: releaseHeldContent
+      summary: Release one held item to other people's AIs
+      description: >
+        Other people's AIs then get the content, with its marks; the hold of the same content stays
+        released. Needs memory:write-reserved (the account holder in person holds it): an AI that has
+        read the held text must not release it on that text's say.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ref]
+              properties:
+                ref: { type: string, description: 'The ref GET /v1/content/risk/held gave: p:<id> or w:<organism>:<workspace>:<id>.' }
+      responses:
+        '200':
+          description: '`{ ref, released: true, at }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without memory:write-reserved.
+        '404':
+          description: No held item of yours, or of a workspace you decide for, has that ref; or content risk marks are off.
   /v1/content/classes:
     get:
       operationId: listContentClasses

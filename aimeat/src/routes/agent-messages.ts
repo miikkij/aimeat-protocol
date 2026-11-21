@@ -10,6 +10,7 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   2026-11-21 — GET /v1/agents/:name/messages carries each message's content_risk to an AI reader.
  *   2026-11-13 — GET /v1/agents/:name/messages reads through services/agent/message-history.ts, the gate and
  *     read aimeat_message_history calls (structure programme 2026-11, unit 2b).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
@@ -62,6 +63,8 @@ import { sendAgentMessage } from '../services/agent/message-send.js';
 import { agentIsStopped } from '../services/agent/stop.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
+import { riskForRead, agentMessageRiskItems, withRisk } from '../services/content/risk-read.js';
+import { callerOf } from '../middleware/caller.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -238,8 +241,12 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
       return;
     }
 
+    // The content risk marks travel with each message to an AI reader; a held one's content is left out
+    // (services/content/risk-read.ts).
+    const rr = await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage), agentMessageRiskItems(result.messages));
     res.json(success(config.nodeId, {
-      messages: await withProvenance(result.messages),
+      ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
+      messages: (await withProvenance(result.messages)).map((m, i) => withRisk(m as unknown as Record<string, unknown>, rr.items[i] ?? null, ['content'])),
       total: result.total,
       page,
       per_page: perPage,

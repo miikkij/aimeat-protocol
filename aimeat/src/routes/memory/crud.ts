@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — GET /v1/memory/search carries each result's content_risk to an AI reader and leaves a
+ *     held result's value or snippet out (services/content/risk-read.ts).
  *   2026-11-10 — GET /v1/memory?include=meta&limit takes `cursor` (additive): one page in key order read
  *     in SQL batches after it (services/memory-query.ts listMemoryMetaPage), with `next_cursor`.
  *   2026-11-10 — GET /v1/memory?include=meta takes `sort` (updated, key, size) and `offset`, so the
@@ -111,6 +113,8 @@ import type { MemoryMetaRow } from '../../storage/repositories/memory.repository
 import { memoryPageWithValues, shownMemoryBytes } from '../../services/memory/list-page.js';
 import { sortMetaRows } from '../../services/db/memory-tab-summary.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
+import { riskForRead, withRisk } from '../../services/content/risk-read.js';
+import { contentRiskTextOf } from '../../services/content/risk-intake.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -675,9 +679,14 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // the shape the node MCP tool has always returned. Without it, "which keys mention this" pulled
     // every matching record across the wire and through a model's context. Same word and same
     // meaning as the listing door beside it, fixed for the same reason on 2026-09-04 (pitfalls §44).
+    // Each result says whether its record carries risk marks, for an AI reader; a held one's words are
+    // left out (services/content/risk-read.ts).
+    const rr = await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage),
+      results.map(r => ({ subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value) })));
     if (req.query.include === 'meta') {
       res.json(success(config.nodeId, {
-        results: results.map(r => ({ ...searchHitShape(r, q), ai_provenance_id: r.aiProvenanceId ?? null, ...warningField(r) })),
+        ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
+        results: results.map((r, i) => withRisk({ ...searchHitShape(r, q), ai_provenance_id: r.aiProvenanceId ?? null, ...warningField(r) } as Record<string, unknown>, rr.items[i] ?? null, ['snippet'])),
         total: results.length,
         query: q,
         hint: 'Snippets only. Read a full value with GET /v1/memory/{key}.',
@@ -686,7 +695,8 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
 
     res.json(success(config.nodeId, {
-      results: results.map(r => ({
+      ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
+      results: results.map((r, i) => withRisk({
         key: r.key,
         value: r.value,
         visibility: r.visibility,
@@ -698,7 +708,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         updated_at: r.updatedAt,
         ai_provenance_id: r.aiProvenanceId ?? null,
         ...warningField(r),
-      })),
+      } as Record<string, unknown>, rr.items[i] ?? null, ['value'])),
       total: results.length,
       query: q,
     }));
