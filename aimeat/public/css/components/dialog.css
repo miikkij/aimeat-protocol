@@ -17,6 +17,8 @@
  *   gets this file copied into its page at build time (scripts/build-app-catalog.ts).
  * @structure frame · header and X · body · footer and its actions · sizes · phone
  * @version-history
+ *   v1.4.1 — 2026-11-21 — The root sets the body's font size, weight, style, letter spacing, case and
+ *     alignment, so a dialog called inside a label or a heading no longer takes its text styles.
  *   v1.4.0 — 2026-09-24 — The frame, corner, shadow, title case and footer rule read the theme's shape
  *     values (theme.css --shape-*), today's values (a move).
  *   v1.3.0 — 2026-09-24 — The footer's actions are the library's action link, loud action and its
@@ -43,6 +45,14 @@ dialog.dlg {
   background: var(--bg); color: var(--text);
   box-shadow: var(--shape-shadow-dialog);
   font-family: var(--font-body);
+  /* A native <dialog> is drawn in the top layer but inherits from its DOM parent, and the SPA has no
+     portal: a dialog opened from a label, a column head or a heading took that element's capitals,
+     spacing and colour. The root sets the body's text values itself (page-base.css body), so where it
+     is called from no longer shows (docs/pitfalls.md §109 until 2026-11-21). line-height is left to
+     inherit: the SPA's body has 1.6 and the app catalog's has none, and one value here would move
+     the dialogs of one of the two. */
+  font-size: 1rem; font-weight: 400; font-style: normal;
+  letter-spacing: normal; text-transform: none; text-align: start;
   overflow: hidden;
 }
 dialog.dlg[open] { display: flex; flex-direction: column; }

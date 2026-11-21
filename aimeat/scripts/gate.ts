@@ -12,7 +12,10 @@
  *
  *     always        check:fast and check:invariants — thirty seconds, and half of them read docs
  *     unit          vitest --changed <base>: the test files whose import graph reaches a changed
- *                   file; the whole suite only with --full
+ *                   file, and the ones whose text names a changed file or its folder
+ *                   (scripts/lib/gate-text-tests.ts); the whole suite only with --full
+ *     test types    tsc over test/ against a per-file error count that may only shrink, when
+ *                   TypeScript under src/ or test/ changed (scripts/check-test-types.ts)
  *     guard tier    when a change touches server source (anything under src/ but src/static), the
  *                   dependency manifests or the E2E machinery (runner, helpers, fixtures); on
  *                   SQLite, and on PostgreSQL too when the Postgres legs run; --full forces it
@@ -43,6 +46,8 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   2026-11-21 -- The unit tests whose text names a changed file run too (docs/pitfalls.md §108), and
+ *     the test tree is typechecked against a shrink-only per-file baseline (§26).
  *   2026-11-15 -- The suites that executed a changed line of src/ run too, chosen from the nightly's
  *     per-suite coverage map (report of 2026-11-15, 4.2.6); the choice no longer rests on memory.
  *   2026-11-14 -- Unit files that fail in the parallel run are run again alone before the gate refuses,
@@ -78,6 +83,7 @@ import { join, resolve } from 'node:path';
 import { describeState, readCiState } from './lib/ci-runs.mjs';
 import { manifestChangedBeyondScripts } from './lib/package-manifest-change.js';
 import { COVERAGE_SUITE_CAP, coverageSelection, type GateCoverage } from './lib/gate-coverage.js';
+import { testsNamingChanged } from './lib/gate-text-tests.js';
 
 const args = process.argv.slice(2);
 const FULL = args.includes('--full');
@@ -161,6 +167,10 @@ const PYTHON_PARITY = /^(?:python\/aimeat-crewai\/|aimeat\/src\/models\/(?:offer
 const SKILLS_STANDARD = /^aimeat\/(?:src\/data\/builtin-skills[^/]*\.ts$|src\/services\/skill-md\.ts$|scripts\/(?:check-skills-standard\.ts|skills-standard-validate\.py)$)/;
 /** Paths a unit test can reach at all. The whole test tree: the runner has unit tests of its own (QA audit P2-06). */
 const UNIT_REACH = /^aimeat\/(src\/|test\/|public\/|scripts\/|package\.json|vitest\.config|tsconfig|eslint\.config|locales\/)/;
+/** Past this many text-named unit tests the whole suite runs instead: a command line of paths has a length limit on Windows. */
+const TEXT_TEST_CAP = 120;
+/** Paths that can change what the test tree typechecks against: TypeScript under src/ or test/, and the test tsconfig. */
+const TEST_TYPES = /^aimeat\/(?:(?:src|test)\/.*\.ts$|tsconfig(?:\.tests)?\.json$|security\/test-types-baseline\.json$)/;
 
 function git(...a: string[]): string {
     return execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' }).trim();
@@ -228,6 +238,24 @@ function plan(files: string[], mergeBase: string, coverage: GateCoverage): Step[
         steps.push({ name: 'unit suite, whole', cmd: ['pnpm', '-s', 'exec', 'vitest', 'run'], why: FULL ? '--full' : 'package.json changed beyond its scripts', unit: true });
     } else if (unitFiles.length > 0) {
         steps.push({ name: `unit tests reaching ${unitFiles.length} changed file(s)`, cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', '--changed', mergeBase, '--passWithNoTests'], why: unitFiles.slice(0, 4).join(', ') + (unitFiles.length > 4 ? ', …' : ''), unit: true });
+    }
+    // The unit tests that READ a changed file rather than import it (readFileSync of a generated
+    // registry, a served file, a folder of packs): vitest's import graph cannot see them, and one
+    // went red on the next whole run after a green gate (docs/pitfalls.md §108 until 2026-11-21).
+    if (!FULL && !manifestChanged) {
+        const reading = testsNamingChanged(AIMEAT, files);
+        if (reading.length > TEXT_TEST_CAP) {
+            steps.push({ name: 'unit suite, whole', cmd: ['pnpm', '-s', 'exec', 'vitest', 'run'], why: `${reading.length} unit tests read a changed file, more than ${TEXT_TEST_CAP}`, unit: true });
+        } else if (reading.length > 0) {
+            steps.push({ name: `unit tests that read a changed file: ${reading.length}`, cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', '--passWithNoTests', ...reading], why: reading.slice(0, 3).join(', ') + (reading.length > 3 ? ', …' : ''), unit: true });
+        }
+    }
+    // The test tree's own typecheck, which tsconfig.json leaves out: a signature change that a test
+    // still calls the old way is red here, against a per-file count that may only shrink
+    // (scripts/check-test-types.ts, docs/pitfalls.md §26 until 2026-11-21).
+    const typedTests = files.filter(f => TEST_TYPES.test(f));
+    if (FULL || typedTests.length > 0) {
+        steps.push({ name: 'typecheck of test/ (shrink-only per file)', cmd: ['pnpm', '-s', 'check:test-types'], why: FULL ? '--full' : typedTests.slice(0, 3).join(', ') + (typedTests.length > 3 ? ', …' : '') });
     }
     // The gate has run check:python-shapes (names, from the Python source) in check:fast since
     // 2026-10-18; this runs the pytest half (values) through uv, and fails with its reason when uv is
@@ -326,6 +354,7 @@ async function main(): Promise<void> {
     if (!steps.some(s => s.unit)) skipped.push('unit tests (nothing a test can reach changed)');
     if (!FULL && !files.some(f => PYTHON_PARITY.test(f))) skipped.push('Python parity tests (no aimeat-crewai, offer schema or shape-allowlist change)');
     if (!FULL && !files.some(f => SKILLS_STANDARD.test(f))) skipped.push('Agent Skills validator (no built-in skill, SKILL.md parser or check change)');
+    if (!FULL && !files.some(f => TEST_TYPES.test(f))) skipped.push('typecheck of test/ (no TypeScript under src/ or test/ changed)');
     if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard and purpose tiers (no server source, dependency or E2E machinery changed)');
     if (postgresWhy(files) === null) skipped.push('PostgreSQL legs (no storage, identity, door or runner change; --postgres forces them)');
     if (coverage.suites === null) skipped.push(`suites reaching the change: ${coverage.note}`);

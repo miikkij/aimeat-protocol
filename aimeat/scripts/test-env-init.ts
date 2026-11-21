@@ -30,6 +30,9 @@
  *        AIMEAT_TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/x pnpm test:env:init --force
  *                                                  (your PostgreSQL account instead of the CI one)
  * @version-history
+ *   v1.4.0 -- 2026-11-21 -- The derived port steps past every port a test file writes down, which
+ *     the runner refuses to start on, and an explicit one of those is warned about (incident
+ *     "test:env:init can derive a worktree port that an E2E suite owns").
  *   v1.3.1 -- 2026-11-15 -- An explicit AIMEAT_E2E_PORT that an existing env file does not carry is
  *     refused without --force, instead of the file being kept and the request ignored.
  *   v1.3.0 -- 2026-11-15 -- An AIMEAT_E2E_PORT outside 40251-40499 is refused with the range, instead
@@ -46,7 +49,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
-import { portConflicts } from './lib/worktree-ports.js';
+import { derivePort, portConflicts, portsNamedByTests } from './lib/worktree-ports.js';
 import { worktreeSlug } from './lib/e2e-databases.js';
 import { pruneE2eDatabases } from './test-db-prune.js';
 
@@ -93,9 +96,17 @@ function portFor(slug: string): number {
     console.error(`  Nothing was written.`);
     process.exit(1);
   }
-  let h = 0;
-  for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return 40251 + (h % 140); // 40251-40390, clear of the dev server and of the lane range
+  // 40251-40390, clear of the dev server and of the lane range, and past every port a test file
+  // writes down: the runner refuses to start on one of those (lib/worktree-ports.ts derivePort).
+  return derivePort(slug, portsNamedByTests(AIMEAT_DIR));
+}
+
+/** An explicit port a test file writes down: the runner will refuse it, so say so now rather than five minutes into a gate. */
+function warnIfNamedByTests(port: number): void {
+  const files = portsNamedByTests(AIMEAT_DIR).get(port);
+  if (!files) return;
+  console.warn(`  ! port ${port} is written down in ${files.join(', ')}; the E2E runner refuses to start on it`);
+  console.warn('    when that suite is in the run. Take a port no test file names (grep -lE "\\b<port>\\b" test/*.ts).');
 }
 
 /** The example, with this worktree's port and database written into it. */
@@ -161,6 +172,7 @@ async function main(): Promise<void> {
   const database = `aimeat_kysely_e2e_${slug}`;
 
   console.log(`\nWorktree ${slug}\n  port     ${port}\n  database ${database}\n`);
+  warnIfNamedByTests(port);
   await reportPortConflicts(port);
 
   const files: Array<{ example: string; target: string; db: string | null }> = [

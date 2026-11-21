@@ -6,6 +6,8 @@
  * must retain changed suites, shared security code must select the guard tier, and a storage,
  * identity, door or runner change must select the PostgreSQL legs without being asked.
  * @version-history
+ *   2026-11-21 -- A unit test that reads a changed file is selected, and TypeScript under src/ or test/
+ *     selects the test tree's typecheck (docs/pitfalls.md §108, §26).
  *   2026-11-14 -- The version-aware suite list is gone with the nightly 4.0.0 run it fed.
  *   2026-10-21 -- The purpose tier is selected wherever the guard tier is, on the same backends; red on
  *     the planner before the change (wish wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni).
@@ -36,8 +38,11 @@ mkdirSync(join(aimeat, 'test'), { recursive: true });
 // A runner that registers one suite without the e2e- prefix, committed in the baseline so it is not a change.
 writeFileSync(join(aimeat, 'test', 'run-e2e-ci.ts'), "const ALL_SUITES = ['test/federation-messages.ts', 'test/e2e-example.ts'];\n");
 const git = (...args: string[]) => execFileSync('git', args, { cwd: scratch, stdio: 'pipe' });
+// A unit test that READS a served registry rather than importing it (docs/pitfalls.md §108).
+mkdirSync(join(aimeat, 'test', 'unit'), { recursive: true });
+writeFileSync(join(aimeat, 'test', 'unit', 'reads-registry.test.ts'), "readFileSync(new URL('../../src/static/sdk-libs/x/describe-data.js', import.meta.url));\n");
 git('init', '-q');
-git('add', 'aimeat/test/run-e2e-ci.ts');
+git('add', 'aimeat/test/run-e2e-ci.ts', 'aimeat/test/unit/reads-registry.test.ts');
 git('-c', 'user.name=Gate Test', '-c', 'user.email=gate@example.invalid', '-c', 'commit.gpgsign=false',
     '-c', 'core.hooksPath=', 'commit', '-qm', 'baseline');
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -140,5 +145,22 @@ describe('the purpose tier runs wherever the guard tier runs (docs/pitfalls.md �
         const output = plan('docs/example.md');
         expect(output).not.toContain('purpose tier, SQLite');
         expect(output).toContain('skipped: guard and purpose tiers');
+    });
+});
+
+describe('the unit tests that read a file, and the test tree types (docs/pitfalls.md §108, §26)', { timeout: 30_000 }, () => {
+    it('a change to a file a unit test reads runs that test', () => {
+        const output = plan('aimeat/src/static/sdk-libs/x/describe-data.js');
+        expect(output).toContain('unit tests that read a changed file: 1');
+        expect(output).toContain('test/unit/reads-registry.test.ts');
+    });
+    it('a change no unit test reads adds no such step', () => {
+        expect(plan('aimeat/src/static/sdk-libs/y/other.js')).not.toContain('unit tests that read a changed file');
+    });
+    it('TypeScript under src/ or test/ typechecks the test tree; a document does not', () => {
+        expect(plan('aimeat/src/services/board-ttl.ts')).toContain('typecheck of test/');
+        const docs = plan('docs/example.md');
+        expect(docs).not.toContain('• typecheck of test/');
+        expect(docs).toContain('skipped: typecheck of test/');
     });
 });

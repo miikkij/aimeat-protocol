@@ -6,6 +6,7 @@
  *  - 2026-11-21: check:scope-words, a scope word added to an MCP tool or REST route that already exists needs a keep-working step new in the same change, or a written reason (docs/pitfalls.md §119, now deleted).
  *  - 2026-11-21: check:overrides, a dependency override's value stays inside one major (docs/pitfalls.md §59, now deleted).
  *  - 2026-11-21: check:no-nul, no raw NUL byte in tracked source text under src/, test/, scripts/ and public/ (docs/pitfalls.md §69, now deleted).
+ *  - 2026-11-21: check:css-facts (an undefined custom property without a fallback, an .ak- root in two kit sheets, a phone view pinned to the page; docs/pitfalls.md §4, §36, §125) and check:env-names (the AIMEAT_* names the node's start-time warning knows, §23).
  *  - 2026-11-20: check:app-ref, an app's name and its `.html` file are related only in src/services/app/app-ref.ts.
  *  - 2026-11-20: check:feature-reach, every MCP tool, served library and seeded package is named in docs/AIMEAT-Feature-List.md, the capability list an AI reads (feature-documentation.md row 5).
  *  - 2026-11-20: check:partial-defaults, no zod .partial() in src/ or public/: a partial-update schema is patchOf() (src/utils/zod-patch.ts), because .partial() keeps the defaults and a PATCH reset the fields it left out (docs/pitfalls.md §127, now deleted).
@@ -101,6 +102,8 @@ export const FAST_CHECKS = [
     { script: 'check:theme-tokens', label: 'theme.css holds tokens only; every page that links it links the shell block' },
     { script: 'check:shape-tokens', label: 'A component sheet reads the theme\'s shape values, never a corner, frame, shadow or letter case of its own' },
     { script: 'check:dialogs', label: 'One dialog for the site: no hand-rolled overlay, backdrop or role="dialog" box' },
+    { script: 'check:css-facts', label: 'No custom property read without a fallback that nothing defines, no .ak- root in two kit sheets, no phone view pinned to the page' },
+    { script: 'check:env-names', label: 'The list of AIMEAT_* names the node warns against at start is the repository\'s' },
     { script: 'check:viewport', label: 'Cortex pack integrity: embed + VERSION constants + registry versions' },
     { script: 'check:ai-disclosure', label: 'AI disclosure gates: one LLM path, one publish path, labels intact', slow: true },
     // Plan doc-mvcn6c7e4e5q, V6.4: each view printed its kind's stored word for who can read a thing.

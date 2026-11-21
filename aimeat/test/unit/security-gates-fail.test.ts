@@ -20,6 +20,8 @@
  *   v1.x, findings()).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-gates-fail.test.ts
  * @version-history
+ *   2026-11-21 — check:scope-parity reports a word a route demands that APP_GRANTABLE_SCOPES does not
+ *     list, and passes one whose orScope an app can hold (docs/pitfalls.md §6).
  *   2026-11-04 — check:python-daemon refuses a renamed route the package calls through decide.py
  *     _call, messaging.py _group_call or a path held in a variable (codebase analysis 2026-11-03, item A14).
  *   2026-11-01 — check:open-writes resolves a guard array in the route file that spreads it: its own
@@ -348,6 +350,19 @@ describe('check:scope-parity finds a permission word on one side only', { timeou
     it('reports a word the owner is offered that no door asks for', () => {
         const keys = scopeParityFindings(files, new Set([...vocabulary, 'fixture:offered']), AIMEAT).map(f => f.key);
         expect(keys).toContain('offered:fixture:offered');
+    });
+    it('reports a word a route demands that no app grant can hold', () => {
+        const route = source(join(AIMEAT, 'src/routes/fixture-app-scope.ts'), "router.post('/v1/x', requireScope('memory:read'), requireScope('fixture:app-less'), (req, res) => {});");
+        const keys = scopeParityFindings([...files, route], new Set([...vocabulary, 'fixture:app-less']), AIMEAT, new Set(['memory:read'])).map(f => f.key);
+        expect(keys).toContain('app-ungrantable:fixture:app-less');
+        expect(keys).not.toContain('app-ungrantable:memory:read');
+    });
+    it('passes a call whose orScope an app grant can hold, and a word outside src/routes', () => {
+        const route = source(join(AIMEAT, 'src/routes/fixture-or-scope.ts'), "router.post('/v1/x', requireRestScope('fixture:agent-only', { orScope: 'contract:spend' }), (req, res) => {});");
+        const service = source(join(AIMEAT, 'src/services/fixture-service.ts'), "requireScope('fixture:service-only');");
+        const keys = scopeParityFindings([...files, route, service], vocabulary, AIMEAT, new Set(['contract:spend'])).map(f => f.key);
+        expect(keys).not.toContain('app-ungrantable:fixture:agent-only');
+        expect(keys).not.toContain('app-ungrantable:fixture:service-only');
     });
 });
 

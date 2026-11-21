@@ -12757,11 +12757,6 @@
   "admin.hooks.moments.w_post_help_question": "The question's id, its state and its topics, after it was sent. Never its text, never a name.",
   "admin.hooks.moments.h_post_help_solved": "A question was solved or ended",
   "admin.hooks.moments.w_post_help_solved": "The question's id, its state (solved or expired) and its topics. Never its text, never a name.",
-  "profile.agents.scopeUi.domainHelp": "Ask someone who knows",
-  "profile.agents.scopeUi.permAsk": "Ask",
-  "profile.agents.scopeUi.permAnswer": "Answer",
-  "profile.agents.scopeUi.scopeText.help.ask": "Find a kept answer or a helper, and ask another member a question in your name, when you allowed your AI to send questions. Not part of full access.",
-  "profile.agents.scopeUi.scopeText.help.answer": "Read the questions sent to you, write a draft answer, and answer on its own in the topics you chose for it. Not part of full access.",
   "home.ask.title": "Who knows?",
   "home.ask.lead": "Ask the people here who know. You see a kept answer and who could answer before anything is sent.",
   "home.ask.askLabel": "Ask",
@@ -19411,7 +19406,6 @@
         "next": "Next: you read what is already waiting, and reply in the same place.",
         "entered": "You went to read your messages."
       },
-      "copyPrompt": "Copy the prompt",
       "copied": "Copied. Paste it in your AI chat"
     },
     "settings": {
@@ -20513,7 +20507,6 @@
     "trust4Title": "GDPR as buttons",
     "trust4Text": "Export and deletion controls are available in your account. Where data is stored and AI processes it depends on the hosting and model you choose.",
     "trustEu": "Built in Finland, in the EU. The rules on this list are the ones we hold ourselves to.",
-    "transCta": "How this node marks AI content →",
     "roomIncAlt": "A delighted scientist in a hatchery full of robot chicks hatching from glowing eggs",
     "roomIncTitle": "Adopt agents from the incubator",
     "roomIncText": "Each one has a name, its own permissions and its own working hours. Adopt one, then another, and one person starts moving like a team.",
@@ -21014,7 +21007,6 @@
     "business": "For your business",
     "learn": "Learn",
     "exchange": "EXCHANGE",
-    "members": "Members",
     "lookMode": "Light or dark",
     "lookLight": "Light",
     "lookDark": "Dark",
@@ -21453,9 +21445,6 @@
     "makeViewer": "→ read only",
     "remove": "Remove",
     "addMemberPlaceholder": "owner name (or owner@node / agent#owner@node)",
-    "roleContributor": "contributor (read + write)",
-    "roleViewer": "viewer (read only)",
-    "addMember": "Add",
     "accessHint": "Members can be a different account; their agents inherit the role. Viewers read; contributors read + write.",
     "contributions": "contributions",
     "events": "events",
@@ -21516,7 +21505,6 @@
     "noPublishedDocs": "No published documents yet. Publish a page to share it.",
     "openLink": "open ↗",
     "openPublicViewer": "Open public viewer",
-    "linkCopied": "Link copied",
     "copyFailed": "Copy failed",
     "shareFailed": "Failed to update sharing",
     "shareAccessTitle": "Who can open the shared pages",
@@ -21776,7 +21764,6 @@
     "formIdentity": "Identity",
     "formAccess": "Access",
     "addTag": "Add…",
-    "saveChanges": "Save changes",
     "discardChanges": "Discard unsaved changes?",
     "deleteOrganismTitle": "Delete this organism",
     "deleteOrganismStats": "Deletes {w} workspaces, {r} records and {d} documents. This cannot be undone.",
@@ -25865,7 +25852,6 @@
       "referencesPackageLevel": "References (package-level)"
     },
     "landing": {
-      "home": "Overview",
       "nextTitle": "Suggested next steps",
       "next": {
         "writeNotesTitle": "Write self-organizing notes",

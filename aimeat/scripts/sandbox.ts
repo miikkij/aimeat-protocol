@@ -52,6 +52,9 @@
  *                                          # the same node on PostgreSQL, with its own state file
  *   AIMEAT_SANDBOX_PRELOAD=scripts/perf/trace-preload.mjs pnpm sandbox   # extra --import modules
  * @version-history
+ *   v1.11.0 — 2026-11-21 — The state records the node's public key, and "up" means up with that key:
+ *     `--status` no longer says UP for another worktree's node on the recorded port, and `pnpm sandbox`
+ *     starts this sandbox on a free port instead of asking that node for tokens (docs/pitfalls.md §77b).
  *   v1.10.1 — 2026-11-15 — The printed report says that openrouter-type providers answer from the
  *     stand-in, so a session that wants a real model knows to add an openai-compatible one.
  *   v1.10.0 — 2026-11-09 — AIMEAT_SANDBOX_DB_URL runs the sandbox on PostgreSQL (postgres-kysely, the
@@ -103,6 +106,7 @@ import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSyn
 import { dirname, join, resolve } from 'node:path';
 import { portIsFree } from './lib/port-free.js';
 import { SANDBOX_MAX_APPS } from './lib/sandbox-limits.js';
+import { nodeKeyOf, sandboxIdentity } from './lib/sandbox-identity.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { idleLimitMs } from './lib/sandbox-idle.mjs';
 import * as ed from '@noble/ed25519';
@@ -156,6 +160,8 @@ interface SandboxState {
     mailPid?: number;
     /** The first owner's connection to it, once connected. */
     mailbox?: string;
+    /** The node's public key, as /.well-known/aimeat publishes it: tells this sandbox from another node on the port. */
+    nodeKey?: string;
 }
 
 /** The test mailbox runs beside the node on the node's port plus this. */
@@ -323,6 +329,11 @@ async function isUp(baseUrl: string): Promise<boolean> {
         const res = await fetch(`${baseUrl}/v1/spec`, { signal: AbortSignal.timeout(2000) });
         return res.ok;
     } catch { return false; }
+}
+
+/** Up, and THIS sandbox rather than another node on its port (lib/sandbox-identity.ts). */
+async function upAndOurs(s: SandboxState): Promise<'ours' | 'other' | 'down'> {
+    return sandboxIdentity(s.baseUrl, s.nodeKey);
 }
 
 async function pickPort(): Promise<number> {
@@ -625,12 +636,21 @@ async function up(reset: boolean): Promise<void> {
         console.log('  reset: the old data is gone.');
     }
 
-    if (s && await isUp(s.baseUrl)) {
+    const state = s ? await upAndOurs(s) : 'down';
+    if (s && state === 'other') {
+        // Another worktree's node holds the port this sandbox last had. Leave it alone, and start
+        // this sandbox on its own data at a free port instead.
+        const port = await pickPort();
+        console.log(`  another node answers on :${s.port} (its key is not this sandbox's); starting this sandbox on :${port} with its own data.`);
+        s = { ...s, port, baseUrl: `http://localhost:${port}`, pid: 0, mailPid: 0, mailPort: undefined, mailbox: undefined };
+    }
+    if (s && state === 'ours') {
         BASE = s.baseUrl;
         // The node is up and already seeded; the tokens are the only thing that goes stale.
         for (const o of s.owners) o.token = await refreshOwnerToken(o);
         if (s.agent) s.agent.token = await agentToken(s.agent.gaii, s.agent.privateKey);
         s = await ensureMailbox(s);
+        s.nodeKey = s.nodeKey ?? (await nodeKeyOf(s.baseUrl)) ?? undefined;
         writeState(s);
         console.log(`  the sandbox on ${s.baseUrl} is already up; tokens refreshed.`);
         report(s);
@@ -653,7 +673,7 @@ async function up(reset: boolean): Promise<void> {
     if (existing) {
         for (const o of existing.owners) o.token = await refreshOwnerToken(o);
         if (existing.agent) existing.agent.token = await agentToken(existing.agent.gaii, existing.agent.privateKey);
-        const next: SandboxState = await ensureMailbox({ ...existing, pid, baseUrl, port, dbPath });
+        const next: SandboxState = await ensureMailbox({ ...existing, pid, baseUrl, port, dbPath, nodeKey: (await nodeKeyOf(baseUrl)) ?? undefined });
         writeState(next);
         console.log('  the node is back up on its own data; tokens refreshed.');
         report(next);
@@ -664,6 +684,7 @@ async function up(reset: boolean): Promise<void> {
     const { owners, agent, apps } = await seed();
     const next: SandboxState = await ensureMailbox({
         port, baseUrl, dbPath, pid, seededAt: new Date().toISOString(), owners, agent, apps,
+        nodeKey: (await nodeKeyOf(baseUrl)) ?? undefined,
     });
     writeState(next);
     report(next);
@@ -684,15 +705,16 @@ async function main(): Promise<void> {
 
     if (args.includes('--status')) {
         if (!s) { console.log('  no sandbox on record. `pnpm sandbox` makes one.'); return; }
-        const running = await isUp(s.baseUrl);
-        console.log(`  sandbox :${s.port}  ${running ? 'UP' : 'down'}  ${s.owners.length} owners, ${s.apps.length} apps, seeded ${s.seededAt.slice(0, 16).replace('T', ' ')}`);
+        const running = await upAndOurs(s);
+        const word = running === 'ours' ? 'UP' : running === 'other' ? 'down (ANOTHER node answers on this port; `pnpm sandbox` starts yours on a free one)' : 'down';
+        console.log(`  sandbox :${s.port}  ${word}  ${s.owners.length} owners, ${s.apps.length} apps, seeded ${s.seededAt.slice(0, 16).replace('T', ' ')}`);
         console.log(`  ${s.baseUrl}  ·  ${s.dbPath}`);
         return;
     }
 
     if (args.includes('--print')) {
         if (!s) { console.log('  no sandbox on record. `pnpm sandbox` makes one.'); return; }
-        if (!await isUp(s.baseUrl)) { console.log(`  the sandbox on :${s.port} is down. \`pnpm sandbox\` brings it back.`); return; }
+        if (await upAndOurs(s) !== 'ours') { console.log(`  the sandbox on :${s.port} is down. \`pnpm sandbox\` brings it back.`); return; }
         BASE = s.baseUrl;
         for (const o of s.owners) o.token = await refreshOwnerToken(o);
         if (s.agent) s.agent.token = await agentToken(s.agent.gaii, s.agent.privateKey);

@@ -1,17 +1,37 @@
 #!/usr/bin/env tsx
 /**
- * Kill any processes listening on the AIMEAT server port before starting dev.
+ * @file scripts/kill-port.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Kill any processes listening on the AIMEAT server port before starting dev.
  * Works on Windows (netstat) and Linux/macOS (lsof).
+ * @usage Prepended to `pnpm dev` as `tsx scripts/kill-port.ts --port-from=.env`.
+ * @version-history
+ *   2026-11-21 — The port comes from .env when the shell names none; a worktree that names none is refused.
  *
  * STRICTLY PORT-SCOPED: every kill path first proves the PID owns a socket on
  * THIS port. The old name-based orphan sweep (any node.exe matching
  * src/index.ts) killed every parallel dev server on the machine — worktree
  * sessions on other ports murdered each other on every `pnpm dev` start.
+ *
+ * THE PORT IS THE ONE THE DEV SERVER WILL BIND (2026-11-21): AIMEAT_PORT from the shell, else from
+ * the env file `pnpm dev` starts the node with (`--port-from=.env` names it), else 40050. It
+ * read the shell alone, so a worktree whose port sat in its .env stopped the main checkout's server
+ * on 40050 before its own booted (docs/pitfalls.md §13 until that day). Inside .worktrees/ a port
+ * that came from nowhere is refused rather than taken to be 40050.
  */
 import { execSync } from 'node:child_process';
 import { platform } from 'node:os';
+import { envFileArgs, portFor } from './lib/env-file-port.js';
 
-const port = process.env.AIMEAT_PORT ?? '40050';
+const chosen = portFor({ keys: ['AIMEAT_PORT'], envFiles: [...envFileArgs(process.argv.slice(2)), '.env'], cwd: process.cwd(), fallback: '40050' });
+const port = chosen.port;
+if (chosen.source === 'default' && /[\\/]\.worktrees[\\/]/.test(process.cwd())) {
+    console.error('\n  STOP: this worktree names no AIMEAT_PORT (shell or aimeat/.env), so its dev server would take'
+        + '\n  40050 and this script would stop the main checkout\'s server there first. Nothing was stopped.'
+        + '\n  Put AIMEAT_PORT=<a port your claim names> in aimeat/.env, then run pnpm dev again.\n');
+    process.exit(1);
+}
 
 /** PIDs owning a socket whose LOCAL address ends with :port (any state).
  *  The endsWith guard matters: `findstr :4005` also matches `:40050` lines. */

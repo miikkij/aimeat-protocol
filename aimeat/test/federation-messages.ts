@@ -9,6 +9,8 @@
  *   Node B: port 28271, aimeat-node-001-msgb
  *
  * @version-history
+ *   2026-11-21 -- Nodes boot through test/helpers/boot-node.ts, which took this suite's re-mint of
+ *     earlier owner tokens after a later boot (docs/pitfalls.md §45).
  *   2026-11-15 -- 7c: an agent of a blocked person is refused on the recipient's node; 10b: the
  *     operator's agent with operator:admin broadcasts federation-wide, lands in a peer owner's inbox
  *     (the receiving node reads the sender's operators from its node card) and not with a person who
@@ -24,13 +26,11 @@
 // Run: cd aimeat && pnpm exec tsx test/federation-messages.ts
 
 import * as ed from '@noble/ed25519';
-import { createHash, randomBytes } from 'node:crypto';
-import { createServer } from '../src/server.js';
-import { loadConfig } from '../src/config.js';
+import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { registerOwner, ownerToken, setupOperator } from './helpers/owner-login.js';
-import { ownNodeDb } from './helpers/own-node-db.js';
+import { bootNode as bootSharedNode, remintAfterLaterBoot } from './helpers/boot-node.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -68,57 +68,21 @@ interface NodeState {
 }
 
 /**
- * Every node booted in this process, in order.
+ * A node of this suite, booted through the shared helper (test/helpers/boot-node.ts).
  *
- * WHY THIS EXISTS. `initNodeKeys` (src/auth/jwt.ts) writes the signing keypair into module-level
- * variables and overwrites them unconditionally. That is correct for a real node, which is one per
- * process; here three nodes share one process, so booting a node REPLACES the key every earlier
- * node's tokens were signed with, and those tokens stop verifying — 401 AUTH_REQUIRED, from a live
- * server, on a token that worked a line earlier.
- *
- * It cost this suite seven assertions that had never run. Node C is booted inside test 5b, and every
- * test from 5b to 10 failed on a 401 from node A or B: the cross-node image pull, the block, the
- * agent DM, the interactive question and the operator broadcast. They read as a federation
- * regression and were a key rotation.
+ * Three nodes share this process, and each boot replaces the process-wide signing key, so every
+ * token an earlier node handed out stops verifying. Node C is booted inside test 5b; before the
+ * re-mint, every test from 5b to 10 failed on a 401 from node A or B and read as a federation
+ * regression. setupOwner registers the owner token's re-mint with the helper, which runs it after
+ * every later boot.
  */
-const BOOTED: NodeState[] = [];
-
 async function bootNode(port: number, nodeId: string): Promise<NodeState> {
-    const adminPw = randomBytes(16).toString('base64url');
-    process.env.AIMEAT_PORT = String(port);
-    process.env.AIMEAT_DEV_MODE = 'true';
-    process.env.AIMEAT_TEST_MODE = 'true';
-    process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
-    process.env.AIMEAT_NODE_ID = nodeId;
-    process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-
-    const { config } = loadConfig({});
-    config.port = port;
-    config.nodeId = nodeId;
-    config.baseUrl = `http://127.0.0.1:${port}`;
-    config.devMode = true;
-    config.testMode = true;
-    config.adminPassword = adminPw;
-    Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
-    config.federationAuthPolicy = 'all_peers';
-
-    const { app } = await createServer(config);
-    const server = await new Promise<Server>((resolve) => { const s = app.listen(port, '127.0.0.1', () => resolve(s)); });
-    const node: NodeState = {
-        server, config, baseUrl: `http://127.0.0.1:${port}`, nodeId,
-        json: makeJson(`http://127.0.0.1:${port}`),
-        ownerName: '', ownerGhii: '', ownerToken: '', ownerPrivateKey: '', adminPw,
+    const booted = await bootSharedNode({ port, nodeId, configure: c => { c.federationAuthPolicy = 'all_peers'; } });
+    return {
+        server: booted.server, config: booted.config, baseUrl: booted.baseUrl, nodeId,
+        json: makeJson(booted.baseUrl),
+        ownerName: '', ownerGhii: '', ownerToken: '', ownerPrivateKey: '', adminPw: booted.adminPw,
     };
-
-    // createServer has just replaced the process-wide signing key (see BOOTED). Every token an
-    // earlier node handed out was signed with the old one and no longer verifies, so mint them again
-    // here rather than at the call site: a suite that adds a fourth node later must not have to know
-    // this, and finding out by way of a 401 six tests further on takes an afternoon.
-    for (const earlier of BOOTED) {
-        if (earlier.ownerName) await mintOwnerToken(earlier);
-    }
-    BOOTED.push(node);
-    return node;
 }
 
 /** A fresh session token for the node's operator: the password sign-in. */
@@ -132,6 +96,7 @@ async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
     node.ownerGhii = `${ownerName}@${node.nodeId}`;
     node.ownerPrivateKey = op.privateKey;
     node.ownerToken = op.token;
+    remintAfterLaterBoot(() => mintOwnerToken(node));
 }
 
 /** The far node's published verification key, read the way any stranger would read it. */

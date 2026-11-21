@@ -10,8 +10,12 @@
  *   node process, so it is safe to run alongside a live `pnpm dev` or a concurrent session.
  * @structure killOnPort (Windows netstat / Unix lsof) + cleanStaleSqlite; runs both on invoke.
  * @usage Prepended to the `test:e2e:*` package scripts (mirrors how `pnpm dev` prepends kill-port.ts).
- *   Override the port with AIMEAT_TEST_PORT. Best-effort: every failure is swallowed.
+ *   Override the port with AIMEAT_TEST_PORT; otherwise AIMEAT_PORT from the shell, then from
+ *   `--port-from=<file>` or this checkout's test env file. Best-effort: every failure is swallowed.
  * @version-history
+ *   v1.2.0 — 2026-11-21 — The port comes from the test env file when the shell sets none (an
+ *     `--port-from=` argument, else .env.test.sqlite, else .env.test.postgres-kysely), as the runner's
+ *     own `node --env-file` reads it, so a plain `pnpm gate` no longer stops port 40251.
  *   v1.1.1 — 2026-11-15 — The stop message names `--force`, without which test-env-init keeps the
  *     existing env files and the new port is never applied.
  *   v1.1.0 — 2026-10-11 — Also clears the session's own lane ports, which are now computed from
@@ -25,6 +29,7 @@ import { existsSync, rmSync } from 'node:fs';
 import { platform } from 'node:os';
 import { resolve } from 'node:path';
 import { basePortHolder, sessionLanePorts } from './lib/e2e-ports.js';
+import { envFileArgs, portFor } from './lib/env-file-port.js';
 
 // THE PORT THIS SESSION'S SERVER ACTUALLY BINDS, not the one the default assumes.
 //
@@ -39,7 +44,20 @@ import { basePortHolder, sessionLanePorts } from './lib/e2e-ports.js';
 // AIMEAT_TEST_PORT still wins, because it is the documented explicit override and somebody may be
 // pointing this at a port the server is not on. AIMEAT_PORT is what a session that only knows one
 // variable sets, and it is now honoured.
-const port = process.env.AIMEAT_TEST_PORT ?? process.env.AIMEAT_PORT ?? '40251';
+//
+// AND THE ENV FILE, when the shell sets neither (2026-11-21). The runner after this script is
+// started with `--env-file=.env.test.<backend>`, which carries the worktree's own port, while this
+// script read the shell alone; a plain `pnpm gate` then stopped whatever listened on 40251, another
+// session's E2E server (incident "kill-test-servers reads the port only from the shell"). The
+// package scripts name the same file (`--port-from=`); without one the SQLite and then the Postgres
+// test env file of this checkout is read, which test:env:init writes with one port for both.
+const chosen = portFor({
+  keys: ['AIMEAT_TEST_PORT', 'AIMEAT_PORT'],
+  envFiles: [...envFileArgs(process.argv.slice(2)), '.env.test.sqlite', '.env.test.postgres-kysely'],
+  cwd: process.cwd(),
+  fallback: '40251',
+});
+const port = chosen.port;
 
 function killOnPort(p: string): void {
   if (platform() === 'win32') {

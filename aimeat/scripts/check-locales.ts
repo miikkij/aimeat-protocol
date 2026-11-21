@@ -17,6 +17,8 @@
  * @usage  pnpm check:locales           (exit 1 on any violation)
  *         pnpm check:locales --list    (coverage only, always exit 0)
  * @version-history
+ *   v1.7.0 — 2026-11-21 — A key written twice in one file, flat and nested, fails (duplicateKeys in
+ *     lib/locale-files.ts); the 33 such keys in en, fi and es kept the spelling the browser showed.
  *   v1.6.0 — 2026-11-15 — PICTURE_WORDS: the door ratchet's model for the other words used as a
  *     picture of something else (road and way in, hand, room, wall, and single images such as a
  *     shelf or a shop window), one baseline file per word.
@@ -49,7 +51,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { shippedLocales, loadLocale, flatten, findDefects } from './lib/locale-files.js';
+import { shippedLocales, loadLocale, flatten, findDefects, duplicateKeys } from './lib/locale-files.js';
 
 /**
  * The agent permission editor builds its labels from key NAMES: a domain `share` is rendered with
@@ -278,6 +280,14 @@ for (const tag of others) {
 }
 
 if (listOnly) process.exit(0);
+
+// One key written twice in one file, flat and nested: the browser shows the later spelling and the
+// server reads the flat one first, so an edit to the other changes nothing (docs/pitfalls.md §5).
+for (const tag of ['en', ...others]) {
+  for (const d of duplicateKeys(loadLocale(tag))) {
+    failures.push(`✖ [${tag}] ${d.key} is written twice: ${d.paths.join(' and ')}\n      → keep one. The browser renders the LATER one in the file, the server the flat one; delete the other so both read the same words.`);
+  }
+}
 
 // The scope editor's labels are keyed by NAME, so a missing one renders the raw key to the owner
 // rather than falling back to English. en.json cannot notice a key nobody ever wrote; the code can.

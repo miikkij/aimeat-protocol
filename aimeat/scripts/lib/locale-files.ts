@@ -15,12 +15,15 @@
  * @structure
  *   - shippedLocales() / loadLocale() / writeLocale()
  *   - flatten(obj)          — dotted key → value, both spellings
+ *   - duplicateKeys(obj)    — a dotted key written twice, flat and nested (docs/pitfalls.md §5)
  *   - pathIn(en, key)       — where a dotted key belongs inside en.json's shape
  *   - setDeep / orderLike   — write a key back, then re-order to match en.json
  *   - varsOf(value)         — the {name} / {{name}} tokens a string interpolates
  *   - findDefects(en, loc)  — the shared verdict: unknown key, type drift, TODO, dropped variable
  * @usage import { flatten, findDefects } from './lib/locale-files.js';
  * @version-history
+ *   v1.1.0 — 2026-11-21 — duplicateKeys(): one key written both flat and nested in one file, which
+ *     flatten() resolved by overwriting in silence.
  *   v1.0.0 — 2026-08-13 — Extracted from check-locales.ts when extract/merge needed the same rules.
  */
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
@@ -61,6 +64,27 @@ export function flatten(obj: LocaleTree, prefix = '', out: Record<string, Locale
     else if (v && typeof v === 'object') flatten(v as LocaleTree, key, out);
   }
   return out;
+}
+
+/**
+ * Every dotted key a file writes more than once, with each spelling's literal path. A flat
+ * `"profile.landing.home"` and a nested `profile > landing > home` are one key to t(): the browser
+ * (public/js/i18n.js) keeps the LATER one in file order and the server (src/i18n.ts) reads the flat
+ * one first, so the two can show different words, and an edit to the losing spelling changes
+ * nothing on screen. flatten() above overwrites in silence, which is why this walks on its own.
+ */
+export function duplicateKeys(obj: LocaleTree): Array<{ key: string; paths: string[] }> {
+  const seen = new Map<string, string[]>();
+  const walk = (node: LocaleTree, prefix: string, literal: string[]): void => {
+    for (const [k, v] of Object.entries(node)) {
+      const key = prefix ? `${prefix}.${k}` : k;
+      const path = [...literal, k];
+      if (typeof v === 'string' || Array.isArray(v)) seen.set(key, [...(seen.get(key) ?? []), path.map(p => JSON.stringify(p)).join(' > ')]);
+      else if (v && typeof v === 'object') walk(v as LocaleTree, key, path);
+    }
+  };
+  walk(obj, '', []);
+  return [...seen].filter(([, paths]) => paths.length > 1).map(([key, paths]) => ({ key, paths }));
 }
 
 /**

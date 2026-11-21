@@ -1,0 +1,10 @@
+{
+  "note": "Findings of scripts/check-css-facts.ts present when it was written (2026-11-21), each with its reason. REVIEWED means the code is meant to be so; DEBT means a defect whose fix changes what a person sees and waits for the developer's look; QUESTION means nobody has read it yet. The list only shrinks: an entry that no longer occurs fails until it is removed.",
+  "allowed": {
+    "undefined-var:public/css/components/top-bar.css:--brand": "DEBT 2026-11-21: .notif-clear-all:hover sets color: var(--brand), and theme.css declares no --brand, so the hover keeps the button's own colour. Choosing the token changes the look.",
+    "undefined-var:public/css/views/portfolio.css:--border-dim": "DEBT 2026-11-21: .portfolio-paste-divider hr has border-top: 1px solid var(--border-dim), which no sheet declares, so the divider line is not drawn. Choosing the token changes the look.",
+    "ak-root-twice:.ak-tabs": "REVIEWED 2026-11-21: controls.css adds position and isolation to the tab row that shell.css lays out, so the ink indicator can sit behind the tabs. One family, extended on purpose.",
+    "ak-root-twice:.ak-app": "REVIEWED 2026-11-21: margins.css sets --ak-margins-w on the frame that shell.css lays out. One family, extended on purpose.",
+    "fixed-phone-view:public/css/views/inbox-poster.css:.og-ib:has(> .og-grid)": "QUESTION 2026-11-21: the inbox's broadcast, responses and results pages fill a phone screen with position: fixed; inset: 0 and scroll inside. Whether a field at their bottom goes behind the iOS keyboard has not been checked on an iPhone."
+  }
+}

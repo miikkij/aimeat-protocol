@@ -45,6 +45,10 @@
  *   cd aimeat && pnpm check:scope-parity --strict  # gate (pre-commit + CI)
  *   cd aimeat && pnpm check:scope-parity --seed    # rewrite the exemption file from today's state
  * @version-history
+ *   2026-11-21 — Direction three: a word a route under src/routes requires that APP_GRANTABLE_SCOPES
+ *     does not list (a call with an orScope passes when either word is grantable), keyed
+ *     app-ungrantable:<word>. The 21 words found that day are seeded as questions in the exemption
+ *     file, events:emit answered (docs/pitfalls.md §6).
  *   2026-10-16 — sources() and findings() are exported as scopeParitySources(dir) and
  *     scopeParityFindings(files, vocabulary, root), and main() runs only when invoked as the script,
  *     so a unit test can show the comparison refusing a word on one side only (QA audit S10-09).
@@ -63,6 +67,7 @@ import { scopeMentions } from './inventory/scope-mentions.js';
 import { readVocabulary, demandedScopes } from './inventory/scope-vocabulary.js';
 import { TOOL_SCOPES, toolScopeWords } from '../src/tool-catalog/scopes.js';
 import { actionScopeWords } from '../src/tool-catalog/action-scopes.js';
+import { APP_GRANTABLE_SCOPES } from '../src/services/app/grant-vocabulary.js';
 
 const AIMEAT = process.cwd();
 const SRC = join(AIMEAT, 'src');
@@ -97,12 +102,13 @@ export interface Finding {
     /** The stable key an exemption is written against. */
     key: string;
     word: string;
-    kind: 'offered-never-asked' | 'demanded-never-offered';
+    kind: 'offered-never-asked' | 'demanded-never-offered' | 'route-not-app-grantable';
     detail: string;
 }
 
 /** The two directions over `files`, against the owner-facing `vocabulary`; `root` makes paths relative. */
-export function scopeParityFindings(files: ts.SourceFile[], vocabulary: Set<string>, root: string = AIMEAT): Finding[] {
+export function scopeParityFindings(files: ts.SourceFile[], vocabulary: Set<string>, root: string = AIMEAT,
+    appGrantable: Set<string> = new Set(Object.keys(APP_GRANTABLE_SCOPES))): Finding[] {
     const mentions = scopeMentions(files, vocabulary, root, DEFINITION_FILES);
     const actionWords = actionScopeWords();
     const mcpWords = new Set([...Object.values(TOOL_SCOPES).flatMap(toolScopeWords), ...actionWords.map(a => a.word)]);
@@ -146,6 +152,58 @@ export function scopeParityFindings(files: ts.SourceFile[], vocabulary: Set<stri
         });
     }
 
+    // ── Direction three: a route demands it, and an app grant can never hold it ──
+    // `requireScope` gives a role-app principal no owner bypass, so a word missing from
+    // APP_GRANTABLE_SCOPES shuts that route to every app, and its owner has no way to fix that
+    // (docs/pitfalls.md §6). A call with an `orScope` passes when either word is grantable.
+    const ungrantable = new Map<string, string[]>();
+    for (const call of routeScopeCalls(files, root)) {
+        if (call.words.some(w => appGrantable.has(w))) continue;
+        for (const w of call.words) ungrantable.set(w, [...(ungrantable.get(w) ?? []), call.at]);
+    }
+    for (const [word, where] of [...ungrantable.entries()].sort()) {
+        out.push({
+            key: `app-ungrantable:${word}`,
+            word,
+            kind: 'route-not-app-grantable',
+            detail: `a route requires it and APP_GRANTABLE_SCOPES (src/services/app/grant-vocabulary.ts) does `
+                + `not list it, so no app can ever be granted it: ${where.slice(0, 4).join(', ')}`
+                + `${where.length > 4 ? ` and ${where.length - 4} more` : ''}`,
+        });
+    }
+
+    return out;
+}
+
+/**
+ * Each `requireScope('w')` / `requireRestScope('w', { orScope: 'v' })` call under src/routes, with
+ * the literal words it accepts, one entry per call (demandedScopes lists words, not calls, and two
+ * calls on one line would merge).
+ */
+function routeScopeCalls(files: ts.SourceFile[], root: string): Array<{ words: string[]; at: string }> {
+    const out: Array<{ words: string[]; at: string }> = [];
+    for (const sf of files) {
+        const rel = relative(root, sf.fileName).split('\\').join('/');
+        if (!rel.startsWith('src/routes/')) continue;
+        const visit = (node: ts.Node): void => {
+            if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+                && (node.expression.text === 'requireScope' || node.expression.text === 'requireRestScope')) {
+                const words: string[] = [];
+                for (const arg of node.arguments) {
+                    if (ts.isStringLiteral(arg)) words.push(arg.text);
+                    if (ts.isObjectLiteralExpression(arg)) {
+                        for (const p of arg.properties) {
+                            if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === 'orScope'
+                                && ts.isStringLiteral(p.initializer)) words.push(p.initializer.text);
+                        }
+                    }
+                }
+                if (words.length > 0) out.push({ words, at: `${rel}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}` });
+            }
+            ts.forEachChild(node, visit);
+        };
+        visit(sf);
+    }
     return out;
 }
 
@@ -183,6 +241,7 @@ function main(): void {
     console.log('  ' + '─'.repeat(62));
     console.log(`  offered to the owner, asked by nothing  ${String(offered.length).padStart(4)}`);
     console.log(`  demanded by a door, offered to nobody   ${String(demandedOnly.length).padStart(4)}`);
+    console.log(`  demanded by a route, no app can hold it ${String(all.filter(f => f.kind === 'route-not-app-grantable').length).padStart(4)}`);
     console.log(`  of those, exempt                        ${String(all.length - fresh.length).padStart(4)}   (seeded backlog, may only shrink)`);
     console.log(`  NEW, not exempt                         ${String(fresh.length).padStart(4)}`);
     if (stale.length) console.log(`  exemptions now fixed                    ${String(stale.length).padStart(4)}   (remove them from the file)`);

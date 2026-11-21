@@ -13524,11 +13524,6 @@
   "admin.hooks.moments.w_post_help_question": "Kysymyksen tunniste, tila ja aiheet sen jälkeen, kun kysymys lähti. Ei koskaan sen tekstiä eikä nimiä.",
   "admin.hooks.moments.h_post_help_solved": "Kysymys ratkesi tai päättyi",
   "admin.hooks.moments.w_post_help_solved": "Kysymyksen tunniste, tila (ratkesi tai päättyi) ja aiheet. Ei koskaan sen tekstiä eikä nimiä.",
-  "profile.agents.scopeUi.domainHelp": "Kysy osaajalta",
-  "profile.agents.scopeUi.permAsk": "Kysyä",
-  "profile.agents.scopeUi.permAnswer": "Vastata",
-  "profile.agents.scopeUi.scopeText.help.ask": "Etsii säilytetyn vastauksen tai auttajan ja kysyy toiselta jäseneltä sinun nimissäsi, kun olet sallinut tekoälysi lähettää kysymyksiä. Ei kuulu täysiin oikeuksiin.",
-  "profile.agents.scopeUi.scopeText.help.answer": "Lukee sinulle tulleet kysymykset, kirjoittaa vastausluonnoksen ja vastaa itse niissä aiheissa, jotka olet sille valinnut. Ei kuulu täysiin oikeuksiin.",
   "home.ask.title": "Kuka osaa?",
   "home.ask.lead": "Kysy täällä niiltä, jotka osaavat. Näet säilytetyn vastauksen ja sen, kuka voisi vastata, ennen kuin mitään lähtee.",
   "home.ask.askLabel": "Kysy",
@@ -20178,7 +20173,6 @@
         "next": "Seuraavaksi: luet mitä siellä jo odottaa, ja vastaat samassa paikassa.",
         "entered": "Menit lukemaan viestisi."
       },
-      "copyPrompt": "Kopioi kehote",
       "copied": "Kopioitu. Liitä se tekoälychattiisi"
     },
     "settings": {
@@ -21280,7 +21274,6 @@
     "trust4Title": "GDPR nappeina",
     "trust4Text": "Tililläsi on toiminnot tietojen vientiin ja poistoon. Tietojen säilytys- ja käsittelypaikat riippuvat valitsemastasi palvelimesta ja tekoälymallista.",
     "trustEu": "Tehty Suomessa, EU:ssa. Tämän listan säännöt on ne, joiden mukaan me itse eletään.",
-    "transCta": "Näin tämä paikka merkitsee tekoälysisällön →",
     "roomIncAlt": "Ilahtunut tutkija hautomossa, jossa robottitipuja kuoriutuu hohtavista munista",
     "roomIncTitle": "Adoptoi agentteja hautomosta",
     "roomIncText": "Jokaisella on nimi, omat oikeudet ja omat työajat. Adoptoi yksi, sitten toinen, ja yksi ihminen tekee tiimin työt.",
@@ -21781,7 +21774,6 @@
     "business": "Yrityksellesi",
     "learn": "Opi",
     "exchange": "EXCHANGE",
-    "members": "Jäsenet",
     "lookMode": "Vaalea vai tumma",
     "lookLight": "Vaalea",
     "lookDark": "Tumma",
@@ -22220,9 +22212,6 @@
     "makeViewer": "→ vain luku",
     "remove": "Poista",
     "addMemberPlaceholder": "omistajan nimi (tai owner@node / agent#owner@node)",
-    "roleContributor": "kirjoittaja (luku + kirjoitus)",
-    "roleViewer": "lukija (vain luku)",
-    "addMember": "Lisää",
     "accessHint": "Jäsen voi olla eri tili; sen agentit perivät roolin. Lukijat lukevat; kirjoittajat lukevat + kirjoittavat.",
     "contributions": "kontribuutiota",
     "events": "tapahtumaa",
@@ -22283,7 +22272,6 @@
     "noPublishedDocs": "Ei julkaistuja dokumentteja vielä. Julkaise sivu jakaaksesi sen.",
     "openLink": "avaa ↗",
     "openPublicViewer": "Avaa julkinen näkymä",
-    "linkCopied": "Linkki kopioitu",
     "copyFailed": "Kopiointi epäonnistui",
     "shareFailed": "Jaon päivitys epäonnistui",
     "shareAccessTitle": "Kuka voi avata jaetut sivut",
@@ -22543,7 +22531,6 @@
     "formIdentity": "Identiteetti",
     "formAccess": "Pääsy",
     "addTag": "Lisää…",
-    "saveChanges": "Tallenna muutokset",
     "discardChanges": "Hylätäänkö tallentamattomat muutokset?",
     "deleteOrganismTitle": "Poista tämä organismi",
     "deleteOrganismStats": "Poistaa {w} työtilaa, {r} tietuetta ja {d} dokumenttia. Ei voi perua.",
@@ -26632,7 +26619,6 @@
       "referencesPackageLevel": "Viitteet (pakettitaso)"
     },
     "landing": {
-      "home": "Yleiskatsaus",
       "nextTitle": "Ehdotetut seuraavat askeleet",
       "next": {
         "writeNotesTitle": "Kirjoita itseorganisoituvia muistiinpanoja",

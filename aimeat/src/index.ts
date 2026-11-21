@@ -6,6 +6,7 @@
  * @description Main AIMEAT CLI entry point, including node management commands and agent connector dispatch.
  * @structure Parses top-level CLI flags, routes subcommands, starts the server, and delegates connector commands.
  * @usage Executed through the published `aimeat` binary.
+ * @version-history 2026-11-21 — `start` names an AIMEAT_* variable that does nothing: a flag name such as AIMEAT_DB used as a variable, or a name nothing in the repository reads (config/unknown-env.ts).
  * @version-history 2026-10-31 — `handover-link`: a one-time sign-in link for the person the node was set up for, as one JSON line (cli/handover-link.ts).
  * @version-history 2026-10-25 — --db-url, --db-path and --admin-password name storage.database_url, storage.sqlite_path and setup.admin_password, the rows' paths on the Config tab.
  * @version-history 2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
@@ -36,6 +37,7 @@ import { logger } from './utils/logger.js';
 import { HELP_TEXT, CONNECT_HELP_TEXT } from './index-help.js';
 import { runConnectCli } from './index-connect.js';
 import { runStart } from './index-start.js';
+import { envWarnings } from './config/unknown-env.js';
 
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled promise rejection', {
@@ -391,6 +393,8 @@ if (subcommand === 'config') {
   console.log('\n  Done!\n');
   process.exit(0);
 } else if (subcommand === 'start' || subcommand === 'serve') {
+  // An AIMEAT_* variable that does nothing is named before the node starts (config/unknown-env.ts).
+  for (const warning of envWarnings(process.env, config)) logger.warn(warning, { event: 'env.unread' });
   await runStart(config, { envKeys, fileKeys, cliKeys, fileName, settingFallbacks }, __pkgRoot);
 } else if (subcommand) {
   console.error(`Unknown command: ${subcommand}\n`);
