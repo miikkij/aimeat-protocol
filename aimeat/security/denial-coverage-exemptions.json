@@ -26,8 +26,8 @@
       "sha": "c88af40ebf88abe0"
     },
     "test/e2e-seo-noindex.ts": {
-      "reason": "REVIEWED 2026-09-30 — the suite has no principal. It reads the node the way an anonymous crawler does (HEAD and GET with the bingbot user agent, no credentials) and asserts the X-Robots-Tag and the robots meta each response carries. The header is the same for every caller by design, so there is no second principal whose answer could differ, and no refusal to assert.",
-      "sha": "b777eca41dd1362b"
+      "reason": "REVIEWED 2026-09-30 — the suite has no principal. It reads the node the way an anonymous crawler does (HEAD and GET with the bingbot user agent, no credentials) and asserts the X-Robots-Tag and the robots meta each response carries. The header is the same for every caller by design, so there is no second principal whose answer could differ, and no refusal to assert. RE-STAMPED 2026-11-21 (cc-jouni-pitfalls-b): three cases added for /v1/app-store, which sends a browser's request to /v1/appcat and keeps the page for a crawler, a script and a markdown reader; they choose by the User-Agent and Accept headers of an anonymous request, still with no credentials, so the reason above still holds.",
+      "sha": "e3ddca9b0d15b0de"
     },
     "test/e2e-boot-port-in-use.ts": {
       "reason": "REVIEWED 2026-09-17 — the suite has no principal at all. It starts a node on a port another listener already holds and asserts the process exits with the port and the cause named, instead of printing its start banner over the failed listen (scripts/check-suite-ports.ts). No request ever reaches the node, so there is no door to refuse anyone at. RE-STAMPED 2026-10-16: the node it starts follows the run's backend (test/helpers/own-node-db.ts, QA audit P1-02); arguments and environment only, no assertion changed. RE-STAMPED 2026-10-27 (cc-jouni-ports): the only change was its fixed ports moving from 40000-41999 to 28000-29999 with every suite's, out of the range the claims board hands out; the reason above was re-read and still holds.",

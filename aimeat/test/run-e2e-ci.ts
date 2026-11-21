@@ -673,6 +673,8 @@ const ALL_SUITES = [
     'test/e2e-app-draft-edit.ts',
     'test/e2e-app-screenshot-capture.ts',
     'test/e2e-app-publish-gate.ts',
+    // An aimeat-scopes word no app grant can hold refuses the publish (2026-11-21).
+    'test/e2e-app-publish-scope-words.ts',
     'test/e2e-app-ai-path.ts',
     'test/e2e-app-publish-scopes.ts',
     'test/e2e-app-playtest.ts',

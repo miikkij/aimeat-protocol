@@ -67,6 +67,8 @@ const NOT_API: Record<string, string> = {
     'GET /v1/echat': PAGE,
     'GET /v1/oauth/consent': PAGE,
     'GET /v1/portal': PAGE,
+    // The public app list a crawler reads; a person's browser is redirected to /v1/appcat (2026-11-21).
+    'GET /v1/app-store': PAGE,
     'GET /v1/portfolio/{}': PAGE,
     'GET /v1/use-with-ai/{}/{}': PAGE,
     'GET /v1/dataset/{}/{}': PAGE,
