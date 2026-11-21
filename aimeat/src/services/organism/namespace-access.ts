@@ -30,6 +30,10 @@
  *   if (refusal) return { ok: false, ...refusal };
  *   const shown = await organismReadableRecords({ storage, config }, callerContext, records);
  * @version-history
+ *   2026-11-21 — A write into a workspace record space meets the space's writeRole: `owner` is the
+ *     workspace's creator or an organism admin, `admin` an organism admin, for the caller's person
+ *     (services/organism/write-role.ts, asked through fencedSpaceRefusal with the caller's owner).
+ *     Ruled by the developer on 2026-11-21; incident mv6pffzu.
  *   2026-11-10 — An agent attached to the organism (agentGaiis) whose owner is an active member acts
  *     with the owner's rights when the organism admits every member's agent, as it already did when it
  *     admits only listed ones. The narrow participant rule (shared area, meta read) is for an attached
@@ -300,14 +304,15 @@ export async function checkOrganismNamespaceAccess(
     }
 
     // A record space that names extensions takes the write of a caller that is not a person only
-    // through one of them (services/fenced-space.ts). Asked last, so every refusal above is still
+    // through one of them (services/fenced-space.ts), and then the space's writeRole holds for the
+    // caller's person (services/organism/write-role.ts, asked by the same call). Asked last, so every refusal above is still
     // the one a caller hears first, and with the real key: the space is matched by its namespace
     // prefix. The account holder in person returns from it before the manifest is read, and so does
     // a session whose scopes cover organism:direct. The same call protects the workspace's manifest
     // record: a write to it that changes the list of a fenced space is accepted from those two only.
     if (mode === 'write' && wsId) {
         const fenced = await fencedSpaceRefusal({ storage, config },
-            { principal: caller.principal, roles: caller.roles, scopes: caller.scopes, extension: caller.extension },
+            { principal: caller.principal, owner: caller.owner, roles: caller.roles, scopes: caller.scopes, extension: caller.extension },
             organismId, wsId, { key }, write);
         if (fenced) return fenced;
     }

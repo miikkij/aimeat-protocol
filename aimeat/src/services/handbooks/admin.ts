@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.43.0 -- 2026-11-21 -- The incident workspace_write_role and its two decisions, enforce and keep.
  *   v1.42.0 -- 2026-11-21 -- compliance.regulated_ai_modes: what an outside AI model gets of regulated
  *     data (five modes, drop included), and the report's regulated_ai section (feature audit item 1.3).
  *   v1.41.0 -- 2026-11-19 -- A declared organism's customer due diligence: aimeat_kyc_customer,
@@ -458,7 +459,11 @@ is \`<owner>/<key>\`: "uncount" leaves it out of the dashboard's money fees, "ke
 locks set before the account that holds their holder's name was registered, which may be an account's erased
 before 2026-11-08 (type \`erased_lock_holders\`, the entry id is \`<applyTo>:<keyPattern>\`: "pseudonymise" keeps
 the lock in force under the erasure pseudonym so no account holds it, "keep" leaves it the current account's;
-the locks of accounts that no longer exist were moved to a pseudonym at start without a question). Read them with
+the locks of accounts that no longer exist were moved to a pseudonym at start without a question), and the
+workspace record spaces that declare writeRole owner or admin and that members who do not meet it wrote into
+before the rule held (type \`workspace_write_role\`, the entry id is \`<organism>/<workspace>/<namespace>\`:
+"enforce" applies the writeRole, so those members are refused; "keep" sets the space's writeRole to member, so
+they keep writing; until then the space works as before). Read them with
 \`aimeat_admin_security_overview\`, tell the operator what each one is, and decide each with
 \`aimeat_admin_incident_resolve\` (\`name\`: the entry id, \`resolution\`: its action or "keep") only as
 the operator says. The incident is resolved with the last entry.

@@ -15,6 +15,8 @@
  *   const caller = workspaceCallerOf({ principal: agentGaii, ownerName, roles: ['agent'] }, config);
  *   const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
  * @version-history
+ *   v1.4.0 — 2026-11-21 — fencedOpRefusal hands the account name over too: the same call now asks the
+ *     space's writeRole for that account (services/organism/write-role.ts; ruling 2026-11-21).
  *   v1.3.0 — 2026-11-13 — memberRoleOf asks services/workspace-share.ts memberRoleOf, the rule the REST
  *     routes ask (structure programme 2026-11, unit 7). Its answer is unchanged.
  *   v1.2.0 — 2026-10-13 — fencedOpRefusal hands the session's `scopes` to the fenced-space rule: a
@@ -125,6 +127,6 @@ export async function fencedOpRefusal(
     deps: WorkspaceOpsDeps, caller: WorkspaceOpsCaller, organismId: string, ws: string, target: FenceTarget,
 ): Promise<WorkspaceOpRefusal | null> {
     const fenced = await fencedSpaceRefusal(deps,
-        { principal: caller.principal, roles: caller.roles, scopes: caller.scopes, extension: caller.extension }, organismId, ws, target);
+        { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes, extension: caller.extension }, organismId, ws, target);
     return fenced ? refuse(fenced.status, fenced.code, fenced.message, fenced.details) : null;
 }

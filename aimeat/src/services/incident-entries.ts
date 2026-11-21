@@ -17,6 +17,8 @@
  * @structure EntryActor · decideIncidentEntry(config, storage, input, actor)
  * @usage const r = await decideIncidentEntry(config, storage, { incidentId, name, resolution, by }, clearAnonymousRecord);
  * @version-history
+ *   v1.1.0 -- 2026-11-21 -- decideIncidentEntry takes a `keeper` for a kind whose 'keep' changes
+ *     something (services/workspace/write-role-hold.ts).
  *   v1.0.0 -- 2026-10-25 -- Initial (secaudit2026oct22: the shared anonymous agent's records, and the
  *     schedules older erasures left behind).
  */
@@ -31,11 +33,16 @@ export type EntryDecision =
   | { ok: true; data: { name: string; resolution: string; entry_done: string; incident_status: string } }
   | { ok: false; code: 'NOT_FOUND' | 'INVALID_INPUT' | 'CONFLICT'; message: string };
 
-/** Decide entry `name` of incident `incidentId`: its offered action, or 'keep'. */
+/**
+ * Decide entry `name` of incident `incidentId`: its offered action, or 'keep'. `keeper`, for a kind
+ * whose 'keep' must change something to stay true (a workspace space whose members keep writing gets
+ * writeRole "member"), runs on 'keep' and says what it did; without it 'keep' changes nothing.
+ */
 export async function decideIncidentEntry(
   config: AimeatConfig, storage: Storage,
   input: { incidentId: string; name: string; resolution: string; by: { principal: string } },
   actor: EntryActor,
+  keeper?: EntryActor,
 ): Promise<EntryDecision> {
   const rec = await findSecurityIncident(storage, config, input.incidentId);
   if (!rec) return { ok: false, code: 'NOT_FOUND', message: 'Incident not found' };
@@ -51,7 +58,8 @@ export async function decideIncidentEntry(
   if (entry.status !== 'open') {
     return { ok: false, code: 'CONFLICT', message: `Entry "${entry.id}" was decided already (${entry.status}${entry.decidedAt ? ` on ${entry.decidedAt.slice(0, 10)}` : ''}).` };
   }
-  const done = input.resolution === 'keep' ? 'kept as it is' : await actor(storage, config, entry);
+  const done = input.resolution !== 'keep' ? await actor(storage, config, entry)
+    : keeper ? await keeper(storage, config, entry) : 'kept as it is';
   const now = new Date().toISOString();
   const next = entries.map(e => (e.id === entry.id
     ? { ...e, status: input.resolution === 'keep' ? 'kept' as const : 'done' as const, decidedAt: now, decidedBy: input.by.principal, done }

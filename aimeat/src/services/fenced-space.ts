@@ -103,6 +103,11 @@
  *   if (fenced) return res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));
  *   const changed = fenceChangeRefusal(manifestBefore, manifestAfter, { principal, roles, scopes });
  * @version-history
+ *   v1.2.0 — 2026-11-21 — fencedSpaceRefusal asks the space's writeRole after the fence
+ *     (services/organism/write-role.ts spaceWriteRoleRefusal), so every code path that asks the fence
+ *     enforces writeRole on memory-backed spaces too; the manifest is read once for both. The caller
+ *     may carry `owner`. fencedKeysRefusal no longer returns early for the account holder in person,
+ *     for whom writeRole holds as well (ruling 2026-11-21, incident mv6pffzu).
  *   v1.1.2 — 2026-10-25 — extensionMarker leaves a name that already carries its installer as it is,
  *     so `alice/x` stays `alice/x` and not `alice/alice/x` (owner namespaces wish, secaudit2026oct22).
  *   v1.1.1 — 2026-10-15 — fencesMet trims a subtree's trailing dots with a scan, not a regular
@@ -119,6 +124,7 @@ import type { Storage } from '../storage/interface.js';
 import { isOwnerInPerson, isGEAI } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isMemoryBackedSpace, readWorkspaceMetaRecord, type WorkspaceManifest } from './workspace/meta-read.js';
+import { spaceWriteRoleRefusal, type WriteRoleRefusal } from './organism/write-role.js';
 
 export interface FenceDeps { storage: Storage; config: { nodeId: string } }
 
@@ -148,6 +154,13 @@ export interface FenceCaller {
     /** `installer/name` of the extension whose action makes the call. Set by
      *  services/extension/workspace.ts and by nothing else. */
     extension?: string;
+    /**
+     * The bare account name behind `principal`, when the code path holds it. The writeRole rule
+     * (services/organism/write-role.ts) decides on that account's standing; without it the name is
+     * read from the identity (localAccountOf), which is the same account for a person, their agent and
+     * their ecosystem app.
+     */
+    owner?: string;
 }
 
 /** The fence one object type declares. */
@@ -177,8 +190,11 @@ export interface FenceChangeRefusal {
     details: { reason: 'FENCE_CHANGE'; spaces: Array<{ space: string; change: FenceChangeKind }> };
 }
 
-/** What the rule answers: the write into a fenced space, or the change to a fenced space's list. */
-export type FenceRefusal = FencedSpaceRefusal | FenceChangeRefusal;
+/**
+ * What the rule answers: the write into a fenced space, the change to a fenced space's list, or the
+ * write into a space whose writeRole the caller's person does not meet (services/organism/write-role.ts).
+ */
+export type FenceRefusal = FencedSpaceRefusal | FenceChangeRefusal | WriteRoleRefusal;
 
 /**
  * What a write-mode operation that names a workspace's manifest record will store, when the code
@@ -458,15 +474,22 @@ export async function fencedSpaceRefusal(
         const changed = await manifestWriteRefusal(deps, caller, organismId, wsId, write);
         if (changed) return changed;
     }
-    if (!callerIsFenced(caller, deps.config.nodeId)) return null;
-    const record = await readWorkspaceMetaRecord(deps.storage, organismId, wsId, 'meta.manifest', deps.config.nodeId, { archived: 'include' });
-    const fences = fencesOf(record?.value as WorkspaceManifest | null | undefined);
-    if (fences.length === 0) return null;
-    const through = (caller.extension ?? '').trim().toLowerCase();
-    for (const fence of fencesMet(fences, `organism.${organismId}.w.${wsId}`, target)) {
-        if (!through || !fence.extensions.includes(through)) return refusalFor(fence);
+    // The manifest is read at most once for both rules; a caller the fence lets through directly
+    // leaves it to the writeRole rule, which skips it for an organism admin.
+    let manifest: unknown;
+    if (callerIsFenced(caller, deps.config.nodeId)) {
+        const record = await readWorkspaceMetaRecord(deps.storage, organismId, wsId, 'meta.manifest', deps.config.nodeId, { archived: 'include' });
+        manifest = record?.value ?? null;
+        const fences = fencesOf(manifest as WorkspaceManifest | null | undefined);
+        const through = (caller.extension ?? '').trim().toLowerCase();
+        for (const fence of fencesMet(fences, `organism.${organismId}.w.${wsId}`, target)) {
+            if (!through || !fence.extensions.includes(through)) return refusalFor(fence);
+        }
     }
-    return null;
+    // The space's writeRole, after the fence, so a fenced space's refusal is still the one an agent
+    // hears first (services/organism/write-role.ts; ruling 2026-11-21).
+    return spaceWriteRoleRefusal(deps, { principal: caller.principal, ...(caller.owner ? { owner: caller.owner } : {}) },
+        organismId, wsId, target, manifest);
 }
 
 /**
@@ -493,12 +516,12 @@ const WORKSPACE_KEY = /^organism\.([^.]+)\.w\.([^.]+)\./;
  * The rule for a list of keys that may lie in several workspaces (the bulk delete): one manifest
  * read per workspace named, and none for a caller the rule allows directly. A key outside every
  * workspace is not this rule's. A key that is a workspace's manifest record is asked as a removal of
- * that manifest (fencedSpaceRefusal), which a hosted app is refused too.
+ * that manifest (fencedSpaceRefusal), which a hosted app is refused too. Every workspace named is
+ * asked, the account holder in person too, because a space's writeRole holds for them as well.
  */
 export async function fencedKeysRefusal(
     deps: FenceDeps, caller: FenceCaller, keys: Iterable<string>,
 ): Promise<FenceRefusal | null> {
-    if (!callerIsFenced(caller, deps.config.nodeId) && mayChangeFence(caller)) return null;
     const byWorkspace = new Map<string, { organismId: string; wsId: string; keys: string[] }>();
     for (const key of keys) {
         const m = WORKSPACE_KEY.exec(key);

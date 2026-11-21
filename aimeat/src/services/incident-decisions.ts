@@ -12,6 +12,8 @@
  * @structure IncidentCaseResult · decideIncidentCase()
  * @usage const r = await decideIncidentCase(config, storage, { incidentId, name, resolution, by });
  * @version-history
+ *   v1.8.0 -- 2026-11-21 -- And of the incident of workspace spaces members wrote before their writeRole
+ *     held: 'enforce' applies it, 'keep' sets the writeRole to "member" (services/workspace/write-role-hold.ts).
  *   v1.7.0 -- 2026-11-08 -- And of the incident of schema locks older than the account that holds their
  *     name: 'pseudonymise' gives the lock the erasure pseudonym (services/csm/erased-lock-holders.ts;
  *     secaudit2026nov08 round 14b).
@@ -41,6 +43,7 @@ import { ERASURE_LEFTOVER_INCIDENT_TYPE, deleteLeftoverSchedule } from './erasur
 import { SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE, serveAtAppAddressOnly } from './subdomain/site-origin-keep.js';
 import { PLATFORM_FEE_INCIDENT_TYPE, uncountPlatformFeeRecord } from '../commerce/platform-fee-writers.js';
 import { ERASED_LOCK_INCIDENT_TYPE, pseudonymiseLockEntry } from './csm/erased-lock-holders.js';
+import { WRITE_ROLE_INCIDENT_TYPE, enforceHeldSpace, letMembersWriteHeldSpace } from './workspace/write-role-hold.js';
 
 export type IncidentCaseResult =
   | { ok: true; data: Record<string, unknown> }
@@ -60,6 +63,9 @@ export async function decideIncidentCase(
     : type === PLATFORM_FEE_INCIDENT_TYPE ? uncountPlatformFeeRecord
     : type === ERASED_LOCK_INCIDENT_TYPE ? pseudonymiseLockEntry : null;
   if (actor) return decideIncidentEntry(config, storage, input, actor);
+  // A workspace space members wrote before its writeRole held: 'enforce' applies it, 'keep' sets the
+  // writeRole to "member" so the members keep writing (services/workspace/write-role-hold.ts).
+  if (type === WRITE_ROLE_INCIDENT_TYPE) return decideIncidentEntry(config, storage, input, enforceHeldSpace, letMembersWriteHeldSpace);
   if (type === DEFAULT_CAPS_INCIDENT_TYPE) {
     const r = await decideDefaultCap(config, storage, input);
     if (!r.ok) return r;

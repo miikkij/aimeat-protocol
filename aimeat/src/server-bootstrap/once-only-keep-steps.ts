@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-11-21 -- holdMemberWrittenSpacesOnce, after the accountant grant step: the workspace spaces whose
+ *     writeRole members already wrote past keep working until the operator decides (ruling 2026-11-21).
  *   2026-11-15 -- moveAppPartiesToTablesOnce, after moveCsmLockHoldersOnce: the people registered to apps
  *     and their collections move from memory records to the AppParty and AppPartyData tables.
  *   2026-11-08 -- moveCsmLockHoldersOnce, after moveErasedLockHoldersOnce: a lock under csm. another account
@@ -121,6 +123,7 @@ import { settleUnknownCapabilityVisibilityOnce } from '../services/capabilities/
 import { markPlatformFeeWritersOnce } from '../commerce/platform-fee-writers.js';
 import { askUncertainAccountantGrantsOnce } from '../services/finance/accountant-grant-ask.js';
 import { givePlaceDefaultToEveryAgent } from '../services/place-agent-scopes.js';
+import { holdMemberWrittenSpacesOnce } from '../services/workspace/write-role-hold.js';
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
 export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfig): Promise<void> {
@@ -268,6 +271,12 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // (services/finance/accountant-grant-ask.ts).
   await askUncertainAccountantGrantsOnce(storage, config)
     .catch(err => logger.error('Failed to look for the older accountant grants to ask about; the next boot tries again', { error: String(err) }));
+  // The memory spaces that declare writeRole "owner" or "admin" and that members who do not meet it
+  // already wrote into keep working as before, each named on the Security page for the operator's
+  // decision; every other space takes the rule at once (services/workspace/write-role-hold.ts).
+  // Awaited, so no member meets the refusal before the hold exists.
+  await holdMemberWrittenSpacesOnce(storage, config)
+    .catch(err => logger.error('Failed to look for the workspace spaces members already write into; the next boot tries again', { error: String(err) }));
   // On a store place (site.purchase_plan set) every agent that has not had the place's default gets it
   // now, once per agent, so a token mint only copies the record (services/place-agent-scopes.ts; codebase
   // analysis 2026-11-03, decision 8b of 2026-11-05). Last, so no step above sees a list it widened;

@@ -20235,7 +20235,14 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: >
+            Refused, nothing written. Among the reasons: a workspace record key whose space's `writeRole`
+            the caller's person does not meet (ACCESS_DENIED, `details.reason` WRITE_ROLE; `owner` is the
+            workspace's creator or an organism admin, `admin` an organism admin; the message names the
+            space and its writeRole).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '413':
           description: Memory quota exceeded
         '422':
@@ -53427,7 +53434,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Not a member who may write this workspace, a session from another node, or no memory:write. SCOPE_DENIED when ai_provenance is declared and the grant or the session lacks provenance:write; nothing is written.
+          description: Not a member who may write this workspace, a session from another node, or no memory:write. SCOPE_DENIED when ai_provenance is declared and the grant or the session lacks provenance:write; nothing is written. ACCESS_DENIED with `details.reason` WRITE_ROLE when the space's writeRole refuses the caller's person (`owner` is the workspace's creator or an organism admin, `admin` an organism admin); the message names the space and its writeRole.
         '409':
           description: ARCHIVED, or VERSION_CONFLICT.
         '422':
@@ -54404,7 +54411,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: not an active member, meta.* without admin/creator, (records) an agent or app token without the workspace creator's contributor grant (CONSENT_REQUIRED), or a record's ai_provenance declaration the caller may not make (SCOPE_DENIED)
+          description: not an active member, meta.* without admin/creator, (records) an agent or app token without the workspace creator's contributor grant (CONSENT_REQUIRED), a record's ai_provenance declaration the caller may not make (SCOPE_DENIED), or the space's writeRole refuses the caller's person (ACCESS_DENIED, `details.reason` WRITE_ROLE; `owner` is the workspace's creator or an organism admin, `admin` an organism admin, and the message names the space and its writeRole)
         '404':
           description: organism not found
         '409':
@@ -54910,7 +54917,7 @@ paths:
         '200': { description: '{ written, row_ids, pruned, revisions_kept } — pruned is what the retention sweep removed; revisions_kept names the rows whose earlier content, last written by another writer family, the node kept as a revision (GET .../{rowId}/revisions)' }
         '400': { description: No rows, a batch over 500, a malformed row, or a space that is not a row space }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, no consent, or the space's writeRole refuses this caller }
+        '403': { description: "Not a member, no consent, or the space's writeRole refuses this caller's person: `owner` is the workspace's creator or an organism admin, `admin` an organism admin" }
         '404': { description: No such workspace or space }
         '413': { description: A row over quota.ws_rows_max_row_kb, or the workspace/organism quota reached }
         '422':
@@ -55749,7 +55756,9 @@ paths:
         Who may publish in a workspace (`ws`): whoever may write the draft, in person or through an
         agent: the workspace's creator, an organism admin, or a holder of the creator's contributor
         grant. A viewer or a member with no grant is refused 403 (CONSENT_REQUIRED) before a publish
-        gate files an approval.
+        gate files an approval. On top of that the space's `writeRole` holds for the caller's person:
+        `owner` is the workspace's creator or an organism admin, `admin` an organism admin; a refusal is
+        403 ACCESS_DENIED with `details.reason` WRITE_ROLE and names the space and its writeRole.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -80966,7 +80975,12 @@ paths:
         platform-fee records outside an operator's account whose writer it could not tell; the entry
         id is `<owner>/<key>`. The start step of type `erased_lock_holders` gives the schema locks of
         accounts that no longer exist the erasure pseudonym, and names the locks set before the account
-        that holds their holder's name now was registered; the entry id is `<applyTo>:<keyPattern>`. With
+        that holds their holder's name now was registered; the entry id is `<applyTo>:<keyPattern>`. The
+        start step of type `workspace_write_role` names the memory-backed workspace record spaces that
+        declare writeRole `owner` or `admin` and that members who do not meet it already wrote into;
+        these keep taking those members' writes until decided, and the entry id is
+        `<organism>/<workspace>/<namespace>`: `enforce` applies the writeRole, `keep` sets the space's
+        writeRole to `member` in the manifest so the members keep writing. With
         `{ name: <entry id>, resolution }` this endpoint decides one
         entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
         none), `delete` (the skill or the data package is deleted with its files, the schedule is
@@ -80992,7 +81006,7 @@ paths:
               type: object
               properties:
                 name: { type: string, description: 'An account name from the incident''s `names`, a classification id from the incident''s `caps`, or an entry id from the incident''s `entries`.' }
-                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount, pseudonymise], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear, delete, app_only, uncount or pseudonymise, or keep.' }
+                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount, pseudonymise, enforce], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear, delete, app_only, uncount, pseudonymise or enforce, or keep (for a workspace_write_role entry, keep sets the space''s writeRole to member).' }
       responses:
         '200':
           description: Incident resolved, or one case of it decided
@@ -81010,7 +81024,7 @@ paths:
                           id: { type: string }
                           resolved_at: { type: string, format: date-time, description: Without a body. }
                           name: { type: string, description: With a name. }
-                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount, pseudonymise], description: With a name. }
+                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount, pseudonymise, enforce], description: With a name. }
                           entry_done: { type: string, description: 'With an entry: what the decision did, in one line.' }
                           done:
                             type: object

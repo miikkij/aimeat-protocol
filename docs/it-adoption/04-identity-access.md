@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.3.1 (commit 06a1ff4e9) on 2026-11-20. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit f6307e340) on 2026-11-21. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -205,10 +205,11 @@ The node has one account role above a person, `operator`. There is no separate `
 | List and remove the ecosystem apps connected to the account | own account | own account | own account | own account | only with `account:security`, an exact tick | no | no |
 | Invite and remove organism members, grant workspace roles | as owner of the organism | as owner of the organism | yes | no | with `organism:invite`, where its owner may | no | no |
 | Read a workspace | as granted | as granted | yes | as granted (`viewer`, `contributor`) | its owner's grants, within its scopes and clearance | as scoped | as scoped |
+| Write a workspace space whose `writeRole` is `owner` or `admin` | as their organism role | as their organism role | yes | only the workspace's creator, and only on `owner` | its owner's standing, within its scopes | its owner's standing, within its scopes | its person's standing |
 | Publish an app | yes | yes | yes | yes | with `app:write` | within its scopes | not with `app:write`, which an app cannot ask |
 | Approve an agent | own agents | own agents | own agents | own agents | a sibling, never with more scopes than its own | no | no |
 
-Sources: `aimeat/src/auth/middleware.ts` (role order operator, owner, agent or ecosystem), `aimeat/src/routes/admin/monitoring.ts` (operator grant and revoke), `aimeat/src/auth/account-security.ts` (account security doors), `aimeat/src/routes/ecosystem-apps.ts` (listing and removing ecosystem apps), `aimeat/src/services/workspace/roles.ts` (workspace roles go to the person and their agents), `aimeat/src/services/app/grant-vocabulary.ts` (what an app may ask), `aimeat/src/utils/scope-coverage.ts` (words outside every wildcard).
+Sources: `aimeat/src/auth/middleware.ts` (role order operator, owner, agent or ecosystem), `aimeat/src/routes/admin/monitoring.ts` (operator grant and revoke), `aimeat/src/auth/account-security.ts` (account security doors), `aimeat/src/routes/ecosystem-apps.ts` (listing and removing ecosystem apps), `aimeat/src/services/workspace/roles.ts` (workspace roles go to the person and their agents), `aimeat/src/services/organism/write-role.ts` (a space's `writeRole` on every write path, memory and row spaces alike; a server that ran before 2026-11-21 keeps the spaces members already wrote in as they were until the operator decides on the Security page, `aimeat/src/services/workspace/write-role-hold.ts`), `aimeat/src/services/app/grant-vocabulary.ts` (what an app may ask), `aimeat/src/utils/scope-coverage.ts` (words outside every wildcard).
 
 ## Agent identities
 

@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-21 — A refusal of a space's writeRole (services/organism/write-role.ts) reads
+ *     `ACCESS_DENIED: …`, as the fenced-space refusals do.
  *   2026-11-21 — aimeat_workspace_update takes expected_version: a stale manifest version answers
  *     VERSION_CONFLICT, the refusal PUT /v1/organisms/:id/workspace answers 409.
  *   2026-11-19 — aimeat_workspace_share takes ics_key, the calendar feed key of the same share route.
@@ -299,8 +301,10 @@ export function registerWorkspaceTools(
             ? fail(JSON.stringify({ error: r.code, message: r.message, ...(r.details ?? {}) }, null, 2))
             // A scope refusal is new on these tools (F2), so it takes the toolError shape the REST
             // door's code reads in: `SCOPE_DENIED: what happened`. The two refusals of the
-            // fenced-space rule (services/fenced-space.ts) are new too and take the same shape.
-            : r.code === 'SCOPE_DENIED' || r.details?.reason === 'FENCED_SPACE' || r.details?.reason === 'FENCE_CHANGE' ? fail(`${r.code}: ${r.message}`) : fail(r.message);
+            // fenced-space rule (services/fenced-space.ts) are new too and take the same shape, and
+            // so does the space's writeRole (services/organism/write-role.ts, 2026-11-21).
+            : r.code === 'SCOPE_DENIED' || r.details?.reason === 'FENCED_SPACE' || r.details?.reason === 'FENCE_CHANGE' || r.details?.reason === 'WRITE_ROLE'
+                ? fail(`${r.code}: ${r.message}`) : fail(r.message);
     /** The fenced-space rule for one record, as a tool error, or null: a record space that names
      *  extensions takes an agent's reopen or delete only through one of them, unless the session
      *  covers organism:direct. The two tools below ask it themselves because neither hands the

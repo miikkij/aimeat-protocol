@@ -33,6 +33,9 @@
  *   - rowSpaceSchema
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-11-21 — The space's writeRole is the shared rule (services/organism/write-role.ts): `owner` is
+ *     the workspace's creator or an organism admin, no longer the organism's creator alone, as on a
+ *     memory space (ruling 2026-11-21). The refusal names the space and its writeRole.
  *   2026-11-21 — readRows gives the content risk read each row's last writer, so a row the reader's own
  *     person wrote is not checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — appendRows answers the space's namespace; a deleted, cut or swept row's content risk
@@ -106,6 +109,7 @@ import { emitChange, emitRowsAppended } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { rowTarget } from '../classification/labels.js';
 import { extensionMarker, fencedSpaceRefusal } from '../fenced-space.js';
+import { standingMeets, writeRoleMessage, writeStandingOf, type SpaceWriteRole } from '../organism/write-role.js';
 import type { ContentReader } from '../classification/reader.js';
 import {
   WorkspaceRowError, resolveRowSpace, columnsForBody, columnsForWhere, retentionOf,
@@ -390,22 +394,25 @@ async function gate(
     await authorize(deps, caller, organismId, wsId, space.namespace, mode);
     if (mode === 'read') await requireWorkspaceRead(deps, caller, organismId, wsId);
   }
-  if (mode === 'write') await requireWriteRole(deps, caller, organismId, space);
+  if (mode === 'write') await requireWriteRole(deps, caller, organismId, wsId, space);
 }
 
-/** The space's own writeRole, on top of membership. Read is every member's. */
+/**
+ * The space's own writeRole, on top of membership. Read is every member's. The one rule the memory
+ * spaces use too (services/organism/write-role.ts): `owner` is the workspace's creator or an organism
+ * admin, `admin` is an organism admin, for the person the caller is or acts for. Until 2026-11-21
+ * `owner` here was the organism's creator alone.
+ */
 async function requireWriteRole(
-  deps: RowServiceDeps, caller: RowCaller, organismId: string, space: RowSpace,
+  deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string, space: RowSpace,
 ): Promise<void> {
   if (space.writeRole === 'member') return;
-  const membership = await deps.storage.getMembership(organismId, caller.owner);
-  const role = membership?.status === 'active' ? membership.role : null;
-  const ok = space.writeRole === 'admin'
-    ? role === 'admin' || role === 'creator'
-    : role === 'creator';
-  if (!ok) {
-    throw new WorkspaceRowError('ACCESS_DENIED', 403,
-      `Writing to "${space.name}" is limited to ${space.writeRole === 'admin' ? 'an admin or the creator' : 'the creator'} of this organism.`);
+  // A value the manifest schema does not know was the strictest rule here before, and stays the
+  // strictest of the three.
+  const role: SpaceWriteRole = space.writeRole === 'admin' ? 'admin' : 'owner';
+  const standing = await writeStandingOf(deps.storage, organismId, wsId, caller.owner || null, { needCreator: role === 'owner' });
+  if (!standingMeets(role, standing)) {
+    throw new WorkspaceRowError('ACCESS_DENIED', 403, writeRoleMessage(space.name, role));
   }
 }
 

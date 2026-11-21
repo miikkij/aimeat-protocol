@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-21 -- e2e-workspace-write-role.ts joins the list (not the guard tier): a record space's
+ *     writeRole holds on every write path, on memory and row spaces alike (ruling 2026-11-21).
  *   2026-11-21 -- e2e-workspace-read-ambiguous.ts joins the list (not the guard tier): an id two spaces
  *     hold, read without a space, names both in `ambiguous`.
  *   2026-11-21 -- e2e-no-silent-drops.ts joins the list (not the guard tier): ignored_fields on a task and a
@@ -1677,6 +1679,9 @@ const ALL_SUITES = [
     // A record space that names extensions takes an agent's write only through one of them: every
     // direct write, publish, reopen, delete and archive of an agent refused, the named extension let in.
     'test/e2e-workspace-fenced-space.ts',
+    // A record space's writeRole holds on every write path: owner = the workspace's creator or an
+    // organism admin, admin = an organism admin, on memory and row spaces alike (ruling 2026-11-21).
+    'test/e2e-workspace-write-role.ts',
     // A record id with a dot lists under its whole id and no longer makes the index unreadable (secaudit2026oct31w2).
     'test/e2e-workspace-dotted-id.ts',
     // The node-reserved parts of a workspace (share, access requests, fingerprints) are no space of any

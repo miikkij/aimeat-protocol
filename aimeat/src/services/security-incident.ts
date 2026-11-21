@@ -23,6 +23,8 @@
  *   undecidedCases · undecidedMessage · SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.12.0 -- 2026-11-21 -- An entry's action can be 'enforce': a workspace space's writeRole holds for the
+ *     members who wrote it before the rule (services/workspace/write-role-hold.ts; ruling 2026-11-21).
  *   v1.11.0 -- 2026-11-15 -- recordSecurityIncident sends an `incident` event to the organisation's
  *     monitoring (services/node-admin/siem-export.ts, team setup T10).
  *   v1.10.0 -- 2026-11-08 -- An entry's action can be 'pseudonymise': a schema lock older than the account
@@ -144,8 +146,9 @@ export interface IncidentEntry {
   params?: Record<string, string | number>;
   /** The action offered besides 'keep'. 'app_only' serves a subdomain address only at its app address;
    *  'uncount' leaves a platform-fee record out of the dashboard's money fees (commerce/platform-fee-writers.ts);
-   *  'pseudonymise' gives a schema lock the erasure pseudonym, so no account holds it (services/csm/erased-lock-holders.ts). */
-  action: 'clear' | 'delete' | 'app_only' | 'uncount' | 'pseudonymise';
+   *  'pseudonymise' gives a schema lock the erasure pseudonym, so no account holds it (services/csm/erased-lock-holders.ts);
+   *  'enforce' applies a workspace space's writeRole to the members who wrote it (services/workspace/write-role-hold.ts). */
+  action: 'clear' | 'delete' | 'app_only' | 'uncount' | 'pseudonymise' | 'enforce';
   status: 'open' | 'done' | 'kept';
   decidedAt?: string;
   decidedBy?: string;

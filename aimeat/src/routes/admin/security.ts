@@ -15,6 +15,8 @@
  *   - POST   /v1/admin/security/incidents/:id/resolve   (with { name, resolution }: decide one case)
  *   - DELETE /v1/admin/security/incidents/:id
  * @version-history
+ *   v1.10.0 -- 2026-11-21 -- An entry's action can be "enforce" (a workspace space's writeRole holds for the
+ *     members who wrote it); the refusal of a malformed body names it.
  *   v1.9.0 -- 2026-11-08 -- An entry's action can be "pseudonymise" (a schema lock older than the account
  *     that holds its name takes the erasure pseudonym); the refusal of a malformed body names it
  *     (secaudit2026nov08 round 14b).
@@ -111,7 +113,7 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
     const body = (req.body ?? {}) as { name?: unknown; resolution?: unknown };
     if (body.name !== undefined || body.resolution !== undefined) {
       if (typeof body.name !== 'string' || body.name === '' || typeof body.resolution !== 'string') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear", "delete", "app_only", "uncount" or "pseudonymise") or "keep" for an entry.'));
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear", "delete", "app_only", "uncount", "pseudonymise" or "enforce") or "keep" for an entry.'));
         return;
       }
       // An agent or an ecosystem app decides as an AI, anyone else as a person (the policy history says which).
