@@ -21,6 +21,11 @@
  * @usage warnings.push(...pageCodeFindings(html));
  * @version-history
  *   v1.0.0 — 2026-11-21 — Initial.
+ *   v1.0.1 — 2026-11-22 — keyframeHideFindings and sessionFetchFindings build no pattern from the
+ *     page's own text: each collects the names it needs (the animation names held forwards, the names
+ *     the json method is called on) into a set and looks the name up (CodeQL js/regex-injection and
+ *     js/incomplete-sanitization, alerts 1833-1836). A keyframe named inside a longer name
+ *     (`fade` in `fade-out`) no longer counts as held.
  */
 import type { AppArtifactFinding } from './artifact-lint.js';
 import { elementBodies, withoutBlockComments } from '../../utils/html-blocks.js';
@@ -151,8 +156,14 @@ export function keyframeHideFindings(html: string): AppArtifactFinding[] {
     if (/opacity\s*:\s*0(?:\.0+)?\s*(?:;|$|!)/.test(frame) || /visibility\s*:\s*hidden/.test(frame)) hiding.push(m[1]);
   }
   if (!hiding.length) return [];
-  const held = hiding.filter(name => ruleBodies(css).some(b =>
-    new RegExp(`animation(?:-name)?\\s*:[^;}]{0,300}\\b${name.replace(/[-]/g, '\\-')}\\b`).test(b) && /\b(?:forwards|both)\b/.test(b)));
+  const heldNames = new Set<string>();
+  for (const body of ruleBodies(css)) {
+    if (!/\b(?:forwards|both)\b/.test(body)) continue;
+    for (const decl of body.matchAll(/animation(?:-name)?\s*:([^;}]{0,300})/g)) {
+      for (const word of decl[1].match(/[\w-]{1,80}/g) ?? []) heldNames.add(word);
+    }
+  }
+  const held = hiding.filter(name => heldNames.has(name));
   if (!held.length) return [];
   return [finding('keyframe-hides-under-less-motion',
     `The keyframe${held.length > 1 ? 's' : ''} ${held.map(n => '`' + n + '`').join(', ')} end${held.length > 1 ? '' : 's'} hidden and `
@@ -227,9 +238,12 @@ export function sessionFetchFindings(html: string): AppArtifactFinding[] {
   let m: RegExpExecArray | null;
   while ((m = chained.exec(code)) !== null) if (!GLOBAL_FETCH.has(m[1])) hits.add(m[1]);
   const assigned = /(?:const|let|var)\s+([A-Za-z_$][\w$]{0,40})\s*=\s*await\s+([A-Za-z_$][\w$]{0,40})\s*\.\s*fetch\s*\(\s*["'`]\/v1\//g;
+  // Every name the page calls json on, read once, so no pattern is built from the page's own text.
+  const jsonCalled = new Set<string>();
+  for (const call of code.matchAll(/(?<![\w$])([A-Za-z_$][\w$]{0,40})\s*\.\s*json\s*\(/g)) jsonCalled.add(call[1]);
   while ((m = assigned.exec(code)) !== null) {
     if (GLOBAL_FETCH.has(m[2])) continue;
-    if (new RegExp(`\\b${m[1].replace(/\$/g, '\\$')}\\s*\\.\\s*json\\s*\\(`).test(code)) hits.add(m[2]);
+    if (jsonCalled.has(m[1])) hits.add(m[2]);
   }
   if (!hits.size) return [];
   return [finding('session-fetch-parsed',

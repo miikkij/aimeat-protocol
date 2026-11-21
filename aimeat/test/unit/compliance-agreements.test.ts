@@ -10,12 +10,15 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-agreements.test.ts
  * @version-history
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p).
+ *   v1.0.1 — 2026-11-22 — generateAnnexes refuses a product the default-processing table does not
+ *     hold itself (CodeQL alert 1831).
  */
 import { describe, it, expect } from 'vitest';
 import { SCC_2021_915, SCC_2021_915_SHA256 } from '../../src/data/legal/eu-scc-2021-915.js';
 import { canonicalText, textHashOf } from '../../src/services/compliance/agreements-render.js';
 import { finalizeNotices, statusOf } from '../../src/services/compliance/agreements.js';
 import { changedParts } from '../../src/services/compliance/agreements-ops.js';
+import { generateAnnexes } from '../../src/services/compliance/agreements-generate.js';
 import { OptionsSchema, type Agreement, type AgreementVersion } from '../../src/services/compliance/agreements-schemas.js';
 import { createHash } from 'node:crypto';
 
@@ -38,6 +41,16 @@ function agreement(versions: AgreementVersion[]): Agreement {
     subject: 'Hostattu AIMEAT-ympäristö', counterparty: { name: 'Asiakas Oy' }, versions, history: [], createdAt: now, updatedAt: now,
   };
 }
+
+describe('the product names a key of the default-processing table', () => {
+  it('a name the table does not hold itself is refused with 400, an inherited one included', async () => {
+    const deps = { storage: {} as never, config: { nodeId: 'n', operator: {} } as never };
+    for (const product of ['constructor', 'toString', '__proto__', 'nope']) {
+      await expect(generateAnnexes(deps, { counterparty: { name: 'Asiakas Oy' }, product: product as never, language: 'en', ourRole: 'processor' }))
+        .rejects.toMatchObject({ status: 400, code: 'INVALID_INPUT' });
+    }
+  });
+});
 
 describe('data processing agreements', () => {
   it('the clauses are the data file\'s text, and its hash is the one recorded beside it', () => {

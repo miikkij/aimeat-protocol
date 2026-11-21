@@ -10,6 +10,8 @@
  *   FIRST FAIL: before the module none of these warnings existed (lintAppArtifact named none).
  * @version-history
  *   v1.0.0 — 2026-11-21 — Initial.
+ *   v1.0.1 — 2026-11-22 — Whole-name matching for a held keyframe and for the json call on an
+ *     awaited session.fetch, after both readers stopped building a pattern from the page's text.
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
@@ -83,6 +85,10 @@ describe('a kit keyframe that ends hidden', () => {
     expect(keyframeHideFindings(page('<style>@keyframes f{to{opacity:0}} .a{animation:f 1s forwards}</style>'))).toEqual([]);
     expect(keyframeHideFindings(page(KIT + '<style>@keyframes f{0%{opacity:1} 100%{visibility:hidden}} .a{animation-name:f;animation-fill-mode:both}</style>'))).toHaveLength(1);
   });
+  it('matches the whole animation name, never a part of a longer one', () => {
+    expect(keyframeHideFindings(page(KIT + '<style>@keyframes fade{to{opacity:0}} .a{animation:fade-out 1s forwards}</style>'))).toEqual([]);
+    expect(keyframeHideFindings(page(KIT + '<style>@keyframes a.b{to{opacity:0}} .a{animation:a 1s forwards}</style>'))).toEqual([]);
+  });
 });
 
 describe('a root found by position in the body', () => {
@@ -103,6 +109,10 @@ describe('.json() on session.fetch', () => {
   it('is quiet for the browser\'s own fetch and for an envelope read as it is', () => {
     expect(sessionFetchFindings(page('', '<script>window.fetch("/v1/x").then(r => r.json()); fetch("/v1/y").then(r => r.json());</script>'))).toEqual([]);
     expect(sessionFetchFindings(page('', '<script>const res = await session.fetch("/v1/x"); if (res.ok) show(res.data);</script>'))).toEqual([]);
+  });
+  it('reads the json call on the same name only, a $ in it included', () => {
+    expect(sessionFetchFindings(page('', '<script>const $r = await s.fetch("/v1/x"); const j = await $r.json();</script>'))).toHaveLength(1);
+    expect(sessionFetchFindings(page('', '<script>const r = await s.fetch("/v1/x"); const j = await xr.json();</script>'))).toEqual([]);
   });
 });
 

@@ -6,6 +6,9 @@
  *   OKF overviews, structure graphs, dangling-refs scan, structure timeline, content search, and the
  *   comments/threads endpoints. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-22 — ?format=md on the two overviews sets its text/markdown content type with res.set and
+ *     nosniff before the body; res.type was not read as a content type by CodeQL's
+ *     reflected-XSS query (alert 1832).
  *   2026-11-21 — GET /v1/organisms/:id/overview answers the organism's own `objectives` beside the
  *     Markdown, which now opens with them (services/structure/overview.ts).
  *   2026-11-21 — POST /comments hands the config to addComment (content risk marks at the shared-write
@@ -323,7 +326,14 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
     const includeArchived = req.query.includeArchived === 'true';
     const { markdown, workspaces, archivedWorkspaces, objectives } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii, includeArchived, reader: readerFor({ storage, config }, req.auth) });
-    if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
+    if (req.query.format === 'md') {
+      // The content type is its own header call before the body: member-written titles in the
+      // Markdown are never read as HTML, and nosniff keeps the browser from guessing otherwise.
+      res.set('Content-Type', 'text/markdown; charset=utf-8');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.send(markdown);
+      return;
+    }
     // `objectives` are the organism's own (its manifest), with their KPIs resolved as the workspace
     // overview resolves a workspace's, so a consumer reads the direction without parsing Markdown.
     res.json(success(config.nodeId, { markdown, workspaces, archivedWorkspaces, objectives }, [
@@ -401,7 +411,12 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
     const { markdown, readable, summary } = await buildWorkspaceOverview(storage, config, { orgId: id, ws, viewerGaii, reader: readerFor({ storage, config }, req.auth) });
-    if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
+    if (req.query.format === 'md') {
+      res.set('Content-Type', 'text/markdown; charset=utf-8');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.send(markdown);
+      return;
+    }
     // `objectives` carries the measurability KPIs with their resolved `current` (computed from records
     // where source:from='records', else declared) so a consumer can check targets without parsing markdown.
     res.json(success(config.nodeId, { markdown, ws, readable, objectives: readable ? summary.objectives : [] }, [

@@ -21,6 +21,9 @@
  * @structure GeneratedAnnexes · generateAnnexes() · operatorParty() · measuresFromConfig() · subprocessorsFor() · DEFAULT_PROCESSING
  * @usage const g = await generateAnnexes({ storage, config }, input);
  * @version-history
+ *   v1.0.4 — 2026-11-22 — generateAnnexes reads the product's default processing only from a key the
+ *     table holds itself, and answers 400 INVALID_INPUT for any other (CodeQL
+ *     js/unvalidated-dynamic-method-call, alert 1831).
  *   v1.0.3 — 2026-11-05 — The encryption measure counts AIMEAT_ENCRYPTION_KEY_1 as a data key (codebase
  *     analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.0.2 — 2026-11-05 — Moved unchanged from src/services/compliance-agreements-generate.ts to src/services/compliance/agreements-generate.ts (codebase analysis 2026-11-03, item D-h).
@@ -31,6 +34,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { readDoc } from './docs.js';
+import { AgreementError } from './agreements-access.js';
 import { derivedProcessors, processorsView } from './derived.js';
 import type { ComplianceProcessor, ComplianceRegister } from './docs-schemas.js';
 import {
@@ -188,7 +192,13 @@ export async function generateAnnexes(deps: Deps, input: Pick<AgreementCreateInp
   sources['I.controller'] = 'human';
   const parties = input.ourRole === 'processor' ? { controller: input.counterparty, processor: us } : { controller: us, processor: input.counterparty };
 
-  const fallback = DEFAULT_PROCESSING[input.product](lang);
+  // The product names a key of a fixed table. A name the table does not hold (or one it inherits,
+  // such as `constructor`) is refused here, whatever schema the caller ran first.
+  const describe = Object.hasOwn(DEFAULT_PROCESSING, input.product) ? DEFAULT_PROCESSING[input.product] : undefined;
+  if (typeof describe !== 'function') {
+    throw new AgreementError(400, 'INVALID_INPUT', `product must be one of: ${Object.keys(DEFAULT_PROCESSING).join(', ')}.`);
+  }
+  const fallback = describe(lang);
   let II = fallback;
   if (input.registerId) {
     const regs = (await readDoc(deps.storage, deps.config.nodeId, 'registers', { kind: 'node' })).items;

@@ -20,6 +20,9 @@
  *   readCompanyPortfolioPage · deleteCompanyPortfolio
  * @usage await publishCompanyPortfolio(config, storage, ownerGhii, companyId, html);
  * @version-history
+ *   v1.3.1 — 2026-11-22 — The "looks like HTML" check finds a tag start and a later `>` in linear time;
+ *     its pattern backtracked on a large page full of `<` with no `>` (CodeQL js/polynomial-redos,
+ *     alert 1830). It admits and refuses the same pages.
  *   v1.3.0 — 2026-10-18 — publishCompanyPortfolio takes `pointAddress`: false stores the page and leaves
  *     the address as it is, which the publish gate uses while the owner is asked (plan doc-mvcn6c7e4e5q, V4).
  *   v1.2.0 — 2026-10-17 — SECURITY: the page file is stored with visibility 'owner'. The company
@@ -75,7 +78,10 @@ export async function publishCompanyPortfolio(
   }
   // Anything that is not a document would be served as text/html anyway, so refusing here is
   // the difference between a clear error now and a blank white address later.
-  if (!/<[a-z!][\s\S]*>/i.test(trimmed)) {
+  // A tag start and a `>` after it, found with one search and one indexOf: the pattern
+  // /<[a-z!][\s\S]*>/ backtracked over every `<` in a large page that has no `>` after it.
+  const tagStart = trimmed.search(/<[a-z!]/i);
+  if (tagStart === -1 || trimmed.indexOf('>', tagStart + 2) === -1) {
     throw new CompanyError('INVALID_PORTFOLIO', 400, 'The page does not look like HTML');
   }
 
