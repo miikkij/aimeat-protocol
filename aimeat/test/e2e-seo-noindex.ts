@@ -17,6 +17,8 @@
  *   E2E_BASE may point at a live node: run against https://aimeat.io before the deploy, it fails
  *   on every rule; after the deploy it is the production check.
  * @version-history
+ *   v1.2.0 — 2026-11-22 — /v1/app-store answers a person's browser with the same page as a crawler;
+ *     the SPA moves the person to /v1/appcat?view=community (spa.html CLIENT_REDIRECTS).
  *   v1.1.0 — 2026-11-21 — /v1/app-store sends a person's browser to /v1/appcat?view=community and
  *     keeps the crawler page; markdown, no User-Agent and other pages keep today's answer.
  *   v1.0.0 — 2026-09-30 — Initial (wish-bing-noindex-kirjautumissivut-ja-konetiedostot)
@@ -128,17 +130,23 @@ const PUBLIC = [
         assert(bad.length === 0, `noindex or unreachable: ${bad.join(', ')}`);
     });
 
-    // /v1/app-store: no SPA view owns it, so a person's browser goes to the community catalogue,
-    // while a crawler keeps the server-written page the sitemap names (2026-11-21).
+    // /v1/app-store: no SPA view owns it, so the SPA moves a person's browser on to the community
+    // catalogue (spa.html CLIENT_REDIRECTS), while the server answers every caller with the one page
+    // the sitemap names: its own head, and the content-access gate in front (2026-11-21, moved to the
+    // client 2026-11-22 because a server redirect skipped both).
     const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
     const BROWSER_ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
     const open = (path: string, headers: Record<string, string>) => fetch(`${BASE}${path}`, { headers, redirect: 'manual' });
 
-    await test('a person\'s browser opening /v1/app-store is sent to the community catalogue', async () => {
+    await test('a person\'s browser opening /v1/app-store gets the page, and the SPA in it moves the person to the community catalogue', async () => {
         const r = await open('/v1/app-store', { 'User-Agent': BROWSER_UA, Accept: BROWSER_ACCEPT });
-        assert(r.status === 302, `status ${r.status}`);
-        assert(r.headers.get('location') === '/v1/appcat?view=community', `location ${r.headers.get('location')}`);
-        assert(/user-agent/i.test(r.headers.get('vary') ?? ''), `a cache must keep the two answers apart: Vary "${r.headers.get('vary')}"`);
+        assert(r.status === 200, `status ${r.status} (location ${r.headers.get('location')})`);
+        const body = await r.text();
+        assert(/<link rel="canonical"/i.test(body), 'the page head has no canonical link');
+        assert(/'\/v1\/app-store'\s*:\s*'\/v1\/appcat\?view=community'/.test(body),
+            'the shell does not carry the client move from /v1/app-store to /v1/appcat?view=community');
+        const target = await open('/v1/appcat?view=community', { 'User-Agent': BROWSER_UA, Accept: BROWSER_ACCEPT });
+        assert(target.status === 200, `the catalogue answers ${target.status}`);
     });
 
     await test('a crawler opening /v1/app-store keeps the server-written page', async () => {

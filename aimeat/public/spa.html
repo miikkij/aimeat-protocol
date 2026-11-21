@@ -1306,6 +1306,18 @@
       '/v1/design-lab/frame': () => import('/views/design-lab/frame.js'),
     };
 
+    // Addresses the server serves with a page of their own (head, markdown mirror, crawler text)
+    // while no view owns them: the SPA moves a person on to the view that does, in place of drawing
+    // the front page there. /v1/app-store is the public app list the sitemap names (data/public-pages.ts);
+    // a person lands on the community catalogue (ruled 2026-11-21). The server answer stays one for
+    // every caller, so the page's head and the content-access gate hold (test/unit/spa-routes-parity.test.ts).
+    const CLIENT_REDIRECTS = {
+      '/v1/app-store': '/v1/appcat?view=community',
+    };
+    function clientRedirect(path) {
+      return CLIENT_REDIRECTS[new URL(path, window.location.origin).pathname] || path;
+    }
+
     // Match route, handling query params for special views
     // The view a path belongs to, or null when no view owns it. The link interceptor asks this
     // before taking a click: /v1/privacy, /v1/terms, /v1/connect and /v1/spec are the server's
@@ -1436,7 +1448,8 @@
       const [locale, setLocale] = useState(getLocale());
 
       // Navigate to a route
-      const navigate = useCallback(async (path, replace = false) => {
+      const navigate = useCallback(async (requested, replace = false) => {
+        const path = clientRedirect(requested);
         const url = new URL(path, window.location.origin);
         const loader = viewFor(url.pathname, url.search);
         // The look follows the address: AIMEAT's own pages wear the chosen theme, the others do not.
@@ -1509,6 +1522,8 @@
 
         // Handle back/forward
         const onPopState = () => {
+          const moved = clientRedirect(location.pathname + location.search);
+          if (moved !== location.pathname + location.search) { navigate(moved, true); return; }
           window.__aimeatLook?.apply(location.pathname);
           const loader = viewFor(location.pathname, location.search);
           loadView(loader).then(mod => {
