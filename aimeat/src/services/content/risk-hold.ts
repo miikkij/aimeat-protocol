@@ -29,6 +29,9 @@
  * @structure RiskItem · listRiskItemsFor · acceptRiskFor · unacceptRiskFor · releaseHeldFor · DECIDE_WORD
  * @usage const items = await listRiskItemsFor(deps, caller, 'open'); await acceptRiskFor(deps, caller, items[0].ref);
  * @version-history
+ *   v1.2.0 — 2026-11-22 — The list's newest items carry `place` and `phrases` (the words each mark found,
+ *     risk-excerpts.ts) for the Data Wallet's marked-content section; every decision sends the live
+ *     change; the acceptance notice links to that section.
  *   v1.1.0 — 2026-11-21 — Every kept item, not only held ones (listRiskItemsFor with a status); accept and
  *     unaccept; an agent's acceptance tells the deciders; RELEASE_WORD became DECIDE_WORD
  *     (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
@@ -45,8 +48,9 @@ import { workspaceRegistrations } from '../workspace/meta-read.js';
 import { updateOwnRecord } from './classes.js';
 import { allFacts, shardKeyOf } from './facts-store.js';
 import { systemOwnerOf } from './shared-profile-key.js';
-import { isApprover, approversOf, openMarks } from './risk-core.js';
+import { isApprover, approversOf, openMarks, placeOf, emitRiskChange } from './risk-core.js';
 import { flushContentRisk } from './risk-intake.js';
+import { subjectFromEntry, wordsOf, marksWithWords, type MarkWords } from './risk-excerpts.js';
 import { listKept, personRiskKey, workspaceRiskKey, type RiskHome } from './risk-store.js';
 import type { RiskMarks, RiskKind } from './risk-types.js';
 import { ContentError } from './pipeline.js';
@@ -75,7 +79,16 @@ export interface RiskItem {
   written_by?: string;
   point: RiskMarks['point'];
   accepted?: { by: string; at: string };
+  /** Where the item is, in the words a person reads (risk-core.ts placeOf). */
+  place?: string;
+  /** Each mark with the phrase it found, rebuilt from the item's words (risk-excerpts.ts); the newest WITH_WORDS items. */
+  phrases?: MarkWords[];
+  /** The item changed after it was marked: its phrases cannot be shown until it is marked again. */
+  changed?: boolean;
 }
+
+/** How many of the newest items carry their phrases: each costs one read of the item. */
+const WITH_WORDS = 50;
 
 function statusOf(m: RiskMarks): RiskItemStatus {
   if (m.hold?.status === 'held') return 'held';
@@ -95,14 +108,18 @@ const toItem = (ref: string, where: RiskItem['where'], subjectId: string, m: Ris
 
 const isKept = (m: RiskMarks | undefined): m is RiskMarks => !!m && Array.isArray(m.marks) && (m.marks.length > 0 || !!m.accepted);
 
-/** Every kept item the caller decides, newest first; with `status`, only those. */
+/**
+ * Every kept item the caller decides, newest first; with `status`, only those. The newest WITH_WORDS
+ * carry where they are and the phrase of each mark, read from the item itself (risk-excerpts.ts).
+ */
 export async function listRiskItemsFor(deps: Deps, caller: CallerContext, status?: RiskItemStatus): Promise<RiskItem[]> {
-  const out: RiskItem[] = [];
+  const found: Array<{ item: RiskItem; home: RiskHome; id: string; entry: RiskMarks; source?: { kind: string; owner: string; key: string } }> = [];
   const me = caller.ownerGhii;
+  const self: RiskHome = { kind: 'person', owner: me };
   for (const f of await allFacts(deps.storage, me)) {
-    if (isKept(f.risk)) out.push(toItem(`p:${f.sourceId}`, { kind: 'person' }, f.sourceId, f.risk));
+    if (isKept(f.risk)) found.push({ item: toItem(`p:${f.sourceId}`, { kind: 'person' }, f.sourceId, f.risk), home: self, id: f.sourceId, entry: f.risk, source: f.source });
   }
-  for (const h of await listKept(deps.storage, me, personRiskKey)) out.push(toItem(`p:${h.id}`, { kind: 'person' }, h.id, h.marks));
+  for (const h of await listKept(deps.storage, me, personRiskKey)) found.push({ item: toItem(`p:${h.id}`, { kind: 'person' }, h.id, h.marks), home: self, id: h.id, entry: h.marks });
   const name = localAccountName(me);
   const system = systemOwnerOf(deps.config.nodeId);
   for (const m of await deps.storage.listMembershipsByGhii(name)) {
@@ -111,11 +128,27 @@ export async function listRiskItemsFor(deps: Deps, caller: CallerContext, status
     for (const [ws, reg] of await workspaceRegistrations(deps.storage, m.organismId, { nodeId: deps.config.nodeId })) {
       if (!manager && reg.creator !== name) continue;
       for (const h of await listKept(deps.storage, system, workspaceRiskKey(m.organismId, ws))) {
-        out.push(toItem(`w:${m.organismId}:${ws}:${h.id}`, { kind: 'workspace', organism_id: m.organismId, ws }, h.id, h.marks));
+        found.push({
+          item: toItem(`w:${m.organismId}:${ws}:${h.id}`, { kind: 'workspace', organism_id: m.organismId, ws }, h.id, h.marks),
+          home: { kind: 'workspace', org: m.organismId, ws }, id: h.id, entry: h.marks,
+        });
       }
     }
   }
-  return out.filter((it) => !status || it.status === status).sort((a, b) => (a.since < b.since ? 1 : -1));
+  const shown = found.filter((f) => !status || f.item.status === status).sort((a, b) => (a.item.since < b.item.since ? 1 : -1));
+  await Promise.all(shown.slice(0, WITH_WORDS).map(async (f) => {
+    const subject = subjectFromEntry(f.home, f.id, f.source);
+    if (!subject) return;
+    f.item.place = placeOf(subject);
+    const words = await wordsOf(deps, subject).catch((e: unknown) => {
+      logger.warn('contentrisk: the words of a marked item could not be read', { id: f.id, error: String((e as Error)?.message ?? e) });
+      return null;
+    });
+    const { marks, changed } = marksWithWords(f.entry, words);
+    f.item.phrases = marks;
+    if (changed) f.item.changed = true;
+  }));
+  return shown.map((f) => f.item);
 }
 
 const REF_HINT = 'ref names a marked item, as aimeat_content_risk { action: "list" } or a read\'s content_risk.ref gives it: p:<id> or w:<organism>:<workspace>:<id>.';
@@ -169,6 +202,7 @@ async function changeEntry(deps: Deps, caller: CallerContext, ref: unknown, chan
     const key = r.home === 'self' ? personRiskKey : workspaceRiskKey(r.org!, r.ws!);
     await updateRecord(deps.storage, owner, key, listRecord, (cur) => (onItems(cur.items) === UNCHANGED ? UNCHANGED : cur), { tag: 'contentrisk', visibility: 'private' });
   }
+  if (before) await emitRiskChange(deps, home).catch((e: unknown) => logger.warn('contentrisk: the live change was not sent', { error: String((e as Error)?.message ?? e) }));
   return before ? { before, home } : null;
 }
 
@@ -182,7 +216,7 @@ async function tellAccepted(deps: Deps, home: RiskHome, ref: string, by: string,
     await notify(deps.storage, r, {
       type: 'content_risk_accepted', title: 'An AI accepted marked content',
       body: `${by} accepted ${count} mark(s) on ${ref}: an AI now uses that text normally. If you did not ask for this, ask your AI to take it back (unaccept).`,
-      link: '/v1/profile?tab=dataWallet', i18n: { key: 'content_risk_accepted', vars },
+      link: '/v1/profile?tab=dataWallet#dw-risk', i18n: { key: 'content_risk_accepted', vars },
     }).catch((err: unknown) => logger.warn('contentrisk: an acceptance notice was not sent', { recipient: r, error: String(err) }));
   }
 }

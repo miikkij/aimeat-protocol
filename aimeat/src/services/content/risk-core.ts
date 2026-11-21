@@ -23,10 +23,13 @@
  *   ACCEPTED. A person's acceptance (risk-hold.ts acceptRiskFor) names the fingerprints of the phrases
  *   they accepted. It is kept when the item is marked again after an edit, and only the marks it does not
  *   name (openMarks) can hold the item or send a notice.
- * @structure hashText · layersFor · resolveForHome · approversOf · isApprover · openMarks · behaviourAt ·
- *   markText
+ * @structure hashText · layersFor · resolveForHome · approversOf · isApprover · emitRiskChange · openMarks ·
+ *   behaviourAt · placeOf · markText
  * @usage const marks = await markText(deps, { subject, text, point: 'intake', writer });
  * @version-history
+ *   v1.2.0 — 2026-11-22 — emitRiskChange: a kept mark sends the live change `contentclass` to the people
+ *     who decide it, so the Data Wallet's marked-content section reads again; placeOf is exported; the
+ *     notice links to that section (#dw-risk).
  *   v1.1.0 — 2026-11-21 — openMarks; markText keeps an item's acceptance across edits, holds and notifies
  *     only for marks nobody accepted, and sends no notice from a read
  *     (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
@@ -38,6 +41,7 @@ import type { AimeatConfig } from '../../config.js';
 import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { notify } from '../notify.js';
+import { emitChange } from '../event-bus.js';
 import { systemReader } from '../classification/reader.js';
 import { fileTarget, memoryTarget, ClassificationError } from '../classification/labels.js';
 import { findWorkspaceRegistration } from '../workspace/meta-read.js';
@@ -116,6 +120,15 @@ export async function isApprover(deps: Deps, home: RiskHome, principal: string):
   return !!m && m.status === 'active' && (m.role === 'creator' || m.role === 'admin');
 }
 
+/**
+ * The live change for the pages of the people who decide a home's items (the Data Wallet's marked
+ * content reads again on `contentclass`): the person, or the workspace's creator and admins.
+ */
+export async function emitRiskChange(deps: Deps, home: RiskHome): Promise<void> {
+  if (home.kind === 'person') { emitChange('contentclass', home.owner); return; }
+  for (const who of await approversOf(deps, home)) emitChange('contentclass', who);
+}
+
 /** The marks a person has not accepted: their fingerprint is not in the item's acceptance. */
 export function openMarks<M extends { fp?: string }>(marks: readonly M[], accepted: RiskAccepted | undefined): M[] {
   if (!accepted?.fps.length) return [...marks];
@@ -144,8 +157,8 @@ function mayNotify(recipient: string): 'yes' | 'over' | 'no' {
   return 'no';
 }
 
-/** Where a person finds the item, in words, for the notice. */
-function placeOf(subject: RiskSubject): string {
+/** Where a person finds the item, in words, for the notice and the decider's list (risk-hold.ts). */
+export function placeOf(subject: RiskSubject): string {
   switch (subject.kind) {
     case 'memory': return subject.key;
     case 'file': return subject.key;
@@ -173,7 +186,7 @@ async function tell(deps: Deps, recipients: string[], subject: RiskSubject, mark
     const body = over ? 'More items were marked in the last hour than this list shows. Ask your AI which items wait for you.'
       : held ? `It has ${marks.marks.length} mark(s): ${kinds}. Other people's AIs get the marks but not the content until you release it. Nothing was changed. When you have looked at it, ask your AI to release it.`
         : `It has ${marks.marks.length} mark(s): ${kinds}. Nothing was changed. An AI that reads it gets the marks and a warning. If the text is meant to be so (for example exercise material for an AI), tell your AI it is fine, and it accepts it.`;
-    await notify(deps.storage, r, { type: key, title, body, link: '/v1/profile?tab=dataWallet', i18n: { key, vars } })
+    await notify(deps.storage, r, { type: key, title, body, link: '/v1/profile?tab=dataWallet#dw-risk', i18n: { key, vars } })
       .catch((err: unknown) => logger.warn('contentrisk: a notice was not sent', { recipient: r, error: String(err) }));
   }
 }
@@ -263,6 +276,7 @@ export async function markText(deps: Deps, input: MarkInput): Promise<RiskMarks 
     ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
   };
   await putRiskMarks(deps, input.subject, kept, input.measure);
+  await emitRiskChange(deps, home).catch((e: unknown) => logger.warn('contentrisk: the live change was not sent', { error: String((e as Error)?.message ?? e) }));
   const told = sameContent && (before?.marks.length ?? 0) > 0;
   // A read does not notify: the reading AI tells its own person (risk-read.ts contentRiskWarning).
   if (!told && open.length > 0 && input.point !== 'read' && (behaviour === 'mark+warn' || behaviour === 'hold')) {

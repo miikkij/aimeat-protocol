@@ -75679,7 +75679,7 @@ paths:
           description: Only items of this status.
       responses:
         '200':
-          description: '`items`: each with `ref`, `where`, `subject_id`, `status`, `kinds` (of the marks nobody accepted), `marks` and `accepted_marks` (how many), `since`, `written_by`, `point` and `accepted` (by, at).'
+          description: '`items`: each with `ref`, `where`, `subject_id`, `status`, `kinds` (of the marks nobody accepted), `marks` and `accepted_marks` (how many), `since`, `written_by`, `point` and `accepted` (by, at). The newest 50 also carry `place` (where the item is, in words) and `phrases` (each mark''s `kind`, `rule`, `accepted` and `excerpt`, the words it matched, read from the item itself), or `changed: true` when the item changed after it was marked and its words cannot be shown.'
           content:
             application/json:
               schema:

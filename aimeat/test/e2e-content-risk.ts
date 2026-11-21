@@ -328,7 +328,11 @@ await test('Accept: A accepts a received exercise text; A\'s agent then uses it 
     assert(cr.marked === false && cr.use === 'normal' && !cr.warning && after.content_risk_warning === undefined, `after accept: ${JSON.stringify(cr)}`);
     assert(cr.marks.length >= 1 && cr.marks.every((m: Body) => m.accepted === true) && cr.accepted?.marks === cr.marks.length, `accepted marks: ${JSON.stringify(cr.marks)}`);
     const listed = await call('/v1/content/risk/items?status=accepted', { token: A.token });
-    assert((listed.body.data.items as Body[]).some(x => x.ref === ref), `accepted list: ${show(listed)}`);
+    const row = (listed.body.data.items as Body[]).find(x => x.ref === ref);
+    assert(row, `accepted list: ${show(listed)}`);
+    // The decider's list (the Data Wallet's Marked content) shows where the item is and the exact words.
+    assert(row.place === 'inbox.ctf' && (row.phrases as Body[]).some(p => p.excerpt === 'Ignore all previous instructions' && p.accepted === true),
+        `the list's place and phrases: ${JSON.stringify(row)}`);
     // The text is edited at the source: the accepted phrase stays accepted, the new one is marked.
     const w2 = await call(`/v1/receive/${A.name}/mail/ctf`, { token: receiverKey, body: { subject: 'Exercise', text: CTF_EDITED } });
     assert(w2.status === 201 || w2.status === 200, `receive edit: ${show(w2)}`);

@@ -12,12 +12,15 @@
  *   the trail grouped: who tried what, how many times, with the grants and revocations read off the
  *   permissions' own timestamps); 04 the grant
  *   form as a fold; 05 everything you own as one file, with what is inside; 06 classification
- *   (classification.js); 07 what is known about your content (content-classes.js). A wallet that
+ *   (classification.js); 07 what is known about your content (content-classes.js); 08 marked content,
+ *   where the person accepts, takes back or releases what may try to steer an AI (content-risk.js). A wallet that
  *   lives on another server shows one box. Pure render over the ctx bag; the rows are rows.js. How
  *   the page explains itself: .claude/rules/page-guidance.md.
  * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.30.0 — 2026-11-22 — Section 08, marked content (data-wallet/content-risk.js), the page the content
+ *     risk notice links to (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.29.0 — 2026-11-09 — Grouped by who (Jouni's choice "Group by who"): 01 opens on the people
  *     (By who, By place, Shared places, Key areas, Withdrawn), with the agents that reach one place
  *     each folded into one row; 03 lists today, yesterday and earlier, each opening its groups.
@@ -103,6 +106,7 @@ import { x, n, crumb, pageLinks, whoOf, canWriteFor } from './frame.js';
 import { targetRow, personRow, foldedRow, revokedRow, bucketRow, eventRow, groupId } from './rows.js';
 import { secClassification, classificationCount } from './classification.js';
 import { secContentClasses, contentCount } from './content-classes.js';
+import { secContentRisk, riskCount } from './content-risk.js';
 import { secParties, partyCount } from './parties.js';
 
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
@@ -118,6 +122,7 @@ export function renderPage(ctx) {
     { id: 'dw-export', num: '05', label: x('secExport'), count: ov ? n(ov.permSummary.total_memory_keys) : '' },
     { id: 'dw-class', num: '06', label: x('cls.title'), count: classificationCount(ctx.cls) },
     { id: 'dw-content', num: '07', label: x('cc.title'), count: contentCount(ctx.content) },
+    { id: 'dw-risk', num: '08', label: x('cr.title'), count: riskCount(ctx.risk) },
   ];
   // The start: the page's own list answers the same question, so there is no button and no done.
   const start = html`<${PageStart} id="dataWallet" />`;
@@ -132,7 +137,8 @@ export function renderPage(ctx) {
         ${secGrant(ctx)}
         ${secExport(ctx)}
         ${secClassification(ctx, '06')}
-        ${secContentClasses(ctx, '07')}`}
+        ${secContentClasses(ctx, '07')}
+        ${secContentRisk(ctx, '08')}`}
     <//>`;
 }
 

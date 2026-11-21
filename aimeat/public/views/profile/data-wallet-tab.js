@@ -16,6 +16,8 @@
  * @structure DataWalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'dataWallet'
  * @version-history
+ *   v2.6.0 — 2026-11-22 — Section 08, marked content: its state is useContentRisk (data-wallet/content-risk.js),
+ *     ctx.risk (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v2.5.0 — 2026-11-09 — Grouped by who (look round of the performance work, Jouni's choice "Group by
  *     who"): 01 opens on the people, with how many places each reaches, and agents that reach one
  *     place each fold into one row; 03 reads the trail as today, yesterday and earlier with the totals
@@ -56,6 +58,7 @@ import { x, targetRows, targetOf, targetWords, whoOf, roleOf, canWriteFor, conse
 import { groupId } from './data-wallet/rows.js';
 import { useClassification } from './data-wallet/classification.js';
 import { useContentClasses } from './data-wallet/content-classes.js';
+import { useContentRisk } from './data-wallet/content-risk.js';
 import { useParties } from './data-wallet/parties.js';
 
 const ENTRY_LIMIT = 20;
@@ -102,6 +105,7 @@ export default function DataWalletTab({ session, showToast }) {
   const federated = !!session?.federated;
   const cls = useClassification({ federated, confirm, toast });
   const content = useContentClasses({ federated, confirm, toast });
+  const risk = useContentRisk({ federated, confirm, toast });
   const parties = useParties({ federated, confirm, toast });
 
   /* ── Reads ─────────────────────────────────────────────────────────────────────────────────── */
@@ -334,7 +338,7 @@ export default function DataWalletTab({ session, showToast }) {
   const ctx = {
     session, federated, ov, failed, names, consents, active, revokedList, targets, people, folded, kinds, events, trail, shownTrail,
     days, reloading, deniedCount, deniedGroups, manifestDenied, manifestShare: deniedCount ? manifestDenied / deniedCount : 0,
-    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, openBucket, bucketGroups, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI, cls, content, parties,
+    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, openBucket, bucketGroups, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI, cls, content, risk, parties,
     setDays, setFilter, setTrailFilter, toggleTarget, toggleGroup, toggleBucket, loadBucketGroups, showMoreTrail, showPerson, loadGroupRows, setForm, toggleForm, prefillGrant, submitGrant, revoke, exportAll,
     openOrganisms: () => openTab('organisms'),
     openAgents: () => openTab('agents'),
