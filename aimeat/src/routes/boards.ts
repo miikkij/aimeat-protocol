@@ -13,6 +13,7 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   2026-11-21 — A deleted post's content risk marks go with it (services/content/risk-keys.ts).
  *   2026-11-14 — PATCH /v1/boards/:boardId/members passes its caller object (callerOf) to setBoardMembersAs.
  *   2026-11-14 — PATCH /v1/boards/:boardId/members calls services/boards/board-members.ts, which
  *     aimeat_board_members calls too: an agent of the board's owner holding social:members changes the
@@ -121,7 +122,8 @@ import {
 import { setBoardVisibility } from '../services/boards/visibility.js';
 import { callerOf } from '../middleware/caller.js';
 import { operatorOverride, rolesWithOperator } from '../services/operator/override.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import { dropPersonRiskEntry } from '../services/content/risk-keys.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai/provenance-marks.js';
@@ -552,6 +554,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     await storage.deletePost(boardId, postId);
+    // The post's content risk marks go with it (content/risk-keys.ts).
+    if (board) await dropPersonRiskEntry(storage, ownerGhiiOf(board.ownerGaii), `board:${boardId}:${postId}`);
     res.json(success(config.nodeId, { deleted: true, post_id: postId }));
     emitChange('boards');
   });

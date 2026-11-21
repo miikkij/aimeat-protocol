@@ -33,6 +33,8 @@
  *   - rowSpaceSchema
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-11-21 — appendRows answers the space's namespace; a deleted, cut or swept row's content risk
+ *     marks go with it (content/risk-keys.ts).
  *   2026-11-20 — Appended rows are counted in the data counts by their size (services/value/data-buffer.ts).
  *   2026-11-15 — deleteRow and deleteRowsBefore ask the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-07 — A row space's JSON Schema binds every writer: appendRows checks every body of a
@@ -111,6 +113,7 @@ import {
 } from './row-revisions.js';
 import { lockedRowSchema, checkRowBodies } from './row-schema.js';
 import { teamDeleteGate } from '../team/action-gate.js';
+import { dropWorkspaceRiskEntry, pruneRowRiskEntries } from '../content/risk-keys.js';
 
 export { WorkspaceRowError } from './row-space.js';
 export { ROW_SCHEMA_REFUSAL } from './row-schema.js';
@@ -164,6 +167,8 @@ export interface RowServiceDeps {
 export interface AppendRowsResult {
   written: number;
   rowIds: string[];
+  /** The space's namespace the rows were written to (a caller may have named the space by its name). */
+  namespace: string;
   /** What the retention sweep removed on the way out. Zero is the ordinary answer. */
   pruned: number;
   /**
@@ -522,7 +527,7 @@ export async function appendRows(
     nodeId: config.nodeId, organismId, wsId, space: space.name, namespace: space.namespace,
     rowIds: deduped.map(r => r.rowId), createdBy: caller.identity,
   });
-  return { written: deduped.length, rowIds: deduped.map(r => r.rowId), pruned, revisionsKept };
+  return { written: deduped.length, rowIds: deduped.map(r => r.rowId), namespace: space.namespace, pruned, revisionsKept };
 }
 
 /**
@@ -577,7 +582,15 @@ export async function sweepRows(
       organismId, wsId, namespace: space.namespace, error: String(err),
     });
   }
+  if (pruned) await dropGoneRowRisk(deps, organismId, wsId, space.namespace);
   return pruned;
+}
+
+/** The content risk marks of rows that are gone go with them (content/risk-keys.ts). Never throws. */
+async function dropGoneRowRisk(deps: RowServiceDeps, organismId: string, wsId: string, namespace: string): Promise<void> {
+  await pruneRowRiskEntries(deps.storage, deps.config.nodeId, organismId, wsId, namespace,
+    async (ids) => new Set((await deps.storage.getWorkspaceRowsByIds(organismId, wsId, namespace, ids)).map(r => r.rowId)))
+    .catch((err: unknown) => logger.warn('workspace-rows: the risk marks of removed rows were not removed', { organismId, wsId, namespace, error: String(err) }));
 }
 
 /**
@@ -682,6 +695,8 @@ export async function deleteRow(
   // The row's kept revisions go with it: the delete authority removed the row, and a removed row has
   // no history to come back from.
   await deps.storage.deleteWorkspaceRowRevisions(organismId, wsId, space.namespace, rowId);
+  // So do its content risk marks (content/risk-keys.ts).
+  await dropWorkspaceRiskEntry(deps.storage, deps.config.nodeId, organismId, wsId, `row:${space.namespace}:${rowId}`);
   emitChange('organisms', undefined);
 }
 
@@ -697,8 +712,10 @@ export async function deleteRowsBefore(
   }
   await teamRowGate(deps, caller, organismId, wsId, space.namespace, `rows before ${cutoff}`);
   const removed = await deps.storage.deleteWorkspaceRowsBefore(organismId, wsId, space.namespace, cutoff);
-  // The revisions of the rows removed here go with them (sweepRevisions drops a gone row's).
+  // The revisions of the rows removed here go with them (sweepRevisions drops a gone row's), and so do
+  // their content risk marks.
   if (removed) await sweepRevisions(deps, organismId, wsId, space);
+  if (removed) await dropGoneRowRisk(deps, organismId, wsId, space.namespace);
   if (removed) emitChange('organisms', undefined);
   return removed;
 }

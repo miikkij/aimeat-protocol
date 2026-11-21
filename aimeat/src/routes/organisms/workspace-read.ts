@@ -589,7 +589,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       if (err instanceof ProvenanceScopeError) { res.status(403).json(error(config.nodeId, err.code, err.message)); return; }
       throw err;
     }
-    const comment = await addComment(storage, id, callerGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id, aiProvenanceId });
+    const comment = await addComment(storage, id, callerGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id, aiProvenanceId }, config);
     emitChange('organisms');
     res.status(201).json(success(config.nodeId, {
       comment, ai_provenance_id: aiProvenanceId ?? null,

@@ -18,6 +18,7 @@
  * @structure RefineryDefinition · RefineryCaller · RunState · Ctx · loadDefinition · readAttachments · runBatch
  * @usage const run = await runBatch(deps, caller, 'postinjalostamo', { onProgress });
  * @version-history
+ *   v1.1.0 — 2026-11-21 — A filed message's row gets its content risk marks at the intake point.
  *   v1.0.1 — 2026-11-20 — The default app's file name comes from htmlFilenameOf (services/app/app-ref.ts).
  *   v1.0.0 — 2026-09-29 — Initial.
  *   v1.0.1 — 2026-09-29 — The "already filed?" row read uses a system classification reader (TARGET-082).
@@ -73,6 +74,7 @@ import {
   type MailMessage, type RefineryRule, type Queue,
 } from './message.js';
 import { htmlFilenameOf } from '../app/app-ref.js';
+import { contentRiskAfterWrite, contentRiskTextOf } from '../content/risk-intake.js';
 
 export interface RefineryDeps { storage: Storage; config: AimeatConfig }
 
@@ -344,8 +346,11 @@ async function processOne(ctx: Ctx, run: RunState, id: string, tick: () => void)
     ...(ctx.def.keepText ? { text: msg.text.slice(0, KEPT_TEXT_MAX), textKept: true } : {}),
   };
   const rc = rowCaller(ctx.caller);
-  await appendRows(ctx.deps, rc, { organismId: ctx.def.organismId, wsId: ctx.def.workspaceId, space: ctx.def.spaces.items,
+  const filed = await appendRows(ctx.deps, rc, { organismId: ctx.def.organismId, wsId: ctx.def.workspaceId, space: ctx.def.spaces.items,
     rows: [{ rowId: rowIdOf(ctx.def, msg.id), occurredAt: msg.date || undefined, body: row }] });
+  // A message from outside: the row's risk marks are written beside it, off this batch (content/risk-intake.ts).
+  contentRiskAfterWrite(ctx.deps, { kind: 'row', org: ctx.def.organismId, ws: ctx.def.workspaceId, space: filed.namespace, id: rowIdOf(ctx.def, msg.id) },
+    { point: 'intake', text: contentRiskTextOf(row) });
   await appendRows(ctx.deps, rc, { organismId: ctx.def.organismId, wsId: ctx.def.workspaceId, space: ctx.def.spaces.events,
     rows: [{ body: { app: ctx.def.app, kind: 'processed', message: rowIdOf(ctx.def, msg.id), subject: msg.subject, actor: 'automatic',
       at: new Date().toISOString(), detail: { queue, runId: run.id, classifier: row.classifier, extractor: row.extractor, error } } }] })

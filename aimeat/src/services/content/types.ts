@@ -36,7 +36,11 @@
  *     wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse). STAGE_NAMES is the one
  *     list of stages the settings, the service and the tool catalog read.
  *   v1.4.0 — 2026-11-03 — ContentProfile.corrected: a person's correction of sections, and who made it.
+ *   v1.5.0 — 2026-11-21 — The `risk` stage, ContentFacts.risk and ContentSettings.risk (wish
+ *     wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-); SETTING_STAGES are the stages
+ *     the owner switches.
  */
+import type { RiskLayer, RiskMarks } from './risk-types.js';
 
 /** Where an item lives. The source id (sourceIdOf) is stable for the same item. */
 export type ContentSource =
@@ -46,10 +50,17 @@ export type ContentSource =
 /** The four kinds the pipeline tells apart, from the MIME type and the file name. */
 export type ContentKind = 'pdf' | 'image' | 'video' | 'text' | 'other';
 
-/** The stages, in the order they run. `technical` needs no model; the other five do. */
-export type StageName = 'technical' | 'describe' | 'classify' | 'extract' | 'propose' | 'profile';
-export const STAGE_NAMES: readonly StageName[] = ['technical', 'describe', 'classify', 'extract', 'propose', 'profile'];
-export const AI_STAGES: readonly StageName[] = ['describe', 'classify', 'extract', 'propose', 'profile'];
+/**
+ * The stages, in the order they run. `technical` needs no model; describe to profile do. `risk` marks
+ * possible risks in the words (risk.ts): its own settings decide when it runs and whether a model
+ * looks too (risk-settings.ts), so it has no switch in `ContentSettings.stages`.
+ */
+export type StageName = 'technical' | 'describe' | 'classify' | 'extract' | 'propose' | 'profile' | 'risk';
+export const STAGE_NAMES: readonly StageName[] = ['technical', 'describe', 'classify', 'extract', 'propose', 'profile', 'risk'];
+/** The stages an owner switches in `ContentSettings.stages`. */
+export type SettingStage = Exclude<StageName, 'risk'>;
+export const AI_STAGES: readonly SettingStage[] = ['describe', 'classify', 'extract', 'propose', 'profile'];
+export const SETTING_STAGES: readonly SettingStage[] = ['technical', 'describe', 'classify', 'extract', 'propose', 'profile'];
 
 /**
  * The kind of text a section is (profile.ts): F fact, A analysis, M opinion, O instruction,
@@ -306,6 +317,8 @@ export interface ContentFacts {
   }>;
   /** The fingerprint: what kind of material the item is and how far it can be trusted (profile.ts). */
   profile?: ContentProfile;
+  /** The risk marks, beside the item and bound to the hash they were read from (risk.ts). */
+  risk?: RiskMarks;
   /** Which stages ran, when; a stage left out did not run. */
   stages: Partial<Record<StageName, { at: string; ok: boolean; note?: string }>>;
   /** The hash the facts were read from. Differs from the source's current hash: stale. */
@@ -317,7 +330,7 @@ export interface ContentFacts {
 export interface ContentSettings {
   /** Run the pipeline when content arrives. Off: only on request. */
   onArrival: boolean;
-  stages: Record<StageName, boolean>;
+  stages: Record<SettingStage, boolean>;
   sources: { files: boolean; memory: boolean; workspace: boolean };
   /** A memory record or document shorter than this gets no facts on arrival (a short note needs none). */
   minTextChars: number;
@@ -340,6 +353,11 @@ export interface ContentSettings {
    * Empty: the content's own language, and English for a picture with no words in it.
    */
   language: string;
+  /**
+   * The person's own layer of the content risk settings (risk-settings.ts): for their own content and
+   * their own AIs' reads. Absent: they follow the node's defaults.
+   */
+  risk?: RiskLayer;
 }
 
 export const DEFAULT_SETTINGS: ContentSettings = Object.freeze({

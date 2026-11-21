@@ -6,6 +6,7 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-21 — POST /v1/knowledge/import: each entry gets its content risk marks at the intake point.
  *   2026-11-14 — GET /v1/knowledge/:id/links reads through packageLinksFor (services/knowledge/package-links.ts),
  *     which aimeat_knowledge_links asks too: an agent holding memory:read-as-owner reaches its owner's
  *     private package (structure programme 2026-11, unit 2b, B15).
@@ -93,6 +94,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { packageLinksFor } from '../../services/knowledge/package-links.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { updateMemoryRecord, UNCHANGED } from '../../services/record-cas.js';
+import { contentRiskAfterWrite } from '../../services/content/risk-intake.js';
 
 // The validator is shared with the operator's import, which used to write a manifest nothing
 // checked. → ./manifest-validator.ts
@@ -340,6 +342,8 @@ export function registerPackagesCoreRoutes(
         ...(entryProvenanceId ? { aiProvenanceId: entryProvenanceId } : {}),
       });
       createdEntries.push(entry.key);
+      // An imported package is content from outside: each entry's risk marks are written beside it.
+      contentRiskAfterWrite({ storage, config }, { kind: 'memory', owner: ownerGaii, key: entry.key }, { point: 'intake' });
     }
 
     // Create memory links if specified: rows of the namespace that holds the manifest just written,

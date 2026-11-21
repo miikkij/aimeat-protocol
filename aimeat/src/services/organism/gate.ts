@@ -138,6 +138,7 @@ import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from '../htm
 import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
 import { valueBytes } from '../value/signal-buffer.js';
 import { holderLivingStatus } from '../living/config-publish.js';
+import { contentRiskAfterWrite } from '../content/risk-intake.js';
 
 export type OrganismGate = ReturnType<typeof createOrganismGate>;
 
@@ -333,6 +334,10 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
     emitMemoryWritten(latestOwner, `${base}.latest`);
     // Write-time classification of the published record (TARGET-082 V3): scheduled, never awaited.
     classifyAfterWrite({ storage, config }, latestOwner, `${base}.latest`, draftValue);
+    // A shared write: the content risk marks, when its writer (the draft's author) is not the
+    // workspace's owner; risk-intake.ts decides that, off this call.
+    contentRiskAfterWrite({ storage, config }, { kind: 'memory', owner: latestOwner, key: `${base}.latest` },
+      { point: 'shared-write', writer: draft.ownerGaii || publisher });
     // Consume the draft — it was the proposal-for-publishing; now it's a frozen version + the new
     // .latest. Re-editing the published instance starts a fresh draft. (Without this the workspace
     // shows a stale draft alongside the identical published copy.) EVERY copy: see draftCopies.
@@ -532,6 +537,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
       recordMemoryTouch({ ownerGaii: e.owner, key: e.key, writerPrincipal: publisher, kind: 'write', bytes: valueBytes(e.value) });
       emitMemoryWritten(e.owner, e.key);
       classifyAfterWrite({ storage, config }, e.owner, e.key, e.value);
+      contentRiskAfterWrite({ storage, config }, { kind: 'memory', owner: e.owner, key: e.key }, { point: 'shared-write', writer: publisher });
     }
     return { results };
   };

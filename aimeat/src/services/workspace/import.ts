@@ -17,6 +17,8 @@
  * @structure importWorkspace(storage, config, { orgId, importerGaii, importerOwner, caller, zip }) -> result
  * @usage import { importWorkspace } from './import.js';
  * @version-history
+ *   2026-11-21 -- A restored published document and every restored row get their content risk marks at
+ *     the intake point (content/risk-intake.ts).
  *   2026-10-20 -- The restore applies the write rules the archive's values would otherwise skip
  *     (secaudit 2026-10, workspace-import:restore-skips-write-gates): the organism-membership
  *     audience rule, the closed node, the label's audience cap and the publish gate decide each
@@ -46,6 +48,7 @@ import { writeStorageFile } from '../stored-files/write.js';
 import { memoryTarget } from '../classification/label-rows.js';
 import { fileTarget } from '../classification/labels.js';
 import { setWorkspaceShareOp } from './share.js';
+import { contentRiskAfterWrite, contentRiskTextOf } from '../content/risk-intake.js';
 import {
   importCallerContext, outsideWorkspaceRoot, restoredLevel,
   type ImportCaller, type RestoreClamp, type RestoreSkip,
@@ -230,12 +233,17 @@ export async function restoreWorkspace(
       { key, target: memoryTarget(importerGaii, key) }, o.visibility, WHERE);
     if (level.clamp) clamped.push(level.clamp);
     await writeMem(key, value, level.visibility);
+    // A restored, published document is content from outside: its risk marks are written beside it.
+    if (o.role === 'latest') contentRiskAfterWrite({ storage, config }, { kind: 'memory', owner: importerGaii, key }, { point: 'intake' });
   }
 
   // 4b) The rows of the row spaces, as prepared above. A row of a space the bundle's manifest does
   // not declare as a row space is named with the skipped records.
   const rows = await writeRestoredRows(storage, rowPlan.records);
   skippedUndeclared.push(...rowPlan.skipped);
+  for (const r of rowPlan.records) {
+    contentRiskAfterWrite({ storage, config }, { kind: 'row', org: orgId, ws: newWs, space: r.namespace, id: r.rowId }, { point: 'intake', text: contentRiskTextOf(r.body) });
+  }
 
   // 5) Register the new workspace under the importer, on the registry's version: a workspace created
   // or imported in the same organism meanwhile stays in the list.

@@ -25,6 +25,8 @@
  * @structure ReceiveRequest · ReceiveAnswer · receive · describeReceiver · mergePatch
  * @usage const out = await receive(fanout, ctx, { method, sub, body, contentType, bytes, idempotencyKey, ifMatch, dryRun });
  * @version-history
+ *   v1.1.0 — 2026-11-21 — What a receiver writes (a memory record, rows) gets its content risk marks at
+ *     the intake point, off the request (content/risk-intake.ts).
  *   v1.0.1 — 2026-11-08 — The refusal messages say incoming webhook where they said receiver; every
  *     code stays (secaudit2026nov08b round 15b).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
@@ -40,6 +42,7 @@ import { RECEIVER_SUB_RE, verbOfMethod, receiverAddress, type ReceiverVerb } fro
 import { ReceiverError } from './store.js';
 import { logDelivery, takeMinuteSlot, takeDaySlot } from './deliveries.js';
 import type { ReceiverContext } from './verify.js';
+import { contentRiskAfterWrite, contentRiskTextOf } from '../content/risk-intake.js';
 
 export interface ReceiveRequest {
     method: string;
@@ -235,6 +238,8 @@ async function runMemory(deps: MemoryWriteFanout, ctx: ReceiverContext, rq: Rece
         pipeline: `receiver:${ctx.owner}/${ctx.name}`, ownerScoped: true,
     });
     if (!out.ok) throw new ReceiverError(out.status, out.code, out.message);
+    // Content from outside: the risk marks are written beside it, off this request (content/risk-intake.ts).
+    contentRiskAfterWrite({ storage, config: deps.config }, { kind: 'memory', owner: ctx.ownerGhii, key: key! }, { point: 'intake' });
     return { status: current ? 200 : 201, data: { key, version: out.record.version, receiver: `${ctx.owner}/${ctx.name}` } };
 }
 
@@ -273,6 +278,12 @@ async function runSpace(deps: MemoryWriteFanout, ctx: ReceiverContext, rq: Recei
         rows.forEach((row, i) => checkShape(ctx, row.body, many ? i : undefined));
         if (rq.dryRun) return { status: 200, data: { dry_run: true, rows: rows.length } };
         const out = await appendRows(rowDeps, caller, { organismId: t.organismId, wsId: t.ws, space: t.space, rows });
+        // Content from outside: each row's risk marks are written beside it, off this request.
+        const byId = new Map(rows.filter(x => x.rowId !== undefined).map(x => [String(x.rowId), x]));
+        out.rowIds.forEach((id, i) => {
+            const row = byId.get(id) ?? (out.rowIds.length === rows.length ? rows[i] : undefined);
+            if (row) contentRiskAfterWrite(rowDeps, { kind: 'row', org: t.organismId, ws: t.ws, space: out.namespace, id }, { point: 'intake', text: contentRiskTextOf(row.body) });
+        });
         return { status: 201, data: { space: t.space, written: out.written, row_ids: out.rowIds, receiver: `${ctx.owner}/${ctx.name}` } };
     } catch (err) {
         if (err instanceof ReceiverError) throw err;

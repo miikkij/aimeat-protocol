@@ -11,6 +11,7 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from './send.js';
  * @version-history
+ *   v1.16.0 — 2026-11-21 — The recipient's copy goes to the content risk marks' shared-write point.
  *   v1.15.0 — 2026-11-15 — The block check for a local recipient also reads a block on the sender's
  *     owner GHII (contact-same-account.ts blockedSenderAccount), so a blocked person's agent or
  *     ecosystem app is refused BLOCKED like the person. It read the exact sender identity only
@@ -87,6 +88,7 @@ import { conversationIdFor, messagePreview, messagePreviewWithAttachments, deliv
 import { notify } from '../notify.js';
 import { emitChange, emitDelivery } from '../event-bus.js';
 import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './delivery.js';
+import { contentRiskAfterWrite, contentRiskMessageText } from '../content/risk-intake.js';
 import { duplicateMessageAttachments } from '../attachment-duplication.js';
 import { localIdentityExists, missingIdentityReason, nodePartRefusal } from '../local-identity.js';
 import { checkSendLimit, type SendLimitMark } from './send-limit.js';
@@ -419,6 +421,10 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
       replyToId, origin: 'local', originNodeId: config.nodeId, aiProvenanceId, ...sentBy,
       createdAt: now, deliveredAt: now,
     });
+    // A shared write into another person's inbox: its content risk marks are written beside it, off
+    // this call (content/risk-intake.ts; a message to one's own agent is not a shared write).
+    contentRiskAfterWrite({ storage, config }, { kind: 'dm', owner: inboundOwner, id },
+      { point: 'shared-write', writer: input.sentByAgent || senderGhii, text: contentRiskMessageText(subject, body) });
 
     // Duplicate attachments into the recipient's storage now (accepted contacts only; a pending request
     // keeps them as reference until accepted — DECISION #3). Own-agent shares the owner's storage, so the

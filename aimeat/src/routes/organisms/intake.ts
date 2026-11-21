@@ -19,6 +19,7 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   2026-11-21 — A submission gets its content risk marks at the intake point (content/risk-intake.ts).
  *   2026-11-08 — A form writes its submissions as the identity that stored its config record, not as
  *     the `ownerGhii` the config value names (services/intake/form-owner.ts): a manager's plain memory
  *     write of a config, and a restored backup of another member's form, named another account there
@@ -89,6 +90,7 @@ import type { OrganismHelpers } from './shared.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { agentBarred, agentBarredMessage } from '../../services/organism/agent-access.js';
 import { formConfigOfRecord } from '../../services/intake/form-owner.js';
+import { contentRiskAfterWrite } from '../../services/content/risk-intake.js';
 
 /** Server-trusted intake-form config, stored at organism.{org}.w.{ws}.meta.intake.{formId}. */
 interface IntakeFormConfig {
@@ -492,6 +494,11 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
         }
       }
       emitChange('organisms');
+      // A visitor's submission is content from outside: its risk marks are written beside it, as a
+      // draft under the form owner or as the workspace's published document.
+      contentRiskAfterWrite({ storage, config },
+        { kind: 'memory', owner: cfg.ownerGhii, key: `organism.${org}.w.${ws}.${cfg.namespace}.${id}.${mode === 'draft' ? 'draft' : 'latest'}` },
+        { point: 'intake' });
       // Write-only: return only the new id. NEVER any other record.
       res.json(success(config.nodeId, { ok: true, id, mode }));
     });

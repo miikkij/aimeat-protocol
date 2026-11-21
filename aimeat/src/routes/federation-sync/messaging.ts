@@ -5,6 +5,7 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — An inbound message from another node gets its content risk marks at the intake point.
  *   2026-11-15 — The broadcast opens a new contact as accepted only for a sender the peer names as
  *     its operator on its node card (federation-book.ts readPeerOperators), or an agent of one; any
  *     other sender of the peer lands as a contact request with the request bell (E2E audit M181).
@@ -131,6 +132,7 @@ import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../
 import { NONCE_WINDOW_MS } from '../../services/request/nonce.js';
 import { boundInboundConversationId } from '../../services/message/thread-binding.js';
 import { normalizeInboundAttachments } from './inbound-attachments.js';
+import { contentRiskAfterWrite, contentRiskMessageText } from '../../services/content/risk-intake.js';
 
 export function registerMessagingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     /**
@@ -531,6 +533,9 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 createdAt: message.createdAt ?? now,
                 deliveredAt: now,
             });
+            // A message from another node is content from outside: its risk marks are written beside it.
+            contentRiskAfterWrite({ storage, config }, { kind: 'dm', owner: deliveryGhii, id: message.id },
+                { point: 'intake', text: contentRiskMessageText(message.subject, message.body) });
             // Accepted contact → pull the attachment bytes into the recipient's storage now; a
             // pending request leaves them as reference until accepted (DECISION #3).
             if (!isRequest && message.attachments?.length) {

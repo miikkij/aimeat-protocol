@@ -47,6 +47,7 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-21 -- A deleted board's posts' content risk marks go with it (content/risk-keys.ts).
  *   2026-11-13 -- A comment names services/cortex/activation.ts, where the cortex activation moved
  *     (structure programme 2026-11, unit 4).
  *   v1.10.0 -- 2026-10-20 -- setBoardMembers() deletes the subscription of an identity it takes off
@@ -88,6 +89,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, BoardRecord, BoardRules, BoardSubscriptionRecord } from '../../storage/interface.js';
 import { isSameOwner, ownerGhiiOf } from '../../utils/gaii.js';
+import { dropPersonRiskPrefix } from '../content/risk-keys.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
 import { parseAudience, audienceAllows, formatAudience, type AudienceAuth } from '../audience.js';
@@ -657,6 +659,8 @@ export async function deleteBoardById(
     }
 
     await storage.deleteBoard(boardId);
+    // Its posts' content risk marks go with it (content/risk-keys.ts).
+    await dropPersonRiskPrefix(storage, ownerGhiiOf(board.ownerGaii), `board:${boardId}:`);
     emitChange('boards');
     return { ok: true, boardId };
 }

@@ -35,6 +35,7 @@
  *     { agentGaii, senderGaii, body: req.body, pipeline: 'rest.agent_message_send' });
  *   if (!result.ok) { res.status(result.status).json(error(config.nodeId, result.code, result.message)); return; }
  * @version-history
+ *   v1.2.0 — 2026-11-21 — An inbound message goes to the content risk marks' shared-write point.
  *   v1.1.0 — 2026-10-08 — Takes the session's scopes and answers a declaration the caller may not
  *     make as a 403 SCOPE_DENIED result, before anything is minted or stored, so POST
  *     /v1/agents/:name/messages can carry ai_provenance (aiprov D5).
@@ -51,6 +52,7 @@ import { emitChange } from '../event-bus.js';
 import { parseGaiiLoose } from '../../utils/gaii.js';
 import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
 import { logger } from '../../utils/logger.js';
+import { contentRiskAfterWrite } from '../content/risk-intake.js';
 
 export interface AgentMessageSendDeps {
   storage: Storage;
@@ -177,6 +179,12 @@ export async function sendAgentMessage(
   };
 
   const created = await storage.createMessage(record);
+  // A message to an agent from someone other than its owner is a shared write: its content risk marks
+  // are written beside it, off this call (content/risk-intake.ts decides whether it is shared).
+  if (created.direction === 'inbound') {
+    contentRiskAfterWrite({ storage, config }, { kind: 'agent-message', owner: created.agentGaii, agent: created.agentGaii, id: created.id },
+      { point: 'shared-write', writer: input.senderGaii, text: created.content });
+  }
 
   // Push, for the direction that has someone waiting: an inbound message is one the agent has not
   // seen yet. An agent's own outbound message needs no wake-up — it is holding the pen.

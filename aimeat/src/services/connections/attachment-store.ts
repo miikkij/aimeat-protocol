@@ -19,11 +19,13 @@
  * @structure StoreAttachmentInput · StoreAttachmentResult · decodeAttachment() · storeMailAttachment()
  * @usage const out = await storeMailAttachment(ctx, deps, ownerGhii, connectionId, { message_id, attachment_id, filename });
  * @version-history
+ *   v1.1.0 — 2026-11-21 — A stored attachment gets its content risk marks at the intake point.
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import type { ConnectContext } from './oauth.js';
 import { readResource } from './read.js';
 import { writeStorageFile, type StorageWriteDeps } from '../stored-files/write.js';
+import { contentRiskAfterWrite } from '../content/risk-intake.js';
 
 /** As a request body arrives: every field is checked here, so none is trusted to be present. */
 export interface StoreAttachmentInput {
@@ -123,5 +125,7 @@ export async function storeMailAttachment(
 
     const written = await writeStorageFile(deps, ownerGhii, { key, data: decoded.bytes, mimeType, visibility: 'private' });
     if (!written.ok) return { ok: false, status: written.status, code: written.code, message: written.message };
+    // A mail attachment is content from outside: its risk marks are written beside it, off this call.
+    contentRiskAfterWrite(deps, { kind: 'file', owner: ownerGhii, key }, { point: 'intake' });
     return { ok: true, provider: read.provider, key, filename, mime_type: mimeType, size: decoded.bytes.length };
 }

@@ -10,6 +10,7 @@
  * @structure contentRouter(config, storage)
  * @usage app.use(contentRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-11-21 — GET /v1/content/risk/held and POST /v1/content/risk/release (content risk marks).
  *   v1.3.1 — 2026-11-03 — A permission the service refuses an agent answers with `details.allow_url`
  *     and a next action, the address where its person allows it.
  *   v1.3.0 — 2026-11-03 — A published workspace document's fingerprint is its one shared fingerprint;
@@ -31,7 +32,7 @@ import { callerOf } from '../middleware/caller.js';
 import { logger } from '../utils/logger.js';
 import {
   factsViewFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
-  removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, ContentError, ContentClassError,
+  removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, heldFor, releaseFor, ContentError, ContentClassError,
 } from '../services/content/service.js';
 
 export function contentRouter(config: AimeatConfig, storage: Storage): Router {
@@ -131,6 +132,17 @@ export function contentRouter(config: AimeatConfig, storage: Storage): Router {
   }));
   router.put('/v1/content/settings', requireAuth(), requireScope('storage:read'), run(async (req, res) => {
     res.json(success(config.nodeId, { settings: await updateSettingsFor(deps, callerOf(req, config.nodeId, storage), req.body ?? {}, targetOf(req)) }));
+  }));
+
+  // ── GET /v1/content/risk/held ── marked content held from other people's AIs, which the caller decides.
+  router.get('/v1/content/risk/held', requireAuth(), requireScope('storage:read'), run(async (req, res) => {
+    res.json(success(config.nodeId, { items: await heldFor(deps, callerOf(req, config.nodeId, storage)) }, [
+      { description: 'Release one held item to other people\'s AIs', method: 'POST', url: '/v1/content/risk/release' },
+    ]));
+  }));
+  // ── POST /v1/content/risk/release ── { ref }: other people's AIs then get the content, with its marks.
+  router.post('/v1/content/risk/release', requireAuth(), requireScope('storage:read'), run(async (req, res) => {
+    res.json(success(config.nodeId, await releaseFor(deps, callerOf(req, config.nodeId, storage), (req.body ?? {}).ref)));
   }));
 
   // ── GET /v1/content/classes ── the built-in and the owner's content classes.

@@ -564,7 +564,7 @@ export function registerOrganismsTools(
                 baseUrl: config.baseUrl,
                 enabled: config.aiProvenance,
             });
-            const comment = await addComment(storage, organism_id, agentGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id, aiProvenanceId });
+            const comment = await addComment(storage, organism_id, agentGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id, aiProvenanceId }, config);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ comment, ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) }, null, 2) }] };
         },
     );

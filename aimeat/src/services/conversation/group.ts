@@ -34,6 +34,8 @@
  *   const convo = await createGroupConversation(ctx, { createdBy, participants, subject });
  *   await sendGroupMessage(ctx, { conversationId: convo.id, senderGhii, body });
  * @version-history
+ *   v1.7.0 -- 2026-11-21 -- Each other participant's copy goes to the content risk marks (a shared write,
+ *     or intake for a message from another node).
  *   v1.6.1 -- 2026-11-14 -- notify() passes i18n so the notification is written in its recipient's
  *     language (notiftext.group_message, direct_message).
  *   v1.6.0 -- 2026-10-22 -- sendGroupMessage stamps each of this node's attachments with the version
@@ -72,6 +74,7 @@ import { notify } from '../notify.js';
 import { emitChange, emitDelivery } from '../event-bus.js';
 import { messagePreview } from '../../utils/messaging.js';
 import { checkSendLimit, type SendLimitMark } from '../message/send-limit.js';
+import { contentRiskAfterWrite, contentRiskMessageText } from '../content/risk-intake.js';
 
 /** The maximum number of identities in one group thread. High enough for a team plus its AIs, low
  *  enough that a single send stays one bounded write rather than an unbounded fan-out. */
@@ -392,6 +395,13 @@ export async function fanOutToParticipants(
       createdAt: msg.createdAt,
       deliveredAt: msg.deliveredAt,
     });
+    // Another participant's copy is a shared write into their inbox: its content risk marks are
+    // written beside it (content/risk-intake.ts). A message from another node is intake.
+    if (!isSenderMailbox) {
+      contentRiskAfterWrite(ctx, { kind: 'dm', owner: mailbox, id: msg.id }, msg.originNodeId && msg.originNodeId !== ctx.config.nodeId
+        ? { point: 'intake', text: contentRiskMessageText(convo.subject, msg.body) }
+        : { point: 'shared-write', writer: msg.sentByAgent || msg.senderGhii, text: contentRiskMessageText(convo.subject, msg.body) });
+    }
 
     // The recipient co-owns their copy of a file here too. A group thread wrote the sender's
     // descriptor into every mailbox and called that delivery: nobody but the sender could open the

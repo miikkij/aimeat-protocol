@@ -21,6 +21,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
+import { dropPersonRiskEntry } from './content/risk-keys.js';
 
 /** What the principal's session says about identity. The two fields this needs, and nothing else. */
 export interface ActingPrincipal {
@@ -55,5 +56,7 @@ export async function deleteOwnerMessage(
 ): Promise<boolean> {
   const gone = await storage.deleteDirectMessage(id, ownerMailbox(auth, nodeId));
   if (gone) emitChange('messages');
+  // The message's content risk marks go with it (content/risk-keys.ts).
+  if (gone) await dropPersonRiskEntry(storage, ownerMailbox(auth, nodeId), `dm:${id}`);
   return gone;
 }

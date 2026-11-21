@@ -18,6 +18,7 @@
  * @structure registerContentTools(mcp, storage, config, caller)
  * @usage registerContentTools(mcp, storage, config, caller);
  * @version-history
+ *   v1.4.0 — 2026-11-21 — aimeat_content_hold: the held items and their release (content risk marks).
  *   v1.3.1 — 2026-11-03 — A permission the service refuses an agent is answered as every tool's
  *     SCOPE_DENIED is (mcp/scope-denied-answer.ts): what it may not do yet and the address where its
  *     person allows it.
@@ -44,7 +45,7 @@ import { scopeDeniedText } from './scope-denied-answer.js';
 import { checkContentInput } from '../tool-catalog/definitions/content.js';
 import {
   factsViewFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
-  removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, ContentError, ContentClassError,
+  removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, heldFor, releaseFor, ContentError, ContentClassError,
 } from '../services/content/service.js';
 
 /** A refusal the service wrote, with its code and status. */
@@ -167,5 +168,16 @@ export function registerContentTools(
         if (patch === undefined) return ok({ settings: await settingsFor(deps, who, target) });
         return ok({ settings: await updateSettingsFor(deps, who, patch, target) });
       } catch (err) { return fail(err, 'aimeat_content_settings'); }
+    });
+
+  mcp.registerTool('aimeat_content_hold', { description: descriptionFor('aimeat_content_hold'), inputSchema: zodShapeFor('aimeat_content_hold'),
+    annotations: annotationsFor('aimeat_content_hold') },
+    async ({ action, ref }) => {
+      try {
+        const who = caller();
+        if (action === 'list') return ok({ items: await heldFor(deps, who) });
+        if (action === 'release') return ok(await releaseFor(deps, who, ref));
+        return toolError('INVALID_INPUT', 'action is list or release.');
+      } catch (err) { return fail(err, 'aimeat_content_hold'); }
     });
 }
