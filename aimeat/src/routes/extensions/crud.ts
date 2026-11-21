@@ -6,6 +6,8 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — GET /v1/extensions/:name?full=true also answers `manifest` (YAML) and `scripts`, which
+ *     install the extension again as it is (services/extension/manifest-export.ts).
  *   2026-10-29 — Activate answers 409 AWAITING_OPERATOR for an extension whose code a package brought in
  *     under install role operator, until an operator allows it; an operator's activate is that approval
  *     (services/extension-code-hold.ts; secaudit2026oct26 round 8c).
@@ -96,6 +98,7 @@ import { codeHoldRefusal, takeHoldOff } from '../../services/extension/code-hold
 import { generateUploadToken, buildUploadMeta } from '../../services/upload/token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { workspaceDeclarationOf } from '../../services/extension/workspace-declaration.js';
+import { manifestOfRecord } from '../../services/extension/manifest-export.js';
 import {
   findExtension, ownComponent, placeExtensionInstall, installNameFor, splitComponentAddress, shortNameOf, addressSegment, withOwnerFields,
 } from '../../services/component/address.js';
@@ -438,6 +441,9 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
             outputSchema: a.outputSchema,
             ...(includeScripts ? { scriptContent: a.scriptContent } : {}),
           })),
+          // With the scripts, the manifest and the scripts map that install it again as it is
+          // (services/extension/manifest-export.ts); a secret's value is not in it.
+          ...(includeScripts ? manifestOfRecord(ext) : {}),
         },
       }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${addressSegment(name)}/activate` },

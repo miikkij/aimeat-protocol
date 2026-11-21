@@ -27,6 +27,9 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   2026-11-21 — The refusals say what to do: EXTENSION_INACTIVE names aimeat_extension_activate and its
+ *     route, EXTENSION_TIMEOUT and API_LIMIT_EXCEEDED name the limit the run had, the manifest field that
+ *     sets it and the node's ceiling.
  *   2026-11-21 — An action marked `decision: person`, called by an agent or an ecosystem app, runs
  *     nothing and files one approval request the person allows in person; the outcome is `awaiting`
  *     (services/extension/person-decision.ts). A run inside another run is refused PERSON_DECIDES.
@@ -252,7 +255,10 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
   }
   const ext = resolved.ext;
   if (ext.status !== 'active') {
-    return { kind: 'refused', status: 503, code: 'EXTENSION_INACTIVE', message: `Extension "${extName}" is not active` };
+    return {
+      kind: 'refused', status: 503, code: 'EXTENSION_INACTIVE',
+      message: `Extension "${extName}" is not active. Its installer switches it on with aimeat_extension_activate (POST /v1/extensions/${encodeURIComponent(ext.name)}/activate), or installs with activate: true; the app tools bound to its actions answer from then on.`,
+    };
   }
   // Nobody signed in: only an action the manifest marks public, priced at nothing, runs for them.
   const visitor = caller.kind === 'anonymous';
@@ -483,8 +489,20 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
     // A workspace refusal the script let through is the SERVICE's answer and keeps its status and code.
     const wsRefusal = workspaceRefusalFor(err, wsCap);
     if (wsRefusal) return { kind: 'refused', status: wsRefusal.status, code: wsRefusal.code, message: `Action "${actionId}" refused: ${wsRefusal.message}` };
-    if (isSandboxTimeout(message)) return { kind: 'refused', status: 500, code: 'EXTENSION_TIMEOUT', message: `Action "${actionId}" timed out`, keepMessage: true };
-    if (message.includes('API call limit exceeded')) return { kind: 'refused', status: 500, code: 'API_LIMIT_EXCEEDED', message: `Action "${actionId}" exceeded API call limit` };
+    // The limit is named, and where it comes from: the manifest's `limits`, under the node's ceiling.
+    const ran = sandboxLimits(ext.limits, config);
+    if (isSandboxTimeout(message)) {
+      return {
+        kind: 'refused', status: 500, code: 'EXTENSION_TIMEOUT', keepMessage: true,
+        message: `Action "${actionId}" timed out after ${ran.timeoutMs} ms, its time limit. The manifest's limits.timeout_ms sets it, up to this node's ceiling of ${config.extensionTimeoutMs} ms; work that takes longer belongs in a schedule or a background job.`,
+      };
+    }
+    if (message.includes('API call limit exceeded')) {
+      return {
+        kind: 'refused', status: 500, code: 'API_LIMIT_EXCEEDED',
+        message: `Action "${actionId}" exceeded API call limit: more than ${ran.maxApiCalls} ctx calls in one run. The manifest's limits.max_api_calls sets it, up to this node's ceiling of ${config.extensionMaxApiCalls}; write many records with one ctx.workspace.publishRecords call instead of one call each.`,
+      };
+    }
     // A refusal the script named (`CLAIM_CONFLICT: …`) is the caller's to act on, not a node fault.
     // The code stays the node's own; the script's code is the reason.
     const named = scriptRefusal(message);

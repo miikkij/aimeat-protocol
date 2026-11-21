@@ -12,6 +12,10 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-21 — +display-version-carried, enforced by the publish warning (services/app/version-label.ts).
+ *     team-data-in-personal-memory takes the data-map table, "whose question does this answer?", the one
+ *     owner-level key and the group switcher; three-namespaces takes the app tool that cannot read the
+ *     caller's records (two learned duplicates merged, pitfall round B6).
  *   2026-11-21 — enforcedBy on the 20 entries a publish check names when it fires (`<module>:<function>`
  *     under services/app/ or utils/): the research overview lists them apart, under `enforced`.
  *     auth-pill-overflow is prevented by the compact pill, not checked, and stays in the list.
@@ -340,11 +344,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'team-data-in-personal-memory',
     title: 'A team app built on per-user memory gives every person an empty copy',
     symptom: 'Each person sees only what they entered themselves, while the team expected one shared list: a colleague adds a candidate and nobody else sees it. The cause is that the app keeps the team\'s data in each signed-in person\'s own memory (AIMEAT.data, or memory keys under the person), which is private to that person by design.',
-    fix: 'Ask the data map step of the build interview BEFORE building: who opens the app, whose each kind of data is (personal, shared by the team, public), who may change the shared data; then confirm a short scenario with named people and wait for a yes. Keep team data in ONE organism workspace (AIMEAT.organism read, writeDraft, publish; AIMEAT.organism.findOrCreateWorkspace or the kit\'s workspacePicker picks it on the first run), keep only each person\'s own view in AIMEAT.data, and limit who opens the app with its open_to setting (signed-in, or organism:<id>). An app already live with team data per person needs the records carried into the workspace once.',
+    fix: 'Ask the data map step of the build interview BEFORE building: who opens the app, whose each kind of data is (personal, shared by the team, public), who may change the shared data; then confirm a short scenario with named people and wait for a yes. Write the map as a table with one row per kind of data: what it is, where it is kept, whose it is, who reads it, what happens to it when a member leaves, and whether it is personal data. For each row ask "whose question does this answer?": the group\'s answers go to an organism workspace record; one person\'s own view goes to that person\'s memory; a public list that names no people may be one public record of the owner; what an extension keeps for its own work stays in its extension namespace. Keep team data in ONE organism workspace (AIMEAT.organism read, writeDraft, publish; AIMEAT.organism.findOrCreateWorkspace or the kit\'s workspacePicker picks it on the first run), keep only each person\'s own view in AIMEAT.data, with exactly ONE owner-level key: the pointer to the group the person has open. Ship the group switcher from the first version and keep the open group\'s name on the screen, so a person in two groups always sees which one they are writing to. Limit who opens the app with its open_to setting (signed-in, or organism:<id>). An app already live with team data per person needs the records carried into the workspace once.',
     appliesTo: ['app'],
     severity: 'critical',
     source: 'curated',
-    updatedAt: '2026-10-17',
+    updatedAt: '2026-11-21',
     ...CHECKED,
   }),
 
@@ -388,11 +392,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'three-namespaces',
     title: 'Owner, extension and instance namespaces: never confuse them',
     symptom: 'Translations or settings "not found", an extension reads the wrong store, or a person\'s data kept by an extension is readable by anyone. Classic mistake: reading user data via getPublic("ext:...").',
-    fix: 'Owner data (translations, settings, user content) is read via AIMEAT.data.get(key), e.g. AIMEAT.data.get("service.i18n.fi"). Extension data (`ext:{name}`) is written ONLY by the extension and read via the public getter; an instance of an extension has its own `ext:{name}.{instanceId}`. An extension\'s writes are public by default: pass `{ visibility: "private" }` on EVERY ctx.memory.set that holds somebody\'s personal data. The extension is sovereign, cortex trusts the ext API, the app trusts cortex, and no layer bypasses the one below.',
+    fix: 'Owner data (translations, settings, user content) is read via AIMEAT.data.get(key), e.g. AIMEAT.data.get("service.i18n.fi"). Extension data (`ext:{name}`) is written ONLY by the extension and read via the public getter; an instance of an extension has its own `ext:{name}.{instanceId}`. An extension\'s writes are public by default: pass `{ visibility: "private" }` on EVERY ctx.memory.set that holds somebody\'s personal data. An extension action\'s ctx.memory reads its own namespace and never the caller\'s memory, so an app tool backed by an action cannot return the caller\'s own records: give agents app tools that read public or the extension\'s own data, and let the person\'s own agent read their records with the memory tools. A tool for other accounts\' agents needs `public: true` on its action and is published with aimeat_app_tools_publish, action_id `ext:<name>:<action>`; a tool with no pacing and no price is listed only to the owner\'s own agents. The extension is sovereign, cortex trusts the ext API, the app trusts cortex, and no layer bypasses the one below.',
     appliesTo: ['ext', 'cortex'],
     severity: 'critical',
     source: 'curated',
-    updatedAt: '2026-09-13',
+    updatedAt: '2026-11-21',
     ...CHECKED,
   }),
   E({
@@ -475,6 +479,19 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     source: 'curated',
     updatedAt: '2026-09-13',
     ...CHECKED,
+  }),
+  E({
+    id: 'display-version-carried',
+    enforcedBy: 'version-label:versionLabelFindings',
+    title: 'A publish that names no version keeps the old display version',
+    symptom: 'The catalogue shows the previous version label (1.1.0) for a page that is 1.2.0: a publish that named no `version` carried the previous label forward, on the inline, the upload and the draft code paths alike.',
+    fix: 'Name the version on every publish (`version` on aimeat_app_publish, aimeat_app_draft_save or aimeat_app_draft_publish), or put `<meta name="aimeat-app-version" content="1.2.0">` in the page\'s head: a publish that names none reads it. A publish that names none, reads none and stores changed bytes says so in its warnings. Check the result with aimeat_app_manage { action: "versions" }.',
+    appliesTo: ['publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-11-21',
+    verifiedAt: '2026-11-21',
+    verifiedVersion: '4.3.1',
   }),
   E({
     id: 'syntax-check-that-checked-nothing',

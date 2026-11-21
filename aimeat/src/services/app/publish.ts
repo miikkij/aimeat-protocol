@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-21 — A publish that names no display version takes the page's <meta name="aimeat-app-version">;
+ *     with neither, a label carried over changed bytes is a warning in artifactWarnings (services/app/version-label.ts).
  *   2026-11-21 — artifactWarnings also carries the grid-track mobile hint as a finding with its curated pitfall.
  *   2026-11-20 — Whether the file is an HTML app (the subdomain and the announcement) is isHtmlAppFile.
  *   2026-11-20 — The app name and the data-map id come from services/app/app-ref.ts (appDisplayName /
@@ -161,6 +163,7 @@ import { levelFindings } from './build-level.js';
 import { recordBookParts } from './book-parts.js';
 import { buildPublishNextSteps } from './publish-next-steps.js';
 import { appDisplayVersionRefusal } from './display-version.js';
+import { pageDisplayVersion, versionLabelFindings } from './version-label.js';
 import { readAppDataMap } from '../data-map/data-map-store.js';
 import { stampFor } from '../data-map/data-map-check.js';
 import { parseAppScopes } from '../protected-resource.js';
@@ -348,6 +351,15 @@ export async function publishApp(
 
   const live = isUpdate ? await storage.getApp(ownerGhii, filename) : null;
   const prev = live?.manifest;
+  // A call that names no display version takes the one the page's head names (aimeat-app-version);
+  // with neither, a label carried over changed bytes is said in the warnings (services/app/version-label.ts).
+  const fromPage = isHtml && requested.version === undefined && input.source !== 'package-install'
+    ? pageDisplayVersion(html) : undefined;
+  const pageVersion = fromPage && 'value' in fromPage ? fromPage.value : undefined;
+  const versionFindings = versionLabelFindings({
+    isUpdate, stated: requested.version !== undefined, fromPage,
+    carried: prev?.version, changed: !live || !Buffer.isBuffer(live.data) || !live.data.equals(data),
+  });
   // A display version the caller states is judged; one carried from the live app, or a package's own, is not.
   const badVersion = input.source !== 'package-install' && requested.version !== prev?.version ? appDisplayVersionRefusal(requested.version) : null;
   if (badVersion) return { refusal: badVersion };
@@ -414,7 +426,7 @@ export async function publishApp(
   const manifest: AppManifest = {
     name: requested.name ?? prev?.name ?? appDisplayName(filename),
     description,
-    version: requested.version ?? prev?.version ?? `1.0.${newVersion - 1}`,
+    version: requested.version ?? pageVersion ?? prev?.version ?? `1.0.${newVersion - 1}`,
     category: requested.category ?? prev?.category ?? 'utility',
     tags: requested.tags ?? prev?.tags ?? [],
     authorDisplay: ownerName,
@@ -765,7 +777,9 @@ export async function publishApp(
       // The agents the app bundles: a block that was not used, and tools with no permissions asked for.
       ...crews.findings,
       // The grid-track mobile hint, as a finding that names its curated pitfall (mobileHints keeps the string).
-      ...(isHtml ? gridTrackFindings(html) : [])],
+      ...(isHtml ? gridTrackFindings(html) : []),
+      // A display version carried over changed bytes, or a page meta that names an unusable one.
+      ...versionFindings],
     servedMarksRemoved,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.

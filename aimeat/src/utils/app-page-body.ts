@@ -31,6 +31,8 @@
  * @usage
  *   parts.push(appPageBodySnippet({ name: 'Noste', description: 'Lift calculator for …', lang: 'fi' }));
  * @version-history
+ *   v1.2.0 — 2026-11-21 — `appHasH1`: an app with an `<h1>` of its own gets the name in an `<h2>`, so
+ *     the served page has one main heading instead of two.
  *   v1.1.0 — 2026-11-06 — The owner's text about the app (AppManifest.about) under the description, as
  *     a section headed "About this app" in the text's language, its markdown rendered by
  *     utils/page-body.ts. The block's `lang` is the about text's language, and absent without one: the
@@ -59,6 +61,11 @@ export interface AppPageBodySpec {
   lang?: string;
   /** The owner's longer text about the app: markdown and the language it is written in. */
   about?: { text: string; lang: string };
+  /**
+   * The served document has an `<h1>` of its own. The block then names the app in an `<h2>`, so
+   * the page keeps one main heading: the app's, which is the one a person sees once the block is gone.
+   */
+  appHasH1?: boolean;
 }
 
 /** The node's locales: the about heading is in the text's language when the node speaks it. */
@@ -84,7 +91,7 @@ export function appPageBodySnippet(spec: AppPageBodySpec): string {
     + '#aimeat-app-body h1{font-size:28px;line-height:1.2;margin:0 0 8px}'
     + '#aimeat-app-body h2,#aimeat-app-body h3{font-size:20px;line-height:1.3;margin:20px 0 8px}'
     + '#aimeat-app-body p,#aimeat-app-body ul,#aimeat-app-body ol{margin:0 0 12px}</style>'
-    + `<h1>${escapeHtml(spec.name.trim())}</h1>`
+    + (spec.appHasH1 ? `<h2>${escapeHtml(spec.name.trim())}</h2>` : `<h1>${escapeHtml(spec.name.trim())}</h1>`)
     + (description ? `<p>${escapeHtml(description)}</p>` : '')
     // The markdown renderer escapes every character before it writes a tag, emits a fixed tag set
     // (headings from h2 down, paragraphs, lists, quotes, code, bold, links on http, https, mailto or

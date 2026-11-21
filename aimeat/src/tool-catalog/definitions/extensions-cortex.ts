@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   2026-11-21 — aimeat_extension_get with include_source names `manifest` and `scripts`, which install it again.
  *   2026-11-21 — aimeat_extension_invoke says an action marked `decision: person` answers an approval request.
  *   2026-11-20 — aimeat_iam_define's `app_id` is "owner/name" without `.html` (services/app/app-ref.ts).
  *   2026-11-13 — aimeat_cortex_list takes namespace and visibility, as GET /v1/cortex does (unit 3b).
@@ -154,7 +155,7 @@ export const extensionsCortexTools = [
     },
     {
         name: 'aimeat_extension_get',
-        description: 'Get one extension\'s full detail by name: status, version, author, required APIs, every action with input/output schemas, config, resource limits, federation, and instance support. Works for inactive extensions too (unlike aimeat_extension_list). Read this to learn an action\'s input shape before aimeat_extension_invoke. Pass include_source:true to get each action\'s installed script as well, which is what you need to add an action or change one and redeploy with aimeat_extension_install update:true; only the installing owner\'s own sessions holding ext:write may read it, and anyone else is refused.',
+        description: 'Get one extension\'s full detail by name: status, version, author, required APIs, every action with input/output schemas, config, resource limits, federation, and instance support. Works for inactive extensions too (unlike aimeat_extension_list). Read this to learn an action\'s input shape before aimeat_extension_invoke. Pass include_source:true to get each action\'s installed script as well, plus `manifest` (YAML) and `scripts`, which install the extension again as it is: change what you need, raise metadata.version, and pass both to aimeat_extension_install with update:true. A secret is written as type: secret with no value, and the update keeps the stored one. Only the installing owner\'s own sessions holding ext:write may read the source, and anyone else is refused.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get Extension', readOnlyHint: true },

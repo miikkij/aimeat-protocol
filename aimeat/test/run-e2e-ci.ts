@@ -657,6 +657,9 @@ const ALL_SUITES = [
     'test/e2e-app-community.ts',
     'test/e2e-app-agent-deploy.ts',
     'test/e2e-app-draft.ts',
+    // A publish that names no display version reads the page's aimeat-app-version meta, and a label
+    // carried over changed bytes is said in app_hints.
+    'test/e2e-app-version-label.ts',
     'test/e2e-app-draft-edit.ts',
     'test/e2e-app-screenshot-capture.ts',
     'test/e2e-app-publish-gate.ts',
@@ -843,6 +846,9 @@ const ALL_SUITES = [
     // The same capability on the road that did not have it: an extension on a clock, writing bytes
     // into the INSTALLER's namespace so a scheduled producer and a hand-run one land at one address.
     'test/e2e-scheduled-ext-files.ts',
+    // The presigned ZIP route writes an extension as every install route does (schedules registered
+    // on activate and replaced on an update), and ?full=true answers a manifest that installs again.
+    'test/e2e-extension-zip-lifecycle.ts',
     // TARGET-063 slice 1 end to end: a package produced by a run with nobody present, read by a
     // program with no session, and read back by an agent that is never told the columns.
     'test/e2e-datapackage-slice1.ts',

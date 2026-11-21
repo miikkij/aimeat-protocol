@@ -46,6 +46,9 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   2026-11-21 — The app-body block names the app in an <h2> when the app has an <h1> of its own,
+ *     so a served page carries one main heading; the badge and the other marks go before the last
+ *     </body> outside a script, a style or a comment (utils/html-inject.ts).
  *   v1.10.0 — 2026-11-06 — `appBody`: the app's name and description as a visible block at the start
  *     of the body (utils/app-page-body.ts), for an app a search engine may index (TARGET-089). A spec
  *     without it produces the same bytes, so the goldens are unchanged.
@@ -352,7 +355,8 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     // whose body does not directly follow its head gets them at the end of the body instead, with
     // the same one helper, because guessing where such a body starts could write into content.
     if (spec.appBody && !text.includes(APP_BODY_MARK)) {
-      const block = appPageBodySnippet(spec.appBody);
+      // An app with its own <h1> keeps the page's one main heading; the block names it in an <h2>.
+      const block = appPageBodySnippet({ ...spec.appBody, appHasH1: findOpenTag(text, 'h1') !== null });
       const at = bodyOpenEnd(out);
       out = at >= 0 ? out.slice(0, at) + block + out.slice(at) : injectBeforeClosingTag(out, block);
     }

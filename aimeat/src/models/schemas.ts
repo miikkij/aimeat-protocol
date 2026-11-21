@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   2026-11-21 — ExtensionInstallSchema.manifest over 100 000 characters is refused with a message that
+ *     names the ceiling and the compact output schema that keeps a manifest under it.
  *   2026-11-15 — WorkRequestSchema.input and WorkDeliverySchema.output are JSON objects again (they
  *     were z.unknown() since 2026-02-26), as the MCP tools take them; output stays optional here.
  *   2026-11-08 — ConsentCreateSchema takes `role` (read | write) for POST /v1/consent: what the
@@ -567,7 +569,8 @@ export const ExtensionInstallSchema = z.object({
     // Presigned mode carries no manifest: the ZIP does. `mode:'presigned'` returns an upload_url
     // and the install happens on PUT /v1/upload/:token (mirrors POST /v1/apps).
     mode: z.literal('presigned').optional(),
-    manifest: z.string().min(1).max(100_000).optional(),
+    // The refusal names the ceiling and the usual cause: one rich schema repeated under every action.
+    manifest: z.string().min(1).max(100_000, 'manifest is over 100 000 characters, the most one extension manifest may have. Describe each output with a compact object schema instead of repeating the full input schema under every action, and keep long explanations in the action scripts.').optional(),
     scripts: z.record(z.string(), z.string().max(512_000)).optional(),
     /** Presigned only: upsert an existing extension instead of 409 (carried in the token meta). */
     update: z.boolean().optional(),

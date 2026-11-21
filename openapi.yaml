@@ -4797,6 +4797,17 @@ components:
                 type: string
         config:
           type: object
+        manifest:
+          type: string
+          description: |
+            Only with `?full=true`: the extension written back out as a manifest (YAML, block style)
+            that installs it again as it is, config types, schedules and snake_case limits included.
+            A secret field is written as `type: secret` with no value.
+        scripts:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Only with `?full=true`, each action's code under the file name the manifest's `script` names."
         limits:
           type: object
           properties:
@@ -31128,7 +31139,12 @@ paths:
             `served_marks_note` when the body was a served copy. A cortex ZIP under the name of a
             cortex the uploader installed replaces it the way PUT /v1/cortex/{name} does: an active
             one is taken down and activated again from the new manifest, and `status` says it is
-            active. A font upload (an address from PUT /v1/themes/fonts/{family}) answers with
+            active. An extension ZIP is written the way POST and PUT /v1/extensions write one: it
+            answers `name`, `version`, `status`, `updated`, `action` (installed, updated, or unchanged
+            for the installed bytes), `reinitialized` (an active extension's schedules were registered
+            again from the new manifest and its @activate jobs ran) and `actions`; `activate` in the
+            token switches it on as POST /v1/extensions/{name}/activate does, schedules included.
+            A font upload (an address from PUT /v1/themes/fonts/{family}) answers with
             `ok`, `family`, `file`, `bytes`, `sha256` and `url`, the address the face file is served at.
           content:
             application/json:
@@ -59513,6 +59529,11 @@ paths:
       description: |
         Returns full extension record (without script content).
         No authentication required (Tier 0).
+        With `full=true`, for the installer's own sessions holding ext:write or an operator, each
+        action also carries its `scriptContent`, and the extension carries `manifest` (YAML) and
+        `scripts` (file name to code): the two install the extension again as it is, through
+        aimeat_extension_install with `update: true` and a new version. A secret's value is not in
+        the manifest; an update that gives none keeps the stored one.
       tags: [Extensions]
       parameters:
         - name: name
@@ -59521,6 +59542,12 @@ paths:
           schema:
             type: string
           description: Extension name
+        - name: full
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Also answer the scripts, the manifest and the scripts map (installer or operator only; 403 otherwise).
       responses:
         '200':
           description: Extension detail

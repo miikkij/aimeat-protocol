@@ -14,6 +14,9 @@
  *   findOpenTag(text, name) — where an opening tag starts and ends, by index scan.
  * @usage import { injectBeforeClosingTag } from './html-inject.js';
  * @version-history
+ *   v1.2.0 — 2026-11-21 — The last `</body>` is the last one OUTSIDE a script, a style, a textarea,
+ *     a title and a comment. A page with a script after its `</body>` whose code held the string
+ *     '</body>' got the snippet inside that string, a SyntaxError that stopped the script.
  *   v1.1.0 — 2026-08-31 — findOpenTag(): locating `<body …>` or `<html …>` in an uploaded document
  *     is an index scan now, not `/<body[^>]*>/`. That regex restarts its `[^>]*` at every `<body`
  *     in the text, so a document written to contain a hundred thousand of them costs quadratic time
@@ -22,26 +25,54 @@
  *     first-match replaces that broke apps whose JS contains '</body>'.
  */
 
-/** Index of the last match of `re` in `text`, or -1. `re` must carry the `g` flag. */
-function lastMatchIndex(text: string, re: RegExp): number {
-    let last = -1;
-    re.lastIndex = 0;
-    for (let m = re.exec(text); m !== null; m = re.exec(text)) {
-        last = m.index;
-        if (m.index === re.lastIndex) re.lastIndex++;
+/** The elements whose content is raw text: a `</body>` inside one is a string, never the tag. */
+const RAW_TEXT = ['script', 'style', 'textarea', 'title'] as const;
+
+/**
+ * Where each closing tag of `name` starts, outside raw text and comments, in document order.
+ *
+ * One linear pass: at each `<` it either skips a comment to its `-->`, skips a raw-text element to
+ * its own closing tag, or notes a `</name>`. The last-match rule alone failed for a page that puts
+ * a script AFTER its `</body>` (browsers accept it): a `'</body>'` string in that script was the
+ * last match, and the snippet landed inside the script's string, which is a SyntaxError.
+ */
+function closingTagsOutsideRawText(text: string, name: string): number[] {
+    const lower = text.toLowerCase();
+    const close = `</${name}`;
+    const found: number[] = [];
+    let at = lower.indexOf('<');
+    while (at >= 0) {
+        if (lower.startsWith('<!--', at)) {
+            const end = lower.indexOf('-->', at + 4);
+            if (end < 0) break;
+            at = lower.indexOf('<', end + 3);
+            continue;
+        }
+        const raw = RAW_TEXT.find(tag => lower.startsWith(`<${tag}`, at) && /[\s/>]/.test(lower[at + tag.length + 1] ?? ''));
+        if (raw) {
+            const end = lower.indexOf(`</${raw}`, at + raw.length + 1);
+            if (end < 0) break;
+            at = lower.indexOf('<', end + raw.length + 2);
+            continue;
+        }
+        if (lower.startsWith(close, at) && /^\s*>/.test(lower.slice(at + close.length, at + close.length + 64))) found.push(at);
+        at = lower.indexOf('<', at + 1);
     }
-    return last;
+    return found;
 }
 
 /**
  * Insert `snippet` immediately before the LAST `</body>` tag (fallback: last `</html>`,
- * else append to the end). Tolerates whitespace before `>` and any tag case. Pure —
- * returns a new string, the original closing tag is kept intact.
+ * else append to the end). Tolerates whitespace before `>` and any tag case. A `</body>` inside a
+ * script, a style, a textarea, a title or a comment is text and never the tag, wherever it stands.
+ * Pure — returns a new string, the original closing tag is kept intact.
  */
 export function injectBeforeClosingTag(text: string, snippet: string): string {
-    const bodyIdx = lastMatchIndex(text, /<\/body\s*>/gi);
+    const bodies = closingTagsOutsideRawText(text, 'body');
+    const bodyIdx = bodies.length ? bodies[bodies.length - 1]! : -1;
     if (bodyIdx >= 0) return text.slice(0, bodyIdx) + snippet + text.slice(bodyIdx);
-    const htmlIdx = lastMatchIndex(text, /<\/html\s*>/gi);
+    const htmls = closingTagsOutsideRawText(text, 'html');
+    const htmlIdx = htmls.length ? htmls[htmls.length - 1]! : -1;
     if (htmlIdx >= 0) return text.slice(0, htmlIdx) + snippet + text.slice(htmlIdx);
     return text + snippet;
 }

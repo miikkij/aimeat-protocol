@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-11-21 — aimeat_extension_get with include_source also answers `manifest` (YAML) and `scripts`,
+ *     which install the extension again as it is (services/extension/manifest-export.ts).
  *   2026-11-21 — aimeat_extension_invoke of an action marked `decision: person` answers the approval
  *     request the person allows; nothing ran (services/extension/person-decision.ts).
  *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
@@ -136,6 +138,7 @@ import {
 } from '../services/extension/email-policy-ask.js';
 import { readAuthorityOf, readAuthorityPayload } from '../services/extension/read-authority.js';
 import { toolError } from './tool-error.js';
+import { manifestOfRecord } from '../services/extension/manifest-export.js';
 
 export function registerExtensionsTools(
     mcp: McpServer,
@@ -775,6 +778,10 @@ export function registerExtensionsTools(
                         installed_at: ext.installedAt,
                         activated_at: ext.activatedAt,
                         used_by: await usedByFor(name),
+                        // The manifest and the scripts that install this extension again as it is
+                        // (services/extension/manifest-export.ts): pass both to aimeat_extension_install
+                        // with update: true and a new version to change it. A secret's value is not in it.
+                        ...(include_source ? manifestOfRecord(ext) : {}),
                     }, null, 2),
                 }],
             };

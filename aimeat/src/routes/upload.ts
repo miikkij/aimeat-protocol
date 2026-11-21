@@ -24,6 +24,11 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   2026-11-21 — An extension ZIP is written by writeExtensionRecord (services/extension/lifecycle.ts),
+ *     the write every install path runs: an update of an active extension registers the new
+ *     manifest's schedules and runs its @activate jobs, a new name meets both install ceilings, and
+ *     `activate` runs activateExtension, which registers the schedules. The answer drops the `note`
+ *     that said schedules were not registered and carries `action` and `reinitialized`.
  *   2026-10-31 — POST /v1/upload/{token}/complete, the second half of a direct upload (upload-storage.ts).
  *   2026-10-29 — An extension ZIP under a new name that starts with aimeat- is refused to anyone but an
  *     operator, 409 NAME_RESERVED (services/component-name-prefix.ts; secaudit2026oct26 round 8c).
@@ -175,7 +180,6 @@ import { verifyUploadToken, UploadTokenError } from '../services/upload/token.js
 import { parseExtensionZip, parseCortexZip } from '../services/upload/zip.js';
 import { installCortex } from '../services/cortex/lifecycle.js';
 import { upsertCortex } from '../services/cortex/upsert.js';
-import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component/versions.js';
 import { handleStorageUpload, declaredFromMeta, completeDirectStorageUpload } from './upload-storage.js';
 import { handleSkillUpload } from './upload-skill.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
@@ -188,22 +192,16 @@ import { effectiveDevLevel, mayAct } from '../services/app/dev-grant.js';
 import { accountOf } from '../services/app/members.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../services/resource-events.js';
-import { getEncryptionKey } from '../services/encryption.js';
-import { prepareSecretConfigForWrite } from '../services/extension/secrets.js';
-import { carryHostFieldValues } from '../services/extension/network-hosts.js';
-import { reconcileAfterExtensionWrite } from '../services/exchange/projection.js';
-import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange/odps-write.js';
-import { managedChangeRefusal } from '../services/packages/install/package-managed.js';
+import { writeExtensionRecord, activateExtension } from '../services/extension/lifecycle.js';
+import { nodeContext } from '../services/node/context.js';
 import { receiveFontUpload } from '../services/themes/fonts.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 import { publishAskOf, type PublishAsk } from '../services/publish-requests/ask.js';
 import { uploadPrincipalRefusal } from '../services/upload/principal.js';
 import { cortexAskedFields } from '../services/cortex/visibility.js';
-import { carryFirstUseKeep } from '../services/extension/first-use-keep.js';
 import { installRoleRefusal } from './extensions/permissions.js';
-import { placeExtensionInstall, settleReclaimed, isNamespacedName, findCortex, ownComponent } from '../services/component/address.js';
+import { placeExtensionInstall, isNamespacedName, findCortex, ownComponent } from '../services/component/address.js';
 import type { DoorAsk } from '../services/publish-requests/door.js';
-import { nodePrefixRefusal } from '../services/component/name-prefix.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -537,119 +535,39 @@ async function handleExtensionUpload(
         res.status(403).json({ success: false, error: 'INSUFFICIENT_ROLE', message: roleRefused });
         return;
     }
-    // A new name with the node's prefix is kept for what the node ships next, as on the inline doors
-    // (services/component/name-prefix.ts). The operator answer is asked as the cortex ZIP asks it.
-    if (!existing) {
-        const prefixed = await nodePrefixRefusal(storage, 'extension', record.name, { ownerName, isOperator: await uploaderIsOperator(storage, sub) });
-        if (prefixed) { res.status(prefixed.status).json({ success: false, error: prefixed.code, message: prefixed.message }); return; }
-    }
-
-    // A flagged action whose changed text would break an ODPS length cap is refused before the write,
-    // as writeExtensionRecord refuses it on the other install doors (2026-09-13).
-    const odps = odpsWriteRefusal(extensionOdpsKey(record.name), record, existing);
-    if (odps) { res.status(odps.status).json({ success: false, error: odps.code, message: odps.message, details: odps.details }); return; }
-
-    // A kept version is immutable on this door as on PUT /v1/extensions/:name (A6-7).
-    const kept = existing ? await keptVersionRefusal(storage, 'extension', record.name, record.version, extensionCodeOf(record)) : null;
-    if (kept) { res.status(kept.status).json({ success: false, error: kept.code, message: kept.message }); return; }
-
-    // Other code for an extension a managed package install owns is refused here as on PUT
-    // (services/packages/install/package-managed.ts). Config alone is a setting and goes through.
-    if (existing && extensionCodeOf(record) !== extensionCodeOf(existing)) {
-        const managed = await managedChangeRefusal(storage, existing.installedBy, 'extension', record.name, 'code');
-        if (managed) { res.status(managed.status).json({ success: false, error: managed.code, message: managed.message, details: managed.details }); return; }
-    }
-
-    // A host field (manifest network.host_fields) keeps the host the installed copy holds, as on
-    // PUT /v1/extensions/:name (services/extension/lifecycle.ts).
-    if (existing) record.config = carryHostFieldValues(record.config, existing.config);
-
-    // Encrypt `type: secret` config values before they are stored, exactly as POST/PUT
-    // /v1/extensions do. Without this a ZIP install was a way to write an API key to the database
-    // in plaintext.
-    // prepareSecretConfigForWrite, as writeExtensionRecord uses: a secret the new manifest declares
-    // without a value keeps the installed copy's stored one. encryptSecretFields alone dropped it, so
-    // an upload over an installed copy erased the owner's API key (found 2026-10-09). Bound to the
-    // extension's name (SecretBinding; secrets audit 2026-10-09, 1.1).
-    const encConfig = prepareSecretConfigForWrite(record.config, existing?.config, getEncryptionKey(config), { extension: record.name });
-    if (encConfig === null) {
-        res.status(503).json({
-            success: false, error: 'ENCRYPTION_NOT_CONFIGURED',
-            message: 'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.',
+    // THE WRITE IS THE ONE EVERY INSTALL PATH RUNS (services/extension/lifecycle.ts): the node prefix
+    // on a new name, both install ceilings, the ODPS caps, a kept version, a managed install's code,
+    // the host fields, the secrets, the first-use mark, the no-op for identical bytes, and on an
+    // update of an ACTIVE extension the schedule re-registration and its @activate jobs. This path
+    // used to carry its own copy of the swap, which left the old schedules running against the new
+    // code and only said so in a `note`, and an `activate` that set the status without registering
+    // the manifest's schedules at all.
+    const deps = { storage, config, scheduler: nodeContext().scheduler };
+    const written = await writeExtensionRecord(deps, record, {
+        existing: existing ?? null, ownerName, actor, isOperator: await uploaderIsOperator(storage, sub),
+    });
+    if (!written.ok) {
+        if (written.status >= 500) logger.error(`Extension upload wrote nothing: ${record.name}`, { by: sub, code: written.code });
+        res.status(written.status).json({
+            success: false, error: written.code, message: written.message,
+            ...(written.details !== undefined ? { details: written.details } : {}),
         });
         return;
     }
-    // Byte-identical code keeps the old-code first-use mark; a changed script drops it
-    // (services/extension/first-use-keep.ts).
-    record.config = carryFirstUseKeep(encConfig, record.actions, existing);
-
-    let saved: ExtensionRecord;
-    if (existing) {
-        // Same field set the REST upsert (PUT /v1/extensions/:name) swaps: code + metadata only.
-        // Lifecycle (status, installedBy, installedAt, activatedAt), the ext:{name} memory and any
-        // instances are preserved — that preservation is the whole reason to upsert instead of
-        // delete + reinstall.
-        const updated = await storage.updateExtension(record.name, {
-            version: record.version,
-            description: record.description,
-            author: record.author,
-            requiredApis: record.requiredApis,
-            actions: record.actions,
-            config: record.config,
-            limits: record.limits,
-            federation: record.federation,
-            instances: record.instances,
-            // Travels with the code, as in services/extension/upsert.ts. `unattendedReadAuthority` is
-            // deliberately absent: it is the owner's choice about the extension, not the code's.
-            installedByPrincipal: record.installedByPrincipal,
-            ...(wantActivate && existing.status !== 'active'
-                ? { status: 'active' as const, activatedAt: new Date().toISOString() }
-                : {}),
-        });
-        // A write that did not happen must never be answered with success. This line used to read
-        // `?? existing`, so a storage failure was reported as `200 {success:true, updated:true}`
-        // carrying the OLD record: the caller was told the upsert worked while the extension kept
-        // running the previous code. That is the worst possible answer — worse than an error,
-        // because it ends the investigation.
-        if (!updated) {
-            logger.error(`Extension upsert wrote nothing via upload: ${record.name}`, { by: sub });
-            res.status(500).json({
-                success: false, error: 'UPDATE_FAILED',
-                message: `Extension "${record.name}" was NOT updated — the storage write did not apply. The installed version is unchanged.`,
-            });
-            return;
-        }
-        saved = updated;
-    } else {
-        if (wantActivate) {
-            record.status = 'active';
-            record.activatedAt = new Date().toISOString();
-        }
-        saved = await storage.createExtension(record);
-        await settleReclaimed(storage, 'extension', saved.name);
+    let saved: ExtensionRecord = written.record;
+    // `activate: true` switches it on the way aimeat_extension_activate does: the status, the
+    // manifest's schedules and its @activate jobs, and the capability rows its app tools resolve to.
+    if (wantActivate && saved.status !== 'active') {
+        saved = (await activateExtension(deps, saved, actor)) ?? saved;
     }
-    // Kept like every other install and update, so `name@version` answers for what this door deployed.
-    await snapshotExtensionVersion(storage, saved, sub)
-        .catch(err => logger.warn('Extension upload: version not kept', { name: saved.name, version: saved.version, error: String(err) }));
-
-    // Parity with the REST and MCP install paths: re-project any EXCHANGE listings the actions
-    // declare, and refresh aggregated capabilities when the extension is live.
-    await reconcileAfterExtensionWrite(storage, ownerName, config.nodeId, saved.name);
     if (saved.status === 'active') {
         import('../services/capabilities/aggregator.js')
             .then(m => m.runCapabilityAggregation(config, storage))
             .catch(err => logger.error('Capability aggregation after extension upload failed', { error: String(err) }));
     }
 
-    logger.info(`Extension ${existing ? 'updated' : 'installed'} via upload: ${saved.name}`, { version: saved.version, by: sub, activated: wantActivate });
+    logger.info(`Extension ${existing ? 'updated' : 'installed'} via upload: ${saved.name}`, { version: saved.version, by: sub, activated: wantActivate, action: written.action });
     emitResourceListChanged(sub);
-
-    // An ACTIVE extension whose manifest declares schedules needs a re-registration this endpoint
-    // has no scheduler for — say so instead of letting the author assume the new cron is live.
-    const hasSchedules = Array.isArray(saved.config.__schedules) && (saved.config.__schedules as unknown[]).length > 0;
-    const scheduleNote = existing && saved.status === 'active' && hasSchedules
-        ? 'schedules in the manifest are NOT re-registered by this endpoint — use PUT /v1/extensions/{name} (REST upsert) or deactivate + activate to refresh them'
-        : undefined;
 
     res.json({
         success: true,
@@ -658,7 +576,10 @@ async function handleExtensionUpload(
         version: saved.version,
         status: saved.status,
         updated: !!existing,
-        ...(scheduleNote ? { note: scheduleNote } : {}),
+        // installed, updated, or unchanged when the bytes were the installed ones; `reinitialized`
+        // says an active extension's schedules were registered again from the new manifest.
+        action: written.action,
+        reinitialized: written.reinitialized,
         actions: saved.actions.map(a => ({ id: a.id, method: a.method, path: a.path })),
         // Non-blocking sandbox-capability notes (no crypto.subtle in QuickJS, non-deterministic
         // Date.now/Math.random). Surfaced here so a ZIP upload is not a way to miss them.
