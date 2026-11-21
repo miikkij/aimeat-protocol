@@ -255,3 +255,7 @@ newest at the top.
   2026-11-19, 4.7). *Haavoittuvuus* / *vulnerabilidad* is the industry word; the Finnish keeps
   *tietoturvailmoitus* for the existing security e-mail setting, and *haavoittuvuusilmoitus* names a
   report of one vulnerability. The file name stays English.
+- **2026-11-21**: the content risk mark (wish
+  wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-). *Riskimerkintä* and *pidätä*
+  are the words of the approved plan (docs/internal/situated-ai/07); *vapauttaa* releases a hold.
+  Spanish *retener* / *liberar*. The six kind names stay English everywhere, as setting values.

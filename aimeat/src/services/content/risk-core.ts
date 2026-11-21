@@ -152,8 +152,9 @@ async function tell(deps: Deps, recipients: string[], subject: RiskSubject, mark
     const vars = { place, kinds, count: String(marks.marks.length), subject: subjectIdOf(subject) };
     const title = over ? 'More content was marked for possible risks'
       : held ? `Marked content waits for you: ${place}` : `Content marked for possible risks: ${place}`;
-    const body = over ? 'More items were marked in the last hour than this notice list shows. Ask your AI for the held items with aimeat_content_hold.'
-      : held ? `It has ${marks.marks.length} mark(s): ${kinds}. Other people's AIs get the marks but not the content until you release it. Nothing was changed. Your AI releases it with aimeat_content_hold, action release, when you say so.`
+    // The English fallback of the locale's notiftext.content_risk_* (en.json says the same words).
+    const body = over ? 'More items were marked in the last hour than this list shows. Ask your AI which items wait for you.'
+      : held ? `It has ${marks.marks.length} mark(s): ${kinds}. Other people's AIs get the marks but not the content until you release it. Nothing was changed. When you have looked at it, ask your AI to release it.`
         : `It has ${marks.marks.length} mark(s): ${kinds}. Nothing was changed. An AI that reads it gets the marks and a warning.`;
     await notify(deps.storage, r, { type: key, title, body, link: '/v1/profile?tab=dataWallet', i18n: { key, vars } })
       .catch((err: unknown) => logger.warn('contentrisk: a notice was not sent', { recipient: r, error: String(err) }));
