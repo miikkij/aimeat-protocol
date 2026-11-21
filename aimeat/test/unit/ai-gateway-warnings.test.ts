@@ -56,7 +56,7 @@ describe('the AI SDK call warnings reach the caller', () => {
       'unsupported: temperature',
     ]);
     expect(vi.mocked(logger.warn)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(logger.warn).mock.calls[0][1]).toMatchObject({ warnings: r.warnings });
+    expect((vi.mocked(logger.warn).mock.calls[0] as unknown[])[1]).toMatchObject({ warnings: r.warnings });
   });
 
   it('leaves `warnings` out and logs nothing when the package said nothing', async () => {
