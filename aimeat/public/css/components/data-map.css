@@ -9,6 +9,7 @@
  *   The values are the old app catalogue's (app-catalog-poster.css .dtl-dm-*), on the theme's tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-11-21 — .data-map-regulated: a row's regulated data and the mode an outside AI model gets of it.
  *   v1.1.0 — 2026-09-27 — appcat parity (sections-a), measured on a map: the greys read the site's
  *     names for the old page's colours (places, where, facts, why, lists: --text-muted; the exact
  *     place: --text-dim), the part headings in the body letters, the key's 6px and the facts' and
@@ -39,6 +40,11 @@
 .data-map-exact { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; color: var(--text-dim); overflow-wrap: anywhere; }
 .data-map-facts { margin-top: 4px; font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); }
 .data-map-personal { color: var(--accent); }
+/* A row's regulated data and what an outside AI model gets of it: two lines under the facts, the
+   labels as the facts' named rows label, "not in force yet" in the muted grey. */
+.data-map-regulated { display: grid; gap: 2px; margin-top: 4px; max-width: 72ch; font-size: .88rem; font-weight: var(--font-poster-text-weight, 500); line-height: 1.5; color: var(--text); }
+.data-map-regulated b { margin-right: 6px; font-size: var(--text-xs, .72rem); color: var(--accent); font-weight: var(--weight-heavy, 800); text-transform: var(--shape-case-label, uppercase); letter-spacing: var(--shape-tracking-label, .1em); }
+.data-map-regulated-pending { color: var(--text-muted); }
 .data-map-why { margin-top: 4px; max-width: 72ch; font-size: .88rem; font-weight: var(--font-poster-text-weight, 500); line-height: 1.5; color: var(--text-muted); }
 .data-map-why--missing { color: var(--accent); }
 .data-map-bullets { margin: 0; padding-left: 18px; font-size: .9rem; font-weight: var(--font-poster-text-weight, 500); line-height: 1.6; color: var(--text-muted); }

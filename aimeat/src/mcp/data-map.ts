@@ -18,6 +18,7 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes, caller);
  * @version-history
+ *   2026-11-21 — aimeat_datamap_get carries regulated_ai, as the REST read.
  *   2026-11-13 — aimeat_datamap_set answers `balancing_test` when the app needs a balancing test and has no approved one.
  *   2026-10-29 — ai_act.asked, as the REST read.
  *   2026-10-28 — aimeat_datamap_get carries ai_act, as the REST read.
@@ -43,7 +44,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import {
-  readProgramMap, stateProgramMap, handsOnKey, type DataMapCaller,
+  readProgramMap, stateProgramMap, handsOnKey, regulatedAiOut, type DataMapCaller,
 } from '../services/data-map/data-map-access.js';
 import { tieAgent, untieAgent } from '../services/data-map/data-map-agent-tie.js';
 import { toolError } from './tool-error.js';
@@ -95,6 +96,7 @@ export function registerDataMapTools(
         app: out.app, data_map: out.dataMap, stamp: out.stamp, findings: out.findings,
         records_of_processing: out.records, privacy_notice: out.privacyNotice,
         ...(out.aiAct ? { ai_act: { questions: out.aiAct.questions, built_in: out.aiAct.builtIn, asked: out.aiAct.asked, unanswered: out.aiAct.unanswered } } : {}),
+        ...(out.regulatedAi ? { regulated_ai: regulatedAiOut(out.regulatedAi) } : {}),
       });
     },
   );

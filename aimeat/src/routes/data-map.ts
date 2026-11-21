@@ -17,6 +17,7 @@
  * @structure dataMapRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-11-21 — GET carries regulated_ai: per regulated domain, the mode an outside AI model gets of the app's data and whether it is in force.
  *   2026-11-13 — The PUT answers `balancing_test` when the app needs a balancing test and has no approved one.
  *   2026-10-29 — ai_act.asked: the questions the maker's answers so far make the node ask.
  *   2026-10-28 — GET carries ai_act for an app that uses AI: the EU AI Act questions its maker answers in the map's `aiAct`.
@@ -38,7 +39,7 @@ import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { callerOf as requestCaller } from '../middleware/caller.js';
-import { readProgramMap, stateProgramMap, type DataMapCaller } from '../services/data-map/data-map-access.js';
+import { readProgramMap, stateProgramMap, regulatedAiOut, type DataMapCaller } from '../services/data-map/data-map-access.js';
 import { tieAgent, untieAgent } from '../services/data-map/data-map-agent-tie.js';
 import type { DataMap } from '../services/data-map/data-map-types.js';
 
@@ -75,6 +76,7 @@ export function dataMapRouter(config: AimeatConfig, storage: Storage): Router {
       ...(out.findings ? { findings: out.findings } : {}),
       records_of_processing: out.records, privacy_notice: out.privacyNotice,
       ...(out.aiAct ? { ai_act: { questions: out.aiAct.questions, built_in: out.aiAct.builtIn, asked: out.aiAct.asked, unanswered: out.aiAct.unanswered } } : {}),
+      ...(out.regulatedAi ? { regulated_ai: regulatedAiOut(out.regulatedAi) } : {}),
     }));
   });
 

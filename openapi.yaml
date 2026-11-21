@@ -20463,6 +20463,15 @@ paths:
         where they are marked `maker`. An AI app whose map answers none gets the finding
         DATAMAP_AI_ACT_UNANSWERED, and the daily job core:compliance-ask-makers sends its owner a
         message with a ready prompt, the same app at most once a fortnight.
+
+        `regulated_ai`, when a held row of the map (`domains`) or a register of the app names a
+        regulated data domain: for each domain, `mode`, what an AI model outside this server gets of
+        the app's data (notify, protect, drop, local or block; setting compliance.regulated_ai_modes,
+        tightened by a register's own `aiMode`), and `in_force`, true when a register names the app
+        with that domain, so the content reader applies the mode now. In force, the mode is the one
+        the reader applies to all of the app's data, the strictest of its domains and registers. Not
+        in force, it is the operator's mode for that domain, which applies once a register names the
+        app with it.
       tags: [Apps]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
@@ -20485,6 +20494,14 @@ paths:
                           stamp:
                             allOf: [{ $ref: '#/components/schemas/DataMapStamp' }]
                             nullable: true
+                          regulated_ai:
+                            type: object
+                            description: Per regulated data domain, what an outside AI model gets of the app's data.
+                            additionalProperties:
+                              type: object
+                              properties:
+                                mode: { type: string, enum: [notify, protect, drop, local, block] }
+                                in_force: { type: boolean }
         '404': { description: 'No such app, or an app that is not public and the caller may not see it' }
     put:
       summary: State where an app puts what

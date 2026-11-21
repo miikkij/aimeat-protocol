@@ -19,9 +19,12 @@
  *     - an owner who does not run the node cannot set the modes, and another owner cannot change a register;
  *     - an agent cannot loosen the operator's setting (PERSON_REQUIRED), a person can;
  *     - the Plain workspace is never touched; the compliance report lists the marks;
- *     - the mode holds with classification off too.
+ *     - the mode holds with classification off too;
+ *     - an app's data map read names, per domain its rows name, the mode an outside model gets and
+ *       whether a register puts it in force; a map with no domain carries none.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-regulated-ai-modes
  * @version-history
+ *   v1.2.0 — 2026-11-21 — The data map read's regulated_ai, REST and MCP.
  *   v1.1.0 — 2026-11-21 — The drop mode (Jouni, 2026-11-21).
  *   v1.0.0 — 2026-11-21 — Initial (plan doc-mwnnp9xz9814, feature audit item 1.3).
  */
@@ -266,6 +269,42 @@ await test('REGISTER: a register\'s own block holds over the operator\'s notify,
     assert((await setModes(['health=block'])).status === 200, 'operator block');
     assert((await register('notify')).status === 200, 'register says notify');
     assert(!(await records(far.token, patients)).has('r1'), 'the register cannot loosen the operator\'s block');
+});
+
+await test('DATA MAP: a row that names health shows what an outside model gets; in force once a register names the app; a map with no domain shows nothing', async () => {
+    const FILE = `regmap${stamp}.html`, PLAIN_FILE = `regplain${stamp}.html`;
+    const row = { what: 'visits', holds: 'who came and why', kind: 'user-entered', usedFor: 'user-returns-to-read', where: 'app-own-memory',
+        owner: 'app', readers: 'app-and-owner', writers: ['the-person'], shape: 'one-per-thing', keptFor: 'until-deleted',
+        lossRisk: 'only-copy', personalData: 'yes', why: 'The visits are the app.', domains: ['health'] };
+    const map = (held: Body[]) => ({ spec: 'aimeat.datamap/2', what: 'A visit log.', usedFor: 'Keeping visits.', form: 'one-person',
+        arrangement: 'One record per visit.', machinery: [], leaves: [], elsewhere: [], held });
+    for (const [file, held] of [[FILE, [row]], [PLAIN_FILE, [{ ...row, personalData: 'no', domains: [] }]]] as const) {
+        const pub = await call('POST', '/v1/apps', alice.token, { filename: file, content: Buffer.from('<!doctype html><title>r</title><p>r</p>').toString('base64'),
+            mime_type: 'text/html', name: file, description: 'E2E' });
+        assert(pub.status === 201, `publish ${file}: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+        const put = await call('PUT', `/v1/datamap/apps/${alice.name}/${file}`, alice.token, map(held as Body[]));
+        assert(put.status === 200, `map ${file}: ${put.status} ${JSON.stringify(put.body?.error)}`);
+    }
+    const read = async (file: string) => {
+        const r = await call('GET', `/v1/datamap/apps/${alice.name}/${file}`, alice.token);
+        assert(r.status === 200, `read ${file}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        return r.body.data as Body;
+    };
+    assert((await setModes(['health=local'])).status === 200, 'operator local');
+    const before = await read(FILE);
+    assert(JSON.stringify(before.regulated_ai) === JSON.stringify({ health: { mode: 'local', in_force: false } }), `before a register: ${JSON.stringify(before.regulated_ai)}`);
+    const reg = await call('PUT', `/v1/compliance/docs/registers?${q({ scope: 'app', app: FILE })}`, alice.token, {
+        items: [{ id: 'visits', title: 'Visits', type: 'personal', purpose: 'patient', legalBasis: ['contract'], specialBasis: 'health-care',
+            domains: ['health'], retentionMonths: 120, aiMode: 'block' }] });
+    assert(reg.status === 200 && reg.body.data.stored === true, `app register: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+    const after = await read(FILE);
+    assert(JSON.stringify(after.regulated_ai) === JSON.stringify({ health: { mode: 'block', in_force: true } }), `with the register (its block over local): ${JSON.stringify(after.regulated_ai)}`);
+    const viaMcp = await callTool(farMcp, 'aimeat_datamap_get', { app: `${alice.name}/${FILE}` });
+    assert(!viaMcp.isError && JSON.stringify((viaMcp.data as Body)?.regulated_ai) === JSON.stringify(after.regulated_ai), `MCP: ${viaMcp.text.slice(0, 400)}`);
+    const plainMap = await read(PLAIN_FILE);
+    assert(plainMap.data_map?.held?.length === 1 && !('regulated_ai' in plainMap), `no domain, no regulated_ai: ${JSON.stringify(plainMap.regulated_ai)}`);
+    for (const file of [FILE, PLAIN_FILE]) await call('DELETE', `/v1/apps/${file}`, alice.token);
+    assert((await setModes(['health=block'])).status === 200, 'operator back to block for the tests below');
 });
 
 await test('REPORT: section 14 lists the mode per domain, the suggestion, and the marks', async () => {

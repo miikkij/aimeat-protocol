@@ -12,6 +12,9 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-11-21 — readProgramMap answers `regulatedAi`: for each regulated domain the map's rows or a
+ *     register of the app name, the mode an outside AI model gets of the app's data and whether a
+ *     register puts it in force yet (compliance/regulated-ai.ts appDomainModes; plan doc-mwnnp9xz9814).
  *   2026-11-21 — putProgramMap drops the owner's cached app key prefixes (services/app/declared-key-prefixes.ts).
  *   2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex
  *     of this file's own; no change in behaviour.
@@ -65,6 +68,7 @@ import type { ComplianceRegister } from '../compliance/docs-schemas.js';
 import { balancingTestStep, type BalancingTestStep } from '../compliance/lia-write.js';
 import { appDataMapId } from '../app/app-ref.js';
 import { forgetOwnerAppKeyPrefixes } from '../app/declared-key-prefixes.js';
+import { appDomainModes, type AppDomainMode } from '../compliance/regulated-ai.js';
 
 export interface DataMapRefusal {
   refusal: { status: number; code: string; message: string };
@@ -92,6 +96,12 @@ export interface ProgramMapResult {
    * The maker answers them in the map. Read only; absent for an app that does not use AI.
    */
   aiAct?: { questions: Array<Omit<ComplianceQuestion, 'implies'>>; builtIn: string[]; asked: string[]; unanswered: string[] };
+  /**
+   * For each regulated domain the map's rows or a register of the app name: what an outside AI model
+   * gets of the app's data (the mode), and whether a register puts that mode in force yet. Read only;
+   * absent when nothing names a domain.
+   */
+  regulatedAi?: Record<string, AppDomainMode>;
   /**
    * Answered by a write, and only when the app needs a balancing test (legitimate interests) and has
    * no approved one: what to tell the person, and where the draft is.
@@ -179,6 +189,8 @@ export async function readProgramMap(
 
   const registers = (await readDoc(storage, config.nodeId, 'registers', { kind: 'app', ownerName: record.ownerName, app: ref.filename })).items;
   const aiAct = await aiActQuestions(storage, config, map, record);
+  const regulatedAi = await appDomainModes({ storage, config }, record.ownerName, ref.filename,
+    (map?.held ?? []).flatMap(r => r.domains ?? []));
   return {
     app: appRef,
     dataMap: map,
@@ -190,7 +202,13 @@ export async function readProgramMap(
     })),
     privacyNotice: !!record.manifest?.legal?.privacy,
     ...(aiAct ? { aiAct } : {}),
+    ...(Object.keys(regulatedAi).length ? { regulatedAi } : {}),
   };
+}
+
+/** `regulatedAi` as the REST read and aimeat_datamap_get answer it: { health: { mode, in_force } }. */
+export function regulatedAiOut(modes: Record<string, AppDomainMode>): Record<string, { mode: string; in_force: boolean }> {
+  return Object.fromEntries(Object.entries(modes).map(([d, m]) => [d, { mode: m.mode, in_force: m.inForce }]));
 }
 
 /**

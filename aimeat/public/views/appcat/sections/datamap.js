@@ -16,6 +16,7 @@
  * @structure meta · agentsOfMap(map) · DataMapSection({ d })
  * @usage const mod = await import('./sections/datamap.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.4.0 — 2026-11-21 — The map's rows show what an outside AI model gets of their regulated data (the read's regulated_ai).
  *   v1.3.1 — 2026-11-14 — An approval by an agent says so, and the owner switches "Only I approve" per test.
  *   v1.3.0 — 2026-11-13 — "Balancing test", for the app's owner: where the test of each register on
  *     legitimate interests stands, its PDF and Excel file, and the owner's approval.
@@ -227,6 +228,7 @@ export default function DataMapSection({ d }) {
         setState({
           loading: false, map: data.data_map || null, findings: data.findings || [],
           records: data.records_of_processing || [], privacyNotice: !!data.privacy_notice,
+          regulatedAi: data.regulated_ai || null,
         });
       })
       // eslint-disable-next-line aimeat/no-silent-catch -- as on the old page, a map that cannot be read is said as "no map yet"
@@ -237,5 +239,5 @@ export default function DataMapSection({ d }) {
     ${state.map ? html`<${TiedAgents} d=${d} map=${state.map} onChanged=${() => setRound((n) => n + 1)} />` : null}
     ${state.loading ? null : html`<${PersonalData} records=${state.records} privacyNotice=${state.privacyNotice} map=${state.map} />`}
     ${state.loading ? null : html`<${BalancingTests} d=${d} />`}
-    <${DataMap} loading=${state.loading} map=${state.map} findings=${state.findings} say=${(k) => x(k)} />`;
+    <${DataMap} loading=${state.loading} map=${state.map} findings=${state.findings} regulatedAi=${state.regulatedAi} say=${(k) => x(k)} />`;
 }

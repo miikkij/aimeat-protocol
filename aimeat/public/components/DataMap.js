@@ -21,9 +21,14 @@
  *   - say(key): the words for a `dataMap.*` key (a page passes its own reader, so its words come from
  *     its own table; the node's `t` by default).
  *   - loading: the map has not answered yet.
+ *   - regulatedAi: the read's `regulated_ai`, { <domain>: { mode, in_force } }, or null. A row whose
+ *     `domains` name regulated data shows them, and with this, what an outside AI model gets of them
+ *     (the mode and one sentence on what it means, plan doc-mwnnp9xz9814).
  * @structure DataMap(props) · dataMapState(map)
- * @usage html`<${DataMap} map=${m} findings=${f} say=${(k) => x(k)} />`
+ * @usage html`<${DataMap} map=${m} findings=${f} regulatedAi=${r} say=${(k) => x(k)} />`
  * @version-history
+ *   v1.2.0 — 2026-11-21 — A held row shows its regulated data domains and, from the read's
+ *     `regulated_ai`, the mode an outside AI model gets of them and whether it is in force yet.
  *   v1.1.0 — 2026-10-18 — "Who it invites": the app invites people into organisms and an invitation
  *     can create an account, from the machinery word `invites-people` or the `invites` statement
  *     (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien). model.js is untouched, so
@@ -33,7 +38,7 @@
  */
 import { h } from 'preact';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { labelKeyFor, orderRows, contradictionOf, placesOf, stateOf, DATA_MAP_SPEC } from '/components/data-map/model.js';
 
 const html = htm.bind(h);
@@ -47,8 +52,37 @@ function labelOf(say, axis, value) {
   return key ? say(key) : String(value || '');
 }
 
-function HeldRow({ row, say }) {
+/** The modes from the most open to the strictest, as data/compliance-domains.ts orders them. */
+const AI_MODES = ['notify', 'protect', 'drop', 'local', 'block'];
+
+/**
+ * What an outside AI model gets of a row's regulated data, from the read's `regulated_ai`. The reader
+ * applies one mode to all of an app's data once a register names the app (the strictest of its
+ * domains), so a mode in force holds for every row; until then the row shows the operator's
+ * strictest mode of its own domains, marked as not in force yet. Null for a row with no domain.
+ */
+function rowAiMode(domains, regulatedAi) {
+  if (!domains.length || !regulatedAi) return null;
+  const inForce = Object.values(regulatedAi).find((m) => m && m.in_force);
+  if (inForce) return { mode: inForce.mode, inForce: true };
+  const modes = domains.map((d) => regulatedAi[d]?.mode).filter((m) => AI_MODES.includes(m));
+  if (!modes.length) return null;
+  return { mode: modes.reduce((a, b) => (AI_MODES.indexOf(b) > AI_MODES.indexOf(a) ? b : a)), inForce: false };
+}
+
+/** A row's regulated data domains and, when the read says it, what an outside AI model gets of them. */
+function Regulated({ domains, regulatedAi, say }) {
+  const words = domains.map((d) => tOr(`admin.compliance.records.domain.${d}`, d)).join(', ');
+  const ai = rowAiMode(domains, regulatedAi);
+  return html`<div class="data-map-regulated" data-mode=${ai ? ai.mode : null}>
+    <div><b>${say('dataMap.regulated.label')}</b> ${words}</div>
+    ${ai ? html`<div><b>${say('dataMap.regulated.aiLabel')}</b> ${say('dataMap.regulated.name.' + ai.mode)}. ${say('dataMap.regulated.means.' + ai.mode)}${ai.inForce ? null : html` <span class="data-map-regulated-pending">${say('dataMap.regulated.notInForce')}</span>`}</div>` : null}
+  </div>`;
+}
+
+function HeldRow({ row, say, regulatedAi }) {
   const why = String(row.why || '').trim();
+  const domains = Array.isArray(row.domains) ? row.domains.filter((d) => typeof d === 'string' && d) : [];
   const facts = [labelOf(say, 'kind', row.kind), labelOf(say, 'use', row.usedFor), labelOf(say, 'readers', row.readers),
     labelOf(say, 'loss', row.lossRisk), labelOf(say, 'kept', row.keptFor)].join(' · ');
   return html`<div class=${why ? 'data-map-row' : 'data-map-row data-map-row--unexplained'}>
@@ -58,6 +92,7 @@ function HeldRow({ row, say }) {
       <span class="data-map-where">${labelOf(say, 'where', row.where)}${row.whereExactly ? html` <span class="data-map-exact">${row.whereExactly}</span>` : null}</span>
     </div>
     <div class="data-map-facts">${facts}${row.personalData === 'yes' ? html` · <span class="data-map-personal">${say('dataMap.personal.yes')}</span>` : null}</div>
+    ${domains.length ? html`<${Regulated} domains=${domains} regulatedAi=${regulatedAi} say=${say} />` : null}
     <div class=${why ? 'data-map-why' : 'data-map-why data-map-why--missing'}>${why || say('dataMap.row.noWhy')}</div>
   </div>`;
 }
@@ -96,9 +131,9 @@ function Invites({ map, say }) {
 }
 
 /**
- * @param {{ map?: any, findings?: Array<{ message: string }>, say?: (key: string) => string, loading?: boolean }} props
+ * @param {{ map?: any, findings?: Array<{ message: string }>, say?: (key: string) => string, loading?: boolean, regulatedAi?: Record<string, { mode: string, in_force: boolean }> | null }} props
  */
-export function DataMap({ map, findings = [], say = t, loading }) {
+export function DataMap({ map, findings = [], say = t, loading, regulatedAi = null }) {
   if (loading) return html`<div class="data-map"><p class="data-map-text">${say('common.loading')}</p></div>`;
   const found = (findings || []).length
     ? html`<${Part}>${say('dataMap.findingsLabel')}<//><ul class="data-map-bullets">${findings.map((f, i) => html`<li key=${i}>${f.message}</li>`)}</ul>`
@@ -117,7 +152,7 @@ export function DataMap({ map, findings = [], say = t, loading }) {
     <${Part}>${say('dataMap.arrangementLabel')}<//>
     <p class="data-map-text">${map.arrangement || say('dataMap.panel.noArrangement')}</p>
     ${places.length ? html`<ul class="data-map-places">${places.map((p) => html`<li key=${p.where}>${labelOf(say, 'where', p.where)} · ${p.n}</li>`)}</ul>` : null}
-    ${rows.length ? html`<${Part}>${say('dataMap.rowsLabel')}<//>${rows.map((r, i) => html`<${HeldRow} key=${r.what || i} row=${r} say=${say} />`)}` : null}
+    ${rows.length ? html`<${Part}>${say('dataMap.rowsLabel')}<//>${rows.map((r, i) => html`<${HeldRow} key=${r.what || i} row=${r} say=${say} regulatedAi=${regulatedAi} />`)}` : null}
     ${(map.machinery || []).length ? html`<${Part}>${say('dataMap.machineryLabel')}<//><p class="data-map-text">${map.machinery.join(' · ')}</p>` : null}
     <${Invites} map=${map} say=${say} />
     ${(map.leaves || []).length ? html`<${Part}>${say('dataMap.leavesLabel')}<//><ul class="data-map-bullets">${map.leaves.map((l, i) => html`<li key=${i}>${l.what} → ${l.to}${l.recallable ? null : html` <span class="data-map-norecall">${say('dataMap.leaves.noRecall')}</span>`}</li>`)}</ul>` : null}

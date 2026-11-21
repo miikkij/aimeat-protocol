@@ -35,11 +35,15 @@
  *   kind and count) and for a use of an exception that opened protect or local; `refused` for what
  *   was held back; `exception` for an attempt on block content while an exception was in force,
  *   which marks the attempt as exceptional and opens nothing. The compliance report lists them.
- * @structure RegulatedFact · regulatedOf() · modeOfDomains() · registerRegulatedSource() · resetRegulatedIndex()
+ *
+ *   THE DATA MAP. appDomainModes() answers an app's data map read (data-map/data-map-access.ts) with
+ *   the mode of each domain its rows name, and says whether a register puts it in force yet.
+ * @structure RegulatedFact · regulatedOf() · modeOfDomains() · appDomainModes() · registerRegulatedSource() · resetRegulatedIndex()
  * @usage
  *   const facts = await regulatedOf(deps, targets);     // null for content outside every domain
  *   if (facts[i]?.mode === 'block') { … }
  * @version-history
+ *   v1.1.0 — 2026-11-21 — appDomainModes(): the mode of each domain an app's data map names.
  *   v1.0.0 — 2026-11-21 — Initial (plan doc-mwnnp9xz9814, feature audit item 1.3).
  */
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
@@ -48,7 +52,7 @@ import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { onChangeEvent } from '../event-bus.js';
 import { aiModesOf, stricterAiMode, type RegulatedAiMode } from '../../data/compliance-domains.js';
-import { containersOf, isContainerKind } from '../classification/containers.js';
+import { appTarget, containersOf, isContainerKind } from '../classification/containers.js';
 import { targetId } from '../classification/label-rows.js';
 import { setRegulatedSource, type RegulatedFact } from '../classification/regulated-gate.js';
 import { listDocs } from './docs.js';
@@ -157,6 +161,32 @@ export async function regulatedOf(deps: RegulatedDeps, targets: ReadonlyArray<Co
       mode: modeOfDomains(domains, entries.map(e => e.aiMode), deps.config.regulatedAiModes),
     };
   });
+}
+
+/** What an outside AI model gets of an app's data in one regulated domain, as the app's data map shows it. */
+export interface AppDomainMode {
+  mode: RegulatedAiMode;
+  /** True when a register names the app with this domain, so the content reader applies `mode` now. */
+  inForce: boolean;
+}
+
+/**
+ * For each domain the app's data map names, and each domain a register names the app with, the mode
+ * an outside AI model gets of the app's data. In force: the mode the content reader applies to the
+ * app's data (regulatedOf, the strictest of all its domains and registers). Not in force: the
+ * operator's mode for that domain, which the reader applies once a register names the app with it.
+ * The app is addressed as domain-floor.ts containersOfRegister addresses it.
+ */
+export async function appDomainModes(
+  deps: RegulatedDeps, ownerName: string, app: string, mapDomains: readonly string[],
+): Promise<Record<string, AppDomainMode>> {
+  const [fact] = await regulatedOf(deps, [appTarget(`${ownerName}@${deps.config.nodeId}`, app)]);
+  const out: Record<string, AppDomainMode> = {};
+  for (const d of new Set([...mapDomains, ...(fact?.domains ?? [])])) {
+    const inForce = !!fact?.domains.includes(d);
+    out[d] = { mode: inForce && fact ? fact.mode : modeOfDomains([d], [], deps.config.regulatedAiModes), inForce };
+  }
+  return out;
 }
 
 /**
