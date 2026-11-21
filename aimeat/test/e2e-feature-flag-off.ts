@@ -12,32 +12,23 @@
  *   switched off, and checks against the suite's own node that a switched-on feature is unchanged.
  *   Seen red first: before flagged-mount.ts the first case got 404 on every path.
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The shared harness (test/helpers/harness.ts), and a second owner's refused
+ *     account delete on the switched-off node: the stubs leave the other routers' refusals as they were.
  *   v1.0.0 — 2026-11-21 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=feature-flag-off
 
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { BASE, test, assert, json, expectRefusal, finish } from './helpers/harness.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 const short = (b: any) => (b === undefined ? '' : String(JSON.stringify(b)).slice(0, 300));
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-async function call(base: string, path: string, opts: RequestInit = {}) {
-    const res = await fetch(`${base}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-    const ct = res.headers.get('content-type') ?? '';
-    const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
-    return { status: res.status, body };
-}
+/** A request to `base`, the suite's own node or the in-process one, through the shared harness. */
+const call = (base: string, path: string, opts: RequestInit = {}) => json(`${base}${path}`, opts);
 
 console.log('\n=== AIMEAT Feature Flag Off E2E ===\n');
 
@@ -95,12 +86,17 @@ await test('On a node with three features off, their routes answer 503 FEATURE_D
         // A feature left on answers as it does on any node.
         const on = await call(offBase, '/v1/extensions', { headers: auth(token) });
         assert(on.status === 200, `extensions on: expected 200, got ${on.status} ${short(on.body)}`);
+
+        // The stubs come after every other router, so the refusals of the routers around them stay:
+        // a second owner on the same node still cannot delete the first owner's account.
+        const second = await registerOwner(offBase, `ffoffb${stamp}`);
+        const other = await call(offBase, `/v1/owners/ffoff${stamp}`, { method: 'DELETE', headers: auth(second.token) });
+        expectRefusal(other, 403, 'ACCESS_DENIED');
     } finally {
         await new Promise<void>(resolve => server.close(() => resolve()));
         for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
     }
 });
 
-console.log(`\n${passed} passed, ${failed} failed\n`);
-// The in-process node keeps timers running; an explicit exit keeps a green run from hanging.
-process.exit(failed > 0 ? 1 : 0);
+// The in-process node keeps timers running; finish() exits, which keeps a green run from hanging.
+finish();

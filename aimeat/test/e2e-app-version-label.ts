@@ -12,24 +12,13 @@
  *   says so in `app_hints` (services/app/version-label.ts, curated pitfall display-version-carried).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-version-label
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The shared harness (test/helpers/harness.ts); a second owner's draft publish
+ *     over the app is refused; the cleanup calls DELETE /v1/apps/:filename, the route that exists.
  *   v1.0.0 — 2026-11-21 — Initial (pitfall round A6).
  */
+import { BASE, test, assert, json, expectRefusal, finish } from './helpers/harness.js';
 import { registerOwner } from './helpers/owner-login.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0;
-let failed = 0;
-async function test(name: string, fn: () => Promise<void>): Promise<void> {
-    try { await fn(); passed++; console.log(`✅ ${name}`); }
-    catch (e) { failed++; console.log(`❌ ${name}: ${(e as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-async function json(path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
-    const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers ?? {}) } });
-    const text = await res.text();
-    try { return { status: res.status, body: JSON.parse(text) }; } catch { return { status: res.status, body: text }; }
-}
 const b64 = (html: string) => Buffer.from(html, 'utf8').toString('base64');
 const page = (body: string, head = '') => `<!DOCTYPE html><html><head><title>Label</title>${head}</head><body>${body}</body></html>`;
 const meta = (v: string) => `<meta name="aimeat-app-version" content="${v}">`;
@@ -90,8 +79,16 @@ await test('6. A page meta that is not a version is not used, and the warning sa
     assert(r.body.data.manifest.version === '1.3.0', `an unusable meta must not become the label: ${r.body.data.manifest.version}`);
     const hint = carriedHint(r.body);
     assert(hint && String(hint.message).includes('not a display version'), `the warning names the bad meta: ${JSON.stringify(r.body.data.app_hints)}`);
-    await json(`/v1/apps/${owner.name}/${APP}`, { method: 'DELETE', headers: { Authorization: `Bearer ${owner.token}` } });
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed ? 1 : 0);
+await test('7. A second owner cannot publish a draft over the first owner\'s app, so the label stays theirs', async () => {
+    const bob = await registerOwner(BASE, `bob${Date.now().toString(36)}`);
+    const r = await json(`/v1/apps/${owner.name}/${APP}/publish-draft`, {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` }, body: JSON.stringify({ version: '9.9.9' }),
+    });
+    expectRefusal(r, 403);
+    const gone = await json(`/v1/apps/${APP}`, { method: 'DELETE', headers: { Authorization: `Bearer ${owner.token}` } });
+    assert(gone.status === 200, `cleanup: ${gone.status} ${JSON.stringify(gone.body?.error)}`);
+});
+
+finish();

@@ -13,30 +13,18 @@
  *   Seen red first: before the change neither answer had `ignored_fields` and the batch refusal had
  *   no word about the lock.
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The shared harness (test/helpers/harness.ts), and a second owner who is no
+ *     member is refused a publish into the strict space.
  *   v1.0.0 — 2026-11-21 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=no-silent-drops
 
+import { BASE, test, assert, json, expectRefusal, finish } from './helpers/harness.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { connectAgentByDevice } from './helpers/agent-device.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 const short = (b: any) => (b === undefined ? '' : String(JSON.stringify(b)).slice(0, 400));
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
-
-async function json(path: string, opts: RequestInit = {}) {
-    const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-    const ct = res.headers.get('content-type') ?? '';
-    const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
-    return { status: res.status, body };
-}
 
 console.log('\n=== AIMEAT No Silent Drops E2E ===\n');
 
@@ -112,10 +100,22 @@ await test('A batch publish under the strict lock refuses the extra field and sa
     assert(msg.includes('"colour"') && msg.includes('strict'), `the refusal should name the field and the strict lock: ${msg}`);
 });
 
-await test('Cleanup: the owner this suite made is gone', async () => {
-    const r = await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: auth(ownerTok) });
-    assert(r.status === 200, `delete: ${r.status} ${short(r.body)}`);
+const otherName = `dropsb${stamp}`;
+let otherTok = '';
+await test('A second owner, not a member, cannot publish into the organism\'s records space', async () => {
+    otherTok = (await registerOwner(BASE, otherName)).token;
+    const r = await json(`/v1/organisms/${encodeURIComponent(org)}/workspace/records/publish`, {
+        method: 'POST', headers: auth(otherTok),
+        body: JSON.stringify({ ws, namespace: 'deals', records: [{ id: 'd3', value: { id: 'd3', title: 'Not mine to add' } }] }),
+    });
+    expectRefusal(r, 403);
 });
 
-console.log(`\n${passed} passed, ${failed} failed\n`);
-process.exit(failed > 0 ? 1 : 0);
+await test('Cleanup: the owners this suite made are gone', async () => {
+    const r = await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: auth(ownerTok) });
+    assert(r.status === 200, `delete: ${r.status} ${short(r.body)}`);
+    const o = await json(`/v1/owners/${otherName}`, { method: 'DELETE', headers: auth(otherTok) });
+    assert(o.status === 200, `delete the second owner: ${o.status} ${short(o.body)}`);
+});
+
+finish();

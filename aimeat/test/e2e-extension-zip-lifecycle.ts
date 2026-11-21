@@ -16,26 +16,13 @@
  *   names aimeat_extension_activate (ext/extension-update-needs-new-version-and-activation).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-zip-lifecycle
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The shared harness (test/helpers/harness.ts).
  *   v1.0.0 — 2026-11-21 — Initial (pitfall round A6).
  */
 import { deflateRawSync, crc32 } from 'node:zlib';
 import { parse as parseYaml } from 'yaml';
+import { BASE, test, assert, json, finish } from './helpers/harness.js';
 import { registerOwner } from './helpers/owner-login.js';
-
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0;
-let failed = 0;
-async function test(name: string, fn: () => Promise<void>): Promise<void> {
-    try { await fn(); passed++; console.log(`✅ ${name}`); }
-    catch (e) { failed++; console.log(`❌ ${name}: ${(e as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-async function json(path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
-    const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers ?? {}) } });
-    const text = await res.text();
-    try { return { status: res.status, body: JSON.parse(text) }; } catch { return { status: res.status, body: text }; }
-}
 
 /** Minimal deflated ZIP writer (as test/e2e-scheduled-ext-files.ts), so the suite needs no dependency. */
 function makeZip(files: Record<string, string>): Buffer {
@@ -212,5 +199,4 @@ await test('9. A ZIP update with activate:true switches it on and registers its 
     await json(`/v1/extensions/${EXT}`, { method: 'DELETE', headers: auth() });
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed ? 1 : 0);
+finish();

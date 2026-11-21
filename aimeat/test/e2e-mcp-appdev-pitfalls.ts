@@ -9,6 +9,8 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-appdev-pitfalls).
  * @version-history
+ *   2026-11-21 — The platform-defect case says confirm_new: its text matches the new curated entry
+ *     display-version-carried, and the case is about the wish text.
  *   2026-11-21 — A free-text category files under the nearest fixed one with a tag and a warning,
  *     instead of a 400 (an earlier client's report keeps working).
  *   2026-11-15 — Audit M064, M065: owner B cannot delete A's shared entry; share=false withdraws it from B's platform list.
@@ -579,6 +581,9 @@ await test('report: kind platform-defect answers with a ready wish text', async 
         model: 'claude-haiku-4.5', category: 'publish', title: 'Upload publish ignores the page version comment',
         symptom: 'the catalogue keeps the previous version label', resolution: 'pass version on every publish call',
         kind: 'platform-defect', evidence: 'services/app/publish.ts reads no manifest comment', seen_version: '4.3.1',
+        // The curated entry display-version-carried (2026-11-21) now describes this defect, so the
+        // repeat check would answer SIMILAR_ENTRY; this case is about the wish text, not the repeat.
+        confirm_new: true,
     });
     assert(r.result?.isError !== true, `platform-defect: ${reportText(r).slice(0, 300)}`);
     const pd = reportOut(r).platform_defect;

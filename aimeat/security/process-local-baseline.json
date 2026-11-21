@@ -237,6 +237,10 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/agent/task-write.ts :: set :: CREATE_FIELDS": {
+      "count": 1,
+      "reason": "The field names of AgentTaskCreateSchema, from the code; every process builds the same set, so nothing breaks with a second process."
+    },
     "src/services/extension-access/internal-pass.ts :: map :: passes": {
       "count": 1,
       "reason": "DEBT"

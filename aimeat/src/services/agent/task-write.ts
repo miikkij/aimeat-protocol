@@ -146,6 +146,7 @@ export type CreateTaskResult =
     | { ok: true; deduplicated: true; task: AgentTaskRecord; ignoredFields?: string[] }
     | { ok: true; deduplicated: false; task: AgentTaskRecord; autoActivated: boolean; decision: TaskStartDecision; ignoredFields?: string[] };
 
+// process-local: the field names of AgentTaskCreateSchema, from the code; every process builds the same set.
 const CREATE_FIELDS: ReadonlySet<string> = new Set(Object.keys(AgentTaskCreateSchema.shape));
 
 /**

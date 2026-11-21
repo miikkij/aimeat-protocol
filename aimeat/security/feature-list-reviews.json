@@ -128,7 +128,7 @@
       "digest": "sha256:5da5741ca94981ae16689baf"
     },
     "7. The agent fleet": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/agent/task-rules.ts",
         "aimeat/src/services/agent/task-start-write.ts",
@@ -146,7 +146,7 @@
         "aimeat/src/routes/connect-tunnel.ts",
         "aimeat/src/services/basic-agents.ts"
       ],
-      "digest": "sha256:8e3efedfe361eb31fe82c974"
+      "digest": "sha256:b1282d633c59f95d052621e3"
     },
     "8. Automation: schedules, workflows and extensions": {
       "reviewedOn": "2026-11-21",
@@ -165,7 +165,7 @@
         "aimeat/src/routes/commerce-ucp.ts",
         "aimeat/src/routes/commerce-acp.ts"
       ],
-      "digest": "sha256:5ff2bd5598bed4357f36828e"
+      "digest": "sha256:fc900c87d4ec442f085ff270"
     },
     "9. AI on the node": {
       "reviewedOn": "2026-11-21",
@@ -194,7 +194,7 @@
         "aimeat/src/tool-catalog/definitions/ai-models.ts",
         "aimeat/src/tool-catalog/definitions/decide.ts"
       ],
-      "digest": "sha256:9a0cec2bfa88c07a7a8d0c41"
+      "digest": "sha256:c30e939a1e51178cd9cac77b"
     },
     "10. Apps": {
       "reviewedOn": "2026-11-20",
@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:347c46b9cbc7d03b175fce35"
+      "digest": "sha256:96cdee23b040865a6ef96aad"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-20",
@@ -682,8 +682,8 @@
       "aimeat/src/tool-catalog/definitions/goals.ts": "d1d14a000c53a6ea",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agent-tasks/completion.ts": "1740131b010fd4c2",
-      "aimeat/src/routes/agent-tasks/create-read.ts": "4e46eba8bab9bd6b",
-      "aimeat/src/routes/agent-tasks/dedupe.ts": "350d88584f9533ee",
+      "aimeat/src/routes/agent-tasks/create-read.ts": "2b29796ce8ef8f37",
+      "aimeat/src/routes/agent-tasks/dedupe.ts": "bbfe9654cd06d631",
       "aimeat/src/routes/agent-tasks/helpers.ts": "8e532f5f296ce335",
       "aimeat/src/routes/agent-tasks/lifecycle.ts": "e721781e12c40bd8",
       "aimeat/src/routes/agents/stop-start.ts": "6103d4376b86a22f",
@@ -717,7 +717,7 @@
       "aimeat/src/services/schedule/run-limit.ts": "2b44c8c159d741d9",
       "aimeat/src/services/schedule/types.ts": "f90eef7c590ee88f",
       "aimeat/src/services/schedule/write.ts": "e964d8ddc942e30d",
-      "aimeat/src/tool-catalog/definitions/extensions-cortex.ts": "fd7f61386516306a",
+      "aimeat/src/tool-catalog/definitions/extensions-cortex.ts": "e573ff8a68b288d9",
       "aimeat/src/routes/schedules.ts": "445717db006e0f07",
       "aimeat/src/routes/workflows.ts": "efaf105d6380eca6",
       "aimeat/src/routes/cortex.ts": "05d7830ff08fc276",
@@ -743,7 +743,7 @@
       "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c",
       "aimeat/src/services/ai/transcription.ts": "994b10f23a26e665",
       "aimeat/src/services/ai/voice.ts": "87d6b0f6a2227a69",
-      "aimeat/src/routes/ai.ts": "cd09968c390a97cf",
+      "aimeat/src/routes/ai.ts": "5a597fdae8434769",
       "aimeat/src/routes/llm-proxy.ts": "027d67cf9f0f75cc",
       "aimeat/src/routes/ai-providers.ts": "223c9be9d18fb28c",
       "aimeat/src/routes/ai-decide.ts": "ff8297466c4c9c73",
@@ -775,7 +775,7 @@
     },
     "11. Served libraries and the Design Book": {
       "aimeat/src/data/library-packs/cortex.ts": "922ad4c03b0a4963",
-      "aimeat/src/data/library-packs/sdk-ai.ts": "c843264ab2802f18",
+      "aimeat/src/data/library-packs/sdk-ai.ts": "8acd12b22ea48c2e",
       "aimeat/src/data/library-packs/sdk-calendar-print.ts": "7ce80495af762d55",
       "aimeat/src/data/library-packs/sdk-datapackage.ts": "575d27ad2b902691",
       "aimeat/src/data/library-packs/sdk-decide.ts": "c8bd5ef8318fdfe9",
@@ -786,11 +786,11 @@
       "aimeat/src/data/library-packs/sdk-parties.ts": "817db4bccccb2be4",
       "aimeat/src/data/library-packs/sdk-prompt.ts": "7f6cc16b4bd0c3ac",
       "aimeat/src/data/library-packs/sdk-refinery.ts": "a23e1337130b3c7d",
-      "aimeat/src/data/library-packs/sdk-ui.ts": "99e746d46e9bb65f",
+      "aimeat/src/data/library-packs/sdk-ui.ts": "d5afac40276c50cc",
       "aimeat/src/data/library-packs/sdk-validate.ts": "74cb81e57ef423c4",
       "aimeat/src/data/library-packs/sdk-webhook.ts": "e8cd8123c3d9d65a",
       "aimeat/src/data/library-packs/sdk-workflows.ts": "7f6ca17f8180fa7b",
-      "aimeat/src/data/library-packs/sdk.ts": "7504eafc3ae67953",
+      "aimeat/src/data/library-packs/sdk.ts": "09230a2c61a07336",
       "aimeat/src/data/library-packs/translations.ts": "3683cb9315747ead",
       "aimeat/src/data/library-packs/types.ts": "e9a3a4616aabd40e",
       "aimeat/src/data/library-packs/vendored-creative.ts": "d441ba5b6ac9c4d4",
