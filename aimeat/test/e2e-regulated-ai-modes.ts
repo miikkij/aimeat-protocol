@@ -14,6 +14,7 @@
  *     - block: neither agent gets it, and the exception does not open it: the attempt is marked as
  *       exceptional; alice still reads it on her own screen;
  *     - a register can tighten (block over the operator's notify) and never loosen;
+ *     - an owner who does not run the node cannot set the modes, and another owner cannot change a register;
  *     - an agent cannot loosen the operator's setting (PERSON_REQUIRED), a person can;
  *     - the Plain workspace is never touched; the compliance report lists the marks;
  *     - the mode holds with classification off too.
@@ -142,6 +143,15 @@ await test('NOTIFY (the default): far reads the Patients record as before, and a
     assert(r?.value?.name === NAME && r.value.note === NOTE, `far reads it whole: ${JSON.stringify(r?.value)}`);
     const rows = await marks('regulated', regulatedRow);
     assert(rows.some(x => String(x.purpose).includes('(notify)') && x.label === 'domain:health'), `a notify mark: ${JSON.stringify(rows).slice(0, 500)}`);
+});
+
+await test('WHO: alice, who does not run the node, cannot set the modes (403); bob cannot change her register\'s mode (404)', async () => {
+    const bob = await registerOwner(BASE, `regbob${stamp}`);
+    expectRefusal(await setConfig(alice.token, 'compliance.regulated_ai_modes', ['health=notify']), 403);
+    const r = await call('PUT', `/v1/compliance/docs/registers?${q(ORG())}`, bob.token, { items: [] });
+    expectRefusal(r, 404);
+    const kept = await call('GET', `/v1/compliance/docs/registers?${q(ORG())}`, alice.token);
+    assert(kept.status === 200 && kept.body.data.items.length === 1, `POSITIVE CONTROL, alice's register stays: ${JSON.stringify(kept.body?.data?.items?.length ?? kept.body?.error)}`);
 });
 
 await test('SETTING: an unknown domain or mode is refused (400); an agent cannot loosen it (403 PERSON_REQUIRED), a person can', async () => {

@@ -14,7 +14,7 @@
  *
  *   PER MODE, for an outside model (block for every model):
  *     notify   passes, and a mark is written;
- *     protect  identifying details are replaced first (compliance/pseudonymise.ts) and the mark says
+ *     protect  identifying details are replaced first (pseudonymise.ts) and the mark says
  *              how many of each kind; an AI call whose caller does not apply protect() (`redacts`) is
  *              refused, so no path sends it unprotected without saying so;
  *     local    held back from an outside model;

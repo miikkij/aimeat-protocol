@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.3.1 (commit 07ae2958c) on 2026-11-20. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit f2e9df7d5) on 2026-11-21. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -101,6 +101,7 @@ Several processes of one node can run against one PostgreSQL database with the s
 | The short address of a presigned upload (`upload_url`): one process issues it and any process takes the upload | `aimeat/src/services/upload/token.ts` |
 | The per-account limits (mail, invitations, AI calls), the count of wrong admin passwords per address and the sign-in tarpit: one count for the node, so N processes allow each limit once. An admin password is counted before it is compared and a right one is taken off the count again, so wrong passwords sent at the same moment are compared only up to the count | `aimeat/src/services/account/limits.ts`, `aimeat/src/services/node-admin/password.ts`, `aimeat/src/middleware/login-tarpit.ts` |
 | The node's AI allowance per account: a debit or grant is written on the record's version, so two processes settling one account's calls lose none | `aimeat/src/services/ai/allowance.ts` |
+| Which content a register puts in a regulated data domain, and its mode for an outside AI model: each process builds this from the stored registers, drops it when a compliance document changes on any process (the event bus), and builds it again after 5 minutes in any case | `aimeat/src/services/compliance/regulated-ai.ts` |
 
 ### What stays in each process, and what follows
 
