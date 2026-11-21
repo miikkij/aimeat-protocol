@@ -504,7 +504,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // (services/content/risk-read.ts heldFromReader); a caller with no credential is not asked.
         const hiddenFromCaller = async (): Promise<boolean> =>
             !(await storedFileShownTo({ storage, config }, contentReaderFor({ storage, config }, req.auth), gaii, key, file))
-            || (!!req.auth?.sub && !isAnonymousPrincipal(req.auth)
+            || (!!req.auth && !isAnonymousPrincipal(req.auth)
                 && await heldFromReader({ storage, config }, callerOf(req, config.nodeId, storage), { kind: 'file', owner: gaii, key }));
 
         // ?mode=handle — answer an ALLOWED read with a presigned URL + metadata instead of the bytes.
