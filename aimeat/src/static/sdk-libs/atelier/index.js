@@ -62,7 +62,9 @@
  *     usable, the phone's bottom sheet, Back and "Step n of m", do-steps, point(), the header
  *     button and the one-time invitation the owner can switch off (shell.js). The aide lights the
  *     places it names and the control of a proposed action (aide.js). tour({ steps }) as before
- *     (wish-opastettu-kierros-sovelluksiin-monikielinen-tutorial-ja-oma-).
+ *     (wish-opastettu-kierros-sovelluksiin-monikielinen-tutorial-ja-oma-). Two desktop defaults in
+ *     the stylesheet: .ak-input stops at 48rem (data.css), and a button straight in a section body
+ *     or the main region keeps its own width (shell.css).
  *   v0.71.0 — 2026-11-21 — kanban onOpen(card) (planner.js), and an app made with nav: 'side' and no
  *     entries builds its column on the first nav.set({ items }) (shell.js).
  *   v0.70.0 — 2026-11-21 — Defaults that did the unexpected: a dialog action closes its dialog

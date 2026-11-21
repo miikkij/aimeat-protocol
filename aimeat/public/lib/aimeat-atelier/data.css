@@ -13,6 +13,9 @@
  *   ak-input/ak-input--range/ak-check/ak-toggle · ak-table · ak-search
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.72.0 — 2026-11-22 — .ak-input stops at 48rem (max-inline-size): a field the page stretched
+ *     across a desktop window ran 1300px wide although the desktop rules say nothing typed into spans
+ *     the screen. A field in a narrower column is as before.
  *   v0.12.0 — 2026-10-05 — Validation: .ak-form__field--valid (border and a check after the label),
  *     .ak-form__alert for a problem of no one field, .ak-form__gate for the line under a held
  *     button, and a held .ak-btn (aria-disabled) reads as held.
@@ -84,6 +87,10 @@
   font-size: var(--ak-text-body);
   width: 100%;
   min-width: 0;
+  /* Nothing that is typed into spans the screen: a sentence fits in 48rem, and a wide window
+     gives the room to the columns beside the field, not to the field (the desktop rules of the
+     Atelier specification, part screens). The kit holds it, so a page that forgets still keeps it. */
+  max-inline-size: 48rem;
 }
 .ak-input--area { min-height: calc(var(--ak-touch) * 2); resize: vertical; }
 

@@ -17,6 +17,9 @@
  *   fade, for every scroller in the kit) · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.72.0 — 2026-11-22 — A button straight in a section's body or in the main region keeps its own
+ *     width (align-self: flex-start); the column stretched it, so a Save button ran 1143px wide on a
+ *     1920 desktop.
  *   v0.62.1 — 2026-10-01 — The tab strip draws no scrollbar (scrollbar-width: none, and the
  *     WebKit pseudo for older Safari); the edge fade remains the sign that it scrolls.
  *   v0.57.0 — 2026-09-29 — .ak-badge--ok / --warn / --err / --quiet: a status badge in its tone.
@@ -380,6 +383,10 @@
 }
 .ak-section__hint { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
 .ak-section__body { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+/* A button keeps its own width, at the start of the line, where the column would stretch it:
+   a save button across a 1200px card is the desktop failure the desktop rules name. */
+.ak-section__body > .ak-btn,
+.ak-app__main > .ak-btn { align-self: flex-start; }
 
 /* ── The sideways edge fade ───────────────────────────────────────────────────────────────────
    A strip that scrolls sideways and a strip that ended look the same, and the measured review
