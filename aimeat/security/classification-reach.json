@@ -1395,6 +1395,16 @@
       },
       "why": "Written 2026-11-21 (content risk marks), the node's own read during an account erasure: every person's contentclass.risk record and the meta.contentrisk records of the workspaces of the erased person's organisms, to give the pseudonym to the entries naming them. The entries hold no words of any content, and nothing is shown to anyone."
     },
+    "src/services/content/risk-excerpts.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getMemoryByKeysAnyOwner": 2,
+        "getStorageFileMeta": 1,
+        "getStorageFile": 1,
+        "getWorkspaceRow": 1
+      },
+      "why": "Written 2026-11-22 (content risk acceptance), a read that is classified in its caller: the words of a marked item, read for the list of the person who decides it (risk-hold.ts listRiskItemsFor: the caller's own items and those of the workspaces they run) to show the phrase each mark found. Each read answers the item's label address (`target`), and the list passes the words through the caller's classification reader (readerFor(caller.auth).show) before it shows any; an item the reader may not see, or a row whose space cannot be named, shows no words."
+    },
     "src/services/content/risk-intake.ts": {
       "reads": {
         "getMemory": 1,

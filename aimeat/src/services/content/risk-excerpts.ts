@@ -15,15 +15,19 @@
  *   mail or drive file read live give no excerpt either.
  *
  *   WHO READS. Only the list of the person who decides the entry calls this (risk-hold.ts
- *   listRiskItemsFor), so every item is one the caller owns or runs as a workspace's admin.
+ *   listRiskItemsFor), so every item is one the caller owns or runs as a workspace's admin. The words
+ *   still pass that caller's classification reader there (each item's label address is `target`): an
+ *   AI deciding for its person sees no words of an item whose label hides it from AI.
  * @structure subjectFromEntry · wordsOf · marksWithWords
  * @usage const s = subjectFromEntry(home, id, source); const w = s && await wordsOf(deps, s);
  * @version-history
  *   v1.0.0 — 2026-11-22 — Initial (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  */
 import { createHash } from 'node:crypto';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
+import { fileTarget, memoryTarget, rowTarget, fileAddressOf } from '../classification/labels.js';
+import { readWorkspaceManifest } from '../workspace/meta.js';
 import { riskTextOf } from './risk-text.js';
 import { excerptOf } from './risk-rules.js';
 import { hashText, openMarks } from './risk-core.js';
@@ -69,15 +73,26 @@ export function subjectFromEntry(
 const joinMessage = (a: string | null | undefined, b: string | null | undefined): string =>
   [a ?? '', b ?? ''].filter((s) => s.trim()).join('\n\n');
 
+/** An item's words: the text, its hash, and the address its classification label is read at (none for a message or a post). */
+export interface ItemWords { text: string; hash: string; target?: ContentLabelTarget }
+
+/** The name of a row space, from its namespace (the label of a row is kept under the space's name). */
+async function rowSpaceName(deps: Deps, org: string, ws: string, namespace: string): Promise<string | null> {
+  const manifest = await readWorkspaceManifest(deps.storage, org, ws, deps.config.nodeId);
+  const types = (manifest?.objectTypes ?? []) as Array<{ name?: unknown; namespace?: unknown }>;
+  const hit = types.find((t) => t.namespace === namespace && typeof t.name === 'string');
+  return hit ? String(hit.name) : null;
+}
+
 /** The item's current words and their hash, read the way its point read them; null when they cannot be read. */
-export async function wordsOf(deps: Deps, s: RiskSubject): Promise<{ text: string; hash: string } | null> {
-  const asText = (text: string) => ({ text, hash: hashText(text) });
+export async function wordsOf(deps: Deps, s: RiskSubject): Promise<ItemWords | null> {
+  const asText = (text: string, target?: ContentLabelTarget): ItemWords => ({ text, hash: hashText(text), ...(target ? { target } : {}) });
   switch (s.kind) {
     case 'memory': {
       const rec = s.owner
         ? await deps.storage.getMemory(s.owner, s.key)
         : (await deps.storage.getMemoryByKeysAnyOwner([s.key]))[0] ?? null;
-      return rec ? asText(riskTextOf(rec.value)) : null;
+      return rec ? asText(riskTextOf(rec.value), memoryTarget(rec.ownerGaii, rec.key)) : null;
     }
     case 'file': {
       const meta = await deps.storage.getStorageFileMeta(s.owner, s.key);
@@ -85,16 +100,22 @@ export async function wordsOf(deps: Deps, s: RiskSubject): Promise<{ text: strin
       const file = await deps.storage.getStorageFile(s.owner, s.key);
       if (!file?.data) return null;
       const bytes = Buffer.from(file.data);
-      return { text: bytes.toString('utf8'), hash: `sha256:${createHash('sha256').update(bytes).digest('hex')}` };
+      return {
+        text: bytes.toString('utf8'), hash: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+        target: await fileAddressOf(deps.storage, fileTarget(s.owner, s.key)),
+      };
     }
     case 'comment': {
       const rec = (await deps.storage.getMemoryByKeysAnyOwner([s.key]))[0];
       const body = (rec?.value as { body?: unknown } | undefined)?.body;
-      return typeof body === 'string' ? asText(body) : null;
+      return typeof body === 'string' ? asText(body, memoryTarget(rec!.ownerGaii, rec!.key)) : null;
     }
     case 'row': {
       const row = await deps.storage.getWorkspaceRow(s.org, s.ws, s.space, s.id);
-      return row ? asText(riskTextOf(row.body)) : null;
+      if (!row) return null;
+      const name = await rowSpaceName(deps, s.org, s.ws, s.space);
+      // A row whose space cannot be named has no label address: its words are not shown.
+      return name ? asText(riskTextOf(row.body), rowTarget(s.org, s.ws, name, s.id)) : null;
     }
     case 'dm': {
       const m = await deps.storage.getDirectMessage(s.id, s.owner);

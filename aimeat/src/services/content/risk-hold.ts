@@ -51,6 +51,7 @@ import { systemOwnerOf } from './shared-profile-key.js';
 import { isApprover, approversOf, openMarks, placeOf, emitRiskChange } from './risk-core.js';
 import { flushContentRisk } from './risk-intake.js';
 import { subjectFromEntry, wordsOf, marksWithWords, type MarkWords } from './risk-excerpts.js';
+import { readerFor } from '../classification/reader.js';
 import { listKept, personRiskKey, workspaceRiskKey, type RiskHome } from './risk-store.js';
 import type { RiskMarks, RiskKind } from './risk-types.js';
 import { ContentError } from './pipeline.js';
@@ -136,14 +137,17 @@ export async function listRiskItemsFor(deps: Deps, caller: CallerContext, status
     }
   }
   const shown = found.filter((f) => !status || f.item.status === status).sort((a, b) => (a.item.since < b.item.since ? 1 : -1));
+  // The words pass the caller's classification reader, as any other read of the content does.
+  const reader = readerFor(deps, caller.auth);
   await Promise.all(shown.slice(0, WITH_WORDS).map(async (f) => {
     const subject = subjectFromEntry(f.home, f.id, f.source);
     if (!subject) return;
     f.item.place = placeOf(subject);
-    const words = await wordsOf(deps, subject).catch((e: unknown) => {
+    let words = await wordsOf(deps, subject).catch((e: unknown) => {
       logger.warn('contentrisk: the words of a marked item could not be read', { id: f.id, error: String((e as Error)?.message ?? e) });
       return null;
     });
+    if (words?.target && !(await reader.show([words], (w) => w.target ?? null)).length) words = null;
     const { marks, changed } = marksWithWords(f.entry, words);
     f.item.phrases = marks;
     if (changed) f.item.changed = true;

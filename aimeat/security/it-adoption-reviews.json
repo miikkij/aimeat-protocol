@@ -113,7 +113,7 @@
         "aimeat/src/services/content/risk-core.ts",
         "aimeat/src/services/content/risk-read.ts"
       ],
-      "digest": "sha256:d0028ac0c7ee3e4be4e7a231"
+      "digest": "sha256:9e019437643159611440a06a"
     },
     "09-hardening-guide.md": {
       "reviewedOn": "2026-11-19",
@@ -371,7 +371,7 @@
     "08-threat-model.md": {
       "docs/security/threat-model.md": "10cf3cf1952417f9",
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce",
-      "aimeat/src/services/content/risk-core.ts": "671183d4d614624f",
+      "aimeat/src/services/content/risk-core.ts": "f38a7bed617ab7f1",
       "aimeat/src/services/content/risk-read.ts": "5b32b030fe04164c"
     },
     "09-hardening-guide.md": {
