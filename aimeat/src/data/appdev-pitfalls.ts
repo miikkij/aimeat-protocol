@@ -12,6 +12,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-21 — app-meta-declarations says a publish asking for an ungrantable scope word is refused.
  *   2026-11-21 — login-is-silent-only, long-ai-calls-timeout and ext-manifest-strict say what the
  *     platform now tells the builder (a console line naming signIn(), `jobHint`, every manifest
  *     problem at once).
@@ -170,7 +171,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     enforcedBy: 'artifact-lint:checkMetas',
     title: 'The three head declarations an app is expected to make',
     symptom: 'The language switch never appears in the login pill, sign-in asks for less than the app needs (ai:use is unavailable, deletes 403), sign-in does nothing at all, or AIMEATAgentFace.publish cannot work out which app it belongs to on a per-app subdomain.',
-    fix: 'Declare them, one line each: `<meta name="aimeat-app" content="my-app.html">` (your published filename), `<meta name="aimeat-scopes" content="memory:read memory:write ai:use">` (what sign-in asks the user to approve; declaring nothing gets the four-word default, and declaring replaces the default rather than adding to it), `<meta name="aimeat-locales" content="en fi">` (the languages you have; two or more draw the switch in the login pill). One word in aimeat-scopes that the node cannot grant refuses the WHOLE sign-in with INVALID_SCOPE; GET /v1/app-grants/scopes lists the grantable words, and the publish answer warns about any other.',
+    fix: 'Declare them, one line each: `<meta name="aimeat-app" content="my-app.html">` (your published filename), `<meta name="aimeat-scopes" content="memory:read memory:write ai:use">` (what sign-in asks the user to approve; declaring nothing gets the four-word default, and declaring replaces the default rather than adding to it), `<meta name="aimeat-locales" content="en fi">` (the languages you have; two or more draw the switch in the login pill). One word in aimeat-scopes that the node cannot grant refuses the WHOLE sign-in with INVALID_SCOPE; GET /v1/app-grants/scopes lists the grantable words, and a publish whose aimeat-scopes asks for any other is refused (APP_ARTIFACT_BROKEN).',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',

@@ -27,6 +27,8 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   (2026-11-21) An aimeat-scopes word no app grant can hold refuses the publish; grantable words
+ *     publish, and a refused update leaves the live version as it was.
  *   (2026-11-19) One track: build-app hands out the Atelier token, a new non-Atelier page is warned
  *     whatever token it carried, and an update of a Classic app stays quiet.
  *   (2026-11-15) Audit M276: DOOR 3 asserts the refused draft left no catalogue row and no version.
@@ -725,6 +727,49 @@ const publish = (token: string, body: Record<string, unknown>) =>
             name: 'Fixed', description: 'Same app with the real library URL.', spec_token: specToken,
         });
         assert(r.status === 201, `the fixed app must publish — got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    });
+
+    // ── An aimeat-scopes word no app grant can hold: nobody could sign in, so it is refused ────
+
+    const scopeName = `gatescope${Date.now()}.html`;
+    const withScopes = (words: string) => app(scopeName).replace('content="memory:read memory:write"', `content="${words}"`);
+    await test('an app whose aimeat-scopes asks for a word no app grant can hold is REFUSED, naming only that word', async () => {
+        const r = await publish(o.token, {
+            filename: scopeName, mime_type: 'text/html', content: b64(withScopes('memory:read storage:delete')),
+            name: 'Bad scope', description: 'Asks for a word the node cannot grant.', spec_token: specToken,
+        });
+        assert(r.status === 422 && r.body.error?.code === 'APP_ARTIFACT_BROKEN',
+            `expected 422 APP_ARTIFACT_BROKEN, got ${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        const hit = (r.body.error?.details?.findings ?? []).find((f: any) => f.pitfall === 'app-meta-declarations');
+        assert(!!hit && hit.severity === 'critical', `expected a critical app-meta-declarations finding: ${JSON.stringify(r.body.error?.details)}`);
+        assert(hit.message.includes('storage:delete') && !hit.message.includes('`memory:read`') && hit.message.includes('/v1/app-grants/scopes'),
+            `the finding names the word and where the vocabulary is: ${hit.message}`);
+        assert(!await appRow(o.name, scopeName, o.token), 'the refused app is in the catalogue');
+    });
+
+    await test('a property name of a plain object, comma-separated, is not a scope word and is refused too', async () => {
+        const r = await publish(o.token, {
+            filename: scopeName, mime_type: 'text/html', content: b64(withScopes('memory:read,constructor')),
+            name: 'Bad scope', description: 'Asks for constructor.', spec_token: specToken,
+        });
+        assert(r.status === 422, `expected 422, got ${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        assert(JSON.stringify(r.body.error?.details?.findings ?? []).includes('constructor'), `the word is named: ${JSON.stringify(r.body.error)}`);
+    });
+
+    await test('the same app asking only grantable words publishes, and a later refused update leaves it live', async () => {
+        const ok = await publish(o.token, {
+            filename: scopeName, mime_type: 'text/html', content: b64(withScopes('memory:read,storage:write')),
+            name: 'Good scope', description: 'Asks for words the node can grant.', spec_token: specToken,
+        });
+        assert(ok.status === 201, `grantable words must publish — got ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+        const bad = await publish(o.token, {
+            filename: scopeName, mime_type: 'text/html', content: b64(withScopes('memory:read organism:admin')),
+            name: 'Good scope', description: 'An update that asks for a word the node cannot grant.', spec_token: specToken,
+        });
+        assert(bad.status === 422, `the update must be refused — got ${bad.status}`);
+        const served = await fetch(`${BASE}/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(scopeName)}`, { headers: auth(o.token) }).then(x => x.text());
+        assert(served.includes('memory:read,storage:write') && !served.includes('organism:admin'),
+            `the live version must stay the one that published: ${served.slice(0, 300)}`);
     });
 
     // ── Every door, not just the one this was written on ───────────────────────────────────────

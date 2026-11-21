@@ -209,10 +209,10 @@ describe('lintAppArtifact — the head declarations', () => {
   // answer 400 for the WHOLE list, so nobody signs in, and the publish said nothing about it.
   it('names every aimeat-scopes word this node cannot grant, and no word it can', async () => {
     const html = CLEAN.replace('content="memory:read memory:write"', 'content="memory:read storage:delete organism:admin"');
-    const { warnings } = await lintAppArtifact(html, config);
-    const scopes = warnings.filter(f => f.pitfall === 'app-meta-declarations' && f.message.includes('cannot grant'));
+    const { blocking } = await lintAppArtifact(html, config);
+    const scopes = blocking.filter(f => f.pitfall === 'app-meta-declarations' && f.message.includes('cannot grant'));
     expect(scopes).toHaveLength(1);
-    expect(scopes[0]?.severity).toBe('warn');
+    expect(scopes[0]?.severity).toBe('critical');
     expect(scopes[0]?.message).toContain('storage:delete');
     expect(scopes[0]?.message).toContain('organism:admin');
     expect(scopes[0]?.message).not.toContain('memory:read');

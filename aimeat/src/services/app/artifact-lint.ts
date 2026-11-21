@@ -25,6 +25,9 @@
  *   REPLACE-ME placeholder, is refused. The shell carries the placeholder ON PURPOSE: the frame
  *   fails the gate, a fork of a genre passes it by construction.
  *
+ *   AN aimeat-scopes WORD NO APP GRANT CAN HOLD blocks too (2026-11-21), on the proof ground: one
+ *   such word refuses the whole sign-in, so the app cannot work for anyone, its owner included.
+ *
  *   THE PROBE FAILS OPEN ON INFRASTRUCTURE AND CLOSED ON EVIDENCE. Only a completed HTTP exchange
  *   answering 404/410 blocks. A timeout, a refused connection, a 5xx or a disabled probe produces
  *   NO finding: the node then has no evidence about that URL, and blocking a publish on the node's
@@ -35,12 +38,14 @@
  *   - AppArtifactFinding / AppArtifactLintResult — the shapes a publish response carries
  *   - lintAppArtifact(html, config) — the whole check: blocking[] + warnings[]
  *   - checkInlineScripts / checkUnparsedModules / collectAssetRefs / probeNodeAssets / checkRegister /
- *     checkTheme / checkMetas / checkAgentDataReads — one concern each
+ *     checkTheme / checkMetas / checkScopeVocabulary / checkAgentDataReads — one concern each
  * @usage
  *   import { lintAppArtifact } from './artifact-lint.js';
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   (2026-11-21) An aimeat-scopes word no app grant can hold refuses the publish (checkScopeVocabulary);
+ *     it warned before. Apps already published are not checked again.
  *   (2026-11-21) Six page-code warnings join from services/app/page-code-lint.ts (pitfall round A8).
  *   (2026-11-19) The Classic guide is retired: a Classic page that draws the Atelier shell is told the
  *     Atelier guide is the one guide (section from-classic), and a dead script URL is answered from
@@ -171,6 +176,7 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   warnings.push(...refs.warnings);
   blocking.push(...await probeNodeAssets(refs.nodePaths, config));
   blocking.push(...checkRegister(html));
+  blocking.push(...checkScopeVocabulary(html));
 
   warnings.push(...checkUnparsedModules(html));
   warnings.push(...checkTheme(html));
@@ -773,21 +779,28 @@ function checkMetas(html: string): AppArtifactFinding[] {
     out.push(finding('app-meta-declarations', 'warn',
       '`<meta name="aimeat-app">` still holds the shell\'s placeholder. Put your published filename in it, exactly as you publish it (for example `my-app.html`).'));
   }
-
-  // A word outside the vocabulary refuses the WHOLE list: the silent bridge answers invalid_scope
-  // and GET /v1/app-grants/authorize answers 400 INVALID_SCOPE, so nobody signs in to the app, its
-  // owner included. A warning rather than a block, as the file header explains: a publish that
-  // fails is a publish that gets worked around, and the sentence below tells the builder exactly
-  // which word to change.
-  const unknown = [...new Set(scopeWords.filter(w => !Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, w)))];
-  if (unknown.length) {
-    out.push(finding('app-meta-declarations', 'warn',
-      `\`<meta name="aimeat-scopes">\` asks for ${unknown.map(w => `\`${w}\``).join(', ')}, which this node `
-      + 'cannot grant. One word outside the vocabulary refuses the whole sign-in, so nobody can sign in '
-      + 'to this app, the owner included. Take the words from GET /v1/app-grants/scopes (file deletion '
-      + 'is storage:write; there is no storage:delete).'));
-  }
   return out;
+}
+
+/**
+ * An aimeat-scopes word no app grant can hold, which REFUSES the publish (2026-11-21).
+ *
+ * One word outside the vocabulary refuses the WHOLE list: the silent bridge answers invalid_scope
+ * and GET /v1/app-grants/authorize answers 400 INVALID_SCOPE, so nobody signs in to the app, its
+ * owner included. That is a claim proven here from the bytes and the vocabulary, the same ground
+ * the parse and 404 findings block on. It warned until 2026-11-21, and the warning let such apps
+ * go live with a sign-in that could never work. An app already published is not checked again;
+ * only the next publish of its bytes meets this.
+ */
+function checkScopeVocabulary(html: string): AppArtifactFinding[] {
+  const scopeWords = declaredScopeWords(html.slice(0, SCAN_BYTES));
+  const unknown = [...new Set(scopeWords.filter(w => !Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, w)))];
+  if (!unknown.length) return [];
+  return [finding('app-meta-declarations', 'critical',
+    `\`<meta name="aimeat-scopes">\` asks for ${unknown.map(w => `\`${w}\``).join(', ')}, which this node `
+    + 'cannot grant. One word outside the vocabulary refuses the whole sign-in, so nobody can sign in '
+    + 'to this app, the owner included. Take the words from GET /v1/app-grants/scopes (file deletion '
+    + 'is storage:write; there is no storage:delete), then publish again.')];
 }
 
 /** The words of the first `<meta name="aimeat-scopes">`, or none when it is absent or empty. */

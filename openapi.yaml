@@ -41471,13 +41471,15 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '422':
           description: >-
-            APP_ARTIFACT_BROKEN — the app cannot run as published, so nothing was written. Exactly
-            three findings reach here, each provable from the bytes: an inline `<script>` that does
+            APP_ARTIFACT_BROKEN — the app cannot run as published, so nothing was written. These
+            findings reach here, each provable from the bytes: an inline `<script>` that does
             not parse, a script/stylesheet URL this node answers 404 for, and an Atelier app that
             names no register (`<meta name="aimeat-register">` absent, still the shell's REPLACE-ME
             placeholder, or `custom:default`; finding id `atelier-register`, pitfall url
-            `/v1/appdev/pitfalls/atelier-register`). `error.details.findings` lists them. A staged
-            draft is left in place.
+            `/v1/appdev/pitfalls/atelier-register`). Since 2026-11-21 also an
+            `<meta name="aimeat-scopes">` word no app grant can hold (finding id
+            `app-meta-declarations`, severity `critical`), because one such word refuses the whole
+            sign-in. `error.details.findings` lists them. A staged draft is left in place.
           content:
             application/json:
               schema:
