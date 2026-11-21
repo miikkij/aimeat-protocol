@@ -19,6 +19,9 @@
  * @structure AppsAdminTab (default) · RightNow · FourStates · TakenDown
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.3.1 — 2026-11-21 — "Open the app list" goes to the app catalogue's community view
+ *     (/v1/appcat?view=community). It went to /v1/app-store, where the server serves the SPA shell
+ *     and no client route owns the address, so the shell drew the front page.
  *   v2.3.0 — 2026-10-30 — The last section: style kits (apps-tab.kits.js): the node's default kit, the
  *     rules kits run by, and the kits for the whole node that wait for the operator.
  *   v2.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
@@ -88,7 +91,7 @@ function RightNow({ facts, number, onFilter }) {
   const row = (key, title, why, chip, value, last) => ({ key, name: title, why, mark: chip, value, last });
   return html`
     <${Section} first id="adm-ap-now" num=${number} title=${A('now.title')}
-      doors=${html`<${Action} small soft href="/v1/app-store" newTab>${A('now.openWall')}<//>`}>
+      doors=${html`<${Action} small soft href="/v1/appcat?view=community" newTab>${A('now.openWall')}<//>`}>
       <${Verdict} word=${word} line=${line}
         stamp=${html`${A('now.stored', { size: fmtBytes(facts.bytes) })}<br />${facts.newest}`}>
         <${Readings} rows=${[
