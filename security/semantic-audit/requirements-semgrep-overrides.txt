@@ -24,3 +24,9 @@ opentelemetry-sdk>=1.45.2,<2
 opentelemetry-exporter-otlp-proto-http>=1.45.2,<2
 opentelemetry-instrumentation-requests>=0.66b1
 opentelemetry-instrumentation-threading>=0.66b1
+#
+# semgrep 1.178.0 (and 1.186.0, the newest on 2026-11-22) pins wcmatch~=8.3, and every wcmatch up to
+# 11.1 matches a multi-star pattern in polynomial time (GHSA-53pm-wgxf-c6qf, moderate; Dependabot
+# #245). Semgrep matches the repo's own include and exclude globs with it, never a name from outside,
+# and the taint job was run on 12.x before this line went in. Kept below 13.
+wcmatch>=11.2,<13
