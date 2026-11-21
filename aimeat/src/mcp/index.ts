@@ -11,6 +11,9 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-11-21 — SECURITY: resource:listChanged and resource:updated reach the 2026-07-28 listen
+ *     streams of the event's principal only (modern.notify takes it); a guard comment on why
+ *     resources.subscribe stays undeclared.
  *   2026-11-05 — createMcpServer registers each tool's schemas through stableToolSchemas
  *     (mcp/tool-schema-cache.ts), so tools/list builds a tool's JSON Schema once per schema, not on
  *     every list; the list is byte-identical (codebase analysis 2026-11-03, decision 11b of 2026-11-05).
@@ -224,9 +227,16 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         build: (agentGaii, role, owner) => createMcpServer(agentGaii, authority.scopes, role, authority.token, owner, true),
     });
     // Change events reach the open 2026-07-28 listen streams too (a 2025 session hears them in core.ts).
+    // A resource event names the principal whose namespace changed, and only that principal's
+    // streams hear it (mcp/principal-bus.ts); the tool list change stays a broadcast (decision
+    // 2026-10-20, item 7).
     resourceEvents.on('tool:listChanged', () => modern.notify.toolsChanged());
-    resourceEvents.on('resource:listChanged', () => modern.notify.resourcesChanged());
-    resourceEvents.on('resource:updated', (evt: ResourceChangeEvent) => modern.notify.resourceUpdated(evt.uri));
+    resourceEvents.on('resource:listChanged', (evt: { agentGaii: string }) => modern.notify.resourcesChanged(evt.agentGaii));
+    // GUARD: resources.subscribe stays undeclared (see the capabilities below). The URIs here carry
+    // no owner (aimeat://memory/<key>), and the SDK matches a subscription by the URI string alone,
+    // so a stream subscribed to aimeat://memory/notes would hear every owner's notes key. The
+    // principal filter on this event is what would stop that; keep it before declaring subscribe.
+    resourceEvents.on('resource:updated', (evt: ResourceChangeEvent) => modern.notify.resourceUpdated(evt.agentGaii, evt.uri));
 
     async function authenticate(req: Request, res: Response): Promise<VerifiedToken | null> {
         const header = req.headers.authorization;

@@ -23,10 +23,12 @@
  *   session that admitted it earlier, and the first-contact records are throttled there.
  *
  *   CHANGE NOTIFICATIONS. The handler serves `subscriptions/listen` itself; mcp/resource-events.ts
- *   events are published on every role's handler (handler.notify), so an open listen stream hears
- *   `tools/list_changed` after a permission change and `resources/updated` for a URI it subscribed
- *   to. The SDK's in-process bus sends tools/list_changed to every listen stream, not per agent
- *   (decision 2026-10-20, item 7): each client then re-lists its own principal-scoped list. Every open
+ *   events go onto one PrincipalBus shared by every role's handler (mcp/principal-bus.ts), so an
+ *   open listen stream hears `tools/list_changed` after a permission change, and
+ *   `resources/list_changed` only for its own principal's namespace. tools/list_changed goes to
+ *   every listen stream, not per agent (decision 2026-10-20, item 7): each client then re-lists its
+ *   own principal-scoped list. A resource event is not a broadcast: the SDK's own bus made it one,
+ *   and another owner's stream learned when this owner wrote. Every open
  *   listen stream is registered in mcp/session-registry.ts under its agent, so deleting the agent or
  *   rotating its key closes it, as it closes a 2025 session.
  *
@@ -38,6 +40,8 @@
  *   const modern = modernEndpoint({ config, storage, run, build });
  *   if (await isModernRequest(req)) return modern.serve(req, res, verified, token, role);
  * @version-history
+ *   v1.2.0 — 2026-11-21 — SECURITY: resource notifications per principal (PrincipalBus). Every listen
+ *     stream heard every owner's new keys as resources/list_changed (wish-mcp-kuuntelukanava-kertoo-toisen-omistajan-muistikirjoituste).
  *   v1.1.0 — 2026-10-26 — The MCP Tasks extension on every modern server (wish-mcp-tasks-laajennus-pitkille-ty-kalukutsuille).
  *   v1.0.0 — 2026-10-20 — Initial (MCP SDK v2 migration steps 5 and 6, plan doc-mvguy322f9se).
  */
@@ -56,6 +60,7 @@ import { mcpSessionPlatform } from './session-platform.js';
 import { noteMcpSession, forgetMcpSession } from './session-registry.js';
 import { installTasksExtension } from './tasks-extension.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { PrincipalBus } from './principal-bus.js';
 
 /** Whether a POST speaks MCP 2026-07-28: the SDK's own classifier, so the two can never disagree. */
 export async function isModernRequest(req: Request): Promise<boolean> {
@@ -82,6 +87,9 @@ export interface ModernEndpointDeps {
 export function modernEndpoint(deps: ModernEndpointDeps) {
     const { config, storage } = deps;
     const handlers = new Map<string, McpHttpHandler>();
+    // One bus for every role's handler: each listen stream remembers its principal, and a resource
+    // change reaches only that principal's streams (mcp/principal-bus.ts).
+    const bus = new PrincipalBus((err: Error) => logger.warn('mcp-modern: a listen stream listener failed', { error: err.message }));
 
     /** One strict handler per surface role, made on first use. */
     function handlerFor(role: SurfaceRole | 'all'): McpHttpHandler {
@@ -96,6 +104,7 @@ export function modernEndpoint(deps: ModernEndpointDeps) {
                 return server;
             }, {
                 legacy: 'reject',
+                bus,
                 // A keep-alive comment on open listen streams, so a proxy does not close an idle one.
                 keepAliveMs: 25_000,
                 onerror: (err: Error) => logger.warn('mcp-modern: the handler reported an error', { error: err.message }),
@@ -135,18 +144,25 @@ export function modernEndpoint(deps: ModernEndpointDeps) {
 
         const handler = handlerFor(role);
         const authInfo = modernAuthInfo(verified, token);
+        // The principal the bus files a listen stream under is the one the change events name: the
+        // resolved identity (an owner's GHII, an agent's GAII), as the 2025 session code compares it.
+        const principal = resolveIdentity(verified, config.nodeId);
         const node = toNodeHandler({
-            fetch: (request, options) => deps.run(token, verified, () => handler.fetch(request, { ...options, authInfo })),
+            fetch: (request, options) => bus.runAs(principal, () => deps.run(token, verified, () => handler.fetch(request, { ...options, authInfo }))),
         }, { onerror: (err) => logger.warn('mcp-modern: the request could not be served', { error: err.message }) });
         // The AuthInfo above is the one the handler sees; Express's own req.auth is not the SDK's.
         await node(req as unknown as NodeIncomingMessageLike, res, req.body);
     }
 
-    /** Publish a change to every role's open listen streams (handler.notify). */
+    /**
+     * Publish a change to the open listen streams. The tool list change is a broadcast (decision
+     * 2026-10-20, item 7); a resource change goes to the streams of the principal it names only,
+     * as core.ts forwards it to a 2025 session.
+     */
     const notify = {
-        toolsChanged: () => { for (const h of handlers.values()) h.notify.toolsChanged(); },
-        resourcesChanged: () => { for (const h of handlers.values()) h.notify.resourcesChanged(); },
-        resourceUpdated: (uri: string) => { for (const h of handlers.values()) h.notify.resourceUpdated(uri); },
+        toolsChanged: () => bus.publish({ kind: 'tools_list_changed' }),
+        resourcesChanged: (principal: string) => bus.publishTo(principal, { kind: 'resources_list_changed' }),
+        resourceUpdated: (principal: string, uri: string) => bus.publishTo(principal, { kind: 'resource_updated', uri }),
     };
 
     async function close(): Promise<void> {

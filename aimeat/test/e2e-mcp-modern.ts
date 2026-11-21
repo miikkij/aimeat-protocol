@@ -14,9 +14,13 @@
  *   agent lacks (SCOPE_DENIED), another owner's agent reading the same key (its own empty namespace),
  *   and a deleted agent's token (refused). CHANGE NOTIFICATIONS: an open subscriptions/listen stream
  *   hears tools/list_changed after the owner narrows the agent's scopes, and deleting the agent
- *   closes the stream (mcp/session-registry.ts).
+ *   closes the stream (mcp/session-registry.ts). Each owner's listen stream hears
+ *   resources/list_changed for its own agent's new key and never for the other owner's
+ *   (mcp/principal-bus.ts).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-modern
  * @version-history
+ *   v1.1.0 — 2026-11-21 — resources/list_changed per owner: red before the fix (the second owner's
+ *     stream heard the first owner's write), green after (wish-mcp-kuuntelukanava-kertoo-toisen-omistajan-muistikirjoituste).
  *   v1.0.0 — 2026-10-20 — Initial (MCP SDK v2 migration steps 5 and 6, plan doc-mvguy322f9se).
  */
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
@@ -257,6 +261,66 @@ await test('Narrowing the agent\'s scopes reaches the open stream as tools/list_
     assert(p.status === 200, `PATCH scopes ${p.status}: ${JSON.stringify(p.body).slice(0, 200)}`);
     const heard = await readUntil('notifications/tools/list_changed', 5000);
     assert(heard === 'seen', `tools/list_changed: ${heard}; stream: ${listenBuffer.slice(-300)}`);
+});
+
+// Two more listen streams, one per owner (mcp/modern-endpoint.ts, the principal bus). Each owner's
+// agent writes one new key; each stream must hear its own write and nothing else. The writer's own
+// stream proves the first write emitted at all, so the other stream's silence means something.
+interface ListenStream { read(want: string, ms: number): Promise<'seen' | 'closed' | 'timeout'>; text(): string; close(): Promise<void> }
+async function openListen(token: string, notifications: Record<string, unknown>): Promise<ListenStream> {
+    const res = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`, ...standardHeaders('subscriptions/listen') },
+        body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: 'subscriptions/listen', params: { notifications, _meta: envelope() } }),
+    });
+    assert(res.status === 200, `listen ${res.status}`);
+    const reader = res.body!.getReader();
+    let buffer = '';
+    const read = async (want: string, ms: number): Promise<'seen' | 'closed' | 'timeout'> => {
+        const deadline = Date.now() + ms;
+        while (Date.now() < deadline) {
+            if (buffer.includes(want)) return 'seen';
+            const chunk = await Promise.race([
+                reader.read(),
+                new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), Math.max(1, deadline - Date.now()))),
+            ]);
+            if (chunk === 'timeout') break;
+            if (chunk.done) return buffer.includes(want) ? 'seen' : 'closed';
+            buffer += decoder.decode(chunk.value, { stream: true });
+        }
+        return buffer.includes(want) ? 'seen' : 'timeout';
+    };
+    return { read, text: () => buffer, close: () => reader.cancel().catch(() => undefined) };
+}
+const LIST_CHANGED = 'notifications/resources/list_changed';
+const countOf = (s: string, what: string) => s.split(what).length - 1;
+
+await test("A listen stream hears resources/list_changed for its own new key and never for another owner's", async () => {
+    const aliceWriter = await makeAgent(BASE, alice, ['memory:read', 'memory:write']);
+    const aliceStream = await openListen(aliceWriter.token, { resourcesListChanged: true });
+    const bobStream = await openListen(bobAgent.token, { resourcesListChanged: true });
+    try {
+        for (const [who, s] of [['alice', aliceStream], ['bob', bobStream]] as const) {
+            const ack = await s.read('notifications/subscriptions/acknowledged', 5000);
+            assert(ack === 'seen' && s.text().includes('resourcesListChanged'), `${who}'s acknowledgement: ${ack}; ${s.text().slice(0, 300)}`);
+        }
+        const stamp = Date.now().toString(36);
+        const first = await modern('/v1/mcp', aliceWriter.token, 'tools/call', { name: 'aimeat_memory_write', arguments: { key: `modern/leak-probe-${stamp}`, value: { n: 1 } } });
+        assert(first.status === 200 && first.body.result?.isError !== true, `the first owner's write ${first.status}: ${toolText(first).slice(0, 200)}`);
+        assert(await aliceStream.read(LIST_CHANGED, 5000) === 'seen', `the first owner's write emitted nothing on its own stream: ${aliceStream.text().slice(-300)}`);
+
+        const own = await modern('/v1/mcp', bobAgent.token, 'tools/call', { name: 'aimeat_memory_write', arguments: { key: `modern/own-probe-${stamp}`, value: { n: 2 } } });
+        assert(own.status === 200 && own.body.result?.isError !== true, `the stream owner's write ${own.status}: ${toolText(own).slice(0, 200)}`);
+        // The other owner's notification, had it leaked, was written to this stream before the
+        // stream owner's own write began; reading until the own one arrives therefore reads both.
+        assert(await bobStream.read(LIST_CHANGED, 5000) === 'seen', `the stream owner's own new key was not heard: ${bobStream.text().slice(-300)}`);
+        assert(countOf(bobStream.text(), LIST_CHANGED) === 1, `the second owner's stream heard ${countOf(bobStream.text(), LIST_CHANGED)} list changes for one own new key: the first owner's write reached it`);
+        await aliceStream.read('\u0000never', 1000);
+        assert(countOf(aliceStream.text(), LIST_CHANGED) === 1, `the first owner's stream heard ${countOf(aliceStream.text(), LIST_CHANGED)} list changes: the second owner's write reached it`);
+    } finally {
+        await aliceStream.close();
+        await bobStream.close();
+    }
 });
 
 await test('Deleting the agent closes its open listen stream, and its token is refused', async () => {
