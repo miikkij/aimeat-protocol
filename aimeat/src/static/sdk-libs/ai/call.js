@@ -5,13 +5,13 @@
  *   refusal's details), the provenance record carried from the envelope's meta, the spend guard every
  *   paid call runs through (the optional confirm dialog and the in-flight collapse of identical
  *   calls), and the Blob conversions for a file or a recording an app holds in memory.
- * @structure outputCap · aiError · withProvenance · postJson · noteSpent · paid · isBlob · blobToBase64 · blobToDataUrl
+ * @structure markCap · aiError · withProvenance · postJson · noteSpent · paid · isBlob · blobToBase64 · blobToDataUrl
  * @usage import { postJson, paid } from './call.js';
  *   return paid(opts, { key: ['ai-embed', opts.app_id, text], what: 'Make embeddings' },
  *     () => postJson('/v1/ai/embed', body, 'Embedding failed'));
  * @version-history
- *   v1.3.0 - 2026-11-21 - outputCap(): complete() and stream() send max_tokens only with allowCap: true;
- *     alone it is left out and the console says why once per page (curated pitfall no-max-tokens).
+ *   v1.3.0 - 2026-11-21 - markCap(): an answer the call's own max_tokens cut says so, with
+ *     `truncated`, `capped_at` and a `warning` naming max_tokens (curated pitfall no-max-tokens).
  *   v1.2.0 - 2026-11-07 - noteSpent(): the budget is remembered and `aimeat-ai-used` fires, so the
  *     sign-in pill's bolt follows the app's AI calls.
  *   v1.1.0 - 2026-10-02 - aiError lifts the refusal's `fix` (the person's sentence), `settingsUrl` and
@@ -23,31 +23,27 @@ import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-ai.js');
 import { once, keyOf, confirmSpend, noteBudget, cancelledError } from '../_core/spend.js';
 
-/** Whether this page was already told that its max_tokens was left out. */
-let capWarned = false;
-
 /**
- * The `max_tokens` a text call sends, which is none unless the app says it means it.
- *
- * A cap cuts the answer at that length without a sign the person sees, and a cap an app copied from
- * an example (256, 500) cut answers that were meant to be whole. So `max_tokens` alone is left out
- * of the request, and the console says so once per page with what to do instead: say the length in
- * the prompt and read `truncated`. `allowCap: true` beside it sends the cap as before, for a call
- * that really must stop at a length (a cost ceiling on a batch, a one-word classifier).
- * @param {{ max_tokens?: unknown, allowCap?: boolean }} opts
- * @returns {number|undefined}
+ * Mark an answer the app's own `max_tokens` cut. The cap is sent as given; what changes is that a
+ * cut answer says so: `truncated: true` (also when only `finish_reason` is 'length'), `capped_at`
+ * with the cap, and `warning`, a sentence naming max_tokens, which the console also shows. A cap
+ * copied from an example (256, 500) cut answers meant to be whole, and the app showed half an
+ * answer as the whole one. An answer that was not cut, or a call without max_tokens, is returned
+ * as it is. Mutates and returns `result`.
+ * @param {{ max_tokens?: unknown }} opts
+ * @param {any} result
+ * @returns {any}
  */
-export function outputCap(opts) {
+export function markCap(opts, result) {
   const cap = opts && opts.max_tokens;
-  if (cap === undefined || cap === null) return undefined;
-  if (opts.allowCap === true) return /** @type {number} */ (cap);
-  if (!capWarned) {
-    capWarned = true;
-    console.warn('[aimeat-ai] max_tokens ' + String(cap) + ' was left out of the request: a cap cuts the '
-      + 'answer without a sign. Say the length you want in the prompt and check `truncated` on the '
-      + 'answer. Pass allowCap: true beside max_tokens to send the cap anyway.');
-  }
-  return undefined;
+  if (!result || typeof result !== 'object' || cap === undefined || cap === null) return result;
+  if (!(result.truncated === true || result.finish_reason === 'length')) return result;
+  result.truncated = true;
+  result.capped_at = cap;
+  result.warning = 'The answer stopped at max_tokens ' + String(cap) + ', the cap this call set, so it is not whole. '
+    + 'Leave max_tokens out (say the length you want in the prompt), or raise it.';
+  console.warn('[aimeat-ai] ' + result.warning);
+  return result;
 }
 
 /**

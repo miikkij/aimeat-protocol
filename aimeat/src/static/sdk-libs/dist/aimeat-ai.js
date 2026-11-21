@@ -1206,19 +1206,15 @@
 
   // src/static/sdk-libs/ai/call.js
   var { authFetch: authFetch3 } = makeSession("aimeat-ai.js");
-  var capWarned = false;
-  function outputCap(opts) {
+  function markCap(opts, result) {
     const cap = opts && opts.max_tokens;
-    if (cap === void 0 || cap === null) return void 0;
-    if (opts.allowCap === true) return (
-      /** @type {number} */
-      cap
-    );
-    if (!capWarned) {
-      capWarned = true;
-      console.warn("[aimeat-ai] max_tokens " + String(cap) + " was left out of the request: a cap cuts the answer without a sign. Say the length you want in the prompt and check `truncated` on the answer. Pass allowCap: true beside max_tokens to send the cap anyway.");
-    }
-    return void 0;
+    if (!result || typeof result !== "object" || cap === void 0 || cap === null) return result;
+    if (!(result.truncated === true || result.finish_reason === "length")) return result;
+    result.truncated = true;
+    result.capped_at = cap;
+    result.warning = "The answer stopped at max_tokens " + String(cap) + ", the cap this call set, so it is not whole. Leave max_tokens out (say the length you want in the prompt), or raise it.";
+    console.warn("[aimeat-ai] " + result.warning);
+    return result;
   }
   function aiError(r, fallback) {
     const e = r && r.error;
@@ -1424,7 +1420,7 @@
       model: opts.model,
       temperature: opts.temperature,
       top_p: opts.top_p,
-      max_tokens: outputCap(opts),
+      max_tokens: opts.max_tokens,
       reasoning: opts.reasoning,
       role: typeof opts.role === "string" && opts.role ? opts.role : void 0
     };
@@ -1444,7 +1440,7 @@
         } else if (event.type === "done") done = event;
       }
       const rest = withoutType(done);
-      return { ...rest, content, model: rest.model || start && start.model };
+      return markCap(opts, { ...rest, content, model: rest.model || start && start.model });
     });
   }
   var SPEECH_MIME = { mp3: "audio/mpeg", pcm: "audio/pcm" };
@@ -1750,8 +1746,7 @@
         modelRole: opts.modelRole,
         temperature: opts.temperature,
         top_p: opts.top_p,
-        // Sent only with allowCap: true (call.js outputCap): a cap alone cut answers without a sign.
-        max_tokens: outputCap(opts),
+        max_tokens: opts.max_tokens,
         app_id: opts.app_id,
         // Pictures for a vision request: data: or https: URLs, at most 8 (the route refuses more).
         // POST /v1/ai/complete has read this since 2026-06-24 and this body never carried it, so a
@@ -1776,7 +1771,7 @@
           opts.role || ""
         ],
         what: "Run an AI request on your own AI provider."
-      }, () => postJson("/v1/ai/complete", body, "AI call failed"));
+      }, () => postJson("/v1/ai/complete", body, "AI call failed").then((r) => markCap(opts, r)));
     },
     /**
      * Convenience: complete + JSON.parse. Adds a "return ONLY valid JSON"
@@ -1822,14 +1817,19 @@
         } catch (e) {
           const mismatch = !!e && /** @type {any} */
           e.code === "JSON_SCHEMA_MISMATCH";
+          const cut = retry.capped_at !== void 0 ? "The answer was cut at max_tokens " + String(retry.capped_at) + ", so it is not whole JSON: leave max_tokens out or raise it. " : "";
           const err = (
-            /** @type {Error & { code?: string, usage?: any, attempts?: number }} */
-            new Error(mismatch ? "AI returned JSON without the requested keys twice (" + /** @type {any} */
-            e.message + "). Original response: " + retry.content.slice(0, 200) : "AI returned invalid JSON twice. Original response: " + retry.content.slice(0, 200))
+            /** @type {Error & { code?: string, usage?: any, attempts?: number, truncated?: boolean, capped_at?: any }} */
+            new Error(cut + (mismatch ? "AI returned JSON without the requested keys twice (" + /** @type {any} */
+            e.message + "). Original response: " + retry.content.slice(0, 200) : "AI returned invalid JSON twice. Original response: " + retry.content.slice(0, 200)))
           );
           err.code = mismatch ? "JSON_SCHEMA_MISMATCH" : "JSON_PARSE_FAILED";
           err.usage = both.usage;
           err.attempts = 2;
+          if (cut) {
+            err.truncated = true;
+            err.capped_at = retry.capped_at;
+          }
           throw err;
         }
       }

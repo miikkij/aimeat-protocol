@@ -14,8 +14,9 @@
  *   if (caps.capabilities.text.on) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
  *   v1.10.0 - 2026-11-21 - completeJson() answers `usage` summed over both calls when it retried, with
- *     `attempts` (1 or 2) and `first_usage`; the error after two misses carries both too. complete()
- *     sends max_tokens only with allowCap: true. disclose() takes `always: true`.
+ *     `attempts` (1 or 2) and `first_usage`; the error after two misses carries both too, and says when
+ *     the call's own max_tokens cut the answer. complete() sends max_tokens as before, and an answer
+ *     that cap cut carries `truncated`, `capped_at` and a `warning` naming it. disclose() takes `always: true`.
  *   v1.9.0 - 2026-10-31 - genRules(): the generation rules and their directive text (GET /v1/ai/gen-rules).
  *   v1.8.1 - 2026-10-12 - isAvailable() drops its fallback to GET /v1/openrouter/settings: node 4.0.0
  *     removes that route, and every node that serves this lib answers GET /v1/ai/available (since
@@ -60,7 +61,7 @@ import { attach } from '../_core/namespace.js';
 import { attachSpend } from '../_core/spend.js';
 import { disclose, chatNotice, declare } from './disclose.js';
 import { job } from './job.js';
-import { paid, postJson, isBlob, blobToDataUrl, outputCap } from './call.js';
+import { paid, postJson, isBlob, blobToDataUrl, markCap } from './call.js';
 import { capabilities, models, roles, genRules, clearCaches } from './capabilities.js';
 import { stream, speak } from './stream.js';
 import { image, transcribe, embed, routing } from './media.js';
@@ -248,8 +249,7 @@ const ai = {
       modelRole: opts.modelRole,
       temperature: opts.temperature,
       top_p: opts.top_p,
-      // Sent only with allowCap: true (call.js outputCap): a cap alone cut answers without a sign.
-      max_tokens: outputCap(opts),
+      max_tokens: opts.max_tokens,
       app_id: opts.app_id,
       // Pictures for a vision request: data: or https: URLs, at most 8 (the route refuses more).
       // POST /v1/ai/complete has read this since 2026-06-24 and this body never carried it, so a
@@ -271,7 +271,7 @@ const ai = {
         Array.isArray(opts.images) ? opts.images.join('\n') : '',
         files ? JSON.stringify(files) : '', opts.provider || '', opts.role || ''],
       what: 'Run an AI request on your own AI provider.',
-    }, () => postJson('/v1/ai/complete', body, 'AI call failed'));
+    }, () => postJson('/v1/ai/complete', body, 'AI call failed').then((r) => markCap(opts, r)));
   },
 
   /**
@@ -324,12 +324,17 @@ const ai = {
       try { return { ...read(retry), ...both }; }
       catch (e) {
         const mismatch = !!e && /** @type {any} */ (e).code === 'JSON_SCHEMA_MISMATCH';
-        const err = /** @type {Error & { code?: string, usage?: any, attempts?: number }} */ (new Error(mismatch
+        // An answer the call's own max_tokens cut is not broken JSON from the model: say the cap cut it.
+        const cut = retry.capped_at !== undefined
+          ? 'The answer was cut at max_tokens ' + String(retry.capped_at) + ', so it is not whole JSON: leave max_tokens out or raise it. '
+          : '';
+        const err = /** @type {Error & { code?: string, usage?: any, attempts?: number, truncated?: boolean, capped_at?: any }} */ (new Error(cut + (mismatch
           ? 'AI returned JSON without the requested keys twice (' + /** @type {any} */ (e).message + '). Original response: ' + retry.content.slice(0, 200)
-          : 'AI returned invalid JSON twice. Original response: ' + retry.content.slice(0, 200)));
+          : 'AI returned invalid JSON twice. Original response: ' + retry.content.slice(0, 200))));
         err.code = mismatch ? 'JSON_SCHEMA_MISMATCH' : 'JSON_PARSE_FAILED';
         err.usage = both.usage;
         err.attempts = 2;
+        if (cut) { err.truncated = true; err.capped_at = retry.capped_at; }
         throw err;
       }
     }
