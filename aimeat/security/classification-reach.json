@@ -3015,6 +3015,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: System security-incident records."
     },
+    "src/services/seed/stamped-seed.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-11-21, the node's own read: a boot seed's fingerprint stamp under SEED_STAMP_OWNER (an owner no account can be), compared with the stored record to decide whether this build may update it. No content is shown to anyone."
+    },
     "src/services/served-page-provenance.ts": {
       "reads": {
         "getStorageFileMeta": 2

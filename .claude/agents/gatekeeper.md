@@ -28,7 +28,7 @@ Since 2026-11-15 the project's order is the area's suites, then `pnpm check:fast
 
 - A shrinking assertion total with few or no failures is a collision or a boot failure, not a result (docs/pitfalls.md 18). Re-run that suite alone before reporting it.
 - No total at all means the server did not boot: report it as a boot failure with the first error line.
-- A failure in a suite the change did not touch: run the same suite on a clean worktree of the base commit and say which of the three it is (asserted the hole, source broken, setup drifted; docs/pitfalls.md 19).
+- A failure in a suite the change did not touch: run the same suite on a clean worktree of the base commit and say which of the three it is (asserted the hole, source broken, setup drifted; `.claude/rules/testing.md`).
 
 ## The five shapes, read against the diff
 

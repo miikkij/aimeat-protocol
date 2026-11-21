@@ -63,7 +63,8 @@ await test('the core scheduled jobs are there for the operator at the first read
 });
 
 await test('an account that is not the operator is refused the job list', async () => {
-    expectRefusal(await json('/v1/admin/scheduler/jobs', bearer(bobToken)), 403);
+    const r = await json('/v1/admin/scheduler/jobs', bearer(bobToken));
+    expectRefusal(r, 403);
 });
 
 await test('a profile schema is locked by the node seeder; a key no seeder owns has none', async () => {
