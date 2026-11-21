@@ -2499,13 +2499,19 @@ components:
         and their entries, data packages, and workspace shares (access open is stored as account).
         GROUP_NOT_NAMED: a record an older node stored at `group` with no group was rewritten without
         naming one, so it still opens to nobody but its owner. A new record of that kind is refused.
+        APP_READS_OWNER_NAMESPACE: an agent's write landed in the agent's own namespace under a key
+        prefix that one of the owner's apps keeps in the owner's memory (`apps.<id>.`, or a data map
+        row kept in owner memory that names no agent), and no owner copy shadows it yet. The write is
+        stored as before; `how_to_fix` names owner_scope: true. The same text on every write door.
       required: [code, message]
       additionalProperties: true
       properties:
-        code: { type: string, enum: [SHADOWED_BY_OWNER_COPY, PUBLISH_NOT_ASKED, PUBLIC_IS_SIGNED_IN_HERE, GROUP_NOT_NAMED] }
+        code: { type: string, enum: [SHADOWED_BY_OWNER_COPY, APP_READS_OWNER_NAMESPACE, PUBLISH_NOT_ASKED, PUBLIC_IS_SIGNED_IN_HERE, GROUP_NOT_NAMED] }
         message: { type: string }
         how_to_fix: { type: string }
         shadowed_by: { type: string, description: 'SHADOWED_BY_OWNER_COPY: the owner GHII whose copy owner-scope reads resolve to' }
+        app: { type: string, description: 'APP_READS_OWNER_NAMESPACE: the file name of the app that keeps the key in the owner''s memory' }
+        prefix: { type: string, description: 'APP_READS_OWNER_NAMESPACE: the key prefix the key is under' }
 
     MemoryWriteResult:
       description: A written memory entry, with what the write has to tell the caller.
@@ -36773,6 +36779,7 @@ paths:
     get:
       operationId: listCheckoutSessions
       summary: List own checkout sessions (buyer view)
+      description: Scope commerce:buy or contract:spend (an app grant holds the second).
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -36802,7 +36809,8 @@ paths:
         price. Sessions expire after one hour. An app-tool or
         ext-call item whose extension serves an app with access `members-only` answers 403
         MEMBERS_ONLY for a buyer who is not a member, before any session opens or anything is
-        collected.
+        collected. Scope: commerce:buy or contract:spend (the word an app grant can hold; an app
+        declares it in aimeat-scopes). The same holds for listing, reading and changing a session.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -36853,6 +36861,7 @@ paths:
     get:
       operationId: getCheckoutSession
       summary: Read a checkout session (buyer only)
+      description: Scope commerce:buy or contract:spend (an app grant holds the second).
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -36869,6 +36878,7 @@ paths:
     patch:
       operationId: updateCheckoutSession
       summary: Update items or cancel a checkout session
+      description: Scope commerce:buy or contract:spend (an app grant holds the second).
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -60325,7 +60335,10 @@ paths:
         writes, `<tool> { field, field: value }` in any Markdown file, held to the app's tool
         manifest: `skill.toolFieldIssues` names each field such a call sends that a tool whose
         schema refuses extra fields does not accept, with the fields it does accept. Advice only;
-        the publish stands.
+        the publish stands. `skill.ownerScopeIssues` names each paragraph that tells the AI to write
+        the app's keys (`apps.<id>.` or a data map row kept in the owner's memory) with
+        aimeat_memory_write and does not say owner_scope; a file that states owner_scope in a
+        paragraph of its own is taken to cover its calls. Advice only as well.
 
         How SKILL.md was written is recorded: the `ai_provenance` declaration or the
         `ai_provenance_id` in the body, else the node's stamp when an agent publishes (a person

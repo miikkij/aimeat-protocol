@@ -953,6 +953,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app configuration values record."
     },
+    "src/services/app/declared-key-prefixes.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-21, the node's own read: an app's public data-map declaration, read for the key families of its rows; only those prefixes are used, to word an advisory warning. No content is shown."
+    },
     "src/services/app/dev-grant.ts": {
       "reads": {
         "getMemory": 2

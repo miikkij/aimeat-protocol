@@ -220,7 +220,7 @@
       "digest": "sha256:53200c3b19590ede60de69a7"
     },
     "11. Served libraries and the Design Book": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/data/library-packs",
         "aimeat/src/tool-catalog/definitions/designbook.ts",
@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:d62ba72b4940a1b08c7d7342"
+      "digest": "sha256:fdc902f8ffb06cd4c06e2040"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-20",
@@ -287,7 +287,7 @@
         "aimeat/src/services/trust.ts",
         "aimeat/src/routes/agents/purchase-limit.ts"
       ],
-      "digest": "sha256:a113916fbe9049d41c27d517"
+      "digest": "sha256:0e85faea8468f240dd4e6b97"
     },
     "15. Bookkeeping and business": {
       "reviewedOn": "2026-11-20",
@@ -790,7 +790,7 @@
       "aimeat/src/data/library-packs/sdk-validate.ts": "74cb81e57ef423c4",
       "aimeat/src/data/library-packs/sdk-webhook.ts": "e8cd8123c3d9d65a",
       "aimeat/src/data/library-packs/sdk-workflows.ts": "7f6ca17f8180fa7b",
-      "aimeat/src/data/library-packs/sdk.ts": "d044752e589a9074",
+      "aimeat/src/data/library-packs/sdk.ts": "0a1f90a8f38b2001",
       "aimeat/src/data/library-packs/translations.ts": "3683cb9315747ead",
       "aimeat/src/data/library-packs/types.ts": "e9a3a4616aabd40e",
       "aimeat/src/data/library-packs/vendored-creative.ts": "d441ba5b6ac9c4d4",
@@ -862,7 +862,7 @@
       "aimeat/src/tool-catalog/definitions/exchange.ts": "acbcf46987f24f6a",
       "aimeat/src/routes/commerce-webhooks.ts": "82408169bd101b2f",
       "aimeat/src/services/morsel.ts": "3d5e33c362495127",
-      "aimeat/src/routes/commerce.ts": "aa6c548e71ef9527",
+      "aimeat/src/routes/commerce.ts": "0f869dd5d0bb0564",
       "aimeat/src/routes/exchange.ts": "cc2b179ef66179a8",
       "aimeat/src/routes/commerce-beneficiaries.ts": "ff1199000a3e0f7c",
       "aimeat/src/routes/disputes.ts": "3c507796d3ddbacb",

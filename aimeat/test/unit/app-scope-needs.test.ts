@@ -159,6 +159,39 @@ describe('what is not a call, or is already asked for', () => {
     });
 });
 
+describe('the calls only the publish answer names (PUBLISH_RULES)', () => {
+    const publishWords = (code: string, scopes?: string) => undeclaredScopeNeeds(page(code, scopes), [], { publish: true }).missing;
+    const cases: Array<[string, string, string[]]> = [
+        ['a delete by SDK', "await AIMEAT.data.delete('notes.' + id)", ['memory:delete']],
+        ['an AI completion by SDK', "const r = await AIMEAT.ai.complete({ prompt })", ['ai:use']],
+        ['an AI job started by SDK', "AIMEAT.ai.job.start({ prompt: 'x', result_key: 'k' })", ['ai:use']],
+        ['an AI completion by route', "session.fetch('/v1/ai/complete', { method: 'POST', body })", ['ai:use']],
+        ['a checkout opened by SDK', 'const s = await AIMEAT.commerce.openCheckout(items)', ['contract:spend']],
+        ['a subscription bought by SDK', "AIMEAT.commerce.subscribe('ext', 'monthly')", ['contract:spend']],
+    ];
+    for (const [name, code, expected] of cases) {
+        it(`${name} needs ${expected.join(', ')}`, () => {
+            expect(publishWords(code)).toEqual(expected);
+        });
+    }
+    it('the keep-working reading does not name them: no app held these words before 4.0', () => {
+        expect(words("AIMEAT.data.delete('k'); AIMEAT.ai.complete({ prompt }); AIMEAT.commerce.openCheckout(items)")).toEqual([]);
+    });
+    it('an app that declares the word, or the app twin of commerce:buy, needs nothing more', () => {
+        expect(publishWords("AIMEAT.data.delete('k'); AIMEAT.ai.complete({ prompt })", 'memory:read memory:write memory:delete ai:use')).toEqual([]);
+        expect(publishWords('AIMEAT.commerce.buyOffer(agent, id)', 'memory:read contract:spend')).toEqual([]);
+    });
+    it('a look-alike that is not the call stays quiet: another method, a status read, a sentence without the call', () => {
+        expect(publishWords("AIMEAT.data.deleteMany(keys); AIMEAT.ai.isAvailable(); AIMEAT.ai.usage(); const t = 'use /v1/ai for AI';")).toEqual([]);
+    });
+    it('the publish warning says the word was never kept', async () => {
+        const findings = await undeclaredScopeFindings(page("AIMEAT.data.delete('k')"), async () => null);
+        expect(findings).toHaveLength(1);
+        expect(findings[0].message).toContain('`memory:delete`');
+        expect(findings[0].message).toContain('no app kept it');
+    });
+});
+
 describe('the publish warning', () => {
     it('names each word, the line that needs it, and the pitfall that explains it', async () => {
         const findings = await undeclaredScopeFindings(page("session.fetch('/v1/ext/guestbook/sign')"), async () => null);

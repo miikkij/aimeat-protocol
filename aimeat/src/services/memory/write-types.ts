@@ -11,6 +11,7 @@
  * @usage import type { MemoryWriteCaller, MemoryWriteResult } from './write.js';
  * @version-history
  *   2026-11-21 — The refusal code PERSON_DECIDES (services/app-tools/decision-binding.ts).
+ *   2026-11-21 — MemoryWriteWarning code APP_READS_OWNER_NAMESPACE (services/memory/write-shadow.ts).
  *   2026-11-04 — Moved verbatim from services/memory-write.ts (codebase analysis 2026-11-03, item C3).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -119,7 +120,9 @@ export interface MemoryWriteWarning {
     // filed (too many already wait for the owner). PUBLIC_IS_SIGNED_IN_HERE: asked public on a node
     // that shows its content to signed-in accounts only, stored at 'members' (closed-node-level.ts).
     // GROUP_NOT_NAMED: a row an older node stored at 'group' with no group, rewritten without naming one.
-    code: 'SHADOWED_BY_OWNER_COPY' | 'PUBLISH_NOT_ASKED' | 'PUBLIC_IS_SIGNED_IN_HERE' | 'GROUP_NOT_NAMED';
+    // APP_READS_OWNER_NAMESPACE: an agent's write landed in its own namespace under a key prefix one of
+    // the owner's apps keeps in the owner's memory (services/app/declared-key-prefixes.ts).
+    code: 'SHADOWED_BY_OWNER_COPY' | 'APP_READS_OWNER_NAMESPACE' | 'PUBLISH_NOT_ASKED' | 'PUBLIC_IS_SIGNED_IN_HERE' | 'GROUP_NOT_NAMED';
     message: string;
     [detail: string]: unknown;
 }

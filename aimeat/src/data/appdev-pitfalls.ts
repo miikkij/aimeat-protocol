@@ -12,6 +12,9 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-21 — handle-both-auth-paths is active again: the trap came back as a learned critical
+ *     entry, and no publish check names it yet. undeclared-scope-words names memory:delete, ai:use and
+ *     contract:spend, which the publish answer now names (services/app/scope-needs.ts PUBLISH_RULES).
  *   2026-11-20 — below-level: the level is the finest unless the owner chose a lower one; it is not asked.
  *   2026-11-15 — track-drift says "the Atelier track", not "the Atelier road".
  *   2026-11-11 — +bundled-agent-block, +bundled-agent-permissions: how an app declares the agent it
@@ -339,14 +342,14 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'handle-both-auth-paths', status: 'outdated',
+    id: 'handle-both-auth-paths',
     title: 'Show the app from onSession: onLogin alone misses a returning user',
     symptom: 'The app works on first sign-in but shows logged-out UI after a reload: onLogin fires on a fresh interactive sign-in, not on a session restored in the background.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification\'s session section and the aimeat-auth library guide state onSession. Pass your "session ready" handler as `mountLoginButton(sel, { onSession: ready })`: it runs once for a restore (`restored: true`) and for a sign-in (`restored: false`), so there is one path instead of two. Without onSession, wire both: `AIMEAT.auth.login().then(s => { if (s) ready(s); })` for the restore and `onLogin: ready` for a fresh sign-in, and make ready() safe to run twice. The pill renders signed-in only from a live session, so a stale stored one no longer shows "logged in" over an app that cannot call anything.',
+    fix: 'Active again since 2026-11-21: it was marked outdated on 2026-10-17 because the build specification\'s session section and the aimeat-auth library guide state onSession, and builders still met it. Pass your "session ready" handler as `mountLoginButton(sel, { onSession: ready })`: it runs once for a restore (`restored: true`) and for a sign-in (`restored: false`), so there is one path instead of two. Without onSession, wire both: `AIMEAT.auth.login().then(s => { if (s) ready(s); })` for the restore and `onLogin: ready` for a fresh sign-in, and make ready() safe to run twice. The pill renders signed-in only from a live session, so a stale stored one no longer shows "logged in" over an app that cannot call anything.',
     appliesTo: ['auth', 'app'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-09-13',
+    updatedAt: '2026-11-21',
     ...CHECKED,
   }),
   E({
@@ -576,11 +579,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'undeclared-scope-words',
     title: 'From 4.0 a route the app calls refuses a word its aimeat-scopes does not name',
     symptom: 'On a 4.0 node a signed-in app gets 403 SCOPE_DENIED from routes that answered on 3.x: an extension action (/v1/ext/..., AIMEAT.iam, AIMEAT.webhook, a cortex lib that calls one), the agent list (AIMEAT.agents.list, /v1/agents), organism workspaces (AIMEAT.organism.workspaces, AIMEAT.intake.listForms), schedules (POST /v1/schedules, AIMEAT.refinery.schedule), a schedule edit (PATCH /v1/schedules/:id), or an image or file that is not public read from /v1/pub with the visitor\'s token (a workspace document\'s images stay empty). The publish answer warns with the word and the line that needs it.',
-    fix: 'Name every word the code needs in `<meta name="aimeat-scopes">`, beside the four the app already uses: ext:invoke for an extension action, agent:read for the agent list, task:write for a task or a new schedule, workflow:write for a schedule edit, organism:read for an organism\'s workspaces, organism:invite for workspace access, social:write for a new realtime room, storage:read for a file from /v1/pub that is not public. Declaring replaces the default set, so keep memory:read memory:write storage:read storage:write in it. An app published before the node moved to 4.0 kept these words by itself (aimeat_app_manage scope_allowance names them); declaring them is still the fix, and a new app gets nothing kept.',
+    fix: 'Name every word the code needs in `<meta name="aimeat-scopes">`, beside the four the app already uses: ext:invoke for an extension action, agent:read for the agent list, task:write for a task or a new schedule, workflow:write for a schedule edit, organism:read for an organism\'s workspaces, organism:invite for workspace access, social:write for a new realtime room, storage:read for a file from /v1/pub that is not public. Declaring replaces the default set, so keep memory:read memory:write storage:read storage:write in it. An app published before the node moved to 4.0 kept these words by itself (aimeat_app_manage scope_allowance names them); declaring them is still the fix, and a new app gets nothing kept. Three more words are refused on every node and no app ever kept them, so the publish answer names them too: memory:delete for AIMEAT.data.delete, ai:use for an AI call (AIMEAT.ai.complete, stream, job.start, a /v1/ai/... route), and contract:spend for a checkout (openCheckout, buyOffer, subscribe, payByCard).',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-10-20',
+    updatedAt: '2026-11-21',
     ...CHECKED,
   }),
 

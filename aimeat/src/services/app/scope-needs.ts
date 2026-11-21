@@ -25,12 +25,16 @@
  *   nothing (services/protected-resource.ts appScopesOf). Every rule names a word an app grant can
  *   hold (routes/app-grant-vocabulary.ts): a gate that also takes a word no app is granted names the
  *   app's word, as checkout completion names contract:spend with commerce:buy as its alternative.
- * @structure ScopeNeed · SCOPE_NEED_WORDS · AI_JOB_ON_DONE_RULE · DATAPACKAGE_READ_RULE · scanScopeNeeds(sources) · cortexLibRefs(html) · undeclaredScopeNeeds(html, libs) ·
+ * @structure ScopeNeed · PUBLISH_RULES · SCOPE_NEED_WORDS · AI_JOB_ON_DONE_RULE · DATAPACKAGE_READ_RULE · scanScopeNeeds(sources, opts) · cortexLibRefs(html) · undeclaredScopeNeeds(html, libs, opts) ·
  *   undeclaredScopeFindings(html, loadLib)
  * @usage
  *   const libs = await loadLibs(cortexLibRefs(html));
  *   const { missing } = undeclaredScopeNeeds(html, libs);
  * @version-history
+ *   2026-11-21 — PUBLISH_RULES, read by the publish warning only (scanScopeNeeds `publish`): a delete
+ *     (AIMEAT.data.delete) needs memory:delete, an AI call (AIMEAT.ai.*, /v1/ai/...) ai:use, and an
+ *     opened checkout (openCheckout, buyOffer, subscribe, ...) contract:spend. The keep-working steps
+ *     do not give them: those calls were refused before 4.0 as well.
  *   v1.3.1 — 2026-10-25 — cortexLibRefs reads `/v1/cortex/<owner>/<name>/libs/<file>` too, the address of
  *     a cortex installed since names carry their owner (owner namespaces wish, secaudit2026oct22).
  *   v1.3.0 — 2026-10-23 — A marketplace call (exchangeNeeds): reading a person's contracts, work,
@@ -137,13 +141,33 @@ const RULES: Rule[] = [
   { word: 'storage:read', rule: DATAPACKAGE_READ_RULE, re: new RegExp(`${LIT}/v1/(?:datapackages/(?!validate\\b)|odata/)`, 'g') },
 ];
 
+/**
+ * Calls the publish answer names and the keep-working steps do not give. A delete, an AI call and a
+ * checkout opened by an app were refused on 3.x already (requireScope, not a 4.0.0 REST gate), so an
+ * app published before 4.0 never had the word to keep: rest-scope-keep-working-migration.ts and the
+ * other keep steps read RULES only, and these words reach a grant only when the app declares them.
+ */
+const PUBLISH_RULES: Rule[] = [
+  // DELETE /v1/memory/:key asks memory:delete (routes/memory/key.ts); the default set does not hold it.
+  { word: 'memory:delete', re: /\bAIMEAT\.data\.(?:delete|remove)\s*\(/g },
+  // Every AI route asks ai:use of an app (routes/ai.ts gateOwnerOrAiUseAgent, routes/ai-jobs.ts).
+  { word: 'ai:use', re: /\bAIMEAT\.ai\.(?:complete|completeJson|stream|speak|image|transcribe|embed|capabilities|models|roles|genRules|job\.start)\s*\(/g },
+  { word: 'ai:use', re: new RegExp(`${LIT}/v1/ai/(?:complete|stream|speak|image|transcribe|embed|jobs|capabilities|models|roles|gen-rules)\\b`, 'g') },
+  // Opening, reading and changing a checkout ask commerce:buy or contract:spend (routes/commerce.ts);
+  // an app grant can hold only the second. subscribe and buyOffer open one inside the library.
+  { word: 'contract:spend', alternatives: ['commerce:buy'], re: /\bAIMEAT\.commerce\.(?:openCheckout|buyOffer|subscribe|payByCard|getCheckout|listCheckouts|updateCheckout|cancelCheckout|cancelSubscription)\s*\(/g },
+];
+
+/** Whether only PUBLISH_RULES name the word, so no keep-working step ever gave it. */
+const publishOnly = (word: string): boolean => PUBLISH_RULES.some(r => r.word === word) && !RULES.some(r => r.word === word);
+
 /** The text around a match, on one line, for the owner to read. */
 function excerpt(text: string, at: number, length: number): string {
   return text.slice(Math.max(0, at - 30), Math.min(text.length, at + length + 50)).replace(/\s+/g, ' ').trim();
 }
 
 /** Every word a finding can name (the rules' and the schedule calls'), for the test that each is grantable. */
-export const SCOPE_NEED_WORDS: readonly string[] = [...new Set([...RULES.map(r => r.word), 'task:write', 'workflow:write', 'memory:write',
+export const SCOPE_NEED_WORDS: readonly string[] = [...new Set([...RULES.map(r => r.word), ...PUBLISH_RULES.map(r => r.word), 'task:write', 'workflow:write', 'memory:write',
   'exchange:read', 'exchange:write', 'exchange:grant'])].sort();
 
 /**
@@ -225,12 +249,16 @@ function onDoneNeeds(text: string, source: string): ScopeNeed[] {
   return out;
 }
 
-/** Every need the texts show. One entry per word and source; the first evidence is kept. */
-export function scanScopeNeeds(sources: ReadonlyArray<{ source: string; text: string }>): ScopeNeed[] {
+/**
+ * Every need the texts show. One entry per word and source; the first evidence is kept. `publish`
+ * also reads PUBLISH_RULES, the calls the publish answer names and no keep-working step gives.
+ */
+export function scanScopeNeeds(sources: ReadonlyArray<{ source: string; text: string }>, opts: { publish?: boolean } = {}): ScopeNeed[] {
   const seen = new Map<string, ScopeNeed>();
+  const rules = opts.publish ? [...RULES, ...PUBLISH_RULES] : RULES;
   for (const { source, text } of sources) {
     const found: ScopeNeed[] = [];
-    for (const rule of RULES) {
+    for (const rule of rules) {
       for (const m of text.matchAll(rule.re)) {
         found.push({
           word: rule.word, ...(rule.rule ? { rule: rule.rule } : {}), ...(rule.alternatives ? { alternatives: rule.alternatives } : {}),
@@ -270,14 +298,14 @@ export function cortexLibRefs(html: string): Array<{ name: string; file: string;
  * default set; a need counts as met when that covers the word or one of its alternatives.
  */
 export function undeclaredScopeNeeds(
-  html: string, libs: ReadonlyArray<{ source: string; text: string }> = [],
+  html: string, libs: ReadonlyArray<{ source: string; text: string }> = [], opts: { publish?: boolean } = {},
 ): { asks: string[]; declared: boolean; signsIn: boolean; needs: ScopeNeed[]; missing: string[]; evidence: ScopeNeed[] } {
   const { scopes: asks, declared } = appScopesOf(html);
   // An app that loads no AIMEAT library and calls no AIMEAT method never signs in, so it holds no
   // grant for a word to go on: its calls go out without a token whatever it declares.
   const signsIn = /\bAIMEAT\.|\/v1\/libs\/|aimeat-(?:boot|auth)\b/.test(html);
   if (!signsIn) return { asks, declared, signsIn, needs: [], missing: [], evidence: [] };
-  const needs = scanScopeNeeds([{ source: 'app', text: html }, ...libs]);
+  const needs = scanScopeNeeds([{ source: 'app', text: html }, ...libs], opts);
   const unmet = needs.filter(n => !scopeIsCovered(asks, n.word) && !(n.alternatives ?? []).some(a => scopeIsCovered(asks, a)));
   const missing = new Set<string>();
   const evidence: ScopeNeed[] = [];
@@ -300,7 +328,7 @@ export async function undeclaredScopeFindings(
     const text = await loadLib(ref.path);
     if (text !== null) libs.push({ source: ref.path, text });
   }
-  const { missing, evidence, declared } = undeclaredScopeNeeds(html, libs);
+  const { missing, evidence, declared } = undeclaredScopeNeeds(html, libs, { publish: true });
   if (!missing.length) return [];
   const where = evidence.map(e => `${e.word}: ${e.source === 'app' ? '' : `${e.source}: `}\`${e.evidence.slice(0, 100)}\``).join('; ');
   return [{
@@ -310,6 +338,9 @@ export async function undeclaredScopeFindings(
       + `. From node 4.0 a signed-in app without the word is refused with 403 SCOPE_DENIED there. Where: ${where}. `
       + 'Add the words to aimeat-scopes (declaring replaces the default, so keep the words the app already uses); '
       + 'the person approves them at sign-in. An app published before its node moved to 4.0 kept them by itself, '
-      + 'and aimeat_app_manage scope_allowance names them; a new app keeps nothing.',
+      + 'and aimeat_app_manage scope_allowance names them; a new app keeps nothing.'
+      + (missing.some(publishOnly)
+        ? ` ${missing.filter(publishOnly).map(w => `\`${w}\``).join(', ')} was refused before 4.0 too, so no app kept it: the app holds it only when aimeat-scopes names it.`
+        : ''),
   }];
 }

@@ -12,6 +12,7 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-11-21 — putProgramMap drops the owner's cached app key prefixes (services/app/declared-key-prefixes.ts).
  *   2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex
  *     of this file's own; no change in behaviour.
  *   2026-11-19 — The refusal points at the Atelier spec's data-map section (build-app-atelier/data-map).
@@ -63,6 +64,7 @@ import { readDoc } from '../compliance/docs.js';
 import type { ComplianceRegister } from '../compliance/docs-schemas.js';
 import { balancingTestStep, type BalancingTestStep } from '../compliance/lia-write.js';
 import { appDataMapId } from '../app/app-ref.js';
+import { forgetOwnerAppKeyPrefixes } from '../app/declared-key-prefixes.js';
 
 export interface DataMapRefusal {
   refusal: { status: number; code: string; message: string };
@@ -409,6 +411,8 @@ export async function putProgramMap(
   const scopes = declaredScopesOf(await storage.getApp(ownerGhii, filename));
   const stamp = stampFor(parsed, appId, at, scopes);
   await storage.updateAppMeta(ownerGhii, filename, { dataMap: stamp });
+  // The key prefixes an agent's write is checked against come from the maps (services/app/declared-key-prefixes.ts).
+  forgetOwnerAppKeyPrefixes(ownerGhii);
   return { map: parsed, stamp, findings: checkMap(parsed, at, scopes, { registersParties: await registersParties(storage, config, ownerGhii, caller.ownerName, filename) }).findings };
 }
 

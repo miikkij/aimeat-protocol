@@ -1849,6 +1849,10 @@ const ALL_SUITES = [
     // hardcoding sqlite, so the both-backends claim is real.
     'test/e2e-sealed-config.ts',
     'test/e2e-memory-namespaces.ts',
+    // An agent's write under an app's key prefix names the owner_scope fix; a bound skill is told at publish.
+    'test/e2e-app-prefix-owner-scope.ts',
+    // An app grant with contract:spend opens, reads, changes and completes a checkout (routes/commerce.ts).
+    'test/e2e-app-checkout-scope.ts',
     'test/e2e-presigned-meta.ts',
     'test/e2e-memory-file-presigned.ts',
     'test/e2e-storage-visibility.ts',

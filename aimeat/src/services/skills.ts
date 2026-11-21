@@ -32,6 +32,8 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   2026-11-21 — publishSkill answers `ownerScopeIssues` for a skill bound to an app: each paragraph
+ *     that writes the app's keys with aimeat_memory_write and no owner_scope (skill/owner-scope-check.ts).
  *   2026-11-21 — publishSkill answers `toolFieldIssues` for a skill bound to an app: each field its
  *     written calls send that the app's tool manifest refuses (skill/tool-fields.ts).
  *   2026-11-20 — A binding `app:owner/name` is stored and listed with the app's file name
@@ -132,6 +134,7 @@ export { parseSkillRef, formatSkillRef, scopeOwnerGhii, readNodeSkillBody, type 
 // The stored and returned shapes and SkillAccessError live in skill-types.ts (max-file-lines).
 import { resolveBindingRef } from './app/app-ref.js';
 import { skillToolFieldIssues } from './skill/tool-fields.js';
+import { skillOwnerScopeIssues } from './skill/owner-scope-check.js';
 import { SkillAccessError, skillFeatureOff, type SkillVersionSnapshot, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill/types.js';
 export { SkillAccessError, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill/types.js';
 
@@ -428,6 +431,9 @@ export async function publishSkill(
   // A skill bound to an app: the calls it writes, held to the app's tool manifest (skill/tool-fields.ts).
   const toolFieldIssues = await skillToolFieldIssues(storage, config, storedBinding, fileTexts);
   if (toolFieldIssues.length > 0) summary.toolFieldIssues = toolFieldIssues;
+  // ...and the app's keys it writes with aimeat_memory_write, held to owner_scope (skill/owner-scope-check.ts).
+  const ownerScopeIssues = await skillOwnerScopeIssues(storage, config, storedBinding, fileTexts);
+  if (ownerScopeIssues.length > 0) summary.ownerScopeIssues = ownerScopeIssues;
   return summary;
 }
 

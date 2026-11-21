@@ -9,6 +9,8 @@
  *   SkillAccessor · SkillAccessError
  * @usage import { type SkillSummary, SkillAccessError } from '../skills.js';   // through the re-export
  * @version-history
+ *   2026-11-21 — SkillSummary.ownerScopeIssues: where a bound skill writes the app's keys without
+ *     owner_scope (owner-scope-check.ts).
  *   2026-11-21 — SkillSummary.toolFieldIssues: the fields a bound skill's calls write that the app's
  *     tools refuse (tool-fields.ts).
  *   v1.3.0 — 2026-11-14 — skillFeatureOff(): a skill names the switch of the feature it teaches; FEATURE_OFF.
@@ -30,6 +32,7 @@ import type { CallerContext } from '../caller-context.js';
 import type { SkillFileEntry } from './files.js';
 import type { SkillStandardIssue } from './md.js';
 import type { SkillToolFieldIssue } from './tool-fields.js';
+import type { SkillOwnerScopeIssue } from './owner-scope-check.js';
 
 export interface SkillVersionSnapshot {
   manifest: SkillManifestValue;
@@ -112,6 +115,9 @@ export interface SkillSummary {
   /** Publish answers only: the fields a skill bound to an app writes in its calls that the app's tool
    *  manifest does not accept (tool-fields.ts). Advice; the publish stands. */
   toolFieldIssues?: SkillToolFieldIssue[];
+  /** Publish answers only: where a skill bound to an app tells the AI to write the app's keys with
+   *  aimeat_memory_write and no owner_scope (owner-scope-check.ts). Advice; the publish stands. */
+  ownerScopeIssues?: SkillOwnerScopeIssue[];
 }
 
 export interface ResolvedSkill extends SkillSummary {

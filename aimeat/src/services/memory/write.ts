@@ -31,6 +31,9 @@
  * @version-history
  *   2026-11-21 — An app tool manifest that binds an action marked `decision: person` is refused 422
  *     PERSON_DECIDES (services/app-tools/decision-binding.ts).
+ *   2026-11-21 — An agent's write into its own namespace under a key prefix an app of its owner keeps in
+ *     the owner's memory carries APP_READS_OWNER_NAMESPACE with the owner_scope fix, when no owner copy
+ *     shadows it yet (services/app/declared-key-prefixes.ts). The write itself is unchanged.
  *   2026-11-20 — afterMemoryWrite takes the value's size and declared provenance level and hands them
  *     to recordMemoryTouch, for the value signals (services/value/signal-buffer.ts).
  *   2026-11-13 — misdirectedCrewKey and crewSitesWriteRefusal come from crews/def-envelope.ts, not from
@@ -191,7 +194,8 @@ import type { PublishAsk, publishRequestedBody } from '../publish-requests/ask.j
 import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from './publish-gate.js';
 import { memoryTarget } from '../classification/label-rows.js';
 import { closedNodeLevel, type ClosedNodeWarning } from '../closed-node-level.js';
-import { shadowWarning } from './write-shadow.js';
+import { shadowWarning, appPrefixWarning } from './write-shadow.js';
+import { appPrefixOfKey } from '../app/declared-key-prefixes.js';
 import { memoryWriteAsks, fileMemoryWriteAsks } from './write-asks.js';
 import { tallyWriterOf } from '../data-map/tally-writer.js';
 import { keepsHistory, HISTORY_KEEP } from '../context/history-keys.js';
@@ -589,6 +593,16 @@ export async function writeMemoryRecord(
 
     const warnings: MemoryWriteWarning[] = [];
     if (shadowedBy) warnings.push(shadowWarning(input.key, caller.targetGaii, shadowedBy));
+    // 7a. The same agent-namespace write, under a key prefix one of the owner's apps keeps in the
+    //     owner's memory, before any owner copy exists: the warning names the fix now rather than
+    //     after the app has saved its own copy. Read by the same callers the shadow check answers.
+    else if (targetAgent && (privileged || scopeIsCovered(caller.scopes, 'memory:read'))) {
+        const hit = await appPrefixOfKey(storage, `${targetAgent.owner}@${config.nodeId}`, input.key).catch((err: unknown) => {
+            logger.warn('writeMemoryRecord: app key prefixes not read', { key: input.key, error: String(err) });
+            return null;
+        });
+        if (hit) warnings.push(appPrefixWarning(input.key, caller.targetGaii, hit));
+    }
     if (closedNode) warnings.push({ ...closedNode });
     // Past the refusal above, group with no group and none on the record is a row an older node stored.
     if (input.visibility === 'group' && !isNamedGroup(input.groupId) && !existing?.groupId) {
