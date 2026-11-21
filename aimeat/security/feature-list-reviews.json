@@ -273,7 +273,7 @@
       "digest": "sha256:562cb5bf0c26b8e876b09590"
     },
     "14. Economy, marketplace and payments": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/tool-catalog/definitions/commerce.ts",
         "aimeat/src/tool-catalog/definitions/exchange.ts",
@@ -287,7 +287,7 @@
         "aimeat/src/services/trust.ts",
         "aimeat/src/routes/agents/purchase-limit.ts"
       ],
-      "digest": "sha256:cee838eab4ae720915950383"
+      "digest": "sha256:a113916fbe9049d41c27d517"
     },
     "15. Bookkeeping and business": {
       "reviewedOn": "2026-11-20",
@@ -858,8 +858,8 @@
       "aimeat/src/tool-catalog/definitions/moderation.ts": "ae6a9716b37aa0a0"
     },
     "14. Economy, marketplace and payments": {
-      "aimeat/src/tool-catalog/definitions/commerce.ts": "5407ca44c64dafe8",
-      "aimeat/src/tool-catalog/definitions/exchange.ts": "894e027fefe17002",
+      "aimeat/src/tool-catalog/definitions/commerce.ts": "3f61889875c4689e",
+      "aimeat/src/tool-catalog/definitions/exchange.ts": "acbcf46987f24f6a",
       "aimeat/src/routes/commerce-webhooks.ts": "82408169bd101b2f",
       "aimeat/src/services/morsel.ts": "3d5e33c362495127",
       "aimeat/src/routes/commerce.ts": "aa6c548e71ef9527",

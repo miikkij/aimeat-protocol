@@ -85,7 +85,7 @@ describe('a bound skill\'s written calls, held to the manifest', () => {
   it('names each field a call sends that a closed schema refuses, and only those', async () => {
     const storage = {
       getMemory: async (owner: string, key: string) => (owner === 'alice@n1' && key === 'apps.lc.html.tools'
-        ? { value: { tools: [HEARTBEAT, { name: 'open', inputSchema: { type: 'object', properties: { a: {} } } }] } }
+        ? { visibility: 'public', value: { version: 1, tools: [HEARTBEAT, { name: 'open', inputSchema: { type: 'object', properties: { a: {} } } }] } }
         : null),
     } as never;
     const issues = await skillToolFieldIssues(storage, { nodeId: 'n1' }, 'app:alice/lc.html', {

@@ -5,6 +5,8 @@
  * @description The shape a new MCP tool failure is written in, and that the next step still
  *   reaches it through the wrapper every tool is registered behind.
  * @version-history
+ *   2026-11-21 — The wrapper case uses NOT_FOUND: an INVALID_INPUT failure now gets its own step
+ *     (mcp/error-next-step.ts INPUT_NEXT_STEP_TEXT, held in mcp-error-next-step.test.ts).
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -21,8 +23,8 @@ describe('toolError', () => {
   it('gets the next step appended by the wrapper, once', async () => {
     let registered: ((...a: unknown[]) => Promise<{ content: { text: string }[] }>) | null = null;
     const register = (...args: unknown[]) => { registered = args[args.length - 1] as typeof registered; };
-    withErrorNextStep(register as never)('a_tool', 'description', {}, async () => toolError('INVALID_INPUT', 'Part 9 does not exist.'));
+    withErrorNextStep(register as never)('a_tool', 'description', {}, async () => toolError('NOT_FOUND', 'Part 9 does not exist.'));
     const result = await registered!();
-    expect(result.content.map(c => c.text)).toEqual(['INVALID_INPUT: Part 9 does not exist.', NEXT_STEP_TEXT]);
+    expect(result.content.map(c => c.text)).toEqual(['NOT_FOUND: Part 9 does not exist.', NEXT_STEP_TEXT]);
   });
 });

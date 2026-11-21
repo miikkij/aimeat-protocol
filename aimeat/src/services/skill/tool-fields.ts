@@ -29,7 +29,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { appToolsKey } from '../../models/app-tool-schemas.js';
+import { loadPublicToolManifest } from '../app-tools/manifest-read.js';
 import { logger } from '../../utils/logger.js';
 
 /** One field a skill writes in a call that the bound app's tool does not accept. */
@@ -99,22 +99,22 @@ export function callFieldsIn(text: string, tool: string): string[] {
  * nothing, to something other than an app, or to an app with no tool manifest.
  */
 export async function skillToolFieldIssues(
-  storage: Pick<Storage, 'getMemory'>, config: Pick<AimeatConfig, 'nodeId'>, binding: string | undefined, fileTexts: Record<string, string>,
+  storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, binding: string | undefined, fileTexts: Record<string, string>,
 ): Promise<SkillToolFieldIssue[]> {
   const m = typeof binding === 'string' ? /^app:([^/]+)\/(.+)$/.exec(binding) : null;
   if (!m) return [];
   const [, owner, filename] = m;
-  let manifest: unknown;
+  // The manifest the tools are called against: the public one aimeat_app_tool_invoke reads
+  // (services/app-tools/manifest-read.ts), so the check holds the skill to what a caller meets.
+  let tools: Array<{ name?: unknown; inputSchema?: Record<string, unknown> }> = [];
   try {
-    manifest = (await storage.getMemory(`${owner}@${config.nodeId}`, appToolsKey(filename)))?.value;
+    const manifest = await loadPublicToolManifest(storage, config.nodeId, owner, filename);
+    if (manifest.state === 'ok') tools = manifest.tools as typeof tools;
   } catch (err) {
     // The check is advice on a publish that stands; a failed read leaves it out and says so in the log.
     logger.warn('skill tool fields: manifest not read', { binding, error: String(err) });
     return [];
   }
-  const tools = manifest && typeof manifest === 'object' && Array.isArray((manifest as { tools?: unknown }).tools)
-    ? (manifest as { tools: Array<{ name?: unknown; inputSchema?: Record<string, unknown> }> }).tools
-    : [];
   const issues: SkillToolFieldIssue[] = [];
   for (const tool of tools) {
     const name = typeof tool.name === 'string' ? tool.name : '';
