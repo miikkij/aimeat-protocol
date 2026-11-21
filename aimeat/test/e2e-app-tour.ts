@@ -19,33 +19,7 @@
  */
 
 import { ownerSignIn } from './helpers/owner-login.js';
-
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0;
-let failed = 0;
-
-async function test(name: string, fn: () => Promise<void>): Promise<void> {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (e) { failed++; console.error(`  ❌ ${name}: ${(e as Error).message}`); }
-}
-
-function assert(cond: unknown, msg: string): asserts cond {
-    if (!cond) throw new Error(msg);
-}
-
-async function json(path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
-    for (let attempt = 0; ; attempt++) {
-        const res = await fetch(`${BASE}${path}`, {
-            ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers ?? {}) },
-        });
-        if (res.status === 429 && attempt < 5) { await new Promise((r) => setTimeout(r, 1200)); continue; }
-        const text = await res.text();
-        let body: any;
-        try { body = JSON.parse(text); } catch { body = { _raw: text }; }
-        return { status: res.status, body };
-    }
-}
+import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
 
 const authed = (token: string): Record<string, string> => ({ Authorization: `Bearer ${token}` });
 const b64 = (s: string): string => Buffer.from(s, 'utf8').toString('base64');
@@ -111,16 +85,15 @@ const settings = (filename: string, body: Record<string, unknown>, token = owner
 console.log('\nPhase 2 — The tour at publish');
 
 await test('A tour block that is not JSON is refused at publish, naming the block', async () => {
-    const { status, body } = await publish(`tour-broken-${tag}.html`, htmlWith('Broken', '{ "tours": [ '));
-    assert(status === 422, `expected 422, got ${status} ${JSON.stringify(body)}`);
-    assert(body.error?.code === 'APP_TOUR_INVALID', `code: ${body.error?.code}`);
-    assert(/aimeat-tour/.test(body.error?.message ?? ''), `message: ${body.error?.message}`);
+    const res = await publish(`tour-broken-${tag}.html`, htmlWith('Broken', '{ "tours": [ '));
+    expectRefusal(res, 422, 'APP_TOUR_INVALID');
+    assert(/aimeat-tour/.test(res.body.error?.message ?? ''), `message: ${res.body.error?.message}`);
 });
 
 await test('A step that asks for a click with no place is refused at publish', async () => {
-    const { status, body } = await publish(`tour-noplace-${tag}.html`, htmlWith('No place', { steps: [{ text: 'Press it', do: 'click' }] }));
-    assert(status === 422 && body.error?.code === 'APP_TOUR_INVALID', `got ${status} ${JSON.stringify(body)}`);
-    assert(/needs a place/.test(body.error.message), `message: ${body.error.message}`);
+    const res = await publish(`tour-noplace-${tag}.html`, htmlWith('No place', { steps: [{ text: 'Press it', do: 'click' }] }));
+    expectRefusal(res, 422, 'APP_TOUR_INVALID');
+    assert(/needs a place/.test(res.body.error.message), `message: ${res.body.error.message}`);
 });
 
 await test('A good tour publishes, and the owner\'s row carries it with the invitation on', async () => {
@@ -177,21 +150,20 @@ await test('A version without the block has no tour', async () => {
 console.log('\nPhase 4 — Refusals');
 
 await test('A tour_invite that is not a boolean is refused', async () => {
-    const { status, body } = await settings(APP, { tour_invite: 'no' });
-    assert(status === 400, `expected 400, got ${status} ${JSON.stringify(body)}`);
-    assert(/tour_invite must be a boolean/.test(body.error?.message ?? ''), `message: ${body.error?.message}`);
+    const res = await settings(APP, { tour_invite: 'no' });
+    expectRefusal(res, 400, 'INVALID_INPUT');
+    assert(/tour_invite must be a boolean/.test(res.body.error?.message ?? ''), `message: ${res.body.error?.message}`);
 });
 
 await test('Another person cannot switch the invitation on someone else\'s app', async () => {
     await settings(APP, { tour_invite: false });
-    const { status } = await json(`/v1/apps/${encodeURIComponent(APP)}`, {
+    const res = await json(`/v1/apps/${encodeURIComponent(APP)}`, {
         method: 'PATCH', headers: authed(stranger.token), body: JSON.stringify({ owner: owner.owner, tour_invite: true }),
     });
     // The body names the app's owner, so the route asks whether the stranger may act on that
     // owner's app (a delegated builder) and refuses: 403.
-    assert(status === 403, `expected 403, got ${status}`);
+    expectRefusal(res, 403);
     assert((await ownRow(APP)).tour_invite === false, 'the stranger changed the switch');
 });
 
-console.log(`\n📊 Results: ${passed} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+finish();
