@@ -1947,6 +1947,15 @@
      "plain": "Extension actions for visitors without an account An action that says public: true in its manifest also answers someone who has not signed in, so a stranger can browse a catalogue or read a free episode. A visitor's call reads and never writes: the action's memory writes are refused, and the wallet, files, notifications, purchases, workspace, AI and mail are not there. The action knows it is serving a visitor. Every other action still needs a sign-in, and a visitor learns nothing about which extensions or actions exist. Limits: a public action takes no price and no pacing; visitor calls are counted per client address. POST /v1/ext/{name}/{action}, AIMEAT.data.action(), manifest public: true"
     },
     {
+     "slug": "g-8-decisions-that-stay-yours",
+     "cells": [
+      "<strong>Decisions that stay yours</strong>",
+      "Some actions are your own decision: approving a post, accepting a sale, placing a bid, opening a dispute. An extension marks such an action with <code>decision: person</code>, and then your AI can prepare it but cannot do it alone. When an agent calls it, nothing runs and nothing is charged: you get one notice with exactly what the agent prepared, and with one press, signed in yourself, it runs as your decision. If you do not allow it, nothing happens, and the agent hears the answer either way. You and the apps you use call the action as before. A schedule or a workflow step never makes the decision, and an app's AI tools cannot offer it. An action without the mark works as before.",
+      "manifest <code>decision: person</code> on an action; <code>POST /v1/ext/{name}/{action}</code> and <code>aimeat_extension_invoke</code> 202 with the request (kind <code>extension-decision</code> on <code>/v1/publish-requests</code>); <code>aimeat_app_tools_publish</code> and <code>POST /v1/memory</code> 422 <code>PERSON_DECIDES</code>"
+     ],
+     "plain": "Decisions that stay yours Some actions are your own decision: approving a post, accepting a sale, placing a bid, opening a dispute. An extension marks such an action with decision: person, and then your AI can prepare it but cannot do it alone. When an agent calls it, nothing runs and nothing is charged: you get one notice with exactly what the agent prepared, and with one press, signed in yourself, it runs as your decision. If you do not allow it, nothing happens, and the agent hears the answer either way. You and the apps you use call the action as before. A schedule or a workflow step never makes the decision, and an app's AI tools cannot offer it. An action without the mark works as before. manifest decision: person on an action; POST /v1/ext/{name}/{action} and aimeat_extension_invoke 202 with the request (kind extension-decision on /v1/publish-requests); aimeat_app_tools_publish and POST /v1/memory 422 PERSON_DECIDES"
+    },
+    {
      "slug": "g-8-an-extension-names-the-services-it-calls",
      "cells": [
       "<strong>An extension names the services it calls</strong>",
@@ -5207,6 +5216,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 535
+  "rows": 536
  }
 }

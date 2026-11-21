@@ -21,6 +21,8 @@
  *   deleteMemoryRecord() · restoreLevel() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-11-21 — A restore of an app tool manifest that binds an action marked `decision: person` is
+ *     refused 422 PERSON_DECIDES, as the write refuses it (services/app-tools/decision-binding.ts).
  *   2026-11-19 — A customer due diligence record (kyc.org.*) is refused on delete and restore, for every caller: only the retention purge removes it (AMLR art. 77).
  *   2026-11-15 — deleteMemoryRecord asks the team approval gate last (services/team/action-gate.ts,
  *     team setup T7): an AI's delete in a team's workspaces waits for a lead.
@@ -97,6 +99,7 @@ import { settleRequestsForBinnedRecord } from '../publish-requests/store.js';
 import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../../utils/scope-coverage.js';
 import { isSecretRecordKey, secretRecordBinRefusal } from '../secret/records.js';
 import { legacyPacingWriteRefusal, type LegacyPacingWriteRefusal } from '../legacy-pacing-write.js';
+import { decisionToolRefusal, type DecisionToolRefusal } from '../app-tools/decision-binding.js';
 import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
 import { memoryCapRefusal, memoryWriterAsk } from './publish-gate.js';
 import { isRaiseToPublic } from '../publish-gate.js';
@@ -114,7 +117,7 @@ export interface MemoryBinRefusal {
   ok: false;
   code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD'
     | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | 'SERVICE_RECORD' | 'QUOTA_EXCEEDED' | 'KYC_RETAINED'
-    | LegacyPacingWriteRefusal['code'] | TeamGateRefusal['code'];
+    | LegacyPacingWriteRefusal['code'] | TeamGateRefusal['code'] | DecisionToolRefusal['code'];
   message: string;
   /** The team gate's approval: its id and where a lead decides it (services/team/action-gate.ts). */
   details?: Record<string, unknown>;
@@ -492,6 +495,9 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
   if (found) {
     const legacy = legacyPacingWriteRefusal(req.key, binned);
     if (legacy) return { ok: false, code: legacy.code, message: legacy.message, status: legacy.status };
+    // A tool manifest that binds an action marked `decision: person` stays in the bin, as the write refuses it.
+    const decision = await decisionToolRefusal(deps.storage, found, req.key, binned);
+    if (decision) return { ok: false, code: decision.code, message: decision.message, status: decision.status };
     // Refuse before you write: the level the record would come back at is decided, and refused,
     // before the tombstone is cleared (restoreLevel says what each rule answers and why).
     const decided = await restoreLevel(deps, req, found, visibility);

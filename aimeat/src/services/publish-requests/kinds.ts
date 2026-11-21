@@ -7,6 +7,7 @@
  * @structure PublishKind
  * @usage import type { PublishKind } from './store.js';
  * @version-history
+ *   v1.2.0 — 2026-11-21 — The kind `extension-decision`.
  *   v1.1.0 — 2026-11-13 — The kind `lia-approval`.
  *   v1.0.0 — 2026-11-02 — Moved verbatim from store.ts (800-line limit), with the kind `mcp-capability-use`
  *     (secaudit2026nov02d round 13).
@@ -54,4 +55,7 @@ export type PublishKind =
   // Another account's capability running a remote MCP tool with the caller's own sign-in (services/mcp-client/capability-consent.ts).
   | 'mcp-capability-use'
   // The balancing test of an app (legitimate interests), approved by its owner in person when an agent asked (services/compliance/lia-ops.ts).
-  | 'lia-approval';
+  | 'lia-approval'
+  // An extension action the manifest marks as the person's own decision, prepared by an agent and run
+  // as the person once they allow it in person (services/extension/person-decision.ts).
+  | 'extension-decision';

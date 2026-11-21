@@ -14134,6 +14134,10 @@
   "notiftext.approval_lia.allow": "Hyväksy testi",
   "notiftext.approval_lia.deny": "Älä hyväksy",
   "notiftext.approval_change.lia": "Lue testi tai muuta sitä sovelluksen sivulla",
+  "notiftext.approval_extension_decision.title": "{who} pyytää sinua tekemään päätöksen laajennuksessa {extension}: {action}",
+  "notiftext.approval_extension_decision.body": "{who} valmisteli tämän sinulle: laajennuksen {extension} toiminto {action} näillä tiedoilla: {input}. Laajennus merkitsee toiminnon sinun omaksi päätökseksesi, joten tekoäly ei voi tehdä sitä yksin. Jos sallit, toiminto tehdään heti sinun päätöksenäsi juuri näillä tiedoilla. Jos et salli, mitään ei tapahdu. Voit myös tehdä päätöksen itse sovelluksessa.",
+  "notiftext.approval_extension_decision.allow": "Tee se päätöksenäni",
+  "notiftext.approval_extension_decision.deny": "Älä tee sitä",
   "notiftext.compliance_lia_approved.title": "Sovelluksen {app} tasapainotesti on hyväksytty",
   "notiftext.compliance_lia_approved.body": "{by} hyväksyi testin. Lopputulos: oikeutettu etu soveltuu rekisterin ”{register}” käsittelyyn.",
   "notiftext.compliance_lia_approved_unsuitable.title": "Sovelluksen {app} tasapainotesti on hyväksytty",
@@ -31628,6 +31632,17 @@
         "high": "Kyvykkyys ei toimi, eikä mitään lähetetä. Kun sitä käytetään seuraavan kerran, sinulta kysytään uudelleen.",
         "tipLabel": "Milloin kannattaa sallia",
         "tip": "Salli, jos tunnet tilin, joka julkaisi kyvykkyyden, ja haluat sen työkalun toimivan omalla tililläsi. Jos et tiedä, miksi se tarvitsee kirjautumistasi, älä salli."
+      },
+      "approval_extension_decision": {
+        "title": "Tekoäly valmisteli päätöksen, joka on sinun",
+        "short": "Yksi tekoälyistäsi haluaa tehdä jotain, mistä laajennuksen mukaan vain sinä päätät.",
+        "what": "Jotkin toiminnot ovat ihmisen oma päätös, esimerkiksi kun hyväksyt julkaisun tai kaupan tai teet tarjouksen. Toiminnon tekevä laajennus merkitsee sen näin. Tekoäly voi valmistella toiminnon sinulle, mutta se ei voi tehdä sitä yksin. Siksi sinulta kysytään.",
+        "lowLabel": "Jos sallit",
+        "low": "Toiminto tehdään kerran, heti, sinun omana päätöksenäsi, juuri näytetyillä tiedoilla.",
+        "highLabel": "Jos et salli",
+        "high": "Mitään ei tapahdu. Tekoäly saa tiedon, ettet sallinut.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli, jos tiedot ovat sitä, mitä haluat päättää. Jos et ole varma, älä salli, ja tee päätös itse sovelluksessa."
       },
       "approval_schedule_instruction": {
         "title": "Joku muutti ajastusta",

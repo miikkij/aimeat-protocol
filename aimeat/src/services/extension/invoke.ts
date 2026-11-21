@@ -27,6 +27,9 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   2026-11-21 — An action marked `decision: person`, called by an agent or an ecosystem app, runs
+ *     nothing and files one approval request the person allows in person; the outcome is `awaiting`
+ *     (services/extension/person-decision.ts). A run inside another run is refused PERSON_DECIDES.
  *   2026-11-20 — The gated app is read through resolveGatedAppRef, so `config.app` named without
  *     `.html` gates the app's roster (services/members-only.ts).
  *   2026-11-15 — ctx.files.write of an agent caller without storage:write is refused with the
@@ -106,6 +109,9 @@ import { takeExtensionRunSlot, createRunQueue, SELLER_RUNS_PER_RUN } from './run
 import { scriptRefusal, EXTENSION_REFUSED } from '../extension-access/script-refusal.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { permissionAskText } from '../permission-ask.js';
+import { isPersonDecision, waitsForPerson, personDecidesText, PERSON_DECIDES } from './decision-mark.js';
+import { askPersonToDecide } from './person-decision.js';
+import { wherePersonDecides } from './decision-where.js';
 
 /**
  * What kind of principal runs the action: the caller object's kind (services/caller-context.ts), or
@@ -141,7 +147,10 @@ export type ExtensionInvokeOutcome =
       /** A retryable refusal (the run slots are full): the seconds a Retry-After carries. */
       retryAfterSec?: number }
   /** The paywall refused and has written its answer into the surface's responder. */
-  | { kind: 'paywall' };
+  | { kind: 'paywall' }
+  /** The action is the person's decision and the caller an agent or an ecosystem app: nothing ran,
+   *  one approval request waits for the person (person-decision.ts). The surface answers 202 with `body`. */
+  | { kind: 'awaiting'; body: Record<string, unknown> };
 
 /**
  * Whether a sandbox run ended by running out of time. QuickJS reports its interrupt as
@@ -298,6 +307,21 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
   }
   if (args.method && action.method !== 'POST' && action.method !== args.method) {
     return { kind: 'refused', status: 405, code: 'METHOD_NOT_ALLOWED', message: `Action "${actionId}" requires ${action.method}, got ${args.method}` };
+  }
+
+  // The person's own decision (`decision: person`): an agent's or an ecosystem app's call runs nothing
+  // and is charged nothing. It files one request the person allows with one press, signed in
+  // themselves, and the node then runs it as theirs (person-decision.ts). A run inside another run
+  // (ctx.buy) has nobody to ask and is refused. Before the paywall, so nothing is taken.
+  if (isPersonDecision(action) && waitsForPerson(caller.kind)) {
+    if (args.admission === 'inherited') {
+      return { kind: 'refused', status: 403, code: PERSON_DECIDES,
+        message: personDecidesText(extName, action.id, await wherePersonDecides(config, storage, ext), 'another extension\'s run does not make it') };
+    }
+    const asked = await askPersonToDecide({ storage, config }, {
+      ext, extRef: resolved.pinned ? `${extName}@${resolved.pinned}` : extName, instanceId, action, input: args.input, caller,
+    });
+    return asked.ok ? { kind: 'awaiting', body: asked.body } : { kind: 'refused', status: asked.status, code: asked.code, message: asked.message };
   }
 
   // Per-call paywall: owner-free / anti-abuse toll / priced payment (services/extension-access/paywall.ts).

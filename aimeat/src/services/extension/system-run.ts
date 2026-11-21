@@ -52,6 +52,9 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   2026-11-21 -- An action marked `decision: person` is refused PERSON_DECIDES with the address where
+ *     the person makes it: a schedule, a workflow step or any other unattended run does not
+ *     (services/extension/person-decision.ts).
  *   v1.12.0 -- 2026-11-09 -- ctx.changed on an unattended run: without owners it tells the installer.
  *   v1.11.0 -- 2026-11-08 -- One label trail per run, shared by the row calls, ctx.files and
  *     ctx.datapackage: a package the run publishes keeps the labels of what it read, and the result
@@ -122,6 +125,8 @@ import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './
 import type { EmailService } from '../email.js';
 import { deactivatedAccountSkip } from '../account/deactivated.js';
 import { logger } from '../../utils/logger.js';
+import { isPersonDecision, personDecidesText, PERSON_DECIDES } from './decision-mark.js';
+import { wherePersonDecides } from './decision-where.js';
 
 export interface SystemRunDeps {
     storage: Storage;
@@ -287,6 +292,12 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
     }
     const action = ext.actions.find(a => a.id === actionId);
     if (!action) throw new Error(`Action "${actionId}" not found in extension "${extensionName}"`);
+    // The person's own decision (`decision: person`) is never made with nobody present: the run is
+    // refused with the address where the person makes it (services/extension/person-decision.ts).
+    if (isPersonDecision(action)) {
+        const where = await wherePersonDecides(config, storage, ext);
+        throw Object.assign(new Error(`${PERSON_DECIDES}: ${personDecidesText(ext.name, actionId, where, 'a run with nobody present does not make it')}`), { code: PERSON_DECIDES });
+    }
 
     const encKey = getEncryptionKey(config);
     const extMemoryOwner = instanceId ? `ext:${ext.name}.${instanceId}` : `ext:${ext.name}`;

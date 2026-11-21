@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   2026-11-21 — aimeat_extension_invoke says an action marked `decision: person` answers an approval request.
  *   2026-11-20 — aimeat_iam_define's `app_id` is "owner/name" without `.html` (services/app/app-ref.ts).
  *   2026-11-13 — aimeat_cortex_list takes namespace and visibility, as GET /v1/cortex does (unit 3b).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -59,7 +60,7 @@ export const extensionsCortexTools = [
     },
     {
         name: 'aimeat_extension_invoke',
-        description: 'Run one action of an installed, active extension by extension name + action id, passing input params (optionally scoped to a specific extension instance). Executes server-side in the sandbox and returns the action\'s result. The extension and action must exist and be active. Discover actions with aimeat_extension_list / aimeat_extension_get. When the node already runs as many extension actions as its operator allows, at once or for your account, it answers EXTENSION_RUNS_BUSY with the seconds to wait; call again after them.',
+        description: 'Run one action of an installed, active extension by extension name + action id, passing input params (optionally scoped to a specific extension instance). Executes server-side in the sandbox and returns the action\'s result. The extension and action must exist and be active. Discover actions with aimeat_extension_list / aimeat_extension_get. When the node already runs as many extension actions as its operator allows, at once or for your account, it answers EXTENSION_RUNS_BUSY with the seconds to wait; call again after them. An action the extension marks as the person\'s own decision (decision: person, such as approving a post or accepting a sale) does not run for you: the answer is an approval request (status awaiting_owner, approve_url). Tell your owner in one sentence what you prepared and give them that address; when they allow it, the node runs it as their decision with your input, so do not call it again.',
         caller: 'agent',
         visibility: agentEverywhere,
         // openWorldHint: extension actions run user-provided WASM with ctx.fetch -- effects unbounded

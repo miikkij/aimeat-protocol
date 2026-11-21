@@ -13367,6 +13367,10 @@
   "notiftext.approval_lia.allow": "Approve the test",
   "notiftext.approval_lia.deny": "Do not approve",
   "notiftext.approval_change.lia": "Read or change the test on the app's page",
+  "notiftext.approval_extension_decision.title": "{who} asks you to make a decision in {extension}: {action}",
+  "notiftext.approval_extension_decision.body": "{who} prepared this for you: the action {action} of the extension {extension}, with this input: {input}. The extension marks this action as your own decision, so an AI cannot make it alone. If you allow it, the action runs now as your decision, with exactly this input. If you do not, nothing happens. You can also make the decision yourself in the app.",
+  "notiftext.approval_extension_decision.allow": "Run it as my decision",
+  "notiftext.approval_extension_decision.deny": "Do not run it",
   "notiftext.compliance_lia_approved.title": "The balancing test of the app {app} was approved",
   "notiftext.compliance_lia_approved.body": "{by} approved it. The outcome: legitimate interests fit the processing in the register \"{register}\".",
   "notiftext.compliance_lia_approved_unsuitable.title": "The balancing test of the app {app} was approved",
@@ -30861,6 +30865,17 @@
         "high": "The capability does not run, and nothing is sent. The next time it is used, you are asked again.",
         "tipLabel": "When to allow",
         "tip": "Allow if you know the account that published it and you want its tool to work with your own account. If you do not know why it needs your sign-in, do not allow it."
+      },
+      "approval_extension_decision": {
+        "title": "An AI prepared a decision that is yours",
+        "short": "One of your AIs wants to do something that the extension says only you decide.",
+        "what": "Some actions are a person's own decision, for example when you approve a post, accept a sale or place a bid. The extension that does the action marks it so. An AI can prepare such an action for you, but it cannot do it alone. That is why you are asked.",
+        "lowLabel": "If you allow",
+        "low": "The action runs once, now, as your own decision, with exactly the input shown.",
+        "highLabel": "If you do not allow",
+        "high": "Nothing happens. The AI hears that you did not allow it.",
+        "tipLabel": "When to allow",
+        "tip": "Allow if the input is what you want to decide. If you are not sure, do not allow it, and make the decision yourself in the app."
       },
       "approval_schedule_instruction": {
         "title": "Someone changed a scheduled task",

@@ -10,6 +10,7 @@
  *   MemoryWriteWarning · AfterMemoryWriteReport · MemoryWriteResult
  * @usage import type { MemoryWriteCaller, MemoryWriteResult } from './write.js';
  * @version-history
+ *   2026-11-21 — The refusal code PERSON_DECIDES (services/app-tools/decision-binding.ts).
  *   2026-11-04 — Moved verbatim from services/memory-write.ts (codebase analysis 2026-11-03, item C3).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -162,6 +163,8 @@ export type MemoryWriteResult =
             | 'RESERVED_KEY'
             // An `agents.` key that carries an identity where the agent's name belongs.
             | 'AGENT_KEY_NOT_A_NAME'
+            // An app tool manifest that binds an action marked `decision: person` (app-tools/decision-binding.ts).
+            | 'PERSON_DECIDES'
             // An EXCHANGE listing source whose changed text would break an ODPS length cap.
             | 'ODPS_FIELD_TOO_LONG'
             // The same source carrying the old morsel price on a node at 4.0.0 or later.

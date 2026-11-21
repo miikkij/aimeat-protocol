@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-11-21 — aimeat_extension_invoke of an action marked `decision: person` answers the approval
+ *     request the person allows; nothing ran (services/extension/person-decision.ts).
  *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-10-29 — aimeat_extension_activate refuses an extension whose code a package brought in under
@@ -315,6 +317,8 @@ export function registerExtensionsTools(
                 return { content: [{ type: 'text' as const, text: refusal.refusal ? refusalText(refusal.refusal) : 'The call was refused.' }], isError: true };
             }
             if (out.kind === 'refused') return { ...toolError(out.code, out.message) };
+            // The person's own decision: nothing ran, one request waits for the person (services/extension/person-decision.ts).
+            if (out.kind === 'awaiting') return { content: [{ type: 'text' as const, text: JSON.stringify(out.body, null, 2) }] };
             emitResourceUpdated(agentGaii, `aimeat://extensions/${encodeURIComponent(out.extName)}`);
             return { content: [{ type: 'text' as const, text: JSON.stringify(out.result, null, 2) }] };
         },

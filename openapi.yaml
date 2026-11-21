@@ -9089,6 +9089,37 @@ components:
                             approve_url: { type: string }
                             next_step: { type: string }
 
+    PersonDecisionRequested:
+      description: >
+        The action is the person's own decision (`decision: person` in its extension's manifest) and the
+        caller an agent or an ecosystem app. Nothing ran and nothing was charged. One approval request
+        waits in the caller's account (kind `extension-decision`); only the account holder, signed in
+        themselves, allows it, and the node then runs the action as the person with exactly this input.
+        Do not call again: the answer comes back as a message with the request id.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AimeatEnvelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      request_id: { type: string }
+                      status: { type: string, enum: [awaiting_owner] }
+                      waiting_for: { type: string, enum: [owner] }
+                      kind: { type: string, enum: [extension-decision] }
+                      title: { type: string }
+                      asks: { type: string }
+                      why: { type: string }
+                      expires_at: { type: string, format: date-time }
+                      already_waiting: { type: boolean }
+                      approve_url: { type: string }
+                      decision: { type: string, enum: [person] }
+                      decide_yourself_at: { type: string, description: The app the extension gates, or the account's Extensions page, where the person makes the decision themselves. }
+                      next_step: { type: string }
+
     OdpsFieldTooLong:
       description: >
         ODPS_FIELD_TOO_LONG. The write would publish an EXCHANGE listing whose ODPS v4.2 document breaks a
@@ -19974,7 +20005,9 @@ paths:
             not declare (see components/responses/UndeclaredSpace). ODPS_FIELD_TOO_LONG: an EXCHANGE listing
             source whose changed text would publish an ODPS document past a schema maxLength (see
             components/responses/OdpsFieldTooLong). SCHEMA_VALIDATION_FAILED: the value does not match the
-            key's schema.
+            key's schema. PERSON_DECIDES: an app tool manifest (`apps.{app}.tools`, also as written by
+            aimeat_app_tools_publish) binds a tool to an extension action marked `decision: person`, which
+            only the person decides; `error.details.tools` names each tool and its `action_id`.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -21128,7 +21161,8 @@ paths:
             not declare (see components/responses/UndeclaredSpace). ODPS_FIELD_TOO_LONG: an EXCHANGE listing
             source whose changed text would publish an ODPS document past a schema maxLength (see
             components/responses/OdpsFieldTooLong). SCHEMA_VALIDATION_FAILED: the new value does not match
-            the key's schema.
+            the key's schema. PERSON_DECIDES: an app tool manifest binds a tool to an extension action
+            marked `decision: person`, as on POST /v1/memory.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -21299,7 +21333,8 @@ paths:
             schema. UNDECLARED_SPACE: a workspace record whose space the workspace manifest does not
             declare (see components/responses/UndeclaredSpace). ODPS_FIELD_TOO_LONG: an EXCHANGE listing
             source whose changed text would publish an ODPS document past a schema maxLength (see
-            components/responses/OdpsFieldTooLong).
+            components/responses/OdpsFieldTooLong). PERSON_DECIDES: the merged app tool manifest binds a
+            tool to an extension action marked `decision: person`, as on POST /v1/memory.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -21484,7 +21519,8 @@ paths:
             text would publish an ODPS document past a schema maxLength is not written and is listed
             under failed[] with a reason starting "ODPS_FIELD_TOO_LONG:". An entry that would make a record
             public, by a caller with nobody on this node to ask, is listed under failed[] with a reason
-            starting "PUBLISH_NOT_ALLOWED:".
+            starting "PUBLISH_NOT_ALLOWED:". An app tool manifest that binds a tool to an extension action
+            marked `decision: person` is listed with a reason starting "PERSON_DECIDES:".
           content:
             application/json:
               schema:
@@ -21570,7 +21606,8 @@ paths:
             An EXCHANGE listing source whose changed text would publish an ODPS document past a schema
             maxLength is listed the same way, with a reason starting "ODPS_FIELD_TOO_LONG:". An entry that
             would make a record public, by a caller with nobody on this node to ask, is listed the same way,
-            with a reason starting "PUBLISH_NOT_ALLOWED:".
+            with a reason starting "PUBLISH_NOT_ALLOWED:". An app tool manifest that binds a tool to an
+            extension action marked `decision: person` is listed with a reason starting "PERSON_DECIDES:".
           content:
             application/json:
               schema:
@@ -30405,10 +30442,11 @@ paths:
           description: The copy would put the caller over its memory quota (QUOTA_EXCEEDED), the same answer every memory write gives.
         '422':
           description: |
-            Two refusals, nothing written. SCHEMA_VALIDATION_FAILED: the copied value does not match the
+            Three refusals, nothing written. SCHEMA_VALIDATION_FAILED: the copied value does not match the
             schema lock on its key, the check POST /v1/memory makes (`error.details` is
             `{ key, violations, schema_url }`). ODPS_FIELD_TOO_LONG: the copy would publish an EXCHANGE
-            listing past an ODPS length cap (see the OdpsFieldTooLong response).
+            listing past an ODPS length cap (see the OdpsFieldTooLong response). PERSON_DECIDES: the copy
+            is an app tool manifest that binds a tool to an extension action marked `decision: person`.
           content:
             application/json:
               schema:
@@ -59364,6 +59402,11 @@ paths:
                     extension as `installer/name` (`objectTypes[].extensions`), also on a schedule or a workflow step.
                     A top-level `network: { hosts: [api.example.com] }` limits `ctx.fetch` to those
                     exact hostnames, on every redirect hop too; the package approval lists them.
+                    An action may say `decision: person` (any other value is refused 400
+                    INVALID_MANIFEST): it is the person's own decision, so an agent's or an ecosystem
+                    app's call waits for the person's approval (POST /v1/ext/{extName}/{actionId}
+                    answers 202), a schedule or workflow step is refused PERSON_DECIDES, and no app
+                    tool manifest may bind it.
                 scripts:
                   type: object
                   additionalProperties:
@@ -59778,6 +59821,18 @@ paths:
         and `ctx.caller.member` as its row on the app's roster; it is never the app's owner. The
         capabilities that act for an account are absent. The instance form of this path refuses the
         token (401).
+
+        The person's own decision: an action the manifest marks `decision: person` (a moderation act,
+        a sale accept, a bid commit) runs as usual for the account holder in person (a session or an
+        owner-level personal access token), an app grant, a person registered to an app and a visitor.
+        Called by an agent or an ecosystem app it runs nothing and charges nothing: it answers 202 with
+        an approval request in the caller's account (kind `extension-decision` on GET
+        /v1/publish-requests; `request_id`, `status: awaiting_owner`, `approve_url`, `next_step`,
+        `decide_yourself_at`). Only the account holder, signed in themselves, allows it; the node then
+        runs the action as the person, with exactly the input the agent sent, once. A request whose
+        action code changed after it was asked is settled outdated and runs nothing. An input over
+        16 000 characters answers 413 PERSON_DECIDES. A run inside another extension's run (ctx.buy)
+        answers 403 PERSON_DECIDES with the address where the person makes the decision.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -59824,6 +59879,8 @@ paths:
                       data:
                         type: object
                         description: Action-specific result
+        '202':
+          $ref: '#/components/responses/PersonDecisionRequested'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
@@ -59873,7 +59930,7 @@ paths:
       operationId: executeExtensionInstanceAction
       summary: Execute extension action on specific instance
       description: |
-        Invoke an action on a specific extension instance. An action the manifest marks `public` also answers a caller with no sign-in, as on POST /v1/ext/{extName}/{actionId}. The run slots apply as there (503 EXTENSION_RUNS_BUSY with Retry-After).
+        Invoke an action on a specific extension instance. An action the manifest marks `public` also answers a caller with no sign-in, as on POST /v1/ext/{extName}/{actionId}. The run slots apply as there (503 EXTENSION_RUNS_BUSY with Retry-After). An action marked `decision: person`, called by an agent or an ecosystem app, answers 202 with the approval request the person allows, as there; the approval runs it on this instance.
 
         The same three segments are the literal form of `<owner>/<name>/<action>`, which the SDK's
         `AIMEAT.data.action('<owner>/<name>', id)` sends. They are read in this order: an extension the
@@ -59910,6 +59967,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PersonDecisionRequested'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -88907,7 +88966,9 @@ paths:
         for seven days. Requires memory:write. The MCP tool aimeat_publish_requests returns the same.
         The same list holds the account's other one-press approvals, the requests that make nothing
         public (an extension's emailPolicy grant, a crew model choice with its own address set by an
-        app, switching off the question before a secret goes to a new address). Such a request has
+        app, switching off the question before a secret goes to a new address, an extension action
+        that is the person's own decision and that an agent prepared, kind `extension-decision`, which
+        only the account holder in person allows). Such a request has
         `waiting_for` (owner or operators), `asks` and `why` in plain words; while it waits for the
         node's operators its `state` is awaiting_operator.
       security: [{ BearerAuth: [] }]

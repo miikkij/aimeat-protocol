@@ -94,6 +94,10 @@ guest receives is missing from that table, so change the table in the same commi
   asks it, its value (one hostname or IPv4, optional `:port`) joins that install's list, and the owner
   changes it with `aimeat_extension_config_set`, no new version (since 2026-10-09).
 - `aimeat_extension_install` does not upsert: pass `update: true` (it survives the presigned path).
+- **An action that records a person's own decision says `decision: person`** (approve, reject,
+  accept a sale, commit a bid). An agent's call then runs nothing and answers 202 with an approval
+  request the person allows with one press; a schedule or workflow step is refused `PERSON_DECIDES`,
+  and no app tool may bind the action. The person, and an app the person uses, call it as usual.
 - **The node does not check `input` against the action's `input` schema.** The schema is published
   for callers and the market; the script checks the fields it reads.
 - **On a schedule, a workflow step or an `ai.start` `on_done` action, a normal return is a success

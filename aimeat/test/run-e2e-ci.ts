@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-21 -- e2e-ext-person-decision.ts joins the list (not the guard tier): actions marked `decision: person`.
  *   2026-11-20 -- e2e-organism-app-wall.ts joins the list (not the guard tier): the organism's app wall and the new entry.
  *   2026-11-20 -- e2e-ai-standing.ts joins the list (not the guard tier): the owner's "Allow always" setting
  *     (wish-ai-toimii-itsen-isesti-omistajan-asetuksella-salli-aina-ja-k).
@@ -810,6 +811,9 @@ const ALL_SUITES = [
     'test/e2e-ext-paywall.ts',
     // A public extension action answers a caller without an account, read-only (Comicland v3 A-7).
     'test/e2e-ext-visitor-actions.ts',
+    // An action marked `decision: person`: an agent's call waits for the person's one-press approval,
+    // no app tool binds it, a schedule is refused (incident mwqdmtk8).
+    'test/e2e-ext-person-decision.ts',
     // The operator's limits on extension load, set from the admin config: each refusal names its
     // setting, and the designed use keeps working under it (secaudit2026oct22, round 7).
     'test/e2e-ext-operator-limits.ts',

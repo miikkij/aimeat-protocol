@@ -7,6 +7,8 @@
  *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — An agent's call of an action marked `decision: person` answers 202 with the approval
+ *     request the person allows (services/extension/person-decision.ts); nothing ran.
  *   2026-11-08 — A refusal the script named (EXTENSION_REFUSED) carries the script's code as
  *     error.details.reason (services/extension-access/script-refusal.ts).
  *   2026-11-01 — POST /v1/ext/:extName/:actionId takes a person registered to an app (an app party
@@ -152,6 +154,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
       return;
     }
+    // The person's own decision, asked of the person: nothing ran (services/extension/person-decision.ts).
+    if (out.kind === 'awaiting') {
+      res.status(202).json(success(config.nodeId, out.body, [
+        { description: 'Read the request', method: 'GET', url: `/v1/publish-requests/${encodeURIComponent(String(out.body.request_id))}` },
+      ]));
+      return;
+    }
     res.json(success(config.nodeId, out.result, [
       { description: 'View extension', method: 'GET', url: `/v1/extensions/${addressSegment(out.extName)}` },
     ]));
@@ -204,7 +213,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
       return;
     }
-    res.json(success(config.nodeId, out.result));
+    // A visitor and a party are people, so their call never waits for one (`awaiting` does not occur).
+    res.json(success(config.nodeId, out.kind === 'ok' ? out.result : out.body));
   };
 
   /**
@@ -239,7 +249,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
       return;
     }
-    res.json(success(config.nodeId, out.result));
+    // A visitor and a party are people, so their call never waits for one (`awaiting` does not occur).
+    res.json(success(config.nodeId, out.kind === 'ok' ? out.result : out.body));
   };
 
   // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──

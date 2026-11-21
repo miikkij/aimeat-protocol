@@ -391,7 +391,7 @@
       "digest": "sha256:3bfeaef59953dc3bf05a49cc"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/builder/extension-prompt.ts",
         "aimeat/src/services/extension/ctx-contract.ts",
@@ -401,7 +401,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension/schedules.ts"
       ],
-      "digest": "sha256:c98cd3ff5ba11bf95095f038"
+      "digest": "sha256:962f3e485fb3b4140c998ad1"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-20",
@@ -451,7 +451,7 @@
       "digest": "sha256:29872ac88059d08fca8a8974"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -462,7 +462,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:30b07784c33d340c89682c3e",
+      "digest": "sha256:cc582def4a02cee6fd078ed8",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -591,13 +591,13 @@
       "note": "The script for repo and marketing pictures, and the node tool an app's pictures come from instead."
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/builder/extension-prompt.ts"
       ],
-      "digest": "sha256:5624a1910e4515b568615abe"
+      "digest": "sha256:e760f59d661fcb4e631f5c3b"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-11-18",
@@ -637,12 +637,12 @@
       "note": "The locale loop it teaches, and the commit-msg hook whose limits it states (the limits themselves are in check-commit-msg.ts, which its eval grader within-hook-limits also mirrors)."
     },
     "project:security-audit": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:b415e14aaecd833247ba67f4",
+      "digest": "sha256:6da953d00282b3a08f18b1e1",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -654,12 +654,12 @@
       "note": "It checks pages on the session's sandbox node; its viewports follow skill aimeat-frontend-verify."
     },
     "agent:gatekeeper": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:b415e14aaecd833247ba67f4",
+      "digest": "sha256:6da953d00282b3a08f18b1e1",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -870,7 +870,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "bbefdfada0757d7f",
       ".githooks/pre-commit": "3ba3106c803ba291",
-      "aimeat/src/services/builder/extension-prompt.ts": "91ab68a199b0d408"
+      "aimeat/src/services/builder/extension-prompt.ts": "b11c99382ea8fcab"
     },
     "project:aimeat-organism-records": {
       "aimeat/src/services/exchange/odps.ts": "e6bddb3b685823fe",
@@ -940,18 +940,18 @@
       "aimeat/src/services/agent/task-rules.ts": "6fe6b779efdd6d20"
     },
     "node:aimeat-extension-builder": {
-      "aimeat/src/services/builder/extension-prompt.ts": "91ab68a199b0d408",
+      "aimeat/src/services/builder/extension-prompt.ts": "b11c99382ea8fcab",
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
-      "aimeat/src/services/extension/manifest.ts": "60cfff445da22fc9",
+      "aimeat/src/services/extension/manifest.ts": "a3e1a073d4a0728f",
       "aimeat/src/services/extension-access/paywall.ts": "4ae1636e51a79bea",
       "aimeat/src/routes/extensions/crud.ts": "0d4388533918bd2e",
       "aimeat/src/routes/extensions/instances.ts": "605862fb1d9f8a42",
       "aimeat/src/services/extension/schedules.ts": "94948c01d41b79b4"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "2df6f6444c486365",
+      "aimeat/src/routes/memory/bulk.ts": "0b5acad7b6ed3bf4",
       "aimeat/src/routes/memory/key.ts": "b1373b7ac0433e98",
-      "aimeat/src/services/memory/bin.ts": "073bd69ddaab0c80",
+      "aimeat/src/services/memory/bin.ts": "0ab3f2033606f8fa",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
       "aimeat/src/routes/owners/export.ts": "c7913eda009f7f9a",
       "aimeat/src/services/owner/erasure.ts": "c8b31a7f7fa97987",
@@ -1057,14 +1057,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "cd394fe614df0f46"
+      "aimeat/test/run-e2e-ci.ts": "dae6dfd574f726a6"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "cd394fe614df0f46"
+      "aimeat/test/run-e2e-ci.ts": "dae6dfd574f726a6"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"

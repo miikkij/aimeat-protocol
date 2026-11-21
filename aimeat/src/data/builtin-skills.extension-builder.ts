@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-11-21 — Section 4: `decision: person` on an action that records a person's own decision; an
+ *     agent's call waits for the person's one-press approval (services/extension/person-decision.ts).
  *   2026-11-15 — A write lands in the owner's namespace "however the code was started", not "on every road".
  *   2026-11-09 — Section 5: an extension signals a change to named owners' pages with ctx.changed;
  *     the line said an extension had no way to reach an app.
@@ -224,6 +226,15 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
   also answers a visitor with no account, read-only: \`ctx.caller.anonymous\` is true, memory writes
   throw VISITOR_READ_ONLY, and the capabilities that act for a person are absent. It takes no price
   and no \`tollMorsels\`. Use it for what a stranger may read: a catalogue, a free episode.
+- An action that records a person's own decision (approve or reject a post, accept a sale, commit a
+  bid, open a dispute) says \`decision: person\` in the manifest. The person signed in, and an app
+  the person uses, call it as usual. An agent's or an ecosystem app's call does not run it: the node
+  answers 202 with an approval request (\`status: awaiting_owner\`, \`approve_url\`), the person allows
+  it with one press, signed in themselves, and the node then runs it as theirs with exactly the input
+  the agent sent. A schedule, a workflow step and any other run with nobody present are refused
+  \`PERSON_DECIDES\`, and an app tool manifest that binds the action is refused at the write. So give
+  the AI actions that prepare a draft and read the status, and keep the decision in the app's own
+  control. Any other value of \`decision\` is refused at install.
 - An extension that gates an app (\`config.app\`) also answers the people registered to that app
   without an account (aimeat-parties), when they call it with the app's sign-in: \`ctx.caller.party\`
   names the person (\`ref\`, \`name\`, \`displayName\`, \`app\`), \`gaii\` and \`owner\` are their identity

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — An extension action's `decision: 'person'` (services/extension/person-decision.ts).
  *   2026-11-13 — A comment names services/cortex/activation.ts, where the cortex activation moved
  *     (structure programme 2026-11, unit 4).
  *   v1.17.0 — 2026-11-12 — OrganismRecord.accessRequests ('on' | 'off', unset reads 'on') and
@@ -436,6 +437,13 @@ export interface ExtensionRecord {
      * pacing toll, which a visitor cannot pay; the manifest validator refuses both together.
      */
     public?: boolean;
+    /**
+     * `person`: the action is the person's own decision (a moderation act, a sale accept, a bid
+     * commit). An agent's or an ecosystem app's call waits for the person's one-press approval, a run
+     * with nobody present is refused, and an app tool manifest may not bind it
+     * (services/extension/person-decision.ts). Absent: every caller runs it as before.
+     */
+    decision?: 'person';
     /**
      * Priced raw call. Present => a non-owner caller pays the owner money per call (owner is always
      * free). Absent => free for every signed-in caller; `public` admits a visitor too.

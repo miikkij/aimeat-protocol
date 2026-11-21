@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.24.0 — 2026-11-21 — An extension action that is the person's own decision, prepared by an agent
+ *     and run as the person once they allow it in person (apply-extension-decision.ts).
  *   v1.23.0 — 2026-11-13 — The balancing test of an app, approved by its owner in person when an agent
  *     or an app asked (apply-lia-approval.ts).
  *   v1.22.0 — 2026-11-02 — Another account's capability running a tool on a remote MCP server with the
@@ -97,6 +99,7 @@ import { applyLivingAiSpend } from './apply-living-ai-spend.js';
 import { applyCompanyPageWrite } from './apply-company-page-write.js';
 import { applyMcpCapabilityUse } from './apply-mcp-capability-use.js';
 import { applyLiaApproval } from './apply-lia-approval.js';
+import { applyExtensionDecision } from './apply-extension-decision.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -134,6 +137,7 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'company-page-write': applyCompanyPageWrite,
   'mcp-capability-use': applyMcpCapabilityUse,
   'lia-approval': applyLiaApproval,
+  'extension-decision': applyExtensionDecision,
 };
 
 /**

@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-21 — Section 4: a restore of an app tool manifest that binds an action marked `decision: person`
+ *     answers PERSON_DECIDES (services/app-tools/decision-binding.ts, services/memory/bin.ts).
  *   2026-11-20 — Section 6: erasure removes the person's value signals and data counts; a record their
  *     agent made in someone else's namespace keeps its count under a pseudonym (services/value/).
  *   2026-11-19 — Section 6: erasure removes each app as its delete does, and no node log names the
@@ -246,7 +248,10 @@ What an export leaves out, and why:
   \`memory:write\`. \`NOT_RESTORABLE\` means it was never deleted, is not theirs, or the window closed.
   \`MORSEL_PRICE_REMOVED\` means the record is an app tool manifest or an offers document that still
   holds the old morsel price: it stays in the bin, and the person writes it again with the pacing
-  amount (\`tollMorsels\`) instead. \`QUOTA_EXCEEDED\` means putting it back would take its holder past
+  amount (\`tollMorsels\`) instead. \`PERSON_DECIDES\` means the record is an app tool manifest
+  with a tool bound to an extension action that is the person's own decision (\`decision: person\`):
+  it stays in the bin, as a write of it is refused, and the person writes it again without that tool.
+  \`QUOTA_EXCEEDED\` means putting it back would take its holder past
   the node's memory key limit or memory quota, the same limits a write answers to, or, for a record
   that was archived when it was deleted, past the archived memory key limit: it stays in the
   bin, and the message names the setting. Fold small records into one, remove what is no longer

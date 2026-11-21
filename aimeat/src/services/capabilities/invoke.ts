@@ -6,6 +6,8 @@
  *   extension through the node's own route in process, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   2026-11-21 — A 202 from the extension route (an action marked `decision: person`, called by an
+ *     agent) is thrown as PERSON_DECIDES with the request in `details`, so nothing reads as delivered.
  *   2026-11-08 — An extension capability's failure keeps the route's error code and details (a
  *     refusal the script named reads EXTENSION_REFUSED with reason CLAIM_CONFLICT) where it said
  *     EXTENSION_ERROR for every one: after the deploy of the named refusals, aimeat_app_tool_invoke
@@ -95,6 +97,7 @@ import { takesPersonalSignIn } from '../../models/mcp-server-schemas.js';
 import { splitExtensionRef } from './extension-ref.js';
 import { resolveExtensionForCall } from '../component/versions.js';
 import { logger } from '../../utils/logger.js';
+import { PERSON_DECIDES } from '../extension/decision-mark.js';
 
 export interface InvokeResult {
   capability: string;
@@ -320,6 +323,15 @@ export async function invokeCapability(
         const routeCode = typeof routeError?.code === 'string' && /^[A-Z][A-Z0-9_]{2,63}$/.test(routeError.code) ? routeError.code : 'EXTENSION_ERROR';
         throw Object.assign(new Error(routeError?.message || 'Extension invoke failed'), {
           statusCode: status, code: routeCode, ...(routeError?.details !== undefined ? { details: routeError.details } : {}),
+        });
+      }
+      // 202: the action is the person's own decision and the caller an agent, so nothing ran and one
+      // request waits for the person (services/extension/person-decision.ts). Thrown, not returned, so
+      // a door that charged pacing or a price for this call gives it back and nobody reads it as delivered.
+      if (status === 202) {
+        const waiting = (body.data ?? {}) as { next_step?: string };
+        throw Object.assign(new Error(waiting.next_step || 'The action waits for the person\'s approval.'), {
+          statusCode: 202, code: PERSON_DECIDES, details: body.data,
         });
       }
       result = mode === 'raw' ? body : body.data;

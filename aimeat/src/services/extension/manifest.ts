@@ -5,6 +5,8 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — An action may say `decision: person`: the person's own decision, which an agent's call
+ *     waits for (services/extension/person-decision.ts). Any other value is refused.
  *   2026-11-01 — An action's commercial block keeps `deliversData` for its EXCHANGE listing (plan D5.5).
  *   2026-10-25 — EXT_ADDRESS_PATTERN: the name, or `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — NODE_OWNED_CONFIG_KEYS is exported: the config route and the action-script route ask it too (secaudit2026oct22).
@@ -74,6 +76,7 @@ import { CAPABILITY_DECLARATION_KEY, NETWORK_HOSTS_KEY, parseCapabilityDeclarati
 import { NETWORK_HOST_FIELDS_KEY, hostRefusal, parseNetworkDeclaration } from './network-hosts.js';
 import { USES_SECRETS_KEY, parseUsesSecrets } from './secret-uses.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { PERSON_DECISION, actionDecisionRefusal } from './decision-mark.js';
 import { EXTENSION_FETCH_MAX_BYTES_CEILING } from '../../utils/read-capped.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../../config/pacing.js';
 import {
@@ -559,6 +562,9 @@ export function buildExtensionRecordFromManifest(
     if (action.public !== undefined && typeof action.public !== 'boolean') {
       return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `Action "${action.id as string}": public must be true or false` };
     }
+    // `decision: person`: the person's own decision, which an agent's call waits for (extension/person-decision.ts).
+    const decisionErr = actionDecisionRefusal(action);
+    if (decisionErr) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: decisionErr };
     const commercial = action.commercial as Record<string, unknown> | undefined;
     if (action.public === true && ((isNonNegInt(action.tollMorsels) && action.tollMorsels > 0)
       || (commercial && (commercial.payMoney !== undefined || commercial.plans !== undefined || commercial.pricesMoney !== undefined)))) {
@@ -705,6 +711,7 @@ export function buildExtensionRecordFromManifest(
         // Pricing (validated above; design notes doc-r6tyr3o).
         ...(a.tollMorsels !== undefined ? { tollMorsels: a.tollMorsels as number } : {}),
         ...(a.public === true ? { public: true } : {}),
+        ...(a.decision === PERSON_DECISION ? { decision: PERSON_DECISION } : {}),
         ...(commercial ? {
           commercial: {
             payMorsels: (commercial.payMorsels as number | undefined) ?? 0,

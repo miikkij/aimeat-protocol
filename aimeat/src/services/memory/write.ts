@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-21 — An app tool manifest that binds an action marked `decision: person` is refused 422
+ *     PERSON_DECIDES (services/app-tools/decision-binding.ts).
  *   2026-11-20 — afterMemoryWrite takes the value's size and declared provenance level and hands them
  *     to recordMemoryTouch, for the value signals (services/value/signal-buffer.ts).
  *   2026-11-13 — misdirectedCrewKey and crewSitesWriteRefusal come from crews/def-envelope.ts, not from
@@ -193,6 +195,7 @@ import { shadowWarning } from './write-shadow.js';
 import { memoryWriteAsks, fileMemoryWriteAsks } from './write-asks.js';
 import { tallyWriterOf } from '../data-map/tally-writer.js';
 import { keepsHistory, HISTORY_KEEP } from '../context/history-keys.js';
+import { decisionToolRefusal } from '../app-tools/decision-binding.js';
 import type {
     MemoryWriteFanout, MemoryWriteCaller, MemoryWriteInput, MemoryWriteWarning, AfterMemoryWriteReport, MemoryWriteResult,
     ExchangeReconcileReport,
@@ -429,6 +432,10 @@ export async function writeMemoryRecord(
     // The same two sources carrying the old morsel price, on a node at 4.0.0 or later.
     const legacyPacing = legacyPacingWriteRefusal(input.key, input.value);
     if (legacyPacing) return legacyPacing;
+    // An app tool manifest that binds an action its extension marks as the person's own decision
+    // (services/app-tools/decision-binding.ts). Any other key answers null without a read.
+    const decisionTool = await decisionToolRefusal(storage, caller.targetGaii, input.key, input.value);
+    if (decisionTool) return decisionTool;
 
     // The three memory ceilings — value size, key count, byte budget — from the one place that
     // holds them (services/memory/ceilings.ts). A single write is a set of one; the workspace batch

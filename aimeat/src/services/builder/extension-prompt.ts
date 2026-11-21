@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from './extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   2026-11-21 — `decision: person` on an action: an agent's call waits for the person's approval
+ *     (services/extension/person-decision.ts). Additive.
  *   2026-11-15 — Words only (Jouni's ruling): "four ways (the columns below)" and "an unattended run", not roads.
  *   2026-11-09 — ADDITIVE: the `ctx.changed({owners})` row.
  *   2026-11-08 — ADDITIVE: ctx.workspace.archiveRecords names the archived memory key limit and its
@@ -225,6 +227,11 @@ function sandboxSection(): string {
     'action takes no price and no `tollMorsels`. To serve data that never changes per caller, you can also',
     'write it with `{ visibility: \'public\' }` and read it from the browser with',
     '`GET /v1/memory/ext:{name}/{key}?soft=1` (null for a key that does not exist yet).',
+    'An action that records a person\'s own decision (approve or reject, accept a sale, commit a bid,',
+    'open a dispute) says `decision: person` in the manifest. An agent\'s call then runs nothing: it',
+    'answers 202 with an approval request the person allows with one press, and the node runs the action',
+    'as the person with the input the agent sent. A schedule or workflow step is refused `PERSON_DECIDES`,',
+    'and no app tool may bind the action. The person, and an app the person uses, call it as usual.',
     'The node resolves two more facts about a signed-in caller before the run: `ctx.caller.adult`',
     '(`{ verified, method, at }`: a verified adult or not, never a birth date) and `ctx.caller.subscriptions`',
     '(`[{ plan, active_until }]`: the caller\'s running subscriptions to THIS extension\'s plans, which the',

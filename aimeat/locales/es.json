@@ -12829,6 +12829,10 @@
   "notiftext.approval_lia.allow": "Aprobar la prueba",
   "notiftext.approval_lia.deny": "No aprobar",
   "notiftext.approval_change.lia": "Lee o cambia la prueba en la página de la aplicación",
+  "notiftext.approval_extension_decision.title": "{who} te pide tomar una decisión en {extension}: {action}",
+  "notiftext.approval_extension_decision.body": "{who} preparó esto para ti: la acción {action} de la extensión {extension}, con estos datos: {input}. La extensión marca esta acción como una decisión tuya, así que una IA no puede tomarla sola. Si lo permites, la acción se ejecuta ahora como decisión tuya, exactamente con estos datos. Si no, no pasa nada. También puedes tomar la decisión tú en la aplicación.",
+  "notiftext.approval_extension_decision.allow": "Ejecutarla como mi decisión",
+  "notiftext.approval_extension_decision.deny": "No ejecutarla",
   "notiftext.compliance_lia_approved.title": "Se aprobó la prueba de ponderación de la aplicación {app}",
   "notiftext.compliance_lia_approved.body": "{by} la aprobó. Resultado: el interés legítimo es adecuado para el tratamiento del registro «{register}».",
   "notiftext.compliance_lia_approved_unsuitable.title": "Se aprobó la prueba de ponderación de la aplicación {app}",
@@ -29233,6 +29237,17 @@
         "high": "La capacidad no se ejecuta y no se envía nada. La próxima vez que se use, se te pregunta de nuevo.",
         "tipLabel": "Cuándo permitirlo",
         "tip": "Permítelo si conoces la cuenta que la publicó y quieres que su herramienta funcione con tu propia cuenta. Si no sabes por qué necesita tu sesión, no lo permitas."
+      },
+      "approval_extension_decision": {
+        "title": "Una IA preparó una decisión que es tuya",
+        "short": "Una de tus IA quiere hacer algo que, según la extensión, solo decides tú.",
+        "what": "Algunas acciones son una decisión propia de la persona, por ejemplo cuando apruebas una publicación, aceptas una venta o haces una oferta. La extensión que hace la acción la marca así. Una IA puede preparar esa acción para ti, pero no puede hacerla sola. Por eso se te pregunta.",
+        "lowLabel": "Si lo permites",
+        "low": "La acción se ejecuta una vez, ahora, como decisión tuya, exactamente con los datos que se muestran.",
+        "highLabel": "Si no lo permites",
+        "high": "No pasa nada. La IA sabe que no lo permitiste.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo si los datos son lo que quieres decidir. Si no estás seguro, no lo permitas y toma la decisión tú en la aplicación."
       },
       "approval_schedule_instruction": {
         "title": "Alguien cambió una programación",

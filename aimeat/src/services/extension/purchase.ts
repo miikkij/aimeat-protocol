@@ -24,6 +24,8 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   2026-11-21 — SellerActionRunner's outcome names `awaiting`, the invoke sequence's new outcome; a
+ *     seller run never gets it (services/extension/person-decision.ts).
  *   v1.6.2 — 2026-11-20 — `ctx.buy('alice/data', tool)` names the manifest of `data.html`
  *     (services/app-tools/manifest-read.ts resolveToolManifestId).
  *   v1.6.1 — 2026-10-31 — An extension-backed capability whose ref names no installed action in the
@@ -93,7 +95,8 @@ export type SellerActionRunner = (run: {
   /** Where the seller's paywall writes a refusal. */
   res: { status(code: number): { json(body: unknown): unknown } };
   internalPass: string;
-}) => Promise<{ kind: 'ok' | 'refused' | 'paywall'; result?: unknown; status?: number; message?: string }>;
+  // 'awaiting' does not occur here: a run inside another run is refused PERSON_DECIDES instead (extension/invoke.ts).
+}) => Promise<{ kind: 'ok' | 'refused' | 'paywall' | 'awaiting'; result?: unknown; status?: number; message?: string }>;
 
 /**
  * Run the seller's extension action for the buyer, in-process, through the same sequence the HTTP
