@@ -88,6 +88,10 @@
  *     backing, writeRole, cardinality, versioned, mode), the ones add_spaces already filled, through
  *     one helper (withSpaceDefaults): aimeat_workspace_create said an objectTypes-only manifest is
  *     accepted and refused one for a missing schemaRef.
+ *   v1.15.0 — 2026-11-21 — updateWorkspaceMeta takes expectedVersion: a manifest at another version
+ *     refuses with VERSION_CONFLICT (409) before any write, and the manifest write lands on that
+ *     version only (setMemoryIfVersion). The answer carries manifest_version
+ *     (wish-suunta-n-kyviin-organismin-manifestin-tavoitteet-ja-tasot-yl).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -113,7 +117,9 @@ export class WorkspaceMetaError extends Error {
     public code: 'WS_NOT_FOUND' | 'NOT_CREATOR' | 'NOTHING_TO_UPDATE' | 'INVALID_MANIFEST' | 'INVALID_APPS' | 'INVALID_RULE'
       // A change to the extensions of a space an app closed to agents, from a caller that may not
       // make it (services/fenced-space.ts fenceChangeRefusal). The HTTP status is 403.
-      | 'ACCESS_DENIED',
+      | 'ACCESS_DENIED'
+      // The manifest is at another version than the caller's expected_version. The HTTP status is 409.
+      | 'VERSION_CONFLICT',
     message: string,
     /** Set with ACCESS_DENIED: the spaces the refused change touches. */
     public details?: Record<string, unknown>,
@@ -343,13 +349,27 @@ export async function listOrganismWorkspaceEntries(storage: Storage, orgId: stri
  */
 export async function writeWorkspaceMetaRecord(
   storage: Storage, key: string, ownerGaii: string, value: unknown, prev: MemoryRecord | null,
+  /** Write only if the stored record is still at this version (the caller's expected_version). */
+  ifVersion?: number,
 ): Promise<void> {
   const now = new Date().toISOString();
-  await storage.setMemory({
+  const record: MemoryRecord = {
     key, ownerGaii, value,
     visibility: prev?.visibility ?? 'private', tags: prev?.tags ?? [], ttlHours: prev?.ttlHours ?? null,
     version: (prev?.version ?? 0) + 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
-  });
+  } as MemoryRecord;
+  // No stored copy yet and the caller read none (version 0): nothing to compare against.
+  if (ifVersion === undefined || (!prev && ifVersion === 0)) { await storage.setMemory(record); return; }
+  // Somebody wrote it between the read and this write: refused, as the check before any write is.
+  if (!prev || !(await storage.setMemoryIfVersion(record, ifVersion))) {
+    throw manifestVersionConflict(ifVersion, prev?.version ?? 0);
+  }
+}
+
+function manifestVersionConflict(expected: number, current: number): WorkspaceMetaError {
+  return new WorkspaceMetaError('VERSION_CONFLICT',
+    `The workspace manifest is at version ${current}, not ${expected}: someone changed it after you read it. Read it again, apply your change to that version and send its version as expected_version.`,
+    { currentVersion: current, expectedVersion: expected });
 }
 
 /**
@@ -415,13 +435,20 @@ export interface UpdateWorkspaceOpts {
   apps?: Array<Record<string, unknown>>;
   /** The workspace's rule for its plain members' changes ('direct' | 'suggest'), stored as `…meta.rules`. */
   memberChanges?: unknown;
+  /**
+   * The manifest version the caller read (aimeat_workspace_read, GET …/workspace). When given, a
+   * manifest at any other version refuses the whole update with VERSION_CONFLICT before anything is
+   * written, and the manifest write itself lands only on that version. Without it the update
+   * replaces what is there, as it always did.
+   */
+  expectedVersion?: number;
 }
 
 export async function updateWorkspaceMeta(
   storage: Storage,
   config: AimeatConfig,
   opts: UpdateWorkspaceOpts,
-): Promise<{ updated: string[]; creator: string; name?: string; added?: string[]; skipped?: string[]; member_changes?: MemberChangeRule }> {
+): Promise<{ updated: string[]; creator: string; name?: string; manifest_version: number; added?: string[]; skipped?: string[]; member_changes?: MemberChangeRule }> {
   const { orgId, ws, callerOwner, isAdmin } = opts;
   const name = typeof opts.name === 'string' ? opts.name.trim() : undefined;
   const readme = typeof opts.readme === 'string' ? opts.readme : undefined;
@@ -454,6 +481,12 @@ export async function updateWorkspaceMeta(
   const appsRec = await pickMeta('meta.apps');
   const creatorGhii = regRec.ownerGaii;
 
+  // The version lock is asked before anything is written (the schema locks below included), so a
+  // refused update changes nothing.
+  const expectedVersion = typeof opts.expectedVersion === 'number' && Number.isInteger(opts.expectedVersion) ? opts.expectedVersion : undefined;
+  if (opts.expectedVersion !== undefined && expectedVersion === undefined) throw new WorkspaceMetaError('INVALID_MANIFEST', 'expected_version is the integer version of the manifest you read.');
+  if (expectedVersion !== undefined && (manRec?.version ?? 0) !== expectedVersion) throw manifestVersionConflict(expectedVersion, manRec?.version ?? 0);
+
   // THE LIST OF A FENCED SPACE IS PROTECTED (services/fenced-space.ts, ruled by the developer on
   // 2026-10-13). A full replacement that changes the `extensions` of a memory-backed space that
   // names some, removes that object type, or moves its namespace or backing is accepted from the
@@ -473,6 +506,12 @@ export async function updateWorkspaceMeta(
   const skipped: string[] = [];
   const write = (key: string, ownerGaii: string, value: unknown, prev: MemoryRecord | null) =>
     writeWorkspaceMetaRecord(storage, key, ownerGaii, value, prev);
+  // The manifest write, on the caller's version when one was given.
+  let manifestVersion: number | undefined;
+  const writeManifest = async (key: string, ownerGaii: string, value: unknown) => {
+    await writeWorkspaceMetaRecord(storage, key, ownerGaii, value, manRec, expectedVersion);
+    manifestVersion = (manRec?.version ?? 0) + 1;
+  };
   const syncRegistryName = async (newName: string) => {
     const list = (((regRec!.value as { workspaces?: Array<Record<string, unknown>> }).workspaces) ?? []).map(w => (w.id === ws ? { ...w, name: newName } : w));
     await write(regKey, regRec!.ownerGaii, { workspaces: list }, regRec);
@@ -498,7 +537,7 @@ export async function updateWorkspaceMeta(
     if (name) manifestValue.name = name;
     const valid = await validateMemoryWrite(`${root}.meta.manifest`, manifestValue, storage);
     if (!valid.valid) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Manifest rejected by schema: ' + JSON.stringify(valid.errors));
-    await write(`${root}.meta.manifest`, manRec?.ownerGaii ?? creatorGhii, manifestValue, manRec);
+    await writeManifest(`${root}.meta.manifest`, manRec?.ownerGaii ?? creatorGhii, manifestValue);
     updated.push('manifest');
     const newName = typeof manifestValue.name === 'string' ? manifestValue.name : entry.name;
     if (newName) await syncRegistryName(newName);
@@ -520,7 +559,7 @@ export async function updateWorkspaceMeta(
       if (changed) throw new WorkspaceMetaError('ACCESS_DENIED', changed.message, changed.details);
       const valid = await validateMemoryWrite(`${root}.meta.manifest`, manifestValue, storage);
       if (!valid.valid) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Manifest rejected by schema: ' + JSON.stringify(valid.errors));
-      await write(`${root}.meta.manifest`, manRec?.ownerGaii ?? creatorGhii, manifestValue, manRec);
+      await writeManifest(`${root}.meta.manifest`, manRec?.ownerGaii ?? creatorGhii, manifestValue);
       updated.push('manifest');
       if (name) await syncRegistryName(name);
     } else if (name) {
@@ -528,7 +567,7 @@ export async function updateWorkspaceMeta(
     }
   } else if (name) {
     // Name-only: patch the manifest's name + the registry, leaving structure untouched.
-    if (manRec && manRec.value && typeof manRec.value === 'object') { await write(manRec.key, manRec.ownerGaii, { ...(manRec.value as object), name }, manRec); updated.push('manifest'); }
+    if (manRec && manRec.value && typeof manRec.value === 'object') { await writeManifest(manRec.key, manRec.ownerGaii, { ...(manRec.value as object), name }); updated.push('manifest'); }
     await syncRegistryName(name);
   }
 
@@ -560,5 +599,11 @@ export async function updateWorkspaceMeta(
     updated.push('rules');
   }
 
-  return { updated, creator: entry.createdBy ?? '', name, ...(addObjectTypes ? { added, skipped } : {}), ...(memberChanges ? { member_changes: memberChanges } : {}) };
+  return {
+    updated, creator: entry.createdBy ?? '', name,
+    // The version the next expected_version names: the new one when the manifest was written, the
+    // one read otherwise.
+    manifest_version: manifestVersion ?? manRec?.version ?? 0,
+    ...(addObjectTypes ? { added, skipped } : {}), ...(memberChanges ? { member_changes: memberChanges } : {}),
+  };
 }

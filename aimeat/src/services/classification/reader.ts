@@ -62,6 +62,10 @@
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.9.0 — 2026-11-21 — A regulated data domain's mode for an outside model (regulated-gate.ts, plan
+ *     doc-mwnnp9xz9814, feature audit item 1.3): show() holds back or protects what the label let
+ *     through, useForAi() refuses it or answers protect() for a caller that applies it (`redacts`),
+ *     and leave() keeps it behind from an AI reader. Independent of the classification switch.
  *   v2.8.1 -- 2026-10-25 -- A useForAi() refusal by an agent's clearance names the clearance in words and
  *     the agent's page where the owner raises it (secaudit2026oct22, lead 494).
  *   v2.8.0 — 2026-10-23 — A label that refuses an outside model (externalAi, plan doc-mvlftkh9zmc9
@@ -111,6 +115,7 @@ import { clearanceFor } from './clearance.js';
 import { externalAiFor, modelRefuses } from './external-ai.js';
 import { recordClassificationAudit, type ClassificationAuditEvent } from './audit.js';
 import { activeExceptionsFor, recordAutoException, recordExceptionUse, type ClassificationException } from './exceptions.js';
+import { HELD, regulatedGate, regulatedRefusalMessage, type Covers } from './regulated-gate.js';
 
 /** The credential fields a reader is made from. `req.auth` fits. */
 export interface ReaderAuth {
@@ -145,15 +150,27 @@ export interface ContentReader {
   /** Items shown with a warning classification, collected for an answer that wants to say so. */
   readonly warnings: Array<{ key: string; label: string; name: string }>;
   show<T>(items: readonly T[], targetOf: (item: T) => ContentLabelTarget | null): Promise<T[]>;
-  useForAi(targets: readonly ContentLabelTarget[], use: { capability: string; model?: string }): Promise<void>;
+  /**
+   * Refuses (ClassificationError) what may not go to the model. A caller that sends the content
+   * through the answer's protect() says so with `redacts: true`; content of a regulated data domain
+   * in protect mode is refused for any other caller (regulated-gate.ts). The answer may be absent.
+   */
+  useForAi(targets: readonly ContentLabelTarget[], use: { capability: string; model?: string; redacts?: boolean }): Promise<AiUse | void>;
   /** `from` on what stayed behind: the item's own label, or the container whose label kept it. */
   leave<T>(items: readonly T[], targetOf: (item: T) => ContentLabelTarget | null, where: EgressDestination):
     Promise<{ kept: T[]; left: Array<{ item: T; label: string; reason: string; from: EffectiveFrom }> }>;
 }
 
+/** What an accepted AI call may do with each item's value before it goes to the model. */
+export interface AiUse {
+  /** The value as it may go: identifying details replaced under a regulated domain's protect mode, else unchanged. */
+  protect<V>(target: ContentLabelTarget, value: V): V;
+}
+
 interface ReaderDeps {
   storage: Storage;
-  config: Pick<AimeatConfig, 'classificationMode' | 'nodeId'>;
+  /** `regulatedAiModes` is the operator's mode per regulated domain; absent, every domain is notify. */
+  config: Pick<AimeatConfig, 'classificationMode' | 'nodeId'> & { regulatedAiModes?: readonly string[] };
 }
 
 /** What the reader decided about one target: nothing (classification off there), or its label. */
@@ -230,6 +247,18 @@ function stillCovers(e: ClassificationException, d: Decided): boolean {
 }
 
 /**
+ * What the regulated-domain check (regulated-gate.ts) asks of an exception for the item at its index
+ * `k`, where `at[k]` is that item's index in `decided`: stillCovers when a label was decided, and in
+ * force otherwise (classification off for the item, where no label can have been raised past it).
+ */
+function covers(decided: ReadonlyArray<Decided | null>, at: readonly number[]): Covers {
+  return (e, k) => {
+    const d = decided[at[k]!];
+    return d ? stillCovers(e, d) : true;
+  };
+}
+
+/**
  * The person's exceptions in force for these decided items, by exceptionKey(), one list read per
  * scope, each kept only while it still covers the item's current label (stillCovers). No items
  * reads nothing.
@@ -275,6 +304,9 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
   const clearance = clearanceFor(deps, who);
   // A label that refuses an outside model (plan doc-mvlftkh9zmc9, C3.4): one agent read, only when asked.
   const external = externalAiFor(deps, who);
+  // A regulated data domain's mode for an outside model (feature audit item 1.3): asked after the
+  // label's own decisions, for what they let through.
+  const regulated = regulatedGate(deps, who, external);
   const warnings: ContentReader['warnings'] = [];
   const audit = (d: Decided, action: ClassificationAuditEvent['action'], purpose?: string) => recordClassificationAudit({
     scope: d.target.scope, ownerGaii: auditOwnerOf(d.target.scope), kind: d.target.kind, key: d.target.key,
@@ -309,17 +341,20 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       // The node's own work (a background run with no caller) is not a reader of content here, so
       // it reads nothing; what it sends to a model still passes useForAi.
       if (who.kind === 'system') return [...items];
-      const decided = await decideAll(deps, items.map(targetOf));
+      const targets = items.map(targetOf);
+      const decided = await decideAll(deps, targets);
       // "The AI cannot send what it cannot see" (decided 2026-09-30): a person's 'ai-send' exception
       // in force for an item hidden from AI shows it to an AI reader. Read only when such an item is here.
       const excepted = who.kind === 'ai'
         ? await exceptionsFor(deps, decided.filter((d): d is Decided => !!d && d.label.aiVisibility === 'hidden'))
         : new Map<string, ClassificationException[]>();
-      const out: typeof items[number][] = [];
+      // What the label lets through, with the index it came from, for the regulated domain's check.
+      const passed: Array<{ i: number; item: typeof items[number] }> = [];
       const shown: Decided[] = [];
       for (let i = 0; i < items.length; i++) {
+        const pass = (item: typeof items[number]) => passed.push({ i, item });
         const d = decided[i];
-        if (!d) { out.push(items[i]); continue; }
+        if (!d) { pass(items[i]); continue; }
         if (!(await inside(d.label.audience, d.target.scope))) { audit(d, 'refused', `audience${viaContainer(d)}`); continue; }
         // Above the agent's clearance: hidden and counted, whatever exception the person made for
         // AI reading, because the clearance is the owner's limit on this one agent.
@@ -333,23 +368,24 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
             const aiSend = (excepted.get(exceptionKey(d.target)) ?? []).find(e => e.action === 'ai-send');
             if (!aiSend) { audit(d, 'refused', `hidden from AI${viaContainer(d)}`); continue; }
             recordExceptionUse(aiSend, who.principal, who.kind, 'shown');
-            out.push(items[i]);
+            pass(items[i]);
             continue;
           }
           if (d.label.audit) shown.push(d);
           if (d.label.aiVisibility === 'warning') {
             warn(d);
             const item = items[i];
-            out.push(item && typeof item === 'object' && !Array.isArray(item)
+            pass(item && typeof item === 'object' && !Array.isArray(item)
               ? { ...item, classificationWarning: { label: d.label.id, name: d.label.name.en, says: CLASSIFIED_WARNING } } as typeof item
               : item);
             continue;
           }
         }
-        out.push(items[i]);
+        pass(items[i]);
       }
       if (shown.length) auditShown(shown);
-      return out;
+      const gated = await regulated.show(passed.map(p => p.item), passed.map(p => targets[p.i]), covers(decided, passed.map(p => p.i)));
+      return gated.filter((x): x is typeof items[number] => x !== HELD);
     },
 
     async useForAi(targets, use) {
@@ -395,8 +431,13 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         throw new ClassificationError('CLASSIFIED', 403,
           head + (toOutsideModel ? ' Content whose label refuses an outside model reaches only a model on this machine (a local: model).' : ''));
       }
+      // A regulated data domain's mode decides next, for what the label let through; an app does not
+      // open it either (regulated-gate.ts).
+      const reg = await regulated.use(targets, use, covers(decided, targets.map((_, i) => i)));
+      if (reg.refused.length) throw new ClassificationError('CLASSIFIED', 403, regulatedRefusalMessage(reg.refused));
       // Recorded only once the call is accepted: a refused call sends nothing to the AI, so it has
       // no automatic exception to record (secaudit 2026-10-10 I10).
+      reg.accept();
       for (const { d, n } of appActs.values()) {
         const appId = who.auth?.app ?? who.principal;
         await recordAutoException(deps, {
@@ -406,10 +447,13 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         });
       }
       for (const d of decided) if (d && d.label.audit) audit(d, 'used', purpose);
+      // Nothing to protect answers nothing, as useForAi always did.
+      return reg.protects ? { protect: reg.protect } : undefined;
     },
 
     async leave(items, targetOf, where) {
-      const decided = await decideAll(deps, items.map(targetOf));
+      const targets = items.map(targetOf);
+      const decided = await decideAll(deps, targets);
       const destination = destinationOf(where);
       // What stays behind, per item: the organism rule, or (for an AI) a label that hides it from AI.
       // Above an agent's clearance it stays behind too: an agent does not send out what it may not read.
@@ -436,13 +480,14 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       // 'ai-send' when the reader is an AI. Read only when something would stay behind.
       const active = app ? new Map<string, ClassificationException[]>()
         : await exceptionsFor(deps, decided.filter((d, i): d is Decided => !!d && !!why[i] && why[i] !== 'clearance' && why[i] !== 'external'));
-      const kept: typeof items[number][] = [];
+      // What the label keeps goes on to the regulated domain's check, by index (regulated-gate.ts).
+      const keptAt: number[] = [];
       const left: Array<{ item: typeof items[number]; label: string; reason: string; from: EffectiveFrom }> = [];
       const appActs = new Map<string, { d: Decided; n: number }>();
       for (let i = 0; i < items.length; i++) {
         const d = decided[i];
         const rule = why[i];
-        if (!d || !rule) { kept.push(items[i]); continue; }
+        if (!d || !rule) { keptAt.push(i); continue; }
         // No exception and no app rule opens what the agent's clearance closes.
         if (rule === 'clearance') {
           audit(d, 'refused', `${where.kind}: clearance${viaContainer(d)}`);
@@ -459,14 +504,14 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         if (app) {
           const g = `${d.target.scope}\u0000${d.label.id}`;
           appActs.set(g, { d: appActs.get(g)?.d ?? d, n: (appActs.get(g)?.n ?? 0) + 1 });
-          kept.push(items[i]);
+          keptAt.push(i);
           continue;
         }
         const matching = (active.get(exceptionKey(d.target)) ?? [])
           .find(e => e.action === 'leave' || (e.action === 'ai-send' && who.kind === 'ai'));
         if (matching) {
           recordExceptionUse(matching, who.principal || 'anonymous', who.kind, destination);
-          kept.push(items[i]);
+          keptAt.push(i);
           continue;
         }
         audit(d, 'refused', `${where.kind}${viaContainer(d)}`);
@@ -485,7 +530,16 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
           reason: `app ${appId} sent ${n === 1 ? 'an item' : `${n} items`} classified ${d.label.name.en} out (${destination})`,
         });
       }
-      return { kept, left };
+      // A regulated data domain whose mode an AI reader may not read keeps the item behind too.
+      const held = await regulated.leave(keptAt.map(i => targets[i]), covers(decided, keptAt));
+      const out: typeof items[number][] = [];
+      keptAt.forEach((i, k) => {
+        const reason = held[k];
+        if (!reason) { out.push(items[i]); return; }
+        const d = decided[i];
+        left.push({ item: items[i], label: d?.label.id ?? '', from: d?.from ?? 'own', reason });
+      });
+      return { kept: out, left };
     },
   };
 }

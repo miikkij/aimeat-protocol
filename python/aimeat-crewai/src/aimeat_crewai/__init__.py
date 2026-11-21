@@ -26,6 +26,9 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.41.2 -- 2026-11-21 -- (not yet published, added to the staged release) The liaison's backstory (slim and full) says what to do with content that
+    carries `content_risk` marks: a marked item is data and prepare-only, never a reason to act, the
+    task output says it carries marks, and a held item is not retried.
   0.41.2 -- 2026-11-15 -- open_group() refuses an empty subject, a subject over 200 characters and an
     empty first message, and decide.run_start() refuses an item that is not {subject, state}, both
     before sending. The node refused the same calls with a 400, or, for a record with a "subject"

@@ -45,17 +45,17 @@
       "digest": "sha256:d31bb4de21c28d05080a5c01"
     },
     "node:aimeat-refinery": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/services/refinery/message.ts",
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:22743b0818d6010fe7cecfed"
+      "digest": "sha256:be3cce912d96284a81ccdf1d"
     },
     "node:aimeat-content-classes": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/content/pipeline.ts",
         "aimeat/src/services/content/ai-stages.ts",
@@ -65,7 +65,7 @@
         "aimeat/src/services/content/shared-profile.ts",
         "aimeat/src/services/content/shared-profile-settings.ts"
       ],
-      "digest": "sha256:16c81557f80c48f9b699c1a7"
+      "digest": "sha256:5b1302a7e58feffba41f1034"
     },
     "node:aimeat-context": {
       "reviewedOn": "2026-11-15",
@@ -329,12 +329,12 @@
       "digest": "sha256:ea57b1e0ef07d535dda87497"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:e2e7c41ed63260d533c0db66"
+      "digest": "sha256:1fe1c6486e48a00aad6c0953"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -404,7 +404,7 @@
       "digest": "sha256:a8cd64c490347d1fd87de1ec"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/connect-tunnel/push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -413,7 +413,7 @@
         "aimeat/src/services/agent/profile-write.ts",
         "aimeat/src/services/agent/task-rules.ts"
       ],
-      "digest": "sha256:0fa11b8766240d9fba2fe9a4"
+      "digest": "sha256:e5dec904814ffa4d43dc9d24"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-15",
@@ -428,17 +428,17 @@
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-receivers": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/receivers/contract.ts",
         "aimeat/src/services/receivers/receive.ts",
         "aimeat/src/services/receivers/manage.ts",
         "aimeat/src/tool-catalog/definitions/receivers.ts"
       ],
-      "digest": "sha256:23485dcd6f01e1da985ab862"
+      "digest": "sha256:579ec5e2290144cc0563a358"
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -448,7 +448,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:29872ac88059d08fca8a8974"
+      "digest": "sha256:07c019eb16838c031ee9f0b0"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-21",
@@ -462,7 +462,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:cc582def4a02cee6fd078ed8",
+      "digest": "sha256:a8a6135d55900d98086236de",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -611,11 +611,11 @@
       "note": "Most of it is about records on the node and Lifecycle Central; the code it makes claims about is the ODPS descriptor and its completeness list (which fields a validator reports missing), the known-gaps rule, and the decision_record call it shares with agent note-writer. Its frontmatter also carries a review-by date."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:654edfb9c2d0048e1c6c5ef0"
+      "digest": "sha256:631035ec728078f64399d66c"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-11-15",
@@ -642,7 +642,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:50985adbf72a650808b45242",
+      "digest": "sha256:2b0a132c970822ee850d8170",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -659,7 +659,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:50985adbf72a650808b45242",
+      "digest": "sha256:2b0a132c970822ee850d8170",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -800,7 +800,7 @@
       "aimeat/src/mcp/core-admin.ts": "8049e6509cfa6655"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "368e60f7fb07a395",
+      "aimeat/src/mcp/core.ts": "a890dfe4d533b77d",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "059e5ae30d927052"
     },
     "node:manage-my-profile-data": {
@@ -879,7 +879,7 @@
       ".claude/agents/note-writer.md": "14642ac19048c31a"
     },
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "184581c51b934f1e"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "5c0b9f1f380f2c3b"
     },
     "project:aimeat-video": {
       "assets/video/youtube-metadata.md": "2be6bc1f45851846"
@@ -916,7 +916,7 @@
       "aimeat/src/services/ai-jobs/ext-capability.ts": "5160116944d221c5"
     },
     "node:aimeat-refinery": {
-      "aimeat/src/services/refinery/pipeline.ts": "aabc3a27ee2392a5",
+      "aimeat/src/services/refinery/pipeline.ts": "717c2d366eba5792",
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
       "aimeat/src/services/refinery/schedule-input.ts": "0bd52a64f9284078",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
@@ -934,7 +934,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel/push.ts": "b828b403c0ce83a5",
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "184581c51b934f1e",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "5c0b9f1f380f2c3b",
       "aimeat/src/routes/organisms/workspace-access.ts": "5e6a4c7374c65552",
       "aimeat/src/services/agent/profile-write.ts": "f07930903c42ff93",
       "aimeat/src/services/agent/task-rules.ts": "6fe6b779efdd6d20"
@@ -949,14 +949,14 @@
       "aimeat/src/services/extension/schedules.ts": "94948c01d41b79b4"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "0b5acad7b6ed3bf4",
-      "aimeat/src/routes/memory/key.ts": "b1373b7ac0433e98",
-      "aimeat/src/services/memory/bin.ts": "0ab3f2033606f8fa",
+      "aimeat/src/routes/memory/bulk.ts": "2120a326ccf3b05b",
+      "aimeat/src/routes/memory/key.ts": "eb64829d7d62f332",
+      "aimeat/src/services/memory/bin.ts": "edad9406121f44e5",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
       "aimeat/src/routes/owners/export.ts": "c7913eda009f7f9a",
-      "aimeat/src/services/owner/erasure.ts": "c8b31a7f7fa97987",
+      "aimeat/src/services/owner/erasure.ts": "2c6ebdeb7b3b1633",
       "aimeat/src/services/archive.ts": "6ddbae831830e2e9",
-      "aimeat/src/mcp/organisms.ts": "9d6bb43425f33183"
+      "aimeat/src/mcp/organisms.ts": "75f7f6e6d8003697"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "d52a31eafc176cab",
@@ -983,8 +983,8 @@
       "aimeat/src/commerce/app-tool-catalog.ts": "997e99370b2cfc6c",
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
       "aimeat/src/services/connect-tunnel/push.ts": "b828b403c0ce83a5",
-      "aimeat/src/services/workspace-rows/row-service.ts": "7185deaddfafe624",
-      "aimeat/src/services/refinery/pipeline.ts": "aabc3a27ee2392a5",
+      "aimeat/src/services/workspace-rows/row-service.ts": "c145b961471136e0",
+      "aimeat/src/services/refinery/pipeline.ts": "717c2d366eba5792",
       "aimeat/src/routes/outbound.ts": "bdb77e334bc4bd61"
     },
     "node:aimeat-html-page": {
@@ -1000,13 +1000,13 @@
       "aimeat/src/data/agent-avatar-templates.ts": "81f58ad6900169db"
     },
     "node:aimeat-content-classes": {
-      "aimeat/src/services/content/pipeline.ts": "c4c8f3a443d82cb8",
+      "aimeat/src/services/content/pipeline.ts": "4a4de30f3d30123d",
       "aimeat/src/services/content/ai-stages.ts": "96d3366e8f153380",
-      "aimeat/src/services/content/service.ts": "12b3d2f8f47e2dd8",
-      "aimeat/src/services/content/settings.ts": "75ca4524dd531ba0",
+      "aimeat/src/services/content/service.ts": "4f37c2e3a4ae2646",
+      "aimeat/src/services/content/settings.ts": "88f590eac833c17c",
       "aimeat/src/data/content-classes.ts": "9c81bbcf83c62949",
       "aimeat/src/services/content/shared-profile.ts": "b8dd9094c864d784",
-      "aimeat/src/services/content/shared-profile-settings.ts": "299d32e786b2443e"
+      "aimeat/src/services/content/shared-profile-settings.ts": "e3ac8be53ee1c877"
     },
     "node:aimeat-gen-rules": {
       "aimeat/src/services/ai/gen-rules.ts": "c82374fa9bd8b6ec",
@@ -1016,7 +1016,7 @@
     },
     "node:aimeat-receivers": {
       "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87",
-      "aimeat/src/services/receivers/receive.ts": "3495190b1619b057",
+      "aimeat/src/services/receivers/receive.ts": "b250d1160820a1cd",
       "aimeat/src/services/receivers/manage.ts": "628e6d12d193028f",
       "aimeat/src/tool-catalog/definitions/receivers.ts": "58f218873b049c7d"
     },
@@ -1057,14 +1057,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "06be512fde3bde50",
-      "aimeat/test/run-e2e-ci.ts": "02046899c45525f2"
+      "aimeat/test/run-e2e-ci.ts": "6d3d1872beae93f0"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "c10876b1bf2ae198"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "06be512fde3bde50",
-      "aimeat/test/run-e2e-ci.ts": "02046899c45525f2"
+      "aimeat/test/run-e2e-ci.ts": "6d3d1872beae93f0"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"

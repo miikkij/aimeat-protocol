@@ -10,6 +10,9 @@
  * @structure DATA_ACCESS_CONFIG_FIELDS
  * @usage import { DATA_ACCESS_CONFIG_FIELDS } from './schema-data-access.js';
  * @version-history
+ *   v1.8.1 — 2026-11-21 — compliance.regulated_ai_modes takes the mode drop.
+ *   v1.8.0 — 2026-11-21 — compliance.regulated_ai_modes (AIMEAT_COMPLIANCE_REGULATED_AI_MODES): what an
+ *     outside AI model gets of a regulated domain's content; an AI may only make it stricter.
  *   2026-11-04 — classification.mode carries `aiMayOnlyTighten`: off, owner, all from open to strict, and
  *     the refusal an AI gets for a looser value, worded as before (codebase analysis 2026-11-03, item B4).
  *   v1.7.0 — 2026-11-15 — consent.app_party_max (AIMEAT_APP_PARTY_MAX, 10 000): the most people one app holds.
@@ -28,6 +31,7 @@
  *     classification.agent_clearance_default added (plan doc-mvdipuyqraas, L2.1).
  */
 import { CLEARANCE_ID_PATTERN, type dataAccessDefaults } from '../../config/data-access.js';
+import { aiModesOf, COMPLIANCE_DOMAINS, parseAiModeEntry, REGULATED_AI_MODES } from '../../data/compliance-domains.js';
 import type { ConfigFieldShape, TightenOnly } from './field-def.js';
 import { oneOf } from './schema-validators.js';
 import { DATASPACE_CONFIG_FIELDS } from './schema-dataspace.js';
@@ -43,6 +47,19 @@ const CLASSIFICATION_TIGHTEN: TightenOnly = {
   refusal: (from, to) => ({ message: `Changing classification from ${from} to ${to} gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves.` }),
 };
 
+/**
+ * The mode per regulated domain (data/compliance-domains.ts RegulatedAiMode): notify, protect, drop, local,
+ * block from open to strict. A change that leaves any domain more open than before gives protection
+ * away, so an AI does not make it; a domain no entry names is notify.
+ */
+const modeRank = (list: unknown, domain: string): number =>
+  REGULATED_AI_MODES.indexOf(aiModesOf(Array.isArray(list) ? list as string[] : [])[domain] ?? 'notify');
+const REGULATED_AI_TIGHTEN: TightenOnly = {
+  order: [],
+  loosens: (from, to) => COMPLIANCE_DOMAINS.some(d => modeRank(to, d.id) < modeRank(from, d.id)),
+  refusal: () => ({ message: 'That change leaves a regulated data domain more open to an outside AI model, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves.' }),
+};
+
 export const DATA_ACCESS_CONFIG_FIELDS: ConfigFieldShape<DataAccessKey>[] = [
   { key: 'consentEnabled', dotPath: 'consent.enabled', envVar: 'AIMEAT_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Consent layer enabled' },
   { key: 'accountEventWindow', dotPath: 'account_events.window', envVar: 'AIMEAT_ACCOUNT_EVENT_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10, immutable: false, description: 'Events kept in an account live "what has happened" window before the oldest are archived', range: '10-10000' },
@@ -54,6 +71,7 @@ export const DATA_ACCESS_CONFIG_FIELDS: ConfigFieldShape<DataAccessKey>[] = [
   { key: 'appPartySignupsPerHour', dotPath: 'consent.app_party_signups_per_hour', envVar: 'AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100000, immutable: false, description: 'How many times one network address may sign up to this server\'s apps in an hour, counted over every app. Past it the signup is refused with 429 until the hour has passed. 0: no limit', range: '0-100000' },
   { key: 'appPartyPendingHours', dotPath: 'consent.app_party_pending_hours', envVar: 'AIMEAT_APP_PARTY_PENDING_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 8760, immutable: false, description: 'How many hours a person who signed up to an app and never opened the mailed link keeps a place in the app\'s list of registered people, counted from the last link sent. After that the next signup to the app removes them, and their place counts no more toward the app\'s limit of people (consent.app_party_max). They can sign up again. 0: they keep the place until the app\'s owner removes them', range: '0-8760' },
   { key: 'appPartyMax', dotPath: 'consent.app_party_max', envVar: 'AIMEAT_APP_PARTY_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000000, immutable: false, description: 'The most people one app holds: the people who registered to it with an e-mail address and no account on this server, counted with the signups still waiting for their link. Past it a new signup is refused with 429 and the app\'s owner sees the app as full. A lower value does not remove anybody; it stops new signups until the app holds fewer', range: '1-1000000' },
+  { key: 'regulatedAiModes', dotPath: 'compliance.regulated_ai_modes', envVar: 'AIMEAT_COMPLIANCE_REGULATED_AI_MODES', type: 'object', list: true, validate: v => Array.isArray(v) && v.every(e => parseAiModeEntry(e) !== null), refusal: 'Write each entry as domain=mode: a domain id such as health, and one of notify, protect, drop, local or block.', aiMayOnlyTighten: REGULATED_AI_TIGHTEN, immutable: false, description: 'What an AI model outside this server gets of a regulated data domain\'s content, one domain=mode entry per domain (health=local). notify (the default for a domain no entry names): the content goes as before, and each time a mark is written. protect: names, personal identity codes, phone numbers, e-mail and street addresses and bank account numbers are replaced with stable stand-ins first. drop: the same details are removed first, and the rest goes. local: only a model on this server reads it. block: no model reads it, a local one neither. A register may make its own data stricter, never more open. An exception in the Data Wallet opens protect, drop and local for one item; it does not open block, and such an attempt is marked as exceptional. An AI may only make this stricter' },
   { key: 'balancingTest', dotPath: 'compliance.balancing_test', envVar: 'AIMEAT_COMPLIANCE_BALANCING_TEST', type: 'string', ...oneOf('required', 'optional', 'off'), immutable: false, description: 'The balancing test of an app whose record of processing names legitimate interests (GDPR art. 6(1)(f)). required: a missing, unapproved or reopened test is a compliance gap, and publishing the app, writing its data map or its register says when one is due. optional (the default): the draft, the approval and the files work, and nothing asks for a test. off: no test is drafted or written; tests stored before stay readable.' },
   { key: 'amlMode', dotPath: 'compliance.aml_mode', envVar: 'AIMEAT_AML_MODE', type: 'string', ...oneOf('report', 'none', 'owners', 'node'), immutable: false, description: 'Whether this server or its owners do work the EU anti-money-laundering regulation (2024/1624) gives an obliged entity, and who. report (the default): nothing is refused, and the Compliance page lists what could make this server or an owner an obliged entity. none: neither the server nor its owners do obliged work, so an organism\'s declaration that it is an obliged entity is refused. owners: an organism that declared itself an obliged entity and named its compliance officer does that work here; the server holds no funds. node: the operator is an obliged entity itself and keeps its own declaration; owners\' declarations are accepted too' },
   { key: 'kycSanctionsSources', dotPath: 'compliance.kyc_sanctions_sources', envVar: 'AIMEAT_KYC_SANCTIONS_SOURCES', type: 'string', validate: v => typeof v === 'string' && (v === '' || v === 'none' || /^(?:(?:eu-fsf|un)=https?:\/\/[^,\s]+)(?:,(?:eu-fsf|un)=https?:\/\/[^,\s]+)?$/.test(v)), immutable: false, description: 'Where the sanctions lists for customer due diligence come from. Empty (the default): the EU consolidated financial sanctions list and the UN Security Council consolidated list, fetched once a day from their official addresses. none: nothing is fetched, and screening answers that no list is available. eu-fsf=<url>,un=<url>: other addresses for one or both, which may be on a private network', range: 'empty | none | eu-fsf=<url>,un=<url>' },

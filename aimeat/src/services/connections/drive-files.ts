@@ -21,6 +21,7 @@
  * @structure DriveFile · fetchDriveFile() · driveFileText() · storeDriveFile()
  * @usage const out = await storeDriveFile(ctx, deps, owner, connectionId, { drive_id, item_id }, { caller, app });
  * @version-history
+ *   v1.2.0 — 2026-11-21 — A stored drive file gets its content risk marks at the intake point.
  *   v1.1.0 — 2026-11-02 — storeDriveFile takes the caller and hands it to the storage write, so keeping
  *     a file at a key a page origin serves asks what the file routes ask (secaudit2026nov02d round 13,
  *     drive-files.ts:storeDriveFile:company-page-key-unfenced-no-page-writer).
@@ -35,6 +36,7 @@ import type { CallerContext } from '../caller-context.js';
 import { extractFileText } from '../file-text/index.js';
 import { pdfReadLimits } from '../file-text/pdf-bounded.js';
 import { logger } from '../../utils/logger.js';
+import { contentRiskAfterWrite } from '../content/risk-intake.js';
 
 const DOWNLOAD_TIMEOUT_MS = 120_000;
 /** Plain text a person's AI is handed whole: the same ceiling a text attachment has. */
@@ -180,5 +182,7 @@ export async function storeDriveFile(
     publishGate: writer,
   });
   if (!written.ok) return { ok: false, status: written.status, code: written.code, message: written.message };
+  // A file from a connected drive is content from outside: its risk marks are written beside it.
+  contentRiskAfterWrite(deps, { kind: 'file', owner: ownerGhii, key }, { point: 'intake' });
   return { ok: true, key, source };
 }

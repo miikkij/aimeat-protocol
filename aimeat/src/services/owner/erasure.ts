@@ -43,6 +43,9 @@
  *   2026-11-14 — The agent telemetry buffer holds the account for the length of the erasure
  *     (holdTelemetryForErasure): a flush in progress stored an agent's activity rows after the cascade
  *     (register finding f-2026-11-13-write-buffers-and-erasure).
+ *   2026-11-21 — The content risk queue holds the account for the length of the erasure
+ *     (holdContentRiskForErasure), and step content_risk gives the pseudonym to the risk marks of what
+ *     the person wrote into other people's places (content/risk-erasure.ts).
  *   2026-11-14 — The content intake queue holds the account for the length of the erasure
  *     (holdContentIntakeForErasure): an inspection in progress stored the facts of the erased person's
  *     file after the cascade (register finding f-2026-11-13-write-buffers-and-erasure).
@@ -170,6 +173,8 @@ import { holdPartyActivityForErasure } from '../parties/activity.js';
 import { holdReceiverLogsForErasure } from '../receivers/deliveries.js';
 import { holdWriteClassificationForErasure } from '../classify-on-write.js';
 import { holdContentIntakeForErasure } from '../content/intake.js';
+import { holdContentRiskForErasure } from '../content/risk-intake.js';
+import { eraseContentRiskOf } from '../content/risk-erasure.js';
 import { holdVisibilityForErasure } from '../visibility/visibility-counter.js';
 import { holdBehaviourForErasure } from '../visibility/behaviour-counter.js';
 import { purgeExceptions } from '../classification/exceptions.js';
@@ -297,6 +302,12 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string,
     await step('classification_exceptions', async () => {
       await purgeExceptions(storage, nodeId, { owner: ghii });
       return 'classification_exceptions';
+    }, deletionLog, storage);
+    // The content risk marks of what they wrote into other people's places name them as the writer:
+    // those entries get the pseudonym. Before the memberships go, which say where to look.
+    await step('content_risk', async () => {
+      const n = await eraseContentRiskOf(storage, nodeId, name, [name, ghii, ...agents.map(a => a.gaii)], logPseudonym);
+      return n ? `content_risk:${n}` : null;
     }, deletionLog, storage);
 
     await step('consents', async () => {
@@ -667,6 +678,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string,
     releases.push(await holdReceiverLogsForErasure(account));
     releases.push(await holdWriteClassificationForErasure(account));
     releases.push(await holdContentIntakeForErasure(account));
+    releases.push(await holdContentRiskForErasure(account));
     releases.push(await holdTelemetryForErasure(account));
     releases.push(await holdVisibilityForErasure(account));
     releases.push(await holdBehaviourForErasure(account, storage));

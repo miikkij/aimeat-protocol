@@ -20,6 +20,8 @@
  *     router answers 503 FEATURE_DISABLED with its setting (flagged-mount.ts).
  *   2026-11-21 -- e2e-skill-bound-public.ts joins the list (not the guard tier): a bound skill is public by default.
  *   2026-11-21 -- e2e-ext-person-decision.ts joins the list (not the guard tier): actions marked `decision: person`.
+ *   2026-11-21 -- e2e-regulated-ai-modes.ts joins the list (not the guard tier): a regulated data domain's
+ *     mode for an outside AI model (feature audit item 1.3).
  *   2026-11-20 -- e2e-organism-app-wall.ts joins the list (not the guard tier): the organism's app wall and the new entry.
  *   2026-11-20 -- e2e-ai-standing.ts joins the list (not the guard tier): the owner's "Allow always" setting
  *     (wish-ai-toimii-itsen-isesti-omistajan-asetuksella-salli-aina-ja-k).
@@ -175,6 +177,8 @@
  *   2026-10-21 -- PURPOSE_SUITES and --purpose: the purpose tier, eleven suites that prove what AIMEAT
  *     is for still works, five of them new (test/e2e-purpose-*.ts); pnpm gate runs it with the guard
  *     tier, and a skipped test in it is red as in the guard tier (docs/pitfalls.md §126).
+ *   2026-11-21 -- e2e-content-risk.ts joins the list (not the guard tier): the content risk marks on the
+ *     runner's server (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  *   2026-10-21 -- e2e-content-class.ts joins the list (not the guard tier): content classes on their
  *     own node on 28451, against the sandbox's decision and completion stand-ins.
  *   2026-10-20 -- e2e-mcp-modern.ts joins the list (not the guard tier): MCP 2026-07-28 on the
@@ -1199,6 +1203,9 @@ const ALL_SUITES = [
     // ephemeral port answering the content class prompts, so the class an item lands in is the
     // pipeline's doing. Follows the runner's backend.
     'test/e2e-content-class.ts',
+    // The content risk marks: intake, shared write and read, the layers, the hold and its release, on
+    // the runner's server (rules only, no model).
+    'test/e2e-content-risk.ts',
     // The model policy (System 2, V2): its own node on 28438 with a recommended list set the way an
     // operator sets it, and the OpenAI-compatible stub on an ephemeral port, so the model the node
     // sent is read from what arrived. Follows the runner's backend.
@@ -1287,6 +1294,9 @@ const ALL_SUITES = [
     // The records of processing, data domains, requests, breaches, frameworks and processors of the
     // node, an organism and an app, over REST and MCP, and their refusals (plan doc-mvlftkh9zmc9).
     'test/e2e-compliance-records.ts',
+    // What an AI model outside the server gets of a regulated data domain: notify, protect, local and
+    // block, an exception that opens local and is marked exceptional on block (feature audit item 1.3).
+    'test/e2e-regulated-ai-modes.ts',
     // Data processing agreements: the draft from the node's data, the Commission's text word for word,
     // signing in the AIMEAT app, a returned PDF and scan, an announced change, end and deletion, and
     // who may do what (plan doc-mvmr4i2wdk0p).

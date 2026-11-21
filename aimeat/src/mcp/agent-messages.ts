@@ -8,6 +8,7 @@
  * @usage
  *   import { registerAgentMessageTools } from './agent-messages.js';
  * @version-history
+ *   2026-11-21 — aimeat_message_inbox carries each message's content_risk and leaves a held one's content out.
  *   2026-11-13 — aimeat_message_history reads through services/agent/message-history.ts, the gate and
  *     read GET /v1/agents/:name/messages calls (structure programme 2026-11, unit 2b).
  *   2026-11-13 — aimeat_message_history filters by direction, as GET /v1/agents/:name/messages does
@@ -53,6 +54,7 @@ import { messageHistoryFor } from '../services/agent/message-history.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import { localAccountName } from '../utils/gaii.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { riskForRead, agentMessageRiskItems, withRisk } from '../services/content/risk-read.js';
 
 export function registerAgentMessageTools(
     mcp: McpServer,
@@ -82,18 +84,22 @@ export function registerAgentMessageTools(
         async () => {
             const messages = await storage.listPendingMessages(agentGaii);
             const provFor = await readProvenanceMany(storage, config, messages.map(m => m.aiProvenanceId));
+            // The content risk marks travel with each message; a held one's content is left out
+            // (services/content/risk-read.ts).
+            const rr = await riskForRead({ storage, config }, sessionCaller(), agentMessageRiskItems(messages));
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        pending_messages: messages.map(m => ({
+                        ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
+                        pending_messages: messages.map((m, i) => withRisk({
                             id: m.id,
                             thread_id: m.threadId,
                             from: m.senderGaii,
                             content: m.content,
                             created_at: m.createdAt,
                             ...provFor(m.aiProvenanceId),
-                        })),
+                        } as Record<string, unknown>, rr.items[i] ?? null, ['content'])),
                         count: messages.length,
                     }, null, 2),
                 }],

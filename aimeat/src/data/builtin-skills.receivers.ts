@@ -10,6 +10,7 @@
  * @structure RECEIVERS_SKILL_ENTRY
  * @usage import { RECEIVERS_SKILL_ENTRY } from './builtin-skills.receivers.js';
  * @version-history
+ *   v1.4.0 — 2026-11-21 — What an incoming webhook writes is marked for content risks beside it.
  *   v1.3.0 — 2026-11-08 — A receiver is an incoming webhook and its key an API key in the skill's text;
  *     the skill name, the tool, the routes and the scopes keep their names (secaudit2026nov08b round 15b).
  *   v1.2.0 — 2026-11-08 — A rotation answers the key to the caller, and removing it names the receiver
@@ -109,7 +110,9 @@ Idempotency-Key: <a stable id of this message>
   422 the shape, 429 limits (Retry-After).
 
 What an incoming webhook writes is recorded as written by a program (provenance level \`machine\`):
-neither as the person's own words nor as AI.
+neither as the person's own words nor as AI. It is also content from outside: right after it is
+stored, text in it that tries to steer an AI is marked beside it (never changed), and an AI reading
+it later gets \`content_risk\` with the marks (skill aimeat-content-classes, content risk marks).
 
 ## When it stops working
 

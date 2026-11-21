@@ -34,6 +34,8 @@
  *   2026-11-21 — An agent's write into its own namespace under a key prefix an app of its owner keeps in
  *     the owner's memory carries APP_READS_OWNER_NAMESPACE with the owner_scope fix, when no owner copy
  *     shadows it yet (services/app/declared-key-prefixes.ts). The write itself is unchanged.
+ *   2026-11-21 — afterMemoryWrite emits the MCP resource notifications on the event bus when the
+ *     caller passed no emitters, so an MCP tool's write reaches its own listen stream as REST did.
  *   2026-11-20 — afterMemoryWrite takes the value's size and declared provenance level and hands them
  *     to recordMemoryTouch, for the value signals (services/value/signal-buffer.ts).
  *   2026-11-13 — misdirectedCrewKey and crewSitesWriteRefusal come from crews/def-envelope.ts, not from
@@ -168,6 +170,7 @@ import { memoryContentBytes } from '../../utils/memory-content.js';
 import { isAnonymousGaii } from '../../utils/visibility-words.js';
 import { emitChange, emitRecordChange } from '../event-bus.js';
 import { enqueueMemoryReplication } from './replication.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../resource-events.js';
 import { emitMemoryWritten } from '../event-bus.js';
 import { reconcileAfterSourceWrite } from '../exchange/projection.js';
 import { nodeContext } from '../node/context.js';
@@ -686,8 +689,18 @@ export async function afterMemoryWrite(
         });
     }
 
-    deps.emitResourceUpdated?.(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
-    if (!existed) deps.emitResourceListChanged?.(gaii);
+    // The MCP change notification, from every caller of this service: the REST route handed the two
+    // emitters in and the MCP tools did not, so an agent's own new key never reached its own
+    // listen stream. The bus is the default; a caller may still pass its own (a test does). Who
+    // hears it is decided per stream by the stream's principal (mcp/modern-endpoint.ts, core.ts).
+    // A listener that throws (a session that went away) must not fail a write that is already stored,
+    // which is how every route guards the same call.
+    try {
+        (deps.emitResourceUpdated ?? emitResourceUpdated)(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
+        if (!existed) (deps.emitResourceListChanged ?? emitResourceListChanged)(gaii);
+    } catch (err) {
+        logger.warn('memory write: an MCP change notification failed, the write stands', { key, error: String(err) });
+    }
 
     // The directory refreshes on the two profile keys it indexes.
     if (deps.onDirectoryChange && /^profile\.[^.]+\.(interests|location)$/.test(key)) deps.onDirectoryChange();

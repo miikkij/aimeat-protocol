@@ -15,9 +15,12 @@
  *   A visitor from another node is refused: the facts are a local account's own.
  * @structure parseSource · factsFor · factsViewFor · textFor · inspectFor · correctFor · scanFor · scanStatusFor · settingsFor ·
  *   updateSettingsFor · classesFor · setClassFor · removeClassFor · proposalsFor · decideProposalFor ·
- *   ontologyFor · overviewFor · listFactsFor · RESERVED_WORD
+ *   ontologyFor · overviewFor · listFactsFor · heldFor · releaseFor · RESERVED_WORD
  * @usage const out = await inspectFor(deps, caller, { source: { kind: 'file', key: 'a.pdf' } });
  * @version-history
+ *   v1.5.0 — 2026-11-21 — The content risk marks: the settings answer risk_in_force; the risk step asks
+ *     ai:use when the rules in force say rules+ai; heldFor and releaseFor (memory:write-reserved) for the
+ *     hold (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  *   v1.4.0 — 2026-11-13 — sourceFor: an agent's facts, inspect and correct requests reach its owner's
  *     memory record (named by the owner's account, or by key alone when the agent holds no record of
  *     its own under it), read under the owner-scope memory rule. The Contexts page's "make a
@@ -53,6 +56,10 @@ import {
   type SharedMeta, type SharedListItem,
 } from './shared-profile.js';
 import { sharedSettingsFor, updateSharedSettingsFor, type SharedProfileSettings } from './shared-profile-settings.js';
+import { resolveForHome } from './risk-core.js';
+import { homeOf } from './risk-store.js';
+import { listHeldFor, releaseHeldFor, RELEASE_WORD, type HeldItem } from './risk-hold.js';
+import type { ResolvedRisk } from './risk-types.js';
 import {
   listClasses, setOwnerClass, removeOwnerClass, listProposals, decideProposal, owlOntology, ContentClassError,
 } from './classes.js';
@@ -213,6 +220,10 @@ export async function inspectFor(
   const stages = parseStages(input.stages);
   const effective = stagesToRun(await readSettings(deps.storage, caller.ownerGhii), stages, false);
   if (effective.some((s) => (AI_STAGES as readonly string[]).includes(s))) requireWord(deps, caller,'ai:use', 'A stage that calls an AI model');
+  // The risk step calls a model when the rules in force for the item say rules+ai.
+  if (effective.includes('risk') && (await resolveForHome(deps, homeOf({ kind: source.kind, owner: source.owner, key: source.key }))).detect === 'rules+ai') {
+    requireWord(deps, caller, 'ai:use', 'The risk step with an AI model');
+  }
   const force = input.force === true;
   if (!(source.kind === 'memory' && isWorkspaceDocKey(source.key) && effective.includes('profile'))) {
     return inspectSource(deps, caller, source, { ...(stages ? { stages } : {}), force, ...(appRef ? { appRef } : {}) });
@@ -300,21 +311,48 @@ export function scanStatusFor(deps: Deps, caller: CallerContext, id: string): Sc
 /** A workspace or an organism named for its shared fingerprint settings; null for the owner's own. */
 type SettingsTarget = { organismId?: unknown; ws?: unknown } | null | undefined;
 
-export async function settingsFor(deps: Deps, caller: CallerContext): Promise<ContentSettings>;
-export async function settingsFor(deps: Deps, caller: CallerContext, target: SettingsTarget): Promise<ContentSettings | SharedProfileSettings>;
-export async function settingsFor(deps: Deps, caller: CallerContext, target?: SettingsTarget): Promise<ContentSettings | SharedProfileSettings> {
-  assertOn(deps); assertLocal(caller);
-  if (target?.organismId !== undefined) return sharedSettingsFor(deps, caller, target);
-  return readSettings(deps.storage, caller.ownerGhii);
+/** The owner's settings as a reader gets them: with the content risk rules in force for their own content. */
+export type ContentSettingsView = ContentSettings & { risk_in_force: ResolvedRisk };
+
+async function withRiskInForce(deps: Deps, ownerGhii: string, s: ContentSettings): Promise<ContentSettingsView> {
+  return { ...s, risk_in_force: await resolveForHome(deps, { kind: 'person', owner: ownerGhii }) };
 }
 
-export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown): Promise<ContentSettings>;
-export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown, target: SettingsTarget): Promise<ContentSettings | SharedProfileSettings>;
-export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown, target?: SettingsTarget): Promise<ContentSettings | SharedProfileSettings> {
+export async function settingsFor(deps: Deps, caller: CallerContext): Promise<ContentSettingsView>;
+export async function settingsFor(deps: Deps, caller: CallerContext, target: SettingsTarget): Promise<ContentSettingsView | SharedProfileSettings>;
+export async function settingsFor(deps: Deps, caller: CallerContext, target?: SettingsTarget): Promise<ContentSettingsView | SharedProfileSettings> {
+  assertOn(deps); assertLocal(caller);
+  if (target?.organismId !== undefined) return sharedSettingsFor(deps, caller, target);
+  return withRiskInForce(deps, caller.ownerGhii, await readSettings(deps.storage, caller.ownerGhii));
+}
+
+export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown): Promise<ContentSettingsView>;
+export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown, target: SettingsTarget): Promise<ContentSettingsView | SharedProfileSettings>;
+export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown, target?: SettingsTarget): Promise<ContentSettingsView | SharedProfileSettings> {
   assertOn(deps); assertLocal(caller);
   requireWord(deps, caller,RESERVED_WORD, 'Changing what runs, and what spends your AI key,');
   if (target?.organismId !== undefined) return updateSharedSettingsFor(deps, caller, target, patch);
-  return writeSettings(deps, writerOf(caller), patch);
+  return withRiskInForce(deps, caller.ownerGhii, await writeSettings(deps, writerOf(caller), patch));
+}
+
+function assertRiskOn(deps: Deps): void {
+  if (deps.config.contentRiskMode === 'off') refuse('NOT_FOUND', 404, 'Content risk marks are off on this node.');
+}
+
+/** The held items the caller decides (risk-hold.ts). */
+export async function heldFor(deps: Deps, caller: CallerContext): Promise<HeldItem[]> {
+  assertRiskOn(deps); assertLocal(caller);
+  return listHeldFor(deps, caller);
+}
+
+/**
+ * Release one held item. memory:write-reserved, because an AI that read the held text must not release
+ * it on that text's say; the account holder in person holds every word.
+ */
+export async function releaseFor(deps: Deps, caller: CallerContext, ref: unknown): Promise<{ ref: string; released: true; at: string }> {
+  assertRiskOn(deps); assertLocal(caller);
+  requireWord(deps, caller, RELEASE_WORD, 'Releasing held content to other people\'s AIs');
+  return releaseHeldFor(deps, caller, ref);
 }
 
 function writerOf(caller: CallerContext) {

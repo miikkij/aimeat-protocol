@@ -24,6 +24,9 @@
  *   const recs = await readAiRecords(deps, reader, ownerGhii, [{ key }], { capability: 'text' }, viewer);
  *   const file = await readAiFile({ storage, config }, reader, ownerGhii, key, { capability: 'text' });
  * @version-history
+ *   v1.4.0 -- 2026-11-21 -- readAiRecords sends each value through the reader's protect(): a regulated
+ *     data domain in protect mode reaches the model with its identifying details replaced (feature
+ *     audit item 1.3). A file is not protected, so readAiFile refuses such a file instead.
  *   v1.3.0 -- 2026-11-08 -- readAiFile takes { storage, config } and asks the labels a data package version
  *     keeps of a package file, as GET /v1/pub does: a reader outside one reads it as absent
  *     (datapackage/source-labels.ts storedFileShownTo; secaudit2026nov08b round 15b). A bare storage, as the
@@ -85,10 +88,13 @@ export async function readAiRecords(
     }
   }
   const present = found.filter((r): r is NonNullable<typeof r> => !!r);
-  // Refused before anything is returned, so no model is called with content it may not read.
-  await reader.useForAi(present.map(r => memoryTarget(r.ownerGaii, r.key)), use);
+  // Refused before anything is returned, so no model is called with content it may not read. The
+  // values go through protect(), so a regulated domain in protect mode is sent with its details
+  // replaced rather than refused (classification/regulated-gate.ts).
+  const aiUse = await reader.useForAi(present.map(r => memoryTarget(r.ownerGaii, r.key)), { ...use, redacts: true });
   const shown = await presentMemories(reader, present);
-  const byId = new Map(shown.map(r => [`${r.ownerGaii}\u0000${r.key}`, r.value]));
+  const byId = new Map(shown.map(r => [`${r.ownerGaii}\u0000${r.key}`,
+    aiUse ? aiUse.protect(memoryTarget(r.ownerGaii, r.key), r.value) : r.value]));
   return keys.map((k, i) => {
     const rec = found[i];
     return { key: k.key, value: rec ? byId.get(`${rec.ownerGaii}\u0000${rec.key}`) : undefined };

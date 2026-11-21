@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.3.1 (commit 43817f23d) on 2026-11-21. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 68bc65f7f) on 2026-11-21. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -101,6 +101,7 @@ Several processes of one node can run against one PostgreSQL database with the s
 | The short address of a presigned upload (`upload_url`): one process issues it and any process takes the upload | `aimeat/src/services/upload/token.ts` |
 | The per-account limits (mail, invitations, AI calls), the count of wrong admin passwords per address and the sign-in tarpit: one count for the node, so N processes allow each limit once. An admin password is counted before it is compared and a right one is taken off the count again, so wrong passwords sent at the same moment are compared only up to the count | `aimeat/src/services/account/limits.ts`, `aimeat/src/services/node-admin/password.ts`, `aimeat/src/middleware/login-tarpit.ts` |
 | The node's AI allowance per account: a debit or grant is written on the record's version, so two processes settling one account's calls lose none | `aimeat/src/services/ai/allowance.ts` |
+| Which content a register puts in a regulated data domain, and its mode for an outside AI model: each process builds this from the stored registers, drops it when a compliance document changes on any process (the event bus), and builds it again after 5 minutes in any case | `aimeat/src/services/compliance/regulated-ai.ts` |
 
 ### What stays in each process, and what follows
 
@@ -123,6 +124,7 @@ Several processes of one node can run against one PostgreSQL database with the s
 | Whether the process has finished seeding its shipped records at start (`seeds` on `GET /v1/build`: `settled` or `pending`) | Each process answers for its own start; through the load balancer the answer is that of the process the request reached | A deploy check that waits for `settled` asks each host's own address | `aimeat/src/server-bootstrap/boot-seed-lock.ts` |
 | The sanctions lists prepared for customer due diligence screening (about 7 000 entries) | Each process reads the stored list once per version and keeps it in memory; every process screens against the same stored version, so a screening answers the same on every host | Nothing; count on a few megabytes of memory per process on a node that does customer due diligence | `aimeat/src/services/kyc/screening/store.ts`, `aimeat/src/services/kyc/screening/match.ts` |
 | The value signals and data counts not yet written (at most `usage.tally_buffer_ms`, 15 s by default), and the records each reader opened today | Each process writes its own counts, so the totals hold every process's writes; a reader who opens the same record on two processes counts as a use on each, once a day per process; a process that stops writes its waiting counts, one that crashes loses at most the last interval | Nothing; count on a use being counted at most once a day per process | `aimeat/src/services/value/signal-buffer.ts`, `aimeat/src/services/value/data-buffer.ts` |
+| The content risk marks still waiting to be written for what a process took in (a write from outside or into a shared place), and how many risk notices each recipient got this hour | Each process marks what it took; a process that crashes leaves its waiting items unmarked, and an AI that reads them still gets the rules' marks on the read, though no hold; each process counts its own notices, so N active processes allow N times the hourly limit of 20 | Nothing; with several active processes count on more risk notices per hour, and use `hold` knowing that an item a crashed process never marked is not held | `aimeat/src/services/content/risk-intake.ts`, `aimeat/src/services/content/risk-core.ts` |
 
 Where the code's own notes still say "a node runs one process", they describe one of the rows above: the AI key hold is "per process, like every limiter here: a node runs one process" (`aimeat/src/services/ai/node-key-hold.ts`).
 

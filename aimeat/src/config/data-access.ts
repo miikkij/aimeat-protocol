@@ -15,6 +15,8 @@
  *   import { dataAccessDefaults } from './data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.10.0 — 2026-11-21 — regulatedAiModes (AIMEAT_COMPLIANCE_REGULATED_AI_MODES, `domain=mode`
+ *     entries): what an outside AI model gets of a regulated domain's content (feature audit item 1.3).
  *   v1.9.0 — 2026-11-14 — balancingTest (AIMEAT_COMPLIANCE_BALANCING_TEST: required | optional, the
  *     default | off): whether the node asks for the balancing test of an app on legitimate interests.
  *   v1.9.0 — 2026-11-15 — appPartyMax (AIMEAT_APP_PARTY_MAX, 10 000): the most people one app holds,
@@ -47,6 +49,7 @@
  */
 
 import { dataspaceDefaults } from './dataspace.js';
+import { parseAiModeEntry } from '../data/compliance-domains.js';
 
 /** The node's classification switch. */
 export type ClassificationMode = 'off' | 'owner' | 'all';
@@ -103,6 +106,9 @@ export function dataAccessDefaults() {
     // Whether the node asks for the balancing test of an app on legitimate interests (services/compliance/lia-need.ts).
     // optional, the default: the test is there to use and nothing asks for it.
     balancingTest: parseBalancingTestMode(process.env.AIMEAT_COMPLIANCE_BALANCING_TEST),
+    // What an outside AI model gets of a regulated domain's content, per domain (services/compliance/regulated-ai.ts).
+    // Empty, the default: every domain is notify, which sends as before and writes a mark.
+    regulatedAiModes: parseRegulatedAiModes(process.env.AIMEAT_COMPLIANCE_REGULATED_AI_MODES),
     // Whether this node or its owners do anti-money-laundering obliged work (EU 2024/1624), and who
     // (services/aml/). report, the code default, refuses nothing and lists what it finds.
     amlMode: parseAmlMode(process.env.AIMEAT_AML_MODE),
@@ -166,6 +172,16 @@ export const BALANCING_TEST_MODES: readonly BalancingTestMode[] = ['required', '
 /** An unknown value is `optional`, the default. */
 export function parseBalancingTestMode(v: unknown): BalancingTestMode {
   return BALANCING_TEST_MODES.find(m => m === v) ?? 'optional';
+}
+
+/**
+ * The operator's mode per regulated domain, as `domain=mode` entries (`health=local,export-controlled=block`).
+ * An entry with an unknown domain or mode is dropped, so a typo leaves that domain at notify, today's
+ * behaviour; the config check (schema-data-access.ts) refuses such an entry when it is saved.
+ */
+export function parseRegulatedAiModes(v: unknown): string[] {
+  const list = typeof v === 'string' ? v.split(',') : Array.isArray(v) ? v : [];
+  return list.map(e => (typeof e === 'string' ? e.trim() : '')).filter(e => parseAiModeEntry(e) !== null);
 }
 
 /**

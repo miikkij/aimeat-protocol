@@ -11,6 +11,8 @@
  *   import { registerMemoryExtendedTools } from './memory-extended.js';
  *   registerMemoryExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-21 — aimeat_memory_search carries each hit's content_risk, read over the whole value, and
+ *     leaves a held hit's snippet out (services/content/risk-read.ts).
  *   2026-11-14 — aimeat_memory_read_public answers the tool manifest of an app the operator hid as absent,
  *     as GET /v1/memory/:gaii/:key does (services/app/tools-manifest-reach.ts; unit 2b, B12).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -59,6 +61,9 @@ import { readProvenance } from '../services/ai/provenance-result.js';
 import { searchMemoryRecords } from '../services/memory/query.js';
 import { toolsManifestHiddenFrom } from '../services/app/tools-manifest-reach.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
+import { riskForRead, withRisk } from '../services/content/risk-read.js';
+import { contentRiskTextOf } from '../services/content/risk-intake.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -122,15 +127,20 @@ export function registerMemoryExtendedTools(
                 wantedTypes.length ? candidates.filter(r => matchesType(r.value, wantedTypes)) : candidates);
             const hits = (include_versions ? typed : typed.filter(r => !isVersionKey(r.key))).slice(0, cap);
             const q = effectiveQuery;
+            // Each hit says whether its record carries risk marks, read over the whole value; a held
+            // hit's snippet is left out (services/content/risk-read.ts).
+            const reader = sessionCaller ? sessionCaller() : { inPerson: false, ownerGhii: ownerGhiiOf(agentGaii), principal: agentGaii };
+            const rr = await riskForRead({ storage, config }, reader, hits.map(r => ({ subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value) })));
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
+                        ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
                         query: q,
                         total: hits.length,
                         truncated: (include_versions ? typed.length : typed.filter(r => !isVersionKey(r.key)).length) > hits.length,
                         // Each hit names its provenance record, as GET /v1/memory/search does (aiprov E14).
-                        hits: hits.map(r => ({ ...searchHitShape(r, q), ai_provenance_id: r.aiProvenanceId ?? null })),
+                        hits: hits.map((r, i) => withRisk({ ...searchHitShape(r, q), ai_provenance_id: r.aiProvenanceId ?? null } as Record<string, unknown>, rr.items[i] ?? null, ['snippet'])),
                         // An empty answer has to say what it covered, or the agent goes looking
                         // for the place it did not search. The cold-agent baseline of 2026-09-18:
                         // asked for a record that did not exist, the agent took eleven and twelve

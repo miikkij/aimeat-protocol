@@ -56,6 +56,12 @@
  *   2026-11-01 — collectWorkspaceSummary reads a record's id from the end of its key (spaceRowAt), so
  *     a record whose id holds a dot is listed and counted under its whole id; it was left out
  *     (secaudit2026oct31w2 round 10b, dotted record ids).
+ *   2026-11-21 — The organism's own objectives (organism.<id>.meta.manifest) in the organism overview,
+ *     as an "Organism objectives" block and in the answer; a KPI whose source names a workspace
+ *     (source.ws) is computed from that workspace's records when the viewer may read it
+ *     (collectOrganismObjectives). An objective's level, serves and until reach both overviews, in
+ *     the summary and the Markdown lines (summarizeObjectives, one builder for both levels)
+ *     (wish-suunta-n-kyviin-organismin-manifestin-tavoitteet-ja-tasot-yl).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -63,7 +69,8 @@ import { localAccountOf } from '../../utils/gaii.js';
 import { isMemoryBackedSpace } from '../workspace/meta.js';
 import { loadWorkspaceContent } from '../workspace/content.js';
 import type { ContentReader } from '../classification/reader.js';
-import { isRecordsSource, evaluateRecordsKpi } from '../kpi-rollup.js';
+import { isRecordsSource, evaluateRecordsKpi, type RecordsKpiSource } from '../kpi-rollup.js';
+import { readOrganismMetaValue } from '../organism/record-helpers.js';
 import { spacePrefixesOf, spaceRowAt } from '../workspace/record-key.js';
 import { logger } from '../../utils/logger.js';
 
@@ -94,6 +101,13 @@ export interface ObjectiveSummary {
   statement?: string;
   why?: string;
   status?: string;
+  /** How much the objective weighs: main | important | background (decision
+   *  decision-situatedai-p-tavoite-organismin-manifestin-objectives-kent-s). */
+  level?: string;
+  /** The objectives of other organisms (or of this one) this objective serves. */
+  serves?: Array<{ organism: string; objective: string }>;
+  /** The date the objective is meant to hold until. */
+  until?: string;
   kpis: KpiSummary[];
 }
 /** One workspace-scope skill (skills registry), surfaced in the overview so an agent reading the
@@ -127,7 +141,111 @@ export interface WorkspaceSummary {
 
 type ObjType = { name?: unknown; namespace?: unknown; mode?: unknown; kind?: unknown; backing?: unknown };
 type RawKpi = { name?: unknown; kind?: unknown; unit?: unknown; target?: unknown; source?: unknown; current?: unknown; measuredAt?: unknown };
-type RawObjective = { id?: unknown; statement?: unknown; why?: unknown; status?: unknown; kpis?: unknown };
+type RawObjective = { id?: unknown; statement?: unknown; why?: unknown; status?: unknown; level?: unknown; serves?: unknown; until?: unknown; kpis?: unknown };
+
+/**
+ * A manifest's `objectives[]` as the overviews show them, for a workspace manifest and the organism's
+ * own alike. `computedOf` answers a `from:'records'` KPI's value from records the reader may read,
+ * or null; a KPI without one keeps its declared `current`. The fields pass through as written:
+ * `level`, `serves` and `until` are the reader's to weigh, not the overview's.
+ */
+export function summarizeObjectives(
+  raw: unknown,
+  computedOf: (source: RecordsKpiSource, objectiveIndex: number, kpiIndex: number) => number | null,
+): ObjectiveSummary[] {
+  const out: ObjectiveSummary[] = [];
+  if (!Array.isArray(raw)) return out;
+  (raw as RawObjective[]).forEach((o, oi) => {
+    if (!o || typeof o !== 'object' || typeof o.id !== 'string') return;
+    const kpis: KpiSummary[] = [];
+    ((Array.isArray(o.kpis) ? o.kpis : []) as RawKpi[]).forEach((k, ki) => {
+      if (!k || typeof k.name !== 'string') return;
+      const computed = isRecordsSource(k.source) ? computedOf(k.source, oi, ki) : null;
+      kpis.push({
+        name: k.name,
+        kind: typeof k.kind === 'string' ? k.kind : undefined,
+        unit: typeof k.unit === 'string' ? k.unit : undefined,
+        target: (k.target && typeof k.target === 'object') ? k.target as KpiSummary['target'] : undefined,
+        current: computed ?? (typeof k.current === 'number' ? k.current : null),
+        computed: computed !== null,
+        measuredAt: typeof k.measuredAt === 'string' ? k.measuredAt : undefined,
+      });
+    });
+    const serves = Array.isArray(o.serves)
+      ? (o.serves as Array<{ organism?: unknown; objective?: unknown }>).flatMap(s =>
+        (s && typeof s.organism === 'string' && typeof s.objective === 'string') ? [{ organism: s.organism, objective: s.objective }] : [])
+      : [];
+    out.push({
+      id: o.id,
+      statement: typeof o.statement === 'string' ? o.statement : undefined,
+      why: typeof o.why === 'string' ? o.why : undefined,
+      status: typeof o.status === 'string' ? o.status : undefined,
+      ...(typeof o.level === 'string' ? { level: o.level } : {}),
+      ...(serves.length ? { serves } : {}),
+      ...(typeof o.until === 'string' ? { until: o.until } : {}),
+      kpis,
+    });
+  });
+  return out;
+}
+
+/** The `from:'records'` KPIs of an organism manifest's objectives that name a workspace
+ *  (`source.ws`), grouped by that workspace: only there can they be computed. */
+function organismKpiPlan(raw: unknown): Map<string, Array<{ key: string; source: RecordsKpiSource }>> {
+  const plan = new Map<string, Array<{ key: string; source: RecordsKpiSource }>>();
+  if (!Array.isArray(raw)) return plan;
+  (raw as RawObjective[]).forEach((o, oi) => {
+    ((o && Array.isArray(o.kpis) ? o.kpis : []) as RawKpi[]).forEach((k, ki) => {
+      const ws = isRecordsSource(k?.source) ? (k.source as { ws?: unknown }).ws : undefined;
+      if (typeof ws !== 'string' || !ws) return;
+      const list = plan.get(ws) ?? [];
+      list.push({ key: `${oi}.${ki}`, source: k.source as RecordsKpiSource });
+      plan.set(ws, list);
+    });
+  });
+  return plan;
+}
+
+/**
+ * The organism's own objectives (`organism.<id>.meta.manifest`, the copy a creator or admin wrote
+ * last, as the gate policy reads it). A KPI whose source names a workspace (`{ from:'records', ws,
+ * space, agg }`) is computed from that workspace's records when the viewer may read it, and keeps
+ * its declared value otherwise. `visit` lets the organism overview compute them during the
+ * workspace pass it makes anyway; without it the named workspaces are read here.
+ * No organism manifest, or one without objectives, answers [].
+ */
+export async function collectOrganismObjectives(
+  storage: Storage,
+  config: AimeatConfig,
+  opts: { orgId: string; viewerGaii: string; reader: ContentReader },
+  raw?: unknown,
+  values?: Map<string, number | null>,
+  visited?: Set<string>,
+): Promise<ObjectiveSummary[]> {
+  const objectives = raw === undefined ? await readOrganismObjectives(storage, opts.orgId) : raw;
+  const computed = values ?? new Map<string, number | null>();
+  for (const [ws, entries] of organismKpiPlan(objectives)) {
+    if (visited?.has(ws)) continue;
+    await collectWorkspaceSummary(storage, config, {
+      orgId: opts.orgId, ws, viewerGaii: opts.viewerGaii, reader: opts.reader, itemLimit: 0,
+      onItems: kpiVisitor(entries, computed),
+    });
+  }
+  return summarizeObjectives(objectives, (_s, oi, ki) => computed.get(`${oi}.${ki}`) ?? null);
+}
+
+/** The organism manifest's objectives array, or [] (services/organism/record-helpers.ts reads the copy). */
+async function readOrganismObjectives(storage: Storage, orgId: string): Promise<unknown[]> {
+  const manifest = await readOrganismMetaValue(storage, orgId, 'meta.manifest');
+  return Array.isArray(manifest?.objectives) ? manifest.objectives as unknown[] : [];
+}
+
+type ItemsVisitor = (items: MemoryRecord[], objectTypes: ObjType[], root: string) => void;
+function kpiVisitor(entries: Array<{ key: string; source: RecordsKpiSource }>, into: Map<string, number | null>): ItemsVisitor {
+  return (items, objectTypes, root) => {
+    for (const e of entries) into.set(e.key, evaluateRecordsKpi(items, objectTypes, root, e.source));
+  };
+}
 
 /** A short, human display title for a record/document value (best-effort, schema-agnostic).
  *  Exported so the workspace-read index (aimeat_workspace_read) titles instances the SAME way the
@@ -177,7 +295,12 @@ function oneLine(md: unknown): string | null {
 export async function collectWorkspaceSummary(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; name?: string; viewerGaii: string; archived?: boolean; itemLimit?: number; reader: ContentReader },
+  opts: {
+    orgId: string; ws: string; name?: string; viewerGaii: string; archived?: boolean; itemLimit?: number; reader: ContentReader;
+    /** Called with the workspace's records when the viewer may read them: the organism's own KPIs
+     *  that name this workspace are computed here, from the same read, under the same rule. */
+    onItems?: ItemsVisitor;
+  },
 ): Promise<WorkspaceSummary> {
   const { orgId, ws, viewerGaii } = opts;
   const itemLimit = opts.itemLimit ?? MAX_ITEMS;
@@ -202,6 +325,7 @@ export async function collectWorkspaceSummary(
   summary.readable = got.canRead;
   if (!got.canRead) return summary;
   const items = got.items;
+  opts.onItems?.(items, manifest?.objectTypes ?? [], root);
   const prefixes = spacePrefixesOf(root, manifest?.objectTypes);
 
   for (const ot of manifest?.objectTypes ?? []) {
@@ -263,34 +387,7 @@ export async function collectWorkspaceSummary(
   // this workspace's published records (the `items` already read above — no extra storage hit, same
   // authorization); a string-recipe / other source falls back to the declared `current`.
   const objectTypes = manifest?.objectTypes ?? [];
-  for (const o of manifest?.objectives ?? []) {
-    if (!o || typeof o.id !== 'string') continue;
-    const kpis: KpiSummary[] = [];
-    for (const k of (Array.isArray(o.kpis) ? o.kpis : []) as RawKpi[]) {
-      if (!k || typeof k.name !== 'string') continue;
-      let current = typeof k.current === 'number' ? k.current : null;
-      let computed = false;
-      if (isRecordsSource(k.source)) {
-        const v = evaluateRecordsKpi(items, objectTypes, root, k.source);
-        if (v !== null) { current = v; computed = true; }
-      }
-      kpis.push({
-        name: k.name,
-        kind: typeof k.kind === 'string' ? k.kind : undefined,
-        unit: typeof k.unit === 'string' ? k.unit : undefined,
-        target: (k.target && typeof k.target === 'object') ? k.target as KpiSummary['target'] : undefined,
-        current, computed,
-        measuredAt: typeof k.measuredAt === 'string' ? k.measuredAt : undefined,
-      });
-    }
-    summary.objectives.push({
-      id: o.id,
-      statement: typeof o.statement === 'string' ? o.statement : undefined,
-      why: typeof o.why === 'string' ? o.why : undefined,
-      status: typeof o.status === 'string' ? o.status : undefined,
-      kpis,
-    });
-  }
+  summary.objectives = summarizeObjectives(manifest?.objectives, source => evaluateRecordsKpi(items, objectTypes, root, source));
   return summary;
 }
 
@@ -417,12 +514,16 @@ function meetsTarget(current: number | null, t: ObjectiveSummary['kpis'][number]
 
 /** Render a workspace's objectives as Markdown lines: each objective a bullet with its KPIs as
  *  "current vs target" sub-bullets (✅ met · ⚠️ off-target · — not yet measured). */
-function objectiveLines(objectives: ObjectiveSummary[], hashes: string): string[] {
+function objectiveLines(objectives: ObjectiveSummary[], hashes: string, title = 'Objectives'): string[] {
   if (!objectives.length) return [];
-  const lines = [`${hashes} Objectives`, ''];
+  const lines = [`${hashes} ${title}`, ''];
   for (const o of objectives) {
-    const tag = o.status && o.status !== 'active' ? ` _(${o.status})_` : '';
+    // The level first, because it says how much the objective weighs; the date it holds until and a
+    // status other than active after it.
+    const tags = [o.level, o.until ? `until ${o.until}` : undefined, o.status && o.status !== 'active' ? o.status : undefined].filter(Boolean);
+    const tag = tags.length ? ` _(${tags.join(' · ')})_` : '';
     lines.push(`- **${o.statement || o.id}**${tag}`);
+    if (o.serves?.length) lines.push(`  - serves: ${o.serves.map(s => `${s.organism} / ${s.objective}`).join(', ')}`);
     for (const k of o.kpis) {
       const cur = k.current === null ? '—' : String(k.current);
       const tgt = targetText(k.target);
@@ -446,7 +547,7 @@ export async function buildOrganismOverview(
   storage: Storage,
   config: AimeatConfig,
   opts: { orgId: string; viewerGaii: string; includeArchived?: boolean; reader: ContentReader },
-): Promise<{ markdown: string; workspaces: number; archivedWorkspaces: number }> {
+): Promise<{ markdown: string; workspaces: number; archivedWorkspaces: number; objectives: ObjectiveSummary[] }> {
   const { orgId, viewerGaii, includeArchived } = opts;
   const org = await storage.getOrganism(orgId);
   const allWss = await listWorkspaces(storage, orgId);
@@ -454,8 +555,22 @@ export async function buildOrganismOverview(
   // only when includeArchived is set) so they stay out of the materials yet remain discoverable.
   const archivedWss = allWss.filter(w => w.archived);
   const wss = includeArchived ? allWss : allWss.filter(w => !w.archived);
+  // The organism's own objectives: their KPIs that name a workspace are computed during the
+  // workspace pass below, from the read it makes anyway, so the overview reads no workspace twice.
+  const rawObjectives = await readOrganismObjectives(storage, orgId);
+  const plan = organismKpiPlan(rawObjectives);
+  const kpiValues = new Map<string, number | null>();
+  const visited = new Set<string>();
   const summaries: WorkspaceSummary[] = [];
-  for (const w of wss) summaries.push(await collectWorkspaceSummary(storage, config, { orgId, ws: w.id, name: w.name, viewerGaii, archived: w.archived, reader: opts.reader }));
+  for (const w of wss) {
+    const entries = plan.get(w.id);
+    summaries.push(await collectWorkspaceSummary(storage, config, {
+      orgId, ws: w.id, name: w.name, viewerGaii, archived: w.archived, reader: opts.reader,
+      ...(entries ? { onItems: kpiVisitor(entries, kpiValues) } : {}),
+    }));
+    visited.add(w.id);
+  }
+  const objectives = await collectOrganismObjectives(storage, config, { orgId, viewerGaii, reader: opts.reader }, rawObjectives, kpiValues, visited);
 
   const totalRecords = summaries.reduce((n, s) => n + s.totalRecords, 0);
   const totalDocs = summaries.reduce((n, s) => n + s.totalDocuments, 0);
@@ -475,6 +590,8 @@ export async function buildOrganismOverview(
   if (org?.description) out.push(`> ${clip(org.description, 200)}\n`);
   const activeCount = summaries.filter(s => !s.archived).length;
   out.push(`> ${activeCount} workspaces · ${totalRecords} records · ${totalDocs} documents${archivedWss.length && !includeArchived ? ` · ${archivedWss.length} archived` : ''}\n`);
+  // The direction of the whole organism, before the workspaces that serve it.
+  out.push(...objectiveLines(objectives, '##', 'Organism objectives'));
   if (!summaries.length) out.push(includeArchived ? '_No workspaces yet._\n' : '_No active workspaces._\n');
   for (const s of summaries) {
     out.push(`## ${s.name}  ·  \`${s.ws}\`${s.archived ? '  🗄️ _archived_' : ''}`);
@@ -493,5 +610,5 @@ export async function buildOrganismOverview(
   }
   // `workspaces` = the number actually rendered in THIS view (active-only by default; active+archived
   // when includeArchived). `archivedWorkspaces` is always the archived count regardless of the view.
-  return { markdown: out.join('\n'), workspaces: summaries.length, archivedWorkspaces: archivedWss.length };
+  return { markdown: out.join('\n'), workspaces: summaries.length, archivedWorkspaces: archivedWss.length, objectives };
 }

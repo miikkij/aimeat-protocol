@@ -25,6 +25,9 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.9.0 — 2026-11-21 — The `risk` stage (risk-core.ts) runs when asked, after the facts are kept; an
+ *     entry the risk marks wrote alone is read as fresh and keeps its marks of the same hash (wish
+ *     wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  *   v1.8.0 — 2026-11-15 — The unread-PDF notice links `?tab=dataWallet`, the tab's id; `datawallet` opened an empty page (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.7.0 — 2026-11-13 — mayAsk admits an agent on its owner's memory record, which service.ts
  *     sourceFor has checked against the owner-scope read rule.
@@ -65,8 +68,11 @@ import { listClasses, addProposal, decideProposal, entityFor } from './classes.j
 import { fieldsOf } from './correct-fields.js';
 import { describeItem, classifyItem, extractClass, proposeClass, type StageCtx, type StageItem } from './ai-stages.js';
 import {
-  AI_STAGES, type ContentFacts, type ContentSource, type ContentSettings, type StageName, type ClassProposal,
+  AI_STAGES, type ContentFacts, type ContentSource, type ContentSettings, type StageName, type SettingStage, type ClassProposal,
 } from './types.js';
+import { markText } from './risk-core.js';
+import { riskTextOf } from './risk-text.js';
+import type { RiskPoint } from './risk-types.js';
 import { createHash } from 'node:crypto';
 import { notify } from '../notify.js';
 
@@ -92,6 +98,8 @@ export interface InspectOptions {
   automatic?: boolean;
   /** `owner/filename` of the app grant that asked, so its model calls run under the owner's rules for that app. */
   appRef?: string;
+  /** The point the `risk` stage runs for (risk-intake.ts); absent: a request, which marks. */
+  riskPoint?: RiskPoint;
 }
 
 export interface InspectResult {
@@ -112,7 +120,7 @@ type Deps = { storage: Storage; config: AimeatConfig };
  * and never from the settings on an inspect or a scan that named no stages.
  */
 export function stagesToRun(settings: ContentSettings, asked: StageName[] | undefined, automatic: boolean): StageName[] {
-  if (automatic || !asked) return (Object.keys(settings.stages) as StageName[]).filter((s) => settings.stages[s] && s !== 'profile');
+  if (automatic || !asked) return (Object.keys(settings.stages) as SettingStage[]).filter((s) => settings.stages[s] && s !== 'profile');
   return [...new Set(asked)];
 }
 
@@ -125,6 +133,8 @@ interface LoadedItem {
   bytes: Buffer | null;
   /** A memory record's text; null for a file. */
   memoryText: string | null;
+  /** A memory record's value as shown to the reader, for the risk stage's words (risk-text.ts). */
+  memoryValue?: unknown;
   aiProvenanceId: string | null;
   target: ReturnType<typeof fileTarget>;
   tooLarge: boolean;
@@ -186,7 +196,7 @@ async function loadItem(deps: Deps, reader: ContentReader, source: ContentSource
   const text = memoryValueText(shown.value);
   return {
     owner: source.owner, key: source.key, mimeType: typeof shown.value === 'string' ? 'text/plain' : 'application/json',
-    filename: source.key, size: Buffer.byteLength(text, 'utf8'), bytes: null, memoryText: text,
+    filename: source.key, size: Buffer.byteLength(text, 'utf8'), bytes: null, memoryText: text, memoryValue: shown.value,
     aiProvenanceId: (shown as { aiProvenanceId?: string | null }).aiProvenanceId ?? null, target, tooLarge: false,
   };
 }
@@ -248,9 +258,13 @@ export async function inspectSource(
   const now = new Date().toISOString();
   const writer = { principal: ownerGhii, ownerGhii, scopes: [] as string[], roles: ['owner'] };
   const existing = await getFacts(deps.storage, ownerGhii, sourceId);
-  const fresh = !existing || existing.readFrom !== hash;
+  // An entry the risk marks wrote alone (risk-store.ts) has no technical stage: read it as fresh, and
+  // keep marks read from the same bytes.
+  const fresh = !existing || existing.readFrom !== hash || !existing.stages.technical;
+  const keptRisk = existing?.risk?.contentHash === hash ? existing.risk : undefined;
   const facts: ContentFacts = fresh
-    ? { source, sourceId, technical: await shallowTechnical(deps, item, hash), stages: {}, readFrom: hash, updatedAt: now }
+    ? { source, sourceId, technical: await shallowTechnical(deps, item, hash), stages: {}, readFrom: hash, updatedAt: now,
+      ...(keptRisk ? { risk: keptRisk } : {}), ...(keptRisk && existing?.stages.risk ? { stages: { risk: existing.stages.risk } } : {}) }
     : structuredClone(existing);
   const ran: StageName[] = [];
   const skipped: Partial<Record<StageName, string>> = {};
@@ -305,6 +319,27 @@ export async function inspectSource(
 
   facts.updatedAt = new Date().toISOString();
   await putFacts(deps, writer, facts);
+
+  // ── risk ── marks beside the item, written by risk-core.ts into these same facts after them.
+  if (stages.includes('risk')) {
+    try {
+      // A memory record is marked on its words as every point reads them (risk-text.ts), hashed the
+      // same way; a file on the text its technical read took out, bound to its bytes.
+      const memory = item.memoryValue !== undefined;
+      const marks = await markText(deps, {
+        subject: { kind: source.kind, owner: source.owner, key: source.key },
+        text: memory ? riskTextOf(item.memoryValue) : text ?? '', ...(memory ? {} : { hash }),
+        point: opts.riskPoint ?? 'request', measure: { mimeType: item.mimeType, size: item.size },
+      });
+      if (marks) facts.risk = marks; else delete facts.risk;
+      facts.stages.risk = { at: now, ok: true, ...(marks ? {} : { note: text ? 'nothing marked, or the point is off' : 'no words to read' }) };
+      ran.push('risk');
+    } catch (err) {
+      const why = String((err as Error)?.message ?? err).slice(0, 500);
+      facts.stages.risk = { at: now, ok: false, note: why };
+      skipped.risk = why;
+    }
+  }
   emitChange('contentclass', ownerGhii);
   return { facts, ran, skipped, proposals };
 }

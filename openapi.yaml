@@ -2513,6 +2513,53 @@ components:
         app: { type: string, description: 'APP_READS_OWNER_NAMESPACE: the file name of the app that keeps the key in the owner''s memory' }
         prefix: { type: string, description: 'APP_READS_OWNER_NAMESPACE: the key prefix the key is under' }
 
+    ObjectiveSummary:
+      type: object
+      description: >-
+        One objective of a manifest (an organism's or a workspace's), as the overviews and the organism
+        read show it. `level`, `serves` and `until` pass through as the manifest states them.
+      required: [id, kpis]
+      properties:
+        id: { type: string }
+        statement: { type: string }
+        why: { type: string }
+        status: { type: string, enum: [active, met, abandoned] }
+        level:
+          type: string
+          description: How much the objective weighs, as written; the convention is main, important or background.
+        serves:
+          type: array
+          description: The objectives (of another organism or of this one) this objective serves.
+          items:
+            type: object
+            required: [organism, objective]
+            properties:
+              organism: { type: string }
+              objective: { type: string }
+        until: { type: string, description: The date the objective is meant to hold until, as written. }
+        kpis:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              kind: { type: string, enum: [value, cost, roi, outcome, quality] }
+              unit: { type: string }
+              target:
+                type: object
+                properties:
+                  op: { type: string, enum: ['<', '<=', '>', '>=', '==', between] }
+                  value: { type: number }
+                  values: { type: array, items: { type: number } }
+              current:
+                type: number
+                nullable: true
+                description: Resolved value (computed or declared); null when not measurable yet
+              computed:
+                type: boolean
+                description: True when `current` was computed from a records rollup
+              measuredAt: { type: string }
+
     MemoryWriteResult:
       description: A written memory entry, with what the write has to tell the caller.
       allOf:
@@ -2582,6 +2629,11 @@ components:
             told which.
         classificationWarning:
           $ref: '#/components/schemas/ClassificationWarning'
+        content_risk:
+          $ref: '#/components/schemas/ContentRisk'
+        content_risk_warning:
+          type: string
+          description: One line for the reading AI when the value carries content risk marks and the reader's setting warns. Only for an AI reader.
         also_under:
           type: array
           items:
@@ -6005,6 +6057,103 @@ components:
           description: >
             Connected accounts created with this app. They can only be renewed by it, so this is
             also how many would stop renewing if it were removed.
+    ContentRiskMark:
+      type: object
+      description: One possible risk in an item's words. Offsets are UTF-16 code units in the text the reader got.
+      required: [kind, rule, by, start, end, excerpt]
+      properties:
+        kind: { type: string, enum: [ai-instruction, hidden-text, false-role, exfil-link, other-person-data, encoded-block] }
+        rule: { type: string, description: 'The rule that matched, such as ai-instruction.ignore-previous, or `model`.' }
+        by: { type: string, enum: [rules, model] }
+        start: { type: integer }
+        end: { type: integer }
+        excerpt: { type: string, description: 'At most 160 characters around the match, invisible characters written as \u{...}. Empty in stored marks (facts.risk); a read builds it from the words it answers.' }
+        why: { type: string, description: 'A model''s reason, in one sentence.' }
+    ContentRisk:
+      type: object
+      description: >
+        The content risk marks beside an item an AI reads (src/services/content/risk-types.ts
+        ContentRisk), in the `content_risk` field of every read answer that carries content to an AI:
+        GET /v1/memory/{key}, GET /v1/memory/search, the workspace read, row reads, GET
+        /v1/storage/{key}?mode=inline, the comment, board, direct message and agent message reads, the
+        mail and drive reads, and the matching MCP tools. A caller that is the account holder in person
+        gets no field. The item itself is never changed by a mark. A marked item (`marked: true`,
+        `use: prepare-only`) may only produce a preparation for a person, never an act of its own: an
+        outside service that reads AIMEAT content (the SituatedAI Engine, an agent framework) relies on
+        this. A field is added to this shape, never renamed or removed. A list answer also carries
+        `content_risk_warning`, one line, when any item is marked and the reader's setting warns.
+      required: [v, marked, use, kinds, marks, content_hash, detect, checked_at, point]
+      properties:
+        v: { type: integer, enum: [1] }
+        marked: { type: boolean }
+        use: { type: string, enum: [prepare-only, normal] }
+        kinds: { type: array, items: { type: string } }
+        marks: { type: array, items: { $ref: '#/components/schemas/ContentRiskMark' } }
+        content_hash: { type: string, description: 'sha256:<hex> of the words (or of a file''s bytes) the marks belong to.' }
+        detect: { type: string, enum: [rules, rules+ai] }
+        checked_at: { type: string, format: date-time }
+        point: { type: string, enum: [intake, shared-write, read, request], description: Where the marks were made. }
+        warning: { type: string, description: One line for the reading AI, present when the item is marked and the reader's setting is mark+warn. }
+        held:
+          type: object
+          description: The item is held from this reader; its content fields are null in this answer. Nothing was changed or deleted.
+          properties:
+            since: { type: string, format: date-time }
+            release_with: { type: string }
+    ContentRiskMarks:
+      type: object
+      description: The marks kept beside one item (facts.risk of a person's file or memory record), bound to its hash.
+      properties:
+        v: { type: integer, enum: [1] }
+        contentHash: { type: string }
+        detect: { type: string, enum: [rules, rules+ai] }
+        point: { type: string, enum: [intake, shared-write, read, request] }
+        at: { type: string, format: date-time }
+        marks: { type: array, items: { $ref: '#/components/schemas/ContentRiskMark' } }
+        kinds: { type: array, items: { type: string } }
+        truncatedAt: { type: integer }
+        model: { type: string }
+        modelSkipped: { type: string }
+        hold:
+          type: object
+          properties:
+            status: { type: string, enum: [held, released] }
+            since: { type: string, format: date-time }
+            decidedBy: { type: string }
+            decidedAt: { type: string, format: date-time }
+        writtenBy: { type: string }
+        expiresAt: { type: string, format: date-time }
+    ContentRiskSettings:
+      type: object
+      description: >
+        One layer of the content risk settings (a person's, an organism's or a workspace's). Every field
+        is optional; a missing one follows the layer above. The content's home decides: a person's item
+        takes the node and that person, a workspace's item the node, the organism and the workspace; a
+        reading AI's person is added for on_read. A locked layer's values are a floor the layers under it
+        may only tighten (off < mark < mark+warn < hold); the operator's floors hold for everyone.
+      properties:
+        enabled: { type: boolean }
+        detect: { type: string, enum: [rules, rules+ai], description: rules+ai spends the AI allowance of whoever chose it. }
+        on_intake: { type: string, enum: [off, mark, mark+warn, hold] }
+        on_shared_write: { type: string, enum: [off, mark, mark+warn, hold] }
+        on_read: { type: string, enum: [off, mark, mark+warn] }
+        kinds:
+          type: object
+          additionalProperties: { type: boolean }
+          description: Each of ai-instruction, hidden-text, false-role, exfil-link, other-person-data, encoded-block on or off.
+        locked: { type: boolean, description: An organism or a workspace only. }
+    ResolvedContentRisk:
+      type: object
+      description: What is in force for an item of a home, and the layer each value comes from (node, floor, organism, workspace, person).
+      properties:
+        enabled: { type: boolean }
+        detect: { type: string, enum: [rules, rules+ai] }
+        on_intake: { type: string }
+        on_shared_write: { type: string }
+        on_read: { type: string }
+        kinds: { type: array, items: { type: string } }
+        aiPayer: { type: string, nullable: true }
+        from: { type: object, additionalProperties: { type: string } }
     ContentSharedFingerprint:
       type: object
       description: >
@@ -20086,13 +20235,24 @@ paths:
     get:
       operationId: listMemory
       summary: List memory (TOC)
-      description: List all memory keys for the authenticated agent.
+      description: >-
+        List all memory keys for the authenticated agent. With `include=meta` and `limit` but no
+        `cursor`, the answer is cut at `limit` and says so with `truncated: true`; to read every key
+        without gaps, pass `cursor` (empty for the first page) and follow `next_cursor` until it is null.
       tags: [Memory]
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/Pagination'
-        - $ref: '#/components/parameters/PerPage'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+          description: >-
+            The most items the answer carries (at most 1000; a larger number is read as 1000). Without
+            `cursor` the list is cut after this many and `total`, `count` and `quota` still describe
+            every match. With `include=meta` and `cursor`, the page size.
         - name: visibility
           in: query
           schema:
@@ -20161,7 +20321,8 @@ paths:
         '200':
           description: |
             Memory listing with quota info. With `count=true`, `data` holds `count` alone. With
-            `include=meta`, each item carries `bytes` in place of `value`.
+            `include=meta`, each item carries `bytes` in place of `value`. With `include=meta`,
+            `limit` and `cursor`, `data` is `{ items, next_cursor, limit }` and nothing else.
           content:
             application/json:
               schema:
@@ -20207,16 +20368,33 @@ paths:
                                   description: Present when the record is classified with a warning an AI is to be told.
                           total:
                             type: integer
+                            description: Every matching key, also when `limit` cut the list. Absent on a cursor page.
                           shown:
                             type: integer
                             description: Present when `limit` cut the list.
                           truncated:
                             type: boolean
+                            description: >-
+                              True when `limit` cut the list: `items` holds the first `shown` of `total`.
+                              Absent when every match is in `items`. A cursor page never carries it; it
+                              says it has more with a non-null `next_cursor`.
                           hint:
                             type: string
+                            description: With `truncated`, how to see the rest (narrow with prefix or tags, add include=meta, raise limit), in words.
+                          next_cursor:
+                            type: [string, 'null']
+                            description: >-
+                              A cursor page only (`include=meta`, `limit`, `cursor`): the cursor of the
+                              next page, the last key of this one; null when the listing ended.
+                          limit:
+                            type: integer
+                            description: 'A cursor page only: the page size the node used.'
+                          offset:
+                            type: integer
+                            description: With include=meta, the `offset` asked for, echoed back when given.
                           quota:
                             type: object
-                            description: Memory quota usage, summed over everything that matched.
+                            description: Memory quota usage, summed over everything that matched. Absent on a cursor page.
                             properties:
                               max_keys:
                                 type: integer
@@ -20521,7 +20699,7 @@ paths:
         - { name: level, in: query, schema: { type: string, enum: [node, owner, organism], default: owner } }
         - { name: organism_id, in: query, schema: { type: string } }
         - { name: since, in: query, schema: { type: string, format: date-time } }
-        - { name: action, in: query, schema: { type: string, enum: [shown, used, refused, changed, exception] }, description: 'exception: an entry of the exceptions list made, used or withdrawn; its purpose names the exception, the act and the reason.' }
+        - { name: action, in: query, schema: { type: string, enum: [shown, used, refused, changed, exception, regulated] }, description: 'exception: an entry of the exceptions list made, used or withdrawn; its purpose names the exception, the act and the reason. regulated: content of a regulated data domain that went to an AI model outside the server, or an exception that opened it; its label names the domains.' }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
       responses:
         '200': { description: '{ level, subject, rows, note? }.' }
@@ -25185,7 +25363,16 @@ paths:
         and reports what is in one and not the other.
 
         Response `data`: `{ scope, not_covered, derived, register, gaps, unlabelled_detail,
-        data_intermediation, aml }`.
+        data_intermediation, aml, regulated_ai }`.
+
+        `regulated_ai` is section 14 (regulated data domains and AI models outside this server):
+        `{ setting: { path, modes: [{ domain, name, mode, law_suggests_local }], suggestions },
+        marks: { from, to, sent, held, exceptional, recent, exceptional_rows, truncated }, note }`.
+        `mode` is notify, protect, drop, local or block (setting compliance.regulated_ai_modes, tightened
+        by a register's `aiMode`). `exceptional` counts attempts on block content while an exception
+        was in force: an exception does not open block, and such an attempt is marked as exceptional.
+        Each row of `recent` and `exceptional_rows` is `{ at, action, domains, reader, reader_kind,
+        scope, key, count, what }`.
 
         `aml` is section 13 (anti-money-laundering, Regulation (EU) 2024/1624): `{ section, mode,
         mode_code, mode_text, declarations, findings, totals, obligations, regulation, edit, note }`.
@@ -51929,6 +52116,11 @@ paths:
         Value per member: while a creator shows the organism's value report per member, an active
         member gets `value_per_member` ({ on, set_at, from, to, yours }): that it is on, and their own
         numbers for the last 30 days.
+
+        Objectives: an active member gets `objectives`, the organism's own (its manifest,
+        `organism.{id}.meta.manifest`, the copy a creator or admin wrote last), with `level`, `serves`,
+        `until` and the KPIs; `[]` when the organism has no manifest or no objectives. Anyone else gets
+        no `objectives` field.
       tags: [Organisms]
       parameters:
         - name: id
@@ -51963,6 +52155,14 @@ paths:
                             properties:
                               role: { type: string }
                               status: { type: string }
+                          objectives:
+                            type: array
+                            description: >-
+                              An active member only: the organism's own objectives. A KPI whose source
+                              names a workspace (`{ from: 'records', ws, space, agg }`) is computed from
+                              that workspace's records when the caller may read it; otherwise it keeps
+                              its declared value.
+                            items: { $ref: '#/components/schemas/ObjectiveSummary' }
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -52663,6 +52863,14 @@ paths:
                     `direct` writes it at once with the member's name on it; `suggest` files it as a
                     suggestion the creator or an admin approves (the default). Stored as the
                     workspace's own `…meta.rules` record, so a manifest replace never resets it.
+                expected_version:
+                  type: integer
+                  description: >
+                    The version of the stored manifest the caller read (`manifest_version` in
+                    GET .../workspace/index and in this route's answer). When the manifest is at
+                    another version, the update answers 409 VERSION_CONFLICT and writes nothing, the
+                    schema locks included; the manifest write itself lands only on this version.
+                    Without it the update replaces what is there.
       responses:
         '200':
           description: Updated. Returns the list of meta records changed.
@@ -52680,8 +52888,18 @@ paths:
                           creator: { type: string }
                           name: { type: string }
                           member_changes: { type: string, enum: [direct, suggest], description: The rule now in force, when this call set it }
+                          manifest_version: { type: integer, description: The stored manifest's version after this call, the one the next expected_version names. }
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          description: >
+            VERSION_CONFLICT: the manifest is not at `expected_version`; `details` carries
+            `currentVersion` and `expectedVersion`. Nothing was written. Read the manifest again,
+            apply the change to that version and send it with its version. Also ARCHIVED: the
+            workspace or organism is archived (read-only).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403':
           description: >
             Not the workspace creator (or an org admin). A member adds a space with
@@ -53004,7 +53222,8 @@ paths:
         whole organism in one read and decide which workspace to drill into — then call
         `/v1/organisms/{id}/workspace/overview?ws=` for the detail. It is a projection of live state,
         never persisted, so it cannot drift. Membership-gated; a workspace the caller cannot read is
-        listed by name only.
+        listed by name only. The organism's own objectives (its manifest, `organism.{id}.meta.manifest`)
+        open the Markdown as an "Organism objectives" block and come back in `objectives`.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -53048,6 +53267,17 @@ paths:
                           workspaces:
                             type: integer
                             description: Number of workspaces summarised
+                          archivedWorkspaces:
+                            type: integer
+                            description: Number of archived workspaces, whether or not this view lists them
+                          objectives:
+                            type: array
+                            description: >-
+                              The organism's own objectives, from its manifest. A KPI whose source names a
+                              workspace (`{ from: 'records', ws, space, agg }`) is computed from that
+                              workspace's records when the caller may read it; otherwise it keeps its
+                              declared value. Empty when the organism has no manifest or no objectives.
+                            items: { $ref: '#/components/schemas/ObjectiveSummary' }
             text/markdown:
               schema:
                 type: string
@@ -53063,7 +53293,9 @@ paths:
       description: >-
         The same answer as the aimeat_workspace_read MCP tool (services/workspace-tool-ops.ts
         readWorkspaceOp). Without `ids`, every space's entries with id, title, updated, version and
-        size, plus the manifest, the pinned apps, the locked schemas, the member change rule and the
+        size, plus the manifest, `manifest_version` (the stored manifest's version, which
+        PUT /v1/organisms/{id}/workspace takes back as `expected_version`; not the manifest's own
+        `manifestVersion` format field), the pinned apps, the locked schemas, the member change rule and the
         section indexes. With `ids`, the full value of only those records (an id, or a record's full
         memory key inside this workspace); an id that records of more than one space carry, asked
         without `space`, is answered from the first space and listed in `ambiguous` ({ id, spaces,
@@ -53224,35 +53456,7 @@ paths:
                               KPIs and a resolved `current` value — computed from the workspace's own
                               published records when the KPI `source` is `{from:'records',...}`, otherwise
                               the declared value. Empty when none are declared or the caller cannot read.
-                            items:
-                              type: object
-                              properties:
-                                id: { type: string }
-                                statement: { type: string }
-                                why: { type: string }
-                                status: { type: string, enum: [active, met, abandoned] }
-                                kpis:
-                                  type: array
-                                  items:
-                                    type: object
-                                    properties:
-                                      name: { type: string }
-                                      kind: { type: string, enum: [value, cost, roi, outcome, quality] }
-                                      unit: { type: string }
-                                      target:
-                                        type: object
-                                        properties:
-                                          op: { type: string, enum: ['<', '<=', '>', '>=', '==', between] }
-                                          value: { type: number }
-                                          values: { type: array, items: { type: number } }
-                                      current:
-                                        type: number
-                                        nullable: true
-                                        description: Resolved value (computed or declared); null when not measurable yet
-                                      computed:
-                                        type: boolean
-                                        description: True when `current` was computed from a records rollup
-                                      measuredAt: { type: string }
+                            items: { $ref: '#/components/schemas/ObjectiveSummary' }
             text/markdown:
               schema:
                 type: string
@@ -75151,7 +75355,9 @@ paths:
         stage makes its one shared fingerprint, on the caller's AI key, and the answer carries
         `shared` (ContentSharedFingerprint): anyone who may read the document makes a missing or
         stale one; a current one is answered as it is (`skipped.profile` says so), and making it
-        again with `force` needs the right to edit the document (403 ACCESS_DENIED otherwise).
+        again with `force` needs the right to edit the document (403 ACCESS_DENIED otherwise). The
+        `risk` stage marks possible risks in the item's words beside it (`facts.risk`, ContentRiskMarks):
+        it never changes the item, and it needs ai:use only when the rules in force say rules+ai.
       tags: [ContentClasses]
       security:
         - BearerAuth: []
@@ -75172,7 +75378,7 @@ paths:
                     owner: { type: string }
                 stages:
                   type: array
-                  items: { type: string, enum: [technical, describe, classify, extract, propose, profile] }
+                  items: { type: string, enum: [technical, describe, classify, extract, propose, profile, risk] }
                 force:
                   type: boolean
                   description: Run the asked stages again even when they ran on the same bytes.
@@ -75345,7 +75551,9 @@ paths:
         organism or workspace get their shared fingerprint (`auto_profile`, this level's own choice or
         null; `effective` and `from`, workspace, organism or default off). It spends nobody's key by
         itself: a document gets it on the publisher's key, and only when the publisher's own settings
-        run the profile step. Any member who may read the workspace reads it.
+        run the profile step. Any member who may read the workspace reads it. Both answers carry the
+        content risk marks: `risk` (this level's own layer, ContentRiskSettings, or absent/null) and
+        `risk_in_force` (ResolvedContentRisk: what is in force and where each value comes from).
       tags: [ContentClasses]
       security:
         - BearerAuth: []
@@ -75366,10 +75574,15 @@ paths:
       summary: Change your content class settings
       description: >
         A partial patch, merged onto the current settings; an unknown key is refused with its name.
-        Needs memory:write-reserved, because the settings decide what spends your AI key. With
-        `organism_id` (and `ws`) the body is `{ autoProfile: true | false | null }` (null follows the
-        level above), changed by the workspace's creator or an organism creator or admin
-        (403 ACCESS_DENIED otherwise).
+        Needs memory:write-reserved, because the settings decide what spends your AI key. `risk`
+        (ContentRiskSettings) is your own layer of the content risk marks, for your own content and
+        your own AIs' reads; a field set to null follows the layer above, and `locked` is refused (a
+        person's choice is a floor for nobody). With `organism_id` (and `ws`) the body takes
+        `autoProfile: true | false | null` (null follows the level above) and `risk`, the organism's
+        or workspace's layer for its shared spaces, where `locked: true` makes its values a floor;
+        changed by the workspace's creator or an organism creator or admin (403 ACCESS_DENIED otherwise).
+        The node's own layer (default, floors, whether rules+ai may be chosen) is the operator's
+        config, content_risk.*.
       tags: [ContentClasses]
       security:
         - BearerAuth: []
@@ -75396,6 +75609,65 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: A token without memory:write-reserved.
+  /v1/content/risk/held:
+    get:
+      operationId: listHeldContent
+      summary: Marked content held from other people's AIs, which you decide
+      description: >
+        Content marked for possible risks at intake or at a shared write, under a layer whose behaviour
+        is `hold`, is kept from other people's AIs: they get its `content_risk` with `held` and not its
+        content, until the owner (for a person's item) or the workspace's creator or an organism admin
+        (for a workspace's item) releases it. Nothing is changed or deleted. This lists your own held
+        items and those of every workspace you decide for. 404 when content risk marks are off on the node.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`items`: each with `ref` (for the release), `where`, `subject_id`, `since`, `kinds`, `marks` (how many), `written_by` and `point`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Content risk marks are off on this node.
+  /v1/content/risk/release:
+    post:
+      operationId: releaseHeldContent
+      summary: Release one held item to other people's AIs
+      description: >
+        Other people's AIs then get the content, with its marks; the hold of the same content stays
+        released. Needs memory:write-reserved (the account holder in person holds it): an AI that has
+        read the held text must not release it on that text's say.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ref]
+              properties:
+                ref: { type: string, description: 'The ref GET /v1/content/risk/held gave: p:<id> or w:<organism>:<workspace>:<id>.' }
+      responses:
+        '200':
+          description: '`{ ref, released: true, at }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without memory:write-reserved.
+        '404':
+          description: No held item of yours, or of a workspace you decide for, has that ref; or content risk marks are off.
   /v1/content/classes:
     get:
       operationId: listContentClasses
@@ -86016,8 +86288,10 @@ paths:
         data domains. A change in one organism workspace is also the domain
         `workspace:<organismId>/<workspaceId>`, sent only to streams of that organism's members. A
         stream opened for one app emits `event: app` with
-        `data: {"kind":"version","version":N}` or `data: {"kind":"draft"}` instead. `:keepalive`
-        comments every 15s. Response is `text/event-stream`; 503 when the visitor streams are at their cap.
+        `data: {"kind":"version","version":N}` or `data: {"kind":"draft"}` instead. Every 15 s the
+        stream sends the keepalive event `event: alive` with `data: {}` (a named event, not an SSE
+        comment, so a page can listen for it; an EventSource with no `alive` listener ignores it).
+        Response is `text/event-stream`; 503 when the visitor streams are at their cap.
         A signed-in stream ends with `event: revoked` when the node stops honouring the credential
         its ticket was minted with (signed out, agent or app grant removed, account deactivated),
         checked before a change frame and every 60 seconds; mint a new ticket with a live credential

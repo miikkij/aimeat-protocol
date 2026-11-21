@@ -10,8 +10,12 @@
  *
  *   THE NODE DECIDES NOTHING BY A DOMAIN'S ID. Every behaviour comes from the fields: `minLabel`
  *   decides the floor, `dpiaRequired` puts a missing impact assessment in the gap list, and
- *   `externalAi` is read by the AI call path once C3 lands. So a domain can be added here, or later
- *   by the operator, without code. The ids are stable: registers store them.
+ *   `externalAi` is the law row's suggestion that the report compares with the operator's mode. So a
+ *   domain can be added here, or later by the operator, without code. The ids are stable: registers
+ *   store them.
+ *
+ *   WHAT AN OUTSIDE MODEL GETS is the operator's mode per domain (RegulatedAiMode), tightened by a
+ *   register's own `aiMode`; services/compliance/regulated-ai.ts reads both for the content reader.
  *
  *   `minLabel` NAMES A DEFAULT LABEL (services/classification/defaults.ts). A node that retired or
  *   renamed that label reads the floor as missing, and the report says so rather than guessing a
@@ -19,10 +23,15 @@
  *
  *   NOT LEGAL ADVICE. The law references say where to read, and the report serves the same
  *   NOT_LEGAL_ADVICE sentence as the AI Act question set.
- * @structure ComplianceDomain · COMPLIANCE_DOMAINS · complianceDomainById()
+ * @structure ComplianceDomain · COMPLIANCE_DOMAINS · complianceDomainById() · RegulatedAiMode ·
+ *   REGULATED_AI_MODES · stricterAiMode() · parseAiModeEntry() · aiModesOf()
  * @usage
  *   const d = complianceDomainById('health');   // { minLabel: 'erittain-luottamuksellinen', dpiaRequired: true, ... }
+ *   aiModesOf(['health=local'])                 // { health: 'local' }
  * @version-history
+ *   v1.2.0 — 2026-11-21 — The mode drop, between protect and local: identifying details removed.
+ *   v1.1.0 — 2026-11-21 — RegulatedAiMode: what an outside model gets of a domain's content (plan
+ *     doc-mwnnp9xz9814, feature audit item 1.3); externalAi is now the law row's suggestion.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C2.1–C2.12).
  */
 
@@ -36,7 +45,12 @@ export interface ComplianceDomain {
   minLabel: string;
   /** GDPR art. 35: a register with this domain needs a data protection impact assessment. */
   dpiaRequired: boolean;
-  /** Content of this domain reaches only a model on this machine (decision 10.5; enforced from C3). */
+  /**
+   * What the law row suggests for an outside model: 'refused' means only a model on this machine
+   * should read it. It decides nothing by itself: the operator's mode per domain does
+   * (RegulatedAiMode below), and the compliance report suggests `local` for a domain marked here
+   * while its mode is more open.
+   */
   externalAi: 'allowed' | 'refused';
   /** May the content leave its organism (federation, cross-organism sharing). */
   mayLeaveOrganism: boolean;
@@ -140,4 +154,43 @@ export const COMPLIANCE_DOMAINS: readonly ComplianceDomain[] = [
 /** The domain with this id, or undefined. */
 export function complianceDomainById(id: string): ComplianceDomain | undefined {
   return COMPLIANCE_DOMAINS.find(d => d.id === id);
+}
+
+/**
+ * What happens when a model outside this machine reads or gets content of a regulated domain (plan
+ * doc-mwnnp9xz9814, feature audit 2026-11-19 item 1.3). From the most open to the strictest:
+ *   notify   the content goes as before, and each time it goes, a mark is written (the default);
+ *   protect  identifying details are replaced with stable pseudonyms before the content goes;
+ *   drop     identifying details are removed before the content goes, and the rest goes (Jouni,
+ *            2026-11-21: "tiputetaan se tieto pois"); nothing links two records to one person;
+ *   local    only a model on this machine reads it;
+ *   block    no model reads it, a local one neither; a person reads it on their own screen.
+ * An exception made in the Data Wallet opens protect, drop and local for its item. It does not open
+ * block: an attempt with one in force is marked exceptional (Jouni, 2026-11-21).
+ */
+export type RegulatedAiMode = 'notify' | 'protect' | 'drop' | 'local' | 'block';
+export const REGULATED_AI_MODES: readonly RegulatedAiMode[] = ['notify', 'protect', 'drop', 'local', 'block'];
+
+/** The stricter of two modes. */
+export function stricterAiMode(a: RegulatedAiMode, b: RegulatedAiMode): RegulatedAiMode {
+  return REGULATED_AI_MODES.indexOf(a) >= REGULATED_AI_MODES.indexOf(b) ? a : b;
+}
+
+/** One `domain=mode` entry of the operator's setting, when both parts are known. */
+export function parseAiModeEntry(entry: unknown): { domain: string; mode: RegulatedAiMode } | null {
+  if (typeof entry !== 'string') return null;
+  const [domain, mode] = entry.split('=').map(s => s.trim());
+  if (!domain || !complianceDomainById(domain)) return null;
+  const m = REGULATED_AI_MODES.find(x => x === mode);
+  return m ? { domain, mode: m } : null;
+}
+
+/** The operator's mode of each domain from the setting's entries; a domain not named is notify. */
+export function aiModesOf(entries: readonly string[] | undefined): Record<string, RegulatedAiMode> {
+  const out: Record<string, RegulatedAiMode> = {};
+  for (const e of entries ?? []) {
+    const p = parseAiModeEntry(e);
+    if (p) out[p.domain] = p.mode;
+  }
+  return out;
 }

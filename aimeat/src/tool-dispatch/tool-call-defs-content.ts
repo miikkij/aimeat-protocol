@@ -14,6 +14,7 @@
  * @structure contentCliTools
  * @usage import { contentCliTools } from './tool-call-defs-content.js';
  * @version-history
+ *   v1.4.0 — 2026-11-21 — aimeat_content_hold: the held items and their release.
  *   v1.3.0 — 2026-11-03 — aimeat_content_facts forwards prefix and has_profile, aimeat_content_correct
  *     profile, aimeat_content_settings organism_id and ws.
  *   v1.2.0 — 2026-11-02 — aimeat_content_facts forwards with_profile to GET /v1/content/facts.
@@ -166,6 +167,15 @@ export const contentCliTools: ConnectCliToolDefinition[] = [
             const patch = optionalRecord(input, 'patch');
             const path = `/v1/content/settings${query({ organism_id: optionalString(input, 'organism_id'), ws: optionalString(input, 'ws') })}`;
             return patch ? client.put(path, patch) : client.get(path);
+        },
+    },
+    {
+        // → GET /v1/content/risk/held, or POST /v1/content/risk/release { ref }.
+        name: 'aimeat_content_hold',
+        handler: ({ client }, input) => {
+            if (input.action === 'list') return client.get('/v1/content/risk/held');
+            if (input.action === 'release') return client.post('/v1/content/risk/release', { ref: optionalString(input, 'ref') });
+            return Promise.resolve({ ok: false, error: { code: 'INVALID_INPUT', message: 'action is list or release.' } });
         },
     },
 ];

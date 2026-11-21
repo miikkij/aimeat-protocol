@@ -10,6 +10,7 @@
  *   what is hidden from AI; the owner in their own session does.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-owner-loaders.test.ts
  * @version-history
+ *   v1.2.1 — 2026-11-21 — addComment is given the config, its new required argument (content risk marks).
  *   v1.2.0 — 2026-11-04 — The AI reader is an unattended run in alice's data space, not her owner-level
  *     PAT, which is the person since 2026-11-04 (Jouni; codebase analysis 2026-11-03, PAT ruling). The
  *     assertions are unchanged.
@@ -88,8 +89,9 @@ describe('owner-content loaders pass the classification check', () => {
 
   it('comments: a hidden comment is left out and a warning comment carries its warning', async () => {
     const input = { ws: 'ws1', space: 'docs', instanceId: 'd1' };
-    const secret = await addComment(storage, 'o1', ALICE, { ...input, body: 'salary numbers' });
-    const conf = await addComment(storage, 'o1', ALICE, { ...input, body: 'draft wording' });
+    // addComment takes the config for the content risk marks' shared-write point (services/organism/comments.ts).
+    const secret = await addComment(storage, 'o1', ALICE, { ...input, body: 'salary numbers' }, config);
+    const conf = await addComment(storage, 'o1', ALICE, { ...input, body: 'draft wording' }, config);
     const prefix = 'organism.o1.w.ws1.meta.comments.docs~d1.';
     await label(memoryTarget(ALICE, `${prefix}${secret.id}`), HIDDEN);
     await label(memoryTarget(ALICE, `${prefix}${conf.id}`), WARNING);

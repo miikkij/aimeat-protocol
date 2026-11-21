@@ -1368,6 +1368,39 @@
       },
       "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl): loadItem reads the item and passes it through the caller's classification reader (reader.show) before anything is read from it, and every model step asks reader.useForAi first; the bytes of a file are loaded only after show admitted its record."
     },
+    "src/services/content/risk-core.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Written 2026-11-21 (content risk marks), the node's own read: an organism's and a workspace's content risk settings layer (organism.<org>[.w.<ws>].meta.contentclass, held by system@<node>). No content of an item."
+    },
+    "src/services/content/risk-erasure.ts": {
+      "reads": {
+        "listAllMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Written 2026-11-21 (content risk marks), the node's own read during an account erasure: every person's contentclass.risk record and the meta.contentrisk records of the workspaces of the erased person's organisms, to give the pseudonym to the entries naming them. The entries hold no words of any content, and nothing is shown to anyone."
+    },
+    "src/services/content/risk-intake.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getStorageFileMeta": 1,
+        "getStorageFile": 1
+      },
+      "why": "Written 2026-11-21 (content risk marks), the node's own read: the item that was just stored at the intake or shared-write point, read once to find its marks with rules (no model). Nothing from it is shown to anyone here: the marks keep no words of it (risk-store.ts), the model part asks the classification's useForAi first (risk-core.ts modelMayRead), and a reader later gets the marks beside content its own read path passed through its classification reader."
+    },
+    "src/services/content/risk-keys.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Written 2026-11-21 (content risk marks), the node's own read: whether a person's contentclass.risk or a workspace's meta.contentrisk record exists before one entry is removed from it. The entries hold no words of any content."
+    },
+    "src/services/content/risk-store.ts": {
+      "reads": {
+        "getMemory": 4
+      },
+      "why": "Written 2026-11-21 (content risk marks), the node's own read: the content risk marks of an item (the risk field of the owner's contentclass.facts shard, a person's contentclass.risk, a workspace's meta.contentrisk held by system@<node>). The marks hold no words of the content; a reader gets them only beside content its own read path passed through its classification reader (risk-read.ts)."
+    },
     "src/services/content/scan.ts": {
       "reads": {
         "listStorageFilesForOwners": 1,

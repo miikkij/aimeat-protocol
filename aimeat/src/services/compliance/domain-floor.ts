@@ -19,7 +19,7 @@
  *   WHICH CONTAINERS. The ones a register names in `containers`. A register of an app scope with
  *   none names the app itself. A register of the node or an organism with a domain and no container
  *   raises nothing, and the report says the register names no container.
- * @structure FloorOutcome · domainFloorOf() · containersOfRegister() · applyDomainFloors()
+ * @structure FloorOutcome · containerInScope() · domainFloorOf() · containersOfRegister() · applyDomainFloors()
  * @usage const outcomes = await applyDomainFloors({ storage, config }, scope, registers);
  * @version-history
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C2, decision 10.7).
@@ -29,6 +29,8 @@
  *     organism or one the register's keeper creates or administers; any other is reported
  *     'not-in-scope', with nothing read or written (secaudit2026oct26,
  *     compliance-docs:register-containers-not-bound-to-scope).
+ *   v1.2.0 — 2026-11-21 — containerInScope() is exported: the regulated-domain index (regulated-ai.ts)
+ *     names only the containers a register may move (feature audit item 1.3).
  *   v1.1.1 — 2026-11-05 — Moved unchanged from src/services/compliance-domain-floor.ts to src/services/compliance/domain-floor.ts (codebase analysis 2026-11-03, item D-h).
  */
 import type { ContentLabelTarget } from '../../storage/interface.js';
@@ -61,7 +63,7 @@ export interface FloorOutcome {
  * one the register's keeper creates or administers: the writer named in `keeperName`, or for an app's
  * register its owner. Anything else is someone else's organism (secaudit2026oct26).
  */
-async function containerInScope(
+export async function containerInScope(
   storage: ClassificationDeps['storage'], scope: ComplianceScope, named: FloorOutcome['container'], keeperName: string | undefined,
 ): Promise<boolean> {
   if (named.kind === 'app' || scope.kind === 'node') return true;

@@ -21,6 +21,8 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-11-21 — GET /v1/messages/agent-inbox and /agent-thread carry each message's content_risk, and
+ *     leave a held message's words out (services/content/risk-read.ts).
  *   2026-11-19 — GET /v1/messages/broadcast/:id also answers an agent holding messages:read about a
  *     broadcast it sent itself, through broadcastSummary (services/message/broadcast.ts), which
  *     aimeat_dm_broadcast_summary reads too (feature audit 2026-11-19, 4.4 item 5).
@@ -154,6 +156,7 @@ import { ClassificationError } from '../services/classification/labels.js';
 import { aiCallerOf } from './ai-policy.js';
 import { checkInteractiveAnswers } from '../services/interactive-answers.js';
 import { teamAgentGate } from '../services/team/action-gate.js';
+import { riskForRead, messageRiskItems, withRisk } from '../services/content/risk-read.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -576,7 +579,10 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const { messages, total } = await readAgentDmInbox(storage, agentGhii, { page, perPage });
     // Each message carries its record: a private message's record resolves for nobody but its
     // owner at /v1/provenance/:id, so the reading agent learns how it was made here (aiprov D6).
-    res.json(success(config.nodeId, { messages: await withMessageProvenance(storage, messages, config), total, page, per_page: perPage }));
+    // And its content risk marks; a held one's words are left out (services/content/risk-read.ts).
+    const rr = await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage), messageRiskItems(messages));
+    const shown = (await withMessageProvenance(storage, messages, config)).map((m, i) => withRisk(m as unknown as Record<string, unknown>, rr.items[i] ?? null, ['subject', 'body', 'attachments', 'interactive']));
+    res.json(success(config.nodeId, { ...(rr.warning ? { content_risk_warning: rr.warning } : {}), messages: shown, total, page, per_page: perPage }));
   });
 
   /* ── GET /v1/messages/agent-thread/:conversationId — full DM thread as the calling agent sees it ── */
@@ -587,7 +593,9 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
     // The owner's rows that do not involve this agent need messages:read-as-owner (secaudit2026oct26).
     const { messages, total, ownerMessagesWithheld } = await readAgentDmThread(storage, agentGhii, conversationId, { page, perPage }, mailboxReaderOf(req.auth!, config.nodeId)?.kind === 'delegate');
-    res.json(success(config.nodeId, { messages: await withMessageProvenance(storage, messages, config), total, page, per_page: perPage,
+    const rr = await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage), messageRiskItems(messages));
+    const shown = (await withMessageProvenance(storage, messages, config)).map((m, i) => withRisk(m as unknown as Record<string, unknown>, rr.items[i] ?? null, ['subject', 'body', 'attachments', 'interactive']));
+    res.json(success(config.nodeId, { ...(rr.warning ? { content_risk_warning: rr.warning } : {}), messages: shown, total, page, per_page: perPage,
       ...withheldOwnerMessagesFields(config.baseUrl, agentGhii, 'GET /v1/messages/agent-thread', ownerMessagesWithheld) }));
   });
 

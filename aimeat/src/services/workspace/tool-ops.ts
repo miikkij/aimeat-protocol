@@ -32,6 +32,10 @@
  * @version-history
  *   2026-11-21 — A batch open names `ambiguous`: an id asked without `space` that records of more than
  *     one space carry, with the spaces and the one that answered (the first, as before).
+ *   2026-11-21 — readWorkspaceOp's index carries manifest_version, the stored manifest's version that
+ *     aimeat_workspace_update takes back as expected_version.
+ *   2026-11-21 — readWorkspaceOp's opened items carry content_risk to an AI reader, and a held item's
+ *     value and draft are left out (services/content/risk-read.ts).
  *   2026-11-20 — readWorkspaceOp's index carries the organism's and the workspace's directive for a
  *     member (services/organism/directives.ts); a batch open does not, so it reads only what it opens.
  *   2026-11-20 — readWorkspaceOp records each record it opens by id for the value signals (services/value/signal-buffer.ts).
@@ -170,6 +174,8 @@ import { directValueProvenance, type DeclarationParser } from './direct-provenan
 import { instanceFromKey, recordAt, isNodeReservedWorkspaceKey } from './record-key.js';
 import { logger } from '../../utils/logger.js';
 import { normalizeHtmlPageValue, isHtmlPageValue, schemaViewOfDocument } from '../html-page.js';
+import { riskForRead, riskReaderOf, withRisk } from '../content/risk-read.js';
+import { contentRiskTextOf } from '../content/risk-intake.js';
 import { isPageStale } from './opened.js';
 import { directiveFields } from '../organism/directives.js';
 
@@ -312,8 +318,9 @@ export async function readWorkspaceOp(
         const whole = new Map(opened.map(r => [`${r.ownerGaii}\u0000${r.key}`, r]));
         const wholeOf = (r: MemoryRecord | undefined) => (r ? whole.get(`${r.ownerGaii}\u0000${r.key}`) : undefined);
         const provFor = await readProvenanceMany(storage, config, opened.map(r => r.aiProvenanceId));
-        const found: unknown[] = [];
+        const found: Array<Record<string, unknown>> = [];
         const missing: string[] = [];
+        const shown: MemoryRecord[] = [];
         for (const { asked, hit } of asks) {
             const latest = wholeOf(hit?.slot.latest);
             const draft = wholeOf(hit?.slot.draft);
@@ -321,6 +328,7 @@ export async function readWorkspaceOp(
             if (!hit || !cur) { missing.push(asked); continue; }
             // A reader other than the maker opened an AI-made record: a use (services/value/signal-buffer.ts).
             recordValueRead({ ownerGaii: cur.ownerGaii, key: cur.key, readerPrincipal: caller.principal });
+            shown.push(cur);
             found.push({
                 space: hit.name, id: hit.id, value: cur.value,
                 published: !!latest, _version: cur.version, _createdAt: cur.createdAt, _updatedAt: cur.updatedAt,
@@ -331,7 +339,11 @@ export async function readWorkspaceOp(
                 ...warningFieldSnake(cur),
             });
         }
-        return { ok: true, data: { organism_id: organismId, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}),
+        // The content risk marks travel with each item to an AI reader; a held item's value and draft
+        // are not in this answer (services/content/risk-read.ts).
+        const rr = await riskForRead(deps, riskReaderOf(caller), shown.map(r => ({ subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value) })));
+        const items = found.map((it, i) => withRisk(it, rr.items[i] ?? null, ['value', 'draft']));
+        return { ok: true, data: { ...(rr.warning ? { content_risk_warning: rr.warning } : {}), organism_id: organismId, ws, mode: 'content', items, ...(missing.length ? { missing } : {}),
             ...(ambiguous.length ? { ambiguous, ambiguous_note: 'These ids are records of more than one space; each was answered from the first space. Pass `space` to read another.' } : {}),
             ...(got.truncated ? { truncated: true } : {}),
             ...(args.reader.warnings.length ? { classification_warnings: args.reader.warnings } : {}) } };
@@ -367,7 +379,11 @@ export async function readWorkspaceOp(
     for (const [name, s] of Object.entries(rowSpaces)) counts[name] = s.rows;
     const schemas = await readWorkspaceSchemas(storage, organismId, ws);
 
-    return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest, apps, rules, counts, index,
+    return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest,
+        // The stored manifest record's version, which aimeat_workspace_update takes back as
+        // expected_version (not the manifest's own manifestVersion field, its format version).
+        manifest_version: manRec.version,
+        apps, rules, counts, index,
         // What the organism's creators ask a member's AI to do here (services/organism/directives.ts).
         // On the index only: a batch open reads nothing but the records it opens (C7), and the AI
         // reads the index before it opens records.

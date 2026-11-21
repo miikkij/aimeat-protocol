@@ -12,6 +12,7 @@
  * @structure registerCoreBoardTools(mcp, deps, caller)
  * @usage registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
  * @version-history
+ *   2026-11-21 — aimeat_board_read carries each post's content_risk and leaves a held post's words out.
  *   2026-11-13 — aimeat_board_read calls services/boards/posts-page.ts, the board read, the gate and
  *     the page GET /v1/boards/:boardId/posts runs (structure programme 2026-11, unit 2b).
  *   2026-11-13 — aimeat_board_post hands ttl_hours to createBoardPost, as the route does (unit 3b).
@@ -41,6 +42,7 @@ import { boardPostsPage } from '../services/boards/posts-page.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import { riskForRead, boardRiskItems, withRisk } from '../services/content/risk-read.js';
 
 export function registerCoreBoardTools(
   mcp: McpServer,
@@ -75,7 +77,10 @@ mcp.registerTool(
         // TARGET-058: an agent asked to summarise a board has to be able to say which posts a
         // model wrote. One query for the page — see readProvenanceMany's N+1 note.
         const provFor = await readProvenanceMany(storage, config, posts.map(p => p.aiProvenanceId));
-        return jsonContent(shapeResponse('aimeat_board_read', response_format, posts.map(p => ({
+        // The content risk marks travel with each post, each with its own warning line; a held post's
+        // words are left out (services/content/risk-read.ts).
+        const rr = await riskForRead({ storage, config }, caller(), boardRiskItems(read.board, posts));
+        return jsonContent(shapeResponse('aimeat_board_read', response_format, posts.map((p, i) => withRisk({
             id: p.id,
             author_gaii: p.authorGaii,
             title: p.title,
@@ -86,7 +91,7 @@ mcp.registerTool(
             ttl_expires_at: p.ttlExpiresAt,
             created_at: p.createdAt,
             ...provFor(p.aiProvenanceId),
-        }))));
+        } as Record<string, unknown>, rr.items[i] ?? null, ['title', 'body']))));
     },
 );
 

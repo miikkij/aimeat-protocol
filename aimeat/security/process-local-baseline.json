@@ -45,6 +45,34 @@
       "count": 1,
       "reason": "This process's own count writes in flight, so its next request from one address reads its own last outcome; the count itself is in the EphemeralClaim table, which every process sees."
     },
+    "src/services/classification/pseudonymise.ts :: let :: cached": {
+      "count": 1,
+      "reason": "The server's pseudonym key, read once from its record under system@<node>; every process reads the same record, so a second process gets the same key."
+    },
+    "src/services/classification/regulated-gate.ts :: let :: source": {
+      "count": 1,
+      "reason": "The function that answers which content is regulated, set once at start by every process that serves reads (server-bootstrap/process-buffers.ts)."
+    },
+    "src/services/classification/regulated-gate.ts :: let :: saidMissing": {
+      "count": 1,
+      "reason": "Whether this process has logged once that no regulated-domain source is set; a log line per process."
+    },
+    "src/services/compliance/regulated-ai.ts :: let :: index": {
+      "count": 1,
+      "reason": "A view derived from the stored registers; each process builds its own and drops it on the 'compliance' change event, which the bus carries to every process, and after five minutes."
+    },
+    "src/services/compliance/regulated-ai.ts :: let :: building": {
+      "count": 1,
+      "reason": "This process's build of the index in progress, so its concurrent readers wait for one read of the registers."
+    },
+    "src/services/compliance/regulated-ai.ts :: let :: listening": {
+      "count": 1,
+      "reason": "Whether this process listens for the change event yet; each process listens for itself."
+    },
+    "src/services/compliance/regulated-ai.ts :: let :: generation": {
+      "count": 1,
+      "reason": "Counts this process's drops of its own index, so a build that started before a drop does not keep its result."
+    },
     "src/services/classification/audit.ts :: let :: soonTimer": {
       "count": 1,
       "reason": "The timer that writes this process's own buffered audit rows within 1 s; no other process reads it."
@@ -1812,6 +1840,26 @@
     "src/services/site.ts :: let :: nodeSite": {
       "count": 1,
       "reason": "the SiteService of this process; a second process has its own front-page cache, so a page stored there is served here until siteCacheTtlSeconds runs out"
+    },
+    "src/services/content/risk-core.ts :: map :: noticeWindow": {
+      "count": 1,
+      "reason": "Each process counts its own content risk notices per recipient, so N active processes allow N times the hourly limit; one active process plus a standby keeps it."
+    },
+    "src/services/content/risk-intake.ts :: map :: perHome": {
+      "count": 1,
+      "reason": "The content risk queue of the process that took the write, as content/intake.ts keeps its own; its items are marked there, and a read still carries the rules' marks when that process stops first."
+    },
+    "src/services/content/risk-intake.ts :: let :: worker": {
+      "count": 1,
+      "reason": "The worker of this process's own content risk queue."
+    },
+    "src/services/content/risk-intake.ts :: let :: dropped": {
+      "count": 1,
+      "reason": "How many items this process left unmarked, for its own log line."
+    },
+    "src/services/content/risk-read.ts :: map :: cache": {
+      "count": 1,
+      "reason": "The rules' marks for a hash are the same in every process; a second process computes its own once."
     }
   }
 }

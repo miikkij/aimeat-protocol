@@ -9,6 +9,7 @@
  * @structure registerConnectionFileTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerConnectionFileTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   v1.2.0 — 2026-11-21 — aimeat_files_get as text carries content_risk (services/content/risk-read.ts).
  *   v1.1.0 — 2026-11-02 — aimeat_files_get as 'store' hands the session's caller to the storage write
  *     (secaudit2026nov02d round 13, drive-files.ts:storeDriveFile:company-page-key-unfenced-no-page-writer).
  *   v1.0.0 — 2026-11-02 — Initial (wish-sharepoint-liitin-tiedostot-luettaviksi-ja-kirjoitettaviksi-).
@@ -22,6 +23,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { riskForRead } from '../services/content/risk-read.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { buildOutboundProviders } from '../services/connections/providers.js';
 import { requireEncryptionKey } from '../services/connections/credential.js';
@@ -96,7 +98,9 @@ export function registerConnectionFileTools(
             }
             const out = await driveFileText(opened.ctx, opened.id, { drive_id, item_id });
             if (!out.ok) return toolError(out.code, out.message);
-            return ok({ text: out.text, ...(out.note ? { note: out.note } : {}), source: out.source });
+            // A drive file is content from outside, read live: its content risk marks travel with it.
+            const [risk] = (await riskForRead({ storage, config }, caller(), [{ subject: { kind: 'external', owner: caller().ownerGhii, ref: `${opened.id}:${out.source.item_id}` }, text: out.text }])).items;
+            return ok({ ...(risk?.warning ? { content_risk_warning: risk.warning } : {}), text: out.text, ...(out.note ? { note: out.note } : {}), source: out.source, ...(risk ? { content_risk: risk } : {}) });
         });
 
     mcp.registerTool('aimeat_files_write', { description: descriptionFor('aimeat_files_write'),

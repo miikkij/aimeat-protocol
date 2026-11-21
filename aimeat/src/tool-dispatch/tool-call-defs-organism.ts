@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — aimeat_workspace_update forwards expected_version (the manifest version lock).
  *   2026-11-19 — aimeat_workspace_share forwards ics_key through shareBodyFromToolInput.
  *   2026-11-15 — aimeat_organism_import forwards preview, people and team (team setup T12).
  *   2026-11-13 — aimeat_workspace_read forwards archived=only to .../workspace/index (unit 3b).
@@ -541,6 +542,8 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const apps = coerceObject(input.apps); if (Array.isArray(apps)) body.apps = apps;
             const memberChanges = optionalString(input, 'member_changes'); if (memberChanges !== undefined) body.member_changes = memberChanges;
             if (Object.keys(body).length === 0) throw new Error('Provide a name, readme, add_spaces, manifest, schemas, apps and/or member_changes.');
+            // Added after the check above: a version alone changes nothing, so it does not count as a change.
+            const expected = optionalNumber(input, 'expected_version'); if (expected !== undefined) body.expected_version = expected;
             return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({ ws: requiredString(input, 'ws') })}`, body);
         },
     },

@@ -29,6 +29,8 @@
  *   const refused = requestLooseningRefusal(caller, config, changes);
  *   if (refused) return { status: refused.status, code: refused.code, message: refused.message };
  * @version-history
+ *   v1.1.0 — 2026-11-21 — A row may judge a change itself (`loosens`), for a list setting whose entries
+ *     each have an order (compliance.regulated_ai_modes, feature audit item 1.3).
  *   v1.0.0 — 2026-11-04 — Initial: the rule moved from config-admin-view.ts, sign-in-policy.ts,
  *     mcp-client/capability-use-setting.ts and classification/switch.ts onto the setting's row
  *     (codebase analysis 2026-11-03, item B4).
@@ -57,7 +59,9 @@ export function tightenOnlyOf(path: string): TightenOnly | undefined {
 
 /** Whether moving the setting from `from` to `to` makes it less strict. False for a value outside its order. */
 export function settingLoosens(path: string, from: unknown, to: unknown): boolean {
-  const order = tightenOnlyOf(path)?.order;
+  const rule = tightenOnlyOf(path);
+  if (rule?.loosens) return rule.loosens(from, to);
+  const order = rule?.order;
   if (!order) return false;
   const a = typeof from === 'string' ? order.indexOf(from) : -1;
   const b = typeof to === 'string' ? order.indexOf(to) : -1;

@@ -26,6 +26,7 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-11-21 — aimeat_mail_read and aimeat_mail_search carry content_risk (services/content/risk-read.ts).
  *   2026-11-13 — aimeat_mail_send hands template_id, variables, invoice_id, from_name, company_id and
  *     links to sendOutbound, as POST /v1/outbound/send does (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -84,6 +85,8 @@ import { sendOutbound, OutboundError } from '../services/outbound/outbound-servi
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { listPublishHistory, repliesForAttempt } from '../services/connections/history.js';
 import { toolError } from './tool-error.js';
+import { riskForRead } from '../services/content/risk-read.js';
+import { contentRiskTextOf } from '../services/content/risk-intake.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -247,7 +250,11 @@ export function registerConnectionTools(
         if (!conn) return unreadable(connectionId, 'NOT_FOUND: no such connection of yours.');
         const out = await readResource(c, conn.id, resource, params);
         if (!out.ok) return fail(`${out.code}: ${out.message}`);
-        return ok({ provider: out.provider, resource: out.resource, data: out.data });
+        // Mail is content from outside, read live: its content risk marks travel with it
+        // (services/content/risk-read.ts).
+        const reader = { inPerson: false, principal: principal(), ownerGhii: ownerGhiiOf(principal()) };
+        const [risk] = (await riskForRead({ storage, config }, reader, [{ subject: { kind: 'external', owner: reader.ownerGhii, ref: `${conn.id}:${resource}` }, text: contentRiskTextOf(out.data) }])).items;
+        return ok({ ...(risk?.warning ? { content_risk_warning: risk.warning } : {}), provider: out.provider, resource: out.resource, data: out.data, ...(risk ? { content_risk: risk } : {}) });
     };
 
     /** The `store: true` branch of aimeat_mail_read: the same service POST /read/attachment calls. */

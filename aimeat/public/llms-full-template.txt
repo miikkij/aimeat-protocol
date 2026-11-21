@@ -1896,7 +1896,7 @@ POST {{BASE_URL}}/v1/events/ticket — Get SSE connection ticket
 GET {{BASE_URL}}/v1/events?ticket=<ticket> — SSE event stream
   → 200: text/event-stream (continuous)
   Events: data: {"type": "memory_changed", ...}\n\n
-  Keepalive: :keepalive\n\n (every 30s)
+  Keepalive: event: alive\ndata: {}\n\n (every 15s; a named event, not a comment)
 
 #### Rules
 - Ticket is single-use and valid for 30 seconds

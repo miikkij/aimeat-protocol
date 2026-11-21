@@ -23,6 +23,8 @@
  * @version-history
  *   2026-11-21 — A restore of an app tool manifest that binds an action marked `decision: person` is
  *     refused 422 PERSON_DECIDES, as the write refuses it (services/app-tools/decision-binding.ts).
+ *   2026-11-21 — Delete and restore tell the namespace principal's MCP listen streams that the key
+ *     list changed (emitResourceListChanged); neither did, on any door.
  *   2026-11-19 — A customer due diligence record (kyc.org.*) is refused on delete and restore, for every caller: only the retention purge removes it (AMLR art. 77).
  *   2026-11-15 — deleteMemoryRecord asks the team approval gate last (services/team/action-gate.ts,
  *     team setup T7): an AI's delete in a team's workspaces waits for a lead.
@@ -91,6 +93,8 @@ const KYC_RETAINED_MESSAGE = 'A customer due diligence record is kept by the ant
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { emitRecordChange } from '../event-bus.js';
+import { emitResourceListChanged } from '../resource-events.js';
+import { logger } from '../../utils/logger.js';
 import { checkDeleteGuard, getNamespacePolicy, parseWorkspaceRecordKey } from '../write-guards.js';
 import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { isServiceOwnedKey, isOwnerRemovableServiceKey, isReservedServerKey, serverWrittenKeyRefusal, appMayWriteKey } from '../../utils/reserved-keys.js';
@@ -384,6 +388,9 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
   // of its doors told the screen anything. A record only its owner read is told to that owner's
   // streams alone (event-bus.ts emitRecordChange).
   emitRecordChange('memory', found, visibility);
+  // And the MCP listen streams of the namespace's own principal: a key left the list. A listener that
+  // throws must not fail a delete that is already done.
+  notifyListChanged(found);
   // A delete is a hand on the key, and GET /v1/memory/:key/hands reports `deletes` from this tally.
   // Only the extension delete recorded one, so the count stayed 0 for every delete made over REST
   // or MCP (feature-list audit #50).
@@ -525,5 +532,11 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
     };
   }
   emitRecordChange('memory', found, level ?? visibility);
+  notifyListChanged(found);
   return { ok: true, key: req.key, ownerGaii: found, restorableUntil: null, graceDays: deps.config.memoryDeleteGraceDays };
+}
+
+/** The MCP listen streams of `principal` hear that its key list changed; a listener's failure is logged, never thrown. */
+function notifyListChanged(principal: string): void {
+  try { emitResourceListChanged(principal); } catch (err) { logger.warn('memory bin: an MCP change notification failed, the change stands', { error: String(err) }); }
 }

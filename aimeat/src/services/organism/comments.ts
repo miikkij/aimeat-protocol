@@ -14,6 +14,8 @@
  *   - addComment(...) / listComments(storage, reader, ...) -- create + read a target's thread
  *   - deleteComment(...) -- author or creator/admin removes one comment
  * @version-history
+ *   v1.5.0 -- 2026-11-21 -- addComment() takes the config and hands the comment to the content risk
+ *     marks' shared-write point; deleteComment() removes the comment's marks.
  *   v1.4.0 -- 2026-10-08 -- addComment() and listComments() return each comment's `aiProvenanceId`,
  *     read from its row, so a reader of a thread can resolve how a comment was made (aiprov E8).
  *   v1.3.0 -- 2026-09-30 -- deleteComment(): moved out of the DELETE route so the new MCP tool
@@ -35,6 +37,8 @@ import { memoryTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
 import { classificationWarningOf } from '../classification/present-memory.js';
 import { isOrganismOwner } from './ownership.js';
+import { contentRiskAfterWrite } from '../content/risk-intake.js';
+import { dropWorkspaceRiskEntry } from '../content/risk-keys.js';
 
 export interface CommentAnchor { section?: string; quote?: string }
 export interface WorkspaceComment {
@@ -78,6 +82,8 @@ export async function addComment(
     /** TARGET-058: the provenance record describing this comment's body. Absent means UNSTATED. */
     aiProvenanceId?: string;
   },
+  /** For the content risk marks of a comment someone other than the workspace's owner writes. */
+  config: AimeatConfig,
 ): Promise<WorkspaceComment> {
   const commentId = randomUUID();
   const now = new Date().toISOString();
@@ -86,12 +92,16 @@ export async function addComment(
     anchor: normaliseAnchor(input.anchor), author, body: input.body.slice(0, 10000),
     parentId: typeof input.parentId === 'string' ? input.parentId : null, createdAt: now,
   };
+  const key = `${commentPrefix(organismId, input.ws, input.space, input.instanceId)}${commentId}`;
   await storage.setMemory({
-    key: `${commentPrefix(organismId, input.ws, input.space, input.instanceId)}${commentId}`,
-    ownerGaii: author, value: comment, visibility: 'private', tags: ['comment'],
+    key, ownerGaii: author, value: comment, visibility: 'private', tags: ['comment'],
     ...(input.aiProvenanceId ? { aiProvenanceId: input.aiProvenanceId } : {}),
     ttlHours: null, version: 1, createdAt: now, updatedAt: now,
   });
+  // A shared write: the comment's risk marks, when its author is not the workspace's owner
+  // (content/risk-intake.ts decides that, off this call).
+  contentRiskAfterWrite({ storage, config }, { kind: 'comment', org: organismId, ws: input.ws, key },
+    { point: 'shared-write', writer: author, text: comment.body });
   return { ...comment, aiProvenanceId: input.aiProvenanceId ?? null };
 }
 
@@ -125,6 +135,8 @@ export async function deleteComment(
     return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the comment author or an organism admin can delete it' };
   }
   await storage.deleteMemory(rec.ownerGaii, key);
+  // The comment's risk marks go with it (content/risk-keys.ts).
+  await dropWorkspaceRiskEntry(storage, config.nodeId, organism.id, target.ws, `comment:${key}`);
   return { ok: true };
 }
 

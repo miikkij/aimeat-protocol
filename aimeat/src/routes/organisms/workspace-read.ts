@@ -6,6 +6,10 @@
  *   OKF overviews, structure graphs, dangling-refs scan, structure timeline, content search, and the
  *   comments/threads endpoints. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — GET /v1/organisms/:id/overview answers the organism's own `objectives` beside the
+ *     Markdown, which now opens with them (services/structure/overview.ts).
+ *   2026-11-21 — POST /comments hands the config to addComment (content risk marks at the shared-write
+ *     point); GET /comments carries each comment's content_risk to an AI reader.
  *   2026-11-13 — GET /v1/organisms/:id/overview and GET /v1/organisms/:id/search ask
  *     services/organism-read/member.ts, the organism read and the membership rule
  *     aimeat_organism_overview and aimeat_organism_search ask; POST, GET and DELETE /:id/comments ask
@@ -83,7 +87,8 @@ import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js'
 import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism/search.js';
 import { scanOrganismDanglingRefs } from '../../services/dangling-refs.js';
-import { canAccessWorkspaceComments, addComment, listComments, type WorkspaceComment } from '../../services/organism/comments.js';
+import { canAccessWorkspaceComments, addComment, listComments, commentPrefix, type WorkspaceComment } from '../../services/organism/comments.js';
+import { riskForRead, commentRiskItems, withRisk } from '../../services/content/risk-read.js';
 import { commentWorkspace, deleteCommentIn } from '../../services/organism-read/comments.js';
 import { buildOrganismOverview, buildWorkspaceOverview, listWorkspaces, collectWorkspaceSummary } from '../../services/structure/overview.js';
 import { buildInstructionBlocks } from '../../services/hello-mcp.js';
@@ -102,6 +107,7 @@ import { classificationWarningOf } from '../../services/classification/present-m
 import { logger } from '../../utils/logger.js';
 import { readOpened } from '../../services/workspace/opened.js';
 import { organismMemberGate } from '../../services/organism-read/member.js';
+import { callerOf } from '../../middleware/caller.js';
 
 export function registerOrganismWorkspaceReadRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/workspace — Manifest-driven workspace read ──
@@ -316,9 +322,11 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
     const includeArchived = req.query.includeArchived === 'true';
-    const { markdown, workspaces, archivedWorkspaces } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii, includeArchived, reader: readerFor({ storage, config }, req.auth) });
+    const { markdown, workspaces, archivedWorkspaces, objectives } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii, includeArchived, reader: readerFor({ storage, config }, req.auth) });
     if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
-    res.json(success(config.nodeId, { markdown, workspaces, archivedWorkspaces }, [
+    // `objectives` are the organism's own (its manifest), with their KPIs resolved as the workspace
+    // overview resolves a workspace's, so a consumer reads the direction without parsing Markdown.
+    res.json(success(config.nodeId, { markdown, workspaces, archivedWorkspaces, objectives }, [
       { description: 'Drill into one workspace', method: 'GET', url: `/v1/organisms/${id}/workspace/overview?ws=<ws>` },
       ...(archivedWorkspaces && !includeArchived ? [{ description: 'Include archived workspaces', method: 'GET', url: `/v1/organisms/${id}/overview?includeArchived=true` }] : []),
     ]));
@@ -585,7 +593,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       if (err instanceof ProvenanceScopeError) { res.status(403).json(error(config.nodeId, err.code, err.message)); return; }
       throw err;
     }
-    const comment = await addComment(storage, id, callerGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id, aiProvenanceId });
+    const comment = await addComment(storage, id, callerGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id, aiProvenanceId }, config);
     emitChange('organisms');
     res.status(201).json(success(config.nodeId, {
       comment, ai_provenance_id: aiProvenanceId ?? null,
@@ -611,8 +619,12 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You cannot read this workspace'));
       return;
     }
-    const comments = await listComments(storage, readerFor({ storage, config }, req.auth), id, ws, space, instanceId);
-    res.json(success(config.nodeId, { comments, total: comments.length }));
+    const listed = await listComments(storage, readerFor({ storage, config }, req.auth), id, ws, space, instanceId);
+    // The content risk marks travel with each comment to an AI reader; a held one's body is left out
+    // (services/content/risk-read.ts).
+    const rr = await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage), commentRiskItems(id, ws, commentPrefix(id, ws, space, instanceId), listed));
+    const comments = listed.map((c, i) => withRisk(c as unknown as Record<string, unknown>, rr.items[i] ?? null, ['body']));
+    res.json(success(config.nodeId, { ...(rr.warning ? { content_risk_warning: rr.warning } : {}), comments, total: comments.length }));
   });
 
   /* ── POST /v1/organisms/:id/comments/batch — comments (or counts) for MANY (ws,space,instance)

@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-21 — aimeat_memory_read carries content_risk (and content_risk_warning) beside the value, and
+ *     withholds a value held from this reader (services/content/risk-read.ts).
  *   2026-11-20 — aimeat_memory_read records the open for the value signals (services/value/signal-buffer.ts).
  *   2026-11-14 — aimeat_agent_profile reads through agentProfileNow (services/agent/profile-read.ts), as
  *     GET /v1/agents/:gaii does: the trust score is computed now and stored, not the stored one (unit 2b, B4).
@@ -244,6 +246,8 @@ import { presentActionPricing } from '../services/action-pacing.js';
 import { memoryVisibilityDefault } from '../services/content-defaults.js';
 import { invitesPeople } from '../services/agent/invites.js';
 import { avatarView, readAvatarsOrEmpty } from '../services/agent/avatar.js';
+import { riskForRead } from '../services/content/risk-read.js';
+import { contentRiskTextOf } from '../services/content/risk-intake.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -524,9 +528,13 @@ export function registerCoreTools(
             }
             // A reader other than the maker opened an AI-made record: a use (services/value/signal-buffer.ts).
             recordValueRead({ ownerGaii: record.ownerGaii, key: record.key, readerPrincipal: agentGaii });
+            // The content risk marks travel with the value; a held value is not in this answer
+            // (services/content/risk-read.ts).
+            const [risk] = (await riskForRead({ storage, config }, caller(), [{ subject: { kind: 'memory', owner: record.ownerGaii, key: record.key }, text: contentRiskTextOf(record.value) }])).items;
             return structuredResult('aimeat_memory_read', response_format, {
+                ...(risk?.warning ? { content_risk_warning: risk.warning } : {}),
                 key: record.key,
-                value: record.value,
+                value: risk?.held ? null : record.value,
                 visibility: record.visibility,
                 tags: record.tags,
                 version: record.version,
@@ -538,6 +546,7 @@ export function registerCoreTools(
                 ...(await readProvenance(storage, config, record.aiProvenanceId)),
                 // TARGET-082 V4: a warning-classified value travels with its warning.
                 ...(classificationWarningOf(record) ? { classification_warning: classificationWarningOf(record) } : {}),
+                ...(risk ? { content_risk: risk } : {}),
             });
         },
     );

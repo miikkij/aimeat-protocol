@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-21 — aimeat_workspace_update takes expected_version: a stale manifest version answers
+ *     VERSION_CONFLICT, the refusal PUT /v1/organisms/:id/workspace answers 409.
  *   2026-11-19 — aimeat_workspace_share takes ics_key, the calendar feed key of the same share route.
  *   2026-11-15 — aimeat_workspace_object_delete asks the workspace write rule (checkOrganismNamespaceAccess,
  *     'write', on the record key) as aimeat_workspace_write and DELETE /v1/memory/:key do: a member
@@ -541,7 +543,7 @@ export function registerWorkspaceTools(
     mcp.registerTool('aimeat_workspace_update', { description: descriptionFor('aimeat_workspace_update'),
         inputSchema: zodShapeFor('aimeat_workspace_update'),
         annotations: annotationsFor('aimeat_workspace_update') },
-        async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas, apps, member_changes }): Promise<TextResult> => {
+        async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas, apps, member_changes, expected_version }): Promise<TextResult> => {
             const role = await roleOf(organism_id);
             if (!role) return fail('You are not a member of this organism.');
             // Archived is read-only, and structure is exactly what it protects. The web door has
@@ -567,6 +569,7 @@ export function registerWorkspaceTools(
                     schemas: parseObj(schemas) as Record<string, Record<string, unknown>> | undefined,
                     apps: Array.isArray(appsParsed) ? appsParsed as Array<Record<string, unknown>> : undefined,
                     memberChanges: member_changes,
+                    expectedVersion: expected_version,
                 });
                 emitChange('organisms');
                 // A new name meets the detection rules written for workspaces (plan doc-mvdipuyqraas, L1.6).
@@ -576,7 +579,7 @@ export function registerWorkspaceTools(
             } catch (e) {
                 // The refusal of a protected change is new on this tool and takes the toolError
                 // shape, with the code the REST route answers; the older refusals keep their sentence.
-                if (e instanceof WorkspaceMetaError && e.code === 'ACCESS_DENIED') return toolError(e.code, e.message);
+                if (e instanceof WorkspaceMetaError && (e.code === 'ACCESS_DENIED' || e.code === 'VERSION_CONFLICT')) return toolError(e.code, e.message);
                 if (e instanceof WorkspaceMetaError) return fail(e.message);
                 return withCaughtError(fail((e as Error).message || 'Update failed'), e);
             }

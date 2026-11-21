@@ -9,6 +9,7 @@
  * @structure TightenOnly · ConfigFieldShape<K>
  * @usage import type { ConfigFieldDef } from './schema.js';
  * @version-history
+ *   2026-11-21 — TightenOnly.loosens: a row judges a change itself (a list of per-entry orders).
  *   2026-11-04 — `aiMayOnlyTighten`: an AI credential may only make the setting stricter, judged by the
  *     order of its values on every write and reset path (services/config-strictness.ts; codebase
  *     analysis 2026-11-03, item B4).
@@ -34,6 +35,11 @@ export interface TightenOnly {
    * the order their first setting stands in the schema.
    */
   group?: string;
+  /**
+   * Judges a change itself, in place of `order`: true when moving from `from` to `to` makes the setting
+   * less strict. For a list whose entries each have an order (compliance.regulated_ai_modes).
+   */
+  loosens?: (from: unknown, to: unknown) => boolean;
   /** What the AI is told when a change from `from` to `to` is refused; a general sentence when absent. */
   refusal?: (from: string, to: string) => { message: string; details?: Record<string, unknown> };
 }

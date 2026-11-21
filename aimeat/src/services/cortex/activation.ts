@@ -6,6 +6,7 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — A board removed on deactivation takes its posts' content risk marks with it.
  *   2026-11-13 — Moved unchanged from src/routes/cortex/activation.ts: it reads no request and every
  *     import is a service, so the cortex lifecycle service no longer imports a route file (structure
  *     programme 2026-11, unit 4).
@@ -59,7 +60,8 @@ import { cortexOntologyToSkos } from './ontology-skos.js';
 import { accountPrincipals } from '../db/owner-identity.js';
 import { schemaLockRefusal } from '../schema-lock-rule.js';
 import { isOwnersLock } from '../packages/compose/package-component-collisions.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
+import { dropPersonRiskPrefix } from '../content/risk-keys.js';
 
 // ── Activation Logic ──
 
@@ -515,6 +517,8 @@ export async function deactivateExtension(
         continue;
       }
       await storage.deleteBoard(boardId);
+      // Its posts' content risk marks go with it (content/risk-keys.ts).
+      await dropPersonRiskPrefix(storage, ownerGhiiOf(board.ownerGaii), `board:${boardId}:`);
       logger.info(`Cortex deactivated board: ${boardId}`, { extension: ext.name });
     }
   }

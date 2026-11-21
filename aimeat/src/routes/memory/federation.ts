@@ -8,6 +8,7 @@
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
  *   door, and then services/memory/write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.13.0 — 2026-11-21 — A pulled record gets its content risk marks at the intake point.
  *   v1.12.1 — 2026-10-21 — livePeerUrl takes the peer record's URL in every status the heartbeat sets and
  *     clears on its own (active, degraded, offline, unreachable: LIVENESS_RECOVERABLE), the same set the
  *     credential check keeps a visitor's session for. Refusing a degraded home peer was more than the
@@ -58,6 +59,7 @@ import { systemReader } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { LIVENESS_RECOVERABLE } from '../../services/federation.js';
+import { contentRiskAfterWrite } from '../../services/content/risk-intake.js';
 
 export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, peers, resolve, stats, onDirectoryChange } = ctx;
@@ -122,6 +124,8 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
       res.status(written.status).json(error(config.nodeId, written.code, written.message, written.status, written.details));
       return false;
     }
+    // A record pulled from another node is content from outside: its risk marks are written beside it.
+    contentRiskAfterWrite({ storage, config }, { kind: 'memory', owner: target, key }, { point: 'intake' });
     return true;
   }
 

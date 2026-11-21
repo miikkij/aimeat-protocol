@@ -24,6 +24,9 @@
  *   import { contentClassDefaults } from './content-class.js';
  *   const config = { ...contentClassDefaults(), ... };
  * @version-history
+ *   v1.4.0 — 2026-11-21 — The content risk marks' node settings (content_risk.*): the switch, the
+ *     default detection and behaviour at each point, the operator's floors and the AI limit (wish
+ *     wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  *   v1.3.0 — 2026-11-02 — contentClassProfileModel (content_class.profile_model): the fingerprint's
  *     model when the owner names none, DeepSeek V4 Pro by default (wish-aineiston-sormenj-lki-
  *     millaista-aineisto-on-yhdell-silm-ykse); contentClassProfileLabels (content_class.profile_labels),
@@ -74,6 +77,43 @@ export interface ContentClassConfig {
    * or 'model' (the text model does all of it).
    */
   contentClassProfileLabels: 'auto' | 'model';
+  /**
+   * The content risk marks (services/content/risk.ts): on (default; the layers below decide what each
+   * point does) or off (nothing extra runs anywhere, and no read carries marks).
+   */
+  contentRiskMode: 'on' | 'off';
+  /** The node's default detection: rules (no model, no cost) or rules+ai. */
+  contentRiskDetect: ContentRiskDetect;
+  /** The operator's limit on detection: allow lets a layer choose rules+ai, deny keeps every layer at rules. */
+  contentRiskAi: 'allow' | 'deny';
+  /** The node's default behaviour at each point. A read has no hold. */
+  contentRiskOnIntake: ContentRiskBehaviour;
+  contentRiskOnSharedWrite: ContentRiskBehaviour;
+  contentRiskOnRead: ContentRiskBehaviour;
+  /** The operator's floor at each point: no organism, workspace or person goes below it. */
+  contentRiskFloorIntake: ContentRiskBehaviour;
+  contentRiskFloorSharedWrite: ContentRiskBehaviour;
+  contentRiskFloorRead: ContentRiskBehaviour;
+  /** The kinds of mark looked for by default, comma-separated. */
+  contentRiskKinds: string;
+}
+
+/** A content risk point's behaviour (services/content/risk-types.ts RiskBehaviour). */
+export type ContentRiskBehaviour = 'off' | 'mark' | 'mark+warn' | 'hold';
+export type ContentRiskDetect = 'rules' | 'rules+ai';
+/** The six kinds (risk-types.ts RISK_KINDS), named here because config sits below services. */
+export const CONTENT_RISK_KIND_NAMES = ['ai-instruction', 'hidden-text', 'false-role', 'exfil-link', 'other-person-data', 'encoded-block'] as const;
+
+function behaviourOr(v: unknown, fallback: ContentRiskBehaviour, read = false): ContentRiskBehaviour {
+  const ok = read ? ['off', 'mark', 'mark+warn'] : ['off', 'mark', 'mark+warn', 'hold'];
+  return typeof v === 'string' && ok.includes(v.trim()) ? (v.trim() as ContentRiskBehaviour) : fallback;
+}
+
+/** A comma list of kinds as configured, unknown names dropped; empty or absent: every kind. */
+export function riskKindsOr(v: unknown): string {
+  if (typeof v !== 'string') return CONTENT_RISK_KIND_NAMES.join(',');
+  const names = v.split(',').map((s) => s.trim()).filter((s) => (CONTENT_RISK_KIND_NAMES as readonly string[]).includes(s));
+  return v.trim() === '' ? CONTENT_RISK_KIND_NAMES.join(',') : [...new Set(names)].join(',');
 }
 
 /** A whole number 0 or above from the environment, else `fallback`. */
@@ -116,5 +156,17 @@ export function contentClassDefaults(): ContentClassConfig {
     mediaReadMemoryMb: wholeOrDefault(process.env.AIMEAT_MEDIA_READ_MEMORY_MB, 512),
     contentClassProfileModel: modelId(process.env.AIMEAT_CONTENT_PROFILE_MODEL, DEFAULT_PROFILE_MODEL),
     contentClassProfileLabels: process.env.AIMEAT_CONTENT_PROFILE_LABELS === 'model' ? 'model' : 'auto',
+    // Content risk marks: on, rules only, a mark at intake and at a shared write, and a mark with a
+    // warning line on read (docs/internal/content-risk-plan.md, the defaults).
+    contentRiskMode: process.env.AIMEAT_CONTENT_RISK === 'off' ? 'off' : 'on',
+    contentRiskDetect: process.env.AIMEAT_CONTENT_RISK_DETECT === 'rules+ai' ? 'rules+ai' : 'rules',
+    contentRiskAi: process.env.AIMEAT_CONTENT_RISK_AI === 'deny' ? 'deny' : 'allow',
+    contentRiskOnIntake: behaviourOr(process.env.AIMEAT_CONTENT_RISK_ON_INTAKE, 'mark'),
+    contentRiskOnSharedWrite: behaviourOr(process.env.AIMEAT_CONTENT_RISK_ON_SHARED_WRITE, 'mark'),
+    contentRiskOnRead: behaviourOr(process.env.AIMEAT_CONTENT_RISK_ON_READ, 'mark+warn', true),
+    contentRiskFloorIntake: behaviourOr(process.env.AIMEAT_CONTENT_RISK_FLOOR_INTAKE, 'off'),
+    contentRiskFloorSharedWrite: behaviourOr(process.env.AIMEAT_CONTENT_RISK_FLOOR_SHARED_WRITE, 'off'),
+    contentRiskFloorRead: behaviourOr(process.env.AIMEAT_CONTENT_RISK_FLOOR_READ, 'off', true),
+    contentRiskKinds: riskKindsOr(process.env.AIMEAT_CONTENT_RISK_KINDS),
   };
 }

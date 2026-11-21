@@ -6,6 +6,7 @@
  * @version-history
  *   2026-11-21 — Both bulk writes refuse an app tool manifest entry that binds an action marked
  *     `decision: person` (services/app-tools/decision-binding.ts).
+ *   2026-11-21 — POST /v1/memory/import: each written record gets its content risk marks at the intake point.
  *   2026-11-15 — POST /v1/memory/bulk-delete asks the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-14 — GET /v1/memory/discover names the tool manifest of an app the operator hid only to that
  *     app's account and the operator (services/memory-discover.ts; unit 2b, B12).
@@ -154,6 +155,7 @@ import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 import { signedInOnly } from '../../config/visibility.js';
 import { isOperatorCaller } from '../../services/operator/override.js';
 import { teamDeleteGate } from '../../services/team/action-gate.js';
+import { contentRiskAfterWrite } from '../../services/content/risk-intake.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
@@ -524,6 +526,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (it.status === 'created' || it.status === 'updated') {
         recordMemoryTouch({ ownerGaii: gaii, key: it.key, writerPrincipal: req.auth!.app ? tallyWriterOf(callerOf(req, config.nodeId, storage), config.nodeId, req.auth!.app) : resolve(req), kind: 'write' });
         emitMemoryWritten(gaii, it.key, it.status);
+        // An import brings content from outside the node: its risk marks are written beside it.
+        contentRiskAfterWrite({ storage, config }, { kind: 'memory', owner: gaii, key: it.key }, { point: 'intake' });
       }
       if (it.status === 'failed') failed.push({ key: renameOf.get(it.key) ?? it.key, reason: it.reason ?? 'failed' });
     }

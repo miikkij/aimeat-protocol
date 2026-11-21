@@ -20,6 +20,8 @@
 #
 # 2026-10-16 — Sets core.hooksPath so a commit in the new worktree runs the pre-commit hook (QA audit
 # W09, P2-07).
+# 2026-11-21 — Prints the path with the drive letter in the case of the caller's cwd, so Claude Code
+# does not refuse the session's commands in the new worktree.
 set -eu
 
 input=$(cat)
@@ -79,4 +81,12 @@ if [ "$(git -C "$dir" config --get core.hooksPath 2>/dev/null || true)" != ".git
   echo "worktree-create: git hooks turned on (core.hooksPath .githooks)" >&2
 fi
 
-if command -v cygpath >/dev/null 2>&1; then cygpath -w "$dir"; else printf '%s\n' "$dir"; fi
+if command -v cygpath >/dev/null 2>&1; then out=$(cygpath -w "$dir"); else out="$dir"; fi
+# Claude Code compares this path with the session's working directory letter for letter. VS Code
+# starts a session at `c:\dev\...` while git answers `C:/dev/...`, and a session that entered a
+# worktree printed with the other drive-letter case had every shell command refused (2026-11-21).
+# So the drive letter takes the case of the cwd Claude Code sent.
+case "$from" in
+  [A-Za-z]:*) case "$out" in [A-Za-z]:*) out="$(printf '%s' "$from" | cut -c1)${out#?}" ;; esac ;;
+esac
+printf '%s\n' "$out"

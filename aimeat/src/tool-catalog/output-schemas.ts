@@ -11,6 +11,8 @@
  *   import { memoryEntryOutput } from './output-schemas.js';
  *   mcp.registerTool('aimeat_memory_read', { description, inputSchema, outputSchema: memoryEntryOutput, annotations }, handler)
  * @version-history
+ *   v1.4.0 -- 2026-11-21 -- contentRiskOutput, and memoryEntryOutput declares content_risk and
+ *     content_risk_warning (the content risk marks), or the schema would strip them.
  *   v1.3.0 -- 2026-10-19 -- agentProfileOutput declares `avatar` (nullable, loose) and `avatar_problem`
  *     (services/agent-avatar.ts), or the schema would strip them. agentsListOutput rows are loose already.
  *   v1.2.0 -- 2026-09-29 -- memoryEntryOutput declares classification_warning (TARGET-082 V4), or the
@@ -47,8 +49,17 @@ export const walletBalanceOutput = {
     available: z.number().optional(),
 };
 
+/**
+ * The content risk marks beside a read item. Declared loose here, so the tool list the chat surface
+ * sends stays inside its budget (e2e-mcp-v2); the shape is the public contract openapi.yaml
+ * components.schemas.ContentRisk states (services/content/risk-types.ts ContentRisk).
+ */
+export const contentRiskOutput = looseRecord.optional();
+
 /** aimeat_memory_read (single entry) */
 export const memoryEntryOutput = {
+    /** One line for the reading AI when the value carries risk marks and the reader's setting warns. */
+    content_risk_warning: z.string().optional(),
     key: z.string(),
     value: z.unknown().optional(),
     visibility: z.string().optional(),
@@ -58,6 +69,8 @@ export const memoryEntryOutput = {
     ai_provenance: aiProvenanceOutput,
     /** TARGET-082: the content is classified with a warning label: use it only for the task. */
     classification_warning: z.object({ label: z.string(), name: z.string(), says: z.string() }).optional(),
+    /** The content risk marks beside the value; with `held`, the value is withheld from this reader. */
+    content_risk: contentRiskOutput,
 };
 
 /** aimeat_memory_list — { items, count } plus the Phase 2 truncation markers and the

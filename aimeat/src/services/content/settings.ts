@@ -19,6 +19,8 @@
  *   if (aiStagesOn(s)) { ... }
  *   await writeSettings(deps, writer, { stages: { describe: true } });
  * @version-history
+ *   v1.2.0 — 2026-11-21 — `risk`: the person's layer of the content risk settings (risk-settings.ts),
+ *     checked by checkRiskLayer; `stages` holds only the switched stages (types.ts SETTING_STAGES).
  *   v1.1.0 — 2026-11-02 — stages.profile (the fingerprint), off by default like every AI stage; the
  *     stage list is types.ts STAGE_NAMES; models.profile, the fingerprint's own model.
  *   v1.0.1 — 2026-10-20 — `stages.technical` is always on: a patch turning it off is refused with the
@@ -28,17 +30,18 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { ContentClassError, updateOwnRecord, type ContentDeps, type ContentWriter } from './classes.js';
-import { AI_STAGES, DEFAULT_SETTINGS, STAGE_NAMES, type ContentSettings, type StageName } from './types.js';
+import { AI_STAGES, DEFAULT_SETTINGS, SETTING_STAGES, type ContentSettings, type SettingStage } from './types.js';
+import { checkRiskLayer, lenientRiskLayer, RiskSettingsError } from './risk-settings.js';
 
 export const SETTINGS_KEY = 'contentclass.settings';
 
-const STAGES: readonly StageName[] = STAGE_NAMES;
+const STAGES: readonly SettingStage[] = SETTING_STAGES;
 const SOURCES = ['files', 'memory', 'workspace'] as const;
 const MODELS = ['text', 'vision', 'profile'] as const;
 const APPROVALS: readonly ContentSettings['approval'][] = ['ask', 'auto', 'rule'];
 const RULE_ID = /^[A-Za-z0-9_.-]{1,64}$/;
 const LANGUAGE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
-const TOP_KEYS = ['onArrival', 'stages', 'sources', 'minTextChars', 'approval', 'approvalRule', 'onlineSignatureChecks', 'models', 'language'] as const;
+const TOP_KEYS = ['onArrival', 'stages', 'sources', 'minTextChars', 'approval', 'approvalRule', 'onlineSignatureChecks', 'models', 'language', 'risk'] as const;
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
@@ -70,6 +73,9 @@ function lenient(v: unknown): ContentSettings {
   if (typeof v.approvalRule === 'string' && RULE_ID.test(v.approvalRule)) out.approvalRule = v.approvalRule;
   // 'rule' without a rule to ask cannot approve anything, so it reads as 'ask'.
   if (okApproval(v.approval) && (v.approval !== 'rule' || out.approvalRule)) out.approval = v.approval;
+  // A person's choice is a floor for nobody: a stored `locked` is not read.
+  const risk = lenientRiskLayer(v.risk);
+  if (risk) { delete risk.locked; out.risk = risk; }
   return out;
 }
 
@@ -90,7 +96,7 @@ function mergeFlags<K extends string>(name: string, keys: readonly K[], patch: u
 }
 
 /** The patch merged onto `cur`, checked strictly. Throws INVALID_INPUT naming the first bad key. */
-function applyPatch(cur: ContentSettings, patch: unknown): ContentSettings {
+function applyPatch(cur: ContentSettings, patch: unknown, who: string): ContentSettings {
   if (!isObj(patch)) throw refuse('The settings change must be an object.');
   const next: ContentSettings = { ...cur, stages: { ...cur.stages }, sources: { ...cur.sources }, models: { ...cur.models } };
   for (const [k, v] of Object.entries(patch)) {
@@ -99,7 +105,20 @@ function applyPatch(cur: ContentSettings, patch: unknown): ContentSettings {
         if (!isBool(v)) throw refuse(`${k} must be true or false.`);
         next[k as 'onArrival' | 'onlineSignatureChecks'] = v;
         break;
+      case 'risk': {
+        if (v === null) { delete next.risk; break; }
+        try {
+          const layer = checkRiskLayer(cur.risk, v, { allowLock: false });
+          if (isObj(v) && 'detect' in v) layer.detectBy = who;
+          next.risk = { ...layer, by: who, at: new Date().toISOString() };
+        } catch (err) {
+          if (err instanceof RiskSettingsError) throw refuse(err.message);
+          throw err;
+        }
+        break;
+      }
       case 'stages':
+        if (isObj(v) && 'risk' in v) throw refuse('stages.risk is not a switch: the risk marks have their own settings, `risk` (enabled, detect, on_intake, on_shared_write, on_read, kinds).');
         mergeFlags('stages', STAGES, v, next.stages);
         // The technical read is what every other step works from, and it calls no model: it is
         // always on. Reading nothing on arrival is `onArrival: false`.
@@ -143,7 +162,7 @@ function applyPatch(cur: ContentSettings, patch: unknown): ContentSettings {
 export async function writeSettings(deps: ContentDeps, writer: ContentWriter, patch: unknown): Promise<ContentSettings> {
   // Checked against the stored settings inside the conditional write: whether approval 'rule' has
   // its rule depends on what is stored. A refusal throws before anything is written.
-  const stored = await updateOwnRecord(deps, writer, SETTINGS_KEY, (cur) => applyPatch(lenient(cur), patch));
+  const stored = await updateOwnRecord(deps, writer, SETTINGS_KEY, (cur) => applyPatch(lenient(cur), patch, writer.principal));
   return lenient(stored);
 }
 

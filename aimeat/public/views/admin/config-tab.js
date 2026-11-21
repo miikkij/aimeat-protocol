@@ -33,6 +33,7 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-11-21 -- The `content_risk` group in the AI domain: the content risk marks' switch, defaults and floors.
  *   2026-11-15 -- consent.app_party_max in Data out, after the signup hours: the most people one app holds.
  *   2026-11-14 -- The `help` section (Ask someone who knows) stands in Money and pacing, beside the morsel policy.
  *   2026-11-14 -- The `compliance` section (compliance.balancing_test) stands in Identity and access, beside classification.
@@ -158,7 +159,7 @@ const SOURCE_BADGE = {
  * matched nothing (`quotas` for `quota`, `sync` for `federation_sync`, `tunnel` for `connect_tunnel`).
  */
 const DOMAINS = [
-  { id: 'ai', groups: ['ai', 'decide', 'content_class', 'agent','agents', 'tasks', 'mcp', 'cortex', 'proactive'] },
+  { id: 'ai', groups: ['ai', 'decide', 'content_class', 'content_risk', 'agent','agents', 'tasks', 'mcp', 'cortex', 'proactive'] },
   { id: 'money', groups: ['morsel_policy', 'help', 'commerce', 'marketplace', 'work', 'portfolio'] },
   { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'compliance', 'security', 'moderation', 'account_events', 'echat'] },
   { id: 'data_out', groups: ['data_out'] },

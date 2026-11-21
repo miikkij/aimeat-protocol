@@ -30,6 +30,8 @@
  *   const out = await createBoardPost({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.7.0 — 2026-11-21 — A post or reply by someone other than the board's keeper goes to the content
+ *     risk marks' shared-write point; a post taken down as handled takes its marks with it.
  *   v1.6.0 — 2026-11-08 — The posting rule 'anyone' admits only a caller that may read the board
  *     (boardReadRefusal). It asked nothing before, so any signed-in caller that knew a shared board's
  *     id posted and replied to it without being able to read it. A public board's 'anyone' is unchanged.
@@ -54,7 +56,9 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, BoardPostRecord, BoardRecord } from '../../storage/interface.js';
 import { executeHooks } from '../hooks.js';
 import { provenanceForWrite, provenanceDeclarationRefusal } from '../ai/provenance.js';
-import { isSameOwner } from '../../utils/gaii.js';
+import { isSameOwner, ownerGhiiOf } from '../../utils/gaii.js';
+import { contentRiskAfterWrite, contentRiskMessageText } from '../content/risk-intake.js';
+import { dropPersonRiskEntry } from '../content/risk-keys.js';
 import { emitChange } from '../event-bus.js';
 import { notifyBoardSubscribers } from './subscribers.js';
 import { boardOrganismAudience, organismBoardAdmits, boardReadRefusal } from './read-access.js';
@@ -278,6 +282,10 @@ export async function createBoardPost(
     if (!post) {
         return { ok: false, status: 402, code: 'INSUFFICIENT_MORSELS', message: `Posting costs ${charged} morsels` };
     }
+    // A shared write when someone other than the board's keeper posts: its content risk marks are
+    // written beside it, off this call (content/risk-intake.ts decides whether it is a shared write).
+    contentRiskAfterWrite(deps, { kind: 'board', owner: ownerGhiiOf(board.ownerGaii), boardId: input.boardId, id: post.id },
+        { point: 'shared-write', writer: caller.gaii, text: contentRiskMessageText(post.title, post.body), ...(post.ttlExpiresAt ? { expiresAt: post.ttlExpiresAt } : {}) });
 
     // The two things that happen BESIDES the write, and both lived in the HTTP route so the tool
     // surface had neither. A board open in a browser listens on the 'boards' domain, so without the
@@ -324,6 +332,8 @@ export async function updateBoardPost(
 
     if (input.resolved === true) {
         await storage.deletePost(input.boardId, input.postId);
+        // The post's content risk marks go with it (content/risk-keys.ts).
+        await dropPersonRiskEntry(storage, ownerGhiiOf(board.ownerGaii), `board:${input.boardId}:${input.postId}`);
         emitChange('boards');
         return { ok: true, resolved: true, postId: input.postId };
     }
@@ -419,6 +429,8 @@ export async function createBoardReply(
         createdAt: new Date().toISOString(),
         ...(aiProvenanceId ? { aiProvenanceId } : {}),
     });
+    contentRiskAfterWrite(deps, { kind: 'board', owner: ownerGhiiOf(board.ownerGaii), boardId: input.boardId, id: reply.id },
+        { point: 'shared-write', writer: caller.gaii, text: contentRiskMessageText(reply.title, reply.body), ...(reply.ttlExpiresAt ? { expiresAt: reply.ttlExpiresAt } : {}) });
 
     emitChange('boards');
     notifyBoardSubscribers(storage, input.boardId, {

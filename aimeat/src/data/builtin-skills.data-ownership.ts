@@ -29,6 +29,8 @@
  * @version-history
  *   2026-11-21 — Section 4: a restore of an app tool manifest that binds an action marked `decision: person`
  *     answers PERSON_DECIDES (services/app-tools/decision-binding.ts, services/memory/bin.ts).
+ *   2026-11-21 — Section 6: the content risk marks of what the person wrote into others' places stay
+ *     with the content under a pseudonym (services/content/risk-erasure.ts).
  *   2026-11-20 — Section 6: erasure removes the person's value signals and data counts; a record their
  *     agent made in someone else's namespace keeps its count under a pseudonym (services/value/).
  *   2026-11-19 — Section 6: erasure removes each app as its delete does, and no node log names the
@@ -383,7 +385,10 @@ let knowledge age, and you should offer them, not wait to be asked:
   and their appeals go, a review they made names the pseudonym, and the public activity feed drops
   the events about their apps. The counts of what their AI made and what happened to it, and of what
   data of theirs passed through, go too; where an agent of theirs made a record in someone else's
-  namespace or a group's workspace, that record's count stays with a pseudonym as its maker. A notification in another person's inbox stays, as that person's own
+  namespace or a group's workspace, that record's count stays with a pseudonym as its maker. The
+  content risk marks of what they wrote into someone else's place (a message, a post, a comment, a
+  workspace document) stay with the content, naming a pseudonym as the writer, and hold no words of
+  it. A notification in another person's inbox stays, as that person's own
   copy, and expires within 90 days. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a

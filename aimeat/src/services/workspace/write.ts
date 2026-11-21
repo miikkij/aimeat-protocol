@@ -63,6 +63,7 @@ import { emitChange } from '../event-bus.js';
 import { isSameOwner } from '../../utils/gaii.js';
 import { classifyAfterWrite } from '../classify-on-write.js';
 import { workspaceDocOfKey, sharedProfilePrefixOf, systemOwnerOf } from '../content/shared-profile-key.js';
+import { dropWorkspaceRiskEntry } from '../content/risk-keys.js';
 
 export interface WorkspaceWriteDeps {
     storage: Storage;
@@ -239,4 +240,6 @@ async function dropSharedFingerprint(storage: Storage, nodeId: string, base: str
         const doc = (r.value as { doc?: { key?: unknown } } | null)?.doc;
         if (r.ownerGaii === owner && doc?.key === latest) await storage.deleteMemory(owner, r.key);
     }
+    // The document's content risk marks go with its last published copy too (content/risk-keys.ts).
+    await dropWorkspaceRiskEntry(storage, nodeId, at.organismId, at.ws, `memory:${latest}`);
 }
