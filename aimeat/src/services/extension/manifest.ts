@@ -5,6 +5,9 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — A refused manifest names every shape problem at once, and the missing identity
+ *     fields one by one, saying when they sit at the top level instead of under metadata: (curated
+ *     appdev pitfall ext-manifest-strict). The first problem's sentence opens the message as before.
  *   2026-11-21 — An action may say `decision: person`: the person's own decision, which an agent's call
  *     waits for (services/extension/person-decision.ts). Any other value is refused.
  *   2026-11-01 — An action's commercial block keeps `deliversData` for its EXCHANGE listing (plan D5.5).
@@ -185,25 +188,30 @@ function validateManifestShape(
   metadata: Record<string, unknown>,
   actions: Array<Record<string, unknown>>,
 ): ExtBuildResult | null {
+  // EVERY shape problem in one refusal, in manifest order (curated appdev pitfall ext-manifest-strict):
+  // an author fixing one field per install round-trip met the next one only on the next try. The
+  // first problem's sentence opens the message as it always did; the rest follow it.
+  const problems: string[] = [];
   for (const field of ['name', 'description', 'author'] as const) {
     if (!isNonEmptyString(metadata[field])) {
-      return fail(`metadata.${field} must be a non-empty string, got ${describeYamlValue(metadata[field])}`);
+      problems.push(`metadata.${field} must be a non-empty string, got ${describeYamlValue(metadata[field])}`);
     }
   }
   // A YAML scalar like `version: 1.0` parses as a number, which is a legitimate thing to write.
   // Accept it and coerce at build time; refuse the shapes that cannot be a version at all.
   if (!isNonEmptyString(metadata.version) && typeof metadata.version !== 'number') {
-    return fail(`metadata.version must be a string (quote it, e.g. "1.0.0"), got ${describeYamlValue(metadata.version)}`);
+    problems.push(`metadata.version must be a string (quote it, e.g. "1.0.0"), got ${describeYamlValue(metadata.version)}`);
   }
 
   for (const [i, action] of actions.entries()) {
     if (typeof action !== 'object' || action === null || Array.isArray(action)) {
-      return fail(`actions[${i}] must be a map with id, method, path and script, got ${describeYamlValue(action)}`);
+      problems.push(`actions[${i}] must be a map with id, method, path and script, got ${describeYamlValue(action)}`);
+      continue;
     }
     const label = isNonEmptyString(action.id) ? `"${action.id}"` : `at index ${i}`;
     for (const field of ['id', 'method', 'path', 'script'] as const) {
       if (!isNonEmptyString(action[field])) {
-        return fail(`Action ${label}: ${field} must be a non-empty string, got ${describeYamlValue(action[field])}`);
+        problems.push(`Action ${label}: ${field} must be a non-empty string, got ${describeYamlValue(action[field])}`);
       }
     }
     // input/output are JSON Schema documents. A comma inside an unquoted flow-map description is
@@ -212,12 +220,14 @@ function validateManifestShape(
     for (const field of ['input', 'output'] as const) {
       const v = action[field];
       if (v !== undefined && (typeof v !== 'object' || v === null || Array.isArray(v))) {
-        return fail(`Action ${label}: ${field} must be a JSON Schema map, got ${describeYamlValue(v)}`
+        problems.push(`Action ${label}: ${field} must be a JSON Schema map, got ${describeYamlValue(v)}`
           + '. A comma inside an unquoted flow map splits it into another entry — quote the text.');
       }
     }
   }
-  return null;
+  if (!problems.length) return null;
+  if (problems.length === 1) return fail(problems[0]);
+  return fail(`${problems[0]} (and ${problems.length - 1} more: ${problems.slice(1).join('; ')})`);
 }
 
 /** Headers the provider key may never be written to: each one changes how the request is framed or
@@ -532,8 +542,15 @@ export function buildExtensionRecordFromManifest(
 
   const metadata = manifest.metadata as Record<string, unknown> | undefined;
   if (!metadata?.name || !metadata?.version || !metadata?.description || !metadata?.author) {
+    // Every missing field at once, and the common cause named: the identity written at the top
+    // level instead of under metadata: (curated appdev pitfall ext-manifest-strict).
+    const fields = ['name', 'version', 'description', 'author'] as const;
+    const missing = fields.filter(f => !metadata?.[f]).map(f => `metadata.${f}`);
+    const atTop = fields.filter(f => !metadata?.[f] && manifest[f] !== undefined);
     return { ok: false, status: 400, code: 'INVALID_MANIFEST',
-      message: 'metadata.name, metadata.version, metadata.description, and metadata.author are required' };
+      message: 'metadata.name, metadata.version, metadata.description, and metadata.author are required'
+        + `; missing: ${missing.join(', ')}`
+        + (atTop.length ? `. ${atTop.join(', ')} ${atTop.length > 1 ? 'are' : 'is'} at the top level of the manifest: move ${atTop.length > 1 ? 'them' : 'it'} under metadata:` : '') };
   }
   if (!EXT_NAME_PATTERN.test(metadata.name as string)) {
     return { ok: false, status: 400, code: 'INVALID_MANIFEST',

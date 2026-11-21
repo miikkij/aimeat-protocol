@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-21 — aimeat_workspace_read's ids say what `ambiguous` means (an id two spaces hold).
  *   2026-11-19 — aimeat_workspace_share takes ics_key ("new" or "clear"), the calendar feed key the
  *     share route makes (feature audit 2026-11-19, 4.4 item 4).
  *   2026-11-15 — aimeat_organism_import takes preview, people and team (team setup T12).
@@ -469,7 +470,7 @@ export const organismsWorkspacesAppsTools = [
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id (from aimeat_workspace_list).' },
-            ids: { type: 'array', description: 'Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit for the lightweight index.', zod: z.array(z.string().max(INPUT_LIMITS.key)) },
+            ids: { type: 'array', description: 'Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit for the lightweight index. An id that records of more than one space carry, asked without `space`, is answered from the first space and named in `ambiguous` with every space that holds it: pass `space` to read another.', zod: z.array(z.string().max(INPUT_LIMITS.key)) },
             space: { type: 'string', description: 'With `ids`: optionally restrict the lookup to this space (objectType name or namespace).' },
             include_archived: { type: 'boolean', description: 'Include archived (hidden) content. Default false.' },
             // As GET /v1/organisms/:id/workspace reads ?archived=only on organism:read (unit 3b).

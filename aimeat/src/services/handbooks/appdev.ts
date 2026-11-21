@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-21 — The aimeat-ai example names prefer.* only and says what local.<capability>=yes does:
+ *     it turned the owner's cloud provider off for builders who copied it.
  *   2026-11-20 — An extension's `config.app` is named `owner/name`, without `.html` (services/members-only.ts resolves it).
  *   2026-11-20 — FINISH names the publish answer's `ai_path` line and the sections ai-path and app-tools.
  *   2026-11-19 — The research-first flow names one guide, the Atelier specification, its part
@@ -251,7 +253,9 @@ their AI settings where it is fixed. Every answer carries \`route\` (who answere
 for one that is off the \`fix\`. In the app, check the same with \`AIMEAT.ai.capabilities()\` and show
 the person the \`fix\` with an "Open AI settings" link to \`settingsUrl\`; never hide a button in
 silence, and never show \`message\` or \`agentFix\`, which are written for an AI. Name what the app prefers in the meta,
-\`prefer.image=openrouter; local.transcription=yes\` (it orders the owner's providers and adds none).
+\`prefer.image=openrouter\` (it orders the owner's providers and adds none). \`local.<capability>=yes\` is
+a different thing: only a provider on this machine may serve that capability, so an owner with only
+cloud providers gets that capability refused; write it only when the data must not leave the machine.
 \`aimeat_ai_models\` lists the catalogue with the \`ref\` to use. Never propose embeddings: they are for a
 collection far larger than one prompt, only when the person decides, and a vector collection does not
 fit one memory value. More than one kind of AI work: declare a role for each in the meta

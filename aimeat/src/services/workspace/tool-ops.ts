@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-21 — A batch open names `ambiguous`: an id asked without `space` that records of more than
+ *     one space carry, with the spaces and the one that answered (the first, as before).
  *   2026-11-20 — readWorkspaceOp's index carries the organism's and the workspace's directive for a
  *     member (services/organism/directives.ts); a batch open does not, so it reads only what it opens.
  *   2026-11-20 — readWorkspaceOp records each record it opens by id for the value signals (services/value/signal-buffer.ts).
@@ -291,14 +293,19 @@ export async function readWorkspaceOp(
         const scoped = space ? [...spaces.values()].filter(s => s.ot.name === space || s.ot.namespace === space) : [...spaces.values()];
         // Which slot each asked id names, in the order asked; then the values of those slots only.
         const asks: Array<{ asked: string; hit?: { name: string; id: string; slot: Slot } }> = [];
+        // An id that more than one space holds, asked without a space: the first space answers, as it
+        // always has, and the answer names the others (appdev pitfall data/workspace-read-ids-needs-space).
+        const ambiguous: Array<{ id: string; spaces: string[]; answered_from: string }> = [];
         for (const asked of new Set(ids!.map(String))) {
             // aimeat_discover names a workspace record by its FULL memory key, and an agent hands
             // that on as it got it. Inside THIS workspace the key says which space and which
             // instance; a key from anywhere else matches no prefix here and stays missing.
             const named = instanceFromKey(root, scoped.map(s => s.ot.namespace as string), asked);
             const id = named?.instance ?? asked;
-            const s = (named ? scoped.filter(x => x.ot.namespace === named.namespace) : scoped)
-                .find(x => { const slot = x.inst.get(id); return !!(slot && (slot.latest ?? slot.draft)); });
+            const holders = (named ? scoped.filter(x => x.ot.namespace === named.namespace) : scoped)
+                .filter(x => { const slot = x.inst.get(id); return !!(slot && (slot.latest ?? slot.draft)); });
+            const s = holders[0];
+            if (holders.length > 1) ambiguous.push({ id, spaces: holders.map(h => h.ot.name), answered_from: s.ot.name });
             asks.push({ asked, ...(s ? { hit: { name: s.ot.name, id, slot: s.inst.get(id)! } } : {}) });
         }
         const opened = await got.hydrate(asks.flatMap(a => (a.hit ? [a.hit.slot.latest, a.hit.slot.draft].filter((r): r is MemoryRecord => !!r) : [])));
@@ -325,6 +332,7 @@ export async function readWorkspaceOp(
             });
         }
         return { ok: true, data: { organism_id: organismId, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}),
+            ...(ambiguous.length ? { ambiguous, ambiguous_note: 'These ids are records of more than one space; each was answered from the first space. Pass `space` to read another.' } : {}),
             ...(got.truncated ? { truncated: true } : {}),
             ...(args.reader.warnings.length ? { classification_warnings: args.reader.warnings } : {}) } };
     }

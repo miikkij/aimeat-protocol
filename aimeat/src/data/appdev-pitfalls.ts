@@ -12,6 +12,9 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-21 — login-is-silent-only, long-ai-calls-timeout and ext-manifest-strict say what the
+ *     platform now tells the builder (a console line naming signIn(), `jobHint`, every manifest
+ *     problem at once).
  *   2026-11-21 — +html-comment-closes-early, +offline-parts-other-origin, +leaflet-l-shadowed,
  *     +keyframe-hides-under-less-motion, +body-first-child-is-node-block, each enforced by a publish
  *     warning (services/app/page-code-lint.ts); they replace learned entries builders met (pitfall
@@ -361,7 +364,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   E({
     id: 'login-is-silent-only',
     title: 'AIMEAT.auth.login() restores a session; AIMEAT.auth.signIn() is the one that asks',
-    symptom: 'A hand-rolled "Sign in" button calling AIMEAT.auth.login() does nothing when there is no session to restore: login() is silent, returns null and never opens anything.',
+    symptom: 'A hand-rolled "Sign in" button calling AIMEAT.auth.login() does nothing when there is no session to restore: login() is silent, returns null and never opens anything. Called from a click, it says so once in the console and names signIn().',
     fix: 'Call `AIMEAT.auth.login()` at start to restore, and `AIMEAT.auth.signIn()` from your own button\'s click handler to sign in: it runs the interactive grant inside the user gesture on an app origin and opens the sign-in dialog elsewhere, resolving to the session or null. The login pill\'s own button calls the same function. Never script a click on the pill: its first button is the language and theme cluster, not Sign In.',
     appliesTo: ['auth', 'app'],
     severity: 'critical',
@@ -429,7 +432,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   E({
     id: 'ext-manifest-strict',
     title: 'Extension/cortex manifests are strict — one missing field fails the install',
-    symptom: 'An install is refused wholesale: identity fields not under metadata:, an action missing id/method/path/script, a YAML value with an unquoted colon, or a cortex lib whose api_surface is not a string. The refusal names the field, and a YAML error names the line and column.',
+    symptom: 'An install is refused wholesale: identity fields not under metadata:, an action missing id/method/path/script, a YAML value with an unquoted colon, or a cortex lib whose api_surface is not a string. The refusal names every missing or malformed field at once (identity fields written at the top level are named as such), and a YAML error names the line and column.',
     fix: 'Extension manifests: name/version/description/author under metadata:, and EVERY action needs id + method + path + script. Cortex manifests are k8s-style (apiVersion: cortex.aimeat.org/v1, kind: Extension, metadata.name + namespace, spec.version) with libs as spec.components type: lib entries carrying exports (a list) and api_surface (a string; write it as a YAML block scalar). Quote any description that contains a colon, and write schemas in YAML block style. Copy the examples from the build spec (GET /v1/prompts/build-extension).',
     appliesTo: ['ext', 'cortex'],
     severity: 'warn',
@@ -464,7 +467,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   E({
     id: 'long-ai-calls-timeout',
     title: 'A generation that takes minutes is a job, not a held-open request',
-    symptom: 'A long completion from the app dies with the tab, the network or a proxy timeout, and the person clicks again and pays twice.',
+    symptom: 'A long completion from the app dies with the tab, the network or a proxy timeout, and the person clicks again and pays twice. The error then carries `jobHint`, and the console names AIMEAT.ai.job once.',
     fix: 'AIMEAT.ai.complete() holds one request open and never retries on its own, so keep it for answers that come back in seconds. For anything longer use `AIMEAT.ai.job.start({ prompt, result_key })` and `AIMEAT.ai.job.waitFor(id)`: the node runs it with the owner\'s key, writes the answer to result_key, and the page can close in between.',
     appliesTo: ['ai'],
     severity: 'warn',

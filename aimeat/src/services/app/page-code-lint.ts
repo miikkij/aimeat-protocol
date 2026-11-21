@@ -10,7 +10,7 @@
  *     leaflet-l-shadowed             a page that loads Leaflet declares its own `L`
  *     keyframe-hides-under-less-motion  a kit page's keyframe ends hidden and holds its last frame
  *     body-first-child-is-node-block the page finds its root by position among the body's children
- *     session-fetch-parsed           session.fetch's answer read with `.json()`
+ *     session-fetch-parsed           session.fetch's answer read with the json method
  *
  *   ALL WARN, NONE BLOCKS, for the reason the artifact lint gives: each one has a page where it is
  *   right, and a publish that fails is a publish that gets worked around. Every reader scans with
@@ -217,7 +217,7 @@ export function bodyPositionFindings(html: string): AppArtifactFinding[] {
 
 /**
  * session.fetch resolves to the node's parsed envelope ({ ok, data, error }), not a Response, so
- * `.json()` on it throws "json is not a function". Only a call to a node path on a variable other
+ * the json method on it throws "json is not a function". Only a call to a node path on a variable other
  * than window counts: the browser's own fetch is a Response.
  */
 export function sessionFetchFindings(html: string): AppArtifactFinding[] {
@@ -233,8 +233,8 @@ export function sessionFetchFindings(html: string): AppArtifactFinding[] {
   }
   if (!hits.size) return [];
   return [finding('session-fetch-parsed',
-    `\`.json()\` is called on what ${[...hits].map(h => '`' + h + '.fetch`').join(', ')} answered. session.fetch resolves to the node's `
-    + 'parsed envelope { ok, data, error }, not a Response, so .json() throws "json is not a function". Use the value as it is: check '
+    `The json method is called on what ${[...hits].map(h => '`' + h + '.fetch`').join(', ')} answered. session.fetch resolves to the node's `
+    + 'parsed envelope { ok, data, error }, not a Response, so calling json on it throws "json is not a function". Use the value as it is: check '
     + 'res.ok, read res.data, and show res.error.message when ok is false; a refusal does not throw.')];
 }
 

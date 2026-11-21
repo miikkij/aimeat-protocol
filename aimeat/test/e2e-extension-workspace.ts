@@ -21,6 +21,7 @@
  *   each test with `// HOLE:`. Two tests (no declaration, scheduled run) assert a GUARD the old tree
  *   satisfied trivially, and say so.
  * @version-history
+ *   v1.9.0 — 2026-11-21 — The API limit refusal says every ctx call counts, ctx.memory included.
  *   v1.8.0 — 2026-10-30 — The ifVersion document test writes as B in person: B's agent no longer opens
  *     B's own image by embedding it (an agent opens only its own files, Jouni 2026-10-30), and the
  *     test is about the order of the swap and the opening, which a writer who may open the file shows.
@@ -411,6 +412,14 @@ await test('Budget: every workspace call counts against maxApiCalls → API_LIMI
     const r = await invoke(EXT_BUDGET, 'burn', bAgentToken);
     // HOLE: a call that did not count would let 11 reads through a budget of 10 (the floor).
     assert(r.status === 500 && r.body?.error?.code === 'API_LIMIT_EXCEEDED', `burn ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('The API limit refusal says every ctx call counts, ctx.memory included (ext/memory-ops-count-as-api-calls)', async () => {
+    const r = await invoke(EXT_BUDGET, 'burn', bAgentToken);
+    const msg = String(r.body?.error?.message ?? '');
+    assert(r.body?.error?.code === 'API_LIMIT_EXCEEDED', `code: ${JSON.stringify(r.body?.error)}`);
+    assert(msg.includes('Every ctx call counts') && msg.includes('ctx.memory'), `message: ${msg}`);
+    assert(msg.includes('limits.max_api_calls'), `the manifest field is still named: ${msg}`);
 });
 
 await test('A scheduled run (nobody present) gets no ctx.workspace', async () => {

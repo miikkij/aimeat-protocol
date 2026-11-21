@@ -18,6 +18,9 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './publish-next-steps.js';
  * @version-history
+ *   v1.7.0 — 2026-11-21 — `register`, for an app whose data map says it keeps personal data and that
+ *     has no register: the three calls that write one (compliance/register-step.ts). Every other app
+ *     gets no key.
  *   v1.6.0 — 2026-11-20 — `screens` on every Atelier level but `proto`: the phone and the desktop
  *     looked at, and what the report says about the desktop; the acceptance names 1920×1080.
  *   v1.5.0 — 2026-11-20 — `ai_path` and `ai_path_tools_count` (ai-path-step.ts): how the person's own
@@ -83,6 +86,7 @@ function toolsCountOf(value: unknown): number {
 }
 import { legalReadiness } from '../app-build/legal-readiness.js';
 import { balancingTestStep } from '../compliance/lia-write.js';
+import { registerStep } from '../compliance/register-step.js';
 
 /**
  * The post-publish reflection: does this app have its agent face and its bound skill yet, and what
@@ -143,6 +147,7 @@ export async function buildPublishNextSteps(
     // them only on the structure page after the four owed items were done (2026-11-08).
     const legalMissing = appRec ? legalReadiness(appRec).missing : [];
     const balancing = await balancingTestStep({ storage, config }, ownerName, filename);
+    const register = await registerStep({ storage, config }, ownerName, filename);
 
     // How big it has become, and how fast. Best-effort like everything here: an app whose version
     // line cannot be read still gets its face and skill reminder.
@@ -234,6 +239,9 @@ export async function buildPublishNextSteps(
           + (balancing.draft ? `The draft: ${balancing.draft.tool}. ` : '')
           + `The app's page: ${balancing.url}. Not blocking: the publish does not wait for it.`,
       } : {}),
+      // Only for an app whose data map says it keeps personal data and that has no register for it
+      // (compliance/register-step.ts, the same reading as the gap app-personal-data-without-register).
+      ...(register ? { register } : {}),
       template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Learnings that would bite the next builder go to aimeat_appdev_pitfall_report.',
     };
   } catch (err) {

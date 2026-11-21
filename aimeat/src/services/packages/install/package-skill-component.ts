@@ -35,6 +35,8 @@
  *   const comps = await boundSkillComponents(storage, ownerGhii, `app:${owner}/${filename}`, filename);
  *   const out = await registerSkillComponent(storage, { config, owner, ownerGaii, ... });
  * @version-history
+ *   v1.2.1 — 2026-11-21 — SKILL_UNBOUND names meta.skill.bindsTo, the id rule and the package's app
+ *     component ids (appdev pitfall publish/hand-written-package-component-shapes). It starts as before.
  *   v1.2.0 — 2026-10-26 — A file stored as base64 travels with its encoding (`encodings`) and installs
  *     as its bytes; the install publishes with `standard: 'warn'`, so a skill written under the rules
  *     before the Agent Skills standard was enforced still installs (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss).
@@ -193,7 +195,12 @@ export async function registerSkillComponent(
     const bindsTo = (input.meta?.skill as { bindsTo?: unknown } | undefined)?.bindsTo;
     const appFilename = typeof bindsTo === 'string' ? ctx.appNames.get(bindsTo) : undefined;
     if (!appFilename) {
-        return { ok: false, error: `SKILL_UNBOUND: the skill binds to "${String(bindsTo)}", which is not an app this package installs` };
+        // The fix in the refusal: which field binds it and which ids would do (appdev pitfall
+        // publish/hand-written-package-component-shapes).
+        const ids = [...ctx.appNames.keys()];
+        return { ok: false, error: `SKILL_UNBOUND: the skill binds to "${String(bindsTo)}", which is not an app this package installs. `
+            + 'A skill component names its app in meta.skill.bindsTo, and the value is the id of an app component of the same package '
+            + `(an app component's id is its file name, such as "shop.html"). This package's app components: ${ids.length ? ids.map(i => `"${i}"`).join(', ') : 'none'}.` };
     }
 
     const binding = `app:${input.owner}/${appFilename}`;

@@ -27,6 +27,8 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   2026-11-21 — API_LIMIT_EXCEEDED says every ctx call counts, ctx.memory's included (appdev pitfall
+ *     ext/memory-ops-count-as-api-calls).
  *   2026-11-21 — The refusals say what to do: EXTENSION_INACTIVE names aimeat_extension_activate and its
  *     route, EXTENSION_TIMEOUT and API_LIMIT_EXCEEDED name the limit the run had, the manifest field that
  *     sets it and the node's ceiling.
@@ -500,7 +502,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
     if (message.includes('API call limit exceeded')) {
       return {
         kind: 'refused', status: 500, code: 'API_LIMIT_EXCEEDED',
-        message: `Action "${actionId}" exceeded API call limit: more than ${ran.maxApiCalls} ctx calls in one run. The manifest's limits.max_api_calls sets it, up to this node's ceiling of ${config.extensionMaxApiCalls}; write many records with one ctx.workspace.publishRecords call instead of one call each.`,
+        message: `Action "${actionId}" exceeded API call limit: more than ${ran.maxApiCalls} ctx calls in one run. Every ctx call counts, each ctx.memory.get, set, list and delete included. The manifest's limits.max_api_calls sets it, up to this node's ceiling of ${config.extensionMaxApiCalls}; write many records with one ctx.workspace.publishRecords call instead of one call each, and keep a collection in one ctx.memory key rather than one key per item.`,
       };
     }
     // A refusal the script named (`CLAIM_CONFLICT: …`) is the caller's to act on, not a node fault.

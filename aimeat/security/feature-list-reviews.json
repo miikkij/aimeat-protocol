@@ -106,7 +106,7 @@
       "digest": "sha256:983adfede3987480bd533f35"
     },
     "6. Organisms, workspaces and knowledge": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts",
         "aimeat/src/tool-catalog/definitions/workspace-spaces.ts",
@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:5da5741ca94981ae16689baf"
+      "digest": "sha256:03e0a96815ee072e10a38ed9"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-21",
@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:96cdee23b040865a6ef96aad"
+      "digest": "sha256:43908078c3c333fef07053d5"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-20",
@@ -638,7 +638,7 @@
       "aimeat/src/services/open-items.ts": "7f41fc9dab8fd03a"
     },
     "6. Organisms, workspaces and knowledge": {
-      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "f1b48df2e1da166a",
+      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "c3a2c4a1ec073ca7",
       "aimeat/src/tool-catalog/definitions/workspace-spaces.ts": "a1a3d7cca99de61a",
       "aimeat/src/services/organism-join-requests/access-targets.ts": "e65a66f0ad193e20",
       "aimeat/src/services/organism-join-requests/requests.ts": "c4fb930994ce6968",
@@ -774,8 +774,8 @@
       "aimeat/src/services/dependency-map.ts": "376c0e1e7ccf2e18"
     },
     "11. Served libraries and the Design Book": {
-      "aimeat/src/data/library-packs/cortex.ts": "922ad4c03b0a4963",
-      "aimeat/src/data/library-packs/sdk-ai.ts": "8acd12b22ea48c2e",
+      "aimeat/src/data/library-packs/cortex.ts": "6b2d9c38cc8c1786",
+      "aimeat/src/data/library-packs/sdk-ai.ts": "c9a36cfb7d273814",
       "aimeat/src/data/library-packs/sdk-calendar-print.ts": "7ce80495af762d55",
       "aimeat/src/data/library-packs/sdk-datapackage.ts": "575d27ad2b902691",
       "aimeat/src/data/library-packs/sdk-decide.ts": "c8bd5ef8318fdfe9",
@@ -786,11 +786,11 @@
       "aimeat/src/data/library-packs/sdk-parties.ts": "817db4bccccb2be4",
       "aimeat/src/data/library-packs/sdk-prompt.ts": "7f6cc16b4bd0c3ac",
       "aimeat/src/data/library-packs/sdk-refinery.ts": "a23e1337130b3c7d",
-      "aimeat/src/data/library-packs/sdk-ui.ts": "d5afac40276c50cc",
+      "aimeat/src/data/library-packs/sdk-ui.ts": "fcf27a92afeda8e7",
       "aimeat/src/data/library-packs/sdk-validate.ts": "74cb81e57ef423c4",
       "aimeat/src/data/library-packs/sdk-webhook.ts": "e8cd8123c3d9d65a",
       "aimeat/src/data/library-packs/sdk-workflows.ts": "7f6ca17f8180fa7b",
-      "aimeat/src/data/library-packs/sdk.ts": "09230a2c61a07336",
+      "aimeat/src/data/library-packs/sdk.ts": "0fe3bb215860a8e2",
       "aimeat/src/data/library-packs/translations.ts": "3683cb9315747ead",
       "aimeat/src/data/library-packs/types.ts": "e9a3a4616aabd40e",
       "aimeat/src/data/library-packs/vendored-creative.ts": "d441ba5b6ac9c4d4",

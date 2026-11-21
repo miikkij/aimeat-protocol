@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-11-21 — Section 3: a refused install names every manifest problem at once. Section 5: a run's
+ *     ctx call count, ctx.memory included.
  *   2026-11-21 — Section 4: `decision: person` on an action that records a person's own decision; an
  *     agent's call waits for the person's one-press approval (services/extension/person-decision.ts).
  *   2026-11-15 — A write lands in the owner's namespace "however the code was started", not "on every road".
@@ -158,7 +160,8 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
 
 ## 3. Manifest essentials
 
-- \`metadata\` holds \`name\`, \`version\`, \`description\` and \`author\`; all four are required.
+- \`metadata\` holds \`name\`, \`version\`, \`description\` and \`author\`; all four are required. A refused
+  install names every missing or malformed field at once, so fix them all before the next try.
 - Every action needs \`id\`, \`method\`, \`path\` and \`script\`, and declares \`input\` and \`output\`
   schemas: a buyer contracts against them, and an action without both is not listed for sale.
 - \`capabilities: [network, ai, email, payments]\` at the top level: what the scripts may do beyond
@@ -260,8 +263,9 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
 - **Read another namespace's private data.** \`ctx.memory.getPublic(namespace, key)\` reads only
   public keys. Translations and settings are the person's data: the cortex reads them from the
   owner namespace, and nothing copies them into \`ext:\`.
-- **Run long, stay up, or load what the sandbox cannot.** One run has a CPU time and a memory limit,
-  nothing stays running between runs, and only JavaScript loads. Work that needs more belongs in a
+- **Run long, stay up, or load what the sandbox cannot.** One run has a CPU time and a memory limit
+  and a number of ctx calls (\`limits.max_api_calls\`, each \`ctx.memory\` call counted), nothing stays
+  running between runs, and only JavaScript loads. Work that needs more belongs in a
   service of its own: section 11.
 
 ## 6. Instances

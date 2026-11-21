@@ -26,6 +26,9 @@
  *     if (await serveAppAgentFace(res, config, storage, app, { lang: formatMdLang(req.query.lang) })) return;
  *   }
  * @version-history
+ *   2026-11-21 — A face stored as a JSON-encoded string is decoded once when read (faceText), so an
+ *     agent reads the markdown and not its escaped form (appdev pitfall
+ *     publish/agentface-value-must-be-plain-text).
  *   2026-11-04 — The cached face carries MEMORY_ANY_LEVEL_TAG (codebase analysis 2026-11-03, item C4).
  *   v1.7.0 — 2026-10-27 — Readers who miss one face entry at once share one build; when the owner's
  *     extension runs are all taken the reader gets the stored face or the converted page, uncached
@@ -58,6 +61,7 @@ import { sendMarkdown, htmlToMarkdown } from '../markdown-negotiation.js';
 import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
 import { getOwnerScopePublicMemory } from '../owner/memory.js';
 import { renderAppMarkdown, FORMAT_MD_BUSY } from '../app/format-md.js';
+import { logger } from '../../utils/logger.js';
 import {
   loadServedProvenance, provenanceFrontmatter, provenanceMarkdownNote, setProvenanceHeaders,
 } from '../ai/provenance-marks.js';
@@ -97,7 +101,27 @@ export async function loadPublicAgentFaceRecord(
   if (!rec) return null;
   if (typeof rec.value !== 'string' || rec.value.length === 0) return null;
   if (Buffer.byteLength(rec.value, 'utf-8') > AGENT_FACE_MAX_BYTES) return null;
-  return { text: rec.value, ...(rec.aiProvenanceId ? { aiProvenanceId: rec.aiProvenanceId } : {}) };
+  const text = faceText(rec.value);
+  if (!text) return null;
+  return { text, ...(rec.aiProvenanceId ? { aiProvenanceId: rec.aiProvenanceId } : {}) };
+}
+
+/**
+ * The face's markdown. A writer that JSON-encoded the markdown before storing it (a quoted string
+ * with literal \n) was served that literal text, quotes and backslashes included, to every agent
+ * (appdev pitfall publish/agentface-value-must-be-plain-text). Such a value is decoded once; any
+ * other value is served as it is.
+ */
+export function faceText(value: string): string {
+  const v = value.trim();
+  if (v.length < 2 || v[0] !== '"' || v[v.length - 1] !== '"') return value;
+  try {
+    const decoded: unknown = JSON.parse(v);
+    return typeof decoded === 'string' ? decoded : value;
+  } catch (err) {
+    logger.debug('agent face: a quoted face is not a JSON string, served as written', { error: String(err) });
+    return value;
+  }
 }
 
 /**

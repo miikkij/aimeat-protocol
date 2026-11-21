@@ -22273,7 +22273,8 @@ paths:
         to fix (`/v1/profile?tab=ai&open=ai-provider-<id>&test=<capability>`, or `open=ai-providers`);
         `agentFix`, the same fix for an AI; for UNTESTED `testProvider` { id, title, capability }; and
         for NO_PROVIDER_SUPPORTS the provider types that could serve it. Every AI call's refusal
-        carries the same `reason`, `fix`, `agentFix` and `settingsUrl` in `error.details`. Each capability is planned with the
+        carries the same `reason`, `fix`, `agentFix` and `settingsUrl` in `error.details`, and `requiresLocal: true` when every
+        provider was left out only for running off this machine (the app's `local.<capability>=yes` or a local role). Each capability is planned with the
         same gate a call runs, for this caller (an owner, an agent with its own key and lists, an app
         with its grant and its meta), and nothing is spent. Also the owner's model policy mode and
         whether it binds this caller, today's budget, the catalogue's snapshot, and `guide`, the skill
@@ -41250,8 +41251,10 @@ paths:
                                   What the app still lacks: an agent face, a bound skill. Also `size`
                                   — the bytes just published, the share of this node's ceiling, the
                                   growth per day and the date that rate meets the ceiling, with a
-                                  `note` once it is worth saying out loud. Best-effort, so it can be
-                                  absent.
+                                  `note` once it is worth saying out loud. `register`, only when the
+                                  app's data map says it keeps personal data and the app has no
+                                  register: the calls that draft and write one. Best-effort, so it can
+                                  be absent.
         '200':
           description: Presigned upload URL (when mode=presigned)
         '403':
@@ -53062,7 +53065,9 @@ paths:
         readWorkspaceOp). Without `ids`, every space's entries with id, title, updated, version and
         size, plus the manifest, the pinned apps, the locked schemas, the member change rule and the
         section indexes. With `ids`, the full value of only those records (an id, or a record's full
-        memory key inside this workspace). Version history is never returned. A session from another
+        memory key inside this workspace); an id that records of more than one space carry, asked
+        without `space`, is answered from the first space and listed in `ambiguous` ({ id, spaces,
+        answered_from }). Version history is never returned. A session from another
         node is refused. For an active member, `organism_directive` carries the organism's directive and this
         workspace's own (organism.{id}.w.{ws}.meta.directive), as on GET /v1/organisms/{id}.
       tags: [Organisms]

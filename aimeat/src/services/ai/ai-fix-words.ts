@@ -18,6 +18,9 @@
  * @structure CapabilityReason · reasonOf · agentFixFor · aiSettingsUrl · personLocale · personFixFor ·
  *   withPersonFix · BalanceChoice · balanceChoices
  * @version-history
+ *   v1.2.0 — 2026-11-21 — A refusal whose every provider was left out for leaving this machine
+ *     carries `requiresLocal: true` and an agentFix naming the app's local.<cap>=yes or a local role
+ *     (localOnlyFix); the person's sentence and the reason are unchanged.
  *   v1.1.1 — 2026-11-01 — No free-model way on in eu-only (ai.region_mode), where the free router does not run.
  *   v1.1.0 — 2026-10-29 — BALANCE_SPENT (AI_BALANCE_SPENT: the allowance the owner bought is used up)
  *     carries `choices`, the three ways on that Jouni named: buy more, their own key, the free model
@@ -118,6 +121,17 @@ export function personFixFor(locale: Locale, reason: CapabilityReason, cap: AiCa
   return `${t(what)} ${t(`aipage.offDo.${reason}`)}`.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? vars[k] : m));
 }
 
+/**
+ * The fix when every provider was left out for leaving this machine (appdev pitfall
+ * ai/local-capability-means-this-machine-only): `local.<cap>=yes` in an app's aimeat-ai meta, or a
+ * local role, turns the owner's cloud providers off for that capability.
+ */
+export function localOnlyFix(cap: AiCapability): string {
+  return `Every provider the owner has for ${cap} runs off this machine, and this call asks for one on this machine: `
+    + `the app's aimeat-ai meta says local.${cap}=yes, or the role it calls is local. Remove local.${cap}=yes (or the role's local) `
+    + `to let the owner's cloud provider answer, or the owner adds a provider on this machine to keep the data here.`;
+}
+
 /** The provider to test, when a test is the fix. */
 export function untestedProviderOf(e: AiCompletionError): { id: string; title: string } | undefined {
   const r = rejectedOf(e).find(x => x.reason === 'untested');
@@ -138,11 +152,16 @@ export async function withPersonFix(
   const untested = reason === 'UNTESTED' ? untestedProviderOf(e) : undefined;
   const locale = await personLocale(storage, gaii, lang);
   const settingsUrl = aiSettingsUrl(config, untested ? { provider: untested.id, capability: cap } : undefined);
+  // Every provider was left out only for leaving this machine: the call asked for a local one. The
+  // reason stays NO_PROVIDER_SUPPORTS for the person; the AI is told where the ask came from.
+  const rejected = rejectedOf(e);
+  const onlyLocal = rejected.length > 0 && rejected.every(r => r.reason === 'requires-local');
   e.details = {
     ...details,
     reason,
     fix: personFixFor(locale, reason, cap, untested?.title),
-    agentFix: agentFixFor(reason, cap, []),
+    agentFix: onlyLocal ? localOnlyFix(cap) : agentFixFor(reason, cap, []),
+    ...(onlyLocal ? { requiresLocal: true } : {}),
     settingsUrl,
     ...(untested ? { testProvider: { id: untested.id, title: untested.title, capability: cap } } : {}),
     ...(reason === 'BALANCE_SPENT' ? { choices: balanceChoices(config, locale, settingsUrl, cap) } : {}),

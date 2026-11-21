@@ -15,6 +15,8 @@
  *   const mode = memoryWriteMode(args);
  *   if ('error' in mode) return toolError(mode.error.code, mode.error.message);
  * @version-history
+ *   v1.0.1 — 2026-11-21 — The patch refusal gives the reason of the field given only: ai_provenance
+ *     was told that a record at a group keeps its group.
  *   v1.0.0 — 2026-11-09 — Initial (aimeat_memory_write `patch`).
  */
 
@@ -38,7 +40,13 @@ export function memoryWriteMode(input: Record<string, unknown>): MemoryWriteMode
     if (hasValue) return { mode: 'value' };
     const extra = ['group_id', 'ai_provenance', 'ai_provenance_id'].filter(k => given(input, k));
     if (extra.length) {
-        return { error: { code: 'INVALID_INPUT', message: `A patch takes no ${extra.join(' or ')}: a record at group keeps its group, and the node stamps the merged value itself. Leave ${extra.length > 1 ? 'them' : 'it'} out, or write the whole value.` } };
+        // Each field's own reason, and only for the fields given: a patch with ai_provenance was told
+        // about groups (appdev pitfall publish/skill-description-and-patch-limits).
+        const why = [
+            ...(extra.includes('group_id') ? ['a record at a group keeps its group'] : []),
+            ...(extra.some(k => k !== 'group_id') ? ['the node stamps the merged value\'s provenance itself'] : []),
+        ];
+        return { error: { code: 'INVALID_INPUT', message: `A patch takes no ${extra.join(' or ')}: ${why.join(', and ')}. Leave ${extra.length > 1 ? 'them' : 'it'} out, or write the whole value.` } };
     }
     return { mode: 'patch' };
 }

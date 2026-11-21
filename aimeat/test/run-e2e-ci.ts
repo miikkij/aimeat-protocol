@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-21 -- e2e-workspace-read-ambiguous.ts joins the list (not the guard tier): an id two spaces
+ *     hold, read without a space, names both in `ambiguous`.
  *   2026-11-21 -- e2e-no-silent-drops.ts joins the list (not the guard tier): ignored_fields on a task and a
  *     workspace create, and a strict lock's refusal that names the lock.
  *   2026-11-21 -- e2e-feature-flag-off.ts joins the list (not the guard tier): a switched-off feature's
@@ -1588,6 +1590,8 @@ const ALL_SUITES = [
     // Three routes that dropped part of a request and answered success now name it: a task's unknown
     // field, a workspace schemaRef that locked nothing, a strict lock closing an open schema.
     'test/e2e-no-silent-drops.ts',
+    // A batch read of an id two spaces hold names both spaces in `ambiguous` (tool-ops readWorkspaceOp).
+    'test/e2e-workspace-read-ambiguous.ts',
     // The new-version check behind the operator's header notice: against a stub registry, the
     // diff of the change logs, the registry failing, and the switch that stops the requests.
     'test/e2e-node-update.ts',
