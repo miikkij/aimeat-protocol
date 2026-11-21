@@ -2507,6 +2507,53 @@ components:
         how_to_fix: { type: string }
         shadowed_by: { type: string, description: 'SHADOWED_BY_OWNER_COPY: the owner GHII whose copy owner-scope reads resolve to' }
 
+    ObjectiveSummary:
+      type: object
+      description: >-
+        One objective of a manifest (an organism's or a workspace's), as the overviews and the organism
+        read show it. `level`, `serves` and `until` pass through as the manifest states them.
+      required: [id, kpis]
+      properties:
+        id: { type: string }
+        statement: { type: string }
+        why: { type: string }
+        status: { type: string, enum: [active, met, abandoned] }
+        level:
+          type: string
+          description: How much the objective weighs, as written; the convention is main, important or background.
+        serves:
+          type: array
+          description: The objectives (of another organism or of this one) this objective serves.
+          items:
+            type: object
+            required: [organism, objective]
+            properties:
+              organism: { type: string }
+              objective: { type: string }
+        until: { type: string, description: The date the objective is meant to hold until, as written. }
+        kpis:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              kind: { type: string, enum: [value, cost, roi, outcome, quality] }
+              unit: { type: string }
+              target:
+                type: object
+                properties:
+                  op: { type: string, enum: ['<', '<=', '>', '>=', '==', between] }
+                  value: { type: number }
+                  values: { type: array, items: { type: number } }
+              current:
+                type: number
+                nullable: true
+                description: Resolved value (computed or declared); null when not measurable yet
+              computed:
+                type: boolean
+                description: True when `current` was computed from a records rollup
+              measuredAt: { type: string }
+
     MemoryWriteResult:
       description: A written memory entry, with what the write has to tell the caller.
       allOf:
@@ -19984,13 +20031,24 @@ paths:
     get:
       operationId: listMemory
       summary: List memory (TOC)
-      description: List all memory keys for the authenticated agent.
+      description: >-
+        List all memory keys for the authenticated agent. With `include=meta` and `limit` but no
+        `cursor`, the answer is cut at `limit` and says so with `truncated: true`; to read every key
+        without gaps, pass `cursor` (empty for the first page) and follow `next_cursor` until it is null.
       tags: [Memory]
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/Pagination'
-        - $ref: '#/components/parameters/PerPage'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+          description: >-
+            The most items the answer carries (at most 1000; a larger number is read as 1000). Without
+            `cursor` the list is cut after this many and `total`, `count` and `quota` still describe
+            every match. With `include=meta` and `cursor`, the page size.
         - name: visibility
           in: query
           schema:
@@ -20059,7 +20117,8 @@ paths:
         '200':
           description: |
             Memory listing with quota info. With `count=true`, `data` holds `count` alone. With
-            `include=meta`, each item carries `bytes` in place of `value`.
+            `include=meta`, each item carries `bytes` in place of `value`. With `include=meta`,
+            `limit` and `cursor`, `data` is `{ items, next_cursor, limit }` and nothing else.
           content:
             application/json:
               schema:
@@ -20105,16 +20164,33 @@ paths:
                                   description: Present when the record is classified with a warning an AI is to be told.
                           total:
                             type: integer
+                            description: Every matching key, also when `limit` cut the list. Absent on a cursor page.
                           shown:
                             type: integer
                             description: Present when `limit` cut the list.
                           truncated:
                             type: boolean
+                            description: >-
+                              True when `limit` cut the list: `items` holds the first `shown` of `total`.
+                              Absent when every match is in `items`. A cursor page never carries it; it
+                              says it has more with a non-null `next_cursor`.
                           hint:
                             type: string
+                            description: With `truncated`, how to see the rest (narrow with prefix or tags, add include=meta, raise limit), in words.
+                          next_cursor:
+                            type: [string, 'null']
+                            description: >-
+                              A cursor page only (`include=meta`, `limit`, `cursor`): the cursor of the
+                              next page, the last key of this one; null when the listing ended.
+                          limit:
+                            type: integer
+                            description: 'A cursor page only: the page size the node used.'
+                          offset:
+                            type: integer
+                            description: With include=meta, the `offset` asked for, echoed back when given.
                           quota:
                             type: object
-                            description: Memory quota usage, summed over everything that matched.
+                            description: Memory quota usage, summed over everything that matched. Absent on a cursor page.
                             properties:
                               max_keys:
                                 type: integer
@@ -51816,6 +51892,11 @@ paths:
         Value per member: while a creator shows the organism's value report per member, an active
         member gets `value_per_member` ({ on, set_at, from, to, yours }): that it is on, and their own
         numbers for the last 30 days.
+
+        Objectives: an active member gets `objectives`, the organism's own (its manifest,
+        `organism.{id}.meta.manifest`, the copy a creator or admin wrote last), with `level`, `serves`,
+        `until` and the KPIs; `[]` when the organism has no manifest or no objectives. Anyone else gets
+        no `objectives` field.
       tags: [Organisms]
       parameters:
         - name: id
@@ -51850,6 +51931,14 @@ paths:
                             properties:
                               role: { type: string }
                               status: { type: string }
+                          objectives:
+                            type: array
+                            description: >-
+                              An active member only: the organism's own objectives. A KPI whose source
+                              names a workspace (`{ from: 'records', ws, space, agg }`) is computed from
+                              that workspace's records when the caller may read it; otherwise it keeps
+                              its declared value.
+                            items: { $ref: '#/components/schemas/ObjectiveSummary' }
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -52550,6 +52639,14 @@ paths:
                     `direct` writes it at once with the member's name on it; `suggest` files it as a
                     suggestion the creator or an admin approves (the default). Stored as the
                     workspace's own `…meta.rules` record, so a manifest replace never resets it.
+                expected_version:
+                  type: integer
+                  description: >
+                    The version of the stored manifest the caller read (`manifest_version` in
+                    GET .../workspace/index and in this route's answer). When the manifest is at
+                    another version, the update answers 409 VERSION_CONFLICT and writes nothing, the
+                    schema locks included; the manifest write itself lands only on this version.
+                    Without it the update replaces what is there.
       responses:
         '200':
           description: Updated. Returns the list of meta records changed.
@@ -52567,8 +52664,18 @@ paths:
                           creator: { type: string }
                           name: { type: string }
                           member_changes: { type: string, enum: [direct, suggest], description: The rule now in force, when this call set it }
+                          manifest_version: { type: integer, description: The stored manifest's version after this call, the one the next expected_version names. }
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          description: >
+            VERSION_CONFLICT: the manifest is not at `expected_version`; `details` carries
+            `currentVersion` and `expectedVersion`. Nothing was written. Read the manifest again,
+            apply the change to that version and send it with its version. Also ARCHIVED: the
+            workspace or organism is archived (read-only).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403':
           description: >
             Not the workspace creator (or an org admin). A member adds a space with
@@ -52891,7 +52998,8 @@ paths:
         whole organism in one read and decide which workspace to drill into — then call
         `/v1/organisms/{id}/workspace/overview?ws=` for the detail. It is a projection of live state,
         never persisted, so it cannot drift. Membership-gated; a workspace the caller cannot read is
-        listed by name only.
+        listed by name only. The organism's own objectives (its manifest, `organism.{id}.meta.manifest`)
+        open the Markdown as an "Organism objectives" block and come back in `objectives`.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -52935,6 +53043,17 @@ paths:
                           workspaces:
                             type: integer
                             description: Number of workspaces summarised
+                          archivedWorkspaces:
+                            type: integer
+                            description: Number of archived workspaces, whether or not this view lists them
+                          objectives:
+                            type: array
+                            description: >-
+                              The organism's own objectives, from its manifest. A KPI whose source names a
+                              workspace (`{ from: 'records', ws, space, agg }`) is computed from that
+                              workspace's records when the caller may read it; otherwise it keeps its
+                              declared value. Empty when the organism has no manifest or no objectives.
+                            items: { $ref: '#/components/schemas/ObjectiveSummary' }
             text/markdown:
               schema:
                 type: string
@@ -52950,7 +53069,9 @@ paths:
       description: >-
         The same answer as the aimeat_workspace_read MCP tool (services/workspace-tool-ops.ts
         readWorkspaceOp). Without `ids`, every space's entries with id, title, updated, version and
-        size, plus the manifest, the pinned apps, the locked schemas, the member change rule and the
+        size, plus the manifest, `manifest_version` (the stored manifest's version, which
+        PUT /v1/organisms/{id}/workspace takes back as `expected_version`; not the manifest's own
+        `manifestVersion` format field), the pinned apps, the locked schemas, the member change rule and the
         section indexes. With `ids`, the full value of only those records (an id, or a record's full
         memory key inside this workspace). Version history is never returned. A session from another
         node is refused. For an active member, `organism_directive` carries the organism's directive and this
@@ -53109,35 +53230,7 @@ paths:
                               KPIs and a resolved `current` value — computed from the workspace's own
                               published records when the KPI `source` is `{from:'records',...}`, otherwise
                               the declared value. Empty when none are declared or the caller cannot read.
-                            items:
-                              type: object
-                              properties:
-                                id: { type: string }
-                                statement: { type: string }
-                                why: { type: string }
-                                status: { type: string, enum: [active, met, abandoned] }
-                                kpis:
-                                  type: array
-                                  items:
-                                    type: object
-                                    properties:
-                                      name: { type: string }
-                                      kind: { type: string, enum: [value, cost, roi, outcome, quality] }
-                                      unit: { type: string }
-                                      target:
-                                        type: object
-                                        properties:
-                                          op: { type: string, enum: ['<', '<=', '>', '>=', '==', between] }
-                                          value: { type: number }
-                                          values: { type: array, items: { type: number } }
-                                      current:
-                                        type: number
-                                        nullable: true
-                                        description: Resolved value (computed or declared); null when not measurable yet
-                                      computed:
-                                        type: boolean
-                                        description: True when `current` was computed from a records rollup
-                                      measuredAt: { type: string }
+                            items: { $ref: '#/components/schemas/ObjectiveSummary' }
             text/markdown:
               schema:
                 type: string
@@ -85588,8 +85681,10 @@ paths:
         data domains. A change in one organism workspace is also the domain
         `workspace:<organismId>/<workspaceId>`, sent only to streams of that organism's members. A
         stream opened for one app emits `event: app` with
-        `data: {"kind":"version","version":N}` or `data: {"kind":"draft"}` instead. `:keepalive`
-        comments every 15s. Response is `text/event-stream`; 503 when the visitor streams are at their cap.
+        `data: {"kind":"version","version":N}` or `data: {"kind":"draft"}` instead. Every 15 s the
+        stream sends the keepalive event `event: alive` with `data: {}` (a named event, not an SSE
+        comment, so a page can listen for it; an EventSource with no `alive` listener ignores it).
+        Response is `text/event-stream`; 503 when the visitor streams are at their cap.
         A signed-in stream ends with `event: revoked` when the node stops honouring the credential
         its ticket was minted with (signed out, agent or app grant removed, account deactivated),
         checked before a change frame and every 60 seconds; mint a new ticket with a live credential

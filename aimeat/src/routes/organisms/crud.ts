@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-21 — GET /v1/organisms/:id carries the organism's own `objectives` for a member, with
+ *     level, serves, until and their KPIs (services/structure/organism-objectives.ts).
  *   2026-11-20 — GET /v1/organisms/:id carries `value_per_member` for a member while the creators see
  *     the value report per member (services/value/per-member.ts).
  *   2026-11-20 — GET /v1/organisms/:id carries the organism's directive for a member and its answer
@@ -127,6 +129,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { teamDeleteGate } from '../../services/team/action-gate.js';
 import { directiveFields } from '../../services/organism/directives.js';
 import { perMemberFields } from '../../services/value/per-member.js';
+import { objectiveFields } from '../../services/structure/organism-objectives.js';
 
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
@@ -342,6 +345,9 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       ...await directiveFields({ storage, config }, detailCaller.ownerName ?? undefined, id),
       // Whether the creators see the value report per member, and this member's own numbers (services/value/per-member.ts).
       ...await perMemberFields({ storage, config }, detailCaller.ownerName ?? undefined, id),
+      // The organism's own objectives, for a member (services/structure/organism-objectives.ts).
+      ...await objectiveFields({ storage, config }, detailCaller.ownerName ?? undefined, id,
+        req.auth ? resolveIdentity(req.auth, config.nodeId) : undefined, readerFor({ storage, config }, req.auth)),
     }));
   });
 

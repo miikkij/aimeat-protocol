@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-21 — aimeat_organism_get carries the organism's own `objectives` for a member, with level,
+ *     serves, until and their KPIs (services/structure/organism-objectives.ts).
  *   2026-11-20 — aimeat_organism_get carries `value_per_member` for a member while the creators see the
  *     value report per member (services/value/per-member.ts).
  *   2026-11-20 — aimeat_organism_get carries the organism's directive for a member and its answer
@@ -154,6 +156,7 @@ import { resourceRefusal } from './resource-refusal.js';
 import { registerOrganismJoinRequestTools } from './organism-join-requests.js';
 import { registerTeamTools } from './teams.js';
 import { directiveFields } from '../services/organism/directives.js';
+import { objectiveFields } from '../services/structure/organism-objectives.js';
 import { perMemberFields } from '../services/value/per-member.js';
 
 export function registerOrganismsTools(
@@ -356,6 +359,8 @@ export function registerOrganismsTools(
                         ...await directiveFields({ storage, config }, getOwnerName(), organism.id),
                         // Whether the creators see the value report per member, and your own numbers.
                         ...await perMemberFields({ storage, config }, getOwnerName(), organism.id),
+                        // The organism's own objectives, for a member (services/structure/organism-objectives.ts).
+                        ...await objectiveFields({ storage, config }, getOwnerName(), organism.id, caller().ownerGhii, readerForAgent({ storage, config }, agentGaii)),
                     }, null, 2),
                 }],
             };

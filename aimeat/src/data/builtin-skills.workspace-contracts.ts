@@ -30,6 +30,9 @@
  * @structure WORKSPACE_CONTRACTS_SKILL_ENTRY
  * @usage import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
  * @version-history
+ *   v1.1.6 — 2026-11-21 — Section 11: the organism's own objectives (organism.<id>.meta.manifest, a KPI
+ *     source names its workspace with `ws`), level/serves/until, where members read them, and
+ *     expected_version on aimeat_workspace_update.
  *   v1.1.5 — 2026-11-19 — Section 9: an app's start of a waiting task waits too when the owner set
  *     task_start_app_waits (services/agent/task-rules.ts appStartWaits).
  *   v1.1.4 — 2026-10-28 — The task-start floor reads permissions given by name; `*` holds no task.
@@ -300,12 +303,22 @@ through the node's push.
 Use this only when the organism carries real, ongoing value; a place for one afternoon declares none
 of it.
 
-- **\`objectives\`** on the manifest (organism or workspace): \`{ id, statement, why, status }\`, status
-  \`active\`, \`met\` or \`abandoned\`, each with \`kpis\`: \`{ name, kind, unit, target: { op, value },
+- **\`objectives\`** on the manifest: the organism's own (\`organism.<id>.meta.manifest\`, written by a
+  creator or admin) for the direction of the whole organism, or a workspace's for its work. Each is
+  \`{ id, statement, why, status }\`, status \`active\`, \`met\` or \`abandoned\`, and may carry \`level\`
+  (\`main\`, \`important\` or \`background\`), \`serves\` (\`[{ organism, objective }]\`, the objective it
+  serves) and \`until\` (a date). Each has \`kpis\`: \`{ name, kind, unit, target: { op, value },
   source }\`. \`kind\` is \`value\`, \`cost\`, \`roi\`, \`outcome\` or \`quality\`, and the unit is the
   domain's own (euros, plots, closed deals). A \`source\` of the form \`{ from: 'records', space, agg:
   'sum'|'count'|'avg'|'min'|'max', field, equals?: { field, value } }\` is computed by the node from the
-  organism's own published records; a text \`source\` is a recipe a person updates by hand.
+  workspace's own published records; on the organism's manifest it also names the workspace (\`ws\`)
+  and is computed only for a reader who may read that workspace. A text \`source\` is a recipe a person
+  updates by hand. Members read the organism's objectives in \`aimeat_organism_get\` and
+  \`aimeat_organism_overview\`, a workspace's in \`aimeat_workspace_overview\`.
+- **Changing a workspace manifest safely.** \`aimeat_workspace_update\` with \`manifest\` replaces the
+  whole manifest. Send the \`manifest_version\` that \`aimeat_workspace_read\` gave you as
+  \`expected_version\`: if someone changed the manifest meanwhile, nothing is written and the answer is
+  \`VERSION_CONFLICT\`; read it again and apply your change to that version.
 - **\`servesObjective: "<objective id>"\`** on a space says which objective it feeds.
 - **\`_meta\`** inside a record: \`{ why, value: { metric, amount, unit }, log: [{ at, by, note }] }\`, one
   line per change that matters. It says why the record changed, which the version history cannot. A

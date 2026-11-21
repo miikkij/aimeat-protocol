@@ -6,6 +6,8 @@
  *   OKF overviews, structure graphs, dangling-refs scan, structure timeline, content search, and the
  *   comments/threads endpoints. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — GET /v1/organisms/:id/overview answers the organism's own `objectives` beside the
+ *     Markdown, which now opens with them (services/structure/overview.ts).
  *   2026-11-13 — GET /v1/organisms/:id/overview and GET /v1/organisms/:id/search ask
  *     services/organism-read/member.ts, the organism read and the membership rule
  *     aimeat_organism_overview and aimeat_organism_search ask; POST, GET and DELETE /:id/comments ask
@@ -316,9 +318,11 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
     const includeArchived = req.query.includeArchived === 'true';
-    const { markdown, workspaces, archivedWorkspaces } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii, includeArchived, reader: readerFor({ storage, config }, req.auth) });
+    const { markdown, workspaces, archivedWorkspaces, objectives } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii, includeArchived, reader: readerFor({ storage, config }, req.auth) });
     if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
-    res.json(success(config.nodeId, { markdown, workspaces, archivedWorkspaces }, [
+    // `objectives` are the organism's own (its manifest), with their KPIs resolved as the workspace
+    // overview resolves a workspace's, so a consumer reads the direction without parsing Markdown.
+    res.json(success(config.nodeId, { markdown, workspaces, archivedWorkspaces, objectives }, [
       { description: 'Drill into one workspace', method: 'GET', url: `/v1/organisms/${id}/workspace/overview?ws=<ws>` },
       ...(archivedWorkspaces && !includeArchived ? [{ description: 'Include archived workspaces', method: 'GET', url: `/v1/organisms/${id}/overview?includeArchived=true` }] : []),
     ]));

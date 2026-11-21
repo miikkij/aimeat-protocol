@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-21 — readWorkspaceOp's index carries manifest_version, the stored manifest's version that
+ *     aimeat_workspace_update takes back as expected_version.
  *   2026-11-20 — readWorkspaceOp's index carries the organism's and the workspace's directive for a
  *     member (services/organism/directives.ts); a batch open does not, so it reads only what it opens.
  *   2026-11-20 — readWorkspaceOp records each record it opens by id for the value signals (services/value/signal-buffer.ts).
@@ -359,7 +361,11 @@ export async function readWorkspaceOp(
     for (const [name, s] of Object.entries(rowSpaces)) counts[name] = s.rows;
     const schemas = await readWorkspaceSchemas(storage, organismId, ws);
 
-    return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest, apps, rules, counts, index,
+    return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest,
+        // The stored manifest record's version, which aimeat_workspace_update takes back as
+        // expected_version (not the manifest's own manifestVersion field, its format version).
+        manifest_version: manRec.version,
+        apps, rules, counts, index,
         // What the organism's creators ask a member's AI to do here (services/organism/directives.ts).
         // On the index only: a batch open reads nothing but the records it opens (C7), and the AI
         // reads the index before it opens records.

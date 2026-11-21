@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — PUT /v1/organisms/:id/workspace takes expected_version, the manifest version the
+ *     caller read: another version answers 409 VERSION_CONFLICT and nothing is written.
  *   2026-11-20 — PUT /v1/organisms/:id/workspace takes a pinned app named without `.html` (services/app/app-ref-inputs.ts).
  *   2026-11-15 — DELETE /v1/organisms/:id/workspace asks the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-14 — PUT /v1/organisms/:id/workspace asks requireMember, the role aimeat_workspace_update
@@ -419,6 +421,8 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
         manifest: req.body?.manifest, schemas: req.body?.schemas,
         apps: Array.isArray(req.body?.apps) ? req.body.apps : undefined,
         memberChanges: req.body?.member_changes,
+        // The manifest version the caller read: a stale one is refused 409 VERSION_CONFLICT.
+        expectedVersion: req.body?.expected_version,
       });
       emitChange('organisms');
       // A new name meets the detection rules written for workspaces (plan doc-mvdipuyqraas, L1.6).
@@ -428,7 +432,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       void updateOrganismStructure(storage, config, id, { event: 'workspace updated', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(err => { logger.warn('PUT /v1/organisms/:id/workspace: best-effort', { error: String(err) }); });
     } catch (e) {
       if (e instanceof WorkspaceMetaError) {
-        const status = e.code === 'WS_NOT_FOUND' ? 404 : e.code === 'NOT_CREATOR' || e.code === 'ACCESS_DENIED' ? 403 : 400;
+        const status = e.code === 'WS_NOT_FOUND' ? 404 : e.code === 'NOT_CREATOR' || e.code === 'ACCESS_DENIED' ? 403 : e.code === 'VERSION_CONFLICT' ? 409 : 400;
         res.status(status).json(error(config.nodeId, e.code, e.message, status, e.details));
         return;
       }
