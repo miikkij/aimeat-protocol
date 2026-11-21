@@ -15,6 +15,8 @@
  *   version recorded here alongside a hash of the pack's bytes. Change the code and the hash moves,
  *   and this fails until the version is bumped with it.
  * @version-history
+ *   v1.1.4 -- 2026-11-21 -- aimeat-input 1.1.0, aimeat-viewport 1.1.0 and aimeat-dag 1.1.5 recorded,
+ *     bumped with their appdev-pitfall fixes (grab point, tap target).
  *   v1.1.3 -- 2026-11-15 -- aimeat-canvas 1.0.2 recorded, bumped with its save fix (create, then
  *     update with the version).
  *   v1.1.2 -- 2026-11-05 -- aimeat-i18n 1.4.1 recorded, bumped with its useProfile and withZone fixes
@@ -60,10 +62,10 @@ const dir = fileURLToPath(new URL('../../public/cortex-bundled/', import.meta.ur
 const KNOWN: Record<string, { version: string; sha256: string }> = {
     'aimeat-canvas': { version: '1.0.2', sha256: '06570c624375c63c' },
     'aimeat-charts': { version: '1.1.3', sha256: 'cdc21136313d147f' },
-    'aimeat-dag': { version: '1.1.4', sha256: '56fff8df06d77259' },
+    'aimeat-dag': { version: '1.1.5', sha256: '29e65880b6f42ffd' },
     'aimeat-flow': { version: '1.0.1', sha256: '1634ee00cbb0099d' },
     'aimeat-i18n': { version: '1.4.1', sha256: '6e2e000475bd87f4' },
-    'aimeat-input': { version: '1.0.0', sha256: '5968dddac74e78aa' },
+    'aimeat-input': { version: '1.1.0', sha256: '802605f5fe1b616d' },
     'aimeat-surface': { version: '1.2.0', sha256: 'baad6d81ddbc1f3e' },
     'aimeat-ui-dialogs': { version: '1.0.1', sha256: '70a017c3b69a64ce' },
     'aimeat-ui-forms': { version: '1.0.0', sha256: 'edc35e2d8441c1a0' },
@@ -71,7 +73,7 @@ const KNOWN: Record<string, { version: string; sha256: string }> = {
     'aimeat-ui-motion': { version: '1.0.2', sha256: '36dc71fef2a69084' },
     'aimeat-ui-nav': { version: '1.0.0', sha256: '949dcbde43c6bf61' },
     'aimeat-ui-viewers': { version: '1.1.0', sha256: 'd8085d04d0064238' },
-    'aimeat-viewport': { version: '1.0.4', sha256: '1d215dd00655b1a8' },
+    'aimeat-viewport': { version: '1.1.0', sha256: 'ccaf56d050818ae9' },
     'aimeat-vocab': { version: '1.0.0', sha256: 'a151786d13fe2291' },
 };
 

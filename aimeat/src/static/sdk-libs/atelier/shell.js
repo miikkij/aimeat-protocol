@@ -26,6 +26,10 @@
  * @usage  const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  *         a.main.appendChild(view);   // the main element is yours to fill
  * @version-history
+ *   v0.71.0 — 2026-11-21 — An app made with nav: 'side' and no entries gets a nav whose first
+ *     set({ items }) builds the side column and the phone bar; it was null, so the column could
+ *     never appear (appdev pitfall atelier/atelier-kit-migration-traps, part 1). Every other app's
+ *     nav is as before.
  *   v0.69.0 — 2026-11-10 — Two optional hooks. onSession(session): with requireLogin off the app
  *     starts once, and a session that appears after onReady ran (a restore that finished late, a
  *     sign-in) never reached it; it does now. onOffline(who): the node gives no answer and the
@@ -167,7 +171,7 @@ const MODE_BUTTON = '#aimeat-mode-switch button[data-mode]';
  * @property {(kind: 'loading'|'ready'|'empty'|'error'|'signin'|'none', opts?: { title?: string, hint?: string, onRetry?: () => void }) => void} status
  * @property {(key: string, vars?: Record<string, any>) => string} t
  * @property {typeof i18n} i18n
- * @property {{ set: (patch: { value?: string, items?: any[] }) => void }|null} nav  the navigation, when navItems were given
+ * @property {{ set: (patch: { value?: string, items?: any[] }) => void }|null} nav  the navigation, when navItems were given or nav is 'side'
  * @property {import('./ambient.js').AmbientHandle|null} ambient  the layer behind the frame (null after `ambient: false`)
  * @property {{ el: HTMLElement }|null} weather  the bar's weather switch
  * @property {() => void} destroy
@@ -296,9 +300,11 @@ export function app(spec) {
   // content column, and the two scroll together inside one frame, so the column stays in place
   // while the page moves. On a phone the column gives way to the bottom bar (the stylesheet
   // decides by width), carrying the top-level pages and a Menu with all of them.
-  const sideMode = spec.nav === 'side' && !!(spec.navItems && spec.navItems.length);
+  // `let`: an app made with nav: 'side' and no entries yet gets the column on its first
+  // nav.set({ items }) (enterSideMode below).
+  let sideMode = spec.nav === 'side' && !!(spec.navItems && spec.navItems.length);
   const main = el('main', { class: 'ak-app__main' + (sideMode ? '' : ' ak-scroll') });
-  const sideHost = sideMode ? el('aside', { class: 'ak-app__side' }) : null;
+  let sideHost = sideMode ? el('aside', { class: 'ak-app__side' }) : null;
   const frame = sideMode ? el('div', { class: 'ak-app__frame ak-scroll' }, [sideHost, main]) : null;
   const footer = spec.footer != null
     ? el('footer', { class: 'ak-app__foot', text: spec.footer })
@@ -359,19 +365,31 @@ export function app(spec) {
       onClose: function () { menuSheet = null; },
     });
   }
-  if (spec.navItems && spec.navItems.length) {
-    const items = linked(spec.navItems);
-    const first = spec.navValue || items[0].id;
+  /** Build the navigation from its first entries: the side column in side mode, and the bar. */
+  function mountNav(rawItems, value) {
+    const items = linked(rawItems);
+    const first = value || items[0].id;
     allItems = items;
     current = first;
     if (sideMode && sideHost) {
       side = sideNav({ target: sideHost, items: items, value: first, label: spec.navLabel });
     }
     barItems = sideMode ? phoneBar(items, openMenu) : items;
-    nav = bottomNav({ items: barItems, value: sideMode ? barValue(first) : spec.navValue });
+    nav = bottomNav({ items: barItems, value: sideMode ? barValue(first) : value });
     root.appendChild(nav.el);
     root.classList.add('ak-app--bottomnav');
   }
+  /** The side frame for an app made with nav: 'side' before it had any entries: main moves into it. */
+  function enterSideMode() {
+    const after = main.nextSibling;
+    sideHost = el('aside', { class: 'ak-app__side' });
+    main.classList.remove('ak-scroll');
+    const lateFrame = el('div', { class: 'ak-app__frame ak-scroll' }, [sideHost, main]);
+    root.insertBefore(lateFrame, after);
+    root.classList.add('ak-app--sidenav');
+    sideMode = true;
+  }
+  if (spec.navItems && spec.navItems.length) mountNav(spec.navItems, spec.navValue);
 
   const mount = resolve(spec.target, document.body);
   mount.appendChild(root);
@@ -609,11 +627,20 @@ export function app(spec) {
     /** The app's navigation (the side column and the phone's bottom bar together): move the
      *  mark with `set({ value })`, change the counts with `set({ items })`. Null without navItems. */
     get nav() {
-      if (!nav) return null;
+      // Without entries the navigation is null, as before, except for an app made with
+      // nav: 'side': its first set({ items }) builds the column and the bar, which the app could
+      // not do before (appdev pitfall atelier/atelier-kit-migration-traps, part 1).
+      if (!nav && spec.nav !== 'side') return null;
       return {
         /** @param {{ value?: string, items?: any[] }} patch */
         set(patch) {
           if (!patch) return;
+          if (!nav) {
+            if (!patch.items || !patch.items.length) return;
+            if (!sideMode) enterSideMode();
+            mountNav(patch.items, patch.value);
+            return;
+          }
           const next = patch.items ? linked(patch.items) : null;
           if (next) { allItems = next; barItems = sideMode ? phoneBar(next, openMenu) : next; }
           if (patch.value != null) current = patch.value;

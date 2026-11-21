@@ -21,18 +21,20 @@ const g = globalThis as any;
 const saved: Record<string, any> = {};
 
 /** The page sources the resolver reads: address, storage, cookie, browser, and the locales meta. */
-function page(opts: { search?: string; stored?: string; cookie?: string; navigator?: string; locales?: string; served?: string; blocked?: boolean }) {
+function page(opts: { search?: string; stored?: string; cookie?: string; navigator?: string; locales?: string; served?: string; blocked?: boolean; defaultLang?: string }) {
   const store = new Map<string, string>();
   if (opts.stored) store.set('aimeat-lang', opts.stored);
   const meta = opts.locales == null ? null : { content: opts.locales };
   const servedMeta = opts.served == null ? null : { content: opts.served };
+  const defaultMeta = opts.defaultLang == null ? null : { content: opts.defaultLang };
   /** Every cookie the code wrote, in order; reading `cookie` gives the page's own string. */
   const written: string[] = [];
   const doc = {
     written,
     get cookie() { return opts.cookie ?? ''; },
     set cookie(v: string) { written.push(v); },
-    querySelector: (sel: string) => (sel.includes('aimeat-locales') ? meta : sel.includes('aimeat-page-lang') ? servedMeta : null),
+    querySelector: (sel: string) => (sel.includes('aimeat-locales') ? meta : sel.includes('aimeat-page-lang') ? servedMeta
+      : sel.includes('aimeat-default-lang') ? defaultMeta : null),
   };
   g.document = doc;
   g.localStorage = opts.blocked
@@ -206,5 +208,33 @@ describe('a page the node picked by language (meta aimeat-page-lang)', () => {
     page({ stored: 'fi', served: 'english' });
     expect(servedPageLang()).toBeNull();
     expect(readLang(['en', 'fi'])).toBe('fi');
+  });
+});
+
+describe('the app\'s declared default language (meta aimeat-default-lang, 2026-11-21)', () => {
+  // Appdev pitfalls app/atelier-lang-follows-navigator and app/getlang-navigator-overrides-app-default-language:
+  // a Finnish app spoke English to every English browser, and the app had no way to say its default.
+  it('answers before the node\'s language and the browser', () => {
+    page({ search: '', navigator: 'en-US', defaultLang: 'fi' });
+    g.window = { __AIMEAT_SDK_CFG__: { defaultLocale: 'es' } };
+    try {
+      expect(readLang(['en', 'fi', 'es'])).toBe('fi');
+    } finally {
+      delete g.window;
+    }
+  });
+
+  it('gives way to the person\'s own choice', () => {
+    page({ search: '', stored: 'en', navigator: 'en-US', defaultLang: 'fi' });
+    expect(readLang(['en', 'fi'])).toBe('en');
+    page({ search: '?lang=en', navigator: 'en-US', defaultLang: 'fi' });
+    expect(readLang(['en', 'fi'])).toBe('en');
+  });
+
+  it('is passed over when the list does not carry it, and the browser answers as before without it', () => {
+    page({ search: '', navigator: 'en-US', defaultLang: 'de' });
+    expect(readLang(['en', 'fi'])).toBe('en');
+    page({ search: '', navigator: 'en-US' });
+    expect(readLang(['en', 'fi'])).toBe('en');
   });
 });

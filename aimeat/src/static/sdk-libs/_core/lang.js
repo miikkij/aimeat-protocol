@@ -29,11 +29,15 @@
  *   (src/i18n.ts pickedLocale), because 'aimeat-lang' alone can be a detected language. The
  *   'aimeat-lang-change' event stays with the caller: each library announces a change its own way.
  * @structure LANG_KEY · LANG_CHOSEN_KEY · readLocales(opts) · storedLang() · servedPageLang() ·
- *   readLang(locales) · pageLang() · writeLang(lang)
+ *   declaredDefaultLang() · readLang(locales) · pageLang() · writeLang(lang)
  * @usage import { readLang, pageLang, writeLang } from '../_core/lang.js';
  *   readLang(['en', 'fi', 'es']);   // a library that ships three languages
  *   pageLang();                     // the page's declared languages, or any language
  * @version-history
+ *   v1.3.0 — 2026-11-21 — `<meta name="aimeat-default-lang" content="fi">`: the app's own default
+ *     answers after the person's choices (address, storage, cookie) and before the node's language and
+ *     the browser (appdev pitfalls app/atelier-lang-follows-navigator,
+ *     app/getlang-navigator-overrides-app-default-language). Without the meta nothing changes.
  *   v1.2.0 — 2026-11-12 — The language of a page the node picked (meta aimeat-page-lang) is the
  *     first source, and writeLang sets the pick mark. On an operator's front page in several
  *     languages the header's language buttons stored the language without the mark, so the server
@@ -103,8 +107,19 @@ export function servedPageLang() {
 }
 
 /**
- * The reader's language: the page the node picked → ?lang= → stored choice → cookie → the node's
- * own language → browser → fallback.
+ * The app's declared default language, from `<meta name="aimeat-default-lang" content="fi">`, or null.
+ * @returns {string|null}
+ */
+export function declaredDefaultLang() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return null;
+  const m = /** @type {HTMLMetaElement|null} */ (document.querySelector('meta[name="aimeat-default-lang"]'));
+  const code = m && m.content ? m.content.trim().toLowerCase() : '';
+  return /^[a-z]{2}$/.test(code) ? code : null;
+}
+
+/**
+ * The reader's language: the page the node picked → ?lang= → stored choice → cookie → the app's
+ * declared default (meta aimeat-default-lang) → the node's own language → browser → fallback.
  * @param {string[]|null} [locales]  the languages accepted; null or left out accepts any
  * @returns {string|undefined}  undefined only for an empty list
  */
@@ -125,6 +140,10 @@ export function readLang(locales) {
     const cv = c ? pick(c[1]) : null;
     if (cv) return cv;
   } catch { /* storage blocked, or no location or document: the browser answers below */ }
+  // The app's own default, when it names one: a Finnish app is Finnish to a visitor who chose
+  // nothing, whatever the browser says. Without the meta the order is as it always was.
+  const declared = pick(declaredDefaultLang());
+  if (declared) return declared;
   const cfg = typeof window !== 'undefined' ? window.__AIMEAT_SDK_CFG__ : undefined;
   const node = pick(cfg && cfg.defaultLocale);
   if (node) return node;

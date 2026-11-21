@@ -39,6 +39,9 @@
  *   fillable elements through slotInto, declare the lines — and describe() picks them up from
  *   the JSDoc on the next `pnpm build:atelier-parts`.
  * @version-history
+ *   v0.71.0 — 2026-11-21 — kanban onOpen(card): a card opens on a click, Enter or Space, and is
+ *     focusable with it, also on a board without onMove (appdev pitfall
+ *     atelier/atelier-kit-migration-traps, part 4: apps made cards pressable by hand after render).
  *   v0.66.1 — 2026-10-10 — schedule: bookings that share hours are drawn beside each other
  *     (planner-lanes.js), each at an equal share of its day. They were drawn at full width on
  *     top of each other, so of three programmes at 21:00 a person saw one. A booking alone on
@@ -82,6 +85,7 @@ function emptyInto(root, spec) {
  *   data?: { columns: Array<{ id: string, label: string, tone?: string }>,
  *            cards: Array<{ id: string, column: string, title: string, sub?: string, badge?: string, tone?: string }> }|null,
  *   onMove?: (cardId: string, toColumnId: string) => void,
+ *   onOpen?: (card: object) => void,
  *   empty?: { title?: string, hint?: string },
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: { data?: object|null }) => void, destroy: () => void }}
@@ -130,6 +134,8 @@ export function kanban(spec) {
     const cards = (data && Array.isArray(data.cards)) ? data.cards.filter((c) => c && c.id) : [];
     if (!columns.length) { emptyCard = emptyInto(root, spec); return; }
     const movable = !!spec.onMove;
+    // A card that opens (onOpen) is a control too: focusable, pressed with a click, Enter or Space.
+    const opens = typeof spec.onOpen === 'function';
 
     columns.forEach((col, colIdx) => {
       const inCol = cards.filter((c) => c.column === col.id);
@@ -154,8 +160,8 @@ export function kanban(spec) {
           class: 'ak-kanban__card' + (TONES.indexOf(card.tone) >= 0 ? ' ak-kanban__card--' + card.tone : ''),
           'data-ak-part': 'card',
           'data-card': card.id,
-          tabindex: movable ? '0' : undefined,
-          role: movable ? 'button' : undefined,
+          tabindex: movable || opens ? '0' : undefined,
+          role: movable || opens ? 'button' : undefined,
         });
         const whole = partValue(spec, 'card', card);
         if (whole !== undefined) {
@@ -174,6 +180,16 @@ export function kanban(spec) {
           arrived.add(card.id);
           node.classList.add('ak-kanban__card--enter');
           node.style.animationDelay = `${Math.min(i * 40, 500)}ms`;
+        }
+        if (opens) {
+          // A drag that ends on the card is not an open: the lift class is still on it then.
+          node.addEventListener('click', () => {
+            if (node.classList.contains('ak-kanban__card--lift')) return;
+            spec.onOpen(card);
+          });
+          node.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); spec.onOpen(card); }
+          });
         }
         if (movable) {
           node.draggable = true;

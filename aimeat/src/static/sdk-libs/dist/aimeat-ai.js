@@ -262,6 +262,31 @@
     attach("spend", spend);
   }
 
+  // src/static/sdk-libs/_core/account-change.js
+  function onAccountChange(fn) {
+    const safe = function() {
+      try {
+        fn();
+      } catch (e) {
+        console.warn("[aimeat] a cache could not be cleared on an account change:", e && /** @type {Error} */
+        e.message);
+      }
+    };
+    function subscribe() {
+      const auth = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.auth;
+      if (!auth || typeof auth.on !== "function") return false;
+      auth.on("login", safe);
+      auth.on("logout", safe);
+      return true;
+    }
+    if (subscribe()) return;
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function" && document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", function() {
+        subscribe();
+      }, { once: true });
+    }
+  }
+
   // src/static/sdk-libs/_core/config.js
   function cfg() {
     return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
@@ -315,6 +340,15 @@
     const code = m && m.content ? m.content.trim().toLowerCase() : "";
     return /^[a-z]{2}$/.test(code) ? code : null;
   }
+  function declaredDefaultLang() {
+    if (typeof document === "undefined" || typeof document.querySelector !== "function") return null;
+    const m = (
+      /** @type {HTMLMetaElement|null} */
+      document.querySelector('meta[name="aimeat-default-lang"]')
+    );
+    const code = m && m.content ? m.content.trim().toLowerCase() : "";
+    return /^[a-z]{2}$/.test(code) ? code : null;
+  }
   function readLang(locales) {
     const list = Array.isArray(locales) ? locales : null;
     const pick2 = list ? function(v) {
@@ -334,6 +368,8 @@
       if (cv) return cv;
     } catch {
     }
+    const declared = pick2(declaredDefaultLang());
+    if (declared) return declared;
     const cfg2 = typeof window !== "undefined" ? window.__AIMEAT_SDK_CFG__ : void 0;
     const node = pick2(cfg2 && cfg2.defaultLocale);
     if (node) return node;
@@ -1234,9 +1270,28 @@
   function withProvenance(r) {
     return r.meta && r.meta.provenance ? { ...r.data, provenance: r.meta.provenance } : r.data;
   }
+  var JOB_HINT = "A generation that takes minutes belongs in a job: AIMEAT.ai.job.start({ prompt, result_key }) and AIMEAT.ai.job.waitFor(id). The node runs it with the owner's key and keeps the answer when the page or the network goes away; complete() holds one request open and is for answers that come back in seconds.";
+  var jobHintShown = false;
+  function withJobHint(path, e) {
+    if (path !== "/v1/ai/complete" || !e || typeof e !== "object") return e;
+    if (Object.isExtensible(e)) e.jobHint = JOB_HINT;
+    if (!jobHintShown) {
+      jobHintShown = true;
+      console.warn("[aimeat-ai] The completion request did not come back. " + JOB_HINT);
+    }
+    return e;
+  }
   async function postJson(path, body, fallback) {
-    const r = await authFetch3(path, { method: "POST", body: JSON.stringify(body) });
-    if (!r || !r.ok) throw aiError(r, fallback);
+    let r;
+    try {
+      r = await authFetch3(path, { method: "POST", body: JSON.stringify(body) });
+    } catch (e) {
+      throw withJobHint(path, e);
+    }
+    if (!r || !r.ok) {
+      const err = aiError(r, fallback);
+      throw /TIMEOUT/.test(String(err.code)) ? withJobHint(path, err) : err;
+    }
     if (r.data) noteSpent(r.data.budget);
     return withProvenance(r);
   }
@@ -1935,4 +1990,7 @@
   };
   attach("ai", ai);
   attachSpend();
+  onAccountChange(function() {
+    ai.invalidateCache();
+  });
 })();

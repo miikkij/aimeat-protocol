@@ -18,6 +18,8 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.8.2 — 2026-11-21 — A block id that is not a slug is refused with the slug it should be
+ *     (historyIntro → history-intro; appdev pitfall atelier/mosaic-two-language-headings).
  *   v1.8.1 — 2026-11-15 — The colour-token refusal says "the one colour you set", not "the one colour door".
  *   v1.8.0 — 2026-10-03 — The face refusal names the faces the operator added as well (servedFontFamilies).
  *   v1.7.0 — 2026-09-28 — The three spring tokens are signature tokens, each a plain number inside
@@ -151,6 +153,12 @@ function distance(a: string, b: string): number {
 }
 
 /** The nearest known name, when it is near enough to be a typo. */
+/** The slug an id was meant to be: historyIntro → history-intro, "Front page" → front-page. */
+export function slugFor(id: string): string {
+  return id.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
+}
+
 export function nearest(given: string, known: Iterable<string>): string | null {
   let best: string | null = null;
   let bestD = SUGGEST_MAX_DISTANCE + 1;
@@ -570,7 +578,10 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
     }
     const b = rawBlock as Record<string, unknown>;
     if (typeof b.id !== 'string' || !SLUG_RE.test(b.id)) {
-      fail(`${at}: the block id must be a short slug (a-z, 0-9, dashes) — it is the address later writes and per-viewer overlays use.`);
+      // A camelCase or spaced id is the common miss; the slug it should be is named, not left to guess.
+      const slug = typeof b.id === 'string' ? slugFor(b.id) : '';
+      const hint = slug && slug !== b.id ? ` Use "${slug}" for "${b.id}".` : '';
+      fail(`${at}: the block id must be a short slug (a-z, 0-9, dashes) — it is the address later writes and per-viewer overlays use.${hint}`);
     }
     if (seenIds.has(b.id)) fail(`${at}: the id "${b.id}" is already used — every block id is unique.`);
     seenIds.add(b.id);

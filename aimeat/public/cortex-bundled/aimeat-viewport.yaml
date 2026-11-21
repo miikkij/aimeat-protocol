@@ -10,7 +10,7 @@ metadata:
     domain: canvas
 
 spec:
-  version: "1.0.4"
+  version: "1.1.0"
   license: MIT
   components:
     - type: prompt
@@ -37,7 +37,7 @@ spec:
           contentBBox?: () => ({ x, y, w, h }),      // world units; fit() asks for this
           onClaimPointer?: (ev) => null | {          // null => the viewport pans
             onMove(worldDx, worldDy, ev, cam), onEnd(movedPastThreshold, ev) },
-          onTap?: (ev) => {},                        // pan gesture that never moved
+          onTap?: (ev, target) => {},                // pan gesture that never moved; target is the element under the pointer (ev.target is the host)
           onCameraChange?: (cam) => {},
           captureSelector?: '[data-frame]',          // opts in to the navigate/interact model
           mode?: 'navigate' | 'interact',

@@ -259,6 +259,31 @@
     attach("spend", spend);
   }
 
+  // src/static/sdk-libs/_core/account-change.js
+  function onAccountChange(fn) {
+    const safe = function() {
+      try {
+        fn();
+      } catch (e) {
+        console.warn("[aimeat] a cache could not be cleared on an account change:", e && /** @type {Error} */
+        e.message);
+      }
+    };
+    function subscribe() {
+      const auth = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.auth;
+      if (!auth || typeof auth.on !== "function") return false;
+      auth.on("login", safe);
+      auth.on("logout", safe);
+      return true;
+    }
+    if (subscribe()) return;
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function" && document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", function() {
+        subscribe();
+      }, { once: true });
+    }
+  }
+
   // src/static/sdk-libs/agents/index.js
   var { authFetch: authFetch2 } = makeSession("aimeat-agents.js");
   var DEDUPE_MS = 6e4;
@@ -626,4 +651,7 @@
   };
   attach("agents", agents);
   attachSpend();
+  onAccountChange(function() {
+    agents.invalidateCache();
+  });
 })();

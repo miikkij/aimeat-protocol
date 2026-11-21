@@ -36,6 +36,7 @@
  *     gesture semantics, same 0.2–2.5 zoom clamp, same fit padding and easing. Consumers need no
  *     change. Dead code removed: clientToWorld was defined and never called — it is now real
  *     public API on the viewport.
+ *   v1.1.5 — 2026-11-21 — The embedded camera is aimeat-viewport 1.1.0 (onTap(ev, target)).
  */
 
 /* The camera lives in aimeat-viewport.js and is copied in verbatim below so this pack keeps
@@ -67,6 +68,9 @@
  *   });
  *   vp.world.appendChild(frameEl);   // children live in world space
  * @version-history
+ *   v1.1.0 — 2026-11-21 — onTap(ev, target): the element under the pointer is the second argument.
+ *     ev.target is the host, where the pointer was captured, so an app's onTap could not tell what
+ *     was tapped (appdev pitfall ui/viewport-tap-target-is-host).
  *   v1.0.3 — 2026-07-25 — Report the version the manifest declares; the constant and the
  *     manifest had crossed. pnpm check:viewport now asserts they match.
  *   v1.0.1 — 2026-07-25 — Fix: do not force position:relative on the host (it beat a consumer's
@@ -151,7 +155,8 @@
    * @param {Function} [opts.contentBBox] () → {x,y,w,h} in world units; required for fit()
    * @param {Function} [opts.onClaimPointer] (ev) → null (viewport pans) | drag handle
    *   { onMove(worldDx, worldDy, ev, cam), onEnd(movedPastThreshold, ev) }
-   * @param {Function} [opts.onTap] (ev) fired when a pan gesture ends without moving
+   * @param {Function} [opts.onTap] (ev, target) fired when a pan gesture ends without moving;
+   *   ev.target is the host, `target` is the element under the pointer
    * @param {Function} [opts.onCameraChange] (cam) after any camera change
    * @param {string}   [opts.captureSelector] children matching this get a capture overlay in
    *   navigate mode. Supplying it OPTS IN to the two-mode model (space-hold, middle-mouse pan,
@@ -323,6 +328,13 @@
       }
     }
 
+    /** The element under the pointer at a tap, or the host when the page cannot say. */
+    function tapTarget(ev) {
+      var doc = host.ownerDocument || (typeof document !== 'undefined' ? document : null);
+      var under = doc && typeof doc.elementFromPoint === 'function' ? doc.elementFromPoint(ev.clientX, ev.clientY) : null;
+      return under || host;
+    }
+
     function onPointerUp(ev) {
       delete pointers[ev.pointerId];
       host.classList.remove(P + '-panning');
@@ -334,7 +346,9 @@
       if (g.mode === 'claim') {
         if (g.handle.onEnd) g.handle.onEnd(g.moved, ev);
       } else if (g.mode === 'pan' && !g.moved) {
-        if (opts.onTap) opts.onTap(ev);
+        // The event's target is the host (the pointer was captured there), so the element under
+        // the pointer goes with it as the second argument.
+        if (opts.onTap) opts.onTap(ev, tapTarget(ev));
       }
     }
 
@@ -444,7 +458,7 @@
     };
   }
 
-  AIMEAT.viewport = { create: create, VERSION: '1.0.4' };
+  AIMEAT.viewport = { create: create, VERSION: '1.1.0' };
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
 /* END embedded aimeat-viewport */

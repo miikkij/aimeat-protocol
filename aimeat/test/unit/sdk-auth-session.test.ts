@@ -17,6 +17,8 @@
  *     too, so a page's own auth.login() and the pill's can overlap. They share one restore.
  * @usage cd aimeat && pnpm exec vitest run test/unit/sdk-auth-session.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-21 — login() inside a click with nothing to restore names signIn() in the
+ *     console once and still answers null (login-is-silent-only). Seen red on session.js v1.9.1.
  *   v1.1.1 — 2026-11-14 — Imports auth.js (session.js with the sign-in dialog registered); the import path is the only change.
  *   v1.1.0 — 2026-09-13 — The developer's onLogin decision: the login event carries { restored }, and
  *     signIn({ onLogin }) calls it once, with that flag, for the session its dialog produced. Both
@@ -270,6 +272,25 @@ describe('the onLogin a caller hands to AIMEAT.auth.signIn()', () => {
     } finally {
       off('login', listen);
       await auth.logout();
+    }
+  });
+
+  it('login() inside a click with nothing to restore answers null and names signIn() once (login-is-silent-only)', async () => {
+    await auth.logout();
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      Object.defineProperty(globalThis, 'navigator', { value: { userActivation: { isActive: false } }, configurable: true });
+      await expect(auth.login()).resolves.toBeNull();
+      expect(warn.mock.calls.some(c => String(c[0]).includes('signIn()'))).toBe(false);
+      Object.defineProperty(globalThis, 'navigator', { value: { userActivation: { isActive: true } }, configurable: true });
+      await expect(auth.login()).resolves.toBeNull();
+      await expect(auth.login()).resolves.toBeNull();
+      expect(warn.mock.calls.filter(c => String(c[0]).includes('signIn()'))).toHaveLength(1);
+      expect(modal.calls).toHaveLength(0);
+    } finally {
+      warn.mockRestore();
+      if (had) Object.defineProperty(globalThis, 'navigator', had);
     }
   });
 

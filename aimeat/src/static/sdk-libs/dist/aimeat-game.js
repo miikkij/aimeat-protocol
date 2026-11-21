@@ -214,6 +214,15 @@
     const code = m && m.content ? m.content.trim().toLowerCase() : "";
     return /^[a-z]{2}$/.test(code) ? code : null;
   }
+  function declaredDefaultLang() {
+    if (typeof document === "undefined" || typeof document.querySelector !== "function") return null;
+    const m = (
+      /** @type {HTMLMetaElement|null} */
+      document.querySelector('meta[name="aimeat-default-lang"]')
+    );
+    const code = m && m.content ? m.content.trim().toLowerCase() : "";
+    return /^[a-z]{2}$/.test(code) ? code : null;
+  }
   function readLang(locales) {
     const list = Array.isArray(locales) ? locales : null;
     const pick = list ? function(v) {
@@ -233,6 +242,8 @@
       if (cv) return cv;
     } catch {
     }
+    const declared = pick(declaredDefaultLang());
+    if (declared) return declared;
     const cfg = typeof window !== "undefined" ? window.__AIMEAT_SDK_CFG__ : void 0;
     const node = pick(cfg && cfg.defaultLocale);
     if (node) return node;

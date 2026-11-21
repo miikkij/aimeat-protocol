@@ -372,6 +372,15 @@
     const code = m && m.content ? m.content.trim().toLowerCase() : "";
     return /^[a-z]{2}$/.test(code) ? code : null;
   }
+  function declaredDefaultLang() {
+    if (typeof document === "undefined" || typeof document.querySelector !== "function") return null;
+    const m = (
+      /** @type {HTMLMetaElement|null} */
+      document.querySelector('meta[name="aimeat-default-lang"]')
+    );
+    const code = m && m.content ? m.content.trim().toLowerCase() : "";
+    return /^[a-z]{2}$/.test(code) ? code : null;
+  }
   function readLang(locales) {
     const list = Array.isArray(locales) ? locales : null;
     const pick = list ? function(v) {
@@ -391,6 +400,8 @@
       if (cv) return cv;
     } catch {
     }
+    const declared = pick(declaredDefaultLang());
+    if (declared) return declared;
     const cfg2 = typeof window !== "undefined" ? window.__AIMEAT_SDK_CFG__ : void 0;
     const node = pick(cfg2 && cfg2.defaultLocale);
     if (node) return node;
@@ -1213,6 +1224,19 @@
     emit("login", session, { restored: true });
     return session;
   }
+  function userGestureActive() {
+    const ua = typeof navigator !== "undefined" ? (
+      /** @type {any} */
+      navigator.userActivation
+    ) : null;
+    return !!(ua && ua.isActive);
+  }
+  var loginGestureWarned = false;
+  function warnLoginInGesture() {
+    if (loginGestureWarned) return;
+    loginGestureWarned = true;
+    console.warn("[aimeat-auth] AIMEAT.auth.login() was called from a click and found no session to restore, so nothing opened. login() only restores a session; call AIMEAT.auth.signIn() from your Sign In button to sign the person in.");
+  }
   var auth = {
     nodeUrl: NODE_URL,
     nodeId: NODE_ID,
@@ -1255,6 +1279,17 @@
      * @returns {Promise<object|null>} Session or null if no stored credentials
      */
     async login(username) {
+      const inGesture = userGestureActive();
+      const s = await auth._restore(username);
+      if (!s && inGesture) warnLoginInGesture();
+      return s;
+    },
+    /**
+     * login()'s restore, never a popup or a dialog. Internal: call login().
+     * @param {string} [username]
+     * @returns {Promise<any>}
+     */
+    async _restore(username) {
       if (isAppOrigin()) return await restoreSessionFromAppOrigin(false);
       if (username) return restoreStoredSession(username);
       if (!loginInFlight) {

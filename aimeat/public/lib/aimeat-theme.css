@@ -40,6 +40,8 @@
  *   Deliberately UNLAYERED: daisyUI declares its themes inside `@layer base`, and any unlayered
  *   rule beats every layered one regardless of order or specificity.
  * @version-history
+ *   v2.5.1 — 2026-11-21 — pre and code take overflow-wrap: anywhere, so a long token in a wrapped
+ *     block no longer widens a phone's page (appdev pitfall app/pre-wrap-does-not-break-long-tokens).
  *   v2.5.0 — 2026-08-29 — The @font-face rules move to /lib/aimeat-fonts.css (imported here), where
  *     Fjalla One, DM Sans and VT323 join them: the headline face of the design language had been the
  *     one face not vendored, fetched from fonts.googleapis.com by sixteen HTML files. Nothing on the
@@ -590,4 +592,9 @@ h1, h2, h3, h4, h5, h6, .card-title {
 }
 code, pre, kbd, samp {
   font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace);
+}
+/* A long token (a URL, a key, a hash) breaks where the text wraps instead of widening the page on
+   a phone. A `pre` that keeps `white-space: pre` does not wrap, so it is unchanged. */
+pre, code {
+  overflow-wrap: anywhere;
 }

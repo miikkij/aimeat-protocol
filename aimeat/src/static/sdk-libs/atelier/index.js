@@ -57,6 +57,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.71.0 — 2026-11-21 — kanban onOpen(card) (planner.js), and an app made with nav: 'side' and no
+ *     entries builds its column on the first nav.set({ items }) (shell.js).
  *   v0.70.0 — 2026-11-21 — Defaults that did the unexpected: a dialog action closes its dialog
  *     (dialog.js), menu onPick only for an entry without run (menu.js), choiceCards value: null and
  *     keepKicker (workbench.js), listDetail keeps typed text on set (list.js), a date-only timeline
@@ -505,7 +507,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.70.0',
+  version: '0.71.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

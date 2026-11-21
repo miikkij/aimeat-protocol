@@ -66,10 +66,11 @@
     if (doc.title) parts.push("# " + String(doc.title).trim());
     const sections = Array.isArray(doc.sections) ? doc.sections : [];
     for (const s of sections) {
-      if (!s || typeof s.heading !== "string" || !s.heading.trim()) {
-        throw new Error("Every section needs a non-empty string heading");
+      const heading = s && typeof s.heading === "string" && s.heading.trim() ? s.heading : s && typeof s.title === "string" ? s.title : "";
+      if (!heading.trim()) {
+        throw new Error('Every section needs a non-empty string heading (or title): { heading: "Orders", body: "…" }');
       }
-      parts.push("## " + s.heading.trim() + "\n\n" + (typeof s.body === "string" ? s.body.trim() : ""));
+      parts.push("## " + heading.trim() + "\n\n" + (typeof s.body === "string" ? s.body.trim() : ""));
     }
     if (parts.length === 0) throw new Error("Nothing to compose — provide a title and/or sections");
     return parts.join("\n\n") + "\n";

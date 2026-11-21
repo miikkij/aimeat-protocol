@@ -124,8 +124,13 @@
     if (body && body.error && body.error.code === "NOT_FOUND") return null;
     throw refusal(body, "The app config could not be read (HTTP " + r.status + "). Try again.", "APP_CONFIG_UNREADABLE");
   }
+  function fullIdentity(gaii) {
+    const s = String(gaii == null ? "" : gaii);
+    if (!s || s.indexOf("@") >= 0 || s.indexOf(":") >= 0 || !NODE_ID) return s;
+    return s + "@" + NODE_ID;
+  }
   async function publicEntryResponse(gaii, key) {
-    const url = NODE_URL + "/v1/memory/" + encodeURIComponent(gaii) + "/" + encodeURIComponent(key) + "?soft=1";
+    const url = NODE_URL + "/v1/memory/" + encodeURIComponent(fullIdentity(gaii)) + "/" + encodeURIComponent(key) + "?soft=1";
     const r = await publicFetch(url);
     const res = await r.json();
     if (!res.ok) {
@@ -173,9 +178,18 @@
     };
   }
   var data = {
-    // Write or upsert a memory entry
+    /**
+     * Write or upsert a memory entry. `{ expectedVersion: n }` is the node's optimistic lock: the
+     * write is refused (VERSION_CONFLICT) when the record is no longer at version n, so a page that
+     * saves its whole copy cannot write over a change an AI or another tab made meanwhile.
+     * @param {string} key
+     * @param {any} value
+     * @param {Record<string, any> & { expectedVersion?: number }} [opts]
+     */
     async set(key, value, opts) {
-      const body = { key, value, visibility: "private", ...opts };
+      const { expectedVersion, ...rest } = opts || {};
+      const body = { key, value, visibility: "private", ...rest };
+      if (typeof expectedVersion === "number") body.expected_version = expectedVersion;
       const res = await authFetch2("/v1/memory", { method: "POST", body: JSON.stringify(body) });
       if (!res.ok) throw refusal(res, "Failed to set memory");
       return res.data;
@@ -246,6 +260,30 @@
         body: JSON.stringify(body)
       });
       if (!res.ok) throw refusal(res, "Failed to update memory");
+      return res.data;
+    },
+    /**
+     * Change some fields of a record and keep the rest (PATCH /v1/memory/:key, a JSON Merge Patch:
+     * a field set to null is removed, an array is replaced whole). The node merges into the stored
+     * value, so a field an AI wrote meanwhile stays. `{ ifVersion: n }` refuses the merge when the
+     * record is no longer at version n; `{ ownerScope: true }` patches the owner's copy.
+     * @param {string} key
+     * @param {Record<string, any>} patch
+     * @param {{ ifVersion?: number, ownerScope?: boolean, visibility?: string, tags?: string[] }} [opts]
+     * @returns {Promise<any>}
+     */
+    async patch(key, patch, opts) {
+      if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+        throw new Error("AIMEAT.data.patch(key, patch): patch must be an object of the fields to change.");
+      }
+      const o = opts || {};
+      const body = { patch };
+      if (typeof o.ifVersion === "number") body.if_version = o.ifVersion;
+      if (o.ownerScope === true) body.owner_scope = true;
+      if (o.visibility) body.visibility = o.visibility;
+      if (Array.isArray(o.tags)) body.tags = o.tags;
+      const res = await authFetch2("/v1/memory/" + encodeURIComponent(key), { method: "PATCH", body: JSON.stringify(body) });
+      if (!res.ok) throw refusal(res, 'The key "' + key + '" could not be changed.');
       return res.data;
     },
     /**

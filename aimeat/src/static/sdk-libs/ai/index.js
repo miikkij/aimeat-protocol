@@ -13,6 +13,10 @@
  *   const caps = await AIMEAT.ai.capabilities({ app_id });
  *   if (caps.capabilities.text.on) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.11.0 - 2026-11-21 - The capabilities, model and availability caches are dropped on AIMEAT.auth's
+ *     login and logout events (_core/account-change.js). A complete() whose request never came back
+ *     (the network, a proxy timeout) throws with `jobHint` and one console line naming AIMEAT.ai.job,
+ *     the call that survives a closed tab (call.js; curated pitfall long-ai-calls-timeout).
  *   v1.10.0 - 2026-11-21 - completeJson() answers `usage` summed over both calls when it retried, with
  *     `attempts` (1 or 2) and `first_usage`; the error after two misses carries both too, and says when
  *     the call's own max_tokens cut the answer. complete() sends max_tokens as before, and an answer
@@ -59,6 +63,7 @@ import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-ai.js');
 import { attach } from '../_core/namespace.js';
 import { attachSpend } from '../_core/spend.js';
+import { onAccountChange } from '../_core/account-change.js';
 import { disclose, chatNotice, declare } from './disclose.js';
 import { job } from './job.js';
 import { paid, postJson, isBlob, blobToDataUrl, markCap } from './call.js';
@@ -455,3 +460,5 @@ const ai = {
 
 attach('ai', ai);
 attachSpend();
+// What the AI can do is per caller: another account must not read the previous one's answers.
+onAccountChange(function () { ai.invalidateCache(); });

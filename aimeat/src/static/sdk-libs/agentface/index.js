@@ -17,6 +17,8 @@
  *   AIMEATAgentFace.publishQuietly(() => ({ title, sections }), { app: 'my-app.html', debounceMs: 800 });
  *   await AIMEAT.agentface.copyText(promptText);  // the shared "Copy prompt" implementation
  * @version-history
+ *   v1.2.1 — 2026-11-21 — A section's `title` is read as its heading (appdev pitfall
+ *     app/agentface-sections-need-heading); `heading` wins when both are given.
  *   v1.2.0 — 2026-10-01 — publishQuietly(input, { app, debounceMs }): the guard ten apps wrote by
  *     hand around publish(). Resolves false and writes nothing when signed out, never throws (one
  *     console.warn line instead), skips a face identical to the last one written for that app,
@@ -54,10 +56,14 @@ function compose(doc) {
   if (doc.title) parts.push('# ' + String(doc.title).trim());
   const sections = Array.isArray(doc.sections) ? doc.sections : [];
   for (const s of sections) {
-    if (!s || typeof s.heading !== 'string' || !s.heading.trim()) {
-      throw new Error('Every section needs a non-empty string heading');
+    // `title` is read as the heading too: the document itself is named with `title`, and a
+    // section written the same way was refused and the face never written.
+    const heading = s && typeof s.heading === 'string' && s.heading.trim() ? s.heading
+      : s && typeof s.title === 'string' ? s.title : '';
+    if (!heading.trim()) {
+      throw new Error('Every section needs a non-empty string heading (or title): { heading: "Orders", body: "…" }');
     }
-    parts.push('## ' + s.heading.trim() + '\n\n' + (typeof s.body === 'string' ? s.body.trim() : ''));
+    parts.push('## ' + heading.trim() + '\n\n' + (typeof s.body === 'string' ? s.body.trim() : ''));
   }
   if (parts.length === 0) throw new Error('Nothing to compose — provide a title and/or sections');
   return parts.join('\n\n') + '\n';

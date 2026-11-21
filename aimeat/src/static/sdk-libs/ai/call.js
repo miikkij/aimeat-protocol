@@ -10,6 +10,8 @@
  *   return paid(opts, { key: ['ai-embed', opts.app_id, text], what: 'Make embeddings' },
  *     () => postJson('/v1/ai/embed', body, 'Embedding failed'));
  * @version-history
+ *   v1.4.0 - 2026-11-21 - A /v1/ai/complete request that never came back (it threw, or the node
+ *     answered a *TIMEOUT code) carries `jobHint` naming AIMEAT.ai.job, once in the console too.
  *   v1.3.0 - 2026-11-21 - markCap(): an answer the call's own max_tokens cut says so, with
  *     `truncated`, `capped_at` and a `warning` naming max_tokens (curated pitfall no-max-tokens).
  *   v1.2.0 - 2026-11-07 - noteSpent(): the budget is remembered and `aimeat-ai-used` fires, so the
@@ -81,6 +83,30 @@ export function withProvenance(r) {
   return r.meta && r.meta.provenance ? { ...r.data, provenance: r.meta.provenance } : r.data;
 }
 
+/** What a lost completion says: the call that outlives the tab and the network is a job. */
+export const JOB_HINT = 'A generation that takes minutes belongs in a job: AIMEAT.ai.job.start({ prompt, result_key }) and '
+  + 'AIMEAT.ai.job.waitFor(id). The node runs it with the owner\'s key and keeps the answer when the page or the network goes away; '
+  + 'complete() holds one request open and is for answers that come back in seconds.';
+
+/**
+ * A completion whose request never came back (a network failure, a proxy or node timeout) carries
+ * `jobHint`, and the console says it once per page. The error itself is unchanged, so a caller that
+ * reads its message or code sees what it saw before.
+ * @param {string} path
+ * @param {any} e
+ * @returns {any}
+ */
+let jobHintShown = false;
+function withJobHint(path, e) {
+  if (path !== '/v1/ai/complete' || !e || typeof e !== 'object') return e;
+  if (Object.isExtensible(e)) e.jobHint = JOB_HINT;
+  if (!jobHintShown) {
+    jobHintShown = true;
+    console.warn('[aimeat-ai] The completion request did not come back. ' + JOB_HINT);
+  }
+  return e;
+}
+
 /**
  * POST a JSON body through the signed-in session and return the envelope's data. Throws aiError on
  * a failed envelope. The budget block of a successful answer is remembered for the next confirm.
@@ -90,8 +116,16 @@ export function withProvenance(r) {
  * @returns {Promise<any>}
  */
 export async function postJson(path, body, fallback) {
-  const r = await authFetch(path, { method: 'POST', body: JSON.stringify(body) });
-  if (!r || !r.ok) throw aiError(r, fallback);
+  let r;
+  try {
+    r = await authFetch(path, { method: 'POST', body: JSON.stringify(body) });
+  } catch (e) {
+    throw withJobHint(path, e);
+  }
+  if (!r || !r.ok) {
+    const err = aiError(r, fallback);
+    throw /TIMEOUT/.test(String(err.code)) ? withJobHint(path, err) : err;
+  }
   if (r.data) noteSpent(r.data.budget);
   return withProvenance(r);
 }

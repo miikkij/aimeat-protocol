@@ -11,6 +11,8 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-agents.js"></script>
  *   const { task, deliverable } = await AIMEAT.agents.run('my-agent', { description: '…' });
  * @version-history
+ *   v1.3.1 — 2026-11-21 — The agent list cache is dropped on AIMEAT.auth's login and logout events
+ *     (_core/account-change.js), so another account never reads the previous one's agents.
  *   v1.3.0 — 2026-11-21 — createTask names what it did not store as task.ignored_fields: the fields
  *     of `task` this library does not send (tags, for one) and the ones the node answered it did not
  *     take, with one console warning. Before, both were dropped and the call succeeded.
@@ -31,6 +33,7 @@ import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-agents.js');
 import { attach } from '../_core/namespace.js';
 import { once, keyOf, confirmSpend, cancelledError, attachSpend } from '../_core/spend.js';
+import { onAccountChange } from '../_core/account-change.js';
 
 // A second identical commission this soon after the first is a double-click, not a second job.
 var DEDUPE_MS = 60000;
@@ -375,3 +378,5 @@ var agents = {
 
 attach('agents', agents);
 attachSpend();
+// The agent list is the signed-in owner's: another account must not read the previous one's.
+onAccountChange(function () { agents.invalidateCache(); });

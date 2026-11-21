@@ -1124,6 +1124,15 @@
     const code = m && m.content ? m.content.trim().toLowerCase() : "";
     return /^[a-z]{2}$/.test(code) ? code : null;
   }
+  function declaredDefaultLang() {
+    if (typeof document === "undefined" || typeof document.querySelector !== "function") return null;
+    const m = (
+      /** @type {HTMLMetaElement|null} */
+      document.querySelector('meta[name="aimeat-default-lang"]')
+    );
+    const code = m && m.content ? m.content.trim().toLowerCase() : "";
+    return /^[a-z]{2}$/.test(code) ? code : null;
+  }
   function readLang(locales) {
     const list3 = Array.isArray(locales) ? locales : null;
     const pick = list3 ? function(v) {
@@ -1143,6 +1152,8 @@
       if (cv) return cv;
     } catch {
     }
+    const declared2 = pick(declaredDefaultLang());
+    if (declared2) return declared2;
     const cfg2 = typeof window !== "undefined" ? window.__AIMEAT_SDK_CFG__ : void 0;
     const node = pick(cfg2 && cfg2.defaultLocale);
     if (node) return node;
@@ -10403,6 +10414,7 @@
         return;
       }
       const movable = !!spec.onMove;
+      const opens = typeof spec.onOpen === "function";
       columns.forEach((col, colIdx) => {
         const inCol = cards.filter((c) => c.column === col.id);
         const lane = el("div", { class: "ak-kanban__col", "data-ak-part": "col", "data-col": col.id, role: "group", "aria-label": `${col.label} · ${inCol.length}` });
@@ -10429,8 +10441,8 @@
             class: "ak-kanban__card" + (TONES6.indexOf(card.tone) >= 0 ? " ak-kanban__card--" + card.tone : ""),
             "data-ak-part": "card",
             "data-card": card.id,
-            tabindex: movable ? "0" : void 0,
-            role: movable ? "button" : void 0
+            tabindex: movable || opens ? "0" : void 0,
+            role: movable || opens ? "button" : void 0
           });
           const whole = partValue(spec, "card", card);
           if (whole !== void 0) {
@@ -10446,6 +10458,18 @@
             arrived.add(card.id);
             node.classList.add("ak-kanban__card--enter");
             node.style.animationDelay = `${Math.min(i * 40, 500)}ms`;
+          }
+          if (opens) {
+            node.addEventListener("click", () => {
+              if (node.classList.contains("ak-kanban__card--lift")) return;
+              spec.onOpen(card);
+            });
+            node.addEventListener("keydown", (ev) => {
+              if (ev.key === "Enter" || ev.key === " ") {
+                ev.preventDefault();
+                spec.onOpen(card);
+              }
+            });
           }
           if (movable) {
             node.draggable = true;
@@ -25998,9 +26022,9 @@ Known schemas:
     };
     bar2.addEventListener("click", onBarClick, true);
     const statusHost = el("div", { class: "ak-app__status" });
-    const sideMode = spec.nav === "side" && !!(spec.navItems && spec.navItems.length);
+    let sideMode = spec.nav === "side" && !!(spec.navItems && spec.navItems.length);
     const main = el("main", { class: "ak-app__main" + (sideMode ? "" : " ak-scroll") });
-    const sideHost = sideMode ? el("aside", { class: "ak-app__side" }) : null;
+    let sideHost = sideMode ? el("aside", { class: "ak-app__side" }) : null;
     const frame2 = sideMode ? el("div", { class: "ak-app__frame ak-scroll" }, [sideHost, main]) : null;
     const footer = spec.footer != null ? el("footer", { class: "ak-app__foot", text: spec.footer }) : null;
     const root = el("div", {
@@ -26058,19 +26082,29 @@ Known schemas:
         }
       });
     }
-    if (spec.navItems && spec.navItems.length) {
-      const items = linked(spec.navItems);
-      const first = spec.navValue || items[0].id;
+    function mountNav(rawItems, value) {
+      const items = linked(rawItems);
+      const first = value || items[0].id;
       allItems = items;
       current2 = first;
       if (sideMode && sideHost) {
         side = sideNav({ target: sideHost, items, value: first, label: spec.navLabel });
       }
       barItems = sideMode ? phoneBar(items, openMenu) : items;
-      nav = bottomNav({ items: barItems, value: sideMode ? barValue(first) : spec.navValue });
+      nav = bottomNav({ items: barItems, value: sideMode ? barValue(first) : value });
       root.appendChild(nav.el);
       root.classList.add("ak-app--bottomnav");
     }
+    function enterSideMode() {
+      const after = main.nextSibling;
+      sideHost = el("aside", { class: "ak-app__side" });
+      main.classList.remove("ak-scroll");
+      const lateFrame = el("div", { class: "ak-app__frame ak-scroll" }, [sideHost, main]);
+      root.insertBefore(lateFrame, after);
+      root.classList.add("ak-app--sidenav");
+      sideMode = true;
+    }
+    if (spec.navItems && spec.navItems.length) mountNav(spec.navItems, spec.navValue);
     const mount = resolve(spec.target, document.body);
     mount.appendChild(root);
     const fullFrame = mount === document.body;
@@ -26285,11 +26319,17 @@ Known schemas:
       /** The app's navigation (the side column and the phone's bottom bar together): move the
        *  mark with `set({ value })`, change the counts with `set({ items })`. Null without navItems. */
       get nav() {
-        if (!nav) return null;
+        if (!nav && spec.nav !== "side") return null;
         return {
           /** @param {{ value?: string, items?: any[] }} patch */
           set(patch) {
             if (!patch) return;
+            if (!nav) {
+              if (!patch.items || !patch.items.length) return;
+              if (!sideMode) enterSideMode();
+              mountNav(patch.items, patch.value);
+              return;
+            }
             const next = patch.items ? linked(patch.items) : null;
             if (next) {
               allItems = next;
@@ -34874,7 +34914,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.70.0",
+    version: "0.71.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

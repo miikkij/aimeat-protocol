@@ -23,6 +23,9 @@
  *     longPress: () => menu(),
  *   }, { axis: 'x' });                                             // vertical scrolling survives
  * @version-history
+ *   v1.1.0 — 2026-11-21 — A gesture's info carries startX and startY, where the press began. A drag
+ *     that grabbed an object measured its offset from dragStart's ev.clientX, which is already past
+ *     the slop, so the object jumped by that much (appdev pitfall ui/input-drag-grab-point-is-pointer-down).
  *   v1.0.0 — 2026-08-12 — Initial release. Pointer Events only (never touch+mouse together),
  *     one gesture state machine per element, keyboard equivalence on by default, touch-action
  *     derived from the handlers you register, and the trailing synthetic click suppressed once a
@@ -38,7 +41,7 @@
   // Idempotent, in case a pack embeds a copy the way aimeat-dag embeds the viewport.
   if (AIMEAT.input) return;
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
 
   // Defaults chosen from the platform conventions rather than invented: 44px is the touch target
   // the mobile checklist already asks for, 500ms is the long-press users bring from the OS, and a
@@ -222,7 +225,8 @@
    * @param {Function} [handlers.doubleTap]  (ev, info) two taps inside `doubleTapMs`
    * @param {Function} [handlers.longPress]  (ev, info) press held past `longPressMs` without moving
    * @param {Function} [handlers.swipe]      (dir, info) 'left'|'right'|'up'|'down'
-   * @param {Function} [handlers.dragStart]  (ev, info) once the press passes the slop
+   * @param {Function} [handlers.dragStart]  (ev, info) once the press passes the slop; info.startX and
+   *   info.startY are where the press began, the point to measure a grab offset from
    * @param {Function} [handlers.dragMove]   (ev, info) info carries dx, dy, and the per-event ddx/ddy
    * @param {Function} [handlers.dragEnd]    (ev, info) info carries the final dx, dy and velocity
    * @param {Object} [opts]
@@ -276,6 +280,10 @@
       var base = {
         dx: g ? g.x - g.sx : 0,
         dy: g ? g.y - g.sy : 0,
+        // Where the press began (client coordinates). A drag that grabs an object keeps its grab
+        // offset from here; ev.clientX on dragStart is already past the slop.
+        startX: g ? g.sx : 0,
+        startY: g ? g.sy : 0,
         duration: g ? nowMs() - g.t0 : 0,
         pointerType: g ? g.pointerType : 'keyboard',
         source: g ? 'pointer' : 'keyboard',
@@ -380,7 +388,7 @@
     function onContextMenu(ev) {
       if (!h.longPress || !keyboard) return;
       ev.preventDefault();
-      h.longPress(ev, { dx: 0, dy: 0, duration: 0, pointerType: 'mouse', source: 'contextmenu' });
+      h.longPress(ev, { dx: 0, dy: 0, startX: 0, startY: 0, duration: 0, pointerType: 'mouse', source: 'contextmenu' });
     }
     function onKeyDown(ev) {
       if (!keyboard) return;
@@ -389,12 +397,12 @@
         if (axis === 'x' && (dir === 'up' || dir === 'down')) return;
         if (axis === 'y' && (dir === 'left' || dir === 'right')) return;
         ev.preventDefault();
-        h.swipe(dir, { dx: 0, dy: 0, duration: 0, velocity: 0, pointerType: 'keyboard', source: 'keyboard' });
+        h.swipe(dir, { dx: 0, dy: 0, startX: 0, startY: 0, duration: 0, velocity: 0, pointerType: 'keyboard', source: 'keyboard' });
         return;
       }
       if (h.tap && (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar')) {
         ev.preventDefault();
-        h.tap(ev, { dx: 0, dy: 0, duration: 0, pointerType: 'keyboard', source: 'keyboard' });
+        h.tap(ev, { dx: 0, dy: 0, startX: 0, startY: 0, duration: 0, pointerType: 'keyboard', source: 'keyboard' });
       }
     }
 

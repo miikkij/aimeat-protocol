@@ -56,6 +56,9 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.71.0 — 2026-11-21 — No CSS change here: the imported aimeat-theme.css 2.5.1 lets pre and code
+ *     break a long token. The kit's JavaScript adds kanban onOpen and a side navigation built on the
+ *     first nav.set({ items }); the version moves with it.
  *   v0.70.0 — 2026-11-21 — No CSS change. The kit's JavaScript changes defaults (a dialog action
  *     closes its dialog, menu onPick, choiceCards with no choice, listDetail keeps typed text, the
  *     timeline's date-only strings, the horizontal chart's height, i18n { kit: false }); the version

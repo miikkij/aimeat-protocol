@@ -10,7 +10,7 @@ metadata:
     domain: ui
 
 spec:
-  version: "1.0.0"
+  version: "1.1.0"
   license: MIT
   components:
     - type: prompt
@@ -56,8 +56,10 @@ spec:
         })
         g.update(newHandlers) · g.destroy()
 
-        `info` carries { dx, dy, duration, velocity, pointerType, source }, and `source` is
-        'pointer', 'keyboard' or 'contextmenu' so a handler can tell a flick from an arrow key.
+        `info` carries { dx, dy, startX, startY, duration, velocity, pointerType, source }, and
+        `source` is 'pointer', 'keyboard' or 'contextmenu' so a handler can tell a flick from an
+        arrow key. startX/startY are where the press began: measure a grab offset from them, never
+        from dragStart's ev.clientX, which is already past the slop.
 
         DECLARE `axis` ON ANYTHING THAT ALSO SCROLLS. The pack sets touch-action from the handlers
         you registered: swipe with axis 'x' becomes `pan-y`, so the user can still scroll the list
@@ -129,7 +131,7 @@ spec:
           Pointer Events only, one gesture per element, a second finger never corrupts one in
           flight, and pointercancel ends a drag cleanly. touch-action is derived from the handlers
           registered: drag -> none, swipe axis 'x' -> pan-y, axis 'y' -> pan-x, tap only ->
-          manipulation. Handlers receive info { dx, dy, duration, velocity, pointerType, source }.
+          manipulation. Handlers receive info { dx, dy, startX, startY, duration, velocity, pointerType, source }.
 
         AIMEAT.input.pad(hostElOrSelector, { mode?, floating?, deadZone?, keyboard?, onChange? })
           -> { host, value(), destroy() }

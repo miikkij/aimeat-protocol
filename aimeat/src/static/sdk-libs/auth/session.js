@@ -14,6 +14,9 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.10.0 — 2026-11-21 — login() called inside a click that finds nothing to restore says so once in
+ *     the console, naming signIn() (curated appdev pitfall login-is-silent-only). It still answers
+ *     null and opens nothing; the restore itself moved unchanged to auth._restore().
  *   v1.9.1 — 2026-11-14 — mountPill and showLoginModal come from session-ui.js, not from pill.js and
  *     modal.js, which import this file: two import cycles end. auth.js registers both and re-exports
  *     this file. Same calls, same arguments.
@@ -499,6 +502,20 @@ async function restoreStoredSession(username) {
 
 // ── Public API ──
 
+/** Whether the page runs inside a person's click or key press (the User Activation API). */
+function userGestureActive() {
+  const ua = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator).userActivation : null;
+  return !!(ua && ua.isActive);
+}
+
+let loginGestureWarned = false;
+function warnLoginInGesture() {
+  if (loginGestureWarned) return;
+  loginGestureWarned = true;
+  console.warn('[aimeat-auth] AIMEAT.auth.login() was called from a click and found no session to restore, so nothing opened. '
+    + 'login() only restores a session; call AIMEAT.auth.signIn() from your Sign In button to sign the person in.');
+}
+
 export const auth = {
   nodeUrl: NODE_URL,
   nodeId: NODE_ID,
@@ -545,6 +562,21 @@ export const auth = {
    * @returns {Promise<object|null>} Session or null if no stored credentials
    */
   async login(username) {
+    // A Sign In button wired to login() did nothing: login() only restores, and with nothing to
+    // restore it answers null. Asked inside a click, that null is said once in the console with the
+    // call that asks (curated appdev pitfall login-is-silent-only). The answer itself is unchanged.
+    const inGesture = userGestureActive();
+    const s = await auth._restore(username);
+    if (!s && inGesture) warnLoginInGesture();
+    return s;
+  },
+
+  /**
+   * login()'s restore, never a popup or a dialog. Internal: call login().
+   * @param {string} [username]
+   * @returns {Promise<any>}
+   */
+  async _restore(username) {
     // On an app origin the host-only cookie is unreachable; use the same-site silent bridge (H-2).
     // Non-interactive (no popup) — login() is commonly called on boot, not from a user gesture.
     if (isAppOrigin()) return await restoreSessionFromAppOrigin(false);

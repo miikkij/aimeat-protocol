@@ -13,6 +13,11 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-data.js"></script>
  *   await AIMEAT.data.set('key', { value }); await AIMEAT.data.get('key');
  * @version-history
+ *   v1.9.0 — 2026-11-21 — set(key, value, { expectedVersion }) sends the node's optimistic lock
+ *     (it went as an unknown field and locked nothing); patch(key, patch, { ifVersion }) merges fields
+ *     through PATCH /v1/memory/:key, so an open page changes one field without writing over an AI's
+ *     write; getPublic('alice', key) reads alice@<this node> (a bare name answered null). Appdev
+ *     pitfalls data/open-page-overwrites-ai-write, data/getpublic-needs-full-identity.
  *   v1.8.2 — 2026-10-25 — action() takes `owner/name/instanceId`: the owner's name travels as one
  *     encoded segment (owner namespaces wish, secaudit2026oct22).
  *   v1.8.1 — 2026-10-19 — appConfig() and the public record read go through _core/public-fetch.js, so
@@ -122,9 +127,22 @@ async function appConfigView() {
   throw refusal(body, 'The app config could not be read (HTTP ' + r.status + '). Try again.', 'APP_CONFIG_UNREADABLE');
 }
 
+/**
+ * The identity the public route takes. A bare account name ('alice') is an account on this node, and
+ * the route answers null for it, so it becomes 'alice@<this node>'. An identity with '@' and a
+ * namespace such as 'ext:quiz' go as given.
+ * @param {string} gaii
+ * @returns {string}
+ */
+function fullIdentity(gaii) {
+  const s = String(gaii == null ? '' : gaii);
+  if (!s || s.indexOf('@') >= 0 || s.indexOf(':') >= 0 || !NODE_ID) return s;
+  return s + '@' + NODE_ID;
+}
+
 /** The public (unauthenticated) memory read, shared by getPublic + getPublicEntry. */
 async function publicEntryResponse(gaii, key) {
-  const url = NODE_URL + '/v1/memory/' + encodeURIComponent(gaii) + '/' + encodeURIComponent(key) + '?soft=1';
+  const url = NODE_URL + '/v1/memory/' + encodeURIComponent(fullIdentity(gaii)) + '/' + encodeURIComponent(key) + '?soft=1';
   const r = await publicFetch(url);
   const res = await r.json();
   if (!res.ok) {
@@ -193,9 +211,19 @@ function discoverRow(item, mine) {
 // ── Memory API (Tier 1, JWT auth) ──
 
 const data = {
-  // Write or upsert a memory entry
+  /**
+   * Write or upsert a memory entry. `{ expectedVersion: n }` is the node's optimistic lock: the
+   * write is refused (VERSION_CONFLICT) when the record is no longer at version n, so a page that
+   * saves its whole copy cannot write over a change an AI or another tab made meanwhile.
+   * @param {string} key
+   * @param {any} value
+   * @param {Record<string, any> & { expectedVersion?: number }} [opts]
+   */
   async set(key, value, opts) {
-    const body = { key, value, visibility: 'private', ...opts };
+    const { expectedVersion, ...rest } = opts || {};
+    /** @type {Record<string, any>} */
+    const body = { key, value, visibility: 'private', ...rest };
+    if (typeof expectedVersion === 'number') body.expected_version = expectedVersion;
     const res = await authFetch('/v1/memory', { method: 'POST', body: JSON.stringify(body) });
     if (!res.ok) throw refusal(res, 'Failed to set memory');
     return res.data;
@@ -269,6 +297,31 @@ const data = {
       method: 'PUT', body: JSON.stringify(body),
     });
     if (!res.ok) throw refusal(res, 'Failed to update memory');
+    return res.data;
+  },
+
+  /**
+   * Change some fields of a record and keep the rest (PATCH /v1/memory/:key, a JSON Merge Patch:
+   * a field set to null is removed, an array is replaced whole). The node merges into the stored
+   * value, so a field an AI wrote meanwhile stays. `{ ifVersion: n }` refuses the merge when the
+   * record is no longer at version n; `{ ownerScope: true }` patches the owner's copy.
+   * @param {string} key
+   * @param {Record<string, any>} patch
+   * @param {{ ifVersion?: number, ownerScope?: boolean, visibility?: string, tags?: string[] }} [opts]
+   * @returns {Promise<any>}
+   */
+  async patch(key, patch, opts) {
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+      throw new Error('AIMEAT.data.patch(key, patch): patch must be an object of the fields to change.');
+    }
+    const o = opts || {};
+    const body = { patch: patch };
+    if (typeof o.ifVersion === 'number') body.if_version = o.ifVersion;
+    if (o.ownerScope === true) body.owner_scope = true;
+    if (o.visibility) body.visibility = o.visibility;
+    if (Array.isArray(o.tags)) body.tags = o.tags;
+    const res = await authFetch('/v1/memory/' + encodeURIComponent(key), { method: 'PATCH', body: JSON.stringify(body) });
+    if (!res.ok) throw refusal(res, 'The key "' + key + '" could not be changed.');
     return res.data;
   },
 
