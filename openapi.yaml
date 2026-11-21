@@ -19732,7 +19732,8 @@ paths:
         SIMILAR_ENTRY and error.details.matches, until the call carries supersedes (an own entry is
         updated in place and a retired one comes back; a curated or shared one is recorded as
         replaced) or confirm_new. The category of a new entry is one of app, publish, auth, data, ext,
-        cortex, ai, ui, mobile, atelier, realtime, iam, games. A learned entry is stored at most warn:
+        cortex, ai, ui, mobile, atelier, realtime, iam, games; another word files the entry under the
+        nearest of these, adds the word to its tags and names the list in data.warnings. A learned entry is stored at most warn:
         critical from anyone but a node operator is kept as requested_severity. An entry naming one app
         (app_ref, or an owner/file.html in its text) stays owner-private, share=true with one is
         refused, and data.notes says where such a lesson belongs. data.warnings asks for evidence,

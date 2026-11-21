@@ -9,7 +9,9 @@
  *   - a new entry is compared with every entry the reporter can read (own, other owners' shared,
  *     curated; active and outdated), and a close one refuses the report with the matches listed until
  *     the call says `supersedes` (update or replace that entry) or `confirm_new`;
- *   - the category is one of a fixed list for a new entry; topic words go to `tags`;
+ *   - the category is one of a fixed list for a new entry; topic words go to `tags`. Another word is
+ *     filed under the nearest fixed category, kept as a tag, and named in a warning (an earlier
+ *     client's free-text category still lands);
  *   - a learned entry is stored at most `warn`; `critical` waits as `requested_severity` until a
  *     curator (a node operator) raises it;
  *   - an entry about one app (app_ref, or an owner/file.html in its text) is kept private and the
@@ -20,6 +22,8 @@
  * @structure PitfallReportInput · PitfallReportResult · reportLearnedPitfall()
  * @usage import { reportLearnedPitfall } from '../services/appdev/kb-report.js';
  * @version-history
+ *   v1.1.0 — 2026-11-21 — A category outside the fixed list is no longer refused: the entry files
+ *     under the nearest fixed one, the word goes to tags, and the answer warns with the list.
  *   v1.0.0 — 2026-11-21 — Moved from kb.ts and extended with the similarity check, the fixed
  *     categories, the severity cap, the app-specific rule, retired_by, evidence and seen_version, and
  *     kind platform-defect.
@@ -39,7 +43,7 @@ import {
     type LearnedPitfallValue, type OwnerScopeViewer,
 } from './kb.js';
 import {
-    PITFALL_CATEGORIES, isPitfallCategory, similarityScore, SIMILARITY_THRESHOLD, namesOneApp,
+    PITFALL_CATEGORIES, isPitfallCategory, nearestPitfallCategory, similarityScore, SIMILARITY_THRESHOLD, namesOneApp,
     APP_NOTES_POINTER, platformDefectWish,
 } from './kb-quality.js';
 
@@ -227,12 +231,17 @@ export async function reportLearnedPitfall(
         }
     }
 
+    // A new entry under a word outside the fixed list files under the nearest fixed category, keeps the
+    // word as a tag and says so. An entry already stored under such a word stays where it is.
+    let categoryTag: string | undefined;
     if (!existing && !isPitfallCategory(cat)) {
-        return {
-            ok: false, status: 400, code: 'INVALID_INPUT',
-            message: `category "${input.category}" is not one of the fixed list: ${PITFALL_CATEGORIES.join(', ')}. Choose the closest one and put topic words in tags.`,
-            details: { categories: [...PITFALL_CATEGORIES] },
-        };
+        const nearest = nearestPitfallCategory(cat);
+        warnings.push(`category "${input.category}" is not one of the fixed list: ${PITFALL_CATEGORIES.join(', ')}. `
+            + `The entry was filed under "${nearest}" and "${cat}" was added to its tags. Next time choose the closest category and put topic words in tags.`);
+        categoryTag = cat;
+        cat = nearest;
+        key = pitfallEntryKey(cat, slg);
+        existing = await findOwnEntry(storage, config, who.principal, key);
     }
 
     // A new entry is compared with everything the reporter can read. An update of an own entry by its
@@ -293,7 +302,7 @@ export async function reportLearnedPitfall(
 
     const normModel = input.model.trim().toLowerCase();
     const stamp = verificationStamp(softwareVersion, now);
-    const topicTags = [...new Set((input.tags ?? []).map(t => slugifyKb(t)).filter(t => t && t !== 'entry'))].slice(0, 8);
+    const topicTags = [...new Set([...(categoryTag ? [categoryTag] : []), ...(input.tags ?? []).map(t => slugifyKb(t))].filter(t => t && t !== 'entry'))].slice(0, 8);
     const value: LearnedPitfallValue = {
         title: input.title, symptom: input.symptom, resolution: input.resolution,
         model: normModel,

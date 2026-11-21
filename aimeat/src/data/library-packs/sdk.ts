@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   2026-11-21 — aimeat-commerce's promptLine leaves the 402 err.paymentRequired detail to its aiDoc,
+ *     which already carries it, so the Atelier spec's libraries part stays inside its size limit.
  *   2026-11-21 — aimeat-commerce's aiDoc and promptLine name contract:spend, the word an app declares
  *     to open and complete a checkout (routes/commerce.ts takes it beside commerce:buy).
  *   v1.40.1 — 2026-11-15 — aimeat-work's aiDoc names request() and deliver() and says input and output
@@ -495,7 +497,7 @@ export const SDK_PACKS: LibraryPack[] = [
     status: 'stable',
     modelTier: 'needs-doc',
     promptGroup: 'economy',
-    promptLine: '- aimeat-commerce.js — buy/sell agent offers via checkout sessions: `AIMEAT.commerce.buyOffer(agent, offerId)` (open + complete in one call), `openCheckout`/`completeCheckout`, the public `feed()` of money-priced offers, the two values of an item (`priceOf` = the money price or null when free; `pacingOf` = morsels of pacing per use, never a price, shown with `fmtPacing(n)` → "pacing 5 morsels") and money formatting — money is integer 6-decimal MICRO-units, `AIMEAT.commerce.fmtMoney(1500000, "EUR")` → "1.50 EUR"; `fmtSession(session)` shows a session\'s money total and pacing together. On 402 INSUFFICIENT_MORSELS, `pacingPack()` / `buyPacingPack()` buy more pacing from the operator, after the person agrees. Read a typed or exported amount with `AIMEAT.commerce.parseAmount(text)` ("12,000.00" → 12000; an ambiguous "1,000" → null, so ask again), never `parseFloat(s.replace(",", "."))`. A 402 error carries `err.paymentRequired` + the x402-style `err.accepts` list. Never ask the user for payment secrets — seller PSP config lives server-side. Requires aimeat-auth. An app that buys declares `contract:spend` in aimeat-scopes (an app cannot ask for commerce:buy).',
+    promptLine: '- aimeat-commerce.js — buy/sell agent offers via checkout sessions: `AIMEAT.commerce.buyOffer(agent, offerId)` (open + complete in one call), `openCheckout`/`completeCheckout`, the public `feed()` of money-priced offers, the two values of an item (`priceOf` = the money price or null when free; `pacingOf` = morsels of pacing per use, never a price, shown with `fmtPacing(n)` → "pacing 5 morsels") and money formatting — money is integer 6-decimal MICRO-units, `AIMEAT.commerce.fmtMoney(1500000, "EUR")` → "1.50 EUR"; `fmtSession(session)` shows a session\'s money total and pacing together. On 402 INSUFFICIENT_MORSELS, `pacingPack()` / `buyPacingPack()` buy more pacing from the operator, after the person agrees. Read a typed or exported amount with `AIMEAT.commerce.parseAmount(text)` ("12,000.00" → 12000; an ambiguous "1,000" → null, so ask again), never `parseFloat(s.replace(",", "."))`. Never ask the user for payment secrets — seller PSP config lives server-side. Requires aimeat-auth. An app that buys declares `contract:spend` in aimeat-scopes, never commerce:buy.',
   },
   {
     id: 'aimeat-exchange',

@@ -7,12 +7,13 @@
  *   Classic move that names its traps itself.
  * @usage pnpm test -- appdev-kb-similarity
  * @version-history
+ *   v1.1.0 — 2026-11-21 — nearestPitfallCategory: the category a free-text word files under.
  *   v1.0.0 — 2026-11-21 — initial.
  */
 import { describe, it, expect } from 'vitest';
 import {
     similarityScore, SIMILARITY_THRESHOLD, pitfallTokens, needsRecheck, isPitfallCategory, namesOneApp,
-    PITFALL_CATEGORIES, platformDefectWish,
+    PITFALL_CATEGORIES, platformDefectWish, nearestPitfallCategory,
 } from '../../src/services/appdev/kb-quality.js';
 import { getAppdevPitfalls } from '../../src/data/appdev-pitfalls.js';
 import { buildFinishChecklist, PITFALL_FOUR_QUESTIONS } from '../../src/services/appdev/flow-constants.js';
@@ -116,6 +117,21 @@ describe('categories, app names and the wish text', () => {
         for (const c of PITFALL_CATEGORIES) expect(isPitfallCategory(c)).toBe(true);
         expect(isPitfallCategory('three-world')).toBe(false);
         expect(isPitfallCategory('')).toBe(false);
+    });
+
+    it('files a free-text category under the nearest fixed one', () => {
+        // A fixed name stays itself, an alias and a dash-separated part name their category.
+        for (const c of PITFALL_CATEGORIES) expect(nearestPitfallCategory(c)).toBe(c);
+        expect(nearestPitfallCategory('build')).toBe('app');
+        expect(nearestPitfallCategory('rendering')).toBe('games');
+        expect(nearestPitfallCategory('three-world')).toBe('games');
+        expect(nearestPitfallCategory('ui-layout')).toBe('ui');
+        expect(nearestPitfallCategory('storage')).toBe('data');
+        // A word that names nothing files under app, never under a category it merely contains
+        // ("build" holds the letters "ui").
+        expect(nearestPitfallCategory('zzz-unknown')).toBe('app');
+        expect(nearestPitfallCategory('builder')).toBe('app');
+        expect(nearestPitfallCategory('')).toBe('app');
     });
 
     it('finds an app file name, and not a library path', () => {

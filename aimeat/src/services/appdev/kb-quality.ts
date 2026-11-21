@@ -13,11 +13,13 @@
  *   report was matched to an existing entry only by its exact {category, slug}; 31 free-text
  *   categories beside nine fixed areas; entries no one had re-checked for months still listed first;
  *   and 32 entries about one app in a list every builder reads.
- * @structure PITFALL_CATEGORIES · isPitfallCategory · STALE_MINOR_WINDOW · STAMPS_BEGAN ·
+ * @structure PITFALL_CATEGORIES · isPitfallCategory · nearestPitfallCategory · STALE_MINOR_WINDOW · STAMPS_BEGAN ·
  *   needsRecheck · pitfallTokens · similarityScore · SIMILARITY_THRESHOLD · namesOneApp ·
  *   platformDefectWish · APP_NOTES_POINTER
  * @usage import { similarityScore, needsRecheck, PITFALL_CATEGORIES } from './kb-quality.js';
  * @version-history
+ *   v1.1.0 — 2026-11-21 — nearestPitfallCategory: a category outside the fixed list files under the
+ *     nearest fixed one instead of being refused, so a report from an earlier client still lands.
  *   v1.0.0 — 2026-11-21 — initial: fixed categories, similarity score, staleness window, app-name
  *     check and the platform-defect wish text.
  */
@@ -35,6 +37,39 @@ export type PitfallCategory = (typeof PITFALL_CATEGORIES)[number];
 
 export function isPitfallCategory(value: string): value is PitfallCategory {
     return (PITFALL_CATEGORIES as readonly string[]).includes(value);
+}
+
+/**
+ * Words reporters used as a category that name one of the fixed ones. Read after the fixed names, so
+ * a word here never shadows a category of the same spelling.
+ */
+const CATEGORY_ALIASES: Readonly<Record<string, PitfallCategory>> = {
+    build: 'app', building: 'app', general: 'app', sdk: 'app', lib: 'app', library: 'app', libraries: 'app',
+    deploy: 'publish', publishing: 'publish', release: 'publish', lint: 'publish', serve: 'publish', serving: 'publish',
+    login: 'auth', signin: 'auth', oauth: 'auth', session: 'auth', sso: 'auth', scope: 'auth', scopes: 'auth',
+    memory: 'data', storage: 'data', records: 'data', rows: 'data', workspace: 'data', datamap: 'data',
+    extension: 'ext', extensions: 'ext', wasm: 'ext', manifest: 'ext',
+    llm: 'ai', model: 'ai', models: 'ai', prompt: 'ai',
+    css: 'ui', layout: 'ui', design: 'ui', theme: 'ui', i18n: 'ui', a11y: 'ui', accessibility: 'ui',
+    phone: 'mobile', ios: 'mobile', android: 'mobile', pwa: 'mobile',
+    sse: 'realtime', live: 'realtime', websocket: 'realtime', events: 'realtime',
+    game: 'games', phaser: 'games', three: 'games', 'three-world': 'games', webgl: 'games', rendering: 'games', canvas: 'games',
+};
+
+/**
+ * The fixed category a reported word files under: the word itself when it is one; else the first of
+ * its dash-separated parts that is one or names one (`ui-layout` → ui, `phaser-physics` → games);
+ * else `app`, the category for anything about building an app. An earlier client sent free-text
+ * categories, and its reports keep working: the caller stores the word in tags and warns.
+ */
+export function nearestPitfallCategory(word: string): PitfallCategory {
+    if (isPitfallCategory(word)) return word;
+    if (CATEGORY_ALIASES[word]) return CATEGORY_ALIASES[word];
+    for (const part of word.split('-')) {
+        if (isPitfallCategory(part)) return part;
+        if (CATEGORY_ALIASES[part]) return CATEGORY_ALIASES[part];
+    }
+    return 'app';
 }
 
 /**

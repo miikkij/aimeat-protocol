@@ -9,6 +9,8 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-appdev-pitfalls).
  * @version-history
+ *   2026-11-21 — A free-text category files under the nearest fixed one with a tag and a warning,
+ *     instead of a 400 (an earlier client's report keeps working).
  *   2026-11-15 — Audit M064, M065: owner B cannot delete A's shared entry; share=false withdraws it from B's platform list.
  *   v1.3.0 — 2026-11-08 — Every row's `open` is the call that opens it: the shared row's
  *     read_public with its owner, the own row's aimeat_memory_read (which then opens it), and the
@@ -60,6 +62,8 @@ import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn, registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession as openAgentSession, callTool as callAgentTool, type McpAgent } from './helpers/mcp-session.js';
+import { PITFALL_CATEGORIES } from '../src/services/appdev/kb-quality.js';
+const PITFALL_LIST_TEXT = PITFALL_CATEGORIES.join(', ');
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -532,10 +536,16 @@ await test('report: retired_by on outdated; supersedes the retired entry brings 
 
 await test('report: category from the fixed list; critical waits for a curator; evidence is asked for', async () => {
     const free = await A.call('aimeat_appdev_pitfall_report', {
-        model: 'gpt-6', category: 'three-world', title: 'Orbit controls are not bundled', symptom: 'import fails', resolution: 'write the orbit yourself',
+        model: 'gpt-6', category: 'three-world', slug: 'orbit-free-text', title: 'Pointer lock waits for a click', symptom: 'requestPointerLock throws at load', resolution: 'ask for it inside the click handler',
     });
-    const text = reportText(free);
-    assert(free.result?.isError === true && /^INVALID_INPUT:/.test(text) && /games/.test(text) && /tags/.test(text), `free-text category: ${text.slice(0, 300)}`);
+    // A free-text category files under the nearest fixed one; the word becomes a tag and the answer
+    // names the fixed list.
+    assert(free.result?.isError !== true, `free-text category: ${reportText(free).slice(0, 300)}`);
+    const freeOut = reportOut(free);
+    assert(freeOut.category === 'games' && freeOut.key.endsWith('/games/orbit-free-text'), `filed under: ${JSON.stringify(freeOut)}`);
+    assert(freeOut.warnings.some((w: string) => /"three-world"/.test(w) && w.includes(PITFALL_LIST_TEXT) && /tags/.test(w)), `category warning: ${JSON.stringify(freeOut.warnings)}`);
+    const freeBody = await A.call('aimeat_memory_read', { key: freeOut.key, owner_scope: true });
+    assert(/"three-world"/.test(reportText(freeBody)), `the word is not a tag: ${reportText(freeBody).slice(0, 300)}`);
 
     const crit = await A.call('aimeat_appdev_pitfall_report', {
         model: 'gpt-6', category: 'games', title: 'Orbit controls are not bundled', symptom: 'import of OrbitControls fails', resolution: 'write the orbit yourself',
@@ -591,7 +601,12 @@ await test('REST: the same refusals on POST /learned (409 with details.matches, 
     const cat = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: h, body: JSON.stringify({
         model: 'goose', category: 'rendering', title: 'Canvas blurs on a retina screen', symptom: 'lines look soft', resolution: 'scale by devicePixelRatio',
     }) });
-    assert(cat.status === 400 && /rendering/.test(cat.body.error.message) && Array.isArray(cat.body.error.details?.categories), `category: ${cat.status} ${JSON.stringify(cat.body?.error)}`);
+    // A free-text category from an earlier client files under the nearest fixed one, keeps the word
+    // as a tag, and the answer names the list.
+    assert(cat.status === 201 && cat.body.data.category === 'games' && cat.body.data.key.endsWith('/games/canvas-blurs-on-a-retina-screen'), `category: ${cat.status} ${JSON.stringify(cat.body?.error ?? cat.body?.data)}`);
+    assert((cat.body.data.warnings as string[]).some(w => /"rendering"/.test(w) && w.includes(PITFALL_LIST_TEXT)), `category warning: ${JSON.stringify(cat.body.data.warnings)}`);
+    const catRead = await json(`/v1/memory/${encodeURIComponent(cat.body.data.key)}?owner_scope=true`, { headers: h });
+    assert(catRead.status === 200 && (catRead.body.data?.value?.tags ?? []).includes('rendering'), `the word is a tag: ${catRead.status} ${JSON.stringify(catRead.body.data?.value?.tags ?? catRead.body?.error)}`);
     const badType = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: h, body: JSON.stringify({
         model: 'goose', category: 'ui', title: 'Something else entirely here', symptom: 'some symptom', resolution: 'some fix', confirm_new: 'yes',
     }) });

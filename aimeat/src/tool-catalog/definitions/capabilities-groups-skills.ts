@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-21 — aimeat_appdev_pitfall_report's category says a word outside the list files under the
+ *     nearest category with a warning, instead of being refused.
  *   2026-11-21 — aimeat_skill_publish's visibility names the public default of a new skill bound to an app.
  *   2026-11-21 — aimeat_appdev_pitfall_report takes evidence, seen_version, tags, supersedes,
  *     confirm_new, kind and retired_by, and its description and category name the fixed list and the
@@ -608,7 +610,7 @@ export const capabilitiesGroupsSkillsTools = [
         surfaces: ['appdev', 'agent'],
         input: {
             model: { type: 'string', required: true, description: 'YOUR OWN model id — the model that hit/solved this. Self-identify from your own configuration, never ask the user. Indicative attribution.', zod: z.string().min(1).max(64) },
-            category: { type: 'string', required: true, description: 'One of: app, publish, auth, data, ext, cortex, ai, ui, mobile, atelier, realtime, iam, games. Another value is refused for a new entry and names the list; topic words go to tags.', zod: z.string().min(1).max(40) },
+            category: { type: 'string', required: true, description: 'One of: app, publish, auth, data, ext, cortex, ai, ui, mobile, atelier, realtime, iam, games. Another value files a new entry under the nearest of these, adds the word to tags and warns; topic words go to tags.', zod: z.string().min(1).max(40) },
             title: { type: 'string', required: true, description: 'Short imperative title.', zod: z.string().min(3).max(160) },
             symptom: { type: 'string', required: true, description: 'What the builder observes.', zod: z.string().min(5).max(10_000) },
             resolution: { type: 'string', required: true, description: 'What to do instead.', zod: z.string().min(5).max(40_000) },
