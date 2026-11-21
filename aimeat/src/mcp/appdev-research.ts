@@ -10,6 +10,7 @@
  * @structure registerAppdevResearchTools() — aimeat_appdev_overview
  * @usage registerAppdevResearchTools(mcp, storage, config, () => agentGaii, caller);
  * @version-history
+ *   2026-11-21 — aimeat_appdev_overview passes `areas`, the areas a draft uses.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — SECURITY: takes the session's caller and hands the overview its view (principal and
@@ -50,12 +51,12 @@ export function registerAppdevResearchTools(
             inputSchema: zodShapeFor('aimeat_appdev_overview'),
             annotations: annotationsFor('aimeat_appdev_overview'),
         },
-        async ({ model, sections }) => {
+        async ({ model, sections, areas }) => {
             // The owner-scope sections read as this agent may (memory:read-as-owner), as
             // GET /v1/appdev/overview reads them (secaudit 2026-10, v56 shape).
             const c = caller();
             const view = { principal: c.principal, readsAll: readsAsOwner(c) };
-            const overview = await buildAppdevOverview(storage, config, readerForAgent({ storage, config }, agentGaii), { model, sections, view });
+            const overview = await buildAppdevOverview(storage, config, readerForAgent({ storage, config }, agentGaii), { model, sections, view, areas });
             return { content: [{ type: 'text' as const, text: JSON.stringify(overview, null, 2) }] };
         },
     );

@@ -14,6 +14,10 @@
  *   import { buildAppdevOverview } from './overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   2026-11-21 — opts.areas (the areas a draft uses) narrows both pitfall sections; a curated entry a
+ *     publish check enforces (enforcedBy) leaves the curated list, counted as enforced_at_publish; a
+ *     learned entry not re-checked within STALE_MINOR_WINDOW minor versions leaves the learned list,
+ *     counted under needs_recheck with the call that re-checks it.
  *   2026-11-19 — Atelier is the only build guide: app_templates leaves out the Classic track's tiered
  *     shells and lists the Atelier shells, then the genres; `tier` and tier_guide give way to
  *     start_guide, which names the level, the genre or shell, and the platform sections. builder_skill
@@ -64,8 +68,10 @@ import type { Storage } from '../../storage/interface.js';
 import { isGEAI, localAccountOf } from '../../utils/gaii.js';
 import { getLibraryPacks } from '../../data/library-packs.js';
 import { getAppTemplateIndex } from '../../data/app-templates.js';
-import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../../data/appdev-pitfalls.js';
+import { getAppdevPitfalls, getAppdevPitfallIndex, getAppdevPitfallFacets } from '../../data/appdev-pitfalls.js';
 import { filterPitfalls, listLearnedPitfalls, listOwnerScopeShown, type OwnerScopeViewer } from './kb.js';
+import { needsRecheck, STALE_MINOR_WINDOW } from './kb-quality.js';
+import { getSoftwareVersion } from '../../utils/version.js';
 import { ownerScopeView } from '../owner/scope-read.js';
 import type { ContentReader } from '../classification/reader.js';
 import { listSkills, type SkillAccessor } from '../skills.js';
@@ -88,6 +94,11 @@ export interface AppdevOverviewOpts {
     model?: string;
     /** Subset of sections to build (token economy); default all. */
     sections?: string[];
+    /**
+     * The areas the draft uses (app, auth, data, ext, ...). The pitfall sections then list only the
+     * entries whose areas or category name one of them. Without it every entry is a candidate.
+     */
+    areas?: string[];
     /**
      * Who reads the owner-scope sections, for ownerScopeView: the caller's principal and whether it
      * reads as the owner (services/owner/scope-read.ts readsAsOwner). Without it the caller is read
@@ -254,11 +265,21 @@ export async function buildAppdevOverview(
     }
 
     // ── Curated pitfalls (platform registry) ──
+    // The areas the draft uses, when the caller named them: the pitfall sections keep what touches one.
+    const areas = new Set((opts.areas ?? []).map(a => a.trim().toLowerCase()).filter(Boolean));
+    if (areas.size > 0) out.areas = [...areas];
+
     if (wanted.has('pitfalls_curated')) {
-        const idx = getAppdevPitfallIndex();
+        // An entry a publish check enforces is shown where the check fires, at publish, so it leaves
+        // the list a builder reads before building (AppdevPitfallEntry.enforcedBy).
+        const enforced = new Set(getAppdevPitfalls().filter(p => p.enforcedBy).map(p => p.id));
+        const idx = getAppdevPitfallIndex()
+            .filter(p => !enforced.has(p.id))
+            .filter(p => areas.size === 0 || (p.appliesTo as string[]).some(a => areas.has(a)));
         out.pitfalls_curated = {
             ...capped(idx),
             facets: getAppdevPitfallFacets(),
+            ...(enforced.size > 0 ? { enforced_at_publish: enforced.size, enforced_note: 'Entries a publish check enforces are left out here: the publish answer names them when the check fires.' } : {}),
             drill_down: 'GET /v1/appdev/pitfalls/{id} (filter: ?applies_to=&severity=)',
         };
     }
@@ -271,9 +292,26 @@ export async function buildAppdevOverview(
     // no other owner saw any of the 118 shared ones. An entry is about the platform far more often
     // than about the model that happened to meet it.
     if (wanted.has('pitfalls_learned')) {
-        const entries = await listLearnedPitfalls(storage, config, reader, { includeShared: true, view });
-        const page = filterPitfalls(entries, { status: 'active', sort: 'severity', preferModel: model, limit: CAP });
+        const all = await listLearnedPitfalls(storage, config, reader, { includeShared: true, view });
+        // An entry not re-checked within STALE_MINOR_WINDOW minor versions of this node leaves the
+        // list and is counted below with the call that re-checks it. Nothing is deleted.
+        const nodeVersion = getSoftwareVersion();
+        const stale = all.filter(e => (e.status ?? 'active') === 'active' && needsRecheck(e, nodeVersion));
+        const staleKeys = new Set(stale.map(e => e.key));
+        const entries = all.filter(e => !staleKeys.has(e.key));
+        const page = filterPitfalls(entries, {
+            status: 'active', sort: 'severity', preferModel: model, limit: CAP, ...(areas.size > 0 ? { areas: [...areas] } : {}),
+        });
+        const ownStale = stale.filter(e => e.source === 'own');
         out.pitfalls_learned = {
+            needs_recheck: {
+                count: stale.length,
+                ...(ownStale.length > 0 ? { own: ownStale.slice(0, CAP).map(e => e.key) } : {}),
+                window: `${STALE_MINOR_WINDOW} minor versions behind ${nodeVersion}`,
+                recheck: 'Read the entry and check it against this node. Still true: report it again with the same category and slug '
+                    + '(aimeat_appdev_pitfall_report, which stamps it with this version), or PATCH /v1/appdev/pitfalls/learned/{category}/{slug} { "verified": true }. '
+                    + 'No longer true: report it with status outdated and retired_by.',
+            },
             items: page.pitfalls.map(e => ({
                 key: e.key, title: e.title, category: e.category ?? null, model: e.model ?? null,
                 severity: e.severity, status: e.status, shared: e.shared, source: e.source,

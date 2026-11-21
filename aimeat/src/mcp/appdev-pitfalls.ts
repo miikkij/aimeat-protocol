@@ -12,6 +12,10 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, scopes, caller);
  * @version-history
+ *   2026-11-21 — The report passes evidence, seen_version, tags, supersedes, confirm_new, kind and
+ *     retired_by, the reader and view the similarity check reads through, and whether the caller is a
+ *     curator; its answer carries warnings, notes and the platform-defect wish text, and a refusal
+ *     over close matches lists them. The list passes `areas`.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — SECURITY: aimeat_appdev_pitfall_list reads the owner-scope learned entries through the
@@ -49,8 +53,9 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import {
     PITFALL_PACKAGE_ID,
-    pitfallEntryKey, deletePitfallEntry, pitfallIndex, reportLearnedPitfall,
+    pitfallEntryKey, deletePitfallEntry, pitfallIndex,
 } from '../services/appdev/kb.js';
+import { reportLearnedPitfall } from '../services/appdev/kb-report.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -82,30 +87,40 @@ export function registerAppdevPitfallTools(
             inputSchema: zodShapeFor('aimeat_appdev_pitfall_report'),
             annotations: annotationsFor('aimeat_appdev_pitfall_report'),
         },
-        async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
-            // The whole report is services/appdev/kb.ts reportLearnedPitfall(), the same function
+        async ({
+            model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share,
+            evidence, seen_version, tags, supersedes, confirm_new, kind, retired_by,
+        }) => {
+            // The whole report is services/appdev/kb-report.ts reportLearnedPitfall(), the same function
             // POST /v1/appdev/pitfalls/learned calls and both connector doors reach through it. The
             // entry is a memory record and answers to memory's rules (archive guard, key and size
             // ceilings, byte quota) inside that function, and it stamps the verification.
+            const c = caller();
             const r = await reportLearnedPitfall(storage, config,
-                caller().principalView,
-                { model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share },
-                getSoftwareVersion());
+                c.principalView,
+                {
+                    model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share,
+                    evidence, seen_version, tags, supersedes, confirm_new, kind, retired_by,
+                },
+                getSoftwareVersion(),
+                {
+                    reader: readerForAgent({ storage, config }, agentGaii, sessionScopes),
+                    view: { principal: c.principal, readsAll: readsAsOwner(c) },
+                    curator: await c.operator(),
+                });
             if (!r.ok) {
-                return { content: [{ type: 'text' as const, text: `${r.code}: ${r.message}` }], isError: true };
+                // A refusal over close matches carries them, with the call that opens each.
+                const details = r.details ? `\n${JSON.stringify(r.details, null, 2)}` : '';
+                return { content: [{ type: 'text' as const, text: `${r.code}: ${r.message}${details}` }], isError: true };
             }
             emitResourceUpdated(agentGaii, `aimeat://knowledge/${PITFALL_PACKAGE_ID}`);
-            const { key, category: cat, slug: slg, visibility } = r;
+            const answer: Record<string, unknown> = { ...r };
+            delete answer.ok;
 
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({
-                        key, category: cat, slug: slg,
-                        updated: r.updated, version: r.version,
-                        visibility, shared: visibility === 'public',
-                        verified_at: r.verified_at, verified_version: r.verified_version,
-                    }, null, 2),
+                    text: JSON.stringify({ ...answer, shared: r.visibility === 'public' }, null, 2),
                 }],
             };
         },

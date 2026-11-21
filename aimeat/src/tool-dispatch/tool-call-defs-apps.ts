@@ -8,6 +8,8 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-11-21 -- aimeat_appdev_pitfall_report forwards evidence, seen_version, tags, supersedes,
+ *     confirm_new, kind and retired_by; aimeat_appdev_overview and aimeat_appdev_pitfall_list send `areas`.
  *   2026-11-20 -- aimeat_app_get finds an app named without `.html` (services/app/app-ref.ts order).
  *   2026-11-15 -- aimeat_app_fork forwards access_code to POST /v1/apps/:owner/:filename/fork (E2E audit M093).
  *   2026-11-13 -- aimeat_app_draft_save forwards mime_type (unit 3b).
@@ -595,13 +597,16 @@ export const appTools: ConnectCliToolDefinition[] = [
         input: {
             model: { type: 'string', description: 'Your own model (indicative): marks proven packs and orders learned pitfalls; filters nothing.' },
             sections: { type: 'array', description: 'Section filter: apps, library_packs, app_templates, skills, pitfalls_curated, pitfalls_learned, template_proposals.' },
+            areas: { type: 'array', description: 'The areas your draft uses; both pitfall sections keep the entries that touch one.' },
         },
         // The catalog publishes sections as a list; the route reads one comma-separated string. A
         // list was dropped by optionalString, so every filtered call answered with every section.
         handler: ({ client }, input) => {
-            const list = optionalArray(input, 'sections');
-            const sections = list ? list.filter((s): s is string => typeof s === 'string').join(',') || undefined : optionalString(input, 'sections');
-            return client.get(`/v1/appdev/overview${query({ model: optionalString(input, 'model'), sections })}`);
+            const csv = (name: string) => {
+                const list = optionalArray(input, name);
+                return list ? list.filter((s): s is string => typeof s === 'string').join(',') || undefined : optionalString(input, name);
+            };
+            return client.get(`/v1/appdev/overview${query({ model: optionalString(input, 'model'), sections: csv('sections'), areas: csv('areas') })}`);
         },
     },
     {
@@ -616,6 +621,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             category: { type: 'string', description: 'Filter by category.' },
             model: { type: 'string', description: 'Filter learned entries to one model.' },
             applies_to: { type: 'string', description: 'Filter by area.' },
+            areas: { type: 'array', description: 'The areas your draft uses; keeps the entries that touch one.' },
             status: { type: 'string', enum: ['active', 'outdated', 'all'], description: 'Default active.' },
             limit: { type: 'number', description: 'Page size, default 25 (max 100).' },
             offset: { type: 'number', description: 'Page start, default 0.' },
@@ -625,6 +631,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             category: optionalString(input, 'category'),
             model: optionalString(input, 'model'),
             applies_to: optionalString(input, 'applies_to'),
+            areas: optionalArray(input, 'areas')?.map(a => String(a)).join(',') || undefined,
             status: optionalString(input, 'status'),
             limit: optionalNumber(input, 'limit'),
             offset: optionalNumber(input, 'offset'),
@@ -659,6 +666,13 @@ export const appTools: ConnectCliToolDefinition[] = [
             status: { type: 'string', enum: ['active', 'outdated'], description: 'Default active.' },
             app_ref: { type: 'string', description: 'Related app owner/filename.html.' },
             share: { type: 'boolean', description: 'true = publish platform-wide (public).' },
+            evidence: { type: 'string', description: 'A file and line, a documentation URL or a reproduction.' },
+            seen_version: { type: 'string', description: 'The node version this was seen on.' },
+            tags: { type: 'array', description: 'Free topic words.' },
+            supersedes: { type: 'string', description: 'The entry this report replaces (own key, category/slug, curated id or shared key).' },
+            confirm_new: { type: 'boolean', description: 'true after reading the SIMILAR_ENTRY matches: a different trap.' },
+            kind: { type: 'string', enum: ['pitfall', 'platform-defect'], description: 'platform-defect: the platform could prevent this.' },
+            retired_by: { type: 'string', description: 'With status outdated: what retired it.' },
         },
         handler: ({ client }, input) => {
             // POST /v1/appdev/pitfalls/learned runs the node MCP tool's own function. This door wrote
@@ -672,14 +686,18 @@ export const appTools: ConnectCliToolDefinition[] = [
                 symptom: requiredString(input, 'symptom'),
                 resolution: requiredString(input, 'resolution'),
             };
-            for (const field of ['slug', 'severity', 'status', 'app_ref'] as const) {
+            for (const field of ['slug', 'severity', 'status', 'app_ref', 'evidence', 'seen_version', 'supersedes', 'kind', 'retired_by'] as const) {
                 const v = optionalString(input, field);
                 if (v) body[field] = v;
             }
             const appliesTo = optionalArray(input, 'applies_to');
             if (appliesTo) body.applies_to = appliesTo.map(a => String(a));
+            const tags = optionalArray(input, 'tags');
+            if (tags) body.tags = tags.map(a => String(a));
             const share = optionalBoolean(input, 'share');
             if (share !== undefined) body.share = share;
+            const confirmNew = optionalBoolean(input, 'confirm_new');
+            if (confirmNew !== undefined) body.confirm_new = confirmNew;
             return client.post('/v1/appdev/pitfalls/learned', body);
         },
     },

@@ -10,6 +10,10 @@
  * @structure appdevPitfallsRouter(config, storage) → Router
  * @usage app.use(appdevPitfallsRouter(config, storage)) from the routes loader.
  * @version-history
+ *   2026-11-21 — POST /learned takes evidence, seen_version, tags, supersedes, confirm_new, kind and
+ *     retired_by (services/appdev/kb-report.ts), answers 409 SIMILAR_ENTRY with the close matches, and
+ *     returns warnings, notes and the platform-defect wish text. PATCH takes retired_by and severity
+ *     (critical from a node operator only). GET /index takes `areas`.
  *   2026-10-20 — SECURITY: GET /index and GET /learned read the owner-scope learned entries through
  *     the caller's view (readsAsOwner): an agent without memory:read-as-owner listed its owner's and
  *     its siblings' private entries here (secaudit 2026-10, the v56 shape).
@@ -44,8 +48,9 @@ import {
   getAppdevPitfalls, getAppdevPitfallFacets,
 } from '../data/appdev-pitfalls.js';
 import {
-  queryLearnedPitfalls, setPitfallFlags, deletePitfallEntry, reportLearnedPitfall, pitfallIndex,
+  queryLearnedPitfalls, setPitfallFlags, deletePitfallEntry, pitfallIndex,
 } from '../services/appdev/kb.js';
+import { reportLearnedPitfall } from '../services/appdev/kb-report.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { readerFor } from '../services/classification/reader.js';
 import { readsAsOwner } from '../services/owner/scope-read.js';
@@ -85,6 +90,7 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
       category: str(req.query.category, 40),
       model: str(req.query.model, 64),
       applies_to: str(req.query.applies_to, 20),
+      areas: str(req.query.areas, 200)?.split(',').map(a => a.trim()).filter(Boolean).slice(0, 12),
       limit: num(req.query.limit),
       offset: num(req.query.offset),
     }, ownerScopeViewOf(req));
@@ -141,22 +147,46 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
     const appliesTo = Array.isArray(b.applies_to)
       ? (b.applies_to as unknown[]).filter((a): a is string => typeof a === 'string' && a.length <= 20).slice(0, 8)
       : undefined;
+    const tags = Array.isArray(b.tags)
+      ? (b.tags as unknown[]).filter((a): a is string => typeof a === 'string' && a.length <= 40).slice(0, 8)
+      : undefined;
+    // A field sent with the wrong type is refused, not dropped: a caller that asked for confirm_new and
+    // had it ignored would be refused over a match it believed it had answered.
+    const limits: Array<[string, number]> = [['evidence', 2000], ['seen_version', 40], ['supersedes', 300], ['retired_by', 200]];
+    const badText = limits.find(([f, max]) => b[f] !== undefined && str(b[f], max) === undefined);
+    if (badText || (b.confirm_new !== undefined && typeof b.confirm_new !== 'boolean')
+      || (b.kind !== undefined && b.kind !== 'pitfall' && b.kind !== 'platform-defect')) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', badText
+        ? `${badText[0]} is a string of at most ${badText[1]} characters`
+        : 'confirm_new is a boolean; kind is pitfall or platform-defect'));
+      return;
+    }
     // The request's caller (middleware/caller.ts, secaudit 2026-10, C9).
-    const r = await reportLearnedPitfall(storage, config, callerOf(req, config.nodeId, storage).principalView, {
+    const caller = callerOf(req, config.nodeId, storage);
+    const r = await reportLearnedPitfall(storage, config, caller.principalView, {
       model, category, title, symptom, resolution,
       slug: str(b.slug, 64), applies_to: appliesTo, severity, status,
       app_ref: str(b.app_ref, 200),
       share: typeof b.share === 'boolean' ? b.share : undefined,
-    }, getSoftwareVersion());
+      evidence: str(b.evidence, 2000),
+      seen_version: str(b.seen_version, 40),
+      tags,
+      supersedes: str(b.supersedes, 300),
+      confirm_new: b.confirm_new === true,
+      kind: b.kind === 'platform-defect' ? 'platform-defect' : undefined,
+      retired_by: str(b.retired_by, 200),
+    }, getSoftwareVersion(), {
+      reader: readerFor({ storage, config }, req.auth),
+      view: ownerScopeViewOf(req),
+      curator: await caller.operator(),
+    });
     if (!r.ok) {
-      res.status(r.status).json(error(config.nodeId, r.code, r.message));
+      res.status(r.status).json(error(config.nodeId, r.code, r.message, undefined, r.details));
       return;
     }
-    res.status(r.updated ? 200 : 201).json(success(config.nodeId, {
-      key: r.key, category: r.category, slug: r.slug, updated: r.updated, version: r.version,
-      visibility: r.visibility, shared: r.visibility === 'public',
-      verified_at: r.verified_at, verified_version: r.verified_version,
-    }));
+    const answer: Record<string, unknown> = { ...r };
+    delete answer.ok;
+    res.status(r.updated ? 200 : 201).json(success(config.nodeId, { ...answer, shared: r.visibility === 'public' }));
   });
 
   // PATCH /v1/appdev/pitfalls/learned/:category/:slug — toggle share (visibility) / status.
@@ -168,11 +198,26 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
     // `verified: true` records that somebody checked the entry against this node again, on the
     // version the node is running now. The version is the node's own, never the caller's word.
     const verified = req.body?.verified === true ? { version: getSoftwareVersion() } : undefined;
-    if (share === undefined && status === undefined && verified === undefined) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide share (boolean), status (active|outdated) and/or verified (true)'));
+    const rawRetired = req.body?.retired_by;
+    const retiredBy = typeof rawRetired === 'string' && rawRetired.trim() && rawRetired.length <= 200 ? rawRetired.trim() : undefined;
+    const rawSeverity = req.body?.severity;
+    const severityValue = rawSeverity === 'info' || rawSeverity === 'warn' || rawSeverity === 'critical' ? rawSeverity : undefined;
+    if ((rawRetired !== undefined && !retiredBy) || (rawSeverity !== undefined && !severityValue)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'retired_by is a string of at most 200 characters; severity is info, warn or critical'));
       return;
     }
-    const entry = await setPitfallFlags(storage, config, identity, req.params.category as string, req.params.slug as string, { share, status, verified });
+    if (share === undefined && status === undefined && verified === undefined && !retiredBy && !severityValue) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide share (boolean), status (active|outdated), retired_by, severity and/or verified (true)'));
+      return;
+    }
+    // critical is a curator's word: a node operator raises a learned entry to it; anyone else's
+    // critical is kept as requested_severity (services/appdev/kb.ts setPitfallFlags).
+    const caller = callerOf(req, config.nodeId, storage);
+    const severity = severityValue
+      ? { value: severityValue, curator: severityValue === 'critical' && await caller.operator() ? caller.principal : null }
+      : undefined;
+    const entry = await setPitfallFlags(storage, config, identity, req.params.category as string, req.params.slug as string,
+      { share, status, verified, retired_by: retiredBy, severity });
     if (!entry) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such learned pitfall in your scope'));
       return;

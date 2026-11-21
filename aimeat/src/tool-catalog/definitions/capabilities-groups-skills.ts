@@ -5,6 +5,9 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-21 — aimeat_appdev_pitfall_report takes evidence, seen_version, tags, supersedes,
+ *     confirm_new, kind and retired_by, and its description and category name the fixed list and the
+ *     SIMILAR_ENTRY refusal; aimeat_appdev_overview and aimeat_appdev_pitfall_list take `areas`.
  *   2026-11-20 — aimeat_appdev_pitfall_report's `app_ref` example names the app without `.html`.
  *   2026-11-19 — aimeat_appdev_overview names the Atelier shells and genres instead of the T1/T2/T3
  *     shells; aimeat_app_template_propose no longer asks for a tier (optional and deprecated).
@@ -583,11 +586,15 @@ export const capabilitiesGroupsSkillsTools = [
         input: {
             model: { type: 'string', description: 'Your primary model (indicative), e.g. claude-haiku-4.5. Marks proven packs and orders learned pitfalls; filters nothing.', zod: z.string().max(64) },
             sections: { type: 'array', description: 'Subset: apps, library_packs, app_templates, skills, pitfalls_curated, pitfalls_learned, template_proposals.', zod: z.array(z.enum(OVERVIEW_SECTIONS)) },
+            areas: { type: 'array', description: 'The areas your draft uses (app, auth, data, ext, cortex, ai, ui, mobile, atelier, realtime, iam, publish, games). Both pitfall sections then list only the entries that touch one of them.', zod: z.array(z.string().max(20)).max(12) },
         },
     },
     {
         name: 'aimeat_appdev_pitfall_report',
-        description: 'Record a pitfall learned while building an app ON AIMEAT (apps/extensions/cortex — never node development): what broke, what fixed it, and WHICH MODEL hit it (model is required, self-reported, indicative). Call at the end of a build for anything the next builder should know. Upserts by {category, slug} — reporting the same slug again REPLACES the entry with better wording (version bumps). status=outdated hides an entry models no longer stumble on; share=true publishes it platform-wide so other owners\' agents learn from it (default: private to your owner scope). Stored in the reserved knowledge package appdev-pitfalls.',
+        description: 'Record a pitfall learned while building an app ON AIMEAT (apps/extensions/cortex — never node development): what broke, what fixed it, and WHICH MODEL hit it (model is required, self-reported, indicative). Call at the end of a build for anything the next builder should know. Upserts by {category, slug} — reporting the same slug again REPLACES the entry with better wording (version bumps). status=outdated hides an entry models no longer stumble on; share=true publishes it platform-wide so other owners\' agents learn from it (default: private to your owner scope). Stored in the reserved knowledge package appdev-pitfalls. '
+            + 'A NEW entry close to one already there (own, shared or curated, active or outdated) is refused as SIMILAR_ENTRY with the matches: open them, then report again with supersedes: "<ref>" (an own entry is updated in place, a retired one comes back) or confirm_new: true. '
+            + 'category is one of app, publish, auth, data, ext, cortex, ai, ui, mobile, atelier, realtime, iam, games; other topic words go to tags. Give evidence (file:line, doc URL or reproduction) and seen_version. '
+            + 'A learned entry is stored at most warn; critical waits for a node operator. An entry about one app (app_ref) stays private: its lesson belongs in App Development Notes. kind platform-defect: the platform could prevent it; the answer carries a ready wish text.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Report AppDev Pitfall', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -599,7 +606,7 @@ export const capabilitiesGroupsSkillsTools = [
         surfaces: ['appdev', 'agent'],
         input: {
             model: { type: 'string', required: true, description: 'YOUR OWN model id — the model that hit/solved this. Self-identify from your own configuration, never ask the user. Indicative attribution.', zod: z.string().min(1).max(64) },
-            category: { type: 'string', required: true, description: 'Kebab-case category (auth, ext, cortex, realtime, mobile, publish, ai, data...).', zod: z.string().min(1).max(40) },
+            category: { type: 'string', required: true, description: 'One of: app, publish, auth, data, ext, cortex, ai, ui, mobile, atelier, realtime, iam, games. Another value is refused for a new entry and names the list; topic words go to tags.', zod: z.string().min(1).max(40) },
             title: { type: 'string', required: true, description: 'Short imperative title.', zod: z.string().min(3).max(160) },
             symptom: { type: 'string', required: true, description: 'What the builder observes.', zod: z.string().min(5).max(10_000) },
             resolution: { type: 'string', required: true, description: 'What to do instead.', zod: z.string().min(5).max(40_000) },
@@ -607,8 +614,15 @@ export const capabilitiesGroupsSkillsTools = [
             applies_to: { type: 'array', description: 'Areas: app, auth, ext, cortex, iam, realtime, ai, mobile, publish.', zod: z.array(z.string().max(20)).max(8) },
             severity: { type: 'string', enum: ['info', 'warn', 'critical'], description: 'Default warn.' },
             status: { type: 'string', enum: ['active', 'outdated'], description: 'outdated = kept but hidden from default lists.' },
-            app_ref: { type: 'string', description: 'Related app (owner/name, e.g. alice/notes).', zod: z.string().max(200) },
+            app_ref: { type: 'string', description: 'Related app (owner/name, e.g. alice/notes). An entry with an app stays private; share=true with one is refused.', zod: z.string().max(200) },
             share: { type: 'boolean', description: 'true = platform-wide public entry; default private to your owner scope.' },
+            evidence: { type: 'string', description: 'What shows the claim: a file and line, a documentation URL, or the steps that reproduce it. Asked for; without it the answer warns.', zod: z.string().max(2000) },
+            seen_version: { type: 'string', description: 'The node version you saw this on (GET /v1/build, or the version the answer names).', zod: z.string().max(40) },
+            tags: { type: 'array', description: 'Free topic words (webgl, kanban, i18n...); the category stays one of the fixed list.', zod: z.array(z.string().max(40)).max(8) },
+            supersedes: { type: 'string', description: 'An entry this report replaces: an own entry\'s key or category/slug (updated in place, a retired one comes back), a curated id, or a shared entry\'s key.', zod: z.string().max(300) },
+            confirm_new: { type: 'boolean', description: 'true after reading the SIMILAR_ENTRY matches: this is a different trap and gets its own entry.' },
+            kind: { type: 'string', enum: ['pitfall', 'platform-defect'], description: 'platform-defect = the platform could prevent this; the answer carries a ready wish text for the platform owner.' },
+            retired_by: { type: 'string', description: 'With status outdated: what retired it (a commit hash, a lint rule id, or an SDK or library version).', zod: z.string().max(200) },
         },
     },
     {
@@ -625,6 +639,7 @@ export const capabilitiesGroupsSkillsTools = [
             category: { type: 'string', description: 'Filter by category.', zod: z.string().max(40) },
             model: { type: 'string', description: 'Filter learned entries to one model (e.g. claude-haiku-4.5).', zod: z.string().max(64) },
             applies_to: { type: 'string', description: 'Filter by area (app, auth, ext, cortex, iam, realtime, ai, mobile, publish).', zod: z.string().max(20) },
+            areas: { type: 'array', description: 'The areas your draft uses: keeps the entries whose areas or category name one of them.', zod: z.array(z.string().max(20)).max(12) },
             status: { type: 'string', enum: ['active', 'outdated', 'all'], description: 'Default active (outdated hidden).' },
             limit: { type: 'number', description: 'Page size, default 25 (max 100).', zod: z.number().int().min(1).max(100) },
             offset: { type: 'number', description: 'Page start, default 0.', zod: z.number().int().min(0) },

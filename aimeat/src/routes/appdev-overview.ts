@@ -9,6 +9,7 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   2026-11-21 — GET /v1/appdev/overview takes ?areas=, the areas a draft uses, which narrow both pitfall sections.
  *   2026-11-19 — GET /v1/appdev/templates and /:id name the caller as the reader of a genre grown out
  *     of an app, which reaches only the people the app's audience admits (feature audit 1.2).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -66,7 +67,11 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     // grant or an agent holding memory:read-as-owner, the visible part for any other (secaudit 2026-10).
     const caller = callerOf(req, config.nodeId, storage);
     const view = { principal: caller.principal, readsAll: readsAsOwner(caller) };
-    const overview = await buildAppdevOverview(storage, config, reader, { model, sections, view });
+    // The areas the draft uses narrow both pitfall sections (comma-separated, like sections).
+    const areas = typeof req.query.areas === 'string'
+      ? req.query.areas.slice(0, 200).split(',').map(s => s.trim()).filter(Boolean).slice(0, 12)
+      : undefined;
+    const overview = await buildAppdevOverview(storage, config, reader, { model, sections, view, areas });
     res.json(success(config.nodeId, overview, [
       { description: 'Curated pitfalls', method: 'GET', url: '/v1/appdev/pitfalls' },
       { description: 'Library pack detail', method: 'GET', url: '/v1/library-packs/{id}' },

@@ -13,6 +13,7 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-21 — Step 7 names the verification checklist, the Atelier platform section `verify`.
  *   2026-11-20 — The proposal recommends a build style (AI-accelerated by default, a quick trial, a
  *     presentation), and step 9's bound skill is written for the person who operates the app
  *     through their AI, with `ai_path` in the publish answer.
@@ -519,7 +520,8 @@ moved under you says so.
    reachable, no console errors. Read the console with the browser's own warnings as well, for
    several seconds while the app works, and run an app that computes every frame once with the
    JavaScript compiler off (\`--js-flags=--jitless\`): the specification's "Finishing" says how
-   and what passes. LOOK FOR A BROWSER BEFORE YOU SAY YOU HAVE NONE: list the tools
+   and what passes. The checklist to go through is the platform section \`verify\`
+   (\`aimeat_handbook_get { tier: "build-app-atelier/verify" }\`). LOOK FOR A BROWSER BEFORE YOU SAY YOU HAVE NONE: list the tools
    you were given and search them for \`playwright\`, \`browser\` and \`chrome\`. A Playwright MCP
    server driving the machine's own Chrome is the usual one, and a session that has it and does
    not look is the common failure. If there is none, say so once and suggest it by name

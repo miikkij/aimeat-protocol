@@ -101,6 +101,9 @@ export const ALLOWED: Record<string, Record<string, string>> = {
     '/^\\/(everything|start|index\\.html)$/': 'The node\'s own pages, real files under public/, not app names.',
     '/^\\/([^/]+\\/[^/]+\\.html?)?$/i': 'A URL test on the app host for a members-only node: only the .html path is opened without a session. Widening it to any two-segment path would open /v1/... there; the short /<owner>/<name> path asks for a sign-in on such a node, and the app\'s subdomain serves it.',
   },
+  'src/services/appdev/kb-quality.ts': {
+    '/\\b[a-z0-9][a-z0-9_-]*\\/[a-z0-9][a-z0-9_.-]*\\.html\\b/i': 'A text search, not an app reference: a pitfall report whose words name one app\'s file is kept private (the app field app_ref is the other signal). Nothing is resolved or opened by it.',
+  },
   'src/routes/bootstrap.ts': {
     '`${base}.html`': 'The node\'s own static front page and its Finnish copy, real files under public/.',
   },

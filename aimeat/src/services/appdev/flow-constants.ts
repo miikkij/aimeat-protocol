@@ -10,6 +10,8 @@
  * @structure FLOW_* string constants + buildResearchStep()/buildFinishChecklist() fragments
  * @usage import { FLOW_SKIP_PHRASE, buildResearchStep } from './flow-constants.js';
  * @version-history
+ *   (2026-11-21) The finish step's "report what bit you" is four questions in order
+ *     (PITFALL_FOUR_QUESTIONS): platform defect, this app only, general web craft, else search then report.
  *   (2026-11-20) The level is the finest unless the owner chose a lower one.
  *   (2026-11-19) The research step loads the Atelier skill and frames by level, genre or shell and
  *     platform sections; no tier. It is served as the Atelier platform section `research`.
@@ -50,5 +52,15 @@ export function buildResearchStep(): string {
 
 /** The finish checklist appended to the MCP section of the build prompt. */
 export function buildFinishChecklist(): string {
-    return `FINISH (after a successful publish — the publish response's next_steps shows what is missing): (1) publish the app's agent face + bind a skill (metadata.binding \`app:{owner}/{filename}\`) so the app is agent-facing by default; (2) if anything generalizes, record a template with \`${FLOW_TOOLS.templatePropose}\` (your own model id required — self-identify, never ask the user); (3) report what bit you with \`${FLOW_TOOLS.pitfallReport}\` (model required) — the next build starts smarter than this one.\n`;
+    return `FINISH (after a successful publish — the publish response's next_steps shows what is missing): (1) publish the app's agent face + bind a skill (metadata.binding \`app:{owner}/{filename}\`) so the app is agent-facing by default; (2) if anything generalizes, record a template with \`${FLOW_TOOLS.templatePropose}\` (your own model id required — self-identify, never ask the user); (3) for what bit you, ask four questions in this order: ${PITFALL_FOUR_QUESTIONS} — the next build starts smarter than this one.\n`;
 }
+
+/**
+ * What a finished build does with what bit it, as four questions in order. The knowledge base had
+ * grown to 195 active entries by 2026-11-21, a sixth of them one app's bugs, general web craft or
+ * a repeat of an entry already there, because the finish step asked only to "report what bit you".
+ */
+export const PITFALL_FOUR_QUESTIONS = `(a) could the platform have prevented it (a check, a default, a refusal with its reason)? Then report it with \`${FLOW_TOOLS.pitfallReport}\` and \`kind: "platform-defect"\`, which answers with a ready wish text for the platform owner; `
+    + '(b) is it about this app only? Then it goes in the app\'s own document in App Development Notes, not in the knowledge base; '
+    + '(c) is it general web craft (CSS, a browser API, a library from outside AIMEAT)? Then it gets no entry; '
+    + `(d) otherwise search the knowledge base first (\`${FLOW_TOOLS.pitfallList}\` with the areas you touched), update the entry that is already there (\`supersedes\`), and report a new one with \`${FLOW_TOOLS.pitfallReport}\` (model, evidence and seen_version) only when none fits`;

@@ -24,6 +24,9 @@
  *   atelierPlatformIds() · ATELIER_PLATFORM_PART_LINE
  * @usage const piece = atelierPlatformPiece('group', config.baseUrl);   // null for an unknown id
  * @version-history
+ *   v1.4.0 — 2026-11-21 — The section `verify` (builtin-skills.app-builder-common.ts VERIFY_SECTION):
+ *     one checklist for checking an app in a browser, folded from six learned pitfalls. `from-classic`
+ *     carries the five migration traps itself instead of sending every builder to a private entry.
  *   v1.3.0 — 2026-11-20 — The platform index points at the node's capability list (`aimeat_handbook_get
  *     { tier: "features" }`, /v1/everything), which check:feature-reach holds whole.
  *   v1.2.0 — 2026-11-20 — The sections `ai-path` and `app-tools` (atelier-ai-path.ts): the path the
@@ -37,7 +40,7 @@
  */
 import { buildAppPrompt } from './app-prompt.js';
 import { splitBuildAppSpec } from './app-layers.js';
-import { AFTER_PUBLISH_SECTION, DATES_NUMBERS_SECTION, PUBLISH_CHECKS_SECTION } from '../../data/builtin-skills.app-builder-common.js';
+import { AFTER_PUBLISH_SECTION, DATES_NUMBERS_SECTION, PUBLISH_CHECKS_SECTION, VERIFY_SECTION } from '../../data/builtin-skills.app-builder-common.js';
 import { buildCapabilityPackLines } from '../../data/library-packs.js';
 import { OTHER_OWNERS_SECTION, OTHER_OWNERS_POINTER } from './atelier-other-owners.js';
 import { AI_PATH_SECTION, APP_TOOLS_SECTION } from './atelier-ai-path.js';
@@ -86,6 +89,7 @@ export const ATELIER_PLATFORM: Array<{ id: string; from?: string; when: string }
   { id: 'agent-face', when: 'Other AI agents should be able to read or operate the published app.' },
   { id: 'install', when: 'The app is installed on a phone: the home-screen icon.' },
   { id: 'dates-numbers', when: 'The app shows a date, a time, a number, money or morsels: they follow the person\'s own format and clock, never the app\'s language.' },
+  { id: 'verify', when: 'Before you say the app works: the one checklist for checking it in a browser (which browser, the visible path, the whole console, sign-up, what automation cannot do, driving an app with Playwright).' },
   { id: 'publish-checks', when: 'Before you publish: check the script so a parse error is not what the node refuses, and send a file over about 1 KB by presigned upload.' },
   { id: 'after-publish', when: 'After the publish: the template and the pitfall the next build starts from, the bound skill\'s reader, and the workstation for an app past about 300 kB.' },
   { id: 'publish-by-hand', from: 'publish', when: 'You cannot publish over MCP: you hand the person one HTML file and tell them how to put it on the node.' },
@@ -104,7 +108,14 @@ export const FROM_CLASSIC_SECTION = '## An app built on the retired Classic trac
   + 'so the page keeps loading their stylesheet until the section is rebuilt with the kit. The sign-in still moves to the shell. Move the rest when the owner asks.\n\n'
   + 'Either way: keep the filename and every memory key, so the published address and the person\'s data stay where they are; read the app\'s data map first (`aimeat_datamap_get`); '
   + 'declare `<meta name="aimeat-track" content="atelier">`; and publish with this specification\'s `spec_token`. '
-  + 'Read the pitfall `atelier-kit-migration-traps` (`aimeat_appdev_pitfall_list`) before you start: a side navigation, the phone bar, strict schemas and daisyUI rules that outrank the kit\'s have each broken a moved app. '
+  + 'Five traps have each broken a moved app (recorded as atelier-kit-migration-traps), and all five are here: '
+  + '(1) `AIMEAT.atelier.app({ nav: "side" })` builds the side column only when `navItems` is non-empty when the app is made; `a.nav.set({ items })` later cannot create it, so pass the whole list up front and filter what each page shows. '
+  + '(2) The phone\'s bottom bar shows only the items with `bottom: true` or no group, and the kit adds a Menu entry that opens every page in a sheet; test the navigation at the phone size, not only that nothing overflows. '
+  + '(3) A workspace created with a strict schema refuses a record with fields the schema does not name, whatever its `additionalProperties` says; give such a schema `patternProperties: { "^.*$": {} }`. '
+  + '(4) `AIMEAT.atelier.kanban` has no card-open callback, and its cards take focus only when `onMove` is set; make each `[data-card]` pressable yourself after it renders. '
+  + '(5) An old stylesheet kept for one section outranks the kit: a later `.btn` rule beats the kit\'s fill, `.input { width: auto }` beats a full-width class, and a wrapper reset such as `.x h1, .x p { margin: 0 }` beats spacing classes. '
+  + 'Put the old class names on the kit\'s `--ak-*` tokens once in the page\'s own sheet, scope house variables to a wrapper inside the frame\'s main area (not `:root`), and write every reset as `:where(...)`. '
+  + 'The frame\'s main area is the scroller, so `window.scrollTo(0, 0)` does nothing: reset the main area too. '
   + 'Compare the old and the new screen on the same walk before you publish.\n';
 
 /** The one line part `start` gives this index (atelier-layers.ts partsIndex). Keep it short: `start` is near MAX_PART_CHARS. */
@@ -177,6 +188,7 @@ export function atelierPlatformPiece(id: string, baseUrl: string): { id: string;
   if (id === 'app-tools') return { id, text: APP_TOOLS_SECTION };
   if (id === 'ai-path') return { id, text: AI_PATH_SECTION };
   if (id === 'from-classic') return { id, text: FROM_CLASSIC_SECTION };
+  if (id === 'verify') return { id, text: VERIFY_SECTION };
   if (id === 'other-owners') return { id, text: OTHER_OWNERS_SECTION };
   const moved = MOVED_FROM_CLASSIC_SKILL[id];
   if (moved) return { id, text: moved };

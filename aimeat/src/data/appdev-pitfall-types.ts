@@ -9,6 +9,8 @@
  * @structure AppdevPitfallScope · AppdevPitfallEntry
  * @usage import type { AppdevPitfallEntry } from './appdev-pitfall-types.js';
  * @version-history
+ *   v1.1.0 — 2026-11-21 — enforcedBy: the publish check that enforces an entry, which leaves it out
+ *     of the research overview.
  *   v1.0.0 — 2026-10-17 — Moved verbatim from appdev-pitfalls.ts.
  */
 
@@ -49,4 +51,10 @@ export interface AppdevPitfallEntry {
    */
   verifiedAt?: string;
   verifiedVersion?: string;
+  /**
+   * The publish check that enforces this entry (a lint rule id or finding code). Such an entry is
+   * shown where the check fires, at publish, and the research overview leaves it out of the list a
+   * builder reads before building (services/appdev/overview.ts).
+   */
+  enforcedBy?: string;
 }

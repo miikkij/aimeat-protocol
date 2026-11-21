@@ -14,6 +14,12 @@
  *   PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './kb.js';
  * @version-history
+ *   2026-11-21 -- reportLearnedPitfall moved to kb-report.ts (with its similarity check, fixed
+ *     categories and severity cap). filterPitfalls and pitfallIndex take `areas`, the areas a draft
+ *     uses; an index row says needs_recheck when it trails the node by more than two minor versions,
+ *     and carries retired_by, and a curated row its enforced_by. setPitfallFlags takes retired_by and a
+ *     severity, where critical needs a curator and is otherwise kept as requested_severity; setting an
+ *     outdated entry active again records `reactivated`.
  *   2026-11-16 -- slugifyKb trims the edge dashes with a linear loop in place of /^-+|-+$/g, which
  *     CodeQL reads as polynomial on a user-supplied category; the slug it returns is unchanged.
  *   2026-11-08 -- Every index row carries `open`, the exact call that opens it: a real build read an
@@ -70,11 +76,12 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { isGEAI, localAccountOf } from '../../utils/gaii.js';
 import { emitRecordChangePriorUnknown } from '../event-bus.js';
-import { writeMemoryRecord } from '../memory/write.js';
 import type { ContentReader } from '../classification/reader.js';
 import { presentMemories, classificationWarningOf } from '../classification/present-memory.js';
 import { getAppdevPitfalls } from '../../data/appdev-pitfalls.js';
 import { ownerScopeView } from '../owner/scope-read.js';
+import { getSoftwareVersion } from '../../utils/version.js';
+import { needsRecheck } from './kb-quality.js';
 
 /** Who reads an owner-scope listing, for ownerScopeView: the principal and whether it reads as the owner. */
 export interface OwnerScopeViewer {
@@ -109,6 +116,23 @@ export interface LearnedPitfallValue {
     /** When this entry was last checked against the platform, and the node version it was checked on. */
     verified_at?: string;
     verified_version?: string;
+    /** A file:line, a doc URL or a reproduction that shows the claim, and the node version it was seen on. */
+    evidence?: string;
+    seen_version?: string;
+    /** Free topic words; the category is one of PITFALL_CATEGORIES (kb-quality.ts). */
+    tags?: string[];
+    /** pitfall (default) or platform-defect: the platform could prevent this. */
+    kind?: 'pitfall' | 'platform-defect';
+    /** The severity the reporter asked for when it was more than a learned entry is stored with. */
+    requested_severity?: 'critical';
+    /** Set when a curator (a node operator) raised the entry to critical. */
+    severity_raised_by?: string;
+    /** What retired an outdated entry: a commit hash, a lint rule id or an SDK/library version. */
+    retired_by?: string;
+    /** Set when a report brought a retired entry back: when, on which version, and what had retired it. */
+    reactivated?: { at: string; version: string; retired_by?: string };
+    /** The curated id or another owner's entry this one replaces (an own entry is updated in place). */
+    supersedes?: string;
 }
 
 /** The stamp a report or an explicit re-check writes: now, on this node's software version. */
@@ -278,6 +302,10 @@ function toEntry(rec: MemoryRecord, source: 'own' | 'shared'): LearnedPitfallEnt
         updated: v?.updated ?? rec.updatedAt,
         verified_at: v?.verified_at,
         verified_version: v?.verified_version,
+        created: v?.created,
+        ...(v?.retired_by ? { retired_by: v.retired_by } : {}),
+        ...(v?.requested_severity ? { requested_severity: v.requested_severity } : {}),
+        ...(v?.tags?.length ? { tags: v.tags } : {}),
         ...(warning ? { classificationWarning: warning } : {}),
     };
 }
@@ -366,6 +394,11 @@ export interface PitfallListQuery {
     /** A curated entry carries no model and passes any model filter. */
     model?: string;
     applies_to?: string;
+    /**
+     * The areas a draft uses (app, auth, data, ...): keeps an entry whose applies_to or category names
+     * one of them. A research call passes the areas it will touch instead of reading every entry.
+     */
+    areas?: string[];
     /** Own entries only: true = shared platform-wide, false = private. */
     shared?: boolean;
     /** Case-insensitive text over title, symptom, resolution, app and model. */
@@ -424,6 +457,11 @@ export function filterPitfalls<T extends PitfallLike>(entries: T[], query: Pitfa
     if (category) out = out.filter(e => e.category === category || e.id === query.category);
     if (model) out = out.filter(e => e.model == null || e.model === model);
     if (area) out = out.filter(e => (e.applies_to ?? []).includes(area));
+    const areas = new Set((query.areas ?? []).map(a => a.trim().toLowerCase()).filter(Boolean));
+    if (areas.size > 0) {
+        out = out.filter(e => (e.applies_to ?? []).some(a => areas.has(String(a).toLowerCase()))
+            || (e.category != null && areas.has(e.category)));
+    }
     if (query.shared !== undefined) out = out.filter(e => e.source === 'curated' || !!e.shared === query.shared);
     if (q) {
         out = out.filter(e => [e.title, e.symptom, e.resolution, e.fix, e.app_ref, e.model, e.category, e.slug, e.id]
@@ -486,6 +524,9 @@ function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): 
         updated: v?.updated ?? rec.updatedAt,
         verified_at: v?.verified_at ?? null,
         verified_version: v?.verified_version ?? null,
+        // Too far behind the node's version to trust without a look (kb-quality.ts STALE_MINOR_WINDOW).
+        ...(needsRecheck({ verified_version: v?.verified_version, created: v?.created ?? rec.createdAt }, getSoftwareVersion()) ? { needs_recheck: true } : {}),
+        ...(v?.retired_by ? { retired_by: v.retired_by } : {}),
         shared: rec.visibility === 'public',
         // Another owner's entry is read by naming its holder (aimeat_memory_read_public {gaii, key}).
         ...(source === 'learned-shared' ? { owner: rec.ownerGaii } : {}),
@@ -506,6 +547,8 @@ export interface PitfallIndexQuery {
     category?: string;
     model?: string;
     applies_to?: string;
+    /** The areas the draft uses; see PitfallListQuery.areas. */
+    areas?: string[];
     limit?: number;
     offset?: number;
 }
@@ -534,6 +577,7 @@ export async function pitfallIndex(
                 model: null, applies_to: p.appliesTo as string[], severity: p.severity,
                 status: p.status ?? 'active', updated: p.updatedAt, shared: true,
                 verified_at: p.verifiedAt ?? null, verified_version: p.verifiedVersion ?? null,
+                ...(p.enforcedBy ? { enforced_by: p.enforcedBy } : {}),
                 detail_url: `/v1/appdev/pitfalls/${p.id}`,
                 open: `GET ${config.baseUrl.replace(/\/+$/, '')}/v1/appdev/pitfalls/${p.id}`,
             } as PitfallLike);
@@ -543,7 +587,7 @@ export async function pitfallIndex(
     // Facets count what the filter left, as the MCP tool always did.
     const page = filterPitfalls(entries, {
         status: wantStatus, category: query.category, model: query.model?.trim().toLowerCase(),
-        applies_to: query.applies_to, sort: 'severity', limit: query.limit, offset: query.offset,
+        applies_to: query.applies_to, areas: query.areas, sort: 'severity', limit: query.limit, offset: query.offset,
     });
     return {
         pitfalls: page.pitfalls,
@@ -563,7 +607,13 @@ export async function pitfallIndex(
 export async function setPitfallFlags(
     storage: Storage, config: AimeatConfig, callerGaii: string,
     category: string, slug: string,
-    flags: { share?: boolean; status?: 'active' | 'outdated'; verified?: { version: string } },
+    flags: {
+        share?: boolean; status?: 'active' | 'outdated'; verified?: { version: string };
+        /** With status outdated: what retired it (a commit hash, a lint rule id, an SDK/library version). */
+        retired_by?: string;
+        /** A new severity; `curator` is the operator principal, the only one that may set critical. */
+        severity?: { value: 'info' | 'warn' | 'critical'; curator: string | null };
+    },
 ): Promise<LearnedPitfallEntry | null> {
     const key = pitfallEntryKey(category, slug);
     const existing = await findOwnEntry(storage, config, callerGaii, key);
@@ -571,8 +621,25 @@ export async function setPitfallFlags(
     const now = new Date().toISOString();
     const value = { ...(existing.value as LearnedPitfallValue) };
     if (flags.status) {
+        if (flags.status === 'active' && value.status === 'outdated') {
+            value.reactivated = { at: now, version: getSoftwareVersion(), ...(value.retired_by ? { retired_by: value.retired_by } : {}) };
+            delete value.retired_by;
+        }
         value.status = flags.status;
         value.updated = now;
+    }
+    if (flags.retired_by && value.status === 'outdated') value.retired_by = flags.retired_by;
+    if (flags.severity) {
+        // A learned entry is stored at most `warn`; critical waits as requested_severity until a curator
+        // raises it (services/appdev/kb-quality.ts, the overview's 25 places went to one app's bugs).
+        if (flags.severity.value === 'critical' && !flags.severity.curator) {
+            value.requested_severity = 'critical';
+        } else {
+            value.severity = flags.severity.value;
+            delete value.requested_severity;
+            if (flags.severity.value === 'critical') value.severity_raised_by = flags.severity.curator!;
+            else delete value.severity_raised_by;
+        }
     }
     if (flags.verified) Object.assign(value, verificationStamp(flags.verified.version));
     const visibility = flags.share === undefined
@@ -589,86 +656,8 @@ export async function setPitfallFlags(
     return toEntry(updated, 'own');
 }
 
-export interface PitfallReportInput {
-    model: string;
-    category: string;
-    title: string;
-    symptom: string;
-    resolution: string;
-    slug?: string;
-    applies_to?: string[];
-    severity?: 'info' | 'warn' | 'critical';
-    status?: 'active' | 'outdated';
-    app_ref?: string;
-    share?: boolean;
-}
-
-export type PitfallReportResult =
-    | { ok: true; key: string; category: string; slug: string; updated: boolean; version: number; visibility: string; verified_at: string; verified_version: string }
-    | { ok: false; status: number; code: string; message: string };
-
-/**
- * Report (upsert) one learned pitfall: the ONE implementation behind the node's MCP tool, POST
- * /v1/appdev/pitfalls/learned and, through that route, both connector doors. The connector doors
- * used to write POST /v1/memory themselves, which skipped the manifest, lost `created` and
- * `reported_by`, and wrote under the connector agent's own namespace even when the entry already
- * lived under another of the owner's identities, where it then shadowed the original.
- *
- * Every report stamps `verified_at` / `verified_version`: a report is a claim about this node as it
- * is now, so re-reporting an entry is how it is re-verified.
- */
-export async function reportLearnedPitfall(
-    storage: Storage, config: AimeatConfig,
-    who: { principal: string; scopes: string[]; roles: string[] },
-    input: PitfallReportInput, softwareVersion: string,
-): Promise<PitfallReportResult> {
-    const cat = slugifyKb(input.category);
-    const slg = input.slug ? input.slug.toLowerCase() : slugifyKb(input.title);
-    if (!PITFALL_SLUG_RE.test(cat) || !PITFALL_SLUG_RE.test(slg)) {
-        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'Invalid category/slug — use kebab-case (a-z, 0-9, dashes)' };
-    }
-    const key = pitfallEntryKey(cat, slg);
-    const now = new Date();
-    const existing = await findOwnEntry(storage, config, who.principal, key);
-    const normModel = input.model.trim().toLowerCase();
-    const stamp = verificationStamp(softwareVersion, now);
-    const value: LearnedPitfallValue = {
-        title: input.title, symptom: input.symptom, resolution: input.resolution,
-        model: normModel,
-        category: cat, slug: slg,
-        applies_to: (input.applies_to ?? []).map(a => a.toLowerCase()),
-        severity: input.severity ?? 'warn',
-        status: input.status ?? 'active',
-        ...(input.app_ref ? { app_ref: input.app_ref } : {}),
-        reported_by: who.principal,
-        created: (existing?.value as LearnedPitfallValue | null)?.created ?? now.toISOString(),
-        updated: now.toISOString(),
-        ...stamp,
-    };
-    const visibility = input.share === true ? 'public' : input.share === false ? 'owner' : (existing?.visibility ?? 'owner');
-    const tags = ['knowledge-entry', 'pitfall', `model:${normModel}`, ...value.applies_to.map(a => `applies:${a}`)];
-
-    // The entry is a memory record, so it answers to memory's rules: the archive guard, the key and
-    // value-size ceilings, the byte quota. Written into whichever of the owner's identities already
-    // holds the key, so an update never forks a second copy.
-    const written = await writeMemoryRecord({ storage, config }, {
-        principal: who.principal,
-        targetGaii: existing?.ownerGaii ?? who.principal,
-        scopes: who.scopes,
-        roles: who.roles,
-    }, {
-        key, value, visibility: visibility as MemoryRecord['visibility'], tags,
-        pipeline: 'appdev.pitfall_report',
-        ownerScoped: true,
-    });
-    if (!written.ok) return { ok: false, status: written.status, code: written.code, message: written.message };
-    await upsertPitfallManifest(storage, config, who.principal, key, input.title);
-    return {
-        ok: true, key, category: cat, slug: slg,
-        updated: !!existing, version: (existing?.version ?? 0) + 1, visibility,
-        ...stamp,
-    };
-}
+// The report (reportLearnedPitfall) lives in kb-report.ts since 2026-11-21: with the similarity
+// check, the fixed categories and the severity cap it would have taken this file past 800 lines.
 
 /** Delete one of the caller's own entries (record + manifest ref). */
 export async function deletePitfallEntry(

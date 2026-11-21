@@ -453,6 +453,203 @@ await test('An agent holding memory:read-as-owner, and the owner in person, list
     }
 });
 
+// ── The knowledge base stops only growing (services/appdev/kb-report.ts, kb-quality.ts, 2026-11-21) ──
+// A report was matched to an existing entry only by its exact {category, slug}, so the production
+// knowledge base held ten near-duplicate pairs and re-reports of retired entries; categories were free
+// text; any reporter could file critical; one app's bugs sat in the shared list.
+
+const reportText = (body: any): string => body.result?.content?.[0]?.text ?? JSON.stringify(body.error ?? body);
+const reportOut = (body: any) => JSON.parse(body.result.content[0].text);
+
+await test('report: a NEW entry close to an own one is refused with the match; confirm_new files it', async () => {
+    const close = {
+        model: 'claude-haiku-4.5', category: 'mobile', slug: 'keyboard-gap-again',
+        title: 'Keyboard height double-counted on a phone', symptom: 'a dead gap above the keyboard',
+        resolution: 'dvh already excludes the keyboard, so subtract nothing',
+    };
+    const refused = await A.call('aimeat_appdev_pitfall_report', close);
+    const text = reportText(refused);
+    assert(refused.result?.isError === true && /^SIMILAR_ENTRY:/.test(text), `expected SIMILAR_ENTRY, got: ${text.slice(0, 300)}`);
+    assert(text.includes('packages/appdev-pitfalls/mobile/keyboard-gap'), `the match is not named: ${text.slice(0, 400)}`);
+    assert(/"open": "aimeat_memory_read /.test(text), `the match carries no open call: ${text.slice(0, 600)}`);
+    // Nothing was written by the refusal.
+    const own = JSON.parse((await A.call('aimeat_appdev_pitfall_list', { scope: 'own', status: 'all', limit: 100 })).result.content[0].text);
+    assert(!own.pitfalls.some((p: any) => p.slug === 'keyboard-gap-again'), 'a refused report was written');
+
+    const filed = await A.call('aimeat_appdev_pitfall_report', { ...close, confirm_new: true });
+    assert(filed.result?.isError !== true, `confirm_new was refused: ${reportText(filed).slice(0, 300)}`);
+    assert(reportOut(filed).key === 'packages/appdev-pitfalls/mobile/keyboard-gap-again', 'confirm_new wrote the wrong key');
+    // Updating that entry by its own {category, slug} is not a new entry and is not compared.
+    const again = await A.call('aimeat_appdev_pitfall_report', { ...close, resolution: 'reworded resolution text' });
+    assert(again.result?.isError !== true && reportOut(again).version === 2, `an update by its own slug was refused: ${reportText(again).slice(0, 300)}`);
+});
+
+await test('report: retired_by on outdated; supersedes the retired entry brings it back with a note', async () => {
+    const retire = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'kimi-k2.6', category: 'realtime', slug: 'batching',
+        title: 'Realtime WS rate limit — batch per tick', symptom: 'notes stop after a while',
+        resolution: 'send ONE batched message per tick carrying all notes',
+        status: 'outdated', retired_by: 'aimeat-realtime 2.4.0',
+    });
+    assert(retire.result?.isError !== true, `retire: ${reportText(retire).slice(0, 300)}`);
+    const all = JSON.parse((await A.call('aimeat_appdev_pitfall_list', { scope: 'own', status: 'all', limit: 100 })).result.content[0].text);
+    const row = all.pitfalls.find((p: any) => p.slug === 'batching');
+    assert(row?.status === 'outdated' && row.retired_by === 'aimeat-realtime 2.4.0', `retired_by not on the row: ${JSON.stringify(row)}`);
+
+    // A re-report of the retired entry without retired_by keeps what retired it (edge).
+    const noReason = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'kimi-k2.6', category: 'realtime', slug: 'batching',
+        title: 'Realtime WS rate limit — batch per tick', symptom: 'notes stop after a while',
+        resolution: 'send ONE batched message per tick carrying all notes', status: 'outdated',
+    });
+    assert(!reportOut(noReason).warnings.some((w: string) => /retired_by/.test(w)), `retired_by lost on a re-report: ${reportText(noReason).slice(0, 300)}`);
+    // Retiring an active entry without retired_by is answered with the question.
+    const asked = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'claude-haiku-4.5', category: 'mobile', slug: 'keyboard-gap-again',
+        title: 'Keyboard height double-counted on a phone', symptom: 'a dead gap above the keyboard',
+        resolution: 'reworded resolution text', status: 'outdated',
+    });
+    assert(reportOut(asked).warnings.some((w: string) => /retired_by/.test(w)), `no retired_by warning: ${reportText(asked).slice(0, 300)}`);
+
+    const back = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'kimi-k2.6', category: 'realtime', slug: 'rate-limit-returns',
+        title: 'The realtime rate limit still drops notes', symptom: 'notes stop after a while on a busy board',
+        resolution: 'batch per tick still', supersedes: 'realtime/batching',
+        evidence: 'steps: open two tabs, play 40 notes a second', seen_version: '4.3.1',
+    });
+    assert(back.result?.isError !== true, `supersedes: ${reportText(back).slice(0, 300)}`);
+    const out = reportOut(back);
+    assert(out.key === 'packages/appdev-pitfalls/realtime/batching' && out.updated === true, `an own entry is updated in place: ${JSON.stringify(out)}`);
+    assert(out.reactivated === true && out.warnings.some((w: string) => /outdated \(retired by aimeat-realtime 2\.4\.0\)/.test(w)), `no reactivation note: ${JSON.stringify(out)}`);
+    assert(!out.warnings.some((w: string) => /^Add (evidence|seen_version)/.test(w)), `evidence was given and still asked for: ${JSON.stringify(out.warnings)}`);
+
+    const missing = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'kimi-k2.6', category: 'realtime', title: 'Anything at all here', symptom: 'some symptom', resolution: 'some fix',
+        supersedes: 'realtime/no-such-entry',
+    });
+    assert(missing.result?.isError === true && /^NOT_FOUND:/.test(reportText(missing)), `unknown supersedes: ${reportText(missing).slice(0, 200)}`);
+});
+
+await test('report: category from the fixed list; critical waits for a curator; evidence is asked for', async () => {
+    const free = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'gpt-6', category: 'three-world', title: 'Orbit controls are not bundled', symptom: 'import fails', resolution: 'write the orbit yourself',
+    });
+    const text = reportText(free);
+    assert(free.result?.isError === true && /^INVALID_INPUT:/.test(text) && /games/.test(text) && /tags/.test(text), `free-text category: ${text.slice(0, 300)}`);
+
+    const crit = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'gpt-6', category: 'games', title: 'Orbit controls are not bundled', symptom: 'import of OrbitControls fails', resolution: 'write the orbit yourself',
+        severity: 'critical', tags: ['Three World', 'orbit'],
+    });
+    assert(crit.result?.isError !== true, `games report: ${reportText(crit).slice(0, 300)}`);
+    const out = reportOut(crit);
+    assert(out.severity === 'warn' && out.requested_severity === 'critical', `an agent's critical was stored: ${JSON.stringify(out)}`);
+    assert(out.warnings.some((w: string) => /evidence/.test(w)) && out.warnings.some((w: string) => /seen_version/.test(w)), `evidence not asked for: ${JSON.stringify(out.warnings)}`);
+    const body = await A.call('aimeat_memory_read', { key: out.key, owner_scope: true });
+    assert(/"three-world"/.test(reportText(body)) && /"orbit"/.test(reportText(body)), `tags not stored: ${reportText(body).slice(0, 300)}`);
+});
+
+await test('report: an entry about one app stays private and points to App Development Notes; shared with one is refused', async () => {
+    const shared = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'claude-haiku-4.5', category: 'data', title: 'Notes app list record grows forever', symptom: 'the list record passes 900 kB',
+        resolution: 'move old rows to a per-month record', app_ref: 'alice/notes', share: true,
+    });
+    assert(shared.result?.isError === true && /names no app/.test(reportText(shared)), `share with app_ref: ${reportText(shared).slice(0, 300)}`);
+    const kept = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'claude-haiku-4.5', category: 'data', title: 'Notes app list record grows forever', symptom: 'the list record passes 900 kB in alice/notes.html',
+        resolution: 'move old rows to a per-month record',
+    });
+    assert(kept.result?.isError !== true, `private app entry: ${reportText(kept).slice(0, 300)}`);
+    const out = reportOut(kept);
+    assert(out.visibility === 'owner' && out.notes.some((n: string) => /App Development Notes/.test(n)), `app entry: ${JSON.stringify(out)}`);
+});
+
+await test('report: kind platform-defect answers with a ready wish text', async () => {
+    const r = await A.call('aimeat_appdev_pitfall_report', {
+        model: 'claude-haiku-4.5', category: 'publish', title: 'Upload publish ignores the page version comment',
+        symptom: 'the catalogue keeps the previous version label', resolution: 'pass version on every publish call',
+        kind: 'platform-defect', evidence: 'services/app/publish.ts reads no manifest comment', seen_version: '4.3.1',
+    });
+    assert(r.result?.isError !== true, `platform-defect: ${reportText(r).slice(0, 300)}`);
+    const pd = reportOut(r).platform_defect;
+    assert(pd && /Platform defect: Upload publish ignores/.test(pd.wish_text) && /Evidence: services\/app\/publish.ts/.test(pd.wish_text), `wish text: ${JSON.stringify(pd)}`);
+    assert(/wish/.test(pd.how) && typeof pd.operators_told === 'boolean', `how: ${JSON.stringify(pd)}`);
+});
+
+await test('REST: the same refusals on POST /learned (409 with details.matches, 400 for a category)', async () => {
+    const tok = viewOwner.token;
+    const h = { Authorization: `Bearer ${tok}` };
+    const first = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: h, body: JSON.stringify({
+        model: 'goose', category: 'ui', slug: 'toast-stack', title: 'Toasts stack over the bottom bar', symptom: 'two toasts cover the phone bar buttons', resolution: 'cap toasts at one',
+    }) });
+    assert(first.status === 201, `first: ${first.status} ${JSON.stringify(first.body?.error)}`);
+    const close = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: h, body: JSON.stringify({
+        model: 'goose', category: 'ui', slug: 'toast-stack-two', title: 'Toasts stack over the phone bottom bar', symptom: 'two toasts cover the bar buttons', resolution: 'show one toast',
+    }) });
+    assert(close.status === 409 && close.body.error.code === 'SIMILAR_ENTRY', `close: ${close.status} ${JSON.stringify(close.body?.error)}`);
+    assert(close.body.error.details.matches.some((m: any) => m.ref.endsWith('/ui/toast-stack') && m.source === 'own'), `details: ${JSON.stringify(close.body.error.details)}`);
+    const cat = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: h, body: JSON.stringify({
+        model: 'goose', category: 'rendering', title: 'Canvas blurs on a retina screen', symptom: 'lines look soft', resolution: 'scale by devicePixelRatio',
+    }) });
+    assert(cat.status === 400 && /rendering/.test(cat.body.error.message) && Array.isArray(cat.body.error.details?.categories), `category: ${cat.status} ${JSON.stringify(cat.body?.error)}`);
+    const badType = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: h, body: JSON.stringify({
+        model: 'goose', category: 'ui', title: 'Something else entirely here', symptom: 'some symptom', resolution: 'some fix', confirm_new: 'yes',
+    }) });
+    assert(badType.status === 400, `confirm_new as a string: ${badType.status}`);
+    // PATCH: critical from a non-curator waits; retired_by lands with outdated.
+    const crit = await json('/v1/appdev/pitfalls/learned/ui/toast-stack', { method: 'PATCH', headers: h, body: JSON.stringify({ severity: 'critical' }) });
+    assert(crit.status === 200 && crit.body.data.pitfall.severity === 'warn' && crit.body.data.pitfall.requested_severity === 'critical', `PATCH critical by a non-operator: ${JSON.stringify(crit.body)}`);
+    const patched = await json('/v1/appdev/pitfalls/learned/ui/toast-stack', { method: 'PATCH', headers: h, body: JSON.stringify({ status: 'outdated', retired_by: 'lint toast-cap' }) });
+    assert(patched.status === 200 && patched.body.data.pitfall.retired_by === 'lint toast-cap', `PATCH retired_by: ${JSON.stringify(patched.body)}`);
+    const badSev = await json('/v1/appdev/pitfalls/learned/ui/toast-stack', { method: 'PATCH', headers: h, body: JSON.stringify({ severity: 'urgent' }) });
+    assert(badSev.status === 400, `PATCH an unknown severity: ${badSev.status}`);
+});
+
+await test('a node operator in person is the curator: PATCH critical raises an entry', async () => {
+    // The first owner registered on a cleared database is the operator; a run that reuses a
+    // database may have another one, so the suite asks the node which this owner is.
+    const { body: signed } = await ownerSignIn(BASE, `pfowna${stamp}`, 'PitfallKb1!');
+    const h = { Authorization: `Bearer ${signed.data.token}` };
+    const isOperator = (await json('/v1/admin/ghii', { headers: h })).status === 200;
+    console.log(`     (owner A is ${isOperator ? '' : 'not '}this node's operator in this run)`);
+    const r = await json('/v1/appdev/pitfalls/learned/games/orbit-controls-are-not-bundled', { method: 'PATCH', headers: h, body: JSON.stringify({ severity: 'critical' }) });
+    assert(r.status === 200, `PATCH as owner A: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const p = r.body.data.pitfall;
+    // The operator's critical lands; anyone else's waits as requested_severity.
+    const want = isOperator ? { severity: 'critical', requested: undefined } : { severity: 'warn', requested: 'critical' };
+    assert(p.severity === want.severity && p.requested_severity === want.requested,
+        `owner A (operator: ${isOperator}) PATCH critical: ${JSON.stringify(p)}`);
+});
+
+await test('overview: areas narrow both pitfall sections; a stale entry leaves the list and is counted', async () => {
+    const h = { Authorization: `Bearer ${viewOwner.token}` };
+    const staleKey = `packages/appdev-pitfalls/auth/${VS}-stale`;
+    const freshKey = `packages/appdev-pitfalls/auth/${VS}-fresh`;
+    const now = new Date().toISOString();
+    for (const [key, ver] of [[staleKey, '1.0.0'], [freshKey, undefined]] as const) {
+        const { status } = await json('/v1/memory', { method: 'POST', headers: h, body: JSON.stringify({
+            key, visibility: 'owner', tags: ['knowledge-entry', 'pitfall', 'model:goose'],
+            value: { title: `Entry ${key}`, symptom: 's', resolution: 'r', model: 'goose', category: 'auth', slug: key.split('/').pop(),
+                applies_to: ['auth'], severity: 'warn', status: 'active', reported_by: 'e2e', created: now, updated: now,
+                ...(ver ? { verified_version: ver, verified_at: now } : {}) },
+        }) });
+        assert(status === 201, `seed ${key}: ${status}`);
+    }
+    const { body } = await json('/v1/appdev/overview?sections=pitfalls_learned,pitfalls_curated&areas=auth', { headers: h });
+    const learned = body.data.pitfalls_learned;
+    const keys = learned.items.map((p: any) => p.key);
+    assert(keys.includes(freshKey) && !keys.includes(staleKey), `stale entry listed or fresh one lost: ${JSON.stringify(keys)}`);
+    assert(learned.needs_recheck.count >= 1 && learned.needs_recheck.own.includes(staleKey) && /verified/.test(learned.needs_recheck.recheck), `needs_recheck: ${JSON.stringify(learned.needs_recheck)}`);
+    assert(!keys.includes(viewKeys.ownerPriv), `areas=auth kept a data entry: ${JSON.stringify(keys)}`);
+    assert(body.data.pitfalls_curated.items.length > 0 && body.data.pitfalls_curated.items.every((p: any) => p.appliesTo.includes('auth')), 'curated not narrowed to auth');
+    // Without areas the data entry is back; the index row says needs_recheck.
+    const { body: wide } = await json('/v1/appdev/overview?sections=pitfalls_learned', { headers: h });
+    assert(wide.data.pitfalls_learned.items.some((p: any) => p.key === viewKeys.ownerPriv), 'without areas the data entry is missing');
+    const idx = await json('/v1/appdev/pitfalls/index?scope=own&status=all&limit=100&areas=auth', { headers: h });
+    const staleRow = idx.body.data.pitfalls.find((p: any) => p.key === staleKey);
+    assert(staleRow?.needs_recheck === true && !idx.body.data.pitfalls.some((p: any) => p.key === viewKeys.ownerPriv), `index: ${JSON.stringify(idx.body.data.pitfalls.map((p: any) => [p.key, p.needs_recheck]))}`);
+});
+
 console.log('\n' + '─'.repeat(40));
 console.log(`MCP appdev-pitfalls E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);
 if (failed > 0) process.exit(1);

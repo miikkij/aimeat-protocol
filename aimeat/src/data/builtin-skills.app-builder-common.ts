@@ -19,12 +19,16 @@
  *   build reaches them: the Agent Skills standard keeps a SKILL.md under 500 lines, and the Atelier
  *   skill had no room for 140 more. The Classic skill's sections on the AI label and on asking for an
  *   AI capability are not here: the platform sections `ai-disclosure` and `ai` carry the same.
- * @structure APP_BUILDER_COMMON · PUBLISH_CHECKS_SECTION · AFTER_PUBLISH_SECTION · DATES_NUMBERS_SECTION
+ * @structure APP_BUILDER_COMMON · PUBLISH_CHECKS_SECTION · AFTER_PUBLISH_SECTION · VERIFY_SECTION · DATES_NUMBERS_SECTION
  * @usage import { APP_BUILDER_COMMON } from './builtin-skills.app-builder-common.js';  // inside a skillMd
  * @version-history
+ *   v1.1.0 — 2026-11-21 — AFTER_PUBLISH_SECTION's "report what bit you" is four questions in order
+ *     (flow-constants.ts PITFALL_FOUR_QUESTIONS). VERIFY_SECTION: one checklist for checking an app
+ *     in a browser, the Atelier platform section `verify`, folded from six learned pitfalls.
  *   v1.0.0 — 2026-11-19 — Moved from builtin-skills.app-builder.ts.
  */
 import { MODEL_QUALITY_ADVICE } from '../services/model-recommendation.js';
+import { PITFALL_FOUR_QUESTIONS } from '../services/appdev/flow-constants.js';
 
 export const APP_BUILDER_COMMON = `## Which model builds it
 
@@ -104,8 +108,9 @@ export const AFTER_PUBLISH_SECTION = `## After the publish: leave the next build
 Beyond the four lines every app owes:
 1. If anything generalizes, record a template: \`aimeat_app_template_propose\`
    (your own model id required — self-identify) — the next build starts from it.
-2. Report what bit you: \`aimeat_appdev_pitfall_report\` (model required; upserts by slug;
-   \`share: true\` publishes it platform-wide) — the next builder skips your mistake.
+2. For what bit you, ask four questions in this order: ${PITFALL_FOUR_QUESTIONS}. A report
+   needs its model; it upserts by slug, and \`share: true\` publishes it platform-wide — the next
+   builder skips your mistake.
 3. Write the bound skill for whoever will USE the app, in the same plain register as the
    proposal, because it is read by other people's agents, not by you.
 4. **A big app: the workstation.** An app is one HTML file, and that holds for the node. Past
@@ -113,6 +118,62 @@ Beyond the four lines every app owes:
    sources split behind a build step on your own machine that assembles the same single file. Load
    \`node:aimeat-app-workstation\` when the app gets there, or when the publish response's
    \`next_steps.size\` says so.
+`;
+
+/**
+ * Atelier platform section `verify` (services/builder/atelier-platform.ts): the one checklist for
+ * checking an app in a browser. Folded on 2026-11-21 from six learned pitfalls that each said one
+ * part of it (which browser, the visible path, the whole console, the sign-up popup, what automation
+ * cannot do, driving an app with Playwright); the skill's step 7 points here.
+ */
+export const VERIFY_SECTION = `## Verify: one checklist before you say it works
+
+Go through all seven. A line you could not check is named in your report as not checked; it is
+never counted as passed.
+
+1. **Name the browser.** "Verified in the browser" is not a claim. "Verified in Playwright's
+   Chromium" is one, and a weaker one: it runs a clean profile with no extensions, no download
+   handler and no policies, so anything those can change (a download's file name, a popup, a
+   blocked request) can behave differently on the owner's own browser. Design so the browser
+   decides nothing: a file the person keeps is served from the node, stored under a key whose last
+   segment is the file name and with type \`application/octet-stream\`, and you check its headers
+   with curl, because a cross-origin fetch cannot read \`Content-Disposition\`. Two buttons that
+   print the same confirmation make a failure impossible to place: give each its own message.
+2. **Drive the visible path, not your hooks.** Press the controls a person presses: the visible
+   button, the real chooser, the canvas where it opens. A test that opens the editor, picks a
+   colour or zooms through a helper proves the helper. Keep such precision tests apart from the
+   one that walks the person's path, and walk it with the edge sizes too: one item, items that do
+   not touch, and data the size production has. Try a touch drag, save, and reload.
+3. **Read the whole console, while the app works.** Three things, all read before the word
+   "clean": console calls of type error and warning; uncaught exceptions; and the browser's own
+   log at levels error AND warning (a WebGL warning, a deprecation, a Permissions-Policy line and a
+   blocked request are written there and never pass through \`console.warn\`). Over the debugging
+   protocol that is \`Log.enable\` and \`Log.entryAdded\`; in Playwright open
+   \`page.context().newCDPSession(page)\` and listen to \`Log.entryAdded\`. Watch for several
+   seconds while the app does its work, and count repeated lines: one that repeats every frame is
+   the one the owner sees.
+4. **Sign-up goes through the real consent window.** On an app's own address,
+   \`AIMEAT.auth.signIn({ tab: 'register' })\` from a real click opens the node's sign-up window;
+   it is not a form inside your page. Start waiting for the new window before the click, check
+   that it is on the node's own address, look at the Create account view without creating an
+   account unless that was asked for, then close it and check that the app is still a guest and
+   saved nothing. A local preview has no app identity and cannot open consent: it proves the
+   guest path only. Never patch the app or fake an identity to satisfy a local test.
+5. **Say what the automation browser cannot do.** It never hides a page (\`visibilityState\`
+   stays \`visible\` when another tab comes to the front) and it refuses fullscreen ("not
+   granted"). Exercise a hidden-page rule with the event a browser sends: define \`document.hidden\`
+   as true, dispatch \`visibilitychange\`, then remove the property and dispatch again. Catch the
+   rejected \`requestFullscreen()\` promise in the app. Report both as not seen in a real browser,
+   and name them as the two things the owner looks at once.
+6. **Driving an AIMEAT app with Playwright.** The kit's form fields carry no \`name\`: a field is
+   \`[data-ak-field="<name>"]\` with the input inside. On aimeat.io press the cookie banner's
+   necessary-only button (\`#cc-main .cm__btn[data-role="necessary"]\`) first on every app address.
+   An app's session lives in the tab, so a reload or a new navigation signs it out (the data
+   stays): sign in again. A second app or a visitor page goes in a second tab. On a sandbox the node
+   and \`<app>.apps.localhost\` are two sites. In the consent window, wait for the Connect button
+   to render. Match the sign-in button by its text without a start anchor.
+7. **Report it in that shape**: what passed, in which browser, and the list of what you could not
+   see running (a microphone, a camera, fullscreen, a real hidden tab), each named once.
 `;
 
 /** Atelier platform section `dates-numbers` (services/builder/atelier-platform.ts). */
