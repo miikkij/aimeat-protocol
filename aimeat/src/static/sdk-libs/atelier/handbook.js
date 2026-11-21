@@ -36,7 +36,7 @@
  */
 import { el, clear, wearLook, reducedMotion, attention } from './dom.js';
 import { applyVariant } from './parts-model.js';
-import { i18n } from './i18n.js';
+import { i18n, t as kitWord } from './i18n.js';
 import { searchBar } from './table.js';
 
 const VARIANTS = ['dense'];
@@ -62,7 +62,7 @@ const STRINGS = {
 
 /** A word of the handbook: the host's own `handbook.<key>` first, then the kit's language. */
 function hb(key) {
-  const hosted = i18n.t('handbook.' + key);
+  const hosted = kitWord('handbook.' + key);
   if (hosted !== 'handbook.' + key) return hosted;
   const table = /** @type {Record<string, string>} */ (STRINGS[/** @type {'en'|'fi'|'es'} */ (i18n.lang())] || STRINGS.en);
   return table[key] || STRINGS.en[key] || key;

@@ -11,7 +11,7 @@
  *   v0.64.0 — 2026-10-02 — Initial: the board's modes, frame chrome, the empty board, the request
  *     panel's prompt, plan and gate, and the shelf's tabs and actions (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-).
  */
-import { i18n } from './i18n.js';
+import { i18n, t as kitWord } from './i18n.js';
 
 const STRINGS = {
   en: {
@@ -201,7 +201,7 @@ const STRINGS = {
  * @returns {string}
  */
 export function tb(key, vars) {
-  const hosted = i18n.t('board.' + key, vars);
+  const hosted = kitWord('board.' + key, vars);
   if (hosted !== 'board.' + key) return hosted;
   const lang = i18n.lang();
   const table = /** @type {Record<string, string>} */ (

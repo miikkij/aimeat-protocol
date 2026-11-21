@@ -56,6 +56,10 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.70.0 — 2026-11-21 — No CSS change. The kit's JavaScript changes defaults (a dialog action
+ *     closes its dialog, menu onPick, choiceCards with no choice, listDetail keeps typed text, the
+ *     timeline's date-only strings, the horizontal chart's height, i18n { kit: false }); the version
+ *     moves with it.
  *   v0.69.0 — 2026-11-02 — fingerprint.css: the fingerprint (seal, barcode, trust bar, quadrant views,
  *     hover card); --ak-fp-F/A/M/O/P/K, --ak-fp-x, --ak-fp-zone and --ak-fp-dim are its own
  *     (wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse).

@@ -42,6 +42,8 @@
  *   await c.cover(); rebuild(); await c.uncover(); c.destroy();
  *   AIMEAT.atelier.intro({ kind: 'halves' });   // as early in the page as it can be called
  * @version-history
+ *   v0.70.0 — 2026-11-21 — The screen transition starts through startTransition (mosaic-motion.js),
+ *     so a skipped one no longer rejects `ready` unhandled.
  *   v0.46.0 — 2026-09-02 — intro(): the opening curtain, down before the first paint and parting
  *     once the hold has passed and the fonts have landed (capped, so a font that never arrives
  *     cannot hold the page shut). curtain gains `start: 'covered'`, which is what intro is built
@@ -53,7 +55,7 @@
  *     no-View-Transitions fallback).
  */
 import { el, resolve, reducedMotion } from './dom.js';
-import { morph } from './mosaic-motion.js';
+import { morph, startTransition } from './mosaic-motion.js';
 
 /** The screen moves, and the panel moves. An unknown name falls back to the first of its set. */
 const SCREEN_KINDS = ['fade', 'wipe', 'curtain', 'zoom', 'iris', 'slide'];
@@ -367,7 +369,8 @@ export function screenTransition(kind, run, opts) {
   };
   // A dropped transition (a hidden tab, a second change on top of this one) must still clear the
   // attribute, or every later change on the page wears this kind.
-  return document.startViewTransition(run).finished.then(clear, clear);
+  // startTransition catches `ready` too: a skipped transition rejected it unhandled.
+  return startTransition(run).finished.then(clear, clear);
 }
 
 /**

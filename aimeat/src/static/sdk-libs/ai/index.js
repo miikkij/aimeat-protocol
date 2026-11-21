@@ -13,6 +13,9 @@
  *   const caps = await AIMEAT.ai.capabilities({ app_id });
  *   if (caps.capabilities.text.on) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.10.0 - 2026-11-21 - completeJson() answers `usage` summed over both calls when it retried, with
+ *     `attempts` (1 or 2) and `first_usage`; the error after two misses carries both too. complete()
+ *     sends max_tokens only with allowCap: true. disclose() takes `always: true`.
  *   v1.9.0 - 2026-10-31 - genRules(): the generation rules and their directive text (GET /v1/ai/gen-rules).
  *   v1.8.1 - 2026-10-12 - isAvailable() drops its fallback to GET /v1/openrouter/settings: node 4.0.0
  *     removes that route, and every node that serves this lib answers GET /v1/ai/available (since
@@ -57,7 +60,7 @@ import { attach } from '../_core/namespace.js';
 import { attachSpend } from '../_core/spend.js';
 import { disclose, chatNotice, declare } from './disclose.js';
 import { job } from './job.js';
-import { paid, postJson, isBlob, blobToDataUrl } from './call.js';
+import { paid, postJson, isBlob, blobToDataUrl, outputCap } from './call.js';
 import { capabilities, models, roles, genRules, clearCaches } from './capabilities.js';
 import { stream, speak } from './stream.js';
 import { image, transcribe, embed, routing } from './media.js';
@@ -84,6 +87,31 @@ async function callFiles(files) {
     if (typeof f === 'string') return f.startsWith('data:') ? { data_url: f } : { storage_key: f };
     return f;
   }));
+}
+
+/**
+ * Two calls' usage added up: every number is summed, a nested object of numbers (token details) is
+ * summed the same way, and anything else is the second call's. A missing side counts as nothing.
+ * @param {any} a @param {any} b
+ * @returns {any}
+ */
+function addUsage(a, b) {
+  if (!a || typeof a !== 'object') return b;
+  if (!b || typeof b !== 'object') return a;
+  /** @type {Record<string, any>} */
+  const out = {};
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const x = a[k];
+    const y = b[k];
+    if (typeof x === 'number' || typeof y === 'number') {
+      out[k] = (typeof x === 'number' ? x : 0) + (typeof y === 'number' ? y : 0);
+    } else if (x && y && typeof x === 'object' && typeof y === 'object' && !Array.isArray(x) && !Array.isArray(y)) {
+      out[k] = addUsage(x, y);
+    } else {
+      out[k] = y === undefined ? x : y;
+    }
+  }
+  return out;
 }
 
 /**
@@ -220,7 +248,8 @@ const ai = {
       modelRole: opts.modelRole,
       temperature: opts.temperature,
       top_p: opts.top_p,
-      max_tokens: opts.max_tokens,
+      // Sent only with allowCap: true (call.js outputCap): a cap alone cut answers without a sign.
+      max_tokens: outputCap(opts),
       app_id: opts.app_id,
       // Pictures for a vision request: data: or https: URLs, at most 8 (the route refuses more).
       // POST /v1/ai/complete has read this since 2026-06-24 and this body never carried it, so a
@@ -276,7 +305,7 @@ const ai = {
       ...opts,
       systemPrompt: (opts.systemPrompt || '') + suffix,
     });
-    try { return read(first); }
+    try { return { ...read(first), attempts: 1 }; }
     catch {
       // One retry with a stronger instruction. A shape miss is retried the same way a parse failure
       // is: from the caller's side both are "the answer is not the thing I asked for".
@@ -288,13 +317,19 @@ const ai = {
         systemPrompt: (opts.systemPrompt || '') + suffix + insist,
         temperature: typeof opts.temperature === 'number' ? Math.max(0, opts.temperature - 0.3) : 0.2,
       });
-      try { return read(retry); }
+      // BOTH CALLS WERE PAID FOR. The answer's `usage` is the sum of the two, `attempts` says there
+      // were two, and `first_usage` keeps the first call's own figures. The retry's usage alone
+      // made a retried answer look half its price.
+      const both = { usage: addUsage(first.usage, retry.usage), first_usage: first.usage, attempts: 2 };
+      try { return { ...read(retry), ...both }; }
       catch (e) {
         const mismatch = !!e && /** @type {any} */ (e).code === 'JSON_SCHEMA_MISMATCH';
-        const err = /** @type {Error & { code?: string }} */ (new Error(mismatch
+        const err = /** @type {Error & { code?: string, usage?: any, attempts?: number }} */ (new Error(mismatch
           ? 'AI returned JSON without the requested keys twice (' + /** @type {any} */ (e).message + '). Original response: ' + retry.content.slice(0, 200)
           : 'AI returned invalid JSON twice. Original response: ' + retry.content.slice(0, 200)));
         err.code = mismatch ? 'JSON_SCHEMA_MISMATCH' : 'JSON_PARSE_FAILED';
+        err.usage = both.usage;
+        err.attempts = 2;
         throw err;
       }
     }

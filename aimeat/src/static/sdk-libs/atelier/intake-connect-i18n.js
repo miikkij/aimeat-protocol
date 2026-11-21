@@ -17,7 +17,7 @@
  *     own connections page). TI_KEYS for the parity test.
  *   v0.61.0 — 2026-10-01 — Initial (iam-members-and-library-blocks plan, Phase D blocks 4 and 5).
  */
-import { i18n } from './i18n.js';
+import { i18n, t as kitWord } from './i18n.js';
 
 const STRINGS = {
   en: {
@@ -383,7 +383,7 @@ export const TI_KEYS = {
  * @returns {string}
  */
 export function ti(key, vars) {
-  const hosted = i18n.t(key, vars);
+  const hosted = kitWord(key, vars);
   if (hosted !== key) return hosted;
   const lang = i18n.lang();
   const table = /** @type {Record<string, string>} */ (

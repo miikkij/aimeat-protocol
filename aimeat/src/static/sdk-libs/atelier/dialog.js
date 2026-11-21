@@ -26,6 +26,10 @@
  * @variants dialog danger · celebrate · ai · roomy · wide
  * @fork dialog Do not: the focus trap, Escape and focus return are the browser's through native <dialog>, and a hand-rolled overlay loses all three. Put your own markup in body(host) instead.
  * @version-history
+ *   v0.70.0 — 2026-11-21 — An action closes its dialog: without `run` the press closes it with the
+ *     action's id as the reason, and a `run` that returns anything but `false` (or whose promise
+ *     resolves so) closes it once it has run. `false`, a throw or a rejection keeps it open.
+ *     `keepOpen: true` on an action or `autoClose: false` on the dialog keeps the old behaviour.
  *   2026-10-30 - Require a backdrop press before dismissing on click; dragging a text selection
  *     from a field to the backdrop keeps the dialog and its form values open.
  *   v0.59.0 — 2026-09-29 — A dialog wears the app's look (wearLook): it sits on the body, outside
@@ -61,8 +65,8 @@ const SIZES = ['compact', 'roomy', 'wide'];
  *   title: string, body?: (host: HTMLElement) => void, text?: string,
  *   layout?: object, sources?: Record<string, () => unknown>,
  *   tone?: 'plain'|'danger'|'celebrate'|'ai', size?: 'compact'|'roomy'|'wide',
- *   actions?: Array<{ id: string, label: string, tone?: 'primary'|'ghost'|'danger', run?: () => unknown }>,
- *   from?: 'center'|'bottom', dismissible?: boolean,
+ *   actions?: Array<{ id: string, label: string, tone?: 'primary'|'ghost'|'danger', run?: () => unknown, keepOpen?: boolean }>,
+ *   from?: 'center'|'bottom', dismissible?: boolean, autoClose?: boolean,
  *   onClose?: (reason: string) => void,
  * }} spec
  * @returns {{ el: HTMLDialogElement, close: (reason?: string) => void, destroy: () => void }}
@@ -105,8 +109,36 @@ export function dialog(spec) {
       class: 'ak-btn ak-btn--' + (action.tone === 'danger' ? 'danger' : action.tone === 'primary' ? 'primary' : 'ghost'),
       'data-ak-part': 'action',
       'data-ak-action': action.id,
-      on: { click: function () { if (action.run) action.run(); } },
+      on: { click: function () { press(action); } },
     }, action.label));
+  }
+
+  /**
+   * AN ACTION CLOSES ITS DIALOG. Without `run` the press closes it with the action's id as the
+   * reason; with `run` the dialog closes once `run` has returned (or its promise has settled) with
+   * anything but `false`. `false`, a throw or a rejection keeps it open, so a form that finds a
+   * missing field stays on the screen. `keepOpen: true` on an action, or `autoClose: false` on the
+   * dialog, is the old behaviour: the press runs `run` and nothing else.
+   * @param {{ id: string, run?: () => unknown, keepOpen?: boolean }} action
+   */
+  function press(action) {
+    const auto = spec.autoClose !== false && action.keepOpen !== true;
+    if (!action.run) { if (auto) close(action.id); return; }
+    let out;
+    try { out = action.run(); } catch (err) {
+      if (!auto) throw err;
+      console.warn('[aimeat-atelier] dialog action "' + action.id + '" threw, so the dialog stays open:', err);
+      return;
+    }
+    if (!auto) return;
+    if (out && typeof (/** @type {any} */ (out)).then === 'function') {
+      /** @type {Promise<unknown>} */ (out).then(
+        function (v) { if (v !== false) close(action.id); },
+        function (err) { console.warn('[aimeat-atelier] dialog action "' + action.id + '" failed, so the dialog stays open:', err); },
+      );
+      return;
+    }
+    if (out !== false) close(action.id);
   }
   // The app's own row beside the kit's buttons: a "don't ask again", a note, a second door.
   slotInto(foot, spec, 'actions', null, { cls: 'ak-dialog__extra' });

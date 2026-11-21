@@ -18,6 +18,10 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.15.0 — 2026-11-21 — use(dict, { kit: false }) keeps an app's words to the app: i18n.t() reads
+ *     them and the kit's components never do, so an app key named like a kit word ("chosen") no
+ *     longer replaces it. A plain use() that rewords a kit word warns once per word, and
+ *     use(dict, { kit: true }) rewords on purpose without the warning. The kit's own lookup is `t`.
  *   v0.14.0 — 2026-10-11 — pacingAmount (en/fi/es): an amount in morsels where a price would stand,
  *     "pacing {amount}" / "tahdistus {amount}" / "{amount} de ritmo". A morsel paces use; it is not a price.
  *   v0.13.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
@@ -499,8 +503,37 @@ export const KIT_KEYS = {
   es: Object.keys(BASE.es),
 };
 
-/** Host dictionaries merged in by `use()`, keyed by language. */
+/** Host dictionaries merged in by `use()`, keyed by language. The kit's components read these too,
+ *  which is how an app replaces a kit word or adds a language the kit does not ship. */
 const HOST = { en: {}, fi: {}, es: {} };
+
+/** The app's own words, merged in by `use(dict, { kit: false })`. Only `i18n.t()` reads them; the
+ *  kit's components never do, so an app key named like a kit word cannot replace that word. */
+const APP = { en: {}, fi: {}, es: {} };
+
+/** The kit words a `use()` already warned about, so a re-render does not repeat the warning.
+ *  @type {Record<string, boolean>} */
+const warned = {};
+
+/**
+ * Warn once per word when a plain `use()` replaces one of the kit's own words. The replacement is
+ * the documented way to reword the kit, and also the way an app's own `chosen` or `back` came to
+ * stand in a kit component with no sign: the warning names the word and the two ways out.
+ * @param {string} lang @param {Record<string, any>} words
+ */
+function warnKitWords(lang, words) {
+  const base = /** @type {Record<string, any>} */ (BASE)[lang] || BASE.en;
+  const hit = Object.keys(words).filter(function (k) {
+    return Object.prototype.hasOwnProperty.call(base, k) && words[k] !== base[k] && !warned[lang + ':' + k];
+  });
+  if (!hit.length) return;
+  for (const k of hit) warned[lang + ':' + k] = true;
+  console.warn('[aimeat-atelier] i18n.use(): ' + hit.map(function (k) { return '"' + k + '"'; }).join(', ')
+    + (hit.length === 1 ? ' is one of the kit\'s own words' : ' are the kit\'s own words')
+    + ' (' + lang + '), so kit components now show your text there. For words of your own app, call '
+    + 'i18n.use(dict, { kit: false }) or give your keys a prefix; to reword the kit on purpose, call '
+    + 'i18n.use(dict, { kit: true }).');
+}
 
 /** @type {Array<(lang: string) => void>} */
 const listeners = [];
@@ -591,40 +624,50 @@ export const i18n = {
   /**
    * Merge the host's dictionary over the kit's. Either `{ en: {...}, fi: {...} }` or a flat
    * object for the current language.
+   *
+   * THREE WAYS, ONE CALL. A plain `use(dict)` merges over the kit as it always has, so a key the
+   * kit also uses rewords that kit word in every component, and the first time that happens the
+   * console names the word. `{ kit: false }` keeps the dictionary to the app: `t()` finds it, the
+   * kit's components never do, so the app's own `chosen` cannot stand where the kit's should.
+   * `{ kit: true }` says the rewording is meant, and warns about nothing.
    * @param {Record<string, any>} dict
+   * @param {{ kit?: boolean }} [opts]
    */
-  use(dict) {
+  use(dict, opts) {
     if (!dict) return;
+    const mode = opts && opts.kit === false ? 'app' : opts && opts.kit === true ? 'kit' : 'plain';
+    const into = mode === 'app' ? APP : HOST;
     const looksNested = Object.keys(dict).every(function (k) {
       return dict[k] && typeof dict[k] === 'object' && !Array.isArray(dict[k]);
     });
+    /** @param {string} lang @param {Record<string, any>} words */
+    const merge = function (lang, words) {
+      if (mode === 'plain') warnKitWords(lang, words);
+      into[lang] = Object.assign({}, into[lang] || {}, words);
+    };
     if (looksNested) {
-      for (const lang in dict) {
-        HOST[lang] = Object.assign({}, HOST[lang] || {}, dict[lang]);
-      }
+      for (const lang in dict) merge(lang, dict[lang]);
     } else {
-      HOST[current] = Object.assign({}, HOST[current] || {}, dict);
+      merge(current, dict);
     }
     announce(current);
   },
 
   /**
-   * Look up a string: host(current) → kit(current) → kit(en) → the key itself. `{name}` in the
-   * text is replaced from `vars`.
+   * Look up a string: app(current) → host(current) → kit(current) → app(en) → host(en) → kit(en)
+   * → the key itself. `{name}` in the text is replaced from `vars`.
    * @param {string} key
    * @param {Record<string, any>} [vars]
    * @returns {string}
    */
   t(key, vars) {
-    const text = (HOST[current] && HOST[current][key])
+    return fill((APP[current] && APP[current][key])
+      || (HOST[current] && HOST[current][key])
       || (BASE[current] && BASE[current][key])
+      || (APP.en && APP.en[key])
       || (HOST.en && HOST.en[key])
       || BASE.en[key]
-      || key;
-    if (!vars) return String(text);
-    return String(text).replace(/\{(\w+)\}/g, function (whole, name) {
-      return vars[name] == null ? whole : String(vars[name]);
-    });
+      || key, vars);
   },
 
   /**
@@ -641,5 +684,24 @@ export const i18n = {
   },
 };
 
-/** Shorthand used inside the kit's own components. @type {(key: string, vars?: any) => string} */
-export const t = i18n.t;
+/** Replace `{name}` in a text from `vars`. @param {any} text @param {Record<string, any>} [vars] */
+function fill(text, vars) {
+  if (!vars) return String(text);
+  return String(text).replace(/\{(\w+)\}/g, function (whole, name) {
+    return vars[name] == null ? whole : String(vars[name]);
+  });
+}
+
+/**
+ * The lookup the kit's own components use: host(current) → kit(current) → host(en) → kit(en) → the
+ * key. The same as `i18n.t()` without the app's own words (`use(dict, { kit: false })`), so those
+ * never stand in a kit component.
+ * @type {(key: string, vars?: any) => string}
+ */
+export const t = function (key, vars) {
+  return fill((HOST[current] && HOST[current][key])
+    || (BASE[current] && BASE[current][key])
+    || (HOST.en && HOST.en[key])
+    || BASE.en[key]
+    || key, vars);
+};

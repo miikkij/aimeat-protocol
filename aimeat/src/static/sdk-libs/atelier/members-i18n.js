@@ -19,7 +19,7 @@
  *   v0.61.0 — 2026-10-01 — Initial; with the words of the tabs, the history, the plan, adding by
  *     address book or email, invitations and the confirm on a raise (wish-library-blocks-in-the-kit-and-the-design-book-iam-members-fi).
  */
-import { i18n } from './i18n.js';
+import { i18n, t as kitWord } from './i18n.js';
 
 const STRINGS = {
   en: {
@@ -360,7 +360,7 @@ const STRINGS = {
  * @returns {string}
  */
 export function tm(key, vars) {
-  const hosted = i18n.t('members.' + key, vars);
+  const hosted = kitWord('members.' + key, vars);
   if (hosted !== 'members.' + key) return hosted;
   const lang = i18n.lang();
   const table = /** @type {Record<string, string>} */ (

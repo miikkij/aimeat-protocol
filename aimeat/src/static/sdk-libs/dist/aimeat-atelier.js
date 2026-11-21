@@ -6,9 +6,15 @@
   var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
   var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
+  // src/static/sdk-libs/_core/escape.js
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
   // src/static/sdk-libs/_core/namespace.js
   function namespace() {
     if (!window.AIMEAT) window.AIMEAT = {};
+    if (typeof window.AIMEAT.escapeHtml !== "function") window.AIMEAT.escapeHtml = escapeHtml;
     return window.AIMEAT;
   }
   function attach(key, value) {
@@ -455,9 +461,21 @@
   }
 
   // src/static/sdk-libs/atelier/mosaic-motion.js
+  var quiet = function() {
+  };
+  function startTransition(run) {
+    const vt = (
+      /** @type {any} */
+      document.startViewTransition(run)
+    );
+    for (const p of [vt && vt.ready, vt && vt.finished, vt && vt.updateCallbackDone]) {
+      if (p && typeof p.catch === "function") p.catch(quiet);
+    }
+    return vt;
+  }
   function transition(run) {
     if (typeof document.startViewTransition === "function" && !reducedMotion()) {
-      document.startViewTransition(run);
+      startTransition(run);
     } else {
       run();
     }
@@ -468,10 +486,11 @@
       return;
     }
     moving.style.viewTransitionName = "ak-morph";
-    const vt = document.startViewTransition(run);
-    vt.finished.finally(function() {
+    const vt = startTransition(run);
+    const done = function() {
       moving.style.viewTransitionName = "";
-    });
+    };
+    vt.finished.then(done, done);
   }
 
   // src/static/sdk-libs/atelier/transitions.js
@@ -722,7 +741,7 @@
       root.style.removeProperty("--ak-iris-y");
       root.style.removeProperty("--ak-transition-span");
     };
-    return document.startViewTransition(run).finished.then(clear2, clear2);
+    return startTransition(run).finished.then(clear2, clear2);
   }
   function heightOf(node) {
     const cs = getComputedStyle(node);
@@ -1678,6 +1697,22 @@
     es: Object.keys(BASE.es)
   };
   var HOST = { en: {}, fi: {}, es: {} };
+  var APP = { en: {}, fi: {}, es: {} };
+  var warned = {};
+  function warnKitWords(lang2, words) {
+    const base = (
+      /** @type {Record<string, any>} */
+      BASE[lang2] || BASE.en
+    );
+    const hit = Object.keys(words).filter(function(k) {
+      return Object.prototype.hasOwnProperty.call(base, k) && words[k] !== base[k] && !warned[lang2 + ":" + k];
+    });
+    if (!hit.length) return;
+    for (const k of hit) warned[lang2 + ":" + k] = true;
+    console.warn("[aimeat-atelier] i18n.use(): " + hit.map(function(k) {
+      return '"' + k + '"';
+    }).join(", ") + (hit.length === 1 ? " is one of the kit's own words" : " are the kit's own words") + " (" + lang2 + "), so kit components now show your text there. For words of your own app, call i18n.use(dict, { kit: false }) or give your keys a prefix; to reword the kit on purpose, call i18n.use(dict, { kit: true }).");
+  }
   var listeners = [];
   var current = detect();
   function detect() {
@@ -1765,35 +1800,42 @@
     /**
      * Merge the host's dictionary over the kit's. Either `{ en: {...}, fi: {...} }` or a flat
      * object for the current language.
+     *
+     * THREE WAYS, ONE CALL. A plain `use(dict)` merges over the kit as it always has, so a key the
+     * kit also uses rewords that kit word in every component, and the first time that happens the
+     * console names the word. `{ kit: false }` keeps the dictionary to the app: `t()` finds it, the
+     * kit's components never do, so the app's own `chosen` cannot stand where the kit's should.
+     * `{ kit: true }` says the rewording is meant, and warns about nothing.
      * @param {Record<string, any>} dict
+     * @param {{ kit?: boolean }} [opts]
      */
-    use(dict) {
+    use(dict, opts) {
       if (!dict) return;
+      const mode = opts && opts.kit === false ? "app" : opts && opts.kit === true ? "kit" : "plain";
+      const into = mode === "app" ? APP : HOST;
       const looksNested = Object.keys(dict).every(function(k) {
         return dict[k] && typeof dict[k] === "object" && !Array.isArray(dict[k]);
       });
+      const merge = function(lang2, words) {
+        if (mode === "plain") warnKitWords(lang2, words);
+        into[lang2] = Object.assign({}, into[lang2] || {}, words);
+      };
       if (looksNested) {
-        for (const lang2 in dict) {
-          HOST[lang2] = Object.assign({}, HOST[lang2] || {}, dict[lang2]);
-        }
+        for (const lang2 in dict) merge(lang2, dict[lang2]);
       } else {
-        HOST[current] = Object.assign({}, HOST[current] || {}, dict);
+        merge(current, dict);
       }
       announce(current);
     },
     /**
-     * Look up a string: host(current) → kit(current) → kit(en) → the key itself. `{name}` in the
-     * text is replaced from `vars`.
+     * Look up a string: app(current) → host(current) → kit(current) → app(en) → host(en) → kit(en)
+     * → the key itself. `{name}` in the text is replaced from `vars`.
      * @param {string} key
      * @param {Record<string, any>} [vars]
      * @returns {string}
      */
     t(key, vars) {
-      const text = HOST[current] && HOST[current][key] || BASE[current] && BASE[current][key] || HOST.en && HOST.en[key] || BASE.en[key] || key;
-      if (!vars) return String(text);
-      return String(text).replace(/\{(\w+)\}/g, function(whole, name) {
-        return vars[name] == null ? whole : String(vars[name]);
-      });
+      return fill(APP[current] && APP[current][key] || HOST[current] && HOST[current][key] || BASE[current] && BASE[current][key] || APP.en && APP.en[key] || HOST.en && HOST.en[key] || BASE.en[key] || key, vars);
     },
     /**
      * Run a callback whenever the language changes (host `use()` counts — new words arrived).
@@ -1808,7 +1850,15 @@
       };
     }
   };
-  var t = i18n.t;
+  function fill(text, vars) {
+    if (!vars) return String(text);
+    return String(text).replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+  var t = function(key, vars) {
+    return fill(HOST[current] && HOST[current][key] || BASE[current] && BASE[current][key] || HOST.en && HOST.en[key] || BASE.en[key] || key, vars);
+  };
 
   // src/static/sdk-libs/atelier/scenics.js
   function easeOf2(node) {
@@ -4132,7 +4182,7 @@
     const total = typeof p === "number" ? 1 : Math.max(Number(p.total) || 0, 0);
     const ratio = total > 0 ? Math.min(Math.max(value / total, 0), 1) : 0;
     const tone = typeof p === "object" && p.tone ? toneOf(p.tone) : ratio >= 1 ? "ok" : "accent";
-    const fill2 = el("div", { class: cls + "__fill ak-tone-fill--" + tone, "data-ak-part": "fill", vars: { "--ak-fill": (ratio * 100).toFixed(1) + "%" } });
+    const fill3 = el("div", { class: cls + "__fill ak-tone-fill--" + tone, "data-ak-part": "fill", vars: { "--ak-fill": (ratio * 100).toFixed(1) + "%" } });
     return el("div", {
       class: cls + "__bar",
       "data-ak-part": "bar",
@@ -4141,7 +4191,7 @@
       "aria-valuemax": String(total || 1),
       "aria-valuenow": String(value),
       "aria-valuetext": total ? t("ofTotal", { value, total }) : null
-    }, fill2);
+    }, fill3);
   }
   function statusBand(spec) {
     const s = Object.assign({}, spec);
@@ -4241,7 +4291,11 @@
     };
   }
   function choiceCards(spec) {
-    const state = { items: spec.items || [], value: spec.value || (spec.items && spec.items[0] ? spec.items[0].id : "") };
+    const none = spec.value === null || spec.allowNone === true;
+    const state = {
+      items: spec.items || [],
+      value: spec.value || (none ? "" : spec.items && spec.items[0] ? spec.items[0].id : "")
+    };
     const root = el("div", { class: "ak-root ak-choices", "data-ak-part": "root" });
     const grid2 = el("div", { class: "ak-choices__grid", "data-ak-part": "grid", role: "radiogroup", "aria-label": spec.label || null });
     const panel = el("div", { class: "ak-choices__panel", "data-ak-part": "panel" });
@@ -4268,14 +4322,18 @@
     function renderCards(focus) {
       clear(grid2);
       const items = state.items;
+      const anyOn = items.some(function(item) {
+        return item.id === state.value;
+      });
       items.forEach(function(item, i) {
         const on2 = item.id === state.value;
+        const kicker = on2 ? spec.keepKicker && item.kicker ? item.kicker + " · " + t("chosen") : t("chosen") : item.kicker || "";
         const card = el("button", {
           type: "button",
           role: "radio",
           class: "ak-choices__card" + (on2 ? " ak-choices__card--on" : ""),
           "aria-checked": on2 ? "true" : "false",
-          tabindex: on2 ? "0" : "-1",
+          tabindex: on2 || !anyOn && i === 0 ? "0" : "-1",
           "data-ak-part": "card",
           "data-ak-id": item.id,
           "data-ak-noguard": true,
@@ -4291,7 +4349,7 @@
             }
           }
         }, [
-          el("span", { class: "ak-choices__kicker", "data-ak-part": "kicker", text: on2 ? t("chosen") : item.kicker || "" }),
+          el("span", { class: "ak-choices__kicker", "data-ak-part": "kicker", text: kicker }),
           el("span", { class: "ak-choices__title", "data-ak-part": "title", text: item.title })
         ]);
         slotInto(card, spec, "text", item.text || null, { cls: "ak-choices__text", args: [item] });
@@ -4310,6 +4368,7 @@
         if (!patch) return;
         if (patch.items) state.items = patch.items;
         if (patch.value != null) state.value = patch.value;
+        else if (patch.value === null && none) state.value = "";
         renderCards(false);
         renderPanel();
       },
@@ -5550,9 +5609,9 @@
     const number = el("b", { class: "ak-rating__value", "data-ak-part": "value" });
     const track = el("span", { class: "ak-rating__track", "data-ak-part": "track" });
     track.appendChild(starRow());
-    const fill2 = el("span", { class: "ak-rating__fill", "data-ak-part": "fill" });
-    fill2.appendChild(starRow());
-    track.appendChild(fill2);
+    const fill3 = el("span", { class: "ak-rating__fill", "data-ak-part": "fill" });
+    fill3.appendChild(starRow());
+    track.appendChild(fill3);
     const words = el("span", { class: "ak-rating__words", "data-ak-part": "words" });
     root.appendChild(number);
     root.appendChild(track);
@@ -5560,7 +5619,7 @@
     function paint() {
       const frac = Math.min(Math.max(state.value / state.max, 0), 1);
       number.textContent = num(Math.round(state.value * 10) / 10);
-      fill2.style.width = (frac * 100).toFixed(1) + "%";
+      fill3.style.width = (frac * 100).toFixed(1) + "%";
       if (hasPart(spec, "words")) {
         clear(words);
         fillPart(words, partValue(spec, "words", state));
@@ -5735,7 +5794,15 @@
     applyVariant(root, spec, LIST_VARIANTS);
     if (spec.target) resolve(spec.target).appendChild(root);
     let detailEmptyCard = null;
+    const keepMode = spec.keepDetail === false ? "never" : spec.keepDetail === "always" ? "always" : "typed";
+    let typed = false;
+    const markTyped = function() {
+      typed = true;
+    };
+    detailBody.addEventListener("input", markTyped);
+    detailBody.addEventListener("change", markTyped);
     function renderDetail() {
+      typed = false;
       if (detailEmptyCard) {
         detailEmptyCard.destroy();
         detailEmptyCard = null;
@@ -5835,9 +5902,19 @@
         if (!patch || !patch.items) return;
         items = patch.items;
         master.set({ items });
-        if (selected && !items.some(function(i) {
+        const stays = selected != null && items.some(function(i) {
           return i.id === selected;
-        })) selected = null;
+        });
+        if (!stays) selected = null;
+        if (stays && (keepMode === "always" || keepMode === "typed" && typed)) {
+          for (const row of root.querySelectorAll(".ak-list__row")) {
+            const on2 = row.getAttribute("data-ak-id") === selected;
+            row.classList.toggle("ak-list__row--selected", on2);
+            if (on2) row.setAttribute("aria-current", "true");
+            else row.removeAttribute("aria-current");
+          }
+          return;
+        }
         select(selected);
       },
       select,
@@ -6218,12 +6295,14 @@
 
   // src/static/sdk-libs/atelier/timeline.js
   var MACHINE_MOMENT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}|^(?:[A-Za-z]{3},? )?\d{1,2} [A-Za-z]{3} \d{4}\b|^[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{4}\b/;
+  var HAS_TIME = /\d{1,2}:\d{2}/;
   function fmtTs(ts) {
     if (ts == null || ts === "") return null;
     if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) return calendar(ts, { dateStyle: "medium" });
     if (typeof ts === "string" && !MACHINE_MOMENT.test(ts)) return ts;
     const d = ts instanceof Date ? ts : new Date(ts);
     if (Number.isNaN(d.getTime())) return String(ts);
+    if (typeof ts === "string" && !HAS_TIME.test(ts)) return calendar(d, { dateStyle: "medium" });
     return dateTime(d, { dateStyle: "medium", timeStyle: "short" });
   }
   function timeline(spec) {
@@ -7263,6 +7342,8 @@
   var W = 560;
   var H = 300;
   var PAD = { top: 16, right: 14, bottom: 34, left: 46 };
+  var H_ROW = 36;
+  var H_ROWS_MIN = 120;
   function chart(spec) {
     const kind = ["donut", "calendar", "scatter", "funnel", "treemap", "flow", "radar"].indexOf(spec.kind) >= 0 ? spec.kind : "axes";
     const root = el("figure", {
@@ -7332,9 +7413,9 @@
       const step = tickStep(max - min);
       min = Math.floor(min / step) * step;
       max = Math.ceil(max / step) * step;
-      const width = horizontal ? H : W;
-      const height = horizontal ? W : H;
       const pad = horizontal ? { top: 14, right: 20, bottom: 16, left: 86 } : PAD;
+      const width = W;
+      const height = horizontal ? Math.max(H_ROWS_MIN, pad.top + pad.bottom + labels.length * H_ROW) : H;
       const innerAlong = horizontal ? height - pad.top - pad.bottom : width - pad.left - pad.right;
       const innerCross = horizontal ? width - pad.left - pad.right : height - pad.top - pad.bottom;
       const along = (i) => (horizontal ? pad.top : pad.left) + innerAlong * i / labels.length;
@@ -8207,8 +8288,8 @@
         const sun = new THREE.DirectionalLight();
         sun.intensity = 2.2;
         sun.position.set(4, 8, 6);
-        const fill2 = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink3), 0.7);
-        group.add(sun, fill2);
+        const fill3 = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink3), 0.7);
+        group.add(sun, fill3);
       }
       frameCamera(barCols);
       clock.start = performance.now();
@@ -10902,7 +10983,7 @@
       const v = parseFloat(input.getAttribute(name) || "");
       return isFinite(v) ? v : fallback;
     }
-    function fill2() {
+    function fill3() {
       const lo = num2("min", 0);
       const hi = num2("max", 100);
       const v = parseFloat(input.value);
@@ -10954,18 +11035,18 @@
       if (up && atMax || down && atMin) spring2.set(0, { velocity: (up ? 1 : -1) * 160 });
     };
     input.addEventListener("pointerdown", onDown);
-    input.addEventListener("input", fill2);
-    input.addEventListener("change", fill2);
+    input.addEventListener("input", fill3);
+    input.addEventListener("change", fill3);
     input.addEventListener("keydown", onKey);
-    fill2();
+    fill3();
     return {
-      sync: fill2,
+      sync: fill3,
       destroy() {
         onUp();
         spring2.destroy();
         input.removeEventListener("pointerdown", onDown);
-        input.removeEventListener("input", fill2);
-        input.removeEventListener("change", fill2);
+        input.removeEventListener("input", fill3);
+        input.removeEventListener("change", fill3);
         input.removeEventListener("keydown", onKey);
         if (stretch) draw(0);
       }
@@ -11183,7 +11264,7 @@
     }
   };
   function tai(key, vars) {
-    const hosted = i18n.t(key, vars);
+    const hosted = t(key, vars);
     if (hosted !== key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -12752,7 +12833,7 @@ Known schemas:
     );
     return "";
   }
-  function fill(s, vars) {
+  function fill2(s, vars) {
     return s.replace(/\{(\w+)\}/g, function(m, k) {
       return vars[k] != null ? String(vars[k]) : m;
     });
@@ -12866,7 +12947,7 @@ Known schemas:
     function words(field, rule, key, vars, l) {
       const s = propSchema(root, field ? field.split(".") : []);
       const own = s && s["x-messages"] && s["x-messages"][rule];
-      return fill(own ? inLang(own, l) : MESSAGES[l][key], vars);
+      return fill2(own ? inLang(own, l) : MESSAGES[l][key], vars);
     }
     function check3(values, options) {
       const opts = options || {};
@@ -13132,7 +13213,7 @@ Known schemas:
     const extra = function(v) {
       return el("option", { value: v }, rows ? tai("modelField.notListed", { model: v }) : v);
     };
-    function fill2(keep) {
+    function fill3(keep) {
       clear(select);
       select.appendChild(el("option", { value: "" }, tai("modelField.default")));
       for (const r of rows || []) {
@@ -13144,7 +13225,7 @@ Known schemas:
       if (!rows) select.appendChild(el("option", { value: "", disabled: true }, tai(failed ? "modelField.failed" : "modelField.loading")));
       select.value = keep || "";
     }
-    fill2(current2);
+    fill3(current2);
     Promise.resolve().then(function() {
       return lib.models({ capability: field.capability || "text" });
     }).then(
@@ -13157,7 +13238,7 @@ Known schemas:
       }
     ).then(function() {
       select.removeAttribute("aria-busy");
-      fill2(select.value);
+      fill3(select.value);
     });
     return {
       input: select,
@@ -13745,7 +13826,7 @@ Known schemas:
     }
   };
   function tc(key, vars) {
-    const hosted = i18n.t("commercial." + key, vars);
+    const hosted = t("commercial." + key, vars);
     if (hosted !== "commercial." + key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -14556,7 +14637,7 @@ Known schemas:
     }
   };
   function tm(key, vars) {
-    const hosted = i18n.t("members." + key, vars);
+    const hosted = t("members." + key, vars);
     if (hosted !== "members." + key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -15721,7 +15802,7 @@ Known schemas:
     }
   };
   function tw(key, vars) {
-    const hosted = i18n.t("workspace." + key, vars);
+    const hosted = t("workspace." + key, vars);
     if (hosted !== "workspace." + key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -17305,7 +17386,7 @@ Known schemas:
     es: Object.keys(STRINGS5.es)
   };
   function ti(key, vars) {
-    const hosted = i18n.t(key, vars);
+    const hosted = t(key, vars);
     if (hosted !== key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -18732,7 +18813,7 @@ Known schemas:
     }
   };
   function twf(key, vars) {
-    const hosted = i18n.t(key, vars);
+    const hosted = t(key, vars);
     if (hosted !== key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -19319,7 +19400,7 @@ Known schemas:
         picking = false;
         close(true);
         if (item.run) item.run();
-        if (s.onPick) s.onPick(item.id, item);
+        if (s.onPick && (!item.run || s.pickAlways === true)) s.onPick(item.id, item);
       };
       if (!box || motionOff(box) || !mark || typeof mark.el.animate !== "function") {
         finish();
@@ -19483,7 +19564,7 @@ Known schemas:
       /** @type {HTMLElement} */
       resolve(target)
     );
-    const m = menu({ items: spec.items, onPick: spec.onPick, label: spec.label });
+    const m = menu({ items: spec.items, onPick: spec.onPick, label: spec.label, pickAlways: spec.pickAlways });
     const onCtx = function(e) {
       e.preventDefault();
       m.close(false);
@@ -20075,7 +20156,7 @@ Known schemas:
     }
   };
   function tu(key, vars) {
-    const hosted = i18n.t(key, vars);
+    const hosted = t(key, vars);
     if (hosted !== key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -21436,7 +21517,7 @@ Known schemas:
     }
   };
   function td(key, vars) {
-    const hosted = i18n.t(key, vars);
+    const hosted = t(key, vars);
     if (hosted !== key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -23043,7 +23124,7 @@ Known schemas:
     ].filter(Boolean));
     if (s.target) resolve(s.target).appendChild(root);
     let up = null;
-    let warned = false;
+    let warned2 = false;
     function take(list3) {
       const files = Array.prototype.slice.call(list3 || []);
       const bad = files.find(function(f2) {
@@ -23063,8 +23144,8 @@ Known schemas:
         if (!up) {
           const lib = storageLib();
           if (lib) up = uploader({ zone: root, upload: s.upload, lib, onUploaded: s.onUploaded, onUploadError: s.onUploadError });
-          else if (!warned) {
-            warned = true;
+          else if (!warned2) {
+            warned2 = true;
             console.warn("[atelier] dropzone: upload needs aimeat-storage.js on the page; the files went to onFiles only.");
           }
         }
@@ -25589,9 +25670,38 @@ Known schemas:
         "data-ak-part": "action",
         "data-ak-action": action.id,
         on: { click: function() {
-          if (action.run) action.run();
+          press(action);
         } }
       }, action.label));
+    }
+    function press(action) {
+      const auto = spec.autoClose !== false && action.keepOpen !== true;
+      if (!action.run) {
+        if (auto) close(action.id);
+        return;
+      }
+      let out;
+      try {
+        out = action.run();
+      } catch (err) {
+        if (!auto) throw err;
+        console.warn('[aimeat-atelier] dialog action "' + action.id + '" threw, so the dialog stays open:', err);
+        return;
+      }
+      if (!auto) return;
+      if (out && typeof /** @type {any} */
+      out.then === "function") {
+        out.then(
+          function(v) {
+            if (v !== false) close(action.id);
+          },
+          function(err) {
+            console.warn('[aimeat-atelier] dialog action "' + action.id + '" failed, so the dialog stays open:', err);
+          }
+        );
+        return;
+      }
+      if (out !== false) close(action.id);
     }
     slotInto(foot, spec, "actions", null, { cls: "ak-dialog__extra" });
     node.appendChild(el(
@@ -26958,7 +27068,7 @@ Known schemas:
       let hatch = "";
       for (let x = x0 + 12; x <= x0 + bw - 14; x += 6) hatch += "M" + R(x) + " " + (y + 7) + "l6 -14";
       svgEl2("path", { d: hatch, class: "ak-orn-hatch", "stroke-width": 0.8 }, d.svg);
-      const fill2 = svgEl2("rect", { x: x0 + 3, y: y - 8, width: 0, height: 16, rx: 8, class: "ak-orn-fill" }, d.svg);
+      const fill3 = svgEl2("rect", { x: x0 + 3, y: y - 8, width: 0, height: 16, rx: 8, class: "ak-orn-fill" }, d.svg);
       const front = d.group(d.svg);
       const add = (parent, gs, role, width) => {
         for (const g of gs) {
@@ -26999,7 +27109,7 @@ Known schemas:
           s.el.style.strokeDashoffset = String(Math.round(s.len * (1 - f2)));
         }
         for (const lf of leaves) lf.el.classList.toggle("ak-orn-open", lf.s <= rv - 4);
-        fill2.setAttribute("width", String(R(Math.max(0, (bw - 6) * v))));
+        fill3.setAttribute("width", String(R(Math.max(0, (bw - 6) * v))));
         const b = base.at(rv);
         const th = k * rv;
         const o = amp * Math.sin(th);
@@ -28772,7 +28882,7 @@ Known schemas:
     }
   };
   function tb(key, vars) {
-    const hosted = i18n.t("board." + key, vars);
+    const hosted = t("board." + key, vars);
     if (hosted !== "board." + key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -29396,7 +29506,7 @@ Known schemas:
     }
   };
   function hb(key) {
-    const hosted = i18n.t("handbook." + key);
+    const hosted = t("handbook." + key);
     if (hosted !== "handbook." + key) return hosted;
     const table2 = (
       /** @type {Record<string, string>} */
@@ -29563,7 +29673,7 @@ Known schemas:
         t2 || c.from || null
       );
     }
-    function fill2(host, v) {
+    function fill3(host, v) {
       clear(host);
       if (v == null || v === false) return;
       if (typeof v === "function") {
@@ -29629,7 +29739,7 @@ Known schemas:
       if (!c) return;
       article.appendChild(el("h3", { class: "ak-handbook__heading", "data-ak-part": "heading", text: wordsOf(c.title) }));
       const body = el("div", { class: "ak-handbook__text", "data-ak-part": "text" });
-      fill2(body, parts.body ? parts.body(c) : c.body);
+      fill3(body, parts.body ? parts.body(c) : c.body);
       article.appendChild(body);
       if (c.target || c.from) {
         const note = el("p", { class: "ak-handbook__note", "data-ak-part": "note", hidden: true, text: hb("away") });
@@ -30019,7 +30129,7 @@ Known schemas:
     es: Object.keys(STRINGS11.es)
   };
   function tf(key, vars) {
-    const hosted = i18n.t("fingerprint." + key, vars);
+    const hosted = t("fingerprint." + key, vars);
     if (hosted !== "fingerprint." + key) return hosted;
     const lang2 = i18n.lang();
     const table2 = (
@@ -32516,8 +32626,8 @@ Known schemas:
         deep: String(h.tagName).toUpperCase() !== "H2"
       };
     });
-    const fill2 = el("span", { class: "ak-reading__fill", "aria-hidden": "true" });
-    const line2 = el("div", { class: "ak-reading__line", "aria-hidden": "true" }, [fill2]);
+    const fill3 = el("span", { class: "ak-reading__fill", "aria-hidden": "true" });
+    const line2 = el("div", { class: "ak-reading__line", "aria-hidden": "true" }, [fill3]);
     const links = items.map(function(it) {
       return el("a", {
         class: "ak-reading__link",
@@ -32578,7 +32688,7 @@ Known schemas:
       const v = viewOf(scroller);
       const r = article.getBoundingClientRect();
       const through = clamp012((v.top - r.top) / Math.max(1, r.height - v.h));
-      fill2.style.setProperty("--ak-fill", (through * 100).toFixed(2) + "%");
+      fill3.style.setProperty("--ak-fill", (through * 100).toFixed(2) + "%");
       const edge = v.top + v.h / READ_LINE;
       let at3 = 0;
       items.forEach(function(it, i) {
@@ -33410,7 +33520,7 @@ Known schemas:
     );
     const axis = o.axis === "x" || o.axis === "y" ? o.axis : "both";
     const home = o.release === "spring";
-    const quiet = reducedMotion();
+    const quiet2 = reducedMotion();
     node.classList.add("ak-tug");
     let dg = null;
     let floor = null;
@@ -33498,7 +33608,7 @@ Known schemas:
       if (o.container) params.container = o.container;
       if (typeof o.stiffness === "number") params.releaseStiffness = o.stiffness;
       if (typeof o.snap === "number" || Array.isArray(o.snap)) params.snap = o.snap;
-      if (quiet) {
+      if (quiet2) {
         params.velocityMultiplier = 0;
         params.maxVelocity = 0;
         params.minVelocity = 0;
@@ -33522,7 +33632,7 @@ Known schemas:
         node.style.transform = "translate(" + tx + "px, " + ty + "px)";
         return;
       }
-      if (quiet) {
+      if (quiet2) {
         dg.setX(tx);
         dg.setY(ty);
         return;
@@ -34764,7 +34874,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.69.0",
+    version: "0.70.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

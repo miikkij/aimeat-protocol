@@ -11,7 +11,7 @@
  * @version-history
  *   v0.69.0 — 2026-11-02 — Initial (wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse).
  */
-import { i18n } from './i18n.js';
+import { i18n, t as kitWord } from './i18n.js';
 
 const STRINGS = {
   en: {
@@ -89,7 +89,7 @@ export const FINGERPRINT_KEYS = {
  * @returns {string}
  */
 export function tf(key, vars) {
-  const hosted = i18n.t('fingerprint.' + key, vars);
+  const hosted = kitWord('fingerprint.' + key, vars);
   if (hosted !== 'fingerprint.' + key) return hosted;
   const lang = i18n.lang();
   const table = /** @type {Record<string, string>} */ (

@@ -9,6 +9,7 @@
  *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v2.0.1 — 2026-11-21 — escHtml is the shared escape (_core/escape.js), the one apps reach as AIMEAT.escapeHtml.
  *   v2.0.0 — 2026-11-07 — The light/dark switch is ONE button that shows the mode in effect and turns to
  *     the other (Jouni's review of the sign-in pill); "Automatic" moves to the look picker's first row
  *     (wireAutoMode). Sign-out is an icon button (`.aimeat-icon-btn`), no longer an underlined word.
@@ -59,13 +60,13 @@
  */
 
 import { inkVarsCss } from './ink.js';
+import { escapeHtml } from '../_core/escape.js';
 
 /** HTML-escape a string for text and for a quoted attribute: all five characters. The DOM form
  *  (textContent → innerHTML) left `"` and `'` as they were, and the sign-in form puts the result in
  *  placeholder="…" and aria-label="…" (secaudit 2026-10, C8). */
 export function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return escapeHtml(s);
 }
 
 // ── Theme toggle (travels with the login pill) ──

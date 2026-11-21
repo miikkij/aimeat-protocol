@@ -56,6 +56,8 @@
  * @tokens callout --ak-callout-pad
  * @fork callout A tinted box with an icon; copy .ak-callout* out of workbench.css.
  * @version-history
+ *   v0.3.0 — 2026-11-21 — choiceCards: `value: null` or `allowNone: true` starts with no card chosen
+ *     (the first was always chosen), and `keepKicker: true` keeps an item's own kicker on the chosen card.
  *   v0.2.0 — 2026-09-28 — settingsGroup names `.ak-setgroups`, the one-card container for a
  *     settings page (workbench.css).
  *   v0.1.0 — 2026-09-28 — Initial: the approved Postinjalostamo design, moved into the kit
@@ -330,16 +332,25 @@ export function checkGrid(spec) {
  * THE CHOICE CARDS — two to four ways to do one thing, side by side as a radio group, and one
  * panel under them for the chosen way. The chosen card says so in words and gets the accent
  * outline; the panel is the app's to fill (renderPanel runs on every change).
+ *
+ * A CHOICE IS OPTIONAL WHEN THE APP SAYS SO. Without `value` the first card is chosen, as before;
+ * `value: null` (or `allowNone: true`) draws every card unchosen until the person picks one, and
+ * `set({ value: null })` clears the choice again. `keepKicker: true` keeps an item's own kicker on
+ * the chosen card and puts the kit's "chosen" word beside it, for a kicker that carries data.
  * @param {{
- *   target?: string|Element, label?: string, value?: string,
+ *   target?: string|Element, label?: string, value?: string|null, allowNone?: boolean, keepKicker?: boolean,
  *   items: Array<{ id: string, kicker?: string, title: string, text?: string }>,
  *   onChange?: (id: string, item: any) => void,
  *   renderPanel?: (item: any, host: HTMLElement) => void, parts?: any, variant?: string,
  * }} spec
- * @returns {{ el: HTMLElement, panel: HTMLElement, set: (patch: { value?: string, items?: any[] }) => void, destroy: () => void }}
+ * @returns {{ el: HTMLElement, panel: HTMLElement, set: (patch: { value?: string|null, items?: any[] }) => void, destroy: () => void }}
  */
 export function choiceCards(spec) {
-  const state = { items: spec.items || [], value: spec.value || (spec.items && spec.items[0] ? spec.items[0].id : '') };
+  const none = spec.value === null || spec.allowNone === true;
+  const state = {
+    items: spec.items || [],
+    value: spec.value || (none ? '' : (spec.items && spec.items[0] ? spec.items[0].id : '')),
+  };
   const root = el('div', { class: 'ak-root ak-choices', 'data-ak-part': 'root' });
   const grid = el('div', { class: 'ak-choices__grid', 'data-ak-part': 'grid', role: 'radiogroup', 'aria-label': spec.label || null });
   const panel = el('div', { class: 'ak-choices__panel', 'data-ak-part': 'panel' });
@@ -371,11 +382,16 @@ export function choiceCards(spec) {
   function renderCards(focus) {
     clear(grid);
     const items = state.items;
+    // With nothing chosen, the first card is the one Tab reaches, as a radio group's first is.
+    const anyOn = items.some(function (item) { return item.id === state.value; });
     items.forEach(function (item, i) {
       const on = item.id === state.value;
+      const kicker = on
+        ? (spec.keepKicker && item.kicker ? item.kicker + ' · ' + t('chosen') : t('chosen'))
+        : (item.kicker || '');
       const card = el('button', {
         type: 'button', role: 'radio', class: 'ak-choices__card' + (on ? ' ak-choices__card--on' : ''),
-        'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1',
+        'aria-checked': on ? 'true' : 'false', tabindex: on || (!anyOn && i === 0) ? '0' : '-1',
         'data-ak-part': 'card', 'data-ak-id': item.id, 'data-ak-noguard': true,
         on: {
           click: function () { choose(item, false); },
@@ -387,7 +403,7 @@ export function choiceCards(spec) {
           },
         },
       }, [
-        el('span', { class: 'ak-choices__kicker', 'data-ak-part': 'kicker', text: on ? t('chosen') : (item.kicker || '') }),
+        el('span', { class: 'ak-choices__kicker', 'data-ak-part': 'kicker', text: kicker }),
         el('span', { class: 'ak-choices__title', 'data-ak-part': 'title', text: item.title }),
       ]);
       slotInto(card, spec, 'text', item.text || null, { cls: 'ak-choices__text', args: [item] });
@@ -407,6 +423,7 @@ export function choiceCards(spec) {
       if (!patch) return;
       if (patch.items) state.items = patch.items;
       if (patch.value != null) state.value = patch.value;
+      else if (patch.value === null && none) state.value = '';
       renderCards(false);
       renderPanel();
     },

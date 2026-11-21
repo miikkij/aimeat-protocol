@@ -57,6 +57,12 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.70.0 — 2026-11-21 — Defaults that did the unexpected: a dialog action closes its dialog
+ *     (dialog.js), menu onPick only for an entry without run (menu.js), choiceCards value: null and
+ *     keepKicker (workbench.js), listDetail keeps typed text on set (list.js), a date-only timeline
+ *     string is a date (timeline.js), a horizontal chart grows with its rows (chart.js),
+ *     i18n.use(dict, { kit: false }) and the rewording warning (i18n.js), and every view transition
+ *     catches its own promises (mosaic-motion.js startTransition).
  *   v0.69.0 — 2026-11-02 — fingerprint(spec): the node's content profile drawn as a seal, a barcode
  *     with the marks + ~ ? x and the topics, a trust bar and three quadrant views, one topic lit across
  *     all of them, views panel, row, seal and barcode, and FINGERPRINT_SAMPLE (fingerprint.js,
@@ -499,7 +505,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.69.0',
+  version: '0.70.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

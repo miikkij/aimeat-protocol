@@ -13,6 +13,8 @@
  * @tokens timeline --ak-timeline-dot · --ak-timeline-rail · --ak-timeline-gap · --ak-timeline-indent
  * @fork timeline Copy .ak-timeline* out of content.css; the rail is one ::before and the dot is one span, and you give up the keyed line so every event re-enters on every change.
  * @version-history
+ *   v0.70.0 — 2026-11-21 — A date string with no time of day ("3 Mar 1940", "Sun Mar 03 1940") is
+ *     printed as a calendar date; it was read as local midnight and printed with "00.00".
  *   v0.53.2 — 2026-09-13 — A MOMENT IS FORMATTED ONLY WHEN IT IS ONE. The kit handed every string
  *     to the browser's date reader, which turned an app's own `07/09, 04:10` into 9 July 2001 with
  *     no warning. A Date, a number and an ISO 8601 or HTTP-style string are formatted as before;
@@ -54,6 +56,9 @@ import { partEl, slotInto, applyVariant, partValue, fillPart, hasPart } from './
  */
 const MACHINE_MOMENT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}|^(?:[A-Za-z]{3},? )?\d{1,2} [A-Za-z]{3} \d{4}\b|^[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{4}\b/;
 
+/** Whether a moment string carries a time of day (hours and minutes). */
+const HAS_TIME = /\d{1,2}:\d{2}/;
+
 /** Default moment wording: date + time in the viewer's locale — except DATE-ONLY input, which
  *  renders as a date. A bare "2026-08-26" parsed as a moment lands on midnight UTC and told
  *  every reader something happened at 3:00 AM (the first design review's finding). A string that
@@ -66,6 +71,9 @@ function fmtTs(ts) {
   if (typeof ts === 'string' && !MACHINE_MOMENT.test(ts)) return ts;
   const d = ts instanceof Date ? ts : new Date(ts);
   if (Number.isNaN(d.getTime())) return String(ts);
+  // "3 Mar 1940" and "Sun Mar 03 1940" name a day and no time: the browser reads them as local
+  // midnight, and printing that midnight added a time of day the writer never gave.
+  if (typeof ts === 'string' && !HAS_TIME.test(ts)) return calendar(d, { dateStyle: 'medium' });
   return dateTime(d, { dateStyle: 'medium', timeStyle: 'short' });
 }
 

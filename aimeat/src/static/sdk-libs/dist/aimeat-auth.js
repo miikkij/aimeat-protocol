@@ -1544,9 +1544,14 @@
     return light + "{" + LIGHT + "}" + dark + "{" + DARK + "}@media (prefers-color-scheme:dark){" + system + "{" + DARK + "}}";
   }
 
+  // src/static/sdk-libs/_core/escape.js
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
   // src/static/sdk-libs/auth/theme.js
   function escHtml(s) {
-    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    return escapeHtml(s);
   }
   var AIMEAT_THEME_KEY = "aimeat-theme";
   function aimeatReadTheme() {
@@ -4430,9 +4435,7 @@
     window.addEventListener("aimeat-theme-change", syncDot);
   }
   function esc(s) {
-    var d = document.createElement("div");
-    d.textContent = s;
-    return d.innerHTML;
+    return escapeHtml(s);
   }
 
   // src/static/sdk-libs/auth/pill.js
@@ -4831,6 +4834,7 @@
   // src/static/sdk-libs/_core/namespace.js
   function namespace() {
     if (!window.AIMEAT) window.AIMEAT = {};
+    if (typeof window.AIMEAT.escapeHtml !== "function") window.AIMEAT.escapeHtml = escapeHtml;
     return window.AIMEAT;
   }
   function attach(key, value) {

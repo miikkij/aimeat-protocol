@@ -31,6 +31,9 @@
  * @tokens listDetail --ak-list-gap · --ak-list-row-gap · --ak-list-aside-size
  * @fork listDetail Do not fork the container: mark your detail's own heading .ak-listdetail__title and the picked row's words travel into it. Its `variant` and `parts` are the list's, handed to the master pane.
  * @version-history
+ *   v0.70.0 — 2026-11-21 — listDetail.set({ items }) leaves the detail pane alone while the person
+ *     has typed in it and its item is still in the list; it drew the pane again and the text was
+ *     gone. `keepDetail: 'always' | false` chooses otherwise; select(id) always draws.
  *   v0.57.0 — 2026-09-29 — A row's badge takes `badgeTone` (ok, warn, err, quiet): a queue or a
  *     status reads by its colour as the approved Postinjalostamo drawing shows, with no app CSS.
  *   v0.50.0 — 2026-09-05 — THE CHANGE IS A MOVE, not three separate ones. The whole reconcile runs
@@ -242,7 +245,9 @@ export function list(spec) {
  *   parts?: Record<string, any>,
  *   empty?: { title?: string, hint?: string },
  *   detailEmpty?: { title?: string, hint?: string },
- * }} spec
+ *   keepDetail?: 'typed'|'always'|false,
+ * }} spec  set({ items }) keeps a detail pane the person typed in while its item is still there
+ *   (`keepDetail: 'typed'`, the default); 'always' keeps it on every set, false draws it every time.
  * @returns {{ el: HTMLElement, set: (patch: { items: ListItem[] }) => void,
  *   select: (id: string|null) => void, destroy: () => void }}
  */
@@ -278,7 +283,19 @@ export function listDetail(spec) {
 
   let detailEmptyCard = null;
 
+  // TYPED TEXT IS KEPT. A person typing in the detail pane fires `input` (a value the app sets in
+  // code does not), and from then until the pane is drawn again for a pick, set({ items }) leaves
+  // the pane as it stands rather than drawing it over the text. `keepDetail: 'always'` keeps it on
+  // every set while the same item stays selected; `keepDetail: false` draws it on every set, as
+  // before 0.70.0. select(id) always draws.
+  const keepMode = spec.keepDetail === false ? 'never' : spec.keepDetail === 'always' ? 'always' : 'typed';
+  let typed = false;
+  const markTyped = function () { typed = true; };
+  detailBody.addEventListener('input', markTyped);
+  detailBody.addEventListener('change', markTyped);
+
   function renderDetail() {
+    typed = false;
     if (detailEmptyCard) { detailEmptyCard.destroy(); detailEmptyCard = null; }
     clear(detailBody);
     const item = items.find(function (i) { return i.id === selected; }) || null;
@@ -376,7 +393,18 @@ export function listDetail(spec) {
       if (!patch || !patch.items) return;
       items = patch.items;
       master.set({ items: items });
-      if (selected && !items.some(function (i) { return i.id === selected; })) selected = null;
+      const stays = selected != null && items.some(function (i) { return i.id === selected; });
+      if (!stays) selected = null;
+      // The picked row is marked again (the list may have rebuilt it); the pane is left alone.
+      if (stays && (keepMode === 'always' || (keepMode === 'typed' && typed))) {
+        for (const row of root.querySelectorAll('.ak-list__row')) {
+          const on = row.getAttribute('data-ak-id') === selected;
+          row.classList.toggle('ak-list__row--selected', on);
+          if (on) row.setAttribute('aria-current', 'true');
+          else row.removeAttribute('aria-current');
+        }
+        return;
+      }
       select(selected);
     },
     select: select,

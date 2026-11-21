@@ -11,6 +11,7 @@
  * @usage const r = await AIMEAT.ai.stream({ app_id, prompt, onText: (d, all) => (el.textContent = all) });
  *   const s = await AIMEAT.ai.speak({ app_id, input: 'Hello' }); new Audio(URL.createObjectURL(s.blob)).play();
  * @version-history
+ *   v1.4.0 - 2026-11-21 - stream() sends max_tokens only with allowCap: true (call.js outputCap).
  *   v1.3.0 - 2026-11-07 - A finished stream notes its budget through noteSpent, so the sign-in pill's bolt follows it.
  *   v1.2.0 - 2026-10-08 - speak() returns `audio` (mime, sample_rate, channels, sample_format) from the
  *     node's start and done frames, takes onStart, and types the blob by the provider's real mime.
@@ -19,7 +20,7 @@
  */
 import { getSession } from '../_core/session.js';
 import { NODE_URL } from '../_core/config.js';
-import { aiError, paid, postJson, noteSpent } from './call.js';
+import { aiError, paid, postJson, noteSpent, outputCap } from './call.js';
 import { capabilities, priceEstimate } from './capabilities.js';
 
 /**
@@ -119,7 +120,7 @@ export async function stream(opts) {
   // The route validates strictly: only these keys, and undefined ones are dropped by JSON.stringify.
   const body = {
     app_id: opts.app_id, messages, model: opts.model,
-    temperature: opts.temperature, top_p: opts.top_p, max_tokens: opts.max_tokens, reasoning: opts.reasoning,
+    temperature: opts.temperature, top_p: opts.top_p, max_tokens: outputCap(opts), reasoning: opts.reasoning,
     role: typeof opts.role === 'string' && opts.role ? opts.role : undefined,
   };
   return paid(opts, {

@@ -33,6 +33,8 @@
  *   AIMEAT.ai.disclose(r.provenance, { target: '#answer-label' });
  *   await AIMEAT.data.set(key, AIMEAT.ai.declare({ text: r.content }, r.provenance));
  * @version-history
+ *   v1.1.0 -- 2026-11-21 -- disclose(provenance, { always: true }) draws the short label for content that
+ *     owes none (a private answer); without it nothing is drawn, as before.
  *   v1.0.4 -- 2026-10-31 -- The language is chosen as the sign-in pill chooses it, and Spanish is one
  *     of them; `<html lang>` (always "en" in a genre) no longer overrides the place's language.
  *   v1.0.3 -- 2026-10-31 -- A page with no `lang` takes the language from readLang (the place's own
@@ -167,20 +169,24 @@ function targetOf(target) {
  *
  * @param {any} record the `aimeat.provenance/v1` document
  * @param {string} [recordUrl] absolute URL of the addressable record — the "How this was made" link
- * @param {{ variant?: 'inline'|'block', class?: string }} [opts]
+ * `always: true` also draws a label no law asks for (a private answer only the person sees): the
+ * short form, inline and light, never the long statement. Content no model made (level original or
+ * machine) still draws nothing.
+ * @param {{ variant?: 'inline'|'block', class?: string, always?: boolean }} [opts]
  * @returns {HTMLElement|null}
  */
 export function buildLabel(record, recordUrl, opts = {}) {
-  const disclosure = record && record.disclosure;
-  if (!disclosure || !disclosure.required) return null;
+  const disclosure = (record && record.disclosure) || null;
+  const owed = !!(disclosure && disclosure.required);
+  if (!owed && !(opts.always === true && record && typeof record === 'object')) return null;
   const icon = euIconFor(record);
   if (!icon) return null;
 
   ensureStyles();
-  const variant = opts.variant === 'block' ? 'block' : 'inline';
+  const variant = owed && opts.variant === 'block' ? 'block' : 'inline';
   // `strength` is optional on a record minted before Phase 3. Absent means "show it": the obligation
   // lives in `required`, and defaulting to the quieter form would under-state rather than over-state.
-  const strength = disclosure.strength === 'full' ? 'full' : 'light';
+  const strength = owed && disclosure.strength === 'full' ? 'full' : 'light';
   const alt = t(icon.alt);
 
   const root = el('div', `ai-label ai-label--${variant} ai-label--${strength} ${opts.class || ''}`.trim());
@@ -225,8 +231,11 @@ export function buildLabel(record, recordUrl, opts = {}) {
  * returned for the app to place itself.
  *
  * @param {any} provenance `{ record, recordUrl }` from a completion, or the record itself
- * @param {{ target?: string|Element, variant?: 'inline'|'block', class?: string }} [opts]
- * @returns {HTMLElement|null} the label, or null when the content owes none
+ * `always: true` draws the short label also for content that owes none, such as a private answer
+ * only the person sees (an empty target stayed empty, and the person could not tell it was AI).
+ *
+ * @param {{ target?: string|Element, variant?: 'inline'|'block', class?: string, always?: boolean }} [opts]
+ * @returns {HTMLElement|null} the label, or null when the content owes none (and `always` is not set)
  */
 export function disclose(provenance, opts = {}) {
   if (!provenance) return null;

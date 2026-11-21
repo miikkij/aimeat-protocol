@@ -40,9 +40,15 @@
   var NODE_ID = cfg().nodeId;
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
+  // src/static/sdk-libs/_core/escape.js
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
   // src/static/sdk-libs/_core/namespace.js
   function namespace() {
     if (!window.AIMEAT) window.AIMEAT = {};
+    if (typeof window.AIMEAT.escapeHtml !== "function") window.AIMEAT.escapeHtml = escapeHtml;
     return window.AIMEAT;
   }
   function attach(key, value) {

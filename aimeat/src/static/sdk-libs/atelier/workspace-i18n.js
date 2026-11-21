@@ -18,7 +18,7 @@
  *     is chosen (workspace-choice.js).
  *   v0.61.0 — 2026-10-01 — Initial (IAM plan Phase D blocks 2 and 3).
  */
-import { i18n } from './i18n.js';
+import { i18n, t as kitWord } from './i18n.js';
 
 const STRINGS = {
   en: {
@@ -299,7 +299,7 @@ const STRINGS = {
  * @returns {string}
  */
 export function tw(key, vars) {
-  const hosted = i18n.t('workspace.' + key, vars);
+  const hosted = kitWord('workspace.' + key, vars);
   if (hosted !== 'workspace.' + key) return hosted;
   const lang = i18n.lang();
   const table = /** @type {Record<string, string>} */ (

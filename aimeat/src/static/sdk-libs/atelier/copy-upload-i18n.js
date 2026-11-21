@@ -12,7 +12,7 @@
  *   v0.62.0 — 2026-10-01 — Initial: dropzone uploads and the kit's copy helper, and the dropzone's
  *     own label and refusals (`drop.`), whose English is the text the zone always had.
  */
-import { i18n } from './i18n.js';
+import { i18n, t as kitWord } from './i18n.js';
 
 const STRINGS = {
   en: {
@@ -62,7 +62,7 @@ const STRINGS = {
  * @returns {string}
  */
 export function tu(key, vars) {
-  const hosted = i18n.t(key, vars);
+  const hosted = kitWord(key, vars);
   if (hosted !== key) return hosted;
   const lang = i18n.lang();
   const table = /** @type {Record<string, string>} */ (

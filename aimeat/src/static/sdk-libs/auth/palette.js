@@ -21,6 +21,8 @@
  * @usage import { PALETTES, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
  *   In the app: nothing — the login pill renders the picker and the CSS follows.
  * @version-history
+ *   v1.4.1 — 2026-11-21 — esc() is the shared escape (_core/escape.js): it goes into title,
+ *     aria-label and data-* attributes, where the DOM form left quotes as they were.
  *   v1.4.0 — 2026-11-07 — The trigger is a painter's palette icon, its first blob the active accent (the
  *     red dot it replaces read as the flag of Japan). paletteControlHtml takes the pill's "Automatic"
  *     row and puts it first in the popover, now that light/dark is one button (theme.js v2.0.0).
@@ -39,6 +41,7 @@
  *   v1.0.0 — 2026-07-25 — Initial palette registry + apply/restore + swatch picker, born with
  *     aimeat-theme.css v2.
  */
+import { escapeHtml } from '../_core/escape.js';
 
 /** The one palette key on this platform (the mode key is 'aimeat-theme' in theme.js). */
 export var AIMEAT_PALETTE_KEY = 'aimeat-palette';
@@ -311,4 +314,6 @@ export function wirePaletteControl(container, clampPopover) {
 }
 
 /** Local escaper (palette.js must not import from theme.js — theme.js may import from here). */
-function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+/** The shared escape: this one goes into attributes too (title, aria-label, data-*), where the DOM
+ *  form left quotes as they were. */
+function esc(s) { return escapeHtml(s); }

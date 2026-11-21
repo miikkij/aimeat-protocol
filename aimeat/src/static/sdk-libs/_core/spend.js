@@ -14,10 +14,12 @@
  *   return once(keyOf(['ai', prompt]), run);          // one click = one call
  *   if (!await confirmSpend({ what: 'Summarise 200 rows' })) return;
  * @version-history
+ *   v1.0.1 — 2026-11-21 — esc() is the shared escape (_core/escape.js).
  *   v1.0.0 — 2026-07-31 — Initial: in-flight/settle dedupe + the spend-confirm dialog, so an app
  *     cannot fire the same paid call five times from five clicks.
  */
 import { namespace, attach } from './namespace.js';
+import { escapeHtml } from './escape.js';
 
 /** Milliseconds the confirm button stays disabled, so a double-click cannot reach it. */
 const ARM_MS = 400;
@@ -105,7 +107,7 @@ export function cancelledError(what) {
 
 // ── The confirm dialog ────────────────────────────────────────────────────────────────────────
 
-function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+function esc(s) { return escapeHtml(s); }
 
 function lang() {
   try {

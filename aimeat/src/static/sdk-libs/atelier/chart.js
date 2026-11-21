@@ -24,6 +24,8 @@
  *           { id: 'in', label: 'Income', kind: 'bar', values: [1200, 1400] },
  *           { id: 'cash', label: 'Cash', kind: 'line', values: [300, 900] } ] } });
  * @version-history
+ *   v0.70.0 — 2026-11-21 — A horizontal chart is as wide as a vertical one and takes 36 units of
+ *     height per category (at least 120); it drew into a fixed 300 × 560 box, very tall in a wide column.
  *   v0.55.0 — 2026-09-28 — The lines draw themselves when the chart comes into view, with the area
  *     and the end dot behind them, and the reading under the pointer (a guide, a marker per line
  *     and the tooltip) travels between labels on the look's spring (chart-motion.js).
@@ -46,6 +48,9 @@ import { drawWhenSeen, hoverRig } from './chart-motion.js';
 const W = 560;
 const H = 300;
 const PAD = { top: 16, right: 14, bottom: 34, left: 46 };
+/** A horizontal chart's height per category, and the least height it takes. */
+const H_ROW = 36;
+const H_ROWS_MIN = 120;
 
 /**
  * The chart.
@@ -123,11 +128,13 @@ export function chart(spec) {
     max = Math.ceil(max / step) * step;
 
     // One geometry, two orientations: `along` runs the label axis, `cross` the value axis.
-    const width = horizontal ? H : W;
-    const height = horizontal ? W : H;
+    // A horizontal chart keeps the vertical one's width and takes the height its rows need: it
+    // swapped the two into a 300 × 560 box, which a wide column scaled up to a very tall chart.
     const pad = horizontal
       ? { top: 14, right: 20, bottom: 16, left: 86 }
       : PAD;
+    const width = W;
+    const height = horizontal ? Math.max(H_ROWS_MIN, pad.top + pad.bottom + labels.length * H_ROW) : H;
     const innerAlong = (horizontal ? height - pad.top - pad.bottom : width - pad.left - pad.right);
     const innerCross = (horizontal ? width - pad.left - pad.right : height - pad.top - pad.bottom);
     const along = (i) => (horizontal ? pad.top : pad.left) + (innerAlong * i) / labels.length;

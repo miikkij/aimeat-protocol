@@ -17,7 +17,7 @@
  *     under a sample form, for the gallery states the Design Book wall shows.
  *   v0.38.0 — 2026-08-30 — Initial (the commercial side arrives in the kit).
  */
-import { i18n } from './i18n.js';
+import { i18n, t as kitWord } from './i18n.js';
 
 const STRINGS = {
   en: {
@@ -208,7 +208,7 @@ const STRINGS = {
  * @returns {string}
  */
 export function tc(key, vars) {
-  const hosted = i18n.t('commercial.' + key, vars);
+  const hosted = kitWord('commercial.' + key, vars);
   if (hosted !== 'commercial.' + key) return hosted;
   const lang = i18n.lang();
   const table = /** @type {Record<string, string>} */ (

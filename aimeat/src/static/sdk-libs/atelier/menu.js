@@ -25,6 +25,8 @@
  *   AIMEAT.atelier.contextMenu(row, { items: [...], onPick(id) {} });
  *   AIMEAT.atelier.tooltip(button, 'Copy link');
  * @version-history
+ *   v0.70.0 — 2026-11-21 — `onPick` runs only for an entry without its own `run`; a menu that gave
+ *     both ran the chosen action twice. `pickAlways: true` keeps the old behaviour.
  *   v0.59.0 — 2026-09-29 — A menu, a popover and a tooltip wear the look of what opened them
  *     (wearLook): they sit on the body, outside the frame that carries the look's tokens.
  *   v0.55.0 — 2026-09-28 — Initial (the ten motion parts).
@@ -117,8 +119,10 @@ function outside(nodes, close) {
 /**
  * The menu. With `anchor` it opens from that button (the button gets aria-haspopup and
  * aria-expanded and toggles it on click); with `open({ x, y })` it opens at a point.
+ * An entry with its own `run` runs that and nothing else; `onPick` hears the entries without one
+ * (`pickAlways: true` makes it hear every pick, as before 0.70.0).
  * @param {{ anchor?: string|Element, items: Array<MenuItem|'-'>, onPick?: (id: string, item: MenuItem) => void,
- *   align?: 'start'|'end', label?: string }} spec
+ *   align?: 'start'|'end', label?: string, pickAlways?: boolean }} spec
  * @returns {{ open: (at?: { x: number, y: number }, fromKeys?: boolean) => void, close: (focusBack?: boolean) => void,
  *   isOpen: () => boolean, set: (patch: { items?: Array<MenuItem|'-'> }) => void, destroy: () => void }}
  */
@@ -154,8 +158,11 @@ export function menu(spec) {
     const finish = function () {
       picking = false;
       close(true);
+      // An entry with its own `run` is handled by it; `onPick` is for the entries without one, so a
+      // menu that mixes both does not do the chosen thing twice. `pickAlways: true` is the old
+      // behaviour, where `onPick` also heard the entries that ran.
       if (item.run) item.run();
-      if (s.onPick) s.onPick(item.id, item);
+      if (s.onPick && (!item.run || s.pickAlways === true)) s.onPick(item.id, item);
     };
     if (!box || motionOff(box) || !mark || typeof mark.el.animate !== 'function') { finish(); return; }
     // THE BLINK: the highlight goes out and comes back once, the way a desktop menu confirms a
@@ -264,12 +271,12 @@ export function menu(spec) {
  * The context menu: the same menu, opened at the pointer by a right click or a long press
  * (the browser's contextmenu event covers both), and by Shift+F10 at the element's corner.
  * @param {string|Element} target
- * @param {{ items: Array<MenuItem|'-'>, onPick?: (id: string, item: MenuItem) => void, label?: string }} spec
+ * @param {{ items: Array<MenuItem|'-'>, onPick?: (id: string, item: MenuItem) => void, label?: string, pickAlways?: boolean }} spec
  * @returns {{ close: () => void, destroy: () => void }}
  */
 export function contextMenu(target, spec) {
   const node = /** @type {HTMLElement} */ (resolve(target));
-  const m = menu({ items: spec.items, onPick: spec.onPick, label: spec.label });
+  const m = menu({ items: spec.items, onPick: spec.onPick, label: spec.label, pickAlways: spec.pickAlways });
   const onCtx = function (e) { e.preventDefault(); m.close(false); m.open({ x: e.clientX, y: e.clientY }); };
   const onKey = function (e) {
     if (e.key === 'F10' && e.shiftKey) {

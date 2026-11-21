@@ -22,9 +22,15 @@
     };
   }
 
+  // src/static/sdk-libs/_core/escape.js
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
   // src/static/sdk-libs/_core/namespace.js
   function namespace() {
     if (!window.AIMEAT) window.AIMEAT = {};
+    if (typeof window.AIMEAT.escapeHtml !== "function") window.AIMEAT.escapeHtml = escapeHtml;
     return window.AIMEAT;
   }
   function attach(key, value) {
@@ -96,9 +102,7 @@
     return e;
   }
   function esc(s) {
-    const d = document.createElement("div");
-    d.textContent = s == null ? "" : String(s);
-    return d.innerHTML;
+    return escapeHtml(s);
   }
   function lang() {
     try {
@@ -993,13 +997,14 @@
     return typeof target === "string" ? document.querySelector(target) : target;
   }
   function buildLabel(record, recordUrl, opts = {}) {
-    const disclosure = record && record.disclosure;
-    if (!disclosure || !disclosure.required) return null;
+    const disclosure = record && record.disclosure || null;
+    const owed = !!(disclosure && disclosure.required);
+    if (!owed && !(opts.always === true && record && typeof record === "object")) return null;
     const icon = euIconFor(record);
     if (!icon) return null;
     ensureStyles2();
-    const variant = opts.variant === "block" ? "block" : "inline";
-    const strength = disclosure.strength === "full" ? "full" : "light";
+    const variant = owed && opts.variant === "block" ? "block" : "inline";
+    const strength = owed && disclosure.strength === "full" ? "full" : "light";
     const alt = t(icon.alt);
     const root = el("div", `ai-label ai-label--${variant} ai-label--${strength} ${opts.class || ""}`.trim());
     root.setAttribute("role", "group");
@@ -1201,6 +1206,20 @@
 
   // src/static/sdk-libs/ai/call.js
   var { authFetch: authFetch3 } = makeSession("aimeat-ai.js");
+  var capWarned = false;
+  function outputCap(opts) {
+    const cap = opts && opts.max_tokens;
+    if (cap === void 0 || cap === null) return void 0;
+    if (opts.allowCap === true) return (
+      /** @type {number} */
+      cap
+    );
+    if (!capWarned) {
+      capWarned = true;
+      console.warn("[aimeat-ai] max_tokens " + String(cap) + " was left out of the request: a cap cuts the answer without a sign. Say the length you want in the prompt and check `truncated` on the answer. Pass allowCap: true beside max_tokens to send the cap anyway.");
+    }
+    return void 0;
+  }
   function aiError(r, fallback) {
     const e = r && r.error;
     const err = (
@@ -1405,7 +1424,7 @@
       model: opts.model,
       temperature: opts.temperature,
       top_p: opts.top_p,
-      max_tokens: opts.max_tokens,
+      max_tokens: outputCap(opts),
       reasoning: opts.reasoning,
       role: typeof opts.role === "string" && opts.role ? opts.role : void 0
     };
@@ -1593,6 +1612,23 @@
       return f;
     }));
   }
+  function addUsage(a, b) {
+    if (!a || typeof a !== "object") return b;
+    if (!b || typeof b !== "object") return a;
+    const out = {};
+    for (const k of /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)])) {
+      const x = a[k];
+      const y = b[k];
+      if (typeof x === "number" || typeof y === "number") {
+        out[k] = (typeof x === "number" ? x : 0) + (typeof y === "number" ? y : 0);
+      } else if (x && y && typeof x === "object" && typeof y === "object" && !Array.isArray(x) && !Array.isArray(y)) {
+        out[k] = addUsage(x, y);
+      } else {
+        out[k] = y === void 0 ? x : y;
+      }
+    }
+    return out;
+  }
   function requiredKeysOf(schema) {
     if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
     if (schema.properties && typeof schema.properties === "object") {
@@ -1714,7 +1750,8 @@
         modelRole: opts.modelRole,
         temperature: opts.temperature,
         top_p: opts.top_p,
-        max_tokens: opts.max_tokens,
+        // Sent only with allowCap: true (call.js outputCap): a cap alone cut answers without a sign.
+        max_tokens: outputCap(opts),
         app_id: opts.app_id,
         // Pictures for a vision request: data: or https: URLs, at most 8 (the route refuses more).
         // POST /v1/ai/complete has read this since 2026-06-24 and this body never carried it, so a
@@ -1771,7 +1808,7 @@
         systemPrompt: (opts.systemPrompt || "") + suffix
       });
       try {
-        return read(first);
+        return { ...read(first), attempts: 1 };
       } catch {
         const insist = want.length ? "\nIMPORTANT: your previous attempt did not match the requested shape. Output ONLY the JSON object, starting with { and ending with }, with exactly these top-level keys: " + want.join(", ") + "." : "\nIMPORTANT: your previous attempt was not valid JSON. Output ONLY the JSON object, starting with { and ending with }. No other text.";
         const retry = await ai.complete({
@@ -1779,17 +1816,20 @@
           systemPrompt: (opts.systemPrompt || "") + suffix + insist,
           temperature: typeof opts.temperature === "number" ? Math.max(0, opts.temperature - 0.3) : 0.2
         });
+        const both = { usage: addUsage(first.usage, retry.usage), first_usage: first.usage, attempts: 2 };
         try {
-          return read(retry);
+          return { ...read(retry), ...both };
         } catch (e) {
           const mismatch = !!e && /** @type {any} */
           e.code === "JSON_SCHEMA_MISMATCH";
           const err = (
-            /** @type {Error & { code?: string }} */
+            /** @type {Error & { code?: string, usage?: any, attempts?: number }} */
             new Error(mismatch ? "AI returned JSON without the requested keys twice (" + /** @type {any} */
             e.message + "). Original response: " + retry.content.slice(0, 200) : "AI returned invalid JSON twice. Original response: " + retry.content.slice(0, 200))
           );
           err.code = mismatch ? "JSON_SCHEMA_MISMATCH" : "JSON_PARSE_FAILED";
+          err.usage = both.usage;
+          err.attempts = 2;
           throw err;
         }
       }

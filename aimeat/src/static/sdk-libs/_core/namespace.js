@@ -8,8 +8,11 @@
  * @structure namespace() · attach(key, value)
  * @usage import { attach } from '../_core/namespace.js';  attach('speech', speech);
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The namespace carries AIMEAT.escapeHtml (_core/escape.js), the escape for
+ *     text and quoted attributes, so an app does not write one that leaves quotes as they are.
  *   v1.0.0 — 2026-07-19 — Initial: extracted from the per-lib inline global attach (SDK-libs migration Phase 0).
  */
+import { escapeHtml } from './escape.js';
 
 /**
  * The global `window.AIMEAT` object, created on first use.
@@ -17,6 +20,9 @@
  */
 export function namespace() {
   if (!window.AIMEAT) window.AIMEAT = {};
+  // The one escape for markup an app builds as a string (_core/escape.js), on whichever library
+  // the page loads first. An app's own `escapeHtml` set before is left as it is.
+  if (typeof window.AIMEAT.escapeHtml !== 'function') window.AIMEAT.escapeHtml = escapeHtml;
   return window.AIMEAT;
 }
 
