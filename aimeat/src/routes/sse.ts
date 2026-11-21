@@ -15,7 +15,8 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
- *   2026-11-19 -- A visitor's stream (no app) carries the public domains, PUBLIC_STREAM_DOMAINS: the
+ *   2026-11-21 -- The stream's cleanup listens on the response's close, not the request's.
+ *   2026-11-19 --A visitor's stream (no app) carries the public domains, PUBLIC_STREAM_DOMAINS: the
  *     front page's counters (`node-totals`), which it read on a 60-second timer before. A stream for
  *     one app still carries no domain frame (feature audit 2026-11-19, 4.6).
  *   2026-11-10 -- A stream reopened with `since` gets one `catchup` frame with the domains that changed
@@ -496,7 +497,9 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
         if (left > 0) visitorStreamsByIp.set(visitorIp, left); else visitorStreamsByIp.delete(visitorIp);
       }
     };
-    req.on('close', cleanup);
+    // The response's close: it fires when the client leaves and when the stream ends itself, while
+    // the request's close on Express 5 belongs to its body (eslint.config.js refuses req.on('close')).
+    res.on('close', cleanup);
   });
 
   return router;

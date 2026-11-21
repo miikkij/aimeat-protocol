@@ -11,6 +11,8 @@
  *   provider (chargePacing).
  * @usage cd aimeat && pnpm exec tsx test/e2e-pacing.ts
  * @version-history
+ *   2026-11-21 — The node is waited for with test/helpers/wait-for-server.ts, which keeps both output
+ *     streams and fails with the node's last lines when it does not boot; the drain discarded them.
  *   2026-11-15 — Audit M220: the runaway-loop test asserts the money budget fell by calls x 20000.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-11 — Pacing is charged through chargePacing (decision-morseli-on-tahdistus-ei-
@@ -25,6 +27,7 @@ import { spawn } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 const PORT = process.env.E2E_PACING_PORT ?? '28488';
 const BASE = `http://localhost:${PORT}`;
@@ -70,11 +73,10 @@ const server = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], {
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
-server.stdout?.on('data', () => {}); server.stderr?.on('data', () => {});
-for (let i = 0; i < 40; i++) {
-  try { const r = await fetch(`${BASE}/v1/spec`); if (r.ok) break; } catch { /* not up yet */ }
-  await new Promise(r => setTimeout(r, 1000));
-}
+// The node logs a refused boot to STDOUT (Winston's console transport), so both streams are kept and a
+// node that never answers fails here with its own last lines, not as forty seconds of silence followed
+// by a run of `fetch failed` (docs/pitfalls.md §63, retired with this).
+await waitForServer(server, BASE, { label: 'the pacing node' });
 
 console.log('\n=== AIMEAT PACING E2E (morsels bound the rate, whatever pays) ===\n');
 

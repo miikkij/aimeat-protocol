@@ -671,12 +671,12 @@
       "note": "Its verification runs against the shared stub harness; its contract is node:aimeat-subagent-brief, which the lead pastes into the brief."
     },
     "agent:note-writer": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "docs/pitfalls.md",
         ".claude/skills/aimeat-organism-records/SKILL.md"
       ],
-      "digest": "sha256:ddd737a9d56a07cfb6512751",
+      "digest": "sha256:65e47d932291cf1cd9c648d1",
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
@@ -1070,7 +1070,7 @@
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
     "agent:note-writer": {
-      "docs/pitfalls.md": "8f3c854126932c20",
+      "docs/pitfalls.md": "19ef8dbdf683ba07",
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {

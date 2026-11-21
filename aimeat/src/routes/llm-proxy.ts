@@ -27,6 +27,7 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.14.2 -- 2026-11-21 -- A caller that leaves aborts the provider call: the abort listens on the response's close.
  *   v1.14.1 -- 2026-11-04 -- The payer is the request's caller's (`callerOf(req).payer`), the answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.14.0 -- 2026-11-01 -- A call with tools says so (`requires.tools`), so its OpenRouter region must offer the model with tool calling.
  *   v1.13.0 -- 2026-10-27 -- A stream the provider answered and then broke off is settled from what came
@@ -256,7 +257,9 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         req.setTimeout(TURN_TIMEOUT_MS);
         res.setTimeout(TURN_TIMEOUT_MS);
         const controller = new AbortController();
-        req.on('close', () => controller.abort());
+        // The response's close, not the request's: on Express 5 the request emits `close` once its
+        // body is read, which was before the awaits above, so a listener on it never fired.
+        res.on('close', () => { if (!res.writableEnded) controller.abort(); });
 
         // The owner's candidates in order, moving on only BEFORE the first byte: a provider that
         // refused or did not answer (services/ai/route-run.ts). Once a stream has started, the

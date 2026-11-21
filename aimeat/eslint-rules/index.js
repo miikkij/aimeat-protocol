@@ -16,12 +16,14 @@
  *   - noErrorObjectLogField: A caught error is logged through errorFields(err), not as an object field
  *   - noRawLocaleFormat: Dates, times and numbers go through the shared formatter, which reads the
  *     reader's own region and clock rather than the page's language
+ *   - noFetchHostHeader: A test sends a chosen Host through node:http; fetch drops it without a word
  *
  * @usage
  *   import aimeatPlugin from './eslint-rules/index.js';
  *   // Then add to ESLint flat config plugins
  *
  * @version-history
+ *   2026-11-21 — Added no-fetch-host-header (docs/pitfalls.md §19, first bullet).
  *   2026-10-16 — Added no-error-object-log-field (QA audit E1-04, F5-07, S5-07).
  *   v1.0.0 — 2026-03-13 — Initial implementation
  *   v1.1.0 — 2026-08-07 — Added no-direct-auth (session single-source cleanup)
@@ -41,9 +43,11 @@ import { noStorageInMcp } from './no-storage-in-mcp.js';
 import { noExpressInService } from './no-express-in-service.js';
 import { noRawLocaleFormat } from './no-raw-locale-format.js';
 import { noErrorObjectLogField } from './no-error-object-log-field.js';
+import { noFetchHostHeader } from './no-fetch-host-header.js';
 
 export default {
   rules: {
+    'no-fetch-host-header': noFetchHostHeader,
     'no-raw-locale-format': noRawLocaleFormat,
     'no-error-object-log-field': noErrorObjectLogField,
     'file-header': fileHeader,

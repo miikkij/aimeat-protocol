@@ -39,6 +39,41 @@
  *   written, writes the placeholder only for a key the file does not hold, and drops entries no
  *   longer measured.
  *
+ *   WHAT THE MEASUREMENT CANNOT SEE (moved here from docs/pitfalls.md §90 on 2026-11-21). A door
+ *   nobody touched that loses its twin, or becomes a finding, is usually one of these:
+ *   - A path the query cannot read pairs with no route. A tool is paired with a route by the REST
+ *     path it calls; literal text is kept and a computed part becomes `*`, so `/v1/mcp-servers/${id}/call`
+ *     matches `/v1/mcp-servers/:id/call`. A path that is a ternary, or that a helper builds
+ *     (`path(server, '/call')`), produces no fact: on 2026-09-16 a ternary cost both MCP attach doors
+ *     their twin, and one helper had hidden seven tools on two surfaces. `aimeat_discover` choosing its
+ *     path into a variable first, and a read whose path a non-calling helper built, did the same.
+ *   - A tool NAME the query cannot read pairs nothing. A dispatch definition that takes its name from
+ *     a spread of the catalog entry (`{ ...def('aimeat_ai_policy_set'), handler }`) is a tool with no
+ *     name: ten AI-model tools paired nothing until 2026-10-05, and the spread hid two scope pairs
+ *     from tool-route-scopes as well.
+ *   - A validator two doors share makes them look like twins. A node MCP tool pairs with a route
+ *     through a function both call; a lookup (`get`, `list`, `find`, `read`, `require`…) does not
+ *     count, a validator does. The operator's policy tool and the attach route both called
+ *     normalizeMcpPrice, so the policy tool was read as the attach door's twin. About twenty routes
+ *     pair through a validator, some genuinely (validateMemoryWrite), so that rule is not changed lightly.
+ *   - A new `*Record` interface can make an untouched route a finding. The field vocabulary is every
+ *     property of every interface in src/ whose name ends in `Record`, less a short list and names
+ *     under five letters (`recordFields` in inventory/field-reach.ts). CatalogRecord.models made the
+ *     calibrator's unrelated `models` body a `no-twin` (edd39e8b3, 2026-09-28); a stored record with
+ *     snake_case `agent`, `organism_id`, `workspace_id` made thirty, and camelCase stored fields
+ *     removed all thirty (2026-10-11). Rename the field, or exempt the DOOR with its reason.
+ *   - A body handed to a service as one object hides every field the service reads: passing
+ *     `req.validated` made each one `unrouted`. Read the fields one by one from `req.body` in the
+ *     handler (`const b = req.body as z.infer<typeof Body>`) (routes/build-with-you.ts, 2026-11-01).
+ *   - Moving a shared implementation moves the boundary: after src/tool-dispatch/ was extracted, both
+ *     `surfaceOfFile` and `clientReach` had to follow it, or the cortex and provenance twins were lost.
+ *   So: write a tool's REST path as a literal or a template and branch on the whole call; write a
+ *   dispatch definition's `name` as a literal beside any spread; put a check every door needs inside
+ *   the service they share. An exemption that says "the twin exists and the measurement cannot see
+ *   it" is a claim this gate can check: delete it and run the gate (four such on 2026-09-16 were one
+ *   helper). Tested and wrong, so nobody need repeat it: removing `?? {}` from `(req.body ?? {}) as T`
+ *   changed nothing.
+ *
  *   WHEN CODEQL IS NOT HERE. CI measures in its own step before check:fast and fails this gate if it
  *   cannot. On a workstation without the CLI the gate says NOT MEASURED, in those words, and under
  *   --strict it refuses: `pnpm codeql:install` installs the pinned bundle once per machine (or
@@ -51,6 +86,8 @@
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts          # report only, never fails
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts --seed   # rewrite the exemption file
  * @version-history
+ *   v2.3.2 — 2026-11-21 — The header says what the measurement cannot see, and a new finding's
+ *     message points there (moved from docs/pitfalls.md §90).
  *   v2.3.1 — 2026-11-14 — A route that admits an agent on an operator word or account:security is
  *     reached too; only a route that refuses every agent keeps a "ROUTE REFUSES AN AGENT" entry.
  *   v2.3.0 — 2026-11-14 — A finding on a route capability is reached through aimeat_invoke and needs
@@ -237,6 +274,11 @@ function main(): void {
         console.log('  passes it: the call answers ok and the field is gone. Declare it on the twin and forward');
         console.log('  it; give a door or a writing route without a twin its tool; or add an entry to');
         console.log(`  ${relative(AIMEAT, EXEMPTIONS)} saying why only a person may reach it.`);
+        console.log('');
+        console.log('  A finding on a door nobody touched usually means the measurement lost sight of something');
+        console.log('  (this file\'s header, WHAT THE MEASUREMENT CANNOT SEE): a new *Record type whose field name');
+        console.log('  a request body also uses, a tool path built by a ternary or a helper, a tool name taken from');
+        console.log('  a spread, or a body handed to a service as one object. Check your change for those first.');
         console.log('');
     }
     if (stale.length) {

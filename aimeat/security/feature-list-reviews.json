@@ -168,7 +168,7 @@
       "digest": "sha256:0c2834d1260b017ab165cd79"
     },
     "9. AI on the node": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/tool-catalog/definitions/living.ts",
         "aimeat/src/tool-catalog/definitions/calibrator.ts",
@@ -194,7 +194,7 @@
         "aimeat/src/tool-catalog/definitions/ai-models.ts",
         "aimeat/src/tool-catalog/definitions/decide.ts"
       ],
-      "digest": "sha256:7b2689a5523dd6ca58cb2478"
+      "digest": "sha256:9a0cec2bfa88c07a7a8d0c41"
     },
     "10. Apps": {
       "reviewedOn": "2026-11-20",
@@ -251,7 +251,7 @@
       "digest": "sha256:bd9e709b646c586ed1d5316c"
     },
     "13. Notifications, boards and live updates": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/tool-catalog/definitions/boards.ts",
         "aimeat/src/routes/sse.ts",
@@ -270,7 +270,7 @@
         "aimeat/src/services/moderation",
         "aimeat/src/tool-catalog/definitions/moderation.ts"
       ],
-      "digest": "sha256:562cb5bf0c26b8e876b09590"
+      "digest": "sha256:eebb901de32e4d442ec6c868"
     },
     "14. Economy, marketplace and payments": {
       "reviewedOn": "2026-11-21",
@@ -386,7 +386,7 @@
       "digest": "sha256:ef076a8b36558cd4613ded92"
     },
     "21. Standards the node speaks": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/security/protocol-versions.json",
         "aimeat/src/routes/wellknown.ts",
@@ -397,7 +397,7 @@
         "aimeat/src/mcp/oauth-metadata.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:c6856343b46b953c21bceb07"
+      "digest": "sha256:8d964b7e88361dba3229efcb"
     },
     "22. Companion projects": {
       "reviewedOn": "2026-11-19",
@@ -744,7 +744,7 @@
       "aimeat/src/services/ai/transcription.ts": "994b10f23a26e665",
       "aimeat/src/services/ai/voice.ts": "87d6b0f6a2227a69",
       "aimeat/src/routes/ai.ts": "cd09968c390a97cf",
-      "aimeat/src/routes/llm-proxy.ts": "925897061d31050d",
+      "aimeat/src/routes/llm-proxy.ts": "027d67cf9f0f75cc",
       "aimeat/src/routes/ai-providers.ts": "223c9be9d18fb28c",
       "aimeat/src/routes/ai-decide.ts": "ff8297466c4c9c73",
       "aimeat/src/routes/ai-decide-rules.ts": "98a8f991a7dd5a65",
@@ -826,8 +826,8 @@
     },
     "13. Notifications, boards and live updates": {
       "aimeat/src/tool-catalog/definitions/boards.ts": "6421b7424f17daa1",
-      "aimeat/src/routes/sse.ts": "05a2b71d150fa988",
-      "aimeat/src/routes/public-events.ts": "9df6e655b36751a9",
+      "aimeat/src/routes/sse.ts": "0f01fd2ebf196f02",
+      "aimeat/src/routes/public-events.ts": "bd514bff5b83336d",
       "aimeat/src/routes/boards.ts": "19c7b4220cbe09cb",
       "aimeat/src/services/boards/board-list.ts": "2a0f8abc1c7df8a5",
       "aimeat/src/services/boards/board-members.ts": "2fbea79d4830a922",
@@ -994,7 +994,7 @@
       "aimeat/security/protocol-versions.json": "73305755a3ef4fd2",
       "aimeat/src/routes/wellknown.ts": "ce51fcd2804c4878",
       "aimeat/src/routes/a2a.ts": "76914839c2692535",
-      "aimeat/src/routes/agui.ts": "d2508b30001dfcc4",
+      "aimeat/src/routes/agui.ts": "2331f91b0ce3eb0b",
       "aimeat/src/routes/ard-manifest.ts": "36edb39d7da3d3fc",
       "aimeat/src/services/oasf-projection.ts": "6fc5ca010c15aac5",
       "aimeat/src/mcp/oauth-metadata.ts": "8dd1400c3c8d340a",

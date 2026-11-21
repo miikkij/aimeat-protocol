@@ -87,6 +87,12 @@ export default defineConfig({
                 test: {
                     name: 'unit',
                     environment: 'node',
+                    // vitest's default is 5 s. `pnpm gate` runs the unit files in parallel on a machine
+                    // where other sessions run their own suites, and tests that take a second alone
+                    // crossed 5 s there, a different set each run (2026-11-12: four files, every one
+                    // green alone). 20 s keeps a hung test a failure and takes load out of the answer.
+                    // A test whose fixture size is the point still sets its own number at the it().
+                    testTimeout: 20_000,
                     include: ['test/unit/**/*.test.ts', 'test/integration/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
                     exclude: MUTATES_THE_TREE,
                     // The connector's record of trusted commands lives in the user's home
@@ -99,6 +105,8 @@ export default defineConfig({
                 test: {
                     name: 'tree-mutating',
                     environment: 'node',
+                    // The same limit as the unit project: projects do not inherit the root's test options.
+                    testTimeout: 20_000,
                     include: MUTATES_THE_TREE,
                     // One at a time, and never beside a reader of the same files.
                     fileParallelism: false,

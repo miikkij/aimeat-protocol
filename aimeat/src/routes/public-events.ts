@@ -13,6 +13,7 @@
  * @structure publicEventsRouter(config, storage) -> Router
  * @usage app.use(publicEventsRouter(config, storage)); client: EventSource('/v1/public/events')
  * @version-history
+ *   v1.1.1 — 2026-11-21 — The cleanup listens on the response's close, so a drain also lowers the stream count.
  *   v1.1.0 — 2026-11-04 — A stop ends the stream at once (services/node-lifecycle.ts endOnDrain), so the
  *     server closes and the process exits 0 (codebase analysis 2026-11-03, HA stage 1).
  *   v1.0.0 — 2026-06-16 — Initial: public landing activity feed + SSE.
@@ -103,7 +104,9 @@ export function publicEventsRouter(config: AimeatConfig, storage: Storage): Rout
     };
     onPublicActivityEvent(handler);
 
-    req.on('close', () => {
+    // The response's close: it fires when the client leaves and when a stop ends the stream, so the
+    // open-stream count also falls on a drain. The request's close on Express 5 belongs to its body.
+    res.on('close', () => {
       clearInterval(keepalive);
       offPublicActivityEvent(handler);
       openConnections = Math.max(0, openConnections - 1);

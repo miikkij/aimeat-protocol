@@ -25,6 +25,19 @@
  *   below the suitePort blocks (30000-32699, test/helpers/free-port.ts) and below the ranges the
  *   systems hand out by themselves (Linux from 32768, Windows from 49152). Nothing else binds there.
  *
+ *   WHY NOT FROM 32768, AND WHY NOT A PORT ASKED OF THE SYSTEM (moved here from docs/pitfalls.md §105
+ *   on 2026-11-21). Linux gives every outgoing TCP connection a local port from 32768 to 60999, a
+ *   Postgres pool socket included, and picks them from a start derived from the address, so the same
+ *   numbers come up night after night: on the Postgres sweeps of 2026-09-30 and 2026-10-02 a suite's
+ *   own node on 41104 got EADDRINUSE, on that backend only. Asking the system for a free port instead
+ *   (listen(0), read it, close, start the node on it) lost a race on 2026-10-08: the node boots for
+ *   seconds after the probe closes, another suite's stub got the same number from its own listen(0),
+ *   and e2e-capabilities talked to a stub that answers {"ok":true} to everything. A node a suite
+ *   starts listens below 32768 (suitePort() in test/helpers/free-port.ts, or a fixed port in the
+ *   band); this gate cannot see a port asked of the system at run time, so that race stays the
+ *   author's to avoid. The tell: EADDRINUSE on a number no file names, on one backend's sweep only,
+ *   or a spawned node's assertions answered by something that is not a node.
+ *
  *   WHAT COUNTS. A port number in code, in test/*.ts. Comments and doc blocks are skipped, because
  *   they name ports on purpose. Two findings:
  *   - `outside-band`: a number in 40000-41999 in code, other than the runner's default base port
@@ -39,6 +52,8 @@
  *   v2.0.0 — 2026-10-27 — The band moves to 28000-29999 and a fixed port in 40000-41999 is refused:
  *     every suite's ports moved down 12000, out of the range the claims board hands out.
  *   v1.0.0 — 2026-09-09 — Initial, with the nine clashes it found separated onto their own ports.
+ *   2026-11-21 — The header carries why a suite's port sits below 32768 and is not asked of the
+ *     system (docs/pitfalls.md §105, deleted). No code change.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -5,28 +5,28 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  hono: '>=4.13.7'
-  '@hono/node-server': '>=2.0.10'
-  express-rate-limit: '>=8.3.0'
-  ip-address@>=10.0.0 <10.7.1: '>=10.7.1'
+  hono: ^4.13.7
+  '@hono/node-server': ^2.0.10
+  express-rate-limit: ^8.3.0
+  ip-address@>=10.0.0 <10.7.1: ^10.7.1
   fast-uri@>=3.0.0 <3.1.7: ^3.1.7
-  body-parser@>=2.0.0 <2.3.0: '>=2.3.0'
+  body-parser@>=2.0.0 <2.3.0: ^2.3.0
   undici@>=6.0.0 <6.28.1: ^6.28.1
-  postcss@>=8.0.0 <8.5.23: '>=8.5.23'
-  nanoid@>=3.0.0 <3.3.18: '>=3.3.18'
-  vite@>=7.0.0 <7.3.5: '>=7.3.5'
-  uuid@>=10.0.0 <11.1.1: '>=11.1.1'
+  postcss@>=8.0.0 <8.5.23: ^8.5.23
+  nanoid@>=3.0.0 <3.3.18: ^3.3.18
+  vite@>=7.0.0 <7.3.5: ^7.3.5 || ^8.0.0
+  uuid@>=10.0.0 <11.1.1: ^11.1.1
   brace-expansion@<1.1.21: ^1.1.21
   brace-expansion@>=2.0.0 <2.1.7: ^2.1.7
-  brace-expansion@>=4.0.0 <5.0.12: '>=5.0.12'
+  brace-expansion@>=4.0.0 <5.0.12: ^5.0.12
   js-yaml@>=4.0.0 <4.3.2: ^4.3.2
   minimatch@>=5.0.0 <5.1.8: 5.1.8
   minimatch@>=10.0.0 <11.0.1: ^11.0.1
   readdir-glob@3>minimatch: ^11.0.1
   path-to-regexp@>=8.0.0 <8.4.0: 8.4.0
   lodash@>=4.0.0 <4.18.0: 4.18.0
-  esbuild@>=0.17.0 <0.28.1: '>=0.28.1'
-  qs@>=6.11.1 <6.15.2: '>=6.15.2'
+  esbuild@>=0.17.0 <0.28.1: ^0.28.1
+  qs@>=6.11.1 <6.15.2: ^6.15.2
   zod@>=4.0.0 <4.6.6: ^4.6.7
   glob@>=9.0.0 <14.0.2: ^14.0.2
   cbor-x>cbor-extract: '-'
@@ -747,7 +747,7 @@ packages:
     resolution: {integrity: sha512-p/KH9MnfNcsm3sR6x4lNgm5j+QN4Et8srKredl9DZfXiyZ1UQ3aQ2YVpFLbqktYN5JI+DB+VZFKM2PqE5hLKjQ==}
     engines: {node: '>=20'}
     peerDependencies:
-      hono: '>=4.13.7'
+      hono: ^4.13.7
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1386,7 +1386,7 @@ packages:
     resolution: {integrity: sha512-5umB9/jlWcqVS6fsrFmv5Gdnpu6wAUio/lEOwAmvB7v+lFo/IW2B9FhAD0p19GCULTgMzLCdUmuCDCnAzWgppQ==}
     peerDependencies:
       msw: ^2.4.9 || ^3.0.0
-      vite: '>=7.3.5'
+      vite: ^7.3.5 || ^8.0.0
     peerDependenciesMeta:
       msw:
         optional: true
@@ -3543,7 +3543,7 @@ packages:
     peerDependencies:
       '@types/node': ^20.19.0 || >=22.12.0
       '@vitejs/devtools': ^0.7.1 || ^0.8.0
-      esbuild: '>=0.28.1'
+      esbuild: ^0.28.1
       jiti: '>=1.21.0'
       less: ^4.0.0
       sass: ^1.70.0
@@ -3595,7 +3595,7 @@ packages:
       '@vitest/ui': 5.1.0
       happy-dom: '*'
       jsdom: '*'
-      vite: '>=7.3.5'
+      vite: ^7.3.5 || ^8.0.0
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true

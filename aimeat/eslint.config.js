@@ -9,6 +9,8 @@
  *   pnpm lint
  *
  * @version-history
+ *   2026-11-21 — src/ refuses req.on('close') (Express 5 fires it when the body is read); test/
+ *     refuses a Host header in a fetch (aimeat/no-fetch-host-header).
  *   2026-10-16 — aimeat/no-error-object-log-field on src/ (QA audit E1-04, F5-07, S5-07).
  *   v1.0.0 — 2026-03-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-03-13 — Added custom aimeat plugin (file-header, max-file-lines)
@@ -129,6 +131,13 @@ export default tseslint.config(
       'no-restricted-syntax': ['error', {
         selector: "Property[key.name='resourceLimits']",
         message: 'A worker that reaches resourceLimits can abort the whole node. Use ContainedWorker (src/services/isolation/contained-worker.ts), which runs the worker in a child process.',
+      }, {
+        // On Express 5 a request emits `close` once its body has been read, which is usually before the
+        // handler's first await returns, so a listener on it never hears the client leave. A streamed
+        // model answer kept running to nobody this way (routes/chat.ts, 2026-09-08; agui.ts and
+        // llm-proxy.ts until 2026-11-21). The response's close is the event that means the connection went.
+        selector: "CallExpression[callee.type='MemberExpression'][callee.object.name=/^req(uest)?$/][callee.property.name=/^(on|once|addListener|prependListener|prependOnceListener)$/][arguments.0.value=/^(close|aborted)$/]",
+        message: "On Express 5 the request's `close` fires when its body has been read, often before this listener exists, so it never hears the client leave. Listen on the response: res.on('close', () => { if (!res.writableEnded) controller.abort(); }), registered before the first await when the work before it can take time.",
       }],
     },
   },
@@ -223,6 +232,10 @@ export default tseslint.config(
       // to assert the setup's own result — `assert(token, 'login returned a token')` — because a
       // silently-undefined token today surfaces as a cascade of confusing failures later.
       'vitest/expect-expect': ['warn', { additionalTestBlockFunctions: ['test'] }],
+
+      // undici drops a Host header without a word, so a fetch that sets one tests the default host.
+      // e2e-companies did for months (docs/pitfalls.md §19). An error from the start: no suite does it.
+      'aimeat/no-fetch-host-header': 'error',
 
       // A test whose assertion accepts two different statuses cannot tell the two apart, so the
       // one it was written for is no longer proven. 373 sites measured on 2026-08-15; warn while

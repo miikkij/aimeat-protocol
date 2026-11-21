@@ -39,6 +39,8 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   2026-11-21 -- 2b2: a caller that leaves a streamed proxy answer cancels the provider call, and a
+ *     stream read to the end is not cancelled (the abort listens on the response's close now).
  *   2026-11-15 -- Audit M095: 7d's plan also names the catalogued delegate (agent 'other', offer 'x'),
  *     which must be kept while the ungrounded 'ghost' is dropped.
  *   2026-11-15 -- 1b also refuses the model list, and 1b2 refuses a chat call with no messages: the two
@@ -441,6 +443,35 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
             'the node asked for usage in the stream, which is how it knows what the turn cost');
         const after = (await json('/v1/ai/usage', { headers: auth(a.token) })).body.data.spent_today_usd;
         assert(after > before, `the streamed turn was billed: $${before} → $${after}`);
+    });
+
+    // The abort listened on the REQUEST's close after two awaits. On Express 5 that event fires once
+    // the body is read, before the listener existed, so a caller that left never cancelled the
+    // provider call and the model kept answering to nobody (docs/pitfalls.md §61, retired with this).
+    await test('2b2. A caller that leaves a streamed completion mid-answer cancels the provider call; one read to the end is not cancelled', async () => {
+        const frame = (content: string) => `data: ${JSON.stringify({ id: 'chatcmpl-leave', object: 'chat.completion.chunk', created: 1, model: MODEL, choices: [{ index: 0, delta: { content }, finish_reason: null }] })}\n\n`;
+        provider.queue('chat', { kind: 'sse-partial', head: frame('Half an '), tail: `${frame('answer.')}data: [DONE]\n\n` }, carries('MARK-PROXY-LEAVE'));
+        const leaving = new AbortController();
+        try {
+            const res = await fetch(`${BASE}/v1/llm/chat/completions`, {
+                method: 'POST', signal: leaving.signal,
+                headers: { 'Content-Type': 'application/json', ...auth(a.token) },
+                body: JSON.stringify({ stream: true, messages: [{ role: 'user', content: 'MARK-PROXY-LEAVE' }] }),
+            });
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            const first = await res.body!.getReader().read();
+            assert(!first.done && Buffer.from(first.value!).toString('utf8').includes('Half an '), 'the first frame arrived before the caller left');
+            // An abort destroys the socket, which is what a closed tab does.
+            leaving.abort();
+            const sent = () => provider.requestsFor('chat').filter(carries('MARK-PROXY-LEAVE')).at(-1);
+            for (let i = 0; i < 50 && !sent()?.aborted; i++) await sleep(100);
+            assert(sent()?.aborted === true, 'the provider call was cancelled within 5 s of the caller leaving');
+        } finally {
+            provider.releaseHeld();
+        }
+        // The edge: 2b's stream was read to the end, and its close after the last byte cancels nothing.
+        const whole = provider.requestsFor('chat').filter(carries('MARK-PROXY-STREAM')).at(-1);
+        assert(!!whole && whole.aborted !== true, `a stream read to the end was not cancelled: ${JSON.stringify(whole?.aborted)}`);
     });
 
     await test('2c. A provider 429 comes back as the node\'s own named reason, not as a 500', async () => {

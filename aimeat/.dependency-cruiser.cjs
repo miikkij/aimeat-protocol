@@ -23,6 +23,8 @@
  *   cd aimeat && pnpm deps:graph          # the same graph as an SVG, to look at
  *   cd aimeat && pnpm deps:baseline:shrink   # remove the baseline entries a fix made stale
  * @version-history
+ *   v1.3.1 — 2026-11-21 — no-circular's comment carries the fix for a new storage method file's
+ *     cycle (`this: HasDb`), which docs/pitfalls.md §89 held until then.
  *   v1.3.0 — 2026-11-04 — routes-do-not-import-the-mcp-server, with no baseline entry: the 23 routes
  *     that imported mcp/index.ts for the resource events import services/resource-events.ts
  *     (codebase analysis 2026-11-03, item D-b).
@@ -58,7 +60,15 @@ module.exports = {
                 'A cycle means neither module can be understood, tested or moved without the other. '
                 + 'Nothing in this repo checked for one before 2026-09-04. This rule takes the cycles '
                 + 'whose every edge exists at run time: those are the ones that load in an order, so a '
-                + 'top-level call in one of their files can read a const of another before it is set.',
+                + 'top-level call in one of their files can read a const of another before it is set. '
+                + 'A NEW storage provider method file that writes `import type { SqliteStorage } from '
+                + "'../index.js'` (or PostgresKyselyStorage) makes index.ts -> methods/x.ts -> index.ts; "
+                + 'the older method files do the same and sit in the baseline, a new one is refused. Do '
+                + 'not re-seed the baseline to admit it (that forgives every entry at once and is a '
+                + 'decision to ask about). These methods only touch this.db, so say so: '
+                + '`interface HasDb { db: Database.Database }` on SQLite, `interface HasDb { db: Kysely<DB> }` '
+                + 'on Postgres, and `this: HasDb` on each method. On Postgres `db` is a getter that returns '
+                + 'the open transaction, so the ambient transaction stays intact.',
             severity: 'error',
             from: { path: '^src' },
             to: { circular: true, viaOnly: { dependencyTypesNot: ['type-only'] } },

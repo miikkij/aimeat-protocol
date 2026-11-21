@@ -6,11 +6,14 @@
  * @usage
  *   node --env-file=.env.test.sqlite --import tsx test/run-playwright-ci.ts
  * @version-history
+ *   v1.0.1 — 2026-11-21 — The server is waited for with helpers/wait-for-server.ts, which keeps both
+ *     output streams; the drain discarded the reason a server did not start.
  *   v1.0.0 — 2026-03-17 — Initial Playwright CI runner (mirrors run-e2e-ci.ts server lifecycle)
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 const PORT = process.env.AIMEAT_PORT ?? '40251';
 // External mode must be opted into explicitly (see run-e2e-ci.ts) so a stray
@@ -52,21 +55,8 @@ async function startServer(): Promise<ChildProcess> {
         cwd: process.cwd(),
     });
 
-    child.stdout?.on('data', () => { }); // drain
-    child.stderr?.on('data', () => { }); // drain
-
-    // Wait for server ready
-    const maxWait = 15_000;
-    const start = Date.now();
-    while (Date.now() - start < maxWait) {
-        try {
-            const res = await fetch(`${BASE_URL}/v1/spec`);
-            if (res.ok) return child;
-        } catch { }
-        await new Promise(r => setTimeout(r, 300));
-    }
-    child.kill('SIGTERM');
-    throw new Error(`Server failed to start within ${maxWait}ms`);
+    // Both output streams are kept, and a server that never answers fails with its own last lines.
+    return waitForServer(child, BASE_URL, { label: 'the Playwright server', budgetMs: 15_000 });
 }
 
 function killServer(child: ChildProcess): void {

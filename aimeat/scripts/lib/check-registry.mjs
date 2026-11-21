@@ -2,6 +2,8 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-21: check:overrides, a dependency override's value stays inside one major (docs/pitfalls.md §59, now deleted).
+ *  - 2026-11-21: check:no-nul, no raw NUL byte in tracked source text under src/, test/, scripts/ and public/ (docs/pitfalls.md §69, now deleted).
  *  - 2026-11-20: check:app-ref, an app's name and its `.html` file are related only in src/services/app/app-ref.ts.
  *  - 2026-11-20: check:feature-reach, every MCP tool, served library and seeded package is named in docs/AIMEAT-Feature-List.md, the capability list an AI reads (feature-documentation.md row 5).
  *  - 2026-11-20: check:partial-defaults, no zod .partial() in src/ or public/: a partial-update schema is patchOf() (src/utils/zod-patch.ts), because .partial() keeps the defaults and a PATCH reset the fields it left out (docs/pitfalls.md §127, now deleted).
@@ -176,6 +178,8 @@ export const FAST_CHECKS = [
     { script: 'check:sse-parity', label: 'An agent writes, and the open page hears about it' },
     { script: 'check:imports-tracked', label: 'Every relative import points at a tracked file' },
     { script: 'check:package-scripts', label: 'Every package.json script points at a tracked file and an existing script' },
+    { script: 'check:overrides', label: 'Every dependency override stays inside one major: no open >= value' },
+    { script: 'check:no-nul', label: 'No raw NUL byte in tracked source text, so grep reads every file as text' },
     // The pre-commit hook's own lint, cached. Without it a file past the 800-line limit passed the
     // gate and was refused at the commit that followed, twice on 2026-10-11.
     { script: 'lint', label: 'ESLint as the pre-commit hook runs it: the 800-line file limit and every other lint error' },

@@ -10,6 +10,8 @@
  *   paths (prepublishOnly and the nightly pack-smoke job) write the shrinkwrap before packing.
  * @usage pnpm exec vitest run test/unit/npm-shrinkwrap.test.ts
  * @version-history
+ *   2026-11-21 -- The advisory-floor case quotes hono's override as package.json now writes it,
+ *     ^4.13.7 (check:overrides); the case still refuses 4.13.6 for the same rule.
  *   v1.1.0 -- 2026-11-03 -- The good tree carries minimatch 11.0.4 and the parent rule pins ^11.0.1
  *     (GHSA-g3hv-75wg-m249); a case holds the new floor for every minimatch 10.x.
  *   v1.0.0 -- 2026-10-29 -- Initial (secaudit2026oct26 round 8c, operator-01).
@@ -86,7 +88,7 @@ describe('overrideViolations: a shrinkwrap version that breaks an override is re
 
     it('a version below an advisory floor', () => {
         const tree = { ...goodTree(), 'node_modules/hono': at('4.13.6') };
-        expect(overrideViolations(tree, OVERRIDES)).toEqual(['node_modules/hono is 4.13.6; override "hono" requires >=4.13.7']);
+        expect(overrideViolations(tree, OVERRIDES)).toEqual(['node_modules/hono is 4.13.6; override "hono" requires ^4.13.7']);
     });
 
     it('a version inside a ranged rule\'s selector, and a nested copy too', () => {

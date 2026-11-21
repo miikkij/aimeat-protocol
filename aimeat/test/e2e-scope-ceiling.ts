@@ -27,6 +27,7 @@
  *   environment variable and the ecosystem route, not storage.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-scope-ceiling
  * @version-history
+ *   2026-11-21 — The node of its own is waited for with helpers/wait-for-server.ts, which keeps its output.
  *   2026-11-15 — Audit M055: a hello manifest above the ecosystem ceiling fails scopes_within_ceiling.
  *   2026-10-16 — The node of its own takes the run's backend through ownNodeDb (QA audit P1-02).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F03a-01).
@@ -37,6 +38,7 @@ import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { suitePort } from './helpers/free-port.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { waitForServer } from './helpers/wait-for-server.js';
 import { generateKeyPair } from '../src/auth/keypair.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -181,12 +183,8 @@ async function startNode(): Promise<void> {
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
-    node.stdout?.on('data', () => {}); node.stderr?.on('data', () => {});
-    for (let i = 0; i < 150; i++) {
-        try { const r = await fetch(`${NODE_BASE}/v1/spec`); if (r.ok) return; } catch { /* not up yet */ }
-        await new Promise((r) => setTimeout(r, 1000));
-    }
-    throw new Error(`the node with a ceiling did not start on ${PORT}`);
+    // Both output streams are kept, and a node that never answers fails with its own last lines.
+    await waitForServer(node, NODE_BASE, { label: `the node with a ceiling on ${PORT}`, budgetMs: 150_000 });
 }
 
 try {

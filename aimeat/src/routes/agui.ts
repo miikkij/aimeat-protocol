@@ -22,6 +22,7 @@
  * @structure aguiRouter(config, storage)
  * @usage app.use(aguiRouter(config, storage));
  * @version-history
+ *   v1.1.2 — 2026-11-21 — A client that leaves aborts the run: the abort listens on the response's close.
  *   v1.1.1 — 2026-10-20 — The GET comment no longer says "No scope" above a route that asks task:read.
  *   v1.1.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): task:read on GET /v1/agui/:owner/:agent/:taskId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6d).
@@ -82,7 +83,9 @@ export function aguiRouter(config: AimeatConfig, storage: Storage): Router {
     res: Response, req: Request, auth: Principal, taskId: string, threadId: string, runId: string,
   ): Promise<void> {
     const controller = new AbortController();
-    req.on('close', () => controller.abort());
+    // The response's close, not the request's: on Express 5 the request emits `close` once its body
+    // is read, before this point, so a listener on it never hears the client leave.
+    res.on('close', () => { if (!res.writableEnded) controller.abort(); });
     try {
       for await (const event of streamTaskAsAgui({ storage, auth, taskId, threadId, runId, signal: controller.signal })) {
         if (controller.signal.aborted) break;
