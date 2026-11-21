@@ -25,12 +25,15 @@
  *   nodes on one CI runner, and in the run that failed a suite that takes 29 seconds here took 56
  *   there. A budget is not a timeout on the feature; nothing waits it out when the node is healthy,
  *   and `AIMEAT_E2E_BOOT_MS` moves it for a machine that needs longer or a test that wants shorter.
- * @structure waitForServer(child, base, opts) — resolves with the child once it answers
+ * @structure waitForServer(child, base, opts) — resolves with the child once it answers and its boot
+ *   seeding has settled · seedsSettled(base, child, deadline) — the second half, also for the runner
  * @usage
  *   import { waitForServer } from './helpers/wait-for-server.js';
  *   const child = spawn('node', [...], { stdio: ['ignore', 'pipe', 'pipe'] });
  *   return waitForServer(child, BASE);
  * @version-history
+ *   v1.4.0 — 2026-11-21 — After the node answers, wait for `seeds: settled` on GET /v1/build
+ *     (seedsSettled), so a suite never races a boot seeder (the seeding bullet of docs/pitfalls.md §19, now deleted).
  *   v1.3.0 — 2026-09-16 — And where in the PROGRAM it is: SIGUSR2 to the child before the SIGKILL,
  *     and the diagnostic report it writes gives the main thread's JavaScript stack and what it still
  *     has open. The thread states narrowed the last one and could not name it; removing tsx from the
@@ -115,7 +118,17 @@ export async function waitForServer(
         }
         // Not listening yet is the normal state for the first second or two. The budget above and
         // the exit check are what report a real failure; this catch is the ordinary case.
-        try { if ((await fetch(`${base}${path}`)).ok) return child; } catch { /* not up yet */ }
+        let answered = false;
+        try { answered = (await fetch(`${base}${path}`)).ok; } catch { /* not up yet */ }
+        // Answering is not seeded: wait for the boot seeders the node did not wait for itself.
+        if (answered) {
+            if (await seedsSettled(base, child, began + budgetMs)) return child;
+            if (child.exitCode === null && child.signalCode === null) {
+                child.kill('SIGKILL');
+                throw new Error(`${label} answered ${base}${path}, but GET /v1/build still said \`seeds: pending\` after ${budgetMs}ms: a boot seeder did not finish.${tail()}`);
+            }
+            continue;   // it died while seeding: the exit check at the top says so
+        }
         await new Promise(r => setTimeout(r, 300));
     }
 
@@ -154,6 +167,32 @@ export async function waitForServer(
         + `The port ${listening ? 'IS accepting connections, so something is there and not answering HTTP' : 'refuses connections, so nothing ever bound it'}; `
         + `${said}.${burned}${threads}${report} `
         + `Raise AIMEAT_E2E_BOOT_MS if the machine is slow rather than broken.${tail()}`);
+}
+
+/**
+ * Poll `GET /v1/build` until it says `seeds: settled`, the child dies, or the deadline passes. True
+ * when settled. A server that does not answer the field (a fake peer, an older build) counts as
+ * settled: only a node that says `pending` is waited for.
+ *
+ * WHY. A node answers before its boot seeders finish: the bundled cortexes, the example packages and
+ * the core scheduled jobs are seeded without the boot waiting for them. A suite that read one at once
+ * won on SQLite and lost on PostgreSQL, where the migrations run first, and a flake teaches everyone
+ * to run a suite again until it is green (src/server-bootstrap/boot-seed-lock.ts).
+ */
+export async function seedsSettled(base: string, child: ChildProcess, deadline: number): Promise<boolean> {
+    while (Date.now() < deadline) {
+        if (child.exitCode !== null || child.signalCode !== null) return false;
+        try {
+            const res = await fetch(`${base}/v1/build`);
+            const body = res.ok && (res.headers.get('content-type') ?? '').includes('json')
+                ? await res.json() as { seeds?: unknown } : null;
+            if (!res.ok || !body || body.seeds !== 'pending') return true;
+        } catch {
+            // A refused connection between two reads: ask again.
+        }
+        await new Promise(r => setTimeout(r, 100));
+    }
+    return false;
 }
 
 /**

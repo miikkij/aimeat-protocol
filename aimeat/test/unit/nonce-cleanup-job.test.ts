@@ -27,6 +27,8 @@ describe('the verification nonce sweep with FTN and EUDIW off', () => {
     const storage = {
       getScheduledJob: async () => null,
       createScheduledJob: async (job: { id: string }) => { created.push(job.id); },
+      // The seed stamps (services/seed/stamped-seed.ts) live in memory records.
+      getMemory: async () => null, setMemory: async (r: unknown) => r,
     } as unknown as Storage;
     await seedCoreScheduledJobs(plainNode, storage);
     expect(created).toContain('core:nonce-cleanup');

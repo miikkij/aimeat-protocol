@@ -17,6 +17,7 @@
  *   v1.1.0 — 2026-06-26 — Version-aware refresh of already-installed bundled cortexes on version bump
  *   v1.2.0 — 2026-10-25 — bundledCortexNames(); a shipped name held by an account other than
  *     system@<nodeId> is not refreshed and opens one security incident (secaudit2026oct22).
+ *   v1.2.1 — 2026-11-21 — The held-name test reads isNodeSeedLock (utils/node-seed-lock.ts); same answer.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -26,6 +27,7 @@ import type { Storage, CortexExtensionRecord } from '../../storage/interface.js'
 import { parseCortexManifest } from './manifest.js';
 import { recordSecurityIncident, SECURITY_INCIDENT_PREFIX, securityOwner } from '../security-incident.js';
 import { logger } from '../../utils/logger.js';
+import { isNodeSeedLock } from '../../utils/node-seed-lock.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLED_DIR = join(__dirname, '..', '..', '..', 'public', 'cortex-bundled');
@@ -114,7 +116,7 @@ export async function seedBundledCortexes(storage: Storage, systemGaii: string, 
       if (existing) {
         // Another account's record under a shipped name: left as it is, and the operator is told. An
         // account name carries no '@', so a system@ installer is a seeder's, of this node id or an earlier one.
-        if (existing.installedBy !== systemGaii && !existing.installedBy.startsWith('system@')) {
+        if (!isNodeSeedLock(existing.installedBy)) {
           logger.error(`Bundled cortex ${baseName}: the name is held by ${existing.installedBy}, not refreshed`);
           await reportHeldName(storage, nodeId, existing);
           continue;

@@ -181,6 +181,7 @@
     "check:atelier-parts": "tsx tools/build-atelier-parts.ts --check",
     "check:living-nodes": "tsx tools/build-living-nodes.ts --check",
     "check:route-scopes": "tsx scripts/check-route-scopes.ts --strict",
+    "check:scope-words": "tsx scripts/check-scope-words.ts",
     "check:denial-coverage": "tsx scripts/check-denial-coverage.ts --strict",
     "check:suite-ports": "tsx scripts/check-suite-ports.ts",
     "check:unit-ports": "tsx scripts/check-unit-ports.ts",

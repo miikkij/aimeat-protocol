@@ -85377,6 +85377,14 @@ paths:
                         description: The process start time in base 36. It changes on every start.
                       version: { type: string }
                       started_at: { type: string, format: date-time, description: When this process started. The same instant as `build`. }
+                      seeds:
+                        type: string
+                        enum: [settled, pending]
+                        description: |
+                          Whether this process's boot seeders have all finished. The node answers
+                          before some of them do (the shipped cortexes, the example packages, the core
+                          scheduled jobs); a test or a deploy check that reads a seeded record waits
+                          for `settled` first.
   /v1/data-wallet:
     get:
       operationId: getDataWallet

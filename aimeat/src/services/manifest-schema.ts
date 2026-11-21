@@ -65,8 +65,10 @@
  *     stranger and skipped the upgrade at every boot afterwards. That node sat at seed v4 for three
  *     weeks and refused every `backing: 'rows'` manifest while running code that supports rows. The
  *     record is re-stamped with the current identity as it is upgraded.
+ *   v1.8.1 -- 2026-11-21 -- isSystemSeeded answers through isNodeSeedLock (utils/node-seed-lock.ts); same answer.
  */
 import type { Storage } from '../storage/interface.js';
+import { isNodeSeedLock } from '../utils/node-seed-lock.js';
 
 /** Wildcard keyPattern (prefix mode) — matches `organism.{anyId}.meta.manifest` for every organism. */
 export const MANIFEST_SCHEMA_KEY = 'organism.*.meta.manifest';
@@ -240,10 +242,11 @@ export function seededVersionOf(schemaJson: Record<string, unknown> | undefined 
  * is stable. `PUT /v1/memory/:key/schema` stamps the caller's GHII (`alice@node-id`), and nothing
  * but a seeder writes a `system@` lock — so the prefix, not the whole string, is what separates
  * "the node seeded this" from "a person customized this". A node id is allowed to change, and when
- * it does the old name stays in every record the node wrote under it.
+ * it does the old name stays in every record the node wrote under it. The test itself is
+ * isNodeSeedLock (utils/node-seed-lock.ts), the one home of the prefix.
  */
 export function isSystemSeeded(lockedBy: string | undefined | null): boolean {
-  return typeof lockedBy === 'string' && lockedBy.startsWith('system@');
+  return isNodeSeedLock(lockedBy);
 }
 
 /**

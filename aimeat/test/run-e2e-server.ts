@@ -7,6 +7,8 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   2026-11-21 -- startServer waits for `seeds: settled` on GET /v1/build after the node answers, so no
+ *     suite races a boot seeder (the seeding bullet of docs/pitfalls.md §19, now deleted).
  *   2026-11-15 -- perSuiteCoverageEnv(): with AIMEAT_COVERAGE_PER_SUITE=<dir>, a suite's node and the
  *     suite process write V8 coverage into <dir>/<suite>, for the per-suite coverage map the gate
  *     selects suites from (scripts/e2e-coverage-map.ts).
@@ -84,6 +86,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { requirePortFree, waitForExit } from './helpers/runner-ports.js';
 import { recordNodeOutput } from './helpers/runner-node-log.js';
+import { seedsSettled } from './helpers/wait-for-server.js';
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -779,6 +782,9 @@ export function perSuiteCoverageEnv(suite?: string): Record<string, string> {
     return { NODE_V8_COVERAGE: dir };
 }
 
+/** A node that answered and whose boot seeding never settled: fatal, never retried as "not listening yet". */
+class SeedsNotSettled extends Error {}
+
 export async function startServer(target: RunnerTarget, suite?: string): Promise<ChildProcess> {
     await requirePortFree(Number(target.port), PORT_FREE_TIMEOUT_MS, 'the runner asked to start a server on it');
     authLogs.delete(target);
@@ -818,8 +824,17 @@ export async function startServer(target: RunnerTarget, suite?: string): Promise
         }
         try {
             const res = await fetch(`${target.baseUrl}/v1/spec`);
-            if (res.ok) return child;
-        } catch {
+            if (res.ok) {
+                // Answering is not seeded: the boot seeders the node did not wait for (bundled
+                // cortexes, example packages, core jobs) run on behind the first answer. A suite that
+                // reads one raced it, won on SQLite and lost on PostgreSQL. Wait for `seeds: settled`.
+                if (await seedsSettled(target.baseUrl, child, started + SERVER_READY_TIMEOUT_MS)) return child;
+                child.kill('SIGKILL');
+                await waitForExit(child, SERVER_EXIT_TIMEOUT_MS);
+                throw new SeedsNotSettled(`Test server (${where}) answered, but GET /v1/build still said \`seeds: pending\` ${SERVER_READY_TIMEOUT_MS}ms after the start: a boot seeder (server-bootstrap/service-init.ts, background-jobs.ts) did not finish.${tail()}`);
+            }
+        } catch (e) {
+            if (e instanceof SeedsNotSettled) throw e;
             // Not listening yet; that is the normal state for the first second or two.
         }
         await new Promise(r => setTimeout(r, 300));

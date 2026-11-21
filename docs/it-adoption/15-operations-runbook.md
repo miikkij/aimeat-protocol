@@ -26,7 +26,7 @@ Every setting is in `aimeat/.env.example` and in the [configuration reference](.
 | Variable | Default | Recommendation for an organisation node | Source |
 |---|---|---|---|
 | `AIMEAT_BASE_URL` | `http://localhost:<port>` | The final HTTPS address. Immutable at runtime; it fixes the passkey RP ID | `aimeat/src/services/config/schema.ts` |
-| `AIMEAT_NODE_ID` | `aimeat-local-001-dev` | A unique id, set before the first start and never changed | `aimeat/.env.example`, [pitfalls §87](../pitfalls.md#87-a-node-that-changed-its-id-stops-receiving-its-own-seeded-upgrades) |
+| `AIMEAT_NODE_ID` | `aimeat-local-001-dev` | A unique id, set before the first start and never changed | `aimeat/.env.example`, `aimeat/src/utils/node-seed-lock.ts` |
 | `AIMEAT_STORAGE` | `memory` (data lost at restart) | `postgres-kysely` | `aimeat/src/config.ts` |
 | `AIMEAT_SECURITY_PROFILE` | inferred: `public` when `AIMEAT_BIND_HOST` names an address beyond loopback. Otherwise `local` for a localhost, loopback, RFC 1918, link-local or IPv6 unique-local base URL or a personal node, and `public` for any other base URL | `public`, always, also on an internal network | `aimeat/src/config/private-host.ts` |
 | `AIMEAT_REGISTRATION_MODE` | `open` | `oauth` (IdP sign-in creates accounts) or `invite` | [organisation node sign-in](../organisation-node-sign-in.md#1-two-gates-and-why-one-is-not-enough) |
@@ -97,7 +97,7 @@ Every setting is in `aimeat/.env.example` and in the [configuration reference](.
 | The first account is refused with `SETUP_CODE_REQUIRED` or `SETUP_CODE_INVALID` | The node has no operator and wants the code from its start log | Copy the line that starts with `Setup code:`; a restart issues a new one | `aimeat/src/services/setup-code.ts` |
 | Health answers 200 but the monitoring says healthy while storage is down | The check reads the HTTP code only | Read `status` and `subsystems.storage` | [health checks](../operations/production-deployment.md#health-checks) |
 | A browser feature works from a shell and fails under systemd | The unit's environment (`LD_PRELOAD`, `NODE_OPTIONS`) reaches child processes | Compare `systemctl show aimeat -p Environment` | [pitfalls §12](../pitfalls.md#12-deploy-release--node-hosted-apps) |
-| After an update, connected agents no longer see tools they used before | A tool gained a permission word; the node registers a tool only for sessions that hold every word | Check the Security page for the migration incident; re-approve the agent with the word | [pitfalls §119](../pitfalls.md#119-after-a-deploy-agents-no-longer-see-tools-they-used-yesterday-every-test-is-green) |
+| After an update, connected agents no longer see tools they used before | A tool gained a permission word; the node registers a tool only for sessions that hold every word | Check the Security page for the migration incident; re-approve the agent with the word. A release cannot add a word to an existing tool without the step that gives it to earlier agents (`pnpm check:scope-words`) | `aimeat/scripts/check-scope-words.ts` |
 | On a signed-in-only node, a signed-in person gets `401 SIGN_IN_REQUIRED` on a picture, link or stream | A browser request that carries no credential reached the content gate; this is a defect in the node | Report it with the address to the maintainer | [pitfalls §124](../pitfalls.md#124-signed-in-and-a-page-picture-link-or-stream-answers-401-on-a-signed-in-only-node) |
 
 Security incidents follow [incident response](../security/incident-response.md).

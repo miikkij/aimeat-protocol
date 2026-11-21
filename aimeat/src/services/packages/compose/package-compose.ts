@@ -40,6 +40,8 @@
  *   import { composePackageFromApps } from './package-compose.js';
  *   const out = await composePackageFromApps({ storage, config }, caller, { name, apps });
  * @version-history
+ *   v1.8.2 — 2026-11-21 — A shipped cortex is known by the `system@` prefix (utils/node-seed-lock.ts):
+ *     one stored under an earlier node id travelled in the package and was named as another account's.
  *   v1.8.1 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
  *     of a regex of this file's own; no change in behaviour.
  *   v1.8.0 — 2026-11-01 — Another account's public, active cortex travels in the package again, and a
@@ -82,6 +84,7 @@ import { readAppDataMap } from '../../data-map/data-map-store.js';
 import { appToolsKey } from '../../../models/app-tool-schemas.js';
 import { toolsForPackage } from '../install/package-app-tools.js';
 import { appDataMapId } from '../../app/app-ref.js';
+import { isNodeSeedLock } from '../../../utils/node-seed-lock.js';
 
 /** What the installing node must already have, because this package deliberately does not carry it. */
 export interface ComposeExpectations {
@@ -153,9 +156,10 @@ async function cortexNamed(storage: Storage, name: string, owner: string): Promi
  * account did and keeps it public and active (Jouni, 2026-11-01). A shipped cortex never travels, and
  * another account's private or inactive one stays with its author.
  */
-function cortexTravels(record: CortexExtensionRecord, composer: string, systemGaii: string): boolean {
+function cortexTravels(record: CortexExtensionRecord, composer: string): boolean {
     if (record.installedBy === composer) return true;
-    if (record.installedBy === systemGaii) return false;
+    // Shipped by this node, under this node id or an earlier one (utils/node-seed-lock.ts).
+    if (isNodeSeedLock(record.installedBy)) return false;
     return record.visibility === 'public' && record.status === 'active';
 }
 
@@ -234,7 +238,7 @@ export async function planComposeFromApps(
     caller: PackageComposeCaller,
     input: PackageComposeInput,
 ): Promise<PackageComposePlan> {
-    const { storage, config } = deps;
+    const { storage } = deps;
     const apps: AppRecord[] = [];
     const includeCortex = input.includeCortex !== false;
     const includeSkills = input.includeSkills !== false;
@@ -249,7 +253,6 @@ export async function planComposeFromApps(
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'apps must be an array with at least 1 filename' };
     }
 
-    const systemGaii = `system@${config.nodeId}`;
     const expects: ComposeExpectations = { cortex: [], extensions: [], packs: [] };
     const notes: string[] = [];
     const appComponents: RawComponentInput[] = [];
@@ -286,8 +289,8 @@ export async function planComposeFromApps(
             // Unknown to this node, shipped by it, or another account's cortex that is private or
             // inactive: named, never copied. The composer's own cortex travels, and so does another
             // account's public, active one, which every account on the node already reads and loads.
-            if (!record || !cortexTravels(record, caller.owner, systemGaii)) {
-                if (record && record.installedBy !== systemGaii) heldByOthers.add(c.name);
+            if (!record || !cortexTravels(record, caller.owner)) {
+                if (record && !isNodeSeedLock(record.installedBy)) heldByOthers.add(c.name);
                 if (!seenExpect.cortex.has(c.name)) {
                     seenExpect.cortex.add(c.name);
                     expects.cortex.push(c.name);

@@ -45,6 +45,8 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-11-21 — canSeeCortex lets a shipped cortex through by the `system@` prefix
+ *     (utils/node-seed-lock.ts): one stored under an earlier node id went private to every account.
  *   2026-11-13 — The activation functions come from services/cortex/activation.ts, not from a route file
  *     (structure programme 2026-11, unit 4).
  *   2026-10-29 — installCortex under a bare name an account erasure or the held-name settlement freed
@@ -120,6 +122,7 @@ import { bundledCortexNames } from './seeder.js';
 import { placeCortexInstall, releaseBareName, settleReclaimed, findCortex } from '../component/address.js';
 import { nodePrefixRefusal } from '../component/name-prefix.js';
 import { noteCortexHolderChange } from './holder-change.js';
+import { isNodeSeedLock } from '../../utils/node-seed-lock.js';
 
 export interface CortexDeps {
     storage: Storage;
@@ -178,11 +181,13 @@ export interface CortexCaller {
 export function canSeeCortex(
     caller: Pick<CortexCaller, 'ownerName' | 'isOperator'>,
     ext: Pick<CortexExtensionRecord, 'visibility' | 'installedBy'>,
-    nodeId: string,
+    // Kept for the callers; the node's own installs are known by the `system@` prefix, whatever id.
+    _nodeId: string,
 ): boolean {
     if (ext.visibility === 'public') return true;
     if (caller.isOperator) return true;
-    if (ext.installedBy === `system@${nodeId}`) return true;
+    // The node's own seeder, under this node id or an earlier one (utils/node-seed-lock.ts).
+    if (isNodeSeedLock(ext.installedBy)) return true;
     return ext.installedBy === caller.ownerName;
 }
 

@@ -117,7 +117,9 @@ describe('the intake conversation retention job', () => {
   it('is seeded as a scheduled job and has its handler registered', async () => {
     const plain = { consentEnabled: false, personalNodesEnabled: false, emailEnabled: false, nodeId: NODE } as unknown as AimeatConfig;
     const created: string[] = [];
-    await seedCoreScheduledJobs(plain, { getScheduledJob: async () => null, createScheduledJob: async (j: { id: string }) => { created.push(j.id); } } as unknown as Storage);
+    // The seed stamps (services/seed/stamped-seed.ts) live in memory records, hence getMemory and setMemory.
+    await seedCoreScheduledJobs(plain, { getScheduledJob: async () => null, createScheduledJob: async (j: { id: string }) => { created.push(j.id); },
+      getMemory: async () => null, setMemory: async (r: unknown) => r } as unknown as Storage);
     expect(created).toContain('core:intake-thread-retention');
     const handlers = new Map<string, () => Promise<void>>();
     registerCoreHandlers({ registerCoreHandler: (n: string, fn: () => Promise<void>) => { handlers.set(n, fn); } } as unknown as Scheduler, plain, storage as unknown as Storage);

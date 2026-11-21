@@ -1,6 +1,10 @@
 {
   "note": "Process-local state and timers in aimeat/src (scripts/check-process-local.ts). Seeded 2026-11-04 from the code of that day (codebase analysis 2026-11-03, HA stage 1). Each entry is a count per file, kind and name, and the reason it is per process; DEBT means known, not judged yet. A count may only fall: a new one needs a `// process-local: <what breaks with a second process>` marker and an entry here with that reason, and a fallen count is lowered here.",
   "entries": {
+    "src/server-bootstrap/boot-seed-lock.ts :: map :: pendingSeeds": {
+      "count": 1,
+      "reason": "Which of this process's boot seeders are still running, for GET /v1/build `seeds`. A probe asks one process about its own boot; a second process seeds and answers for itself, so nothing breaks."
+    },
     "src/services/cache.ts :: map :: inFlight": {
       "count": 1,
       "reason": "Each process shares its own computes of one cache key; a second process computes its own once."

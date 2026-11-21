@@ -1,7 +1,7 @@
 /**
  * @file test/unit/agent-default-workspace-scopes.test.ts
  * @description What a newly approved agent may do in its owner's organisms. Since 2026-10-06 the
- *   workspace read tools ask organism:read and publishing asks organism:write (pitfalls §119), and
+ *   workspace read tools ask organism:read and publishing asks organism:write (scripts/check-scope-words.ts), and
  *   neither list an agent is approved with carried either word, so an agent approved from that day
  *   on could not read a workspace. Jouni 2026-10-06 (secaudit 2026-10 last items, D4): organism:read
  *   goes into the node's default list and the "standard" consent preset; organism:write into the

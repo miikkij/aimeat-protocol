@@ -24,6 +24,8 @@
  *   cd aimeat && pnpm check:route-scopes --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:route-scopes --seed     # rewrite the exemption file from today's state
  * @version-history
+ *   v1.4.3 — 2026-11-21 — middlewareSection is exported: check-scope-words.ts reads a route's scope
+ *     words from the same section.
  *   v1.4.2 — 2026-11-06 — requireSchemaLockCaller counts: it admits the operator, the owner in person
  *     and a principal holding memory:write (auth/schema-lock-caller.ts, decision 13a of 2026-11-05).
  *   v1.4.1 — 2026-11-05 — requireOwnerPrincipalOrScope counts: it admits the account holder or a
@@ -118,7 +120,7 @@ function walk(dir: string, out: string[] = []): string[] {
  * handler. Stops at the handler's parameter list, which is the first `(req`/`(_req`/`(async` shape,
  * so a handler body full of parentheses never confuses the scan.
  */
-function middlewareSection(source: string, from: number): string {
+export function middlewareSection(source: string, from: number): string {
     const slice = source.slice(from, from + 900);
     const handlerAt = slice.search(/(async\s*)?\(\s*_?req\b|\basync\s*\(\s*_?\w*\s*[,)]/);
     return handlerAt > 0 ? slice.slice(0, handlerAt) : slice;

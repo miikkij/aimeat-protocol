@@ -635,7 +635,7 @@ await test("The node registry's POST, PATCH and DELETE refuse a plain owner and 
 // read workspaces, see its owner's agents) and what it does not get. Written out by hand on purpose: a
 // list derived from the catalog would move with the next scope word and catch nothing, which is how a
 // deploy took workspace reads from every default agent in October with every suite green
-// (docs/pitfalls.md §119; QA audit P7-03, F03a-02).
+// (scripts/check-scope-words.ts now refuses such a word without its keep-working step; QA audit P7-03, F03a-02).
 const NODE_DEFAULT = (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*').split(',').map(s => s.trim());
 const PROMISED = ['aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_delete',
     'aimeat_catalogue_search', 'aimeat_workspace_read', 'aimeat_workspace_list', 'aimeat_workspace_overview', 'aimeat_organism_search',

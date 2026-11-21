@@ -2084,6 +2084,9 @@ const ALL_SUITES = [
     'test/e2e-maintenance-cli.ts',
     // The liveness and readiness probes, and /v1/health as before (codebase analysis 2026-11-03, HA stage 1).
     'test/e2e-health-probes.ts',
+    // GET /v1/build says when the boot seeding has settled, and the runner waits for it before the
+    // first test, so a suite never races a seeder (the seeding bullet of docs/pitfalls.md §19, now deleted).
+    'test/e2e-boot-seeds-settled.ts',
     // A stop drains first: a request in flight finishes, readiness 503, live streams end, exit 0 (HA stage 1).
     'test/e2e-graceful-shutdown.ts',
     // Two processes started together on one empty PostgreSQL database both boot (the boot lock; HA stage 1).

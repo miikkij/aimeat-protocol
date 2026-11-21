@@ -33,6 +33,9 @@
  *     one write is evaluated once (event-bus.ts origin rule; codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   v1.5.0 — 2026-11-04 — Boot starts this process's lease first (services/process-lease.ts; codebase analysis
  *     2026-11-03, item HA 2.5).
+ *   v1.6.0 — 2026-11-21 — The core scheduled jobs' seeding counts in the boot seeding's settled signal
+ *     (boot-seed-lock.ts trackBootSeed), which GET /v1/build answers and the E2E runner waits for, and
+ *     scheduler.start() waits for it, so the jobs it loads are this build's.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -58,6 +61,7 @@ import { backfillDependencyMap } from '../services/dependency-map.js';
 import { backfillComponentVersions } from '../services/component/versions.js';
 import { resumeOutbox } from '../services/outbox.js';
 import { startProcessLease } from '../services/process-lease.js';
+import { trackBootSeed } from './boot-seed-lock.js';
 
 export interface BackgroundJobDeps {
   config: AimeatConfig;
@@ -83,9 +87,11 @@ export function startBackgroundJobs(deps: BackgroundJobDeps): void {
   startProcessLease(storage, config)
     .catch(err => logger.error('Process lease failed to start', { error: String(err) }));
 
-  // Seed core scheduled jobs (idempotent — only creates if not already present)
-  seedCoreScheduledJobs(config, storage).catch(err =>
-    logger.error('Failed to seed core scheduled jobs', { error: String(err) }));
+  // Seed core scheduled jobs (services/job-seeding.ts). Counted in the boot seeding's settled signal,
+  // and waited for by scheduler.start() below, which loads the jobs once: a job created or brought up
+  // to this build's cron after that load would run on the old cron until the next start.
+  const coreJobsSeeded = trackBootSeed(seedCoreScheduledJobs(config, storage).catch(err =>
+    logger.error('Failed to seed core scheduled jobs', { error: String(err) })), 'core scheduled jobs');
 
   // Wire dispatch + notification deps for ai/agent_task schedules before start.
   scheduler.setWebhookDispatcher(webhookDispatcher);
@@ -114,6 +120,7 @@ export function startBackgroundJobs(deps: BackgroundJobDeps): void {
   // thing start() does is fire every @activate job on the node.
   backfillExtensionJobOwnerScope(config, storage)
     .catch(err => logger.error('Extension job owner-scope backfill failed', { error: String(err) }))
+    .then(() => coreJobsSeeded)
     .then(() => scheduler.start())
     .catch(err => logger.error('Scheduler start failed', { error: String(err) }));
 

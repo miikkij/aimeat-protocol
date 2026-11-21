@@ -2,15 +2,19 @@
  * @file src/services/job-seeding.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Idempotently seeds the core scheduled-job records (with cron expressions) into storage
- *   at startup, creating each only if absent so restarts don't duplicate them; feature-gated jobs are
+ * @description Seeds the core scheduled-job records (with cron expressions) into storage at startup:
+ *   a missing job is created, a job nobody changed follows this build's name and cron, and a job an
+ *   operator moved or switched off keeps that (services/seed/stamped-seed.ts). Feature-gated jobs are
  *   seeded per config (consent, personal nodes, verification nonce cleanup).
  *
  * @structure
  *   - CoreJobDef: shape of a seeded job (id, name, coreHandler, cron)
- *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
+ *   - seedCoreScheduledJobs(config, storage): builds the job list and brings each job into step
+ *   - coreJobSeedContent(job): the fields the seed owns and compares
  *
  * @version-history
+ *   2026-11-21 — Seeded through seedStamped: a cron changed here reaches every node whose job nobody
+ *     changed. Until now seeding was create-if-absent, so a changed cron did nothing to an existing node.
  *   2026-11-20 — Seed core:report-subscriptions (every 15 minutes): the due report subscriptions.
  *   2026-11-20 — Seed core:value-fold (03:45): the value signals' old day counts become week counts.
  *   2026-11-19 — Seed core:kyc-lists (05:10) and core:kyc-daily (06:20): customer due diligence.
@@ -50,6 +54,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { seedStamped } from './seed/stamped-seed.js';
 
 interface CoreJobDef {
   id: string;
@@ -131,7 +136,7 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     jobs.push({ id: 'core:mcp-onboarding-rescue', name: 'MCP Onboarding Rescue', coreHandler: 'mcp-onboarding-rescue', cron: '15 * * * *' });
     // Once a day is the most this may ever run: the work is a fortnight-scale comparison, and a
     // more frequent pass buys nothing while multiplying the chance of a mistake reaching an inbox.
-    // NOTE: seeding is create-if-absent — changing this cron does nothing to an existing DB.
+    // A changed cron reaches every node whose job nobody changed (seedStamped below).
     jobs.push({ id: 'core:inactivity-nudge', name: 'Inactivity Nudge', coreHandler: 'inactivity-nudge', cron: '40 9 * * *' });
   }
 
@@ -157,8 +162,7 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
 
   // Usage telemetry. The fold every 5 minutes is what makes the serving layer's staleness a number
   // we can state (`computed_through`) rather than a shrug; the archive sweep runs nightly, off-peak,
-  // because it moves rows in bulk. NOTE: seeding is create-if-absent, so changing a cron here does
-  // nothing to a database that already has the job.
+  // because it moves rows in bulk. A changed cron here reaches every node whose job nobody changed.
   jobs.push({ id: 'core:usage-rollup', name: 'Usage Rollup', coreHandler: 'usage-rollup', cron: '*/5 * * * *' });
   jobs.push({ id: 'core:usage-archive', name: 'Usage Archive Sweep', coreHandler: 'usage-archive', cron: '20 3 * * *' });
   // The privacy notice's thirteen months for a visit record that names an account. Nightly at 03:40,
@@ -176,8 +180,8 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   jobs.push({ id: 'core:value-fold', name: 'Value Signals Fold', coreHandler: 'value-fold', cron: '45 3 * * *' });
   // The report subscriptions (services/reports/subscriptions.ts), every 15 minutes at :07, :22, :37, :52.
   jobs.push({ id: 'core:report-subscriptions', name: 'Report Subscriptions', coreHandler: 'report-subscriptions', cron: '7,22,37,52 * * * *' });
-  // The Content Classifier's queue (TARGET-082 V3), hourly at :25. Seeded on every node, because
-  // seeding is create-if-absent and an operator may turn classification on later; the handler reads
+  // The Content Classifier's queue (TARGET-082 V3), hourly at :25. Seeded on every node, because an
+  // operator may turn classification on later; the handler reads
   // nothing while AIMEAT_CLASSIFICATION is off.
   jobs.push({ id: 'core:classification-queue', name: 'Classification Queue', coreHandler: 'classification-queue', cron: '25 * * * *' });
   // The classification audit log and the exceptions list past the retention in the node's
@@ -192,22 +196,42 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // died: every minute, claimed per fire, on every node; a node with nothing waiting reads one prefix.
   jobs.push({ id: 'core:outbox-sweep', name: 'Outbox Retry Sweep', coreHandler: 'outbox-sweep', cron: '* * * * *' });
 
-  const now = new Date().toISOString();
   for (const def of jobs) {
-    const existing = await storage.getScheduledJob(def.id);
-    if (!existing) {
-      await storage.createScheduledJob({
-        id: def.id,
-        name: def.name,
-        type: 'core',
-        coreHandler: def.coreHandler,
-        cron: def.cron,
-        enabled: true,
-        createdBy: `system@${config.nodeId}`,
-        createdAt: now,
-        updatedAt: now,
-      });
-      logger.info(`Seeded core scheduled job: ${def.id} (${def.cron})`);
+    // The part of the job the seed owns. An operator's cron or switch-off is a change to it, and is
+    // kept; a job nobody changed follows this build's cron (services/seed/stamped-seed.ts).
+    const action = await seedStamped(storage, {
+      store: 'core-job',
+      name: def.id,
+      shipped: coreJobSeedContent({ ...def, enabled: true }),
+      read: async () => {
+        const existing = await storage.getScheduledJob(def.id);
+        return existing ? { content: coreJobSeedContent(existing) } : null;
+      },
+      write: async (shipped, act) => {
+        const now = new Date().toISOString();
+        if (act === 'update') {
+          await storage.updateScheduledJob(def.id, { ...shipped, updatedAt: now });
+          return;
+        }
+        await storage.createScheduledJob({
+          id: def.id,
+          type: 'core',
+          ...shipped,
+          createdBy: `system@${config.nodeId}`,
+          createdAt: now,
+          updatedAt: now,
+        });
+      },
+    });
+    if (action === 'create' || action === 'update') {
+      logger.info(`${action === 'create' ? 'Seeded' : 'Brought up to this build'} core scheduled job: ${def.id} (${def.cron})`);
     }
   }
+}
+
+/** The fields of a core job the seed writes and compares: an edit to any of them is the operator's. */
+export function coreJobSeedContent(job: { name: string; coreHandler?: string; cron: string; enabled?: boolean }): {
+  name: string; coreHandler: string; cron: string; enabled: boolean;
+} {
+  return { name: job.name, coreHandler: job.coreHandler ?? '', cron: job.cron, enabled: job.enabled !== false };
 }

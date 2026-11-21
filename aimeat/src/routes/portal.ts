@@ -14,6 +14,7 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-11-21 — GET /v1/build answers `seeds` (settled or pending): whether this process's boot seeders have all finished.
  *   2026-11-09 — The Link header of /v1/portal and of a page's markdown: the canonical address comes from canonicalPageUrl (data/public-pages.ts): the main node's for a page this node repeats (seo.primary_node_url, TARGET-094).
  *   2026-11-04 — GET /v1/build answers the process stamp (PROCESS_BUILD_ID) as before; the pages' stamp names the code (codebase analysis 2026-11-03, item A7).
  *   2026-11-01 — /v1/dataset/:owner/:name answers 404 (same page body) when no public package is
@@ -145,6 +146,7 @@ import { ownerAnalyticsNotice } from '../services/visibility/privacy-notice.js';
 import { aiRegionNotice } from '../services/privacy-ai-region.js';
 import { operatorPlaceVars } from '../services/operator/place.js';
 import { renderPolicyNotSetPage } from './portal-policy-not-set.js';
+import { bootSeedsState } from '../server-bootstrap/boot-seed-lock.js';
 
 /**
  * Returns a Record<placeholder, value> for the templated static pages
@@ -393,6 +395,9 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       build: PROCESS_BUILD_ID, version: getSoftwareVersion(),
       started_at: new Date(parseInt(PROCESS_BUILD_ID, 36)).toISOString(),
       ...runningBuild(),
+      // Whether this process's boot seeders have all finished (server-bootstrap/boot-seed-lock.ts);
+      // the E2E runner waits for `settled` before the first test.
+      seeds: bootSeedsState().settled ? 'settled' : 'pending',
     });
   });
 

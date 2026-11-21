@@ -25,6 +25,8 @@ describe('the gate approval expiry', () => {
     const storage = {
       getScheduledJob: async () => null,
       createScheduledJob: async (job: { id: string; coreHandler: string }) => { created.push(job); },
+      // The seed stamps (services/seed/stamped-seed.ts) live in memory records.
+      getMemory: async () => null, setMemory: async (r: unknown) => r,
     } as unknown as Storage;
     await seedCoreScheduledJobs(plainNode, storage);
     expect(created.find((j) => j.id === 'core:gate-expiry')?.coreHandler).toBe('gate-expiry');

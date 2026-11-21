@@ -3,10 +3,14 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The anonymous mode's shared identity: the anonymous owner, its one shared agent and
- *   its GHII, created when missing, and the anonymous auth fallback switched on for this node.
- * @structure setupAnonymousIdentity(config, storage)
+ *   its GHII, created when missing, and the anonymous auth fallback switched on for this node. The
+ *   shared agent's scopes follow ANONYMOUS_SCOPES on a node where nobody changed them
+ *   (services/seed/stamped-seed.ts).
+ * @structure setupAnonymousIdentity(config, storage) · createAnonymousAgent(...)
  * @usage await setupAnonymousIdentity(config, storage);   // from initializeServices, when anonymous mode is on
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The shared agent is seeded through seedStamped: a scope word ANONYMOUS_SCOPES
+ *     gains or loses reaches a node that already has the agent, unless its scopes were changed there.
  *   v1.0.0 — 2026-11-04 — Moved unchanged out of service-init.ts, which had reached the 800-line limit
  *     after the HA stage 1 merge (codebase analysis 2026-11-03).
  */
@@ -18,6 +22,7 @@ import { enableAnonymousAuth } from '../auth/middleware.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
+import { seedStamped } from '../services/seed/stamped-seed.js';
 
 /** Set up the anonymous owner + agent + GHII for anonymous mode. Normal auth still works alongside. */
 export async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): Promise<void> {
@@ -40,31 +45,25 @@ export async function setupAnonymousIdentity(config: AimeatConfig, storage: Stor
       logger.info('Anonymous owner created');
     }
 
-    // Create anonymous agent if doesn't exist
-    const agent = await storage.getAgent(ANON_GAII);
-    if (!agent) {
-      const kp = await generateKeyPair();
-      await storage.createAgent({
-        name: ANON_AGENT_NAME,
-        owner: ANON_OWNER,
-        gaii: ANON_GAII,
-        displayName: 'Shared Anonymous Agent',
-        description: 'Shared agent for anonymous mode — all AI agents share this identity and memory space',
-        capabilities: ['memory', 'actions', 'catalogue'],
-        // THE RECORD CARRIES WHAT THE MINT HANDS OUT. It carried nothing, which was invisible while
-        // a token's own scopes were the answer; auth/effective-scopes.ts made the record the truth
-        // for every agent, so an empty list here meant the anonymous token was refused everywhere
-        // it had worked the day before. Named in one place (ANONYMOUS_SCOPES) so the two cannot
-        // drift again.
-        defaultScopes: [...ANONYMOUS_SCOPES],
-        publicKey: kp.publicKey,
-        trustScore: 50,
-        morselBalance: config.welcomeBonus,
-        createdAt: new Date().toISOString(),
-        lastSeen: new Date().toISOString(),
-      });
-      logger.info('Anonymous agent created', { gaii: ANON_GAII });
-    }
+    // The shared agent's scopes follow ANONYMOUS_SCOPES on a node where nobody changed them, so a
+    // word this build adds or drops reaches every node that already has the agent; scopes changed on
+    // the node after the seed wrote them are kept (services/seed/stamped-seed.ts).
+    await seedStamped(storage, {
+      store: 'anonymous-scopes',
+      name: ANON_GAII,
+      shipped: [...ANONYMOUS_SCOPES].sort(),
+      read: async () => {
+        const existing = await storage.getAgent(ANON_GAII);
+        return existing ? { content: [...(existing.defaultScopes ?? [])].sort() } : null;
+      },
+      write: async (shipped, action) => {
+        if (action === 'create') { await createAnonymousAgent(config, storage, ANON_AGENT_NAME, ANON_OWNER, ANON_GAII); return; }
+        const held = (await storage.getAgent(ANON_GAII))?.defaultScopes ?? [];
+        if (!await storage.setAgentScopesIf(ANON_GAII, held, shipped)) {
+          throw new Error('the shared anonymous agent\'s scopes changed while the seed wrote them; the next start tries again');
+        }
+      },
+    }).catch(err => logger.error('Failed to bring the shared anonymous agent up to this build; the next start tries again', errorFields(err)));
 
     // Create anonymous GHII if doesn't exist — system identity for anonymous chat sessions
     const ANON_GHII = `${ANON_OWNER}@${config.nodeId}`;
@@ -93,4 +92,29 @@ export async function setupAnonymousIdentity(config: AimeatConfig, storage: Stor
   } catch (err) {
     logger.error('Failed to setup anonymous identity', errorFields(err));
   }
+}
+
+/** Create the shared anonymous agent with the scopes the anonymous token is minted with. */
+async function createAnonymousAgent(config: AimeatConfig, storage: Storage, name: string, owner: string, gaii: string): Promise<void> {
+  const kp = await generateKeyPair();
+  await storage.createAgent({
+    name,
+    owner,
+    gaii,
+    displayName: 'Shared Anonymous Agent',
+    description: 'Shared agent for anonymous mode — all AI agents share this identity and memory space',
+    capabilities: ['memory', 'actions', 'catalogue'],
+    // THE RECORD CARRIES WHAT THE MINT HANDS OUT. It carried nothing, which was invisible while
+    // a token's own scopes were the answer; auth/effective-scopes.ts made the record the truth
+    // for every agent, so an empty list here meant the anonymous token was refused everywhere
+    // it had worked the day before. Named in one place (ANONYMOUS_SCOPES) so the two cannot
+    // drift again.
+    defaultScopes: [...ANONYMOUS_SCOPES],
+    publicKey: kp.publicKey,
+    trustScore: 50,
+    morselBalance: config.welcomeBonus,
+    createdAt: new Date().toISOString(),
+    lastSeen: new Date().toISOString(),
+  });
+  logger.info('Anonymous agent created', { gaii });
 }

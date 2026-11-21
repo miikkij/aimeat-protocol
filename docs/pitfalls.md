@@ -29,8 +29,8 @@ number is never reused.
 
 ## The five shapes
 
-1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 36, 64, 75, 76, 84, 87, 88, 98, 107, 122
-2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §17, 18, 19, 21, 26, 37, 45, 50, 54, 79, 108, 119, 123, 125, 126
+1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 36, 64, 75, 76, 84, 98, 107, 122
+2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §17, 18, 21, 26, 37, 45, 50, 54, 79, 108, 123, 125, 126
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 44, 58, 81, 124, 128
 4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 43
 5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. *Ask what happens when a second session runs the same thing on this machine at the same moment.* §13, 14, 20, 23, 39, 77b
@@ -52,7 +52,6 @@ number is never reused.
 | 14 | Login 500s on the dev node, native DLL EPERM on install | 5 |
 | 17 | A green suite over a bug that is still there | 2 |
 | 18 | Sweep totals swing by hundreds; fails in the sweep, passes alone | 2 |
-| 19 | A suite goes green after a change nobody can justify | 2 |
 | 20 | A hook fails on a file you never touched; two writers' edits interleaved in one file | 5 |
 | 21 | A revoked token keeps authenticating | 2 |
 | 23 | A scratch server writes test data into the developer's dev database | 5 |
@@ -75,13 +74,10 @@ number is never reused.
 | 79 | A disabled feature answers 404 where the spec promises 503 | 2 |
 | 81 | A Finnish page prints 9/12/2026, 3:11 PM; date copies disagree | 3 |
 | 84 | Settings back to defaults after a storage hiccup or a badly timed save | 1 |
-| 87 | One node refuses what its code supports, and a new build changes nothing | 1 |
-| 88 | A shipped fix to a bundled package, prompt or cortex never reaches a node that had it | 1 |
 | 98 | Anthropic answers stop near 4096 tokens, and only a warning says why | 1 |
 | 107 | An app's record read beside it comes back empty, though the app has one | 1 |
 | 108 | Gate green, pushed, and an unrelated unit test red on the next full run | 2 |
 | 109 | A dialog opened from a label reads in the label's capitals and colour | · |
-| 119 | After a deploy, agents no longer see tools they used yesterday; every test is green | 2 |
 | 122 | An origin fix is green, and the same code still runs on that origin by another path | 1 |
 | 123 | A sandboxed frame loads none of its own files, and every test sees 200 | 2 |
 | 124 | Signed in, and a page, picture, link or stream answers 401 on a signed-in-only node | 3 |
@@ -127,7 +123,6 @@ number is never reused.
 
 - **Anonymous requests can carry a truthy shared identity** — an `if (!req.auth)` guard can pass for anon because a shared anon identity is injected. Gate on the real principal / membership, not just presence of `req.auth`.
 - **Replacing an old path with a new one (batched endpoint, DB-service reroute) MUST reproduce the old path's FULL guard chain — middleware AND inline checks.** A refactor that optimises the *data* operation (batched reads/writes, a service layer) is exactly where authorization silently regresses: the guards read as boilerplate, so a new bulk/batched handler is written with `requireAuth() + requireScope()` and the *inline* checks (`requireExternalPrincipal()`, an `existing.archived` read-only 409, a `storage_ref` existence check, `requireScope('memory:delete')`) get dropped because they were one line among many. **Before merging a replacement, diff old-vs-new guard chains line by line** — enumerate the OLD handler's middleware list + every inline `if (…) return 403/409/422` + every per-item guard, and assert the NEW path runs each one. This is not optional polish; a dropped guard on the storage layer is the highest-blast-radius bug in the whole redesign.
-- **A NEW required permission cannot be applied to consent already given.** Adding a scope gate to a route that had none refuses every grant issued before the scope existed — those owners approved the app under rules that had no such question, and the first they learn of the new one is their app answering 403 mid-use. Ship the gate WITH a grandfather clause (a grant created before the permission existed passes) and let it expire by RE-CONSENT rather than by date: reapproving reissues the grant with whatever scopes it now asks for, so the exception removes itself.
 - **A scope enforced on a route must also be REQUESTABLE.** `requireScope('x')` gives no owner bypass to a role-`app` principal, so if `x` is missing from `APP_GRANTABLE_SCOPES` the app can never obtain it and its owner has no way to fix that — the permission it needs cannot be asked for. Adding a scope means adding it in BOTH places, and deciding deliberately whether it belongs in `DEFAULT_SCOPES` (spending money and giving away what you sell do not). `check:scope-parity` does not read `APP_GRANTABLE_SCOPES`, so no gate says when one is missing.
 
 ## 7. Storage & multi-backend
@@ -179,11 +174,6 @@ Every session works in its own worktree (`CLAUDE.md`); the two bullets about sha
 
 - **Parse a runner's summary by field, never by column.** The summary line is `✗ name passed failed total time` with padding, and a long suite name eats the padding, so `$2` becomes `e2e-ai-provenance-agent-plane22` and every column after it shifts. Sanity-check any parsed list against the reported total.
 - **A suite whose server dies at start with an error in a file you are editing loaded a half-written file.** The runner starts each suite's server from `src/` through tsx, so a suite that starts between two edits loads half a change; run it again before concluding anything.
-
-## 19. A test that fails is one of three things, and saying which is the work
-*Symptoms: a suite goes green after a change nobody can justify.*
-
-- **A seeded record must be waited for, never raced.** Several boot seeders are fired WITHOUT `await` in `server-bootstrap/service-init.ts` (built-in skills, bundled cortexes, example packages). A suite reading one immediately wins on sqlite and loses on postgres, where the migrations run first. A flake is worse than a missing test, because it teaches everyone to re-run until green, which is how a real regression gets waved through.
 
 ## 20. Two writers, one working tree
 *Symptoms: a pre-commit hook failing on a file you never touched; your edits and theirs interleaved inside one file.*
@@ -372,26 +362,6 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The rule.** A read that falls back to defaults is for DECIDING or DISPLAYING, never for writing back. Anything that reads in order to write takes the strict read and lets the failure throw, and it reads immediately before writing, inside a per-owner queue (`utils/serial-by-key.ts`), changing only its own fields on top of what it just read: `updateNotificationSettings(storage, ghii, cur => ({ ...cur, lastDigestAt }))`. A door that feeds an editor refuses (503) rather than serve defaults the editor would save, and the editor refuses to save without a loaded record. When a module has both reads, name them apart (`readX` / `readXStrict`) so a caller has to choose. The browser has the same shape (2026-10-16): a failed `listWorkspaces()` answered `[]` and the next create wrote the organism's registry as that one workspace, so the services in `public/js/services/` carry `…Strict` reads, every whole-record write goes through `readForWrite()` in `/js/load-state.js`, and a page refuses to save a record it did not load.
 - **The tell:** a `try { read } catch { return defaults }` whose result later flows into a `setMemory`, or a write built from a record read before an `await` that sends mail, calls a provider or waits on anything slow.
 
-## 87. A node that changed its id stops receiving its own seeded upgrades
-
-*Symptoms: one node refuses what the code plainly supports, and the refusal comes from the schema rather than from the feature's own checks. Deploying the newest build changes nothing, because the stale thing is a database record, not the binary.*
-
-- **The case.** orgnode.example refused every `backing: 'rows'` manifest with `allowedValues ["memory","tasks"]`, three weeks after row spaces shipped and while running code that has them. Its stored manifest-format schema was seed v4 from 2026-08-21, locked by `system@aimeat-local-001-dev`: the node first booted on the default dev id and was renamed to `example-org-001` on 2026-08-24. `seedManifestSchema` upgrades a stored record only when its `lockedBy` equals `system@{the current node id}`, so from the rename onwards every boot read the node's own earlier self as a stranger and skipped the upgrade. Twenty of that node's 34 schema records carry the old lock. Measured 2026-09-14; fixed by adopting any `system@` lock and re-stamping it.
-- **Why the equality check looked right.** It is guarding something real: an operator who customized the schema must not have it overwritten at every boot. But `lockedBy` answers two questions at once, and only one of them is stable. `PUT /v1/memory/:key/schema` stamps the caller's GHII, and nothing but a seeder writes a `system@` lock, so the PREFIX is the durable test for "the node wrote this" while the full string is a name that is allowed to change.
-- **The tell.** Any `existing.X !== config.nodeId` in code that runs at boot. A node id is configuration, not identity: it can be set after the first boot, changed by an operator, or inherited from a restored database. Records written under the previous value are still the node's own.
-- **How to see it from outside.** `GET /v1/memory/{a concrete key}/schema` needs no auth and returns `locked_by` plus the schema, whose `$comment: aimeat-seed-vN` is the stored version. `GET /v1/schemas` lists every lock, so grouping by `locked_by` shows at a glance whether a node is seeding under a name it no longer uses.
-- **The sibling.** §88's version-gated seed is the same family with a different key: a stored artifact that only refreshes on a version comparison, where the comparison never fires.
-
-## 88. A seed that creates only what is missing never delivers a fix
-
-*Symptoms: a fix to a bundled package, prompt or preset is in the release, the node runs the release, and the node still serves the old one. `aimeat_package_update` answers "no update" to everyone who installed it. Restarting changes nothing.*
-
-- **The case.** An operator of another node reported on 2026-09-15 that the 3.15.0 company-brain fixes (source kinds, the data map, the workspace name) reached no node that had already seeded the package. `package-seeder.ts` skipped a group with any published version, and the package version was the seed's wall-clock stamp, so nothing about the content was ever compared. aimeat.io was in the same state. The same rule held two other stores: system prompts outside the code-owned groups (`bootstrap-auth` and `anonymous-share` went on telling agents to use micro-memory after it was deleted on 2026-08-23), and the Design Book leiskat (rewritten on 2026-09-05, bare on every node seeded before).
-- **Why it looked right.** Create-if-missing protects something real: an operator's edit must survive a restart. But it cannot tell an edit from an untouched copy, so it treats every existing record as edited, and the protection costs every fix the project ships.
-- **The rule.** A boot seed compares what it would write with what is stored, and needs a way to know whether anyone else wrote it. Three answers now exist, one per store: the package fingerprint (a system package has no other writer, so a changed fingerprint is always safe to publish as a new version), the prompt's newest version entry (a factory write whose text is still stored means nobody changed it), and the Design Book part's owner (only the system can propose a system part; its status stays the operator's). `skill-seeds.ts` has the fourth, a stored fingerprint of what it last wrote. A version-gated seed (cortexes, extensions, the manifest schema) is a fifth, and a forgotten bump means no node that already has it ever gets the change. A bundled cortex code change is three edits: the code, the pack's `VERSION` constant, and `spec.version` in its manifest. `test/unit/cortex-bundle-versions.test.ts` reads the pack files rather than importing them, so the local gate (which picks tests by import graph) does not run it: run it by hand and record the line it prints.
-- **What is still create-if-missing, measured 2026-09-15.** Profile schemas, CSM templates, template bundles, core scheduled jobs and the anonymous identity's scopes. None of their content had changed since 2026-08-01, so nothing is stuck yet; the first change to any of them will be.
-- **The tell.** `if (existing) continue` in anything under `server-bootstrap/` or named `seed*`. Ask what happens to a node that booted yesterday when this file changes today.
-
 ## 98. An AI SDK provider package checks the answer's shape and the model id, and neither shows as an error
 
 *Symptoms: an answer from an Anthropic provider stops mid-sentence at about 4096 tokens with finish reason `length`, and the only trace is a warning line in the console.*
@@ -424,14 +394,6 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The case.** On 2026-10-03 the help question mark (`components/HelpTip.js`) was put after a Facts row's name, which is a `.poster-label`: uppercase, spaced, coral. The tooltip and the explanation dialog are children of the HelpTip span, and the explanation read as coral capitals. The dialog is the site's Modal on the browser's own `<dialog>` opened with `showModal()`. The top layer changes where a dialog is drawn, not where it sits in the DOM, so it inherits `color`, `font-*`, `letter-spacing`, `text-transform`, `line-height` and `text-align` from its DOM parent like any other element. The SPA has no portal (preact/compat is not loaded), so a dialog is always rendered at the place its component is called.
 - **The rule.** A component that renders a dialog or a tooltip inline resets the inherited text styles on its own wrapper to the body's tokens (`help-tip.css` `.help-tip`: `color`, `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, `text-transform`, `text-align`), and its trigger button sets its own face. Where the caller controls the markup, put the trigger outside the styled element instead: `PageHead` draws its HelpTip after the `<h1>`, not inside it.
 - **The tell.** A Modal, a `<dialog>` or a `position: fixed` popover called from inside a label, a `th`, a heading or any element whose class sets `text-transform` or a colour. Open it once in the browser from that place, not from the design lab demo, where it sits in plain body text.
-
-## 119. After a deploy, agents no longer see tools they used yesterday; every test is green
-
-*Symptoms: an agent connected over the node's MCP says a tool does not exist (`aimeat_workspace_read`, `aimeat_workspace_publish`); a test agent with `*` sees it; the suites that broke were fixed by giving their test agents a new scope word.*
-
-- **The case.** The secaudit 2026-10 follow-up (A4, `65d3c5b36`) made each MCP tool ask the scope words its REST route asks. The node MCP registers a tool only when the session holds every word on it (`scopeAllowsTool`), so a new word does not refuse a call, it REMOVES the tool. `organism:read` went onto the workspace read tools, and neither `config.defaultAgentScopes` nor the "standard" consent preset carries it: on aimeat.io every agent approved with them lost workspace read, overview, organism search and export at the deploy. Four E2E suites failed and were fixed by adding the word to their test agents, which is the one fix a real agent never gets. The same shape broke production in changelog 1.33.1. Fixed by `services/tool-scope-words-migration.ts`.
-- **The rule.** A word added to a tool's `scope` ships in the same commit as a once-per-node migration that hands the word to the agents approved before it, on positive evidence only (the word they already held that reached the tool), and never a word that opens more than the reach they had (`services/scope/vocabulary-migration.ts` and `tool-scope-words-migration.ts` say which words never go in). Check the default scopes and the consent presets as well: an agent approved tomorrow gets the same lists.
-- **The tell.** A test fixed by giving its agent a new scope word. Ask what happens to the agents in production that hold yesterday's words.
 
 ## 122. An origin fix is green, and the same code still runs on that origin by another path
 

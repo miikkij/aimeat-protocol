@@ -25,6 +25,8 @@ describe('the classification audit prune runs with consent off', () => {
     const storage = {
       getScheduledJob: async () => null,
       createScheduledJob: async (job: { id: string }) => { created.push(job.id); },
+      // The seed stamps (services/seed/stamped-seed.ts) live in memory records.
+      getMemory: async () => null, setMemory: async (r: unknown) => r,
     } as unknown as Storage;
     await seedCoreScheduledJobs(consentOff, storage);
     expect(created).toContain('core:classification-audit-prune');

@@ -16,12 +16,16 @@
  *   client/agent apply a bundle through existing endpoints without a new apply route.
  * @structure
  *   - loadBundle(kind) — parse a bundle's CSMs + manifest skeleton, compile per-type JSON Schemas
- *   - seedTemplateBundles(storage, systemGaii) — register every bundle CSM globally (idempotent)
+ *   - seedTemplateBundles(storage, systemGaii) — register every bundle CSM globally (services/csm/seed.ts
+ *     seedCsmDefinition: an unreplaced copy follows this build, a replaced one is kept)
  *   - BUNDLE_KINDS — the shipped bundles (currently: 'project')
  * @usage
  *   import { loadBundle, seedTemplateBundles } from '../services/template-bundles.js';
  *   const { objects, manifestTemplate } = loadBundle('project');
  * @version-history
+ *   v1.1.0 -- 2026-11-21 -- Seeds through seedCsmDefinition (seed stamps): a bundle CSM this build changes
+ *     reaches every node whose copy nobody replaced, and its seeder-held lock follows; until now a bundle
+ *     CSM was written only when missing.
  *   v1.0.0 -- 2026-06-07 -- Phase 3: ship + seed the project template bundle.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -30,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import type { Storage } from '../storage/interface.js';
 import { parseCsm, validateCsm, csmToJsonSchema, type CsmDefinition } from './csm-parser.js';
 import { logger } from '../utils/logger.js';
+import { seedCsmDefinition } from './csm/seed.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -108,14 +113,13 @@ export function loadBundle(kind: string): LoadedBundle {
 }
 
 /**
- * Seed every shipped bundle's object CSMs globally (idempotent by CSM name) so their compiled
- * schemas are discoverable + fetchable through the existing CSM API. Mirrors `seedCsmTemplates`.
+ * Seed every shipped bundle's object CSMs globally so their compiled schemas are discoverable +
+ * fetchable through the existing CSM API, through the same seedCsmDefinition as `seedCsmTemplates`.
  *
- * @returns number of newly registered bundle CSMs.
+ * @returns number of bundle CSMs written (created + brought up to this build).
  */
 export async function seedTemplateBundles(storage: Storage, systemGaii: string): Promise<number> {
   let seeded = 0;
-  const now = new Date().toISOString();
 
   for (const kind of BUNDLE_KINDS) {
     const dir = bundleDir(kind);
@@ -130,28 +134,9 @@ export async function seedTemplateBundles(storage: Storage, systemGaii: string):
           continue;
         }
 
-        if (await storage.getCsm(def.service.name)) continue; // idempotent
-
-        const schemaKey = `csm.${def.service.name}`;
-        await storage.setSchema({
-          keyPattern: schemaKey,
-          applyTo: 'prefix',
-          schemaJson: csmToJsonSchema(def),
-          schemaMode: def.schemaMode,
-          lockedBy: systemGaii,
-          setAt: now,
-          updatedAt: now,
-        });
-        await storage.createCsm({
-          name: def.service.name,
-          definition: def as unknown as Record<string, unknown>,
-          jsonSchemaKey: schemaKey,
-          serviceType: def.service.type,
-          registeredBy: systemGaii,
-          registeredAt: now,
-          updatedAt: now,
-        });
-        seeded++;
+        // Created when missing, brought up to this build when nobody replaced it, kept otherwise.
+        const action = await seedCsmDefinition(storage, def, systemGaii, { store: 'template-bundle', withSemantic: false, source: `${kind}/${file}` });
+        if (action === 'create' || action === 'update') seeded++;
       } catch (err) {
         logger.warn(`Failed to seed bundle CSM ${kind}/${file}`, { error: (err as Error).message });
       }

@@ -46,6 +46,9 @@
  *   import { seedBuiltinSkills } from './seeds.js';
  *   seedBuiltinSkills(storage, config).then(r => ...);
  * @version-history
+ *   v2.3.0 -- 2026-11-21 -- The decision and the fingerprint are the ones every stamped seed uses
+ *     (services/seed/stamped-seed.ts decideStampedSeed, seedFingerprint); same answers. The stamps stay
+ *     under the keys and owner they always had, so no node loses what it knows.
  *   v2.2.0 -- 2026-11-08 -- A pre-fingerprint copy still at version 1.0.0 is updated: it was seeded and
  *     never published again, so it is not an edit. Two such copies on production never moved.
  *   v2.1.0 -- 2026-09-19 -- Removes a retired built-in skill from a node that never edited it.
@@ -55,8 +58,8 @@
  *     Agent Skills discovery index is never empty); default stays 'members'
  *   v1.0.0 -- 2026-07-05 -- Initial (Skills feature Phase 2b)
  */
-import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
+import { decideStampedSeed, seedFingerprint } from '../seed/stamped-seed.js';
 import type { Storage } from '../../storage/interface.js';
 import { BUILTIN_SKILLS } from '../../data/builtin-skills.js';
 import { RETIRED_BUILTIN_SKILLS } from '../../data/builtin-skills.retired.js';
@@ -83,8 +86,7 @@ export type SeedAction =
 export const seedStampKey = (name: string): string => `skills.${name}.seeded-from-repo`;
 
 /** Fingerprint of one skill text. Not a secret and not a signature: an equality check that fits in a record. */
-export const skillFingerprint = (text: string): string =>
-  createHash('sha256').update(text, 'utf8').digest('hex');
+export const skillFingerprint = (text: string): string => seedFingerprint(text);
 
 /**
  * Decide what happens to one skill, from three texts and nothing else.
@@ -94,14 +96,12 @@ export const skillFingerprint = (text: string): string =>
  *   repo  — what this build ships
  */
 export function decideSeedAction(live: string | null, stamp: string | null, repo: string, neverRepublished = false): SeedAction {
-  if (live === null) return 'create';
-  // A copy from before fingerprints that is still at its first version was written by the seeder
-  // and never published again, so nobody edited it here: an edit on the node is a publish, and a
-  // publish bumps the version. Production held aimeat-node-guide and aimeat-open-items that way at
-  // 1.0.0 for months, the first still sending a new app to the Classic track (2026-11-08).
-  if (stamp === null) return live === repo ? 'adopt' : neverRepublished ? 'update' : 'keep-unknown';
-  if (skillFingerprint(live) !== stamp) return 'keep-edited';
-  return live === repo ? 'current' : 'update';
+  // The rule every stamped seed follows (services/seed/stamped-seed.ts). A copy from before
+  // fingerprints that is still at its first version was written by the seeder and never published
+  // again, so nobody edited it here: an edit on the node is a publish, and a publish bumps the
+  // version. Production held aimeat-node-guide and aimeat-open-items that way at 1.0.0 for months,
+  // the first still sending a new app to the Classic track (2026-11-08).
+  return decideStampedSeed(live === null ? null : skillFingerprint(live), stamp, skillFingerprint(repo), { untouchedWithoutStamp: neverRepublished });
 }
 
 /** What to do with one skill this repo no longer ships. */

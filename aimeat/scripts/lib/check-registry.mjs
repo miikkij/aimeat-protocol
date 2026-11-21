@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-21: check:scope-words, a scope word added to an MCP tool or REST route that already exists needs a keep-working step new in the same change, or a written reason (docs/pitfalls.md §119, now deleted).
  *  - 2026-11-21: check:overrides, a dependency override's value stays inside one major (docs/pitfalls.md §59, now deleted).
  *  - 2026-11-21: check:no-nul, no raw NUL byte in tracked source text under src/, test/, scripts/ and public/ (docs/pitfalls.md §69, now deleted).
  *  - 2026-11-20: check:app-ref, an app's name and its `.html` file are related only in src/services/app/app-ref.ts.
@@ -110,6 +111,7 @@ export const FAST_CHECKS = [
     { script: 'check:protocol-versions', label: 'Protocol versions declared vs current' },
     { script: 'check:supply-chain', label: 'CI and model images: third-party code runs pinned, and never beside a secret or a write token' },
     { script: 'check:route-scopes', label: 'Route authorization gates' },
+    { script: 'check:scope-words', label: 'A scope word added to an existing MCP tool or route comes with the step that keeps earlier agents working' },
     { script: 'check:denial-coverage', label: 'Every suite asks what a second principal gets, and every authenticated route has a refusal test' },
     // QA audit 2026-10, W27: 138 of 431 catalog MCP tools were named by no E2E suite, so a handler's
     // own access check could be removed with every suite green. The list may only shrink.
