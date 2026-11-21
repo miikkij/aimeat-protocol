@@ -23,6 +23,7 @@
  *   v1.2.0 -- 2026-11-15 -- The hooks run in findBash()'s bash (Git Bash on Windows), not the first
  *     `bash` on PATH, which from PowerShell is WSL's; the tests skip with a reason when none is
  *     found. The ritual must name `pnpm test:env:init --force`.
+ *   v1.3.0 -- 2026-11-21 -- The WorktreeCreate hook prints the drive letter in the caller's case.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -271,5 +272,27 @@ describe.skipIf(NO_BASH)('a worktree made by the WorktreeCreate hook runs the gi
         wg('add', 'change.txt');
         wg('-c', 'user.name=Hook Test', '-c', 'user.email=hook@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'first commit in the worktree');
         expect(existsSync(marker), 'the pre-commit hook did not run in the new worktree').toBe(true);
+    });
+
+    // Claude Code compares the path the hook prints with the session's working directory letter for
+    // letter. VS Code starts a session at `c:\dev\...`, git answers `C:/dev/...`, and a session that
+    // entered a worktree printed with the other drive-letter case had every shell command refused.
+    it.skipIf(process.platform !== 'win32')('prints the worktree path with the drive letter spelled as the caller spelled it', () => {
+        const origin = join(scratch, 'origin-case');
+        const og = gitRepo(origin);
+        mkdirSync(join(origin, 'aimeat'), { recursive: true });
+        writeFileSync(join(origin, 'aimeat', 'README'), 'placeholder\n');
+        og('add', '.');
+        og('-c', 'core.hooksPath=', 'commit', '-qm', 'origin');
+        const clone = join(scratch, 'clone-case');
+        execFileSync('git', ['clone', '-q', origin, clone]);
+        const first = clone.charAt(0);
+        const flipped = (first === first.toUpperCase() ? first.toLowerCase() : first.toUpperCase()) + clone.slice(1);
+        const made = execFileSync(BASH as string, [WORKTREE_CREATE], {
+            cwd: clone, encoding: 'utf8', timeout: 60_000,
+            input: JSON.stringify({ name: 'cc-test-case', cwd: flipped }),
+            env: { ...process.env, AIMEAT_WORKTREE_HOOK_SKIP_INSTALL: '1' },
+        }).trim();
+        expect(made).toBe(join(flipped, '.worktrees', 'cc-test-case'));
     });
 });
