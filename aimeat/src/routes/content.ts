@@ -30,10 +30,16 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { callerOf } from '../middleware/caller.js';
 import { logger } from '../utils/logger.js';
+import { z } from 'zod';
+import { validateBody } from '../models/schemas.js';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import {
   factsViewFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
   removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, heldFor, releaseFor, ContentError, ContentClassError,
 } from '../services/content/service.js';
+
+/** POST /v1/content/risk/release: the ref GET /v1/content/risk/held gave. */
+const ReleaseBody = z.object({ ref: z.string().min(3).max(INPUT_LIMITS.url) }).strict();
 
 export function contentRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -141,7 +147,7 @@ export function contentRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   }));
   // ── POST /v1/content/risk/release ── { ref }: other people's AIs then get the content, with its marks.
-  router.post('/v1/content/risk/release', requireAuth(), requireScope('storage:read'), run(async (req, res) => {
+  router.post('/v1/content/risk/release', requireAuth(), requireScope('storage:read'), validateBody(ReleaseBody, config.nodeId), run(async (req, res) => {
     res.json(success(config.nodeId, await releaseFor(deps, callerOf(req, config.nodeId, storage), (req.body ?? {}).ref)));
   }));
 

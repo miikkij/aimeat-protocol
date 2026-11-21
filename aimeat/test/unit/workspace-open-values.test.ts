@@ -12,6 +12,8 @@
  * @structure fixture (classification-reads-review.test.ts) · cases
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-open-values.test.ts
  * @version-history
+ *   2026-11-21 — The opened items carry content_risk for the AI reader: the expected shape was the old
+ *     answer's, not a defect (services/content/risk-read.ts).
  *   2026-11-04 — Initial (codebase analysis 2026-11-03, item C7).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -121,9 +123,11 @@ describe('workspace batch-open reads only what it opens (C7)', () => {
     const b = await storage.getMemory(ALICE, `${ROOT}.notes.b.latest`);
     const bd = await storage.getMemory(ALICE, `${ROOT}.notes.b.draft`);
     const p = await storage.getMemory(BOB, `${ROOT}.pages.p.latest`);
+    // An AI reader's item carries its content risk marks (services/content/risk-read.ts); these plain notes have none.
+    const unmarked = expect.objectContaining({ v: 1, marked: false, use: 'normal', marks: [] });
     expect(data.items).toEqual([
-      { space: 'note', id: 'b', value: b!.value, published: true, _version: b!.version, _createdAt: b!.createdAt, _updatedAt: b!.updatedAt, draft: bd!.value, _draftVersion: bd!.version },
-      { space: 'page', id: 'p', value: p!.value, published: true, _version: p!.version, _createdAt: p!.createdAt, _updatedAt: p!.updatedAt },
+      { space: 'note', id: 'b', value: b!.value, published: true, _version: b!.version, _createdAt: b!.createdAt, _updatedAt: b!.updatedAt, draft: bd!.value, _draftVersion: bd!.version, content_risk: unmarked },
+      { space: 'page', id: 'p', value: p!.value, published: true, _version: p!.version, _createdAt: p!.createdAt, _updatedAt: p!.updatedAt, content_risk: unmarked },
     ]);
     // The record hidden from an AI is not in the read at all, as before.
     expect(data.missing).toEqual(['nope', 'hid']);

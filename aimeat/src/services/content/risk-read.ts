@@ -57,11 +57,11 @@ export type RiskReader = Pick<CallerContext, 'inPerson' | 'ownerGhii' | 'princip
 
 /**
  * The reader of a caller that carries no `inPerson` (a workspace operation's caller): the account
- * holder in person is the session whose principal is the owner's GHII with the owner role and no app
- * or extension acting.
+ * holder in person is the session whose principal is the owner's GHII itself (an agent's is its GAII)
+ * with no app grant or extension acting in their name.
  */
 export function riskReaderOf(c: { principal: string; ownerGhii: string; roles: readonly string[]; extension?: string }): RiskReader {
-  return { principal: c.principal, ownerGhii: c.ownerGhii, inPerson: c.principal === c.ownerGhii && c.roles.includes('owner') && !c.roles.includes('app') && !c.extension };
+  return { principal: c.principal, ownerGhii: c.ownerGhii, inPerson: c.principal === c.ownerGhii && !c.roles.includes('app') && !c.extension };
 }
 
 export interface ReadRisk {
@@ -72,6 +72,7 @@ export interface ReadRisk {
 }
 
 const CACHE_SIZE = 2000;
+// process-local: the rules' answer for a hash is the same in every process; a second process computes its own once.
 const cache = new Map<string, { marks: RiskMark[]; truncatedAt?: number }>();
 
 function rulesFor(text: string, hash: string, r: ResolvedRisk): { marks: RiskMark[]; truncatedAt?: number } {

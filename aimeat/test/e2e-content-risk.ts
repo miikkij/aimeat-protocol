@@ -25,29 +25,17 @@
  */
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
-
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err) { failed++; console.error(`  ❌ ${name}: ${(err as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-
+import { BASE, test, assert, json, expectRefusal, finish } from './helpers/harness.js';
 type Body = Record<string, any>;
 interface Answer { status: number; body: Body; text: string }
+/** One call through the harness's json(), with a bearer token and a JSON body. */
 async function call(path: string, opts: { token?: string; body?: unknown; method?: string } = {}): Promise<Answer> {
     const method = opts.method ?? (opts.body === undefined ? 'GET' : 'POST');
-    const res = await fetch(BASE + path, {
-        method,
-        headers: { ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}) },
+    const r = await json<Body>(path, {
+        method, ...(opts.token ? { headers: { Authorization: `Bearer ${opts.token}` } } : {}),
         ...(opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }),
-        signal: AbortSignal.timeout(60_000),
     });
-    const text = await res.text();
-    let body: Body = { _raw: text };
-    try { body = JSON.parse(text) as Body; } catch { /* a non-JSON body stays raw */ }
-    return { status: res.status, body, text };
+    return { status: r.status, body: r.body ?? {}, text: JSON.stringify(r.body ?? null) };
 }
 const show = (r: Answer) => `${r.status} ${r.text.slice(0, 400)}`;
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -245,6 +233,17 @@ await test('Hold: with the workspace at hold, B\'s marked comment reaches C\'s a
     heldRef = item.ref;
 });
 
+await test('Refusals: a token without storage:read lists nothing; another person releases nothing of A\'s', async () => {
+    // agentC holds memory:read and organism:read, not storage:read, the word both routes ask at the door.
+    const held = await call('/v1/content/risk/held', { method: 'GET', token: agentC.token });
+    assert(held.status === 403 && held.body.error?.code === 'SCOPE_DENIED', `held without storage:read: ${show(held)}`);
+    const release = await call('/v1/content/risk/release', { method: 'POST', token: agentC.token, body: { ref: heldRef } });
+    assert(release.status === 403 && release.body.error?.code === 'SCOPE_DENIED', `release without storage:read: ${show(release)}`);
+    // B, a member who wrote the held comment and is not an approver, may not release it.
+    expectRefusal(await call('/v1/content/risk/release', { token: B.token, body: { ref: heldRef } }), 404, 'NOT_FOUND');
+    expectRefusal(await call('/v1/content/risk/release', { token: A.token, body: { ref: heldRef, extra: 1 } }), 400);
+});
+
 await test('Release: A\'s agent without memory:write-reserved is refused; A in person releases and C\'s agent gets the body', async () => {
     const mcp = await openSession(BASE, agentA.token);
     const refused = await callTool(mcp, 'aimeat_content_hold', { action: 'release', ref: heldRef });
@@ -304,5 +303,4 @@ await test('Request: aimeat_content_inspect with the risk step marks A\'s own re
     assert(kinds.has('hidden-text') && kinds.has('ai-instruction') && r.body.data.facts.risk.point === 'request', `request marks: ${JSON.stringify(r.body.data.facts.risk)}`);
 });
 
-console.log(`\n${passed} passed, ${failed} failed\n`);
-process.exit(failed ? 1 : 0);
+finish();

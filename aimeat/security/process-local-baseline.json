@@ -1832,6 +1832,26 @@
     "src/services/site.ts :: let :: nodeSite": {
       "count": 1,
       "reason": "the SiteService of this process; a second process has its own front-page cache, so a page stored there is served here until siteCacheTtlSeconds runs out"
+    },
+    "src/services/content/risk-core.ts :: map :: noticeWindow": {
+      "count": 1,
+      "reason": "Each process counts its own content risk notices per recipient, so N active processes allow N times the hourly limit; one active process plus a standby keeps it."
+    },
+    "src/services/content/risk-intake.ts :: map :: perHome": {
+      "count": 1,
+      "reason": "The content risk queue of the process that took the write, as content/intake.ts keeps its own; its items are marked there, and a read still carries the rules' marks when that process stops first."
+    },
+    "src/services/content/risk-intake.ts :: let :: worker": {
+      "count": 1,
+      "reason": "The worker of this process's own content risk queue."
+    },
+    "src/services/content/risk-intake.ts :: let :: dropped": {
+      "count": 1,
+      "reason": "How many items this process left unmarked, for its own log line."
+    },
+    "src/services/content/risk-read.ts :: map :: cache": {
+      "count": 1,
+      "reason": "The rules' marks for a hash are the same in every process; a second process computes its own once."
     }
   }
 }

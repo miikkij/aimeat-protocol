@@ -114,6 +114,7 @@ export function behaviourAt(r: ResolvedRisk, point: RiskPoint): RiskBehaviour {
 
 const NOTICE_LIMIT = 20;
 const HOUR = 3_600_000;
+// process-local: each process counts its own notices per recipient, so N active processes allow N times the hourly limit; one active process plus a standby keeps it.
 const noticeWindow = new Map<string, { since: number; sent: number; over: boolean }>();
 
 /** Whether one more notice may go to this recipient now; the first one past the limit says so. */

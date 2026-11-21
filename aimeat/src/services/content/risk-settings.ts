@@ -119,8 +119,19 @@ export function lenientRiskLayer(v: unknown): RiskLayer | null {
 type RiskConfig = Pick<AimeatConfig, 'contentRiskMode' | 'contentRiskDetect' | 'contentRiskAi' | 'contentRiskOnIntake' | 'contentRiskOnSharedWrite'
   | 'contentRiskOnRead' | 'contentRiskFloorIntake' | 'contentRiskFloorSharedWrite' | 'contentRiskFloorRead' | 'contentRiskKinds'>;
 
-/** The operator's layer: the node's defaults and floors, as a reader of the settings sees them. */
-export function nodeRiskLayer(config: RiskConfig): { mode: 'on' | 'off'; defaults: ResolvedRisk; floors: Record<(typeof POINT_FIELDS)[number], RiskBehaviour>; ai: 'allow' | 'deny' } {
+/**
+ * The operator's layer: the node's defaults and floors, as a reader of the settings sees them. A field
+ * a config does not carry (a config built by hand, a test's) takes the default config/content-class.ts
+ * gives it.
+ */
+export function nodeRiskLayer(given: Partial<RiskConfig>): { mode: 'on' | 'off'; defaults: ResolvedRisk; floors: Record<(typeof POINT_FIELDS)[number], RiskBehaviour>; ai: 'allow' | 'deny' } {
+  const config: RiskConfig = {
+    contentRiskMode: given.contentRiskMode ?? 'on', contentRiskDetect: given.contentRiskDetect ?? 'rules', contentRiskAi: given.contentRiskAi ?? 'allow',
+    contentRiskOnIntake: given.contentRiskOnIntake ?? 'mark', contentRiskOnSharedWrite: given.contentRiskOnSharedWrite ?? 'mark',
+    contentRiskOnRead: given.contentRiskOnRead ?? 'mark+warn', contentRiskFloorIntake: given.contentRiskFloorIntake ?? 'off',
+    contentRiskFloorSharedWrite: given.contentRiskFloorSharedWrite ?? 'off', contentRiskFloorRead: given.contentRiskFloorRead ?? 'off',
+    contentRiskKinds: given.contentRiskKinds ?? RISK_KINDS.join(','),
+  };
   const kinds = config.contentRiskKinds.split(',').map((s) => s.trim()).filter((s): s is RiskKind => (RISK_KINDS as readonly string[]).includes(s));
   const from = { enabled: 'node', detect: 'node', on_intake: 'node', on_shared_write: 'node', on_read: 'node', kinds: 'node' } as const;
   return {

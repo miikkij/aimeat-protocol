@@ -46,8 +46,11 @@ const MAX_PENDING_PER_HOME = 50;
 
 interface Pending { deps: Deps; subject: RiskSubject; point: Exclude<RiskPoint, 'read' | 'request'>; writer?: string; text?: string; expiresAt?: string }
 const pending: Pending[] = [];
+// process-local: the queue of the process that took the write; its items are marked there, and the read still carries the rules' marks if that process stops before them.
 const perHome = new Map<string, number>();
+// process-local: the worker of this process's own queue.
 let worker: Promise<void> | null = null;
+// process-local: how many items this process left unmarked, for its log line only.
 let dropped = 0;
 /** The accounts whose erasure runs now: their items are not queued, and the one in progress is waited for. */
 const erasing = new ErasureHolds();
