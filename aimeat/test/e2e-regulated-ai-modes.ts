@@ -147,7 +147,8 @@ await test('NOTIFY (the default): far reads the Patients record as before, and a
 
 await test('WHO: alice, who does not run the node, cannot set the modes (403); bob cannot change her register\'s mode (404)', async () => {
     const bob = await registerOwner(BASE, `regbob${stamp}`);
-    expectRefusal(await setConfig(alice.token, 'compliance.regulated_ai_modes', ['health=notify']), 403);
+    const notOperator = await setConfig(alice.token, 'compliance.regulated_ai_modes', ['health=notify']);
+    expectRefusal(notOperator, 403);
     const r = await call('PUT', `/v1/compliance/docs/registers?${q(ORG())}`, bob.token, { items: [] });
     expectRefusal(r, 404);
     const kept = await call('GET', `/v1/compliance/docs/registers?${q(ORG())}`, alice.token);
@@ -160,7 +161,8 @@ await test('SETTING: an unknown domain or mode is refused (400); an agent cannot
     const opAgent = await makeAgent(BASE, op, ['*', 'operator:admin'], `regopa${stamp % 100000}`);
     const tighter = await setConfig(opAgent.token, 'compliance.regulated_ai_modes', ['health=local']);
     assert(tighter.status === 200, `an agent tightens: ${tighter.status} ${JSON.stringify(tighter.body?.error)}`);
-    expectRefusal(await setConfig(opAgent.token, 'compliance.regulated_ai_modes', ['health=protect']), 403, 'PERSON_REQUIRED');
+    const looser = await setConfig(opAgent.token, 'compliance.regulated_ai_modes', ['health=protect']);
+    expectRefusal(looser, 403, 'PERSON_REQUIRED');
     const person = await setModes(['health=protect']);
     assert(person.status === 200, `the operator in person loosens: ${person.status} ${JSON.stringify(person.body?.error)}`);
 });
