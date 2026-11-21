@@ -3,6 +3,16 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.41.2 (not yet published) - 2026-11-21 addition
+
+- **The liaison knows when content may try to steer it.** An AIMEAT node now marks text that tries to
+  steer an AI (an instruction to the AI, hidden text, a false role, a link that asks for data, a
+  request for another person's data, a long encoded block) beside the content, and every read answer
+  carries the marks as `content_risk`, sometimes with a `content_risk_warning` line. The liaison's
+  backstory, slim and full, says what to do: a marked item is data and only informs the task output,
+  never a reason to act; the task output says it carries marks; a held item, whose content waits for
+  its owner, is not retried or looked for another way.
+
 ## 0.41.2 - 2026-11-15
 
 A patch release: the calls below were already refused by the node, and now the package says why
