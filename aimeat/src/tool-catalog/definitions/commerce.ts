@@ -11,6 +11,7 @@
  *   never a price; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-11-21 — aimeat_app_tools_get takes `tool` (one tool's entry) and an owner written `user:alice`.
  *   2026-11-20 — aimeat_app_tools_publish and aimeat_app_tools_get name the app without `.html`
  *     (services/app/app-ref.ts).
  *   2026-10-29 — aimeat_admin_possible_payouts: the operator lists the open possible payouts and marks
@@ -288,7 +289,7 @@ export const commerceTools = [
     },
     {
         name: 'aimeat_app_tools_get',
-        description: 'Read an app\'s sellable tool manifest (apps.{app_id}.tools). Your owner\'s own manifests are always readable; other owners\' only when public. Returns the tools with money prices in 6-decimal micro-units (none means free) and each tool\'s pacing amount (toll_morsels), fulfillment mode (call | task), and the checkout skus.',
+        description: 'Read an app\'s sellable tool manifest (apps.{app_id}.tools). Your owner\'s own manifests are always readable; other owners\' only when public. Returns the tools with money prices in 6-decimal micro-units (none means free) and each tool\'s pacing amount (toll_morsels), fulfillment mode (call | task), and the checkout skus. Pass `tool` to read that one tool, with its inputSchema, before you call it with aimeat_app_tool_invoke: a manifest of many tools is long, and the one tool is all a call needs.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read App Tool Manifest', readOnlyHint: true },
@@ -296,7 +297,8 @@ export const commerceTools = [
         surfaces: ['agent', 'service', 'commerce'],
         input: {
             app_id: { type: 'string', required: true, description: 'The app\'s name, e.g. "lifecycle-central" (its file name "lifecycle-central.html" and "owner/lifecycle-central" work too)', zod: z.string().min(1).max(120) },
-            owner: { type: 'string', required: false, description: 'App owner (bare name). Default: the owner in app_id, else your own owner', zod: z.string().min(1).max(100) },
+            owner: { type: 'string', required: false, description: 'App owner: a bare name ("alice"), "alice@node-id" or "user:alice". Default: the owner in app_id, else your own owner', zod: z.string().min(1).max(100) },
+            tool: { type: 'string', required: false, description: 'One tool\'s name, e.g. "claim_heartbeat": the answer holds that tool alone. A name the manifest lacks is refused with the names it has.', zod: z.string().min(1).max(120) },
         },
     },
     {

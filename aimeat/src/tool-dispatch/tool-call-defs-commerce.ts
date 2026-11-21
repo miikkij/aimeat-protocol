@@ -12,6 +12,8 @@
  * @structure commerceCliTools[] — the handler table, spread by tool-call.ts
  * @usage import { commerceCliTools } from './tool-call-defs-commerce.js';
  * @version-history
+ *   2026-11-21 — aimeat_app_tools_get takes `tool` and answers that one tool's entry, and drops a
+ *     `user:` prefix from owner, as the node MCP tool does.
  *   2026-11-20 — aimeat_app_tools_get reads the manifest of an app named without `.html`
  *     (services/app/app-ref.ts order); aimeat_app_tools_publish already lands there through the shared
  *     memory write (services/app/tools-key.ts).
@@ -30,6 +32,7 @@ import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.j
 import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredArray, optionalRecord } from './tool-call-helpers.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import { appFilenameCandidates, splitAppRef } from '../services/app/app-ref.js';
+import { pickManifestTool } from '../services/app-tools/one-tool.js';
 
 export const commerceCliTools: ConnectCliToolDefinition[] = [
     {
@@ -110,13 +113,16 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
     {
         // → GET /v1/memory/apps.{app_id}.tools — read the manifest (own always; others only when public).
         name: 'aimeat_app_tools_get',
-        description: 'Read an app\'s sellable tool manifest (apps.{app_id}.tools). Omit owner for your own; pass a full GHII (owner@node) to read another owner\'s PUBLIC manifest.',
+        description: 'Read an app\'s sellable tool manifest (apps.{app_id}.tools). Omit owner for your own; pass a full GHII (owner@node) to read another owner\'s PUBLIC manifest. Pass tool to read that one tool\'s entry.',
         input: {
             app_id: { type: 'string', required: true, description: 'The app\'s published filename.' },
             owner: { type: 'string', description: 'App owner GHII (owner@node) for a cross-owner public read. Default: your own owner.' },
+            tool: { type: 'string', description: 'One tool\'s name: the answer holds that tool alone.' },
         },
         handler: async ({ client }, input) => {
-            const owner = optionalString(input, 'owner');
+            // `user:alice@node` is the GHII `alice@node`: the prefix is how a skill ref names its owner.
+            const owner = optionalString(input, 'owner')?.replace(/^user:/, '');
+            const oneTool = optionalString(input, 'tool');
             // A bare owner used to fall back to reading YOUR OWN manifest, which is the worst kind
             // of wrong answer: the caller asked about someone else's app and got their own back with
             // no indication that the question had changed. Say so instead.
@@ -140,7 +146,17 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
                 if (resp.ok !== false || resp.error?.code !== 'NOT_FOUND') break;
                 resp = await read(id);
             }
-            return resp;
+            if (!oneTool || resp.ok === false) return resp;
+            // The memory route answers the record; its `value` is the manifest (services/app-tools/one-tool.ts).
+            const data = (resp as { data?: { value?: unknown } }).data;
+            const picked = pickManifestTool(data?.value, oneTool);
+            if (!picked.ok) {
+                return { ok: false as const, error: {
+                    code: 'TOOL_NOT_FOUND',
+                    message: `no tool "${oneTool}" in this manifest. Its tools: ${picked.names.join(', ') || 'none'}.`,
+                } };
+            }
+            return { ok: true as const, data: { tool: picked.tool } };
         },
     },
     {

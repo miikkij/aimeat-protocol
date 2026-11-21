@@ -21,6 +21,9 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-11-21 — aimeat_app_tool_invoke checks the input through checkAppToolInputOrRefuse
+ *     (services/app/tool-input-refusal.ts): the refusal lists the accepted fields and the app's bound
+ *     skills and is recorded on the tool's usage coordinate. The owner may be written `user:alice`.
  *   2026-11-20 — aimeat_app_tool_invoke takes the app's name without `.html` and `owner/name`
  *     (services/app/app-ref.ts); its not-found hint names the nearest manifests first, without `.html`.
  *   2026-11-14 — aimeat_app_tool_invoke reads the manifest through loadPublicToolManifest
@@ -113,8 +116,8 @@ import { recordCallDuration } from '../services/call-timing.js';
 import { meteredRefusalText } from '../services/extension-access/metered-response.js';
 import { applyLockedInput, isToolPriced } from '../models/app-tool-schemas.js';
 import { appToolManifestIds, loadPublicToolManifest, resolveToolManifestId } from '../services/app-tools/manifest-read.js';
-import { appDisplayName } from '../services/app/app-ref.js';
-import { checkAppToolInput } from '../services/app/tool-input.js';
+import { appDisplayName, appOwnerName } from '../services/app/app-ref.js';
+import { checkAppToolInputOrRefuse } from '../services/app/tool-input-refusal.js';
 import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
 import { sendDirectMessage } from '../services/message/send.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -175,7 +178,8 @@ export function registerExchangeRunTools(
             annotations: annotationsFor('aimeat_app_tool_invoke'),
         },
         async ({ owner: appOwner, app: appRef, tool, input }) => {
-            const ownerName = localAccountName(appOwner);
+            // `user:alice` (the owner part of a skill ref) names the account `alice` too.
+            const ownerName = appOwnerName(appOwner);
             // `lifecycle-central`, `lifecycle-central.html` and `owner/lifecycle-central` all name the
             // stored app (services/app/app-ref.ts); everything below keys on the stored filename.
             const app = await resolveToolManifestId(storage, ownerName, `${ownerName}@${config.nodeId}`, appRef);
@@ -195,7 +199,9 @@ export function registerExchangeRunTools(
             // Checked against the tool's published schema BEFORE anything is metered, and every
             // problem named at once (services/app/tool-input.ts).
             const toolInput = applyLockedInput(toolDef, (input ?? {}) as Record<string, unknown>);
-            const inputCheck = checkAppToolInput(toolDef, toolInput);
+            const inputCheck = await checkAppToolInputOrRefuse({ storage, config }, {
+                ownerName, filename: app, tool: toolDef, input: toolInput, callerGaii,
+            });
             if (!inputCheck.ok) return fail(`INVALID_INPUT: ${inputCheck.message}`);
 
             const coordExt = `apptool:${ownerName}/${app}`;

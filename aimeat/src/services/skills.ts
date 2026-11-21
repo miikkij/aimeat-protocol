@@ -32,6 +32,8 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   2026-11-21 — publishSkill answers `toolFieldIssues` for a skill bound to an app: each field its
+ *     written calls send that the app's tool manifest refuses (skill/tool-fields.ts).
  *   2026-11-20 — A binding `app:owner/name` is stored and listed with the app's file name
  *     (services/app/app-ref.ts); a binding written without `.html` was never listed.
  *   2026-11-14 — A node skill whose `metadata.requires_config` switch is off reads as FEATURE_OFF.
@@ -129,6 +131,7 @@ export { parseSkillRef, formatSkillRef, scopeOwnerGhii, readNodeSkillBody, type 
 
 // The stored and returned shapes and SkillAccessError live in skill-types.ts (max-file-lines).
 import { resolveBindingRef } from './app/app-ref.js';
+import { skillToolFieldIssues } from './skill/tool-fields.js';
 import { SkillAccessError, skillFeatureOff, type SkillVersionSnapshot, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill/types.js';
 export { SkillAccessError, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill/types.js';
 
@@ -422,6 +425,9 @@ export async function publishSkill(
 
   const summary = toSummary(record, opts.scope, opts.scope === 'user' ? opts.owner! : null, isWs ? org : undefined, isWs ? ws : undefined);
   if (parsed.issues.length > 0) summary.standardIssues = parsed.issues.map(({ code, field, message }) => ({ code, field, message }));
+  // A skill bound to an app: the calls it writes, held to the app's tool manifest (skill/tool-fields.ts).
+  const toolFieldIssues = await skillToolFieldIssues(storage, config, storedBinding, fileTexts);
+  if (toolFieldIssues.length > 0) summary.toolFieldIssues = toolFieldIssues;
   return summary;
 }
 

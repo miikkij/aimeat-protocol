@@ -27,6 +27,9 @@
  *   - Phase 5: the provider side (consumers) and the refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-exchange
  * @version-history
+ *   2026-11-21 — Phase 7 (31-34): a bound skill's call with a refused field is named at publish; the
+ *     refusal of an app tool's input lists the accepted fields, names the bound skill and the one-tool
+ *     read, and carries the correct-the-input step; aimeat_app_tools_get takes `tool`; `user:<owner>`.
  *   v1.3.0 — 2026-10-17 — 6, 7: the exchange words are one-press, so an agent without them is listed
  *     the tools (permission ask, mcp/permission-ask-gate.ts) and every call is refused SCOPE_DENIED
  *     with the allow address; the fence is asserted on the call instead of on the list.
@@ -697,6 +700,61 @@ await test('30. The REST twin answers 400 with the same missing fields in detail
     assert(r.status === 400 && r.body?.error?.code === 'INVALID_INPUT', `expected 400 INVALID_INPUT, got ${r.status} ${JSON.stringify(r.body?.error)}`);
     assert(JSON.stringify(r.body.error.details?.missing) === JSON.stringify(['ruling', 'why']),
         `details.missing must list both: ${JSON.stringify(r.body.error.details)}`);
+});
+
+console.log('\nPhase 7 — a refusal says how to make the next call right');
+
+// On 2026-11-21 an agent heartbeating a claim sent `note`, was told `note` is refused and which two
+// fields are required, guessed again, and was then told to write to the operators. These hold what
+// the refusal owes it instead: every field the tool accepts, the app's skill, and the step to correct.
+const STRICT_SKILL = `strict-guide-${Date.now().toString(36).slice(-6)}`;
+
+await test('31. A skill bound to the app that writes a field the tool refuses is told so at publish', async () => {
+    const skillMd = [
+        '---', `name: ${STRICT_SKILL}`, 'description: How the strict app records a ruling.',
+        'metadata:', `  binding: "app:${provider.owner}/${STRICT_APP}"`, '---', '',
+        '# Recording', '', 'Call `record { title, ruling, why, decidedBy }` once per ruling.', '',
+    ].join('\n');
+    const r = await json('/v1/skills', { method: 'POST', headers: authed(provider.token), body: JSON.stringify({ skill_md: skillMd }) });
+    assert(r.status === 201, `skill publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    const issues = r.body.data.skill.toolFieldIssues as Array<{ tool: string; field: string; accepted: string[] }> | undefined;
+    assert(Array.isArray(issues) && issues.length === 1 && issues[0].tool === 'record' && issues[0].field === 'decidedBy',
+        `toolFieldIssues must name decidedBy and nothing else: ${JSON.stringify(issues)}`);
+    assert(JSON.stringify(issues[0].accepted) === JSON.stringify(['ruling', 'title', 'why']),
+        `…with the fields the tool accepts: ${JSON.stringify(issues[0].accepted)}`);
+});
+
+await test('32. The refusal lists every accepted field, names the bound skill, and says to correct the input', async () => {
+    const out = await callTool(providerSession, 'aimeat_app_tool_invoke', {
+        owner: provider.owner, app: STRICT_APP, tool: 'record', input: { title: 'abc', note: 'n' },
+    });
+    assert(out.isError && out.text.startsWith('INVALID_INPUT'), `expected INVALID_INPUT: ${out.text.slice(0, 300)}`);
+    assert(out.text.includes('Accepted fields: title (string, at least 3 characters, required); ruling (string, required); why (string, required). No other field is accepted.'),
+        `the refusal must list the accepted fields with types and limits: ${out.text.slice(0, 900)}`);
+    assert(out.text.includes(`user:${provider.owner}/${STRICT_SKILL}`), `the refusal must name the bound skill: ${out.text.slice(0, 900)}`);
+    assert(out.text.includes(`tool: "record"`), `the refusal must say how to read this one tool: ${out.text.slice(0, 900)}`);
+    const body = await mcpRpc(providerSession, 'tools/call', { name: 'aimeat_app_tool_invoke', arguments: { owner: provider.owner, app: STRICT_APP, tool: 'record', input: {} } });
+    const step = String(body?.result?.content?.[1]?.text ?? '');
+    assert(step.startsWith('What to do next: the message above says what the input got wrong'),
+        `a refused input gets the correct-the-input step, not the report-a-fault step: ${step.slice(0, 200)}`);
+});
+
+await test('33. aimeat_app_tools_get with tool answers that one tool; an unknown name lists the tools there are', async () => {
+    const one = await callTool(providerSession, 'aimeat_app_tools_get', { app_id: STRICT_APP, owner: provider.owner, tool: 'record' });
+    assert(!one.isError && one.data?.tool?.name === 'record' && one.data?.tool?.inputSchema?.required?.length === 3 && one.data?.manifest === undefined,
+        `one tool, with its schema, and not the manifest: ${one.text.slice(0, 300)}`);
+    const none = await callTool(providerSession, 'aimeat_app_tools_get', { app_id: STRICT_APP, owner: provider.owner, tool: 'nosuch' });
+    assert(none.isError && none.text.startsWith('TOOL_NOT_FOUND') && none.text.includes('Its tools: record'),
+        `an unknown tool names the tools the app has: ${none.text.slice(0, 300)}`);
+});
+
+await test('34. An owner written user:<name>, the way a skill ref writes it, names the same account', async () => {
+    const got = await callTool(providerSession, 'aimeat_app_tools_get', { app_id: STRICT_APP, owner: `user:${provider.owner}`, tool: 'record' });
+    assert(!got.isError && got.data?.tool?.name === 'record', `aimeat_app_tools_get with user:<owner>: ${got.text.slice(0, 300)}`);
+    const run = await callTool(providerSession, 'aimeat_app_tool_invoke', {
+        owner: `user:${provider.owner}`, app: STRICT_APP, tool: 'record', input: { title: 'abc', ruling: 'r', why: 'w' },
+    });
+    assert(!run.isError, `aimeat_app_tool_invoke with user:<owner> runs the tool: ${run.text.slice(0, 300)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-21 — aimeat_app_tools_get takes `tool` and answers that one tool's entry
+ *     (services/app-tools/one-tool.ts), and reads an owner written `user:alice` as `alice`.
  *   2026-11-20 — aimeat_app_tools_get takes the app's name without `.html` and `owner/name`
  *     (services/app/app-ref.ts); its not-found hint names the nearest manifests first, without `.html`.
  *   2026-11-14 — aimeat_app_tools_get answers the manifest of an app the operator hid as missing to anyone
@@ -130,7 +132,8 @@ import { exchangeOutcome, type ReconcileReport } from '../services/exchange/proj
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { resolveOperatorAgentName } from '../services/operator/principal.js';
 import { appToolManifestIds, resolveToolManifestId } from '../services/app-tools/manifest-read.js';
-import { appDisplayName, splitAppRef } from '../services/app/app-ref.js';
+import { appDisplayName, appOwnerName, splitAppRef } from '../services/app/app-ref.js';
+import { pickManifestTool } from '../services/app-tools/one-tool.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -344,10 +347,11 @@ export function registerCommerceTools(
             inputSchema: zodShapeFor('aimeat_app_tools_get'),
             annotations: annotationsFor('aimeat_app_tools_get'),
         },
-        async ({ app_id: appRef, owner: ownerArg }) => {
-            // `owner/name` in app_id names the owner when the owner argument is left out.
+        async ({ app_id: appRef, owner: ownerArg, tool: oneTool }) => {
+            // `owner/name` in app_id names the owner when the owner argument is left out; `user:alice`
+            // (a skill ref's owner part) names `alice` (services/app/app-ref.ts appOwnerName).
             const prefixed = splitAppRef(appRef);
-            const targetOwner = localAccountName(ownerArg ?? prefixed.owner ?? owner);
+            const targetOwner = appOwnerName(ownerArg ?? prefixed.owner ?? owner);
             // `lifecycle-central`, `lifecycle-central.html` and `owner/lifecycle-central` all name the
             // stored app (services/app/app-ref.ts); the manifest key carries the stored filename.
             const app_id = await resolveToolManifestId(storage, targetOwner, `${targetOwner}@${config.nodeId}`, appRef);
@@ -367,6 +371,13 @@ export function registerCommerceTools(
                     ? ` This owner publishes tool manifests for: ${near.join(', ')}.`
                     : '';
                 return fail(`APP_TOOLS_NOT_FOUND: app "${targetOwner}/${appDisplayName(prefixed.name)}" declares no ${targetOwner === owner ? '' : 'public '}tool manifest.${hint}`);
+            }
+            if (oneTool) {
+                // One tool's entry: what a caller needs before one call, without every other tool of
+                // the app (services/app-tools/one-tool.ts, the CLI dispatch's twin).
+                const picked = pickManifestTool(rec.value, oneTool);
+                if (!picked.ok) return fail(`TOOL_NOT_FOUND: no tool "${oneTool}" on app "${targetOwner}/${appDisplayName(app_id)}". Its tools: ${picked.names.join(', ') || 'none'}.`);
+                return ok({ app: `${targetOwner}/${app_id}`, visibility: rec.visibility, tool: picked.tool });
             }
             return ok({ app: `${targetOwner}/${app_id}`, visibility: rec.visibility, manifest: rec.value });
         },

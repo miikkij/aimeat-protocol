@@ -20,6 +20,10 @@
 # project, claim_open with project), and the hook prints AIMEAT_PROJECT. It named two workspace ids
 # and no project, while a claim without a project is refused; the ids live in skill aimeat-dev-session
 # now, the one home of the ritual (instruction review 2026-11-14, X6).
+#
+# 2026-11-21 — Step 4 writes the heartbeat as a call with its fields. It said "heartbeat whenever the
+# area changes" while claim_heartbeat accepted no area, so sessions sent `area` and `note` and were
+# refused; Lifecycle Central 3.x now takes both, and the line shows them.
 set -u
 
 # Claude Code hands the hook a JSON object on stdin, and its session_id is the one thing a session
@@ -135,8 +139,11 @@ skill `aimeat-dev-session` on the node (aimeat_skill_get) has the detail.
      AIMEAT_E2E_PORT=<port> pnpm test:env:init --force, because the worktree already has its
      env files), your intent, and the session id printed above.
      A claim without a project is refused. A claim written afterwards protected nobody.
-  4. Heartbeat it at least hourly (claim_heartbeat), and whenever the area changes. Three
-     hours old reads as stale to everyone else.
+  4. Heartbeat it at least hourly: claim_heartbeat { id, session, sessionId }. Three hours
+     old reads as stale to everyone else. When the area changes, the heartbeat carries the
+     new list and why: claim_heartbeat { id, session, area: ["..."], note: "..." }.
+     Every tool refuses a field its schema does not name, and the refusal lists the fields
+     it accepts: correct the call from that list, never resend the same input.
   5. Release (claim_release) or hand off (claim_handoff) when you stop.
 
 And two rules this repo learned the hard way, both on 2026-09-05:

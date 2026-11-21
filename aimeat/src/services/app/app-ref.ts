@@ -24,11 +24,13 @@
  *
  *   WHAT IS SHOWN. appDisplayName() is the name people and AIs read: the filename without `.html` or
  *   `.htm`. Stored keys and records keep the filename; they are not rewritten.
- * @structure appDisplayName · isHtmlAppFile · htmlFilenameOf · appDataMapId · appFilenameCandidates · splitAppRef · resolveAppFilename ·
- *   resolveOwnerAppRef · resolveBindingRef · publishFilename · findAppFilename
+ * @structure appDisplayName · isHtmlAppFile · htmlFilenameOf · appDataMapId · appFilenameCandidates · splitAppRef · appOwnerName ·
+ *   resolveAppFilename · resolveOwnerAppRef · resolveBindingRef · publishFilename · findAppFilename
  * @usage
  *   const filename = await resolveAppFilename(storage, { ownerGaii }, 'lifecycle-central'); // 'lifecycle-central.html'
  * @version-history
+ *   2026-11-21 — appOwnerName: an app's owner written `user:alice` names `alice`, for the app tool
+ *     MCP tools (wish-app-ty-kalujen-skeemavirheet-ly-korjaa-kutsun-yhdell-yrityks).
  *   v1.0.0 — 2026-11-20 — Initial (wish-sovelluksen-nimi-ilman-html-p-tett-kaikkialla).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -84,6 +86,15 @@ export function splitAppRef(ref: string): { owner?: string; name: string } {
   const slash = s.indexOf('/');
   if (slash <= 0) return { name: s };
   return { owner: s.slice(0, slash), name: s.slice(slash + 1) };
+}
+
+/**
+ * The account name a caller means by an app's owner: `alice`, `alice@node-id` and `user:alice` all
+ * name `alice`. `user:` is how a skill ref names its owner (`user:alice/shop-guide`), and an agent
+ * that read the app's skill first carries that form over to the app's tools.
+ */
+export function appOwnerName(owner: string): string {
+  return localAccountName(String(owner ?? '').trim().replace(/^user:/, ''));
 }
 
 /** The account name a bucket key or an owner name stands for, for comparing an `owner/` prefix. */

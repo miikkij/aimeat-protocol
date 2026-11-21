@@ -20,6 +20,9 @@
  * @usage
  *   patchable.tool = wrapToolHandler(gatedTool, () => agentGaii);
  * @version-history
+ *   2026-11-21 — A failing result is recorded with the error code it names as its reason
+ *     (`tool_error_result` when it names none), and an INVALID_INPUT result as `refused`, not
+ *     `error`: one call in seven to aimeat_app_tool_invoke failed and the report could not say why.
  *   2026-11-20 — A tool an agent ran notes its words in services/ai-standing/use.ts, for the owner's
  *     feed line when the word is one the person gives by name.
  *   2026-11-04 —actorKindOf reads usageActorOfPrincipal (services/caller-facts.ts), the one test of a
@@ -63,6 +66,12 @@ function isErrorResult(value: unknown): boolean {
 export function noteMcpScopeRefusal(principal: string, words: string[], toolName: string): void {
   if (words.length === 0 || actorKindOf(principal) !== 'agent') return;
   noteAgentRefusal({ sub: principal, roles: ['agent'] }, words, false, `MCP ${toolName}`);
+}
+
+/** The first text part of a tool result, or '' when it has none. */
+function firstText(value: unknown): string {
+  const content = (value as { content?: Array<{ text?: unknown }> }).content;
+  return Array.isArray(content) && typeof content[0]?.text === 'string' ? content[0].text : '';
 }
 
 /** The error code a failing tool result carries: `CODE: …` text, or a JSON object's `error` or `code`. */
@@ -111,12 +120,17 @@ export function wrapToolHandler(register: AnyFn, principal: () => string): AnyFn
     const wrapped = async (...handlerArgs: unknown[]): Promise<unknown> => {
       const startedAt = Date.now();
       const gaii = principal();
-      let outcome: 'ok' | 'error' = 'ok';
+      let outcome: 'ok' | 'refused' | 'error' = 'ok';
       let reason = '';
       try {
         const result = await (handler as AnyFn)(...handlerArgs);
         if (isErrorResult(result)) {
-          outcome = 'error'; reason = 'tool_error_result';
+          // The code the result names is the reason, so a report can tell a refused input from a
+          // fault. A refused input is the caller's to correct: `refused`, the way the metered gate
+          // records the refusals it makes (storage/types/usage.ts, UsageOutcome).
+          const code = resultErrorCode(firstText(result));
+          outcome = code === 'INVALID_INPUT' ? 'refused' : 'error';
+          reason = code ?? 'tool_error_result';
           // A tool that refused the agent a permission is the MCP half of auth/deny.ts: the same
           // note on the agent's card and open tasks (services/agent/refusals.ts).
           noteMcpScopeRefusal(gaii, scopeDeniedWords(result), name);

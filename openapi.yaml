@@ -36960,7 +36960,10 @@ paths:
         (body: { input }); an unpriced unbound tool answers 422. Before anything is metered or
         paid, the input is checked against the tool's published inputSchema: a mismatch answers
         400 INVALID_INPUT naming every missing field at once (`details.missing`,
-        `details.violations`). A schema that does not compile is not enforced. A tool whose
+        `details.violations`); the message also lists every field the tool accepts with its type
+        and limits, and names the skills bound to the app that the caller can load. A signed-in
+        caller's refusal is counted on the tool's own usage coordinate (`refused`, reason
+        INVALID_INPUT). A schema that does not compile is not enforced. A tool whose
         backing extension serves an app with access `members-only` answers 403 MEMBERS_ONLY to a
         caller who is not a member, before anything is settled. An agent or an ecosystem app needs
         the scope exchange:invoke (exchange:write covers it), as the MCP tool aimeat_app_tool_invoke does, before anything is
@@ -60214,6 +60217,12 @@ paths:
         `skill.standardIssues` lists every rule of the standard SKILL.md breaks, the warnings
         included (a top-level field the standard does not define, a metadata value that is not a
         string).
+
+        A skill bound to an app (`metadata.binding: app:<owner>/<filename>`) has the calls it
+        writes, `<tool> { field, field: value }` in any Markdown file, held to the app's tool
+        manifest: `skill.toolFieldIssues` names each field such a call sends that a tool whose
+        schema refuses extra fields does not accept, with the fields it does accept. Advice only;
+        the publish stands.
 
         How SKILL.md was written is recorded: the `ai_provenance` declaration or the
         `ai_provenance_id` in the body, else the node's stamp when an agent publishes (a person

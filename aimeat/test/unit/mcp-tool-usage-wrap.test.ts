@@ -99,6 +99,25 @@ describe('the wrapper records', () => {
     expect(row.reason).toBe('tool_error_result');
   });
 
+  it('the code a failing result names as its reason, and a refused input as refused', async () => {
+    // One call in seven to aimeat_app_tool_invoke failed in thirty days and the report could not
+    // say whether the node or the caller's input was at fault.
+    const { registered, register } = registrar();
+    const wrapped = wrapToolHandler(register, () => PRINCIPAL);
+    wrapped('aimeat_bad_input', async () => ({ content: [{ type: 'text', text: 'INVALID_INPUT: no' }], isError: true }));
+    wrapped('aimeat_gone', async () => ({ content: [{ type: 'text', text: 'NOT_FOUND: no' }], isError: true }));
+
+    await registered.aimeat_bad_input();
+    await registered.aimeat_gone();
+
+    const rows = pendingUsageCalls({ surface: 'mcp' });
+    const byTool = Object.fromEntries(rows.map(r => [r.coordinate, r]));
+    expect(byTool.aimeat_bad_input.outcome).toBe('refused');
+    expect(byTool.aimeat_bad_input.reason).toBe('INVALID_INPUT');
+    expect(byTool.aimeat_gone.outcome).toBe('error');
+    expect(byTool.aimeat_gone.reason).toBe('NOT_FOUND');
+  });
+
   it('reads the principal at CALL time, not at registration time', async () => {
     // Registration happens once per session; the identity closure is what the session binds. A
     // wrapper that captured the value would attribute every later call to whoever registered first.

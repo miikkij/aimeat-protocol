@@ -22,6 +22,8 @@
  *   const face = await buildAppAgentFace(config, storage, app);
  *   res.type('text/plain; charset=utf-8').send(appLlmsTxt(config, app, tools, face?.markdown));
  * @version-history
+ *   2026-11-21 — AGENTS.md says to load the app's bound skill and read the one tool's schema
+ *     (aimeat_app_tools_get `tool`) before the first call.
  *   v1.2.0 — 2026-11-20 — llms.txt names the app without `.html` in its tool calls and says the file
  *     name works too; it said the id must carry its extension, which is no longer so (services/app/app-ref.ts).
  *   v1.1.0 — 2026-08-29 — llms.txt gains a Legal section naming the app's own pages when it has any.
@@ -132,8 +134,13 @@ Over MCP — attach any MCP-capable client to \`${b}/v1/mcp\` (OAuth 2.1), then:
 \`\`\`
 ${identifiers(app)}
 
-aimeat_app_tools_get   { owner: "${app.ownerName}", app_id: "${app.filename}" }
+aimeat_skill_list      { binding: "app:${app.ownerName}/${app.filename}" }
+aimeat_app_tools_get   { owner: "${app.ownerName}", app_id: "${app.filename}", tool: "<the tool you will call>" }
 \`\`\`
+
+Before the first call, load the skill the list names (\`aimeat_skill_get\`): it says how this
+app's tools are used. Then read the one tool you will call: its \`inputSchema\` names every field
+it accepts, and a field it does not name is refused.
 
 Over HTTP — get an identity through the RFC 8628 device flow described at \`${b}/auth.md\`, then
 call the endpoints in \`${b}/v1/spec\`.

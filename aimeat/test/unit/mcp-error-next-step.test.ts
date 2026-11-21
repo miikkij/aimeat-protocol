@@ -8,10 +8,11 @@
  *   step, nothing that succeeded is touched, and a tool that already said it is not told twice.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-error-next-step.test.ts
  * @version-history
+ *   2026-11-21 — An INVALID_INPUT failure gets INPUT_NEXT_STEP_TEXT.
  *   v1.0.0 — 2026-09-18 — Initial (wish-mcp-virheilmoituksiin-seuraava-askel-...).
  */
 import { describe, it, expect } from 'vitest';
-import { withErrorNextStep, NEXT_STEP_TEXT } from '../../src/mcp/error-next-step.js';
+import { withErrorNextStep, NEXT_STEP_TEXT, INPUT_NEXT_STEP_TEXT } from '../../src/mcp/error-next-step.js';
 
 function registrar() {
   const registered: Record<string, (...a: unknown[]) => unknown> = {};
@@ -33,6 +34,15 @@ describe('a failing tool says what to do next', () => {
     expect(result.content[0].text).toBe('Task not found');
     expect(result.content[1].text).toBe(NEXT_STEP_TEXT);
     expect(NEXT_STEP_TEXT).toContain('support@operators');
+  });
+
+  it('a refused input gets the step that says to correct it, not to report a fault', async () => {
+    const { registered, register } = registrar();
+    withErrorNextStep(register)('aimeat_app_tool_invoke', async () => ({ content: [{ type: 'text', text: 'INVALID_INPUT: tool "x" input does not match its published schema' }], isError: true }));
+    const result = await registered.aimeat_app_tool_invoke() as { content: { text: string }[] };
+    expect(result.content[1].text).toBe(INPUT_NEXT_STEP_TEXT);
+    expect(INPUT_NEXT_STEP_TEXT).toContain('Correct the input');
+    expect(INPUT_NEXT_STEP_TEXT).not.toBe(NEXT_STEP_TEXT);
   });
 
   it('leaves a successful result exactly as the tool returned it', async () => {

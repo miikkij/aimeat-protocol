@@ -14,6 +14,7 @@
  *
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-tools-owner-scope.test.ts
  * @version-history
+ *   2026-11-21 — The CLI read takes `tool` and an owner written `user:<owner@node>`.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -80,5 +81,22 @@ describe('publishing an app tool manifest', () => {
                 { app_id: 's6demo.html', owner: 'bob' }) as { ok?: boolean; error?: { code?: string } };
         expect(res.ok).toBe(false);
         expect(res.error?.code).toBe('INVALID_INPUT');
+    });
+
+    it('and with `tool` it answers that one tool\'s entry, and reads user:<owner@node> as the GHII', async () => {
+        const tool = CONNECT_CLI_TOOLS.find(t => t.name === 'aimeat_app_tools_get')!;
+        const sent: Sent[] = [];
+        const manifest = { tools: [{ name: 'echo', inputSchema: { type: 'object' } }, { name: 'other' }] };
+        const client = { ...recordingClient(sent), get: (p: string) => { sent.push({ method: 'GET', path: p }); return Promise.resolve({ ok: true, data: { value: manifest } } as never); } };
+        const call = (input: JsonObject) => (tool as { handler: (c: never, i: JsonObject) => Promise<unknown> })
+            .handler({ client, config: {}, agentPath: 'p' } as never, input) as Promise<{ ok?: boolean; data?: { tool?: { name?: string } }; error?: { code?: string; message?: string } }>;
+        const one = await call({ app_id: 's6demo.html', owner: 'user:bob@node.test', tool: 'echo' });
+        expect(one.ok).toBe(true);
+        expect(one.data?.tool?.name).toBe('echo');
+        expect(sent[0].path).toContain(encodeURIComponent('bob@node.test'));
+        const none = await call({ app_id: 's6demo.html', tool: 'nope' });
+        expect(none.ok).toBe(false);
+        expect(none.error?.code).toBe('TOOL_NOT_FOUND');
+        expect(none.error?.message).toContain('echo, other');
     });
 });

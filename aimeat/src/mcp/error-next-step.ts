@@ -24,11 +24,18 @@
  *   WHAT IT LEAVES ALONE. A successful result, by identity. A thrown error, which the SDK turns
  *   into its own failure. And a failure whose text already names the operators: a tool that wrote
  *   its own, more specific next step is not told twice.
- * @structure NEXT_STEP_TEXT · withErrorNextStep(register)
+ *
+ *   A REFUSED INPUT GETS ITS OWN STEP. INVALID_INPUT is the caller's mistake, which the caller
+ *   corrects; the general step reads "the same call keeps failing" as a reason to write to the
+ *   operators, so an agent guessing at a tool's fields was sent to report a fault the node did not
+ *   have (2026-11-21). INPUT_NEXT_STEP_TEXT says to correct the input from the message first.
+ * @structure NEXT_STEP_TEXT · INPUT_NEXT_STEP_TEXT · withErrorNextStep(register)
  * @usage
  *   const stepped = withErrorNextStep(originalTool);
  *   patchable.tool = wrapToolHandler(stepped, () => agentGaii);
  * @version-history
+ *   2026-11-21 — An INVALID_INPUT failure gets INPUT_NEXT_STEP_TEXT: correct the input from the
+ *     message, and write to the operators only when a matching input is still refused.
  *   v1.0.0 — 2026-09-18 — Initial (wish-mcp-virheilmoituksiin-seuraava-askel-...).
  */
 
@@ -39,6 +46,27 @@ type AnyFn = (...args: unknown[]) => unknown;
  * beside the tool because `aimeat_dm_send` is not on every v2 surface, and the address works on
  * all of them.
  */
+/**
+ * The step for a refusal of the caller's own input (`INVALID_INPUT: …`). The general step above told
+ * an agent to write to the operators when "the same call keeps failing", and an agent that kept
+ * guessing at a tool's fields did keep failing, so it was sent to report a fault the node did not
+ * have. A refused input is corrected, not reported; the operators are the next step only when the
+ * call already matches what the refusal describes.
+ */
+export const INPUT_NEXT_STEP_TEXT = [
+  'What to do next: the message above says what the input got wrong, and for an app tool it lists',
+  'every field the tool accepts. Correct the input to match it and call again; do not send the same',
+  'input twice, and do not add fields the message does not list. When the app has a skill named',
+  'above, load it first. Only when your input already matches what the message describes and the',
+  'call is still refused, tell the people who run this node: send a message to "support@operators"',
+  '(aimeat_dm_send, or POST /v1/messages) with the call you made and the answer you got.',
+].join(' ');
+
+/** Whether a failing result refuses the caller's input: its text starts with the INVALID_INPUT code. */
+function refusesInput(said: string): boolean {
+  return /^\s*INVALID_INPUT\b/.test(said);
+}
+
 export const NEXT_STEP_TEXT = [
   'What to do next: when the message above explains what happened (the thing does not exist, a',
   'value is missing, a permission is not granted), act on that: correct the call, or tell the',
@@ -62,7 +90,8 @@ export function withErrorNextStep(register: AnyFn): AnyFn {
       if (!result || typeof result !== 'object' || result.isError !== true) return result;
       const said = (result.content ?? []).map(c => c.text ?? '').join(' ');
       if (said.includes('support@operators')) return result;
-      return { ...result, content: [...(result.content ?? []), { type: 'text' as const, text: NEXT_STEP_TEXT }] };
+      const step = refusesInput(said) ? INPUT_NEXT_STEP_TEXT : NEXT_STEP_TEXT;
+      return { ...result, content: [...(result.content ?? []), { type: 'text' as const, text: step }] };
     };
 
     const next = [...args];

@@ -17,6 +17,9 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for a money price; auth + pacing for free)
  * @version-history
+ *   2026-11-21 — POST .../webmcp/tools/:tool checks the input through checkAppToolInputOrRefuse, as
+ *     aimeat_app_tool_invoke does: the 400 lists the accepted fields and the app's bound skills, and a
+ *     signed-in caller's refusal is recorded on the tool's usage coordinate.
  *   2026-11-14 — POST .../webmcp/tools/:tool reads the manifest through loadPublicToolManifest
  *     (services/app-tools/manifest-read.ts), which aimeat_app_tool_invoke asks too: a public manifest
  *     that does not parse answers 422 INVALID_TOOL_MANIFEST, not 404 (structure programme 2026-11, unit 2b, B14).
@@ -94,7 +97,7 @@ import { paymentChallenge } from '../commerce/x402.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { pacingReceipt } from '../services/metered/settlement.js';
 import { publicManifestTools, toolPacing, paceFreeToolUse } from '../commerce/app-tool-catalog.js';
-import { checkAppToolInput } from '../services/app/tool-input.js';
+import { checkAppToolInputOrRefuse } from '../services/app/tool-input-refusal.js';
 import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
 import { authoriseMeteredCall, type ProductRefusal } from '../services/metered/access.js';
 import type { MeteredEntitlement } from '../services/metered/entitlements.js';
@@ -256,8 +259,13 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
 
     // Checked against the tool's published schema BEFORE anything is metered or paid for, and every
     // problem named at once (services/app/tool-input.ts). Same check as the MCP twin.
+    // A refusal names the accepted fields and the app's bound skills, and is counted on the tool's own
+    // usage coordinate for a signed-in caller (services/app/tool-input-refusal.ts).
     const toolInput = applyLockedInput(tool, (req.body?.input ?? req.body ?? {}) as Record<string, unknown>);
-    const inputCheck = checkAppToolInput(tool, toolInput);
+    const inputCheck = await checkAppToolInputOrRefuse({ storage, config }, {
+      ownerName, filename, tool, input: toolInput,
+      callerGaii: req.auth && !isAnonymousPrincipal(req.auth) ? resolveIdentity(req.auth, config.nodeId) : null,
+    });
     if (!inputCheck.ok) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', inputCheck.message, 400,
         { missing: inputCheck.missing, violations: inputCheck.violations }));

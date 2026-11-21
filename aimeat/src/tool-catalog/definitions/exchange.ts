@@ -13,6 +13,8 @@
  *   Money is 6-decimal micro-units; morsels are whole units of pacing, never a price. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-11-21 — aimeat_app_tool_invoke's description says to load the app's bound skill and read the
+ *     one tool's schema before the first call, and what a refusal of the input names.
  *   2026-11-20 — aimeat_app_tool_invoke's `app` is the app's name without `.html` (services/app/app-ref.ts).
  *   2026-11-02 — aimeat_app_tool_invoke asks exchange:invoke, split out of exchange:write, which still covers it (Jouni, 10.25).
  *   2026-10-13 — aimeat_app_tool_invoke declares ext:invoke beside exchange:write, enforced from 4.0.0 like
@@ -222,7 +224,7 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_app_tool_invoke',
-        description: 'CALL a published app tool (a method like getCompanyBrief). A tool with no money price needs no contract and is charged its pacing (toll_morsels) per use; a tool with a money price requires your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform rake), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Read inputSchema with aimeat_app_tools_get first: invalid input is refused before charging, with every missing field named. Needs two scopes: exchange:write for the call, and ext:invoke because the tool runs its backing extension action with your token.',
+        description: 'CALL a published app tool (a method like getCompanyBrief). A tool with no money price needs no contract and is charged its pacing (toll_morsels) per use; a tool with a money price requires your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform rake), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Before the first call to a tool, load the skill bound to its app (aimeat_skill_list with binding "app:<owner>/<filename>") and read the tool\'s inputSchema with aimeat_app_tools_get and `tool`: invalid input is refused before charging, and the refusal names every wrong and missing field, lists every field the tool accepts, and names the app\'s skills. Correct the input from that list; never resend the same input. Needs two scopes: exchange:write for the call, and ext:invoke because the tool runs its backing extension action with your token.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Invoke App Tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

@@ -17,6 +17,8 @@
  * @structure ATELIER_AI_PATH_SECTION · AI_PATH_SECTION · APP_TOOLS_SECTION · AI_PATH_NONE_META
  * @usage body += ATELIER_AI_PATH_SECTION; atelierPlatformPiece('app-tools', …) answers APP_TOOLS_SECTION.
  * @version-history
+ *   2026-11-21 — The bound skill writes each app tool call with its fields, and the publish names
+ *     the fields a tool refuses (skill.toolFieldIssues). Additive.
  *   v1.0.0 — 2026-11-20 — Initial.
  */
 
@@ -55,6 +57,7 @@ export const AI_PATH_SECTION = '## How the person\'s own AI uses the app: the bu
   + 'where each kind of data lives (the keys with the app\'s prefix, or the workspace and its spaces, as the data map says); the record shape with a short example, '
   + 'and what the app derives itself and must not be written; the rules the app checks, so a direct write keeps them; which acts the person confirms and how the AI proposes them; '
   + 'the app tools, if any, and that they come before a direct write; and whether the open app shows a change without a reload. '
+  + 'Write each app tool call in it with its fields, `tool_name { field, field: value }`: the publish holds those calls to the tool manifest and names in `skill.toolFieldIssues` every field a tool does not accept, so fix those before anyone follows the skill. '
   + 'Bind it with `metadata.binding: "app:<owner>/<filename>"` (`aimeat_skill_publish`). Test it once as its reader: with only the skill, add one record and change it, see the app show it, then remove the record.\n';
 
 /** The platform section `app-tools`: read when rule 2, 3 or 4 of the core section applies. */

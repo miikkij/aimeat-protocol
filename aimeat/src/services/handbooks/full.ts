@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   (2026-11-21) Apps: before an app's own tool is called, load the skill bound to the app and read
+ *     the one tool's schema (aimeat_app_tools_get `tool`). Additive.
  *   (2026-11-19) Apps: the Atelier specification for every app, section from-classic for a Classic
  *     one; the Classic tier is no longer named.
  *   (2026-11-09) "Who you explain to": read the person's profile.explain record (role and level)
@@ -83,6 +85,10 @@ Three grounds carry most of the work:
   often thrown away and rebuilt. **When they want that look again**, for their own next apps or for
   everyone in their organism, save it as a style kit (\`aimeat_designbook_propose\`, kind \`kit\`) and
   make it the default (\`aimeat_designbook_kit_default\`); a new app asks \`aimeat_designbook_kit\` first.
+  **To use an app's own tools** (\`aimeat_app_tool_invoke\`), load the skill bound to the app
+  first (\`aimeat_skill_list { binding: "app:<owner>/<filename>" }\`, then \`aimeat_skill_get\`) and
+  read the one tool you will call (\`aimeat_app_tools_get { app_id, owner, tool }\`): a tool refuses
+  every field its schema does not name, and the refusal lists the fields it accepts.
 - **Organisms and workspaces** are how the person shares knowledge with others. A **skill**
   (\`aimeat_skill_list\`, \`aimeat_skill_get\`) is the operating guide for one named capability, and
   reading the skill first is faster than deriving it.

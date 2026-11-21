@@ -9,6 +9,8 @@
  *   SkillAccessor · SkillAccessError
  * @usage import { type SkillSummary, SkillAccessError } from '../skills.js';   // through the re-export
  * @version-history
+ *   2026-11-21 — SkillSummary.toolFieldIssues: the fields a bound skill's calls write that the app's
+ *     tools refuse (tool-fields.ts).
  *   v1.3.0 — 2026-11-14 — skillFeatureOff(): a skill names the switch of the feature it teaches; FEATURE_OFF.
  *   v1.2.0 — 2026-10-26 — A file index entry may say `encoding: "base64"` (skill-files.ts);
  *     SkillSummary.standardIssues on a publish that breaks a rule of the Agent Skills standard; the
@@ -27,6 +29,7 @@ import type { AudienceAuth } from '../audience.js';
 import type { CallerContext } from '../caller-context.js';
 import type { SkillFileEntry } from './files.js';
 import type { SkillStandardIssue } from './md.js';
+import type { SkillToolFieldIssue } from './tool-fields.js';
 
 export interface SkillVersionSnapshot {
   manifest: SkillManifestValue;
@@ -106,6 +109,9 @@ export interface SkillSummary {
   /** Publish answers only: the Agent Skills standard's rules this SKILL.md breaks (skill-md.ts).
    *  A skill new to the registry is refused for a blocking one, so here they are warnings. */
   standardIssues?: Array<Omit<SkillStandardIssue, 'blocking'>>;
+  /** Publish answers only: the fields a skill bound to an app writes in its calls that the app's tool
+   *  manifest does not accept (tool-fields.ts). Advice; the publish stands. */
+  toolFieldIssues?: SkillToolFieldIssue[];
 }
 
 export interface ResolvedSkill extends SkillSummary {
