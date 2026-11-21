@@ -12,6 +12,9 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-21 — enforcedBy on the 20 entries a publish check names when it fires (`<module>:<function>`
+ *     under services/app/ or utils/): the research overview lists them apart, under `enforced`.
+ *     auth-pill-overflow is prevented by the compact pill, not checked, and stays in the list.
  *   2026-11-21 — handle-both-auth-paths is active again: the trap came back as a learned critical
  *     entry, and no publish check names it yet. undeclared-scope-words names memory:delete, ai:use and
  *     contract:spend, which the publish answer now names (services/app/scope-needs.ts PUBLISH_RULES).
@@ -115,6 +118,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   // ---- app basics -------------------------------------------------------
   E({
     id: 'invented-lib-urls',
+    enforcedBy: 'artifact-lint:probeNodeAssets',
     title: 'Invented script/style URLs 404 and break the app',
     symptom: 'The app references a plausible-looking node URL (e.g. /i18n/translations.js, /components/x.js) that does not exist. Publishing REFUSES a node path that answers 404 (APP_ARTIFACT_BROKEN); a relative path or an outside host only gets a warning, and then the page half-loads in the browser.',
     fix: 'Only load URLs the build spec lists. Fetch the build spec first (GET /v1/prompts/build-app-atelier, with its platform section engines) and use exactly the library and script URLs it names, and GET /v1/library-packs for everything the node vendors. Never guess one.',
@@ -126,6 +130,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'inline-js-does-not-parse',
+    enforcedBy: 'artifact-lint:checkInlineScripts',
     title: 'An inline <script> that does not parse takes the whole app with it',
     symptom: 'The page renders its static HTML and then nothing works: no data, no handlers, no login bar. The browser stopped at the syntax error and never reached anything after it. Publishing REFUSES a classic inline block that does not parse (APP_ARTIFACT_BROKEN). A `<script type="module">` block is not parsed by the gate, and the publish answer says so with a warning, so a module with a syntax error still goes live.',
     fix: 'Parse before you publish, module blocks especially: `node -e \'new (require("vm").Script)(require("fs").readFileSync(process.argv[1],"utf8"))\' block.js` on each inline body, or move a module into its own file and run `node --check`. The classic cause is a literal closing script tag inside a JS string or comment: the HTML parser ends the block there, mid-statement, so build one from pieces: `"</" + "script>"`.',
@@ -137,6 +142,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'atelier-kit-not-loaded',
+    enforcedBy: 'artifact-lint:lintAppArtifact',
     title: 'Calling AIMEAT.atelier without loading the kit stops the whole script',
     symptom: 'The page renders its static HTML and then nothing works: the buttons do nothing and no sign-in pill appears. The console says "Cannot read properties of undefined (reading \'i18n\')" or the same for app, copy or section. Only /v1/libs/aimeat-atelier.js defines AIMEAT.atelier, so the first call throws. Publishing REFUSES such a page (APP_ARTIFACT_BROKEN).',
     fix: 'Load the kit in the head, after aimeat-auth.js and aimeat-data.js: `<link rel="stylesheet" href="/lib/aimeat-atelier.css">` and `<script src="/v1/libs/aimeat-atelier.js"></script>`.',
@@ -149,6 +155,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'app-meta-declarations',
+    enforcedBy: 'artifact-lint:checkMetas',
     title: 'The three head declarations an app is expected to make',
     symptom: 'The language switch never appears in the login pill, sign-in asks for less than the app needs (ai:use is unavailable, deletes 403), sign-in does nothing at all, or AIMEATAgentFace.publish cannot work out which app it belongs to on a per-app subdomain.',
     fix: 'Declare them, one line each: `<meta name="aimeat-app" content="my-app.html">` (your published filename), `<meta name="aimeat-scopes" content="memory:read memory:write ai:use">` (what sign-in asks the user to approve; declaring nothing gets the four-word default, and declaring replaces the default rather than adding to it), `<meta name="aimeat-locales" content="en fi">` (the languages you have; two or more draw the switch in the login pill). One word in aimeat-scopes that the node cannot grant refuses the WHOLE sign-in with INVALID_SCOPE; GET /v1/app-grants/scopes lists the grantable words, and the publish answer warns about any other.',
@@ -160,6 +167,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'intake-form-undeclared',
+    enforcedBy: 'intake-forms:intakeDeclarationOf',
     title: 'Name every intake form the page submits to in <meta name="aimeat-intake">',
     symptom: 'The publish answer warns that the code submits to an intake form the page does not declare; on a node that shows its content to signed-in accounts only, the form of an app opened to the internet answers visitors 401 while the page itself opens.',
     fix: 'Put `<meta name="aimeat-intake" content="<org>/<ws>/<formId> <org>/<ws>/<formId>">` in the head, one org/workspace/form id per form the page calls with AIMEAT.intake.submit, getForm or thread.*. Each must be a form you manage (the workspace\'s creator or an organism admin), or the publish is refused with APP_INTAKE_INVALID. An app opened to the internet opens exactly the forms its live version declares; a form a new version adds waits for the operator where the node asks for approval.',
@@ -172,6 +180,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'app-declared-unused',
+    enforcedBy: 'artifact-lint:checkDeclaredButUnused',
     title: 'Loaded, declared, and never used',
     symptom: 'The published app opens with no sign-in and no way to change language or theme, or it downloads daisyUI and renders unstyled. Every stylesheet is linked and none of it shows. The publish answer warns about all three shapes; the person finds it in five seconds by opening the app.',
     fix: 'Start from what the node hands you, never from an empty page. A new app forks a genre (`aimeat_app_template_get { id: "genre-<id>" }`) and adds the sign-in bar the way the Atelier specification\'s fork section shows; a prototype or an ordinary page starts from `shell-atelier`, whose frame carries the sign-in. An app built on the retired Classic track is moved with the specification\'s section `from-classic`. If you keep a stylesheet or `aimeat-auth.js` in the head, use what it provides: mount the bar with `AIMEAT.auth.mountLoginButton(sel, { onSession })`, which restores a returning session and handles a fresh sign-in (see handle-both-auth-paths).',
@@ -183,6 +192,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'track-mixing',
+    enforcedBy: 'artifact-lint:checkTrackMixing',
     title: 'An app built from two guides at once',
     symptom: 'The app declares one build track and carries the other track\'s vocabulary: Classic declared with the Atelier shell drawn (atelier.app()) or with the kit loaded and nothing in it called, Atelier declared with the kit missing or with raw daisyUI class markup outside a section escape hatch, or the Atelier kit loaded with no track declared at all. Publishing warns; the visible cost comes later, when an edit session loads the declared track\'s guide and half-understands the file.',
     fix: 'Declare `<meta name="aimeat-track" content="atelier">` and let the Atelier kit be the vocabulary; raw markup lives only inside a section body the app fills itself (`AIMEAT.atelier.section`). A page built on the retired Classic track keeps `content="classic"` until it is moved (the specification\'s section `from-classic`), and meanwhile it may load the kit for the library blocks it uses (AIMEAT.atelier.members, joinRequest, aiTask, copy, workspaceTeam); that is not a mix. The declaration must match what the page actually does.',
@@ -194,6 +204,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'below-level',
+    enforcedBy: 'build-level:levelFindings',
     title: 'The app is not at the level its owner chose',
     symptom: 'The owner asked for an app and found out by looking at the result what kind of app they got: a bare stack of components where they expected something worth showing, or an hour of styling where they wanted to try one idea today. The builder chose the level, usually the one that was least work. Publishing warns (`app_hints`, pitfall `below-level`) when a page that states `aimeat-level` "proto" or "plain" carries a sheet of styles of its own, and refuses (`atelier-register`) a page that states "fine", or no level, and names no register.',
     fix: 'The level is the finest unless the owner chose a lower one in their own words: do not ask it, say in the proposal that you build the finest and that the lower two are theirs to pick. In plain words, what each one gets them: a quick prototype (the kit\'s components as they come, no styling), an ordinary page (a ready layout and look from the Design Book, following their theme), or the finest (a forked genre, the Book\'s proven parts, components of its own, each written down with its reason). All three are Atelier, in two languages, with the data on the owner\'s node, so raising the level later is a change of look and never a rewrite. State it in the head: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. A page that states none is held to the finest. Never pick a lower level on the owner\'s behalf.',
@@ -205,6 +216,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'hand-rolled',
+    enforcedBy: 'hand-rolled:handRolledFindings',
     title: 'A mechanism written by hand that a library of this node already is',
     symptom: 'The app runs its own speech recognition loop, its own audio graph, its own `fetch` to `/v1/memory`, `/v1/ai/` or `/v1/storage`, its own `EventSource` to the node, its own notification, its own language control, keeps a person\'s data under several `localStorage` keys, or draws a chart in code (SVG shapes or a 2d canvas) on a page that loads the Atelier kit. It works on the day it ships. It stops following the platform the day the route, the token handling or the consent rule behind it changes, and nobody is told. Publishing warns (`app_hints`, pitfall `hand-rolled`) when the page uses the browser API and loads none of the libraries that would have done it.',
     fix: 'Read the list of libraries BEFORE writing a mechanism: `GET /v1/libs`, or part `libraries` of the build specification. Speech and conversation: `aimeat-voice`. Instruments and samples: `aimeat-audio`. A person\'s data: `aimeat-data`, one record per thing. A model: `aimeat-ai`, or `aimeat-decide` for a decision. Files: `aimeat-storage`. Live updates: `aimeat-live`. Notifications: `aimeat-push`. A chart, a gauge or a radar: `AIMEAT.atelier.chart` (with `kind: "radar"` for a radar) and `AIMEAT.atelier.gauge`, which draw in the page\'s own tokens; a genre that draws its own figures keeps them, and the warning stays quiet there. The language switch is in the sign-in bar. A draft or a preference in `localStorage` is fine. If the hand-written mechanism is deliberate, say why to the owner.',
@@ -216,6 +228,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'genre-not-forked',
+    enforcedBy: 'genre-fork:genreForkFindings',
     title: 'A genre\'s name over a page that is not its fork',
     symptom: 'The head says `aimeat-register` `genre-<id>` and the page is the default look with a hero, forms and cards stacked in it: the same dashboard every app becomes, in new paint. It passes the register gate, which asks only that a register is named, and it passes contrast, width and tap-size checks, none of which say whether the page is any good. Publishing warns (`app_hints`, pitfall `genre-not-forked`) when the page carries under a fifth of the genre\'s own styles; a real fork keeps about four fifths.',
     fix: 'Fork the genre: `aimeat_app_template_get { id: "genre-<id>" }` returns the whole page. Keep its composition, its type and its physics, and change the words, the sources and the images; let kit components serve the page where it needs a live part. A look preset is for a screen with no genre of its own. If the page has a look of its own, declare `content="custom:<name>"`. Before handing over, put it beside the genre at 390×844 and 1280×900 in both themes and ask whether it holds up: passing tests do not answer that.',
@@ -227,6 +240,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'one-language',
+    enforcedBy: 'language-default:oneLanguageFindings',
     title: 'A new app that speaks one language',
     symptom: 'The app declares `aimeat-locales` with one language, so the sign-in bar draws no language switch, or it declares two and its strings are typed into the markup, so the switch changes the bar and nothing else. It usually happens because the builder was talking to the owner in that language and took it for the app\'s, or because it forked a genre, which carries one language. Publishing a NEW one-language app warns (`app_hints`, pitfall `one-language`).',
     fix: 'Two languages is the default: `<meta name="aimeat-locales" content="en fi">`. Put every string the page shows in a dictionary and paint from it: on the Atelier track `AIMEAT.atelier.i18n.use({ en: {...}, fi: {...} })`, `i18n.t(key)`, and `i18n.onChange(paint)`, with the node\'s own bar mounted by `AIMEAT.auth.mountLoginButton(\'#pill\', ...)`; never a switch of your own. The switch keeps what the person was doing. One language is the owner\'s decision: ask, do not decide. Before handing over, press the switch both ways in the middle of using the app and read every screen in both.',
@@ -238,6 +252,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'track-drift',
+    enforcedBy: 'track-drift:trackDriftFindings',
     title: 'A new app that is not an Atelier app',
     symptom: 'A new app is published with no Atelier kit in it and no track declared. It works and it looks like every hand-built page: a header written by hand, a sign-in bar that breaks at phone width, states nobody designed. Publishing warns (`app_hints`, pitfall `track-drift`). It happens because a blank page can be started from at once and the Atelier specification asks for a level and a genre or shell first.',
     fix: 'Every app is built with the Atelier specification: load `node:aimeat-app-builder-atelier`, read it (`aimeat_handbook_get { tier: "build-app-atelier" }`, in parts; over HTTP `GET /v1/prompts/build-app-atelier`), and fork a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`) or start from `shell-atelier`. A page with a look or an engine of its own goes inside the Atelier shell and names its register as `custom:<name>`. The Classic track was retired on 2026-11-19; an update of an app built on it stays quiet, and it is moved with the specification\'s section `from-classic`.',
@@ -249,6 +264,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'atelier-register',
+    enforcedBy: 'artifact-lint:checkRegister',
     title: 'An Atelier app that never chose a look',
     symptom: 'The app is the bare shell with words in it: stacked sections in the default look, the same page every other app built that way has. Publishing REFUSES this (APP_ARTIFACT_BROKEN): an Atelier app that states no `aimeat-level`, or states "fine", and has no `aimeat-register` meta in its head, still has the shell\'s REPLACE-ME placeholder, or names an empty `custom:` register, does not go live. A page whose owner chose "proto" or "plain" owes no register (see below-level).',
     fix: 'Start from a genre, never from the bare shell. `GET /v1/designbook?kind=genre` lists the committed registers and `GET /v1/app-templates/genre-<id>` hands over the whole page; every genre already carries `<meta name="aimeat-register" content="genre-<id>">`, so a fork passes the gate by construction. Swap the words, sources and images for the app at hand and keep the physics. A page that commits to a look of its own names it: `<meta name="aimeat-register" content="custom:<name>">`, where the name says what the register is (custom:game, custom:ledger), never "default". The bare shell is a frame, not a page.',
@@ -271,6 +287,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'cdn-libs-blocked',
+    enforcedBy: 'artifact-lint:collectAssetRefs',
     title: 'CDN libraries are one CSP tightening away from a blank screen',
     symptom: 'A <script src="https://cdn.jsdelivr.net/..."> works today, because the app CSP still allows https script hosts, and the publish answer warns about it. The app goes blank on the day a node tightens its CSP to its own origin.',
     fix: 'Use the node-vendored equivalents under /lib/ and /v1/libs/ (/lib/tailwindcss@4.js, /lib/daisyui@5.css + /lib/aimeat-daisyui-bridge.css, /lib/chartjs@4.js, ...). GET /v1/library-packs lists what the node serves. Load nothing from a CDN.',
@@ -282,6 +299,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'provenance-without-model',
+    enforcedBy: 'ai-model-hints:provenanceModelFindings',
     title: 'The AI label says who served the model and not which model',
     symptom: 'The app was published with an `ai_provenance` block that gives `level` (and often `provider`) but no `model`. The public "How this was made" page then shows "Served by openai" and no model row, and nobody can tell from the record which model wrote the app. The node cannot fill the gap: it did not watch the generation, and a publish with the owner\'s own token has no agent record to read a model from. Publishing warns (`app_hints`, pitfall `provenance-without-model`).',
     fix: 'Name your own model in every declaration: `ai_provenance: { level: "ai-generated", model: "openai/gpt-6", provider: "openai" }`, with the id as your provider names it. Take it from your own configuration; do not ask the person. The record is bound to one version, so the next publish is where the model appears.',
@@ -293,6 +311,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'hardcoded-theme-colors',
+    enforcedBy: 'artifact-lint:checkTheme',
     title: 'Hardcoded colors make the light/dark toggle look broken',
     symptom: 'The login pill\'s mode switch flips <html data-theme> and fires the `aimeat-theme-change` window event, but the app never repaints: users report "the dark/light button does nothing". Publishing warns about hardcoded chrome colours.',
     fix: 'Drive chrome colours off data-theme: the /lib/aimeat-theme.css tokens (what the shells link), daisyUI tokens via the bridge CSS, or your own :root + :root[data-theme="light"] variables. Restore the saved mode before first paint (the shells carry the inline script reading localStorage["aimeat-theme"]). A page that deliberately keeps its own light, a tracker grid or a canvas, says so with `<meta name="aimeat-light" content="fixed">`, which turns the switch off instead of leaving it dead.',
@@ -494,6 +513,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'grid-track-blowout',
+    enforcedBy: 'app-mobile-lint:gridTrackFindings',
     title: 'One wide child inflates a 1fr grid track and the whole page overflows',
     symptom: 'ONE view overflows horizontally on mobile while sibling views are fine — a non-wrapping table/<pre>/long code inside an overflow-x:auto wrapper still pushes the page wide, because the grid track grew to its min-content.',
     fix: 'Use grid-template-columns: ... minmax(0,1fr) and/or min-width:0 on the grid/flex children so the track can shrink and the inner overflow-x:auto actually scrolls. Verify per element at 390px with the measure the build specification gives in its mobile section: under the shells\' body{overflow-x:clip} a scrollWidth check passes while the track is still too wide.',
@@ -577,6 +597,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   // ---- the words 4.0 checks ------------------------------------------------
   E({
     id: 'undeclared-scope-words',
+    enforcedBy: 'scope-needs:undeclaredScopeFindings',
     title: 'From 4.0 a route the app calls refuses a word its aimeat-scopes does not name',
     symptom: 'On a 4.0 node a signed-in app gets 403 SCOPE_DENIED from routes that answered on 3.x: an extension action (/v1/ext/..., AIMEAT.iam, AIMEAT.webhook, a cortex lib that calls one), the agent list (AIMEAT.agents.list, /v1/agents), organism workspaces (AIMEAT.organism.workspaces, AIMEAT.intake.listForms), schedules (POST /v1/schedules, AIMEAT.refinery.schedule), a schedule edit (PATCH /v1/schedules/:id), or an image or file that is not public read from /v1/pub with the visitor\'s token (a workspace document\'s images stay empty). The publish answer warns with the word and the line that needs it.',
     fix: 'Name every word the code needs in `<meta name="aimeat-scopes">`, beside the four the app already uses: ext:invoke for an extension action, agent:read for the agent list, task:write for a task or a new schedule, workflow:write for a schedule edit, organism:read for an organism\'s workspaces, organism:invite for workspace access, social:write for a new realtime room, storage:read for a file from /v1/pub that is not public. Declaring replaces the default set, so keep memory:read memory:write storage:read storage:write in it. An app published before the node moved to 4.0 kept these words by itself (aimeat_app_manage scope_allowance names them); declaring them is still the fix, and a new app gets nothing kept. Three more words are refused on every node and no app ever kept them, so the publish answer names them too: memory:delete for AIMEAT.data.delete, ai:use for an AI call (AIMEAT.ai.complete, stream, job.start, a /v1/ai/... route), and contract:spend for a checkout (openCheckout, buyOffer, subscribe, payByCard).',
@@ -590,6 +611,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   // ---- an agent the app brings with it ---------------------------------------
   E({
     id: 'bundled-agent-block',
+    enforcedBy: 'bundled-crews:decideBundledCrews',
     title: 'An app declares the agent it brings in one aimeat-crews block in its own HTML',
     symptom: 'The app publishes and shows no agent, a package made from it installs with no agent, or the publish answer carries an app_hints entry about the aimeat-crews block. The usual causes: the definition was sent only in the publish request (a package reads only the page), the block is not valid JSON, or a task has no {{ctx.prompt}}.',
     fix: 'Put `<script type="application/json" id="aimeat-crews">[ ... ]</script>` in the page, a list of at most five definitions. One definition: `agent_name` (3 to 32 lowercase letters, digits and hyphens, starting with a letter), `description` (one or two sentences the owner reads before approving), `scopes` (the permissions the job needs), `agents` (the crew: each with `role`, `goal`, optional `backstory`, `tools`, `skills`) and `tasks` (each with `description`, `expected_output` and `agent`, the role that does it). At least one task description contains {{ctx.prompt}}, which is replaced by the request the agent was given. Publish without cortex_agents and the block is the declaration on every route: a plain publish, a draft and a package. The definition is data: the node validates it and never runs code from the app. A person adds the agent from the app\'s page in the App Catalog, or their AI does with aimeat_app_manage { action: "agent_deploy" }; it reaches them as a proposal, and nothing exists until they approve it. Read the node skill node:aimeat-app-agents for a whole example.',
@@ -602,6 +624,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'bundled-agent-permissions',
+    enforcedBy: 'bundled-crews:crewPermissionFindings',
     title: 'A bundled agent holds only the permissions its definition asks for',
     symptom: 'The owner approved the agent, its first task ends as refused, and the agent\'s refusals name a permission. Or the publish answer carries an app_hints entry saying the agent names tools and asks for no permissions.',
     fix: 'List what the job needs in `scopes` beside `agent_name`, for example ["organism:read", "task:write"]. A proposal asks the owner for exactly those, plus memory:read and memory:write, which the crew runtime needs for itself. `*` and the permissions an owner grants one by one (account:security and the like) are never taken from an app; the answer names them in scopes_left_out and the owner can grant them on the agent\'s page. Ask for the smallest list that does the job: the owner reads it before approving. aimeat_app_manage { action: "agent_status" } shows the permissions a proposal would ask for.',

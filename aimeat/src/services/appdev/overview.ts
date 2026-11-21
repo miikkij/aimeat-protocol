@@ -14,6 +14,8 @@
  *   import { buildAppdevOverview } from './overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   2026-11-21 — pitfalls_curated.enforced names each enforced entry (id, title, enforced_by), narrowed
+ *     by the areas like the items, and enforced_at_publish counts that list.
  *   2026-11-21 — opts.areas (the areas a draft uses) narrows both pitfall sections; a curated entry a
  *     publish check enforces (enforcedBy) leaves the curated list, counted as enforced_at_publish; a
  *     learned entry not re-checked within STALE_MINOR_WINDOW minor versions leaves the learned list,
@@ -272,14 +274,23 @@ export async function buildAppdevOverview(
     if (wanted.has('pitfalls_curated')) {
         // An entry a publish check enforces is shown where the check fires, at publish, so it leaves
         // the list a builder reads before building (AppdevPitfallEntry.enforcedBy).
-        const enforced = new Set(getAppdevPitfalls().filter(p => p.enforcedBy).map(p => p.id));
+        const inAreas = (appliesTo: readonly string[]) => areas.size === 0 || appliesTo.some(a => areas.has(a));
+        const enforcedEntries = getAppdevPitfalls().filter(p => p.enforcedBy);
+        const enforced = new Set(enforcedEntries.map(p => p.id));
         const idx = getAppdevPitfallIndex()
             .filter(p => !enforced.has(p.id))
-            .filter(p => areas.size === 0 || (p.appliesTo as string[]).some(a => areas.has(a)));
+            .filter(p => inAreas(p.appliesTo));
+        // Still named, apart: what the publish answer will name when its check fires.
+        const enforcedList = enforcedEntries.filter(p => inAreas(p.appliesTo))
+            .map(p => ({ id: p.id, title: p.title, enforced_by: p.enforcedBy as string }));
         out.pitfalls_curated = {
             ...capped(idx),
             facets: getAppdevPitfallFacets(),
-            ...(enforced.size > 0 ? { enforced_at_publish: enforced.size, enforced_note: 'Entries a publish check enforces are left out here: the publish answer names them when the check fires.' } : {}),
+            ...(enforcedList.length > 0 ? {
+                enforced_at_publish: enforcedList.length,
+                enforced: enforcedList,
+                enforced_note: 'Entries a publish check enforces are listed here under enforced, not in items: the publish answer names the entry (pitfall and url) when the check fires. GET /v1/appdev/pitfalls/{id} opens one.',
+            } : {}),
             drill_down: 'GET /v1/appdev/pitfalls/{id} (filter: ?applies_to=&severity=)',
         };
     }

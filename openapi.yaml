@@ -19597,8 +19597,10 @@ paths:
       responses:
         '200':
           description: >-
-            The overview sections (indexes + drill-down pointers). pitfalls_curated leaves out an entry a
-            publish check enforces (counted as enforced_at_publish); pitfalls_learned leaves out an entry
+            The overview sections (indexes + drill-down pointers). pitfalls_curated leaves out of its items
+            an entry a publish check enforces and lists it under enforced ({id, title, enforced_by}, the
+            check as `<module>:<function>`), counted as enforced_at_publish; the publish answer names such
+            an entry (pitfall and url) in app_hints when the check fires. pitfalls_learned leaves out an entry
             not re-checked within two minor versions of this node, counted under needs_recheck with the
             call that re-checks it.
         '401':
@@ -19988,7 +19990,9 @@ paths:
           schema: { type: string }
       responses:
         '200':
-          description: The pitfall entry (data.pitfall)
+          description: >-
+            The pitfall entry (data.pitfall). An entry a publish check enforces carries enforcedBy, the
+            check as `<module>:<function>`; that check's finding in a publish answer carries this id.
         '404':
           description: No such pitfall
 

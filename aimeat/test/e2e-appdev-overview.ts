@@ -7,6 +7,8 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-overview).
  * @version-history
+ *   v1.6.0 — 2026-11-21 — Curated entries a publish check enforces are listed under enforced (and
+ *     narrowed by areas), and a publish names grid-track-blowout with its address in app_hints.
  *   v1.4.2 — 2026-11-15 — Audit M051: B's include_shared list is read before A shares the entry.
  *   v1.5.0 — 2026-11-19 — The Classic track is retired: app_templates leads with shell-atelier, offers
  *     no tiered shell and carries start_guide; the Atelier builder skill leads the node skills alone;
@@ -148,6 +150,39 @@ await test('?sections= narrows the payload', async () => {
     const d = body.data;
     assert(d.library_packs && d.pitfalls_curated, 'requested sections missing');
     assert(d.apps === undefined && d.skills === undefined, 'unrequested sections leaked');
+});
+
+await test('curated pitfalls a publish check enforces are listed apart under enforced, narrowed by area', async () => {
+    const { status, body } = await json('/v1/appdev/overview?sections=pitfalls_curated', { headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(status === 200, `overview ${status}`);
+    const c = body.data.pitfalls_curated;
+    const shown = new Set((c.items as any[]).map(i => i.id));
+    const enforced = c.enforced as Array<{ id: string; title: string; enforced_by: string }>;
+    assert(Array.isArray(enforced) && enforced.length === c.enforced_at_publish && enforced.length >= 20, `enforced: ${JSON.stringify(c.enforced_at_publish)}`);
+    assert(enforced.every(e => !shown.has(e.id) && /^[a-z-]+:[A-Za-z]+$/.test(e.enforced_by) && e.title), 'an enforced entry is still in items, or names no check');
+    assert(enforced.some(e => e.id === 'grid-track-blowout' && e.enforced_by === 'app-mobile-lint:gridTrackFindings'), 'grid-track-blowout not listed as enforced');
+    assert(shown.has('handle-both-auth-paths') && shown.has('namespace-rule'), 'an entry no check covers left the research list');
+    const one = await json('/v1/appdev/pitfalls/inline-js-does-not-parse');
+    assert(one.status === 200 && one.body.data.pitfall.enforcedBy === 'artifact-lint:checkInlineScripts', `entry: ${JSON.stringify(one.body.data?.pitfall?.enforcedBy)}`);
+    const mobile = await json('/v1/appdev/overview?sections=pitfalls_curated&areas=mobile', { headers: { Authorization: `Bearer ${tokenA}` } });
+    const me = mobile.body.data.pitfalls_curated.enforced as Array<{ id: string }>;
+    assert(me.length === 1 && me[0].id === 'grid-track-blowout', `areas=mobile enforced: ${JSON.stringify(me)}`);
+});
+
+await test('a publish names the curated pitfall a finding enforces, with its address; a safe grid gets none', async () => {
+    const page = (cols: string) => b64(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="aimeat-app" content="ovgrid.html"><style>.g{display:grid;grid-template-columns:${cols}}</style></head><body><div class="g">x</div></body></html>`);
+    const pub = async (cols: string) => json('/v1/apps', {
+        method: 'POST', headers: { Authorization: `Bearer ${tokenA}` },
+        body: JSON.stringify({ filename: 'ovgrid.html', content: page(cols), name: 'Grid', description: 'grid probe', category: 'utility' }),
+    });
+    const bad = await pub('250px 1fr');
+    assert(bad.status === 201 || bad.status === 200, `publish ${bad.status}: ${JSON.stringify(bad.body?.error)}`);
+    const hit = (bad.body.data.app_hints ?? []).find((h: any) => h.pitfall === 'grid-track-blowout');
+    assert(!!hit && hit.severity === 'warn' && hit.url === '/v1/appdev/pitfalls/grid-track-blowout', `app_hints: ${JSON.stringify(bad.body.data.app_hints)}`);
+    assert((bad.body.data.mobile_hints ?? []).some((h: string) => /grid-track-blowout/.test(h)), 'the string hint is still there');
+    const ok = await pub('250px minmax(0,1fr)');
+    assert(ok.status === 200 || ok.status === 201, `republish ${ok.status}`);
+    assert(!(ok.body.data.app_hints ?? []).some((h: any) => h.pitfall === 'grid-track-blowout'), `a safe grid was named: ${JSON.stringify(ok.body.data.app_hints)}`);
 });
 
 await test('?model= marks proven packs', async () => {

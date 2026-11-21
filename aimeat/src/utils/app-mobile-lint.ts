@@ -8,9 +8,12 @@
  *   users hit them. Deliberately high-confidence + low-noise — only patterns that are almost always
  *   a real mobile problem. The login-pill overflow class is prevented at the library level (the
  *   compact pill is default on app origins), so it is NOT re-checked here.
- * @structure lintAppHtmlForMobile(html) -> string[]
+ * @structure lintAppHtmlForMobile(html) -> string[]; gridTrackFindings(html) -> the grid hint as a
+ *   finding with its curated pitfall
  * @usage import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
  * @version-history
+ *   v1.1.0 — 2026-11-21 — gridTrackFindings: the grid hint as a publish finding carrying
+ *     grid-track-blowout and its address, for app_hints. The string hints are unchanged.
  *   v1.0.0 — 2026-07-19 — initial: viewport-meta presence + width=device-width, and the CSS-grid
  *     1fr-blowout hint (appdev pitfall grid-track-blowout).
  *   v1.0.1 — 2026-09-06 — The viewport-meta match is two linear passes instead of one regex with an
@@ -42,10 +45,27 @@ export function lintAppHtmlForMobile(html: string): string[] {
   //    minmax(0,…) or min-width:0 on children lets a wide non-wrapping child (table, <pre>, long
   //    code) inflate the track and overflow the whole page on mobile. Flag only when the safe
   //    idiom is entirely absent, to stay low-noise.
-  if (noWs.includes('grid-template-columns') && noWs.includes('1fr')
-      && !noWs.includes('minmax(0') && !noWs.includes('min-width:0')) {
-    hints.push('CSS grid uses `1fr` tracks but no `minmax(0,1fr)` or `min-width:0` on children — a wide child (table, <pre>, long code) can inflate the track and overflow the page on mobile. See appdev pitfall grid-track-blowout.');
-  }
+  if (gridTrackCanBlowOut(noWs)) hints.push(GRID_TRACK_HINT);
 
   return hints;
+}
+
+const GRID_TRACK_PITFALL = 'grid-track-blowout';
+const GRID_TRACK_HINT = 'CSS grid uses `1fr` tracks but no `minmax(0,1fr)` or `min-width:0` on children — a wide child (table, <pre>, long code) can inflate the track and overflow the page on mobile. See appdev pitfall grid-track-blowout.';
+
+/** The lowercased page with no whitespace has a bare 1fr track and neither safe idiom. */
+function gridTrackCanBlowOut(noWs: string): boolean {
+  return noWs.includes('grid-template-columns') && noWs.includes('1fr')
+    && !noWs.includes('minmax(0') && !noWs.includes('min-width:0');
+}
+
+/**
+ * The grid-track hint as a publish finding (the AppArtifactFinding shape, services/app/artifact-lint.ts),
+ * carrying the curated pitfall it enforces and the address that opens it. The publish answer lists it
+ * in app_hints beside the other findings; `mobile_hints` keeps the same sentence as a string.
+ */
+export function gridTrackFindings(html: string): Array<{ pitfall: string; severity: 'warn'; message: string; url: string }> {
+  if (!html || typeof html !== 'string') return [];
+  if (!gridTrackCanBlowOut(html.toLowerCase().replace(/\s+/g, ''))) return [];
+  return [{ pitfall: GRID_TRACK_PITFALL, severity: 'warn', message: GRID_TRACK_HINT, url: `/v1/appdev/pitfalls/${GRID_TRACK_PITFALL}` }];
 }

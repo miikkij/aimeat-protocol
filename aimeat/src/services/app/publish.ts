@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-21 — artifactWarnings also carries the grid-track mobile hint as a finding with its curated pitfall.
  *   2026-11-20 — Whether the file is an HTML app (the subdomain and the announcement) is isHtmlAppFile.
  *   2026-11-20 — The app name and the data-map id come from services/app/app-ref.ts (appDisplayName /
  *     appDataMapId) instead of a regex of this file's own; no change in behaviour.
@@ -164,7 +165,7 @@ import { readAppDataMap } from '../data-map/data-map-store.js';
 import { stampFor } from '../data-map/data-map-check.js';
 import { parseAppScopes } from '../protected-resource.js';
 import type { DataMapStamp } from '../data-map/data-map-types.js';
-import { lintAppHtmlForMobile } from '../../utils/app-mobile-lint.js';
+import { gridTrackFindings, lintAppHtmlForMobile } from '../../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../../utils/app-protect.js';
 import { ensureAppSubdomain } from '../subdomain/names.js';
 import { appSeoListable } from './seo.js';
@@ -762,7 +763,9 @@ export async function publishApp(
       // A form the code submits to and the aimeat-intake meta leaves out.
       ...(intakeDecl && 'warnings' in intakeDecl ? intakeDecl.warnings : []),
       // The agents the app bundles: a block that was not used, and tools with no permissions asked for.
-      ...crews.findings],
+      ...crews.findings,
+      // The grid-track mobile hint, as a finding that names its curated pitfall (mobileHints keeps the string).
+      ...(isHtml ? gridTrackFindings(html) : [])],
     servedMarksRemoved,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.
