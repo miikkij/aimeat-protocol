@@ -27,6 +27,9 @@
  * @usage const v = classifyVisitor(req.get('user-agent'));  // { klass, aiAgent, aiKind }
  * @version-history
  *   v1.0.0 — 2026-08-24 — Initial, for the signals collector.
+ *   v1.0.1 — 2026-11-22 — A bare runtime agent (`node`, `undici`, `deno`, `bun`, with or without a
+ *     version) is a script. Node's own fetch counted as a person in the signal and visibility reports,
+ *     and for a short while on 2026-11-21 a server redirect meant for a person's browser sent it on.
  */
 import type { VisitorClass, AiFetchKind } from '../../models/signal-schemas.js';
 
@@ -114,6 +117,13 @@ const GENERIC_BOTS = [
   'playwright', 'puppeteer', 'scrapy', 'apache-httpclient',
 ];
 
+/**
+ * Whole User-Agent values that only an HTTP library sends: Node's built-in fetch says `node`, undici
+ * says `undici`, Deno and Bun name themselves. Matched whole, because the word inside a browser's
+ * agent string means nothing.
+ */
+const RUNTIME_AGENTS = new Set(['node', 'undici', 'deno', 'bun']);
+
 /** Last-resort words. Anything self-describing as a robot is taken at its word. */
 const BOT_WORDS = ['bot', 'crawler', 'spider', 'scraper', 'monitor', 'fetcher'];
 
@@ -128,6 +138,10 @@ export function classifyVisitor(userAgent: string | undefined | null): VisitorVe
   const ua = (userAgent ?? '').trim();
   if (!ua) return { klass: 'bot', aiAgent: null, aiKind: null, matched: 'no-user-agent' };
   const lower = ua.toLowerCase();
+  const product = lower.split('/')[0]!;
+  if (RUNTIME_AGENTS.has(product) && !lower.includes(' ')) {
+    return { klass: 'bot', aiAgent: null, aiKind: null, matched: product };
+  }
 
   for (const rule of AI_AGENTS) {
     if (lower.includes(rule.token.toLowerCase())) {
