@@ -111,7 +111,7 @@
         "aimeat/src/services/content/risk-core.ts",
         "aimeat/src/services/content/risk-read.ts"
       ],
-      "digest": "sha256:138940c85eedc056049d2811"
+      "digest": "sha256:9604d4e1a6072978192d7d36"
     },
     "09-hardening-guide.md": {
       "reviewedOn": "2026-11-19",
@@ -235,7 +235,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:94cc30e8c7c3dea723f76b0a"
+      "digest": "sha256:e3c4ca668139914e795b69e9"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -367,8 +367,8 @@
     "08-threat-model.md": {
       "docs/security/threat-model.md": "10cf3cf1952417f9",
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce",
-      "aimeat/src/services/content/risk-core.ts": "8b7c676a9280b1cf",
-      "aimeat/src/services/content/risk-read.ts": "3355a833ad2d3a52"
+      "aimeat/src/services/content/risk-core.ts": "214ff2a5ad8e0b71",
+      "aimeat/src/services/content/risk-read.ts": "278cc60841b487a5"
     },
     "09-hardening-guide.md": {
       "aimeat/src/config/posture.ts": "c0ed072cd1e3f4ca",
@@ -472,7 +472,7 @@
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
-      "aimeat/security/process-local-baseline.json": "bc3a3cb5d0137687",
+      "aimeat/security/process-local-baseline.json": "2b7f90fbf4a7dce6",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52",
