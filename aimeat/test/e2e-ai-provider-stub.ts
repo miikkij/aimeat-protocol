@@ -39,6 +39,7 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   2026-11-21 -- The node it starts is test/helpers/ai-provider-stub-node.ts (pure extraction, 800-line limit).
  *   2026-11-21 -- 2b2: a caller that leaves a streamed proxy answer cancels the provider call, and a
  *     stream read to the end is not cancelled (the abort listens on the response's close now).
  *   2026-11-15 -- Audit M095: 7d's plan also names the catalogued delegate (agent 'other', offer 'x'),
@@ -80,16 +81,8 @@
  *     retries (502 EMPTY_COMPLETION naming finish_reason=length, three attempts).
  *   v1.0.0 — 2026-09-08 — Initial.
  */
-import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
-import { spawn, type ChildProcess } from 'node:child_process';
-import { once } from 'node:events';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pinnedEnv } from './run-e2e-server.js';
-import { ownNodeDb } from './helpers/own-node-db.js';
-import { waitForServer } from './helpers/wait-for-server.js';
+import { startAiStubNode, stopAiStubNode } from './helpers/ai-provider-stub-node.js';
 import {
     startFakeAiProvider, chatJson, chatErrorBody, sseChat, modelsJson, transcriptionJson,
     imageJson, providerStatus, type FakeAiProvider, type RecordedRequest,
@@ -132,59 +125,7 @@ function assertLegacyGone(r: { status: number; body: any; headers: Headers }, wh
     assert(r.headers.get('x-aimeat-removed-in') === AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN, `${what}: X-AIMEAT-Removed-In ${r.headers.get('x-aimeat-removed-in')}`);
 }
 
-// ── the node under test ───────────────────────────────────────────────────────
-
-const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-ai-stub-'));
-const DB_PATH = join(dbDir, 'ai-stub.db');
-
-async function startServer(): Promise<ChildProcess> {
-    const db = await ownNodeDb(PORT, { sqlitePath: DB_PATH });
-    const target = {
-        port: PORT, baseUrl: BASE, dbType: db.provider, dbPath: db.sqlitePath, dbUrl: db.dbUrl, external: false,
-    };
-    const env: Record<string, string | undefined> = {
-        ...process.env,
-        // The runner's own pin list, so this node behaves like every other test node: no real SMTP,
-        // no developer .env leaking a live OAuth client, generous ceilings, a fixed operator.
-        ...pinnedEnv(target),
-        ...db.env,
-        AIMEAT_DEV_MODE: 'true',
-        AIMEAT_TEST_MODE: 'true',
-        // The stub lives on loopback, which outbound validation refuses on a public node and must.
-        AIMEAT_ALLOW_PRIVATE_EGRESS: 'true',
-        AIMEAT_RL_OPENROUTER: '1000',
-        AIMEAT_RL_GLOBAL: '10000',
-        AIMEAT_RL_AUTH: '1000', AIMEAT_RL_WORK: '1000', AIMEAT_RL_MEMORY: '1000',
-        AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '1000',
-        AIMEAT_DEFAULT_AGENT_SCOPES: '*',
-        // One slot, so the second job of a pair is genuinely queued rather than racing to finish.
-        AIMEAT_AI_JOB_SLOTS: '1',
-        // 5e: a node key and a node default IMAGE model, but no node default transcription model.
-        // The node's key goes only to OpenRouter's own address, so no stub can answer it; what 5e
-        // proves is which key the gate CHOSE, read off the refusal each operation reaches. No free
-        // starter allowance, so the node's key is chosen and found spent rather than called.
-        AIMEAT_OPENROUTER_INSTANCE_KEY: 'sk-node-e2e-never-sent',
-        AIMEAT_CHAT_FREE_ALLOWANCE_USD: '0',
-        AIMEAT_MODEL_DEFAULT_IMAGE: 'stub/node-image-model',
-        AIMEAT_MODEL_DEFAULT_STT: '',
-    };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
-        { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
-    // The stderr tail and the exit check that used to live here are the helper now, so the other
-    // sixteen suites that spawn a node get them too.
-    return waitForServer(child, BASE, { label: 'the AI-provider node' });
-}
-
-async function stopServer(child: ChildProcess): Promise<void> {
-    if (child.exitCode === null && child.signalCode === null) {
-        child.kill('SIGTERM');
-        // Wait for the process to be GONE rather than sleeping a guessed second: on Windows the
-        // SQLite file cannot be deleted while the handle is open.
-        const timer = setTimeout(() => child.kill('SIGKILL'), 10_000);
-        await once(child, 'exit');
-        clearTimeout(timer);
-    }
-}
+// ── the node under test: test/helpers/ai-provider-stub-node.ts ────────────────
 
 // ── owners, agents and the one record that aims the node at the stub ──────────
 
@@ -253,7 +194,7 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
     // The default answer is a FUNCTION, so a background living-document derive or a stray job never
     // consumes a reply written for a named test. 'Stop condition:' is the living charter's judge.
     provider.setDefault('chat', (r) => r.body.includes('Stop condition:') ? chatJson('NO') : chatJson(DEFAULT_ANSWER));
-    const server = await startServer();
+    const server = await startAiStubNode(PORT, BASE);
     // Node 4.0.0 removes GET /v1/openrouter/models (3b, 3b2, 3c): it answers 410 and asks the provider nothing.
     const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
 
@@ -1264,10 +1205,8 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
 
     // ── cleanup ──
     provider.releaseHeld();
-    await stopServer(server);
+    await stopAiStubNode(server);
     await provider.close();
-    // A leftover temp directory is not a result, and the OS collects it either way.
-    try { rmSync(dbDir, { recursive: true, force: true }); } catch { /* the OS will collect it */ }
 
     console.log(`\n  ${passed} passed, ${failed} failed`);
     process.exit(failed > 0 ? 1 : 0);

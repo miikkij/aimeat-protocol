@@ -78,8 +78,8 @@
       "sha": "55380193f3086751"
     },
     "test/e2e-scope-ceiling.ts": {
-      "reason": "ANSWERED 2026-10-16 (QA audit F03a-01). The refusal under test is the operator's scope ceiling, which every route answers with 400 INVALID_SCOPES by design (the request names a permission the node does not grant, it is not a second principal reaching for the first one's data). Each of the six routes and the ecosystem approval is asserted to refuse with that code and to leave nothing behind. Re-stamped 2026-11-15 after audit part E (M055): the edit adds the scopes_within_ceiling validation check, no second principal; the reason holds.",
-      "sha": "e300cf5ac555ec27"
+      "reason": "ANSWERED 2026-10-16 (QA audit F03a-01). The refusal under test is the operator's scope ceiling, which every route answers with 400 INVALID_SCOPES by design (the request names a permission the node does not grant, it is not a second principal reaching for the first one's data). Each of the six routes and the ecosystem approval is asserted to refuse with that code and to leave nothing behind. Re-stamped 2026-11-15 after audit part E (M055): the edit adds the scopes_within_ceiling validation check, no second principal; the reason holds. RE-STAMPED 2026-11-21: the only edit waits for the suite's own node with helpers/wait-for-server.ts, which keeps the node's output for a failed start; no principal and no assertion changed, and the reason above was re-read and still holds.",
+      "sha": "618cf1a281b38b44"
     },
     "test/e2e-package-update-widening.ts": {
       "reason": "ANSWERED 2026-10-16 (QA audit F08c-03). The refusal under test is the daily update holding back a version that can do more than the owner approved: it answers the outcome needs_owner, the install stays on its version and the owner is told once. No second principal is involved; the guard is between an automatic job and the owner's approval.",

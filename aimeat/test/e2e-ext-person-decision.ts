@@ -15,28 +15,14 @@
  *   is unchanged; a manifest with another value of `decision` is refused.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-person-decision
  * @version-history
+ *   2026-11-21 — test, assert, json and finish come from test/helpers/harness.ts.
  *   v1.0.0 — 2026-11-21 — Initial (incident mwqdmtk8).
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
+import { BASE, assert, finish, json, test } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>): Promise<void> {
-  try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (err) { failed++; console.error(`  ❌ ${name}: ${(err as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers ?? {}) } });
-  const text = await res.text();
-  let body: any;
-  try { body = JSON.parse(text); } catch { body = { _raw: text }; }
-  return { status: res.status, body };
-}
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 const stamp = Date.now().toString(36) + randomBytes(2).toString('hex');
@@ -261,5 +247,4 @@ async function appGrantToken(scopes: string[]): Promise<string> {
   return tok.body.data.access_token as string;
 }
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+finish();

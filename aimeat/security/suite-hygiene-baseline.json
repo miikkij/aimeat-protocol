@@ -380,7 +380,7 @@
   "test/e2e-ai-provider-stub.ts": {
    "ownHarness": 1,
    "deviceFlow": 1,
-   "lines": 1168
+   "lines": 1135
   },
   "test/e2e-ai-providers.ts": {
    "ownHarness": 1,
@@ -2441,9 +2441,6 @@
    "lintErrors": 2
   },
   "test/helpers/host-request.ts": {
-   "lintErrors": 1
-  },
-  "test/run-playwright-ci.ts": {
    "lintErrors": 1
   },
   "test/unit/a2a-foreign-paid-turn.test.ts": {

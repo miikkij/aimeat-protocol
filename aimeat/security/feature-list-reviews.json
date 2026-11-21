@@ -149,7 +149,7 @@
       "digest": "sha256:8e3efedfe361eb31fe82c974"
     },
     "8. Automation: schedules, workflows and extensions": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-21",
       "watches": [
         "aimeat/src/services/hooks.ts",
         "aimeat/src/mcp/agent-schedules.ts",
@@ -165,7 +165,7 @@
         "aimeat/src/routes/commerce-ucp.ts",
         "aimeat/src/routes/commerce-acp.ts"
       ],
-      "digest": "sha256:0c2834d1260b017ab165cd79"
+      "digest": "sha256:5ff2bd5598bed4357f36828e"
     },
     "9. AI on the node": {
       "reviewedOn": "2026-11-21",
@@ -287,7 +287,7 @@
         "aimeat/src/services/trust.ts",
         "aimeat/src/routes/agents/purchase-limit.ts"
       ],
-      "digest": "sha256:0e85faea8468f240dd4e6b97"
+      "digest": "sha256:d32f49ae29321509fde8ca66"
     },
     "15. Bookkeeping and business": {
       "reviewedOn": "2026-11-20",
@@ -717,7 +717,7 @@
       "aimeat/src/services/schedule/run-limit.ts": "2b44c8c159d741d9",
       "aimeat/src/services/schedule/types.ts": "f90eef7c590ee88f",
       "aimeat/src/services/schedule/write.ts": "e964d8ddc942e30d",
-      "aimeat/src/tool-catalog/definitions/extensions-cortex.ts": "98438e8757ff541b",
+      "aimeat/src/tool-catalog/definitions/extensions-cortex.ts": "fd7f61386516306a",
       "aimeat/src/routes/schedules.ts": "445717db006e0f07",
       "aimeat/src/routes/workflows.ts": "efaf105d6380eca6",
       "aimeat/src/routes/cortex.ts": "05d7830ff08fc276",
@@ -858,7 +858,7 @@
       "aimeat/src/tool-catalog/definitions/moderation.ts": "ae6a9716b37aa0a0"
     },
     "14. Economy, marketplace and payments": {
-      "aimeat/src/tool-catalog/definitions/commerce.ts": "3f61889875c4689e",
+      "aimeat/src/tool-catalog/definitions/commerce.ts": "7055c86dcd007e02",
       "aimeat/src/tool-catalog/definitions/exchange.ts": "acbcf46987f24f6a",
       "aimeat/src/routes/commerce-webhooks.ts": "82408169bd101b2f",
       "aimeat/src/services/morsel.ts": "3d5e33c362495127",
