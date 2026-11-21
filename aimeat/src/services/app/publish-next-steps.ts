@@ -147,7 +147,8 @@ export async function buildPublishNextSteps(
     // them only on the structure page after the four owed items were done (2026-11-08).
     const legalMissing = appRec ? legalReadiness(appRec).missing : [];
     const balancing = await balancingTestStep({ storage, config }, ownerName, filename);
-    const register = await registerStep({ storage, config }, ownerName, filename);
+    // Not `register`: that name is the Atelier register this function takes.
+    const recordsOfProcessing = await registerStep({ storage, config }, ownerName, filename);
 
     // How big it has become, and how fast. Best-effort like everything here: an app whose version
     // line cannot be read still gets its face and skill reminder.
@@ -241,7 +242,7 @@ export async function buildPublishNextSteps(
       } : {}),
       // Only for an app whose data map says it keeps personal data and that has no register for it
       // (compliance/register-step.ts, the same reading as the gap app-personal-data-without-register).
-      ...(register ? { register } : {}),
+      ...(recordsOfProcessing ? { register: recordsOfProcessing } : {}),
       template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Learnings that would bite the next builder go to aimeat_appdev_pitfall_report.',
     };
   } catch (err) {

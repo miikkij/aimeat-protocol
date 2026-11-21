@@ -27,7 +27,7 @@ let bob = '';
 let org = '';
 let ws = '';
 
-await test('Setup: alice with an organism and a workspace of a records space and a document space; bob, no member', async () => {
+await test('Setup: alice with an organism and a workspace of two records spaces; bob, no member', async () => {
     alice = (await registerOwner(BASE, `amb${stamp}a`)).token;
     bob = (await registerOwner(BASE, `amb${stamp}b`)).token;
     const made = await json('/v1/organisms', { method: 'POST', headers: auth(alice), body: JSON.stringify({ name: 'Twins', visibility: 'private' }) });
@@ -37,12 +37,12 @@ await test('Setup: alice with an organism and a workspace of a records space and
         method: 'POST', headers: auth(alice),
         body: JSON.stringify({ name: 'Twins', manifest: { objectTypes: [
             { name: 'note', namespace: 'notes', mode: 'records' },
-            { name: 'page', namespace: 'pages', mode: 'document' },
+            { name: 'card', namespace: 'cards', mode: 'records' },
         ] } }),
     });
     assert(w.status === 201, `workspace: ${w.status} ${short(w.body)}`);
     ws = w.body.data.ws;
-    const drafts: Array<[string, string, unknown]> = [['note', 'twin', { title: 'Twin note' }], ['page', 'twin', '# Twin page'], ['note', 'solo', { title: 'Only a note' }]];
+    const drafts: Array<[string, string, unknown]> = [['note', 'twin', { title: 'Twin note' }], ['card', 'twin', { title: 'Twin card' }], ['note', 'solo', { title: 'Only a note' }]];
     for (const [space, id, value] of drafts) {
         const d = await json(`/v1/organisms/${encodeURIComponent(org)}/workspace/drafts`, {
             method: 'POST', headers: auth(alice), body: JSON.stringify({ ws, space, id, value }),
@@ -59,12 +59,12 @@ await test('An id two spaces hold, read without space, is answered from the firs
     const d = r.body.data;
     assert(d.items?.length === 1 && d.items[0].space === 'note', `answered from the first space: ${short(d.items)}`);
     const amb = (d.ambiguous ?? []).find((a: any) => a.id === 'twin');
-    assert(amb && amb.spaces.includes('note') && amb.spaces.includes('page') && amb.answered_from === 'note', `ambiguous: ${short(d.ambiguous)}`);
+    assert(amb && amb.spaces.includes('note') && amb.spaces.includes('card') && amb.answered_from === 'note', `ambiguous: ${short(d.ambiguous)}`);
 });
 
 await test('The space named reads the other record, and nothing is ambiguous', async () => {
-    const r = await read(alice, 'ids=twin&space=page');
-    assert(r.status === 200 && r.body.data.items?.[0]?.space === 'page', `space page: ${r.status} ${short(r.body)}`);
+    const r = await read(alice, 'ids=twin&space=card');
+    assert(r.status === 200 && r.body.data.items?.[0]?.space === 'card' && r.body.data.items[0].value?.title === 'Twin card', `space card: ${r.status} ${short(r.body)}`);
     assert(!('ambiguous' in r.body.data), `ambiguous: ${short(r.body.data.ambiguous)}`);
 });
 
