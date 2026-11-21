@@ -17,6 +17,8 @@
  *   E2E_BASE may point at a live node: run against https://aimeat.io before the deploy, it fails
  *   on every rule; after the deploy it is the production check.
  * @version-history
+ *   v1.1.0 — 2026-11-21 — /v1/app-store sends a person's browser to /v1/appcat?view=community and
+ *     keeps the crawler page; markdown, no User-Agent and other pages keep today's answer.
  *   v1.0.0 — 2026-09-30 — Initial (wish-bing-noindex-kirjautumissivut-ja-konetiedostot)
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=seo-noindex
@@ -124,6 +126,36 @@ const PUBLIC = [
             if (r.status !== 200 || /noindex/i.test(r.tag) || metaNoindex(r.body)) bad.push(`${path} (${r.status}, "${r.tag}")`);
         }
         assert(bad.length === 0, `noindex or unreachable: ${bad.join(', ')}`);
+    });
+
+    // /v1/app-store: no SPA view owns it, so a person's browser goes to the community catalogue,
+    // while a crawler keeps the server-written page the sitemap names (2026-11-21).
+    const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+    const BROWSER_ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
+    const open = (path: string, headers: Record<string, string>) => fetch(`${BASE}${path}`, { headers, redirect: 'manual' });
+
+    await test('a person\'s browser opening /v1/app-store is sent to the community catalogue', async () => {
+        const r = await open('/v1/app-store', { 'User-Agent': BROWSER_UA, Accept: BROWSER_ACCEPT });
+        assert(r.status === 302, `status ${r.status}`);
+        assert(r.headers.get('location') === '/v1/appcat?view=community', `location ${r.headers.get('location')}`);
+        assert(/user-agent/i.test(r.headers.get('vary') ?? ''), `a cache must keep the two answers apart: Vary "${r.headers.get('vary')}"`);
+    });
+
+    await test('a crawler opening /v1/app-store keeps the server-written page', async () => {
+        const r = await open('/v1/app-store', { 'User-Agent': UA, Accept: BROWSER_ACCEPT });
+        assert(r.status === 200, `status ${r.status} (location ${r.headers.get('location')})`);
+        const body = await r.text();
+        assert(body.includes('Applications published here'), 'the crawler text is missing from the page');
+        assert(!/noindex/i.test(r.headers.get('x-robots-tag') ?? '') && !metaNoindex(body), 'the crawler page says noindex');
+    });
+
+    await test('a browser asking for markdown, and a script asking for HTML, keep today\'s answer; other pages are not redirected', async () => {
+        const md = await open('/v1/app-store', { 'User-Agent': BROWSER_UA, Accept: 'text/markdown' });
+        assert(md.status === 200 && /markdown/i.test(md.headers.get('content-type') ?? ''), `markdown ${md.status} ${md.headers.get('content-type')}`);
+        const script = await open('/v1/app-store', { 'User-Agent': 'curl/8.9.1', Accept: 'text/html' });
+        assert(script.status === 200, `a script ${script.status} (location ${script.headers.get('location')})`);
+        const members = await open('/v1/members', { 'User-Agent': BROWSER_UA, Accept: BROWSER_ACCEPT });
+        assert(members.status === 200, `/v1/members ${members.status} (location ${members.headers.get('location')})`);
     });
 
     console.log(`\n${passed} passed, ${failed} failed\n`);

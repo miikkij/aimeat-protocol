@@ -7,6 +7,7 @@
  *   answers 404 on F5; a path in SPA_PAGE_PATHS alone serves the shell, which then draws the front
  *   page under that address (docs/pitfalls.md §2 until 2026-11-21).
  * @version-history
+ *   v1.0.2 — 2026-11-21 — /v1/app-store's open question is ruled: a person goes to the community catalogue.
  *   v1.0.1 — 2026-11-21 — /v1/app-store's reason names the crawler page; the admin link left it.
  *   v1.0.0 — 2026-11-21 — Initial.
  */
@@ -29,11 +30,11 @@ const ONE_SIDE: Record<string, string> = {
     // not in SPA_PAGE_PATHS; ROUTES uses it as the view every unknown address falls back to.
     '/v1/portal': 'served by its own route in routes/portal.ts',
     // The public app list a search engine reads (data/public-pages.ts, services/page/body-live.ts
-    // writes its crawler body, the sitemap names it). The shell is served here and no view owns the
-    // address, so a person who opens it sees the front page. The node's own links go to /v1/appcat
-    // (services/home/rooms.ts, the admin Apps tab since 2026-11-21). Which view owns this address is
-    // not decided.
-    '/v1/app-store': 'public crawler page; no client view, the shell draws the front page (open question)',
+    // writes its crawler body, the sitemap names it). No view owns the address: a person's browser
+    // is sent to /v1/appcat?view=community (routes/portal.ts, ruled 2026-11-21), and a crawler, an AI
+    // or a script gets the shell with the server-written text. The node's own links go to /v1/appcat
+    // (services/home/rooms.ts, the admin Apps tab since 2026-11-21).
+    '/v1/app-store': 'public crawler page; a person is redirected to /v1/appcat?view=community',
 };
 
 describe('spa.html ROUTES and SPA_PAGE_PATHS name the same pages', () => {

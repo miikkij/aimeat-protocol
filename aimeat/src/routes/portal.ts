@@ -14,6 +14,8 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-11-21 — A person's browser opening /v1/app-store goes to /v1/appcat?view=community (302); a
+ *     crawler, an AI and a script keep the server-written page.
  *   2026-11-21 — GET /v1/build answers `seeds` (settled or pending): whether this process's boot seeders have all finished.
  *   2026-11-09 — The Link header of /v1/portal and of a page's markdown: the canonical address comes from canonicalPageUrl (data/public-pages.ts): the main node's for a page this node repeats (seo.primary_node_url, TARGET-094).
  *   2026-11-04 — GET /v1/build answers the process stamp (PROCESS_BUILD_ID) as before; the pages' stamp names the code (codebase analysis 2026-11-03, item A7).
@@ -147,6 +149,7 @@ import { aiRegionNotice } from '../services/privacy-ai-region.js';
 import { operatorPlaceVars } from '../services/operator/place.js';
 import { renderPolicyNotSetPage } from './portal-policy-not-set.js';
 import { bootSeedsState } from '../server-bootstrap/boot-seed-lock.js';
+import { classifyVisitor } from '../services/signals/visitor-class.js';
 
 /**
  * Returns a Record<placeholder, value> for the templated static pages
@@ -626,6 +629,24 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/pricing', (_req, res) => {
     if (config.siteLinks.store) { res.redirect(301, config.siteLinks.store); return; }
     res.redirect(302, '/v1/portal');
+  });
+
+  // /v1/app-store is the public app list a search engine reads (data/public-pages.ts; the sitemap
+  // names it), and no SPA view owns the address, so a person who opened it saw the front page. A
+  // person is sent to the community catalogue instead (302, ruled 2026-11-21); a crawler, an AI and
+  // a script keep the server-written page below. A person is a browser navigation: Accept names
+  // text/html and the User-Agent reads as a person (services/signals/visitor-class.ts). Anything
+  // else, an absent User-Agent included, keeps today's answer.
+  router.get('/v1/app-store', (req, res, next) => {
+    res.vary('Accept');
+    res.vary('User-Agent');
+    const asksForHtml = /\btext\/html\b/i.test(req.get('accept') ?? '');
+    if (asksForHtml && !prefersMarkdown(req) && req.query.format !== 'md'
+      && classifyVisitor(req.get('user-agent')).klass === 'human') {
+      res.redirect(302, '/v1/appcat?view=community');
+      return;
+    }
+    next();
   });
 
   for (const path of spaRoutes) {
