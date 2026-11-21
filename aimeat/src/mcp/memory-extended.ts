@@ -11,6 +11,8 @@
  *   import { registerMemoryExtendedTools } from './memory-extended.js';
  *   registerMemoryExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-21 — aimeat_memory_search gives the risk read each hit's provenance id, so its writer decides
+ *     whether the words are checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — aimeat_memory_search carries each hit's content_risk, read over the whole value, and
  *     leaves a held hit's snippet out (services/content/risk-read.ts).
  *   2026-11-14 — aimeat_memory_read_public answers the tool manifest of an app the operator hid as absent,
@@ -130,7 +132,7 @@ export function registerMemoryExtendedTools(
             // Each hit says whether its record carries risk marks, read over the whole value; a held
             // hit's snippet is left out (services/content/risk-read.ts).
             const reader = sessionCaller ? sessionCaller() : { inPerson: false, ownerGhii: ownerGhiiOf(agentGaii), principal: agentGaii };
-            const rr = await riskForRead({ storage, config }, reader, hits.map(r => ({ subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value) })));
+            const rr = await riskForRead({ storage, config }, reader, hits.map(r => ({ subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value), provenanceId: r.aiProvenanceId })));
             return {
                 content: [{
                     type: 'text' as const,

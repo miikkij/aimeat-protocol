@@ -10,6 +10,8 @@
  * @structure contentRouter(config, storage)
  * @usage app.use(contentRouter(config, storage));
  * @version-history
+ *   v1.5.0 — 2026-11-21 — GET /v1/content/risk/held became GET /v1/content/risk/items (by status); POST
+ *     /v1/content/risk/accept and /unaccept (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.4.0 — 2026-11-21 — GET /v1/content/risk/held and POST /v1/content/risk/release (content risk marks).
  *   v1.3.1 — 2026-11-03 — A permission the service refuses an agent answers with `details.allow_url`
  *     and a next action, the address where its person allows it.
@@ -35,11 +37,12 @@ import { validateBody } from '../models/schemas.js';
 import { INPUT_LIMITS } from '../models/input-limits.js';
 import {
   factsViewFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
-  removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, heldFor, releaseFor, ContentError, ContentClassError,
+  removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, riskItemsFor, acceptFor, unacceptFor, releaseFor,
+  ContentError, ContentClassError,
 } from '../services/content/service.js';
 
-/** POST /v1/content/risk/release: the ref GET /v1/content/risk/held gave. */
-const ReleaseBody = z.object({ ref: z.string().min(3).max(INPUT_LIMITS.url) }).strict();
+/** POST /v1/content/risk/accept, /unaccept and /release: the ref GET /v1/content/risk/items or a read's content_risk.ref gave. */
+const RefBody = z.object({ ref: z.string().min(3).max(INPUT_LIMITS.url) }).strict();
 
 export function contentRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -140,14 +143,23 @@ export function contentRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, { settings: await updateSettingsFor(deps, callerOf(req, config.nodeId, storage), req.body ?? {}, targetOf(req)) }));
   }));
 
-  // ── GET /v1/content/risk/held ── marked content held from other people's AIs, which the caller decides.
-  router.get('/v1/content/risk/held', requireAuth(), requireScope('storage:read'), run(async (req, res) => {
-    res.json(success(config.nodeId, { items: await heldFor(deps, callerOf(req, config.nodeId, storage)) }, [
+  // ── GET /v1/content/risk/items ── the marked items the caller decides; ?status=held|open|accepted narrows it.
+  router.get('/v1/content/risk/items', requireAuth(), requireScope('storage:read'), run(async (req, res) => {
+    res.json(success(config.nodeId, { items: await riskItemsFor(deps, callerOf(req, config.nodeId, storage), req.query.status) }, [
+      { description: 'Accept a marked item that is meant to be so', method: 'POST', url: '/v1/content/risk/accept' },
       { description: 'Release one held item to other people\'s AIs', method: 'POST', url: '/v1/content/risk/release' },
     ]));
   }));
+  // ── POST /v1/content/risk/accept ── { ref }: the item's current marks stop warning and stop making it prepare-only.
+  router.post('/v1/content/risk/accept', requireAuth(), requireScope('storage:read'), validateBody(RefBody, config.nodeId), run(async (req, res) => {
+    res.json(success(config.nodeId, await acceptFor(deps, callerOf(req, config.nodeId, storage), (req.body ?? {}).ref)));
+  }));
+  // ── POST /v1/content/risk/unaccept ── { ref }: the item's marks warn again.
+  router.post('/v1/content/risk/unaccept', requireAuth(), requireScope('storage:read'), validateBody(RefBody, config.nodeId), run(async (req, res) => {
+    res.json(success(config.nodeId, await unacceptFor(deps, callerOf(req, config.nodeId, storage), (req.body ?? {}).ref)));
+  }));
   // ── POST /v1/content/risk/release ── { ref }: other people's AIs then get the content, with its marks.
-  router.post('/v1/content/risk/release', requireAuth(), requireScope('storage:read'), validateBody(ReleaseBody, config.nodeId), run(async (req, res) => {
+  router.post('/v1/content/risk/release', requireAuth(), requireScope('storage:read'), validateBody(RefBody, config.nodeId), run(async (req, res) => {
     res.json(success(config.nodeId, await releaseFor(deps, callerOf(req, config.nodeId, storage), (req.body ?? {}).ref)));
   }));
 

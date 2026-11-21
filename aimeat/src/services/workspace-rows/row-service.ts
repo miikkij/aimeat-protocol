@@ -33,6 +33,8 @@
  *   - rowSpaceSchema
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-11-21 — readRows gives the content risk read each row's last writer, so a row the reader's own
+ *     person wrote is not checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — appendRows answers the space's namespace; a deleted, cut or swept row's content risk
  *     marks go with it (content/risk-keys.ts); readRows carries each row's content_risk to an AI reader
  *     and leaves a held row's body out.
@@ -658,7 +660,7 @@ export async function readRows(
   // (services/content/risk-read.ts).
   const ownerGhii = caller.owner.includes('@') ? caller.owner : `${caller.owner}@${deps.config.nodeId}`;
   const rr = await riskForRead(deps, riskReaderOf({ principal: caller.principal, ownerGhii, roles: caller.app ? [...caller.roles, 'app'] : caller.roles, ...(caller.extension ? { extension: caller.extension } : {}) }),
-    shown.map(r => ({ subject: { kind: 'row' as const, org: input.organismId, ws: input.wsId, space: space.namespace, id: r.rowId }, text: contentRiskTextOf(r.body) })));
+    shown.map(r => ({ subject: { kind: 'row' as const, org: input.organismId, ws: input.wsId, space: space.namespace, id: r.rowId }, text: contentRiskTextOf(r.body), from: lastWriterOf(r) })));
   return {
     ...(rr.warning ? { content_risk_warning: rr.warning } : {}),
     space: space.name,

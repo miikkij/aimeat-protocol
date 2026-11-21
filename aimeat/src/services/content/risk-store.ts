@@ -21,13 +21,17 @@
  *   No entry keeps words of the content: the excerpts are stripped before a write and built again on a
  *   read from the words the reader gets (risk-read.ts). A deleted item's entry is removed by its delete
  *   path (risk-keys.ts).
- *   An item with no marks stores nothing, and its earlier marks are removed. A record past
- *   RECORD_LIMIT_BYTES drops its oldest entries that are not held; a held entry is never dropped.
- *   Every write is on the version that was read (record-cas.ts / classes.ts updateOwnRecord).
+ *   An item with no marks stores nothing, and its earlier marks are removed, unless a person accepted
+ *   marks of it: that entry stays with no marks, so the acceptance outlives an edit. A record past
+ *   RECORD_LIMIT_BYTES drops its oldest entries that are not held, the accepted ones last; a held entry
+ *   is never dropped. Every write is on the version that was read (record-cas.ts / classes.ts
+ *   updateOwnRecord).
  * @structure RiskSubject · RiskHome · homeOf · subjectIdOf · getRiskMarks · getRiskMarksMany · putRiskMarks ·
- *   listHeld · personRiskKey · workspaceRiskKey · RECORD_LIMIT_BYTES
+ *   listKept · personRiskKey · workspaceRiskKey · RECORD_LIMIT_BYTES
  * @usage await putRiskMarks(deps, subject, marks, { mimeType: 'text/plain', size: 120 });
  * @version-history
+ *   v1.1.0 — 2026-11-21 — listHeld became listKept (every entry with marks or an acceptance); fit drops
+ *     accepted entries last (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.0.0 — 2026-11-21 — Initial (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -154,7 +158,10 @@ function fit(items: Record<string, RiskMarks>): void {
   for (const [id, m] of Object.entries(items)) if (m.expiresAt && m.expiresAt < now) delete items[id];
   const size = () => Buffer.byteLength(JSON.stringify({ v: 1, items }), 'utf8');
   if (size() <= RECORD_LIMIT_BYTES) return;
-  const oldest = Object.entries(items).filter(([, m]) => m.hold?.status !== 'held').sort((a, b) => (a[1].at < b[1].at ? -1 : 1));
+  // An entry a person decided (accepted) goes after every entry nobody decided, oldest first in each.
+  const decided = (m: RiskMarks): number => (m.accepted ? 1 : 0);
+  const oldest = Object.entries(items).filter(([, m]) => m.hold?.status !== 'held')
+    .sort((a, b) => decided(a[1]) - decided(b[1]) || (a[1].at < b[1].at ? -1 : 1));
   for (const [id] of oldest) {
     delete items[id];
     if (size() <= RECORD_LIMIT_BYTES) return;
@@ -213,10 +220,10 @@ export async function putRiskMarks(
   }, { tag: 'contentrisk', visibility: 'private' });
 }
 
-/** Every held entry of one record, with its id. For the approver's list. */
-export async function listHeld(storage: Storage, owner: string, key: string): Promise<Array<{ id: string; marks: RiskMarks }>> {
+/** Every entry of one record that carries marks or an acceptance, with its id. For the decider's list. */
+export async function listKept(storage: Storage, owner: string, key: string): Promise<Array<{ id: string; marks: RiskMarks }>> {
   const rec: MemoryRecord | null = await storage.getMemory(owner, key);
   return Object.entries(parseItems(rec?.value).items)
-    .filter(([, m]) => isMarks(m) && m.hold?.status === 'held')
+    .filter(([, m]) => isMarks(m) && (m.marks.length > 0 || !!m.accepted))
     .map(([id, marks]) => ({ id, marks }));
 }

@@ -16,13 +16,15 @@
  * @structure MAX_MODEL_CHARS · detectRiskModel()
  * @usage const r = await detectRiskModel(deps, payer, text, kinds);
  * @version-history
+ *   v1.1.0 — 2026-11-21 — A model's mark carries its fingerprint, as a rule's does
+ *     (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.0.0 — 2026-11-21 — Initial (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { completeForOwner } from '../ai/completion.js';
 import { parseJsonAnswer } from '../refinery/message.js';
-import { excerptOf } from './risk-rules.js';
+import { excerptOf, markFp } from './risk-rules.js';
 import { RISK_KINDS, type RiskKind, type RiskMark } from './risk-types.js';
 
 /** The most text the model reads. */
@@ -77,7 +79,7 @@ export async function detectRiskModel(
     if (start < 0) continue;
     marks.push({
       kind: kind as RiskKind, rule: 'model', by: 'model', start, end: start + quote.length,
-      excerpt: excerptOf(text, start, start + quote.length),
+      excerpt: excerptOf(text, start, start + quote.length), fp: markFp(kind as RiskKind, 'model', quote),
       ...(typeof why === 'string' && why.trim() ? { why: why.trim().slice(0, 300) } : {}),
     });
   }

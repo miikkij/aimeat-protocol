@@ -259,3 +259,7 @@ newest at the top.
   wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-). *Riskimerkintä* and *pidätä*
   are the words of the approved plan (docs/internal/situated-ai/07); *vapauttaa* releases a hold.
   Spanish *retener* / *liberar*. The six kind names stay English everywhere, as setting values.
+- **2026-11-21**: accepting a content risk mark (wish
+  wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy). *Hyväksyä* / *aceptar*, and
+  *perua hyväksyntä* / *deshacer la aceptación* for unaccept: the everyday words for saying a flagged
+  thing is fine.

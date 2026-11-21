@@ -18,6 +18,8 @@
  * @structure registerContentTools(mcp, storage, config, caller)
  * @usage registerContentTools(mcp, storage, config, caller);
  * @version-history
+ *   v1.5.0 — 2026-11-21 — aimeat_content_hold became aimeat_content_risk: list by status, accept, unaccept,
+ *     release (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.4.0 — 2026-11-21 — aimeat_content_hold: the held items and their release (content risk marks).
  *   v1.3.1 — 2026-11-03 — A permission the service refuses an agent is answered as every tool's
  *     SCOPE_DENIED is (mcp/scope-denied-answer.ts): what it may not do yet and the address where its
@@ -45,7 +47,7 @@ import { scopeDeniedText } from './scope-denied-answer.js';
 import { checkContentInput } from '../tool-catalog/definitions/content.js';
 import {
   factsViewFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
-  removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, heldFor, releaseFor, ContentError, ContentClassError,
+  removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, riskItemsFor, acceptFor, unacceptFor, releaseFor, ContentError, ContentClassError,
 } from '../services/content/service.js';
 
 /** A refusal the service wrote, with its code and status. */
@@ -170,14 +172,16 @@ export function registerContentTools(
       } catch (err) { return fail(err, 'aimeat_content_settings'); }
     });
 
-  mcp.registerTool('aimeat_content_hold', { description: descriptionFor('aimeat_content_hold'), inputSchema: zodShapeFor('aimeat_content_hold'),
-    annotations: annotationsFor('aimeat_content_hold') },
-    async ({ action, ref }) => {
+  mcp.registerTool('aimeat_content_risk', { description: descriptionFor('aimeat_content_risk'), inputSchema: zodShapeFor('aimeat_content_risk'),
+    annotations: annotationsFor('aimeat_content_risk') },
+    async ({ action, ref, status }) => {
       try {
         const who = caller();
-        if (action === 'list') return ok({ items: await heldFor(deps, who) });
+        if (action === 'list') return ok({ items: await riskItemsFor(deps, who, status) });
+        if (action === 'accept') return ok(await acceptFor(deps, who, ref));
+        if (action === 'unaccept') return ok(await unacceptFor(deps, who, ref));
         if (action === 'release') return ok(await releaseFor(deps, who, ref));
-        return toolError('INVALID_INPUT', 'action is list or release.');
-      } catch (err) { return fail(err, 'aimeat_content_hold'); }
+        return toolError('INVALID_INPUT', 'action is list, accept, unaccept or release.');
+      } catch (err) { return fail(err, 'aimeat_content_risk'); }
     });
 }

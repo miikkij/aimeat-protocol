@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-21 — aimeat_memory_read gives the risk read the record's provenance id, so its writer decides
+ *     whether the words are checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — aimeat_memory_read carries content_risk (and content_risk_warning) beside the value, and
  *     withholds a value held from this reader (services/content/risk-read.ts).
  *   2026-11-20 — aimeat_memory_read records the open for the value signals (services/value/signal-buffer.ts).
@@ -530,7 +532,7 @@ export function registerCoreTools(
             recordValueRead({ ownerGaii: record.ownerGaii, key: record.key, readerPrincipal: agentGaii });
             // The content risk marks travel with the value; a held value is not in this answer
             // (services/content/risk-read.ts).
-            const [risk] = (await riskForRead({ storage, config }, caller(), [{ subject: { kind: 'memory', owner: record.ownerGaii, key: record.key }, text: contentRiskTextOf(record.value) }])).items;
+            const [risk] = (await riskForRead({ storage, config }, caller(), [{ subject: { kind: 'memory', owner: record.ownerGaii, key: record.key }, text: contentRiskTextOf(record.value), provenanceId: record.aiProvenanceId }])).items;
             return structuredResult('aimeat_memory_read', response_format, {
                 ...(risk?.warning ? { content_risk_warning: risk.warning } : {}),
                 key: record.key,

@@ -6069,6 +6069,8 @@ components:
         end: { type: integer }
         excerpt: { type: string, description: 'At most 160 characters around the match, invisible characters written as \u{...}. Empty in stored marks (facts.risk); a read builds it from the words it answers.' }
         why: { type: string, description: 'A model''s reason, in one sentence.' }
+        fp: { type: string, description: 'The mark''s fingerprint: a hash of its kind, rule and matched words. An acceptance names fingerprints, so an accepted phrase stays accepted after an edit and a new phrase is marked again. Keeps no words.' }
+        accepted: { type: boolean, description: 'In a read answer: a person accepted this exact phrase in this item. An accepted mark does not warn and does not make the item prepare-only.' }
     ContentRisk:
       type: object
       description: >
@@ -6082,6 +6084,10 @@ components:
         outside service that reads AIMEAT content (the SituatedAI Engine, an agent framework) relies on
         this. A field is added to this shape, never renamed or removed. A list answer also carries
         `content_risk_warning`, one line, when any item is marked and the reader's setting warns.
+        Words the reading person or their own agents wrote are not checked on the read, and their
+        stored marks do not warn that person: the read checks what came from someone else. A mark a
+        person accepted stays in `marks` with `accepted: true`; `marked`, `use`, `kinds` and `warning`
+        count only the marks nobody accepted, so accepted exercise material is used normally.
       required: [v, marked, use, kinds, marks, content_hash, detect, checked_at, point]
       properties:
         v: { type: integer, enum: [1] }
@@ -6100,6 +6106,14 @@ components:
           properties:
             since: { type: string, format: date-time }
             release_with: { type: string }
+        ref: { type: string, description: 'The item''s ref for POST /v1/content/risk/accept, /unaccept and /release (aimeat_content_risk): p:<id> for the reader''s own item, w:<organism>:<workspace>:<id> for a workspace''s. Absent on another person''s item and on a live mail or drive read.' }
+        accepted:
+          type: object
+          description: A person accepted marks of this item.
+          properties:
+            by: { type: string, description: The principal that accepted. }
+            at: { type: string, format: date-time }
+            marks: { type: integer, description: How many of the item's marks are accepted. }
     ContentRiskMarks:
       type: object
       description: The marks kept beside one item (facts.risk of a person's file or memory record), bound to its hash.
@@ -6121,6 +6135,13 @@ components:
             since: { type: string, format: date-time }
             decidedBy: { type: string }
             decidedAt: { type: string, format: date-time }
+        accepted:
+          type: object
+          description: A person's acceptance, kept across edits of the item.
+          properties:
+            fps: { type: array, items: { type: string }, description: The fingerprints of the accepted marks. }
+            by: { type: string }
+            at: { type: string, format: date-time }
         writtenBy: { type: string }
         expiresAt: { type: string, format: date-time }
     ContentRiskSettings:
@@ -75609,30 +75630,111 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: A token without memory:write-reserved.
-  /v1/content/risk/held:
+  /v1/content/risk/items:
     get:
-      operationId: listHeldContent
-      summary: Marked content held from other people's AIs, which you decide
+      operationId: listContentRiskItems
+      summary: The marked content you decide
       description: >
-        Content marked for possible risks at intake or at a shared write, under a layer whose behaviour
-        is `hold`, is kept from other people's AIs: they get its `content_risk` with `held` and not its
-        content, until the owner (for a person's item) or the workspace's creator or an organism admin
-        (for a workspace's item) releases it. Nothing is changed or deleted. This lists your own held
-        items and those of every workspace you decide for. 404 when content risk marks are off on the node.
+        Content marked for possible risks, kept beside the content: your own items, and those of every
+        workspace whose creator or organism admin you are. Each item's status is `held` (marked outside
+        content kept from other people's AIs until it is released), `open` (marks nobody accepted) or
+        `accepted` (every mark accepted). Nothing is changed or deleted. 404 when content risk marks are
+        off on the node.
       tags: [ContentClasses]
       security:
         - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [held, open, accepted] }
+          description: Only items of this status.
       responses:
         '200':
-          description: '`items`: each with `ref` (for the release), `where`, `subject_id`, `since`, `kinds`, `marks` (how many), `written_by` and `point`.'
+          description: '`items`: each with `ref`, `where`, `subject_id`, `status`, `kinds` (of the marks nobody accepted), `marks` and `accepted_marks` (how many), `since`, `written_by`, `point` and `accepted` (by, at).'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Content risk marks are off on this node.
+  /v1/content/risk/accept:
+    post:
+      operationId: acceptContentRisk
+      summary: Accept a marked item that is meant to be so
+      description: >
+        For training or exercise material that is meant to instruct an AI, a runbook, or anything else
+        whose marks the person who decides it has looked at: the item's current marks are accepted by
+        their fingerprints. They stay listed with `accepted: true`, no longer warn and no longer make the
+        item prepare-only; a hold on it is released. The acceptance outlives an edit, and a phrase added
+        later is marked again. Needs memory:write-reserved (the account holder in person holds it); an
+        agent's refusal carries the address where its person allows the word. When an agent accepts, the
+        people who decide the item are told. 403 ACCEPT_OFF when the operator set content_risk.accept to
+        deny.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ref]
+              properties:
+                ref: { type: string, description: 'The ref GET /v1/content/risk/items or a read''s content_risk.ref gave: p:<id> or w:<organism>:<workspace>:<id>.' }
+      responses:
+        '200':
+          description: '`{ ref, accepted: true, marks, at }`: marks is how many of the item''s marks are now accepted.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without memory:write-reserved, or the operator does not let marks be accepted (ACCEPT_OFF).
+        '404':
+          description: No marked item of yours, or of a workspace you decide for, has that ref; or content risk marks are off.
+  /v1/content/risk/unaccept:
+    post:
+      operationId: unacceptContentRisk
+      summary: Take back an acceptance of a marked item
+      description: >
+        The item's marks warn again and make it prepare-only again. Needs memory:write-reserved.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ref]
+              properties:
+                ref: { type: string, description: 'The ref GET /v1/content/risk/items gave.' }
+      responses:
+        '200':
+          description: '`{ ref, accepted: false, at }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without memory:write-reserved.
+        '404':
+          description: No marked item of yours, or of a workspace you decide for, has that ref; or content risk marks are off.
   /v1/content/risk/release:
     post:
       operationId: releaseHeldContent
@@ -75652,7 +75754,7 @@ paths:
               type: object
               required: [ref]
               properties:
-                ref: { type: string, description: 'The ref GET /v1/content/risk/held gave: p:<id> or w:<organism>:<workspace>:<id>.' }
+                ref: { type: string, description: 'The ref GET /v1/content/risk/items gave: p:<id> or w:<organism>:<workspace>:<id>.' }
       responses:
         '200':
           description: '`{ ref, released: true, at }`.'

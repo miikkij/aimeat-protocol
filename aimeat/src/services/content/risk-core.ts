@@ -17,10 +17,19 @@
  *
  *   NOTICES. Once per item and hash, and at most NOTICE_LIMIT per recipient per hour in this process;
  *   past that the recipient gets one notice saying more were marked, so a flood of marked writes cannot
- *   flood a person's notices.
- * @structure hashText · layersFor · resolveForHome · approversOf · isApprover · behaviourAt · markText
+ *   flood a person's notices. A read records what it found and tells nobody: the reading AI tells its
+ *   own person.
+ *
+ *   ACCEPTED. A person's acceptance (risk-hold.ts acceptRiskFor) names the fingerprints of the phrases
+ *   they accepted. It is kept when the item is marked again after an edit, and only the marks it does not
+ *   name (openMarks) can hold the item or send a notice.
+ * @structure hashText · layersFor · resolveForHome · approversOf · isApprover · openMarks · behaviourAt ·
+ *   markText
  * @usage const marks = await markText(deps, { subject, text, point: 'intake', writer });
  * @version-history
+ *   v1.1.0 — 2026-11-21 — openMarks; markText keeps an item's acceptance across edits, holds and notifies
+ *     only for marks nobody accepted, and sends no notice from a read
+ *     (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.0.0 — 2026-11-21 — Initial (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  */
 import { createHash } from 'node:crypto';
@@ -38,7 +47,7 @@ import { resolveRisk, lenientRiskLayer, type LayerIn } from './risk-settings.js'
 import { detectRiskRules } from './risk-rules.js';
 import { detectRiskModel } from './risk-model.js';
 import { homeOf, getRiskMarks, putRiskMarks, subjectIdOf, type RiskHome, type RiskSubject } from './risk-store.js';
-import type { ResolvedRisk, RiskBehaviour, RiskMarks, RiskPoint } from './risk-types.js';
+import type { ResolvedRisk, RiskAccepted, RiskBehaviour, RiskMarks, RiskPoint } from './risk-types.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
@@ -107,6 +116,13 @@ export async function isApprover(deps: Deps, home: RiskHome, principal: string):
   return !!m && m.status === 'active' && (m.role === 'creator' || m.role === 'admin');
 }
 
+/** The marks a person has not accepted: their fingerprint is not in the item's acceptance. */
+export function openMarks<M extends { fp?: string }>(marks: readonly M[], accepted: RiskAccepted | undefined): M[] {
+  if (!accepted?.fps.length) return [...marks];
+  const ok = new Set(accepted.fps);
+  return marks.filter((m) => !m.fp || !ok.has(m.fp));
+}
+
 /** The behaviour of a point. A request marks; a read is decided by the read helper. */
 export function behaviourAt(r: ResolvedRisk, point: RiskPoint): RiskBehaviour {
   return point === 'intake' ? r.on_intake : point === 'shared-write' ? r.on_shared_write : point === 'read' ? r.on_read : 'mark';
@@ -156,7 +172,7 @@ async function tell(deps: Deps, recipients: string[], subject: RiskSubject, mark
     // The English fallback of the locale's notiftext.content_risk_* (en.json says the same words).
     const body = over ? 'More items were marked in the last hour than this list shows. Ask your AI which items wait for you.'
       : held ? `It has ${marks.marks.length} mark(s): ${kinds}. Other people's AIs get the marks but not the content until you release it. Nothing was changed. When you have looked at it, ask your AI to release it.`
-        : `It has ${marks.marks.length} mark(s): ${kinds}. Nothing was changed. An AI that reads it gets the marks and a warning.`;
+        : `It has ${marks.marks.length} mark(s): ${kinds}. Nothing was changed. An AI that reads it gets the marks and a warning. If the text is meant to be so (for example exercise material for an AI), tell your AI it is fine, and it accepts it.`;
     await notify(deps.storage, r, { type: key, title, body, link: '/v1/profile?tab=dataWallet', i18n: { key, vars } })
       .catch((err: unknown) => logger.warn('contentrisk: a notice was not sent', { recipient: r, error: String(err) }));
   }
@@ -225,26 +241,31 @@ export async function markText(deps: Deps, input: MarkInput): Promise<RiskMarks 
   }
   marks.sort((a, b) => a.start - b.start || a.end - b.end);
   const before = await getRiskMarks(deps, input.subject);
+  // An acceptance names phrases, not a hash: it stays with the item across edits (openMarks).
+  const accepted = before?.accepted;
+  const now = new Date().toISOString();
   if (!marks.length) {
-    if (before) await putRiskMarks(deps, input.subject, null);
+    if (accepted) await putRiskMarks(deps, input.subject, { v: 1, contentHash: hash, detect: r.detect, point: input.point, at: now, marks: [], kinds: r.kinds, accepted });
+    else if (before) await putRiskMarks(deps, input.subject, null);
     return null;
   }
-  const now = new Date().toISOString();
+  const open = openMarks(marks, accepted);
   const sameContent = before?.contentHash === hash;
   // Content from outside has no writer here: it is never an approver's own write.
   const writerIsApprover = input.writer ? await isApprover(deps, home, input.writer) : false;
-  const holdNow = behaviour === 'hold' && (input.point === 'intake' || input.point === 'shared-write') && !writerIsApprover;
+  const holdNow = open.length > 0 && behaviour === 'hold' && (input.point === 'intake' || input.point === 'shared-write') && !writerIsApprover;
   const hold = sameContent && before?.hold ? before.hold : holdNow ? { status: 'held' as const, since: now } : undefined;
   const kept: RiskMarks = {
     v: 1, contentHash: hash, detect: r.detect, point: input.point, at: now, marks, kinds: r.kinds,
     ...(found.truncatedAt ? { truncatedAt: found.truncatedAt } : {}),
     ...(model ? { model } : {}), ...(modelSkipped ? { modelSkipped } : {}),
-    ...(hold ? { hold } : {}), ...(input.writer ? { writtenBy: input.writer } : {}),
+    ...(hold ? { hold } : {}), ...(accepted ? { accepted } : {}), ...(input.writer ? { writtenBy: input.writer } : {}),
     ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
   };
   await putRiskMarks(deps, input.subject, kept, input.measure);
   const told = sameContent && (before?.marks.length ?? 0) > 0;
-  if (!told && (behaviour === 'mark+warn' || behaviour === 'hold')) {
+  // A read does not notify: the reading AI tells its own person (risk-read.ts contentRiskWarning).
+  if (!told && open.length > 0 && input.point !== 'read' && (behaviour === 'mark+warn' || behaviour === 'hold')) {
     const held = kept.hold?.status === 'held';
     await tell(deps, held ? await approversOf(deps, home) : home.kind === 'person' ? [home.owner] : await approversOf(deps, home), input.subject, kept, held);
   }

@@ -15,7 +15,9 @@
  *   components.schemas.ContentRisk, and every MCP read result that carries `content_risk`). An outside
  *   service relies on it: a marked item (`marked: true`, `use: 'prepare-only'`) may only produce a
  *   preparation for a person, never an act of its own. A field is added to it, never renamed or
- *   removed.
+ *   removed. A mark a person ACCEPTED (docs/internal/content-risk-accept-plan.md) stays listed with
+ *   `accepted: true` and no longer makes the item prepare-only: training or exercise material that is
+ *   meant to instruct an AI is used normally once its owner said so.
  *
  *   SETTINGS. `RiskSettings` is one layer's choice (the node's default, an organism, a workspace, a
  *   person); risk-settings.ts lays them over each other: the content's home decides its rules, an
@@ -26,6 +28,8 @@
  *   ResolvedRisk
  * @usage import type { RiskMarks, ContentRisk } from './risk-types.js';
  * @version-history
+ *   v1.1.0 — 2026-11-21 — RiskMark.fp and accepted, RiskAccepted, RiskMarks.accepted, ContentRisk.ref and
+ *     accepted (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.0.0 — 2026-11-21 — Initial.
  */
 
@@ -63,6 +67,25 @@ export interface RiskMark {
   excerpt: string;
   /** A model's reason, in one sentence. */
   why?: string;
+  /**
+   * The mark's fingerprint: a hash of its kind, rule and matched words (risk-rules.ts markFp). An
+   * acceptance names fingerprints, so an accepted phrase stays accepted after an edit and a new one is
+   * marked again. It keeps no words.
+   */
+  fp?: string;
+  /** In a read answer: a person accepted this exact phrase in this item (RiskMarks.accepted). */
+  accepted?: boolean;
+}
+
+/**
+ * A person's acceptance of an item's marks: the fingerprints they accepted, who and when. Kept across
+ * edits of the item; `unaccept` removes it.
+ */
+export interface RiskAccepted {
+  fps: string[];
+  /** The principal that accepted: the person, or their agent holding memory:write-reserved. */
+  by: string;
+  at: string;
 }
 
 /** A hold: the item waits for the owner or the workspace admin before other people's AIs get it. */
@@ -92,6 +115,8 @@ export interface RiskMarks {
   /** Why the model's part did not run, when it was asked for and did not. */
   modelSkipped?: string;
   hold?: RiskHold;
+  /** The marks a person accepted: their phrases do not warn and do not make the item prepare-only. */
+  accepted?: RiskAccepted;
   /** Who wrote the content, when it was marked at a shared write. */
   writtenBy?: string;
   /** When the content itself expires (a board post): the entry goes at the record's next write after it. */
@@ -119,6 +144,13 @@ export interface ContentRisk {
   warning?: string;
   /** Present when the item is held: its content is not in this answer. */
   held?: { since: string; release_with: string };
+  /**
+   * The item's reference for aimeat_content_risk (accept, unaccept, release), when its marks are kept
+   * and the reader may decide them or ask the one who does.
+   */
+  ref?: string;
+  /** Present when a person accepted marks of this item: who, when, and how many of its marks. */
+  accepted?: { by: string; at: string; marks: number };
 }
 
 /** One layer's choice. Every field is optional: a missing field follows the layer above. */

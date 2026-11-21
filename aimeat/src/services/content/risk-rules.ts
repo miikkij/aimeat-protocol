@@ -25,11 +25,14 @@
  *   side (test/unit/content-risk-rules.test.ts runs classification/regex-safety.ts unsafeRegexReason on
  *   each). Shapes a single pattern cannot say safely are found in two steps (a link first, then its
  *   value; lines first, then their run). The text is read up to MAX_SCAN_CHARS.
- * @structure MAX_SCAN_CHARS · RULE_PATTERNS · detectRiskRules() · excerptOf()
+ * @structure MAX_SCAN_CHARS · RULE_PATTERNS · markFp() · detectRiskRules() · excerptOf()
  * @usage const { marks, truncatedAt } = detectRiskRules(text, ['ai-instruction', 'hidden-text']);
  * @version-history
+ *   v1.1.0 — 2026-11-21 — Every mark carries `fp` (markFp), which an acceptance names
+ *     (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.0.0 — 2026-11-21 — Initial (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  */
+import { createHash } from 'node:crypto';
 import type { RiskKind, RiskMark } from './risk-types.js';
 
 /** The most of a text the rules read. A memory value holds at most 1024 kB. */
@@ -117,6 +120,17 @@ export const RULE_PATTERNS: readonly Rule[] = [
 ];
 
 const COMPILED = RULE_PATTERNS.map((r) => ({ ...r, re: new RegExp(r.source, r.flags ?? 'giu') }));
+
+/**
+ * A mark's fingerprint: the first 32 hex characters of sha256 over its kind, rule and matched words,
+ * the words lower-cased with their whitespace runs made one space. The same phrase gives the same
+ * fingerprint wherever it moves in the text, so an acceptance survives an edit around it; another
+ * phrase gives another one. A model's mark uses the rule `model`.
+ */
+export function markFp(kind: RiskKind, rule: string, words: string): string {
+  const norm = words.toLowerCase().replace(/\s+/gu, ' ').trim();
+  return createHash('sha256').update(`${kind}\u0000${rule}\u0000${norm}`, 'utf8').digest('hex').slice(0, 32);
+}
 
 /** The text near [start, end), at most EXCERPT characters, with invisible characters spelled out. */
 export function excerptOf(text: string, start: number, end: number): string {
@@ -246,7 +260,10 @@ export function detectRiskRules(input: string, kinds: readonly RiskKind[]): { ma
   if (want.has('hidden-text')) { scanInvisible(text, add); scanHidingMarkup(text, add); }
   if (want.has('exfil-link')) scanLinks(text, add);
   if (want.has('encoded-block')) scanEncoded(text, add);
-  for (const m of found) if (!m.rule.includes('.')) m.rule = `${m.kind}.${m.rule}`;
+  for (const m of found) {
+    if (!m.rule.includes('.')) m.rule = `${m.kind}.${m.rule}`;
+    m.fp = markFp(m.kind, m.rule, text.slice(m.start, m.end));
+  }
   found.sort((a, b) => a.start - b.start || a.end - b.end);
   return { marks: found, ...(input.length > MAX_SCAN_CHARS ? { truncatedAt: MAX_SCAN_CHARS } : {}) };
 }

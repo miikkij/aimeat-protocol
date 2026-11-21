@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — GET /v1/memory/:key gives the risk read the record's provenance id, so its writer decides
+ *     whether the words are checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — GET /v1/memory/:key carries content_risk to an AI reader and withholds a held value
  *     (services/content/risk-read.ts).
  *   2026-11-20 — GET /v1/memory/:key records the open for the value signals (services/value/signal-buffer.ts).
@@ -244,7 +246,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // The content risk marks travel with the value to an AI reader (a token, not the person in
     // person); a value held from this reader is not in the answer (services/content/risk-read.ts).
     const [risk] = (await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage),
-      [{ subject: { kind: 'memory', owner: record.ownerGaii, key: record.key }, text: contentRiskTextOf(record.value) }])).items;
+      [{ subject: { kind: 'memory', owner: record.ownerGaii, key: record.key }, text: contentRiskTextOf(record.value), provenanceId: record.aiProvenanceId }])).items;
 
     res.json(success(config.nodeId, {
       ...(risk?.warning ? { content_risk_warning: risk.warning } : {}),

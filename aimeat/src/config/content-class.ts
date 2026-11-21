@@ -24,6 +24,8 @@
  *   import { contentClassDefaults } from './content-class.js';
  *   const config = { ...contentClassDefaults(), ... };
  * @version-history
+ *   v1.5.0 — 2026-11-21 — contentRiskAccept (content_risk.accept): whether a marked item may be accepted
+ *     (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.4.0 — 2026-11-21 — The content risk marks' node settings (content_risk.*): the switch, the
  *     default detection and behaviour at each point, the operator's floors and the AI limit (wish
  *     wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
@@ -96,6 +98,11 @@ export interface ContentClassConfig {
   contentRiskFloorRead: ContentRiskBehaviour;
   /** The kinds of mark looked for by default, comma-separated. */
   contentRiskKinds: string;
+  /**
+   * Whether a person (or their agent holding memory:write-reserved) may accept a marked item they decide,
+   * so its accepted phrases stop warning: allow (default) or deny (every mark stays on this node).
+   */
+  contentRiskAccept: 'allow' | 'deny';
 }
 
 /** A content risk point's behaviour (services/content/risk-types.ts RiskBehaviour). */
@@ -168,5 +175,6 @@ export function contentClassDefaults(): ContentClassConfig {
     contentRiskFloorSharedWrite: behaviourOr(process.env.AIMEAT_CONTENT_RISK_FLOOR_SHARED_WRITE, 'off'),
     contentRiskFloorRead: behaviourOr(process.env.AIMEAT_CONTENT_RISK_FLOOR_READ, 'off', true),
     contentRiskKinds: riskKindsOr(process.env.AIMEAT_CONTENT_RISK_KINDS),
+    contentRiskAccept: process.env.AIMEAT_CONTENT_RISK_ACCEPT === 'deny' ? 'deny' : 'allow',
   };
 }

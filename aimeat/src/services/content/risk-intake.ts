@@ -19,9 +19,14 @@
  *   A SHARED WRITE is marked only when the writer is not the home's owner (risk-core.ts decides the
  *   hold; this file decides whether it is a shared write at all): for a workspace item, a writer who is
  *   the workspace's creator or an organism admin is not "someone other than the owner".
- * @structure contentRiskAfterWrite · contentRiskTextOf · contentRiskMessageText · holdContentRiskForErasure · flushContentRisk · pendingContentRisk · MAX_TEXT_FILE_BYTES
+ *
+ *   A READ that marked an item with no entry for its words queues it too (contentRiskAfterRead), so the
+ *   marks are kept and the item gets a ref a person can accept; the same list, the same bounds.
+ * @structure contentRiskAfterWrite · contentRiskAfterRead · contentRiskTextOf · contentRiskMessageText · holdContentRiskForErasure · flushContentRisk · pendingContentRisk · MAX_TEXT_FILE_BYTES
  * @usage contentRiskAfterWrite(deps, { kind: 'comment', org, ws, key }, { point: 'shared-write', writer, text });
  * @version-history
+ *   v1.1.0 — 2026-11-21 — contentRiskAfterRead: a read's marks are kept off the request path
+ *     (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.0.0 — 2026-11-21 — Initial (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  */
 import { createHash } from 'node:crypto';
@@ -33,8 +38,8 @@ import { callerFromAuth } from '../caller-context.js';
 import { inspectSource } from './pipeline.js';
 import { riskTextOf } from './risk-text.js';
 import { markText, isApprover } from './risk-core.js';
-import { homeOf, type RiskSubject } from './risk-store.js';
-import type { RiskPoint } from './risk-types.js';
+import { homeOf, subjectIdOf, type RiskSubject } from './risk-store.js';
+import type { ResolvedRisk, RiskPoint } from './risk-types.js';
 import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -44,7 +49,11 @@ export const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_PENDING = 1000;
 const MAX_PENDING_PER_HOME = 50;
 
-interface Pending { deps: Deps; subject: RiskSubject; point: Exclude<RiskPoint, 'read' | 'request'>; writer?: string; text?: string; expiresAt?: string }
+interface Pending {
+  deps: Deps; subject: RiskSubject; point: Exclude<RiskPoint, 'request'>; writer?: string; text?: string; expiresAt?: string;
+  /** A read's: the hash of the words it read, and the rules in force for that reader. */
+  hash?: string; resolved?: ResolvedRisk;
+}
 const pending: Pending[] = [];
 // process-local: the queue of the process that took the write; its items are marked there, and the read still carries the rules' marks if that process stops before them.
 const perHome = new Map<string, number>();
@@ -74,7 +83,10 @@ async function markOne(item: Pending): Promise<void> {
   // A write by the home's owner (or, in a workspace, its creator or an organism admin) is not shared.
   if (point === 'shared-write' && writer && await isApprover(deps, homeOf(subject), writer)) return;
   if (item.text !== undefined) {
-    await markText(deps, { subject, text: item.text, point, ...(writer ? { writer } : {}), ...(item.expiresAt ? { expiresAt: item.expiresAt } : {}) });
+    await markText(deps, {
+      subject, text: item.text, point, ...(writer ? { writer } : {}), ...(item.expiresAt ? { expiresAt: item.expiresAt } : {}),
+      ...(item.hash ? { hash: item.hash } : {}), ...(item.resolved ? { resolved: item.resolved } : {}),
+    });
     return;
   }
   if (subject.kind === 'memory') {
@@ -148,6 +160,21 @@ export function contentRiskAfterWrite(
     deps, subject, point: opts.point, ...(opts.writer ? { writer: opts.writer } : {}), ...(opts.text !== undefined ? { text: opts.text } : {}),
     ...(opts.expiresAt ? { expiresAt: opts.expiresAt } : {}),
   });
+  perHome.set(id, (perHome.get(id) ?? 0) + 1);
+  if (!worker) startWorker();
+}
+
+/**
+ * A read marked an item that has no entry for these words: keep the marks, so the item has a ref a
+ * person can accept (risk-read.ts). Returns at once; a read does not notify anybody (risk-core.ts).
+ */
+export function contentRiskAfterRead(deps: Deps, subject: RiskSubject, opts: { text: string; hash: string; resolved: ResolvedRisk }): void {
+  if (deps.config.contentRiskMode === 'off' || subject.kind === 'external' || !opts.text.trim()) return;
+  if (coveredItem({ deps, subject, point: 'read' })) return;
+  const id = homeId(subject);
+  if (pending.length >= MAX_PENDING || (perHome.get(id) ?? 0) >= MAX_PENDING_PER_HOME) return;
+  if (pending.some((p) => p.point === 'read' && p.hash === opts.hash && subjectIdOf(p.subject) === subjectIdOf(subject))) return;
+  pending.push({ deps, subject, point: 'read', text: opts.text, hash: opts.hash, resolved: opts.resolved });
   perHome.set(id, (perHome.get(id) ?? 0) + 1);
   if (!worker) startWorker();
 }

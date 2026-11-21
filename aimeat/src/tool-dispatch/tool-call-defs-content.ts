@@ -14,6 +14,8 @@
  * @structure contentCliTools
  * @usage import { contentCliTools } from './tool-call-defs-content.js';
  * @version-history
+ *   v1.5.0 — 2026-11-21 — aimeat_content_hold became aimeat_content_risk: GET /v1/content/risk/items, POST
+ *     /v1/content/risk/accept, /unaccept and /release (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.4.0 — 2026-11-21 — aimeat_content_hold: the held items and their release.
  *   v1.3.0 — 2026-11-03 — aimeat_content_facts forwards prefix and has_profile, aimeat_content_correct
  *     profile, aimeat_content_settings organism_id and ws.
@@ -170,12 +172,14 @@ export const contentCliTools: ConnectCliToolDefinition[] = [
         },
     },
     {
-        // → GET /v1/content/risk/held, or POST /v1/content/risk/release { ref }.
-        name: 'aimeat_content_hold',
+        // → GET /v1/content/risk/items?status=, or POST /v1/content/risk/accept | unaccept | release { ref }.
+        name: 'aimeat_content_risk',
         handler: ({ client }, input) => {
-            if (input.action === 'list') return client.get('/v1/content/risk/held');
+            if (input.action === 'list') return client.get(`/v1/content/risk/items${query({ status: optionalString(input, 'status') })}`);
+            if (input.action === 'accept') return client.post('/v1/content/risk/accept', { ref: optionalString(input, 'ref') });
+            if (input.action === 'unaccept') return client.post('/v1/content/risk/unaccept', { ref: optionalString(input, 'ref') });
             if (input.action === 'release') return client.post('/v1/content/risk/release', { ref: optionalString(input, 'ref') });
-            return Promise.resolve({ ok: false, error: { code: 'INVALID_INPUT', message: 'action is list or release.' } });
+            return Promise.resolve({ ok: false, error: { code: 'INVALID_INPUT', message: 'action is list, accept, unaccept or release.' } });
         },
     },
 ];

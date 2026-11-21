@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-21 — GET /v1/memory/search gives the risk read each result's provenance id, so its writer
+ *     decides whether the words are checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — GET /v1/memory/search carries each result's content_risk to an AI reader and leaves a
  *     held result's value or snippet out (services/content/risk-read.ts).
  *   2026-11-10 — GET /v1/memory?include=meta&limit takes `cursor` (additive): one page in key order read
@@ -682,7 +684,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Each result says whether its record carries risk marks, for an AI reader; a held one's words are
     // left out (services/content/risk-read.ts).
     const rr = await riskForRead({ storage, config }, callerOf(req, config.nodeId, storage),
-      results.map(r => ({ subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value) })));
+      results.map(r => ({ subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value), provenanceId: r.aiProvenanceId })));
     if (req.query.include === 'meta') {
       res.json(success(config.nodeId, {
         ...(rr.warning ? { content_risk_warning: rr.warning } : {}),

@@ -8,6 +8,7 @@
  * @structure CONTENT_CLASS_CONFIG_FIELDS
  * @usage import { CONTENT_CLASS_CONFIG_FIELDS } from './schema-content-class.js';
  * @version-history
+ *   v1.5.0 — 2026-11-21 — content_risk.accept: whether a marked item may be accepted.
  *   v1.4.0 — 2026-11-21 — content_risk.*: the content risk marks' switch, defaults, floors and AI limit.
  *   v1.3.0 — 2026-11-02 — content_class.profile_model, the fingerprint's default model, and
  *     content_class.profile_labels, who marks its sections.
@@ -45,5 +46,6 @@ export const CONTENT_CLASS_CONFIG_FIELDS: ConfigFieldShape<keyof ContentClassCon
   { key: 'contentRiskFloorSharedWrite', dotPath: 'content_risk.floor_on_shared_write', envVar: 'AIMEAT_CONTENT_RISK_FLOOR_SHARED_WRITE', type: 'string', ...oneOf('off', 'mark', 'mark+warn', 'hold'), immutable: false, description: 'The least any organism or workspace may choose for writes into a shared place. Default off (no limit)' },
   { key: 'contentRiskFloorRead', dotPath: 'content_risk.floor_on_read', envVar: 'AIMEAT_CONTENT_RISK_FLOOR_READ', type: 'string', ...oneOf('off', 'mark', 'mark+warn'), immutable: false, description: 'The least any organism, workspace or person may choose for an AI\'s read. Default off (no limit)' },
   { key: 'contentRiskKinds', dotPath: 'content_risk.kinds', envVar: 'AIMEAT_CONTENT_RISK_KINDS', type: 'string', validate: isRiskKinds, immutable: false, description: 'The kinds of risk looked for by default, comma-separated: ai-instruction, hidden-text, false-role, exfil-link, other-person-data, encoded-block. Empty: all six' },
+  { key: 'contentRiskAccept', dotPath: 'content_risk.accept', envVar: 'AIMEAT_CONTENT_RISK_ACCEPT', type: 'string', ...oneOf('allow', 'deny'), immutable: false, description: 'Whether a person may accept a marked item they decide (training or exercise material meant to instruct an AI), so its accepted phrases stop warning. An agent needs memory:write-reserved for it. Default allow; deny keeps every mark on this node' },
   { key: 'mediaReadMemoryMb', dotPath: 'content_class.media_read_memory_mb', envVar: 'AIMEAT_MEDIA_READ_MEMORY_MB', type: 'number', validate: isWhole, immutable: false, range: '0-65536', description: 'Memory in MB the node may use to read the metadata of a stored picture or video. Past it the file stays stored, its format and size are still known, and its details say the rest was not read. A PNG colour profile larger than half of it is not read. 0 = no limit' },
 ];

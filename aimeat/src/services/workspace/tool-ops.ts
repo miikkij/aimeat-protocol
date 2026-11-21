@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-21 — The content risk read is given each record's writer from its provenance, so a
+ *     document the reader's own person wrote is not checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — A batch open names `ambiguous`: an id asked without `space` that records of more than
  *     one space carry, with the spaces and the one that answered (the first, as before).
  *   2026-11-21 — readWorkspaceOp's index carries manifest_version, the stored manifest's version that
@@ -340,8 +342,11 @@ export async function readWorkspaceOp(
             });
         }
         // The content risk marks travel with each item to an AI reader; a held item's value and draft
-        // are not in this answer (services/content/risk-read.ts).
-        const rr = await riskForRead(deps, riskReaderOf(caller), shown.map(r => ({ subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value) })));
+        // are not in this answer (services/content/risk-read.ts). The record's provenance names its
+        // writer, which tells the read whether the words came from the reader's own person.
+        const rr = await riskForRead(deps, riskReaderOf(caller), shown.map(r => ({
+            subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value), provenanceId: r.aiProvenanceId,
+        })));
         const items = found.map((it, i) => withRisk(it, rr.items[i] ?? null, ['value', 'draft']));
         return { ok: true, data: { ...(rr.warning ? { content_risk_warning: rr.warning } : {}), organism_id: organismId, ws, mode: 'content', items, ...(missing.length ? { missing } : {}),
             ...(ambiguous.length ? { ambiguous, ambiguous_note: 'These ids are records of more than one space; each was answered from the first space. Pass `space` to read another.' } : {}),

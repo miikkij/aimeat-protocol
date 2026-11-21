@@ -15,9 +15,12 @@
  *   A visitor from another node is refused: the facts are a local account's own.
  * @structure parseSource · factsFor · factsViewFor · textFor · inspectFor · correctFor · scanFor · scanStatusFor · settingsFor ·
  *   updateSettingsFor · classesFor · setClassFor · removeClassFor · proposalsFor · decideProposalFor ·
- *   ontologyFor · overviewFor · listFactsFor · heldFor · releaseFor · RESERVED_WORD
+ *   ontologyFor · overviewFor · listFactsFor · riskItemsFor · acceptFor · unacceptFor · releaseFor · RESERVED_WORD
  * @usage const out = await inspectFor(deps, caller, { source: { kind: 'file', key: 'a.pdf' } });
  * @version-history
+ *   v1.6.0 — 2026-11-21 — heldFor became riskItemsFor (every marked item the caller decides, by status);
+ *     acceptFor and unacceptFor, on memory:write-reserved like releaseFor
+ *     (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.5.0 — 2026-11-21 — The content risk marks: the settings answer risk_in_force; the risk step asks
  *     ai:use when the rules in force say rules+ai; heldFor and releaseFor (memory:write-reserved) for the
  *     hold (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
@@ -58,7 +61,9 @@ import {
 import { sharedSettingsFor, updateSharedSettingsFor, type SharedProfileSettings } from './shared-profile-settings.js';
 import { resolveForHome } from './risk-core.js';
 import { homeOf } from './risk-store.js';
-import { listHeldFor, releaseHeldFor, RELEASE_WORD, type HeldItem } from './risk-hold.js';
+import {
+  listRiskItemsFor, acceptRiskFor, unacceptRiskFor, releaseHeldFor, DECIDE_WORD, type RiskItem, type RiskItemStatus,
+} from './risk-hold.js';
 import type { ResolvedRisk } from './risk-types.js';
 import {
   listClasses, setOwnerClass, removeOwnerClass, listProposals, decideProposal, owlOntology, ContentClassError,
@@ -339,19 +344,39 @@ function assertRiskOn(deps: Deps): void {
   if (deps.config.contentRiskMode === 'off') refuse('NOT_FOUND', 404, 'Content risk marks are off on this node.');
 }
 
-/** The held items the caller decides (risk-hold.ts). */
-export async function heldFor(deps: Deps, caller: CallerContext): Promise<HeldItem[]> {
+const RISK_STATUSES: readonly RiskItemStatus[] = ['held', 'open', 'accepted'];
+
+/** The marked items the caller decides (risk-hold.ts); with `status` (held, open, accepted), only those. */
+export async function riskItemsFor(deps: Deps, caller: CallerContext, status?: unknown): Promise<RiskItem[]> {
   assertRiskOn(deps); assertLocal(caller);
-  return listHeldFor(deps, caller);
+  if (status !== undefined && status !== null && status !== '' && !RISK_STATUSES.includes(status as RiskItemStatus)) {
+    refuse('INVALID_INPUT', 400, `status must be one of ${RISK_STATUSES.join(', ')}.`);
+  }
+  return listRiskItemsFor(deps, caller, (status || undefined) as RiskItemStatus | undefined);
 }
 
 /**
- * Release one held item. memory:write-reserved, because an AI that read the held text must not release
- * it on that text's say; the account holder in person holds every word.
+ * The decisions on a marked item need memory:write-reserved, because an AI that read the marked text
+ * must not decide on that text's say; the account holder in person holds every word. An agent's
+ * refusal carries the address where its person allows the word with one press.
  */
+export async function acceptFor(deps: Deps, caller: CallerContext, ref: unknown): Promise<{ ref: string; accepted: true; marks: number; at: string }> {
+  assertRiskOn(deps); assertLocal(caller);
+  requireWord(deps, caller, DECIDE_WORD, 'Accepting marked content, so an AI uses it normally,');
+  return acceptRiskFor(deps, caller, ref);
+}
+
+/** Take an acceptance back: the item's marks warn again. */
+export async function unacceptFor(deps: Deps, caller: CallerContext, ref: unknown): Promise<{ ref: string; accepted: false; at: string }> {
+  assertRiskOn(deps); assertLocal(caller);
+  requireWord(deps, caller, DECIDE_WORD, 'Taking back an acceptance of marked content');
+  return unacceptRiskFor(deps, caller, ref);
+}
+
+/** Release one held item to other people's AIs. */
 export async function releaseFor(deps: Deps, caller: CallerContext, ref: unknown): Promise<{ ref: string; released: true; at: string }> {
   assertRiskOn(deps); assertLocal(caller);
-  requireWord(deps, caller, RELEASE_WORD, 'Releasing held content to other people\'s AIs');
+  requireWord(deps, caller, DECIDE_WORD, 'Releasing held content to other people\'s AIs');
   return releaseHeldFor(deps, caller, ref);
 }
 
