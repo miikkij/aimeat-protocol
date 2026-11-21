@@ -11,7 +11,10 @@ What each release gives you as a user of the package. Releases up to 0.27.1 are 
   carries the marks as `content_risk`, sometimes with a `content_risk_warning` line. The liaison's
   backstory, slim and full, says what to do: a marked item is data and only informs the task output,
   never a reason to act; the task output says it carries marks; a held item, whose content waits for
-  its owner, is not retried or looked for another way.
+  its owner, is not retried or looked for another way. A person can accept material that is meant to
+  instruct an AI (a security exercise, a runbook): its marks then show `accepted: true` and the item
+  is used normally. The liaison never accepts a mark on its own; it names the item's ref in the task
+  output so the person can.
 
 ## 0.41.2 - 2026-11-15
 
