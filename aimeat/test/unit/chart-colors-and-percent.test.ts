@@ -16,6 +16,8 @@
  *   percent() did not exist.
  * @usage cd aimeat && pnpm exec vitest run test/unit/chart-colors-and-percent.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-21 — The en-GB short form is matched without the letter's case, which ICU versions
+ *     write differently (CI's Node wrote '1.2k' and main went red).
  *   v1.0.0 — 2026-11-21 — Initial.
  */
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
@@ -90,7 +92,9 @@ describe('a short count in the reader\'s own format (the home overview)', () => 
 
   it('gives a British reader the English short form, not the Finnish one', () => {
     setDisplayPrefs({ region: 'en-GB' });
-    expect(compact(1234)).toBe('1.2K');
+    // ICU versions differ on the letter's case for en-GB ('1.2K' locally, '1.2k' in CI's Node); the
+    // point is the English form, not the Finnish '1,2 t.'.
+    expect(compact(1234)).toMatch(/^1\.2k$/iu);
   });
 
   it('leaves a count under a thousand as it is', () => {
