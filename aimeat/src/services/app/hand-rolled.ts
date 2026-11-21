@@ -23,6 +23,9 @@
  * @structure HAND_ROLLED_RULES · handRolledFindings(html)
  * @usage const hints = handRolledFindings(html);
  * @version-history
+ *   v1.2.0 — 2026-11-21 — Pan and zoom pointer code of its own (setPointerCapture, a wheel listener)
+ *     with no camera or gesture pack loaded; a cortex pack counts as loaded from /v1/cortex/<pack>/
+ *     (appdev pitfall mobile/canvas-pointer-capture-eats-child-clicks).
  *   v1.1.2 — 2026-10-17 — The chart hint names chart's radar kind; the kit has no atelier.radar() (pitfall-list round).
  *   v1.1.1 — 2026-09-20 — The inline scripts and their block comments are read by utils/html-blocks
  *     in one pass. Both patterns it replaces scanned to the end of the file from every `<script`
@@ -62,6 +65,14 @@ export const HAND_ROLLED_RULES: Rule[] = [
   { what: 'a live stream opened with `EventSource` or `WebSocket` to this node', test: /\bnew\s+(?:EventSource|WebSocket)\s*\([^)]{0,120}\/v1\//, address: true, libs: ['aimeat-live', 'aimeat-agents', 'aimeat-tunnel'] },
   { what: 'a notification through `new Notification(`', test: /\bnew\s+Notification\s*\(/, libs: ['aimeat-push'] },
   {
+    // Pointer capture on a surface takes every later event, clicks on its children included, and
+    // a wheel zoom differs per device: the camera and gesture packs already handle both.
+    what: 'pan and zoom pointer code of its own (`setPointerCapture`, or a `wheel` listener)',
+    test: /\.setPointerCapture\s*\(|addEventListener\s*\(\s*["']wheel["']|\bonwheel\s*=/, address: true,
+    libs: ['aimeat-viewport', 'aimeat-input', 'aimeat-dag', 'aimeat-flow', 'aimeat-canvas', 'aimeat-phaser', 'aimeat-game'],
+    instead: 'the cortex packs `aimeat-viewport` (pan, zoom, pinch, with taps on children kept) and `aimeat-input` (drags and gestures) do this the same way on a finger, a mouse and a trackpad',
+  },
+  {
     // `auth.setLang`, which moves the PLATFORM's language, and not `i18n.setLang`, which a page
     // calls at start to bring the kit into step with it: a live app does exactly that
     // (`A.i18n.setLang(AIMEAT.auth.getLang())`) and the first version of this rule flagged it.
@@ -82,7 +93,9 @@ function withoutStrings(code: string): string {
   return code.replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""');
 }
 
-const loaded = (html: string, lib: string): boolean => html.includes(`/v1/libs/${lib}.js`) || html.includes(`/v1/libs/${lib}?`);
+const loaded = (html: string, lib: string): boolean => html.includes(`/v1/libs/${lib}.js`) || html.includes(`/v1/libs/${lib}?`)
+  // A cortex pack loads from its own address.
+  || html.includes(`/v1/cortex/${lib}/`);
 
 export function handRolledFindings(html: string): AppArtifactFinding[] {
   const code = codeOf(html);

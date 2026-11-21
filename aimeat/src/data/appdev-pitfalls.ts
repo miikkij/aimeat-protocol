@@ -12,6 +12,11 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-21 — +html-comment-closes-early, +offline-parts-other-origin, +leaflet-l-shadowed,
+ *     +keyframe-hides-under-less-motion, +body-first-child-is-node-block, each enforced by a publish
+ *     warning (services/app/page-code-lint.ts); they replace learned entries builders met (pitfall
+ *     round A8). session-fetch-parsed is named by the same module and stays in the research list,
+ *     because the check sees only `.json()`.
  *   2026-11-21 — +display-version-carried, enforced by the publish warning (services/app/version-label.ts).
  *     team-data-in-personal-memory takes the data-map table, "whose question does this answer?", the one
  *     owner-level key and the group switcher; three-namespaces takes the app tool that cannot read the
@@ -651,6 +656,74 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     updatedAt: '2026-11-11',
     verifiedAt: '2026-11-11',
     verifiedVersion: '4.3.0',
+  }),
+
+  // ---- page code read at publish (services/app/page-code-lint.ts) ----------
+  // Each one was a learned entry builders met more than once; the publish answer now names it.
+  E({
+    id: 'html-comment-closes-early',
+    enforcedBy: 'page-code-lint:commentCloseFindings',
+    title: 'An arrow inside an HTML comment closes it, and the rest shows on the page',
+    symptom: 'Text from a head comment (a version history, a note) shows at the top of the live page. A comment ends at its FIRST `-->`, so a relation written as an arrow (draft-->review) closes it early. The publish answer warns.',
+    fix: 'Write relations in words inside HTML comments. Open the app signed out and read its body text once after publishing.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-11-21',
+    verifiedAt: '2026-11-21',
+    verifiedVersion: '4.3.1',
+  }),
+  E({
+    id: 'offline-parts-other-origin',
+    enforcedBy: 'page-code-lint:offlineOriginFindings',
+    title: 'An offline app loads every part from its own address',
+    symptom: 'The app declares aimeat-offline and opens with no connection, but without its styles, a library or a font: the offline worker keeps only what the app\'s own address serves. The publish answer warns with the hosts.',
+    fix: 'Load every library, stylesheet and font with a path on this node (/lib/…, /v1/libs/…), never a full address or a CDN.',
+    appliesTo: ['app', 'mobile'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-11-21',
+    verifiedAt: '2026-11-21',
+    verifiedVersion: '4.3.1',
+  }),
+  E({
+    id: 'leaflet-l-shadowed',
+    enforcedBy: 'page-code-lint:leafletFindings',
+    title: 'Do not name a page variable L on a page that loads Leaflet',
+    symptom: 'L.map is not a function, or the map never draws: the page declared its own `L`, which replaced Leaflet\'s global. A popup built from a template string with values renders them as HTML. The publish answer warns.',
+    fix: 'Name your own variables anything but L. Build a popup from a DOM element, or escape every value with AIMEAT.escapeHtml.',
+    appliesTo: ['app'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-11-21',
+    verifiedAt: '2026-11-21',
+    verifiedVersion: '4.3.1',
+  }),
+  E({
+    id: 'keyframe-hides-under-less-motion',
+    enforcedBy: 'page-code-lint:keyframeHideFindings',
+    title: 'On a kit page, a keyframe must not carry an element\'s visibility',
+    symptom: 'A toast or a badge never appears for a person with reduced motion on, or after the kit\'s Less-motion switch: the kit runs every animation in 1 ms, and a keyframe that ends hidden with fill forwards or both holds that frame. The publish answer warns.',
+    fix: 'Keep the element visible in its own rule, let the keyframe only bring it in (fill backwards), and take it away with a class and a transition. Check with reduced motion emulated and with document.documentElement.dataset.akMotion = "less".',
+    appliesTo: ['app'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-11-21',
+    verifiedAt: '2026-11-21',
+    verifiedVersion: '4.3.1',
+  }),
+  E({
+    id: 'body-first-child-is-node-block',
+    enforcedBy: 'page-code-lint:bodyPositionFindings',
+    title: 'Find the app\'s root by id, never by its position in the body',
+    symptom: 'On a search-visible app the node opens the body with the app\'s name and description (#aimeat-app-body) while the page loads, and removes it just before DOMContentLoaded. Code that reads document.body.firstElementChild early, or CSS on body > :first-child, meets that block. The publish answer warns.',
+    fix: 'Find your root by id (document.getElementById("app")), do work that needs the final page in DOMContentLoaded or later, and keep script-src \'self\' in any CSP the app declares.',
+    appliesTo: ['app', 'publish'],
+    severity: 'info',
+    source: 'curated',
+    updatedAt: '2026-11-21',
+    verifiedAt: '2026-11-21',
+    verifiedVersion: '4.3.1',
   }),
 ];
 

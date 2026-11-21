@@ -41,6 +41,7 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   (2026-11-21) Six page-code warnings join from services/app/page-code-lint.ts (pitfall round A8).
  *   (2026-11-19) The Classic guide is retired: a Classic page that draws the Atelier shell is told the
  *     Atelier guide is the one guide (section from-classic), and a dead script URL is answered from
  *     the Atelier spec and its section engines.
@@ -118,6 +119,7 @@ import { undeclaredScopeFindings } from './scope-needs.js';
 import { readTextCapped } from '../../utils/read-capped.js';
 import { tagAttributes } from '../../utils/html-tag-scan.js';
 import { kitCalledButNotLoaded, KIT_NOT_LOADED_MESSAGE } from './lint-kit-loaded.js';
+import { pageCodeFindings } from './page-code-lint.js';
 
 /** The most of one cortex lib the scope check reads; a larger one is not read (its calls are not seen). */
 const LIB_READ_MAX_BYTES = 2 * 1024 * 1024;
@@ -176,6 +178,10 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   warnings.push(...checkAgentDataReads(html));
   warnings.push(...checkDeclaredButUnused(html));
   warnings.push(...checkTrackMixing(html));
+  // Six page-code traps read from the bytes: a comment closed early, an offline app's foreign
+  // parts, a page `L` over Leaflet's, a keyframe that hides under less motion, a root found by
+  // position, .json() on session.fetch (services/app/page-code-lint.ts).
+  warnings.push(...pageCodeFindings(html));
   // A word the code needs on a 4.0 node and the sign-in does not ask for (services/app/scope-needs.ts).
   warnings.push(...await undeclaredScopeFindings(html, (path) => readNodeLib(path, config)));
   // No served-copy check: services/app/publish.ts strips the node's serve marks before this runs and
