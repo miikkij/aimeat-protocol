@@ -76,7 +76,7 @@
         "aimeat/src/services/content/risk-keys.ts",
         "aimeat/src/services/content/risk-erasure.ts"
       ],
-      "digest": "sha256:f96c8ee907decfb7730db240"
+      "digest": "sha256:941a82e1e39cd66a766e9bb9"
     },
     "06-ai-and-models.md": {
       "reviewedOn": "2026-11-19",
@@ -112,7 +112,7 @@
         "aimeat/src/services/content/risk-core.ts",
         "aimeat/src/services/content/risk-read.ts"
       ],
-      "digest": "sha256:9604d4e1a6072978192d7d36"
+      "digest": "sha256:d0028ac0c7ee3e4be4e7a231"
     },
     "09-hardening-guide.md": {
       "reviewedOn": "2026-11-19",
@@ -339,9 +339,9 @@
       "aimeat/src/services/connections/drive-files.ts": "2b1c734af0fe2717",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
       "aimeat/src/routes/owners/export-records.ts": "a151c3e4aa88ab66",
-      "aimeat/src/services/content/risk-store.ts": "167bc7d77c21f663",
+      "aimeat/src/services/content/risk-store.ts": "252b4fec38df8c15",
       "aimeat/src/services/content/risk-keys.ts": "2119fb0b93e600bb",
-      "aimeat/src/services/content/risk-erasure.ts": "aa3715bc34f0dac3"
+      "aimeat/src/services/content/risk-erasure.ts": "3f43dfe241bd2f3f"
     },
     "06-ai-and-models.md": {
       "aimeat/src/services/ai/adapters/audio.ts": "254929d4cb5beacc",
@@ -369,8 +369,8 @@
     "08-threat-model.md": {
       "docs/security/threat-model.md": "10cf3cf1952417f9",
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce",
-      "aimeat/src/services/content/risk-core.ts": "214ff2a5ad8e0b71",
-      "aimeat/src/services/content/risk-read.ts": "278cc60841b487a5"
+      "aimeat/src/services/content/risk-core.ts": "671183d4d614624f",
+      "aimeat/src/services/content/risk-read.ts": "5b32b030fe04164c"
     },
     "09-hardening-guide.md": {
       "aimeat/src/config/posture.ts": "c0ed072cd1e3f4ca",

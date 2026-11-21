@@ -16568,7 +16568,7 @@
     "cfg_content_risk_kinds": "Kinds of risk",
     "cfgDesc_content_risk_kinds": "The kinds of risk looked for by default, separated by commas: ai-instruction, hidden-text, false-role, exfil-link, other-person-data, encoded-block. Empty: all six.",
     "cfg_content_risk_accept": "Marked content may be accepted",
-    "cfgDesc_content_risk_accept": "Whether a person may accept a marked item they decide (for example exercise material meant to instruct an AI). The accepted phrases stop warning, and a new phrase is marked again. An agent needs the permission memory:write-reserved, and the people who decide are told when an agent accepts. Default: allow. Deny: every mark stays on this node.",
+    "cfgDesc_content_risk_accept": "Whether a person may accept a marked item they decide (for example exercise material meant to instruct an AI). The accepted phrases stop warning, and a new phrase is marked again. An agent needs the permission memory:write-reserved, and the people who decide are told when an agent accepts. Default: allow. Deny: every mark stays, and nobody here can accept one.",
     "cfgGroup_content_class": "Content classes",
     "cfg_content_class_mode": "Content classes",
     "cfg_content_class_ffprobe_path": "ffprobe program",

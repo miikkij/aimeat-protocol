@@ -262,6 +262,9 @@ await test('Refusals: a token without storage:read lists nothing; another person
     assert(held.status === 403 && held.body.error?.code === 'SCOPE_DENIED', `list without storage:read: ${show(held)}`);
     const accept = await call('/v1/content/risk/accept', { method: 'POST', token: agentC.token, body: { ref: heldRef } });
     assert(accept.status === 403 && accept.body.error?.code === 'SCOPE_DENIED', `accept without storage:read: ${show(accept)}`);
+    const unaccept = await call('/v1/content/risk/unaccept', { method: 'POST', token: agentC.token, body: { ref: heldRef } });
+    assert(unaccept.status === 403 && unaccept.body.error?.code === 'SCOPE_DENIED', `unaccept without storage:read: ${show(unaccept)}`);
+    expectRefusal(await call('/v1/content/risk/unaccept', { token: B.token, body: { ref: heldRef } }), 404, 'NOT_FOUND');
     // B wrote the comment and decides nothing in A's workspace: B accepts nothing of it.
     expectRefusal(await call('/v1/content/risk/accept', { token: B.token, body: { ref: heldRef } }), 404, 'NOT_FOUND');
     const release = await call('/v1/content/risk/release', { method: 'POST', token: agentC.token, body: { ref: heldRef } });

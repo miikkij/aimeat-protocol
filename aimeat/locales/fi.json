@@ -17335,7 +17335,7 @@
     "cfg_content_risk_kinds": "Riskien lajit",
     "cfgDesc_content_risk_kinds": "Oletuksena etsittävät riskit pilkuilla eroteltuina: ai-instruction, hidden-text, false-role, exfil-link, other-person-data, encoded-block. Tyhjä: kaikki kuusi.",
     "cfg_content_risk_accept": "Merkityn sisällön saa hyväksyä",
-    "cfgDesc_content_risk_accept": "Saako henkilö hyväksyä merkityn sisällön, josta hän päättää (esimerkiksi harjoitusaineiston, jonka on tarkoitus ohjata tekoälyä). Hyväksytyistä kohdista ei enää varoiteta, ja uusi kohta merkitään taas. Agentti tarvitsee tähän oikeuden memory:write-reserved, ja päättäjät saavat ilmoituksen, kun agentti hyväksyy. Oletus: salli. Estä: kaikki merkinnät pysyvät tässä solmussa.",
+    "cfgDesc_content_risk_accept": "Saako henkilö hyväksyä merkityn sisällön, josta hän päättää (esimerkiksi harjoitusaineiston, jonka on tarkoitus ohjata tekoälyä). Hyväksytyistä kohdista ei enää varoiteta, ja uusi kohta merkitään taas. Agentti tarvitsee tähän oikeuden memory:write-reserved, ja päättäjät saavat ilmoituksen, kun agentti hyväksyy. Oletus: salli. Estä: kaikki merkinnät pysyvät, eikä kukaan täällä voi hyväksyä niitä.",
     "cfgGroup_content_class": "Sisältöluokat",
     "cfg_content_class_mode": "Sisältöluokat",
     "cfg_content_class_ffprobe_path": "ffprobe-ohjelma",

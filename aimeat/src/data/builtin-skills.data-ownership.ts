@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-21 — Section 6: who accepted content risk marks in a workspace gets the pseudonym too.
  *   2026-11-21 — Section 4: a restore of an app tool manifest that binds an action marked `decision: person`
  *     answers PERSON_DECIDES (services/app-tools/decision-binding.ts, services/memory/bin.ts).
  *   2026-11-21 — Section 6: the content risk marks of what the person wrote into others' places stay
@@ -387,8 +388,8 @@ let knowledge age, and you should offer them, not wait to be asked:
   data of theirs passed through, go too; where an agent of theirs made a record in someone else's
   namespace or a group's workspace, that record's count stays with a pseudonym as its maker. The
   content risk marks of what they wrote into someone else's place (a message, a post, a comment, a
-  workspace document) stay with the content, naming a pseudonym as the writer, and hold no words of
-  it. A notification in another person's inbox stays, as that person's own
+  workspace document) stay with the content, naming a pseudonym as the writer (and as who accepted
+  marks in a workspace they ran), and hold no words of it. A notification in another person's inbox stays, as that person's own
   copy, and expires within 90 days. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a

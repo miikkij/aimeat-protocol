@@ -7,9 +7,10 @@
  *   The person's own marks go with their memory: their facts shards and `contentclass.risk` are their
  *   records. What stays is the marks of content they wrote into other people's places: a message in
  *   another person's inbox, a post on another person's board, a document, a comment or a row of a
- *   workspace. Those entries name the writer (`writtenBy`, and `hold.decidedBy` when they released a
- *   hold), and the erasure gives each of them the erasure's pseudonym, as it does every other record it
- *   keeps for the other side. The marks themselves keep no words of the content (risk-store.ts).
+ *   workspace. Those entries name the writer (`writtenBy`, `hold.decidedBy` when they released a hold,
+ *   and `accepted.by` when they accepted its marks as a workspace's admin), and the erasure gives each
+ *   of them the erasure's pseudonym, as it does every other record it keeps for the other side. The
+ *   marks themselves keep no words of the content (risk-store.ts).
  *
  *   WHERE IT LOOKS. Every person's `contentclass.risk` (one prefix query), and the risk record of every
  *   workspace of every organism the person is a member of: a person writes into no other workspace.
@@ -17,13 +18,15 @@
  * @structure eraseContentRiskOf
  * @usage const renamed = await eraseContentRiskOf(storage, nodeId, name, identities, pseudonym);
  * @version-history
+ *   v1.1.0 — 2026-11-21 — An entry's `accepted.by` gets the pseudonym too
+ *     (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.0.0 — 2026-11-21 — Initial (wish-sis-ll-n-riskimerkinn-t-merkit-n-metadatalla-alkuper-ist-ei-).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { personRiskKey } from './risk-keys.js';
 
-interface Entry { writtenBy?: string; hold?: { decidedBy?: string } }
+interface Entry { writtenBy?: string; hold?: { decidedBy?: string }; accepted?: { by?: string } }
 interface Items { v: 1; items: Record<string, Entry> }
 const parse = (v: unknown): Items => ({ v: 1, items: { ...((v as Items | null)?.items ?? {}) } });
 
@@ -37,6 +40,7 @@ async function rename(storage: Storage, rec: MemoryRecord, who: Set<string>, pse
       const next: Entry = { ...e };
       if (e.writtenBy && who.has(e.writtenBy)) { next.writtenBy = pseudonym; changed = true; }
       if (e.hold?.decidedBy && who.has(e.hold.decidedBy)) { next.hold = { ...e.hold, decidedBy: pseudonym }; changed = true; }
+      if (e.accepted?.by && who.has(e.accepted.by)) { next.accepted = { ...e.accepted, by: pseudonym }; changed = true; }
       if (changed) { cur.items[id] = next; n++; }
     }
     return n ? cur : UNCHANGED;

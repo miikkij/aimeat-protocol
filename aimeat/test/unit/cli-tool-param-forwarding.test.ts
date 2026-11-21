@@ -26,6 +26,7 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-11-21 — aimeat_content_risk's status rides only on action='list'; the probe holds action at release.
  *   2026-11-07 — aimeat_admin_receivers is probed on its decide branch, as the app party registrations are.
  *   2026-11-01 — aimeat_admin_app_party_registrations is probed on its decide branch (WP9b).
  *   2026-11-01 — aimeat_dataspace is probed on its decline branch; list and settings in dataspace-dispatch.test.ts (plan D8.3).
@@ -243,6 +244,11 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
             + "`action` at its enum sentinel 'decide' so that `decision` and `role` are measurable at all. "
             + 'The three are mutually exclusive branches of one tool and one probe run cannot exercise two '
             + "of them; the request branch is covered end to end by test/e2e-organism-workspace-access.ts.",
+    },
+    aimeat_content_risk: {
+        status: "Conditional, not dropped: `status` narrows action='list', and the probe holds `action` at its "
+            + "enum sentinel 'release' so that `ref` is measurable. The list branch sends it as a query "
+            + 'parameter of GET /v1/content/risk/items, covered end to end by test/e2e-content-risk.ts.',
     },
     aimeat_workspace_suggestions: {
         ws: "Conditional, not dropped: `ws` narrows action='list', and the probe holds `action` at its enum "

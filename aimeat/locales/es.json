@@ -15699,7 +15699,7 @@
     "cfg_content_risk_kinds": "Tipos de riesgo",
     "cfgDesc_content_risk_kinds": "Los tipos de riesgo que se buscan por defecto, separados por comas: ai-instruction, hidden-text, false-role, exfil-link, other-person-data, encoded-block. Vacío: los seis.",
     "cfg_content_risk_accept": "Se puede aceptar contenido marcado",
-    "cfgDesc_content_risk_accept": "Si una persona puede aceptar un contenido marcado que ella decide (por ejemplo, material de ejercicio pensado para dar instrucciones a una IA). Las frases aceptadas dejan de generar advertencias, y una frase nueva se marca otra vez. Un agente necesita el permiso memory:write-reserved, y quienes deciden reciben un aviso cuando un agente acepta. Por defecto: permitir. Denegar: todas las marcas se quedan en este nodo.",
+    "cfgDesc_content_risk_accept": "Si una persona puede aceptar un contenido marcado que ella decide (por ejemplo, material de ejercicio pensado para dar instrucciones a una IA). Las frases aceptadas dejan de generar advertencias, y una frase nueva se marca otra vez. Un agente necesita el permiso memory:write-reserved, y quienes deciden reciben un aviso cuando un agente acepta. Por defecto: permitir. Denegar: todas las marcas se quedan y nadie aquí puede aceptarlas.",
     "cfgGroup_content_class": "Clases de contenido",
     "cfg_content_class_mode": "Clases de contenido",
     "cfg_content_class_ffprobe_path": "Programa ffprobe",
