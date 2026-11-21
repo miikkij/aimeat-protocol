@@ -26,8 +26,8 @@
  *
  *   LONG LISTS. Marks of one scope, action and domain set past MARK_ROWS items are one audit row with
  *   their count, as the reader does for shown rows.
- * @structure HELD · Covers · RegulatedRefusal · RegulatedUse · RegulatedGate · regulatedRefusalMessage() ·
- *   regulatedGate()
+ * @structure RegulatedFact · RegulatedSource · setRegulatedSource() · REGULATED_LABEL · regulatedMarkPurpose() ·
+ *   HELD · Covers · RegulatedRefusal · RegulatedUse · RegulatedGate · regulatedRefusalMessage() · regulatedGate()
  * @usage
  *   const gate = regulatedGate(deps, who, external);
  *   const out = await gate.show(items, targets, covers);       // HELD for what is held back
@@ -42,8 +42,64 @@ import type { ClassificationAuditReaderKind } from '../../storage/types/classifi
 import { ownerOfScope } from './policy.js';
 import { isLocalModelRef, type ExternalAiCheck } from './external-ai.js';
 import { activeExceptionsFor, recordExceptionUse, type ClassificationException } from './exceptions.js';
-import { regulatedOf, recordRegulatedMark, type RegulatedFact } from '../compliance/regulated-ai.js';
-import { protectValue, pseudonymKey, type Protected } from '../compliance/pseudonymise.js';
+import { recordClassificationAudit } from './audit.js';
+import { protectValue, pseudonymKey, type Protected } from './pseudonymise.js';
+import { logger } from '../../utils/logger.js';
+
+/** What makes one piece of content regulated, and the mode that holds for it (compliance/regulated-ai.ts). */
+export interface RegulatedFact {
+  domains: string[];
+  mode: 'notify' | 'protect' | 'local' | 'block';
+  /** The registers that name its container. */
+  registers: string[];
+  /** The container a register named (its label address as targetId), the nearest first. */
+  container: string;
+}
+
+/** Answers, for each target, what makes it regulated, or null. */
+export type RegulatedSource = (deps: Deps, targets: ReadonlyArray<ContentLabelTarget | null>) => Promise<Array<RegulatedFact | null>>;
+
+// process-local: the function that answers which content is regulated, set once at start by every process that serves reads.
+let source: RegulatedSource | null = null;
+// process-local: whether this process has said once that no source is set.
+let saidMissing = false;
+
+/**
+ * Set where the regulated domains come from. The compliance family registers its index at start
+ * (compliance/regulated-ai.ts registerRegulatedSource, called by server-bootstrap/process-buffers.ts),
+ * so the classification family imports nothing of compliance.
+ */
+export function setRegulatedSource(fn: RegulatedSource | null): void {
+  source = fn;
+}
+
+async function regulatedOf(deps: Deps, targets: ReadonlyArray<ContentLabelTarget | null>): Promise<Array<RegulatedFact | null>> {
+  if (source) return source(deps, targets);
+  if (!saidMissing) {
+    saidMissing = true;
+    logger.warn('classification: no source of regulated data domains is set in this process; their modes are not applied here');
+  }
+  return targets.map(() => null);
+}
+
+/** The label column of a mark: the domains, so the audit groups them apart from any label. */
+export const REGULATED_LABEL = (f: Pick<RegulatedFact, 'domains'>): string => `domain:${f.domains.join('+')}`.slice(0, 120);
+
+/** What a mark says: the domains and mode, then what happened. */
+export function regulatedMarkPurpose(f: Pick<RegulatedFact, 'domains' | 'mode'>, what: string): string {
+  return `regulated ${f.domains.join(', ')} (${f.mode}): ${what}`.slice(0, 500);
+}
+
+/** Write one mark; `count` stands for that many items of one scope and mode. Buffered by audit.ts. */
+function recordRegulatedMark(
+  target: ContentLabelTarget, fact: Pick<RegulatedFact, 'domains' | 'mode'>, reader: { principal: string; kind: ClassificationAuditReaderKind },
+  action: 'regulated' | 'refused' | 'exception', what: string, ownerGaii: string | null, count = 1,
+): void {
+  recordClassificationAudit({
+    scope: target.scope, ownerGaii, kind: target.kind, key: target.key, label: REGULATED_LABEL(fact),
+    reader: reader.principal || 'anonymous', readerKind: reader.kind, action, purpose: regulatedMarkPurpose(fact, what), count,
+  });
+}
 
 /** What show() answers for an item held back. */
 export const HELD = Symbol('regulated-held');

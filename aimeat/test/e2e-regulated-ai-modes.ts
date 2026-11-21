@@ -25,16 +25,9 @@ import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpAgent, type McpSession } from './helpers/mcp-session.js';
 import { takeOffAudienceCaps } from './helpers/classification-caps.js';
 import { startFakeAiProvider, chatJson, type FakeAiProvider } from './helpers/fake-ai-provider.js';
+import { BASE, assert, expectRefusal, finish, test } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now();
-
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err) { failed++; console.error(`  ❌ ${name}: ${(err as Error).message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 // Runtime assertions below check the HTTP contract at this untyped JSON boundary.
@@ -152,15 +145,12 @@ await test('NOTIFY (the default): far reads the Patients record as before, and a
 });
 
 await test('SETTING: an unknown domain or mode is refused (400); an agent cannot loosen it (403 PERSON_REQUIRED), a person can', async () => {
-    const bad = await setModes(['health=nothing']);
-    assert(bad.status === 400, `an unknown mode: ${bad.status} ${JSON.stringify(bad.body?.error)}`);
-    const badDomain = await setModes(['nowhere=block']);
-    assert(badDomain.status === 400, `an unknown domain: ${badDomain.status}`);
+    expectRefusal(await setModes(['health=nothing']), 400);
+    expectRefusal(await setModes(['nowhere=block']), 400);
     const opAgent = await makeAgent(BASE, op, ['*', 'operator:admin'], `regopa${stamp % 100000}`);
     const tighter = await setConfig(opAgent.token, 'compliance.regulated_ai_modes', ['health=local']);
     assert(tighter.status === 200, `an agent tightens: ${tighter.status} ${JSON.stringify(tighter.body?.error)}`);
-    const looser = await setConfig(opAgent.token, 'compliance.regulated_ai_modes', ['health=protect']);
-    assert(looser.status === 403 && looser.body.error.code === 'PERSON_REQUIRED', `an agent loosens: ${looser.status} ${JSON.stringify(looser.body?.error)}`);
+    expectRefusal(await setConfig(opAgent.token, 'compliance.regulated_ai_modes', ['health=protect']), 403, 'PERSON_REQUIRED');
     const person = await setModes(['health=protect']);
     assert(person.status === 200, `the operator in person loosens: ${person.status} ${JSON.stringify(person.body?.error)}`);
 });
@@ -261,5 +251,4 @@ await test('CLASSIFICATION OFF: the block still holds; Plain still reads', async
 await setModes([]);
 await setConfig(op.token, 'classification.mode', 'off');
 await fake.close();
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed ? 1 : 0);
+finish();

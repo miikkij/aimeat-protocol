@@ -18,6 +18,7 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-11-21 — registerRegulatedSource: the content reader learns which content is in a regulated data domain.
  *   2026-11-20 — initValueSignals / shutdownValueSignals: the value signals buffer (services/value/signal-buffer.ts).
  *   2026-11-20 — initStandingUse and its shutdown flush: the owner's feed line when an agent acts
  *     without asking (services/ai-standing/use.ts).
@@ -69,6 +70,7 @@ import { initValueSignals } from '../services/value/signal-buffer.js';
 import { initDataCounts } from '../services/value/data-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent/audit-buffer.js';
 import { initClassificationAudit } from '../services/classification/audit.js';
+import { registerRegulatedSource } from '../services/compliance/regulated-ai.js';
 import { initAgentRefusals } from '../services/agent/refusals.js';
 import { sendPermissionAsk } from '../services/permission-ask-notice.js';
 import { initScopeUse } from '../services/scope/use.js';
@@ -132,6 +134,9 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // Off-request-path buffer for the classification audit log (TARGET-082 V4): shown, used, refused
   // and changed, merged per reader, item, action and minute.
   initClassificationAudit(storage);
+  // Which content a register puts in a regulated data domain, for the content reader's check of what
+  // an AI model outside this server gets (services/compliance/regulated-ai.ts). Before any route reads.
+  registerRegulatedSource();
   // The agent refusal notes: a scope refusal of an agent goes on its card and its open tasks
   // (services/agent/refusals.ts). Armed with the refusal log, before any route can refuse. A newly
   // opened refusal the person can allow with one press asks them in the bell and by email

@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance/pseudonymise.ts
+ * @file src/services/classification/pseudonymise.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The protect mode of a regulated data domain (data/compliance-domains.ts RegulatedAiMode,
@@ -28,11 +28,12 @@
  *   const key = await pseudonymKey(storage, nodeId);
  *   const { value, counts } = protectValue(record.value, key, 'workspace\u0000organism:o1\u0000ws-1');
  * @version-history
- *   v1.0.0 — 2026-11-21 — Initial (plan doc-mwnnp9xz9814, feature audit item 1.3).
+ *   v1.0.0 — 2026-11-21 — Initial (plan doc-mwnnp9xz9814, feature audit item 1.3). In the classification
+ *     family, because the content reader (reader.ts through regulated-gate.ts) calls it.
  */
 import { createHmac, randomBytes } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
-import { readSystem, updateSystem, UNCHANGED } from '../classification/system-record.js';
+import { readSystem, updateSystem, UNCHANGED } from './system-record.js';
 
 export type PseudonymKind = 'email' | 'person-id' | 'phone' | 'iban' | 'address' | 'name';
 

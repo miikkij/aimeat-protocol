@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { aiModesOf, parseAiModeEntry, stricterAiMode } from '../../src/data/compliance-domains.js';
 import { parseRegulatedAiModes } from '../../src/config/data-access.js';
 import { modeOfDomains } from '../../src/services/compliance/regulated-ai.js';
-import { protectValue } from '../../src/services/compliance/pseudonymise.js';
+import { protectValue } from '../../src/services/classification/pseudonymise.js';
 import { settingLoosens } from '../../src/services/config/strictness.js';
 
 const KEY = Buffer.alloc(32, 7);

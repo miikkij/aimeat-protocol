@@ -26,13 +26,16 @@
  *   (the 'compliance' change event) and after INDEX_TTL_MS, which also covers a change of who manages
  *   an organism. With no register naming a domain the index is empty, and a reader asks nothing more.
  *
- *   THE MARKS. What happened is written to the classification audit (audit.ts): action `regulated`
+ *   HOW THE READER GETS IT. registerRegulatedSource() hands regulatedOf() to the reader's gate at start
+ *   (classification/regulated-gate.ts setRegulatedSource), so the classification family imports
+ *   nothing of compliance (check:family-index).
+ *
+ *   THE MARKS (written by the gate). What happened is written to the classification audit: action `regulated`
  *   for content that went to an outside model under notify or protect (with what protect replaced, by
  *   kind and count) and for a use of an exception that opened protect or local; `refused` for what
  *   was held back; `exception` for an attempt on block content while an exception was in force,
  *   which marks the attempt as exceptional and opens nothing. The compliance report lists them.
- * @structure RegulatedFact · regulatedOf() · modeOfDomains() · recordRegulatedMark() ·
- *   regulatedMarkPurpose() · REGULATED_LABEL · resetRegulatedIndex()
+ * @structure RegulatedFact · regulatedOf() · modeOfDomains() · registerRegulatedSource() · resetRegulatedIndex()
  * @usage
  *   const facts = await regulatedOf(deps, targets);     // null for content outside every domain
  *   if (facts[i]?.mode === 'block') { … }
@@ -47,8 +50,7 @@ import { onChangeEvent } from '../event-bus.js';
 import { aiModesOf, stricterAiMode, type RegulatedAiMode } from '../../data/compliance-domains.js';
 import { containersOf, isContainerKind } from '../classification/containers.js';
 import { targetId } from '../classification/label-rows.js';
-import { recordClassificationAudit } from '../classification/audit.js';
-import type { ClassificationAuditReaderKind } from '../../storage/types/classification-audit.js';
+import { setRegulatedSource, type RegulatedFact } from '../classification/regulated-gate.js';
 import { listDocs } from './docs.js';
 import { containerInScope, containersOfRegister } from './domain-floor.js';
 
@@ -57,23 +59,15 @@ export interface RegulatedDeps {
   config: Pick<AimeatConfig, 'nodeId'> & { regulatedAiModes?: readonly string[] };
 }
 
-/** What makes one piece of content regulated, and the mode that holds for it. */
-export interface RegulatedFact {
-  domains: string[];
-  mode: RegulatedAiMode;
-  /** The registers that name its container. */
-  registers: string[];
-  /** The container a register named (its label address as targetId), the nearest first. */
-  container: string;
-}
+export type { RegulatedFact };
 
 interface IndexEntry { domains: string[]; aiMode?: RegulatedAiMode; register: string }
 
 /** How long the index is kept when nothing changes: a change of who manages an organism is seen by then. */
 const INDEX_TTL_MS = 5 * 60_000;
 
-// process-local: derived from the stored registers, dropped on the 'compliance' change event (which
-// reaches every process through the bus) and after INDEX_TTL_MS.
+// The index is dropped on the 'compliance' change event, which reaches every process through the bus.
+// process-local: derived from the stored registers; each process builds its own and drops it on the event or after INDEX_TTL_MS.
 let index: { nodeId: string; at: number; map: Map<string, IndexEntry[]> } | null = null;
 // process-local: the build in progress, so concurrent readers wait for one read of the registers.
 let building: Promise<Map<string, IndexEntry[]>> | null = null;
@@ -165,26 +159,12 @@ export async function regulatedOf(deps: RegulatedDeps, targets: ReadonlyArray<Co
   });
 }
 
-/** The label column of a mark: the domains, so the audit groups them apart from any label. */
-export const REGULATED_LABEL = (f: Pick<RegulatedFact, 'domains'>): string => `domain:${f.domains.join('+')}`.slice(0, 120);
-
-/** What a mark says: the domains and mode, then what happened. */
-export function regulatedMarkPurpose(f: Pick<RegulatedFact, 'domains' | 'mode'>, what: string): string {
-  return `regulated ${f.domains.join(', ')} (${f.mode}): ${what}`.slice(0, 500);
-}
-
 /**
- * Write one mark. `count` stands for that many items of one scope and mode (a long list is one row).
- * Buffered off the request path by audit.ts, as every classification audit row is.
+ * Hand this index to the content reader (classification/regulated-gate.ts). Called once at start by
+ * every process that serves reads (server-bootstrap/process-buffers.ts).
  */
-export function recordRegulatedMark(
-  target: ContentLabelTarget, fact: Pick<RegulatedFact, 'domains' | 'mode'>, reader: { principal: string; kind: ClassificationAuditReaderKind },
-  action: 'regulated' | 'refused' | 'exception', what: string, ownerGaii: string | null, count = 1,
-): void {
-  recordClassificationAudit({
-    scope: target.scope, ownerGaii, kind: target.kind, key: target.key, label: REGULATED_LABEL(fact),
-    reader: reader.principal || 'anonymous', readerKind: reader.kind, action, purpose: regulatedMarkPurpose(fact, what), count,
-  });
+export function registerRegulatedSource(): void {
+  setRegulatedSource((deps, targets) => regulatedOf(deps, targets));
 }
 
 /** Test seam: forget the index. */
