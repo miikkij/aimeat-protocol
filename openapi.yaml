@@ -25080,7 +25080,7 @@ paths:
         `regulated_ai` is section 14 (regulated data domains and AI models outside this server):
         `{ setting: { path, modes: [{ domain, name, mode, law_suggests_local }], suggestions },
         marks: { from, to, sent, held, exceptional, recent, exceptional_rows, truncated }, note }`.
-        `mode` is notify, protect, local or block (setting compliance.regulated_ai_modes, tightened
+        `mode` is notify, protect, drop, local or block (setting compliance.regulated_ai_modes, tightened
         by a register's `aiMode`). `exceptional` counts attempts on block content while an exception
         was in force: an exception does not open block, and such an attempt is marked as exceptional.
         Each row of `recent` and `exceptional_rows` is `{ at, action, domains, reader, reader_kind,

@@ -5,7 +5,7 @@
  * @description Section 14 of the compliance report: what AI models outside this server got of the
  *   regulated data domains (plan doc-mwnnp9xz9814, feature audit item 1.3). The operator's mode per
  *   domain with what the law row suggests, and the marks the content reader wrote in the period
- *   (classification/regulated-gate.ts): content that went (notify, protect, or by an exception), what
+ *   (classification/regulated-gate.ts): content that went (notify, protect, drop, or by an exception), what
  *   was held back, and every attempt on block content while an exception was in force, which is
  *   marked as exceptional and opened nothing.
  *
@@ -19,6 +19,7 @@
  * @structure RegulatedAiSection · buildRegulatedAiSection()
  * @usage const regulated_ai = await buildRegulatedAiSection({ storage, config }, { since, ownerGhii });
  * @version-history
+ *   v1.0.1 — 2026-11-21 — The mode drop counts as content that went.
  *   v1.0.0 — 2026-11-21 — Initial (plan doc-mwnnp9xz9814, feature audit item 1.3).
  */
 import type { Storage, ClassificationAuditRow } from '../../storage/interface.js';
@@ -54,7 +55,7 @@ export interface RegulatedAiSection {
   marks: {
     from: string;
     to: string;
-    /** How many items went to an outside model (notify, protect, or by an exception). */
+    /** How many items went to an outside model (notify, protect, drop, or by an exception). */
     sent: number;
     /** How many were held back. */
     held: number;

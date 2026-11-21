@@ -195,13 +195,14 @@ no entry names is `notify`, and the setting is empty by default.
 |---|---|
 | `notify` (default) | the content, as before; each send writes a `regulated` row to the classification audit |
 | `protect` | the content with names in name fields (`name`, `firstName`, `etunimi`, `sukunimi` and the like), Finnish personal identity codes, phone numbers, e-mail and street addresses and IBANs replaced by stand-ins such as `[phone-3f9a2c1b]`: an HMAC under a key the server keeps, the same for the same value in the same container. The audit row counts what was replaced. An AI call path that cannot replace the details first is refused |
+| `drop` | the content with the same details removed: a detail in a text becomes `[removed phone]` (the kind is named), and a name field is left out of its record. Nothing links two records to one person, and no key is used. The audit row counts what was removed. An AI call path that cannot remove the details first is refused |
 | `local` | nothing: only a `local:` model, or an agent whose runtime report says its model is local, reads it |
 | `block` | nothing, and a local model neither; a person still reads it on their own screen |
 
 A register can set its own `aiMode`, and the stricter of the operator's and the register's mode
 holds, so a register can tighten and never loosen. An `ai-send` exception in the Data Wallet
-(`POST /v1/classification/exceptions`) opens `protect` (the item goes unprotected) and `local` for its
-item, and its use is recorded. It does not open `block`: an attempt on block content while an
+(`POST /v1/classification/exceptions`) opens `protect` and `drop` (the item goes with its identifying details) and `local`
+for its item, and its use is recorded. It does not open `block`: an attempt on block content while an
 exception is in force is written as an `exception` row. The modes hold whether classification is on
 or off. An AI credential may make the setting only stricter (a looser value answers 403
 `PERSON_REQUIRED`). Section 14 of the compliance report (`regulated_ai`) shows the mode per domain,
@@ -212,7 +213,7 @@ rows read with `GET /v1/classification/audit?action=regulated` or `aimeat_classi
 
 Limits: a name inside free text is not found; an app's data is covered in its own namespace
 (`eco:<app>#<owner>@<node>`), not what a hosted app writes into its owner's namespace, the same reach
-as the floor; a stored file sent to an AI under `protect` is refused, not protected; a local model an
+as the floor; a stored file sent to an AI under `protect` or `drop` is refused, not protected; a local model an
 agent reports is the agent's claim, which the server cannot check.
 
 **What an app's users see.** An app's data map read (`GET /v1/datamap/apps/{owner}/{filename}`,

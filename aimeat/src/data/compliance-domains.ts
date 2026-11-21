@@ -29,6 +29,7 @@
  *   const d = complianceDomainById('health');   // { minLabel: 'erittain-luottamuksellinen', dpiaRequired: true, ... }
  *   aiModesOf(['health=local'])                 // { health: 'local' }
  * @version-history
+ *   v1.2.0 — 2026-11-21 — The mode drop, between protect and local: identifying details removed.
  *   v1.1.0 — 2026-11-21 — RegulatedAiMode: what an outside model gets of a domain's content (plan
  *     doc-mwnnp9xz9814, feature audit item 1.3); externalAi is now the law row's suggestion.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C2.1–C2.12).
@@ -160,13 +161,15 @@ export function complianceDomainById(id: string): ComplianceDomain | undefined {
  * doc-mwnnp9xz9814, feature audit 2026-11-19 item 1.3). From the most open to the strictest:
  *   notify   the content goes as before, and each time it goes, a mark is written (the default);
  *   protect  identifying details are replaced with stable pseudonyms before the content goes;
+ *   drop     identifying details are removed before the content goes, and the rest goes (Jouni,
+ *            2026-11-21: "tiputetaan se tieto pois"); nothing links two records to one person;
  *   local    only a model on this machine reads it;
  *   block    no model reads it, a local one neither; a person reads it on their own screen.
- * An exception made in the Data Wallet opens protect and local for its item. It does not open block:
- * an attempt with one in force is marked exceptional (Jouni, 2026-11-21).
+ * An exception made in the Data Wallet opens protect, drop and local for its item. It does not open
+ * block: an attempt with one in force is marked exceptional (Jouni, 2026-11-21).
  */
-export type RegulatedAiMode = 'notify' | 'protect' | 'local' | 'block';
-export const REGULATED_AI_MODES: readonly RegulatedAiMode[] = ['notify', 'protect', 'local', 'block'];
+export type RegulatedAiMode = 'notify' | 'protect' | 'drop' | 'local' | 'block';
+export const REGULATED_AI_MODES: readonly RegulatedAiMode[] = ['notify', 'protect', 'drop', 'local', 'block'];
 
 /** The stricter of two modes. */
 export function stricterAiMode(a: RegulatedAiMode, b: RegulatedAiMode): RegulatedAiMode {

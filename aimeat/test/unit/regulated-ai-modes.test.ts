@@ -5,6 +5,7 @@
  *   only tighten the setting, and the stand-ins of protect mode.
  * @usage cd aimeat && pnpm exec vitest run test/unit/regulated-ai-modes.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The drop mode: its order, and the details it removes.
  *   v1.0.0 — 2026-11-21 — Initial (plan doc-mwnnp9xz9814, feature audit item 1.3).
  */
 import { describe, it, expect } from 'vitest';
@@ -34,6 +35,9 @@ describe('the mode of a piece of content', () => {
         expect(modeOfDomains(['health'], ['block'], ['health=notify'])).toBe('block');
         expect(modeOfDomains(['health'], ['notify'], ['health=block'])).toBe('block');
         expect(stricterAiMode('protect', 'local')).toBe('local');
+        expect(stricterAiMode('protect', 'drop')).toBe('drop');
+        expect(stricterAiMode('drop', 'local')).toBe('local');
+        expect(modeOfDomains(['health'], ['drop'], ['health=protect'])).toBe('drop');
     });
 });
 
@@ -44,6 +48,8 @@ describe('an AI may only tighten the setting', () => {
         expect(settingLoosens(PATH, ['health=local'], [])).toBe(true);
         expect(settingLoosens(PATH, [], ['children=protect'])).toBe(false);
         expect(settingLoosens(PATH, ['health=local', 'children=block'], ['health=block', 'children=local'])).toBe(true);
+        expect(settingLoosens(PATH, ['health=protect'], ['health=drop'])).toBe(false);
+        expect(settingLoosens(PATH, ['health=drop'], ['health=protect'])).toBe(true);
     });
 });
 
@@ -64,6 +70,19 @@ describe('protect mode', () => {
         expect(out.name).toMatch(/^\[name-[0-9a-f]{8}\]$/);
         expect((out.value as { etunimi: string }).etunimi).toMatch(/^\[name-[0-9a-f]{8}\]$/);
         expect(counts).toEqual({ name: 2, email: 1, 'person-id': 1, iban: 1, address: 1, phone: 2 });
+    });
+
+    it('drop removes the details: a text says what was removed, and a name field leaves the record', () => {
+        const { value: dropped, counts: n } = protectValue(record, KEY, 'workspace\u0000organism:o1\u0000ws-1', { drop: true });
+        const note = (dropped.value as { note: string }).note;
+        for (const detail of ['040 123 4567', '010190-123A', 'maija@example.com', 'FI21 1234 5600 0007 85', 'Mannerheimintie 12 A 5']) expect(note).not.toContain(detail);
+        expect(note).toContain('[removed phone]');
+        expect(note).toContain('[removed person-id]');
+        expect(note).not.toMatch(/\[(?:phone|email|person-id)-[0-9a-f]{8}\]/);
+        expect('name' in dropped).toBe(false);
+        expect('etunimi' in (dropped.value as object)).toBe(false);
+        expect(dropped.key).toBe(record.key);
+        expect(n).toEqual({ name: 2, email: 1, 'person-id': 1, iban: 1, address: 1, phone: 2 });
     });
 
     it('gives the same stand-in to the same value in one container, another in another, and does not protect a stand-in again', () => {

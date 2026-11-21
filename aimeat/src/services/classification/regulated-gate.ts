@@ -17,10 +17,11 @@
  *     protect  identifying details are replaced first (pseudonymise.ts) and the mark says
  *              how many of each kind; an AI call whose caller does not apply protect() (`redacts`) is
  *              refused, so no path sends it unprotected without saying so;
+ *     drop     the same, with the details removed instead of replaced (Jouni, 2026-11-21);
  *     local    held back from an outside model;
  *     block    held back from every model.
- *   A person's 'ai-send' exception in force for the item (Data Wallet) opens protect (the content goes
- *   unprotected) and local, and its use is recorded. It does not open block: the attempt is written as
+ *   A person's 'ai-send' exception in force for the item (Data Wallet) opens protect and drop (the
+ *   content goes with its details) and local, and its use is recorded. It does not open block: the attempt is written as
  *   an `exception` mark that says so (Jouni, 2026-11-21: "poikkeus ei avaa estä-tilaa vaan se merkitään
  *   poikkeukselliseksi").
  *
@@ -33,6 +34,7 @@
  *   const out = await gate.show(items, targets, covers);       // HELD for what is held back
  *   const use = await gate.use(targets, { model, capability, redacts }, covers);
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The drop mode: the details removed instead of replaced; an exception opens it.
  *   v1.0.0 — 2026-11-21 — Initial (plan doc-mwnnp9xz9814, feature audit item 1.3).
  */
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
@@ -49,7 +51,7 @@ import { logger } from '../../utils/logger.js';
 /** What makes one piece of content regulated, and the mode that holds for it (compliance/regulated-ai.ts). */
 export interface RegulatedFact {
   domains: string[];
-  mode: 'notify' | 'protect' | 'local' | 'block';
+  mode: 'notify' | 'protect' | 'drop' | 'local' | 'block';
   /** The registers that name its container. */
   registers: string[];
   /** The container a register named (its label address as targetId), the nearest first. */
@@ -115,7 +117,12 @@ interface Deps {
 interface Who { kind: ReaderKind | 'system'; principal: string }
 
 /** One item of an AI call this gate refused, and why in words. */
-export interface RegulatedRefusal { target: ContentLabelTarget; fact: RegulatedFact; why: 'block' | 'local' | 'protect' }
+export interface RegulatedRefusal { target: ContentLabelTarget; fact: RegulatedFact; why: 'block' | 'local' | 'protect' | 'drop' }
+
+/** Protect and drop change the content before it goes; the others pass it whole or hold it back. */
+const changesContent = (f: Pick<RegulatedFact, 'mode'>): boolean => f.mode === 'protect' || f.mode === 'drop';
+/** What a mark says was done to the details. */
+const doneTo = (f: Pick<RegulatedFact, 'mode'>): string => (f.mode === 'drop' ? 'details removed' : 'protected');
 
 export interface RegulatedUse {
   refused: RegulatedRefusal[];
@@ -144,6 +151,7 @@ export function regulatedRefusalMessage(refused: readonly RegulatedRefusal[]): s
     ...(why.has('block') ? ['The setting of that domain keeps them from every AI model, and an exception does not open that. Leave them out.'] : []),
     ...(why.has('local') ? ['The setting of that domain lets only a model on this server (a local: model) read them. Leave them out, use a local: model, or ask the person who owns them for an exception in their Data Wallet.'] : []),
     ...(why.has('protect') ? ['The setting of that domain replaces identifying details before they go to a model outside this server, and this AI call cannot do that. Leave them out, use a local: model, or ask the person who owns them for an exception in their Data Wallet.'] : []),
+    ...(why.has('drop') ? ['The setting of that domain removes identifying details before they go to a model outside this server, and this AI call cannot do that. Leave them out, use a local: model, or ask the person who owns them for an exception in their Data Wallet.'] : []),
   ].join(' ');
 }
 
@@ -228,7 +236,7 @@ export function regulatedGate(deps: Deps, who: Who, external: ExternalAiCheck): 
         if (f.mode === 'notify') { marks.push({ target: t, fact: f, action: 'regulated', what: 'shown to an AI reader outside this server' }); continue; }
         if (e) {
           recordExceptionUse(e, who.principal || 'anonymous', kindLabel(who), 'ai:shown');
-          marks.push({ target: t, fact: f, action: 'regulated', what: `shown ${f.mode === 'protect' ? 'unprotected ' : ''}to an AI reader outside this server by exception ${e.id}` });
+          marks.push({ target: t, fact: f, action: 'regulated', what: `shown ${changesContent(f) ? 'with its identifying details ' : ''}to an AI reader outside this server by exception ${e.id}` });
           continue;
         }
         if (f.mode === 'local') {
@@ -236,9 +244,9 @@ export function regulatedGate(deps: Deps, who: Who, external: ExternalAiCheck): 
           marks.push({ target: t, fact: f, action: 'refused', what: 'held back from an AI reader outside this server' });
           continue;
         }
-        const p = protectValue(items[i], await keyOf(), f.container);
+        const p = protectValue(items[i], await keyOf(), f.container, { drop: f.mode === 'drop' });
         out[i] = p.value;
-        marks.push({ target: t, fact: f, action: 'regulated', what: `shown to an AI reader outside this server, protected: ${countsText(p.counts)}` });
+        marks.push({ target: t, fact: f, action: 'regulated', what: `shown to an AI reader outside this server, ${doneTo(f)}: ${countsText(p.counts)}` });
       }
       writeMarks(who, marks);
       return out;
@@ -274,14 +282,14 @@ export function regulatedGate(deps: Deps, who: Who, external: ExternalAiCheck): 
         if (f.mode === 'notify') { marks.push({ target: t, fact: f, action: 'regulated', what: `sent to ${model} (${use.capability})` }); continue; }
         if (e) {
           uses.push(e);
-          marks.push({ target: t, fact: f, action: 'regulated', what: `sent ${f.mode === 'protect' ? 'unprotected ' : ''}to ${model} (${use.capability}) by exception ${e.id}` });
+          marks.push({ target: t, fact: f, action: 'regulated', what: `sent ${changesContent(f) ? 'with its identifying details ' : ''}to ${model} (${use.capability}) by exception ${e.id}` });
           continue;
         }
         if (f.mode === 'local' || !use.redacts) {
-          refused.push({ target: t, fact: f, why: f.mode === 'local' ? 'local' : 'protect' });
+          refused.push({ target: t, fact: f, why: f.mode === 'local' ? 'local' : f.mode === 'drop' ? 'drop' : 'protect' });
           held.push({ target: t, fact: f, action: 'refused', what: f.mode === 'local'
             ? `refused for ${model} (${use.capability})`
-            : `refused for ${model} (${use.capability}): this AI call cannot replace identifying details first` });
+            : `refused for ${model} (${use.capability}): this AI call cannot ${f.mode === 'drop' ? 'remove' : 'replace'} identifying details first` });
           continue;
         }
         protectAt.set(`${t.scope}\u0000${t.kind}\u0000${t.key}`, f);
@@ -300,8 +308,8 @@ export function regulatedGate(deps: Deps, who: Who, external: ExternalAiCheck): 
         protect(target, value) {
           const f = protectAt.get(`${target.scope}\u0000${target.kind}\u0000${target.key}`);
           if (!f || !k) return value;
-          const p = protectValue(value, k, f.container);
-          writeMarks(who, [{ target, fact: f, action: 'regulated', what: `sent to ${model} (${use.capability}), protected: ${countsText(p.counts)}` }]);
+          const p = protectValue(value, k, f.container, { drop: f.mode === 'drop' });
+          writeMarks(who, [{ target, fact: f, action: 'regulated', what: `sent to ${model} (${use.capability}), ${doneTo(f)}: ${countsText(p.counts)}` }]);
           return p.value;
         },
       };

@@ -22,12 +22,18 @@
  *   (`compliance.pseudonym-key` of system@<node>, made on first use) and never sends out, so it cannot
  *   be turned back into the value without that key.
  *
+ *   THE DROP MODE finds the same details and removes them: a detail in a text becomes
+ *   `[removed phone]`, and a name field is left out of its record. The model reads the rest, and
+ *   nothing in it links two records to one person.
+ *
  *   COST. One record read per process for the key, kept; the rules are linear regular expressions.
  * @structure PseudonymKind · Protected · pseudonymKey() · protectValue()
  * @usage
  *   const key = await pseudonymKey(storage, nodeId);
  *   const { value, counts } = protectValue(record.value, key, 'workspace\u0000organism:o1\u0000ws-1');
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The drop mode (`opts.drop`): the same details removed instead of replaced, and
+ *     a name field left out of its record (Jouni, 2026-11-21).
  *   v1.0.0 — 2026-11-21 — Initial (plan doc-mwnnp9xz9814, feature audit item 1.3). In the classification
  *     family, because the content reader (reader.ts through regulated-gate.ts) calls it.
  */
@@ -97,12 +103,15 @@ function standIn(kind: PseudonymKind, value: string, key: Buffer, container: str
   return `[${kind}-${h.slice(0, 8)}]`;
 }
 
-function protectText(text: string, key: Buffer, container: string, counts: Protected<unknown>['counts']): string {
+/** What a detail is replaced with: a stand-in (protect), or a note that it was removed (drop). */
+type Replace = (kind: PseudonymKind, value: string) => string;
+
+function protectText(text: string, replace: Replace, counts: Protected<unknown>['counts']): string {
   let out = text;
   for (const { kind, re } of RULES) {
     out = out.replace(re, m => {
       counts[kind] = (counts[kind] ?? 0) + 1;
-      return standIn(kind, m, key, container);
+      return replace(kind, m);
     });
   }
   return out;
@@ -111,21 +120,31 @@ function protectText(text: string, key: Buffer, container: string, counts: Prote
 /**
  * The value with its details replaced (see the file header), and the counts. A string, an array and a
  * plain object are walked to any depth; anything else is returned as it is.
+ *
+ * `drop` (the drop mode): a detail in a text becomes `[removed <kind>]` and a name field is left out of
+ * its record, so nothing in what goes links two records to one person; the key is not used.
  */
-export function protectValue<T>(value: T, key: Buffer, container: string): Protected<T> {
+export function protectValue<T>(value: T, key: Buffer, container: string, opts: { drop?: boolean } = {}): Protected<T> {
   const counts: Protected<T>['counts'] = {};
+  const replace: Replace = opts.drop ? kind => `[removed ${kind}]` : (kind, v) => standIn(kind, v, key, container);
+  const isName = (field: string | null, v: string) => !!field && NAME_FIELDS.has(fold(field)) && !!v.trim() && !STAND_IN.test(v.trim());
   const walk = (v: unknown, field: string | null): unknown => {
     if (typeof v === 'string') {
-      if (field && NAME_FIELDS.has(fold(field)) && v.trim() && !STAND_IN.test(v.trim())) {
+      if (isName(field, v)) {
         counts.name = (counts.name ?? 0) + 1;
-        return standIn('name', v, key, container);
+        return replace('name', v);
       }
-      return protectText(v, key, container, counts);
+      return protectText(v, replace, counts);
     }
     if (Array.isArray(v)) return v.map(x => walk(x, field));
     if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
       const o: Record<string, unknown> = {};
-      for (const [k, x] of Object.entries(v)) o[k] = STRUCTURAL_FIELDS.has(fold(k)) ? x : walk(x, k);
+      for (const [k, x] of Object.entries(v)) {
+        if (STRUCTURAL_FIELDS.has(fold(k))) { o[k] = x; continue; }
+        // Drop leaves a person's name field out of the record altogether.
+        if (opts.drop && typeof x === 'string' && isName(k, x)) { counts.name = (counts.name ?? 0) + 1; continue; }
+        o[k] = walk(x, k);
+      }
       return o;
     }
     return v;

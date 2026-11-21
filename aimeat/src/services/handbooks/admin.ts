@@ -7,7 +7,7 @@
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
  *   v1.42.0 -- 2026-11-21 -- compliance.regulated_ai_modes: what an outside AI model gets of regulated
- *     data, and the report's regulated_ai section (feature audit item 1.3).
+ *     data (five modes, drop included), and the report's regulated_ai section (feature audit item 1.3).
  *   v1.41.0 -- 2026-11-19 -- A declared organism's customer due diligence: aimeat_kyc_customer,
  *     aimeat_kyc_suspicion_mark and aimeat_kyc_settings; decisions in person on the card.
  *   v1.40.0 -- 2026-11-19 -- Anti-money-laundering: the setting AIMEAT_AML_MODE, section 13 of the report,
@@ -321,7 +321,7 @@ unapproved or reopened test and a trial that ended with no decision a gap in \`p
 The setting \`compliance.regulated_ai_modes\` (AIMEAT_COMPLIANCE_REGULATED_AI_MODES) decides what an
 AI model outside this server gets of regulated data, one \`domain=mode\` entry per domain: \`notify\`
 (the default) sends it and marks each send, \`protect\` replaces identifying details with stand-ins
-first, \`local\` lets only a model on this server read it, \`block\` lets no model read it. A
+first, \`drop\` removes them first, \`local\` lets only a model on this server read it, \`block\` lets no model read it. A
 register's \`aiMode\` can only tighten it, and an exception never opens \`block\`. You may only make
 the setting stricter; a person makes it more open. The report's \`regulated_ai\` section shows the
 modes, the domains where \`local\` is suggested, and the marks of the period.

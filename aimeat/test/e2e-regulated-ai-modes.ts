@@ -9,6 +9,8 @@
  *     - notify (the default): far reads the record as before, and a `regulated` mark is written;
  *     - protect: far reads the record with the name, the phone number, the identity code and the
  *       e-mail address replaced by stand-ins, the same stand-in on every read; alice reads it whole;
+ *     - drop: far reads the record with the name field left out and the details removed, named as
+ *       removed; the model of an AI job gets the rest and none of the details;
  *     - local: far does not get it, near does; an AI job over it is refused; alice's 'ai-send'
  *       exception opens it for far, and the use is recorded;
  *     - block: neither agent gets it, and the exception does not open it: the attempt is marked as
@@ -20,6 +22,7 @@
  *     - the mode holds with classification off too.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-regulated-ai-modes
  * @version-history
+ *   v1.1.0 — 2026-11-21 — The drop mode (Jouni, 2026-11-21).
  *   v1.0.0 — 2026-11-21 — Initial (plan doc-mwnnp9xz9814, feature audit item 1.3).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
@@ -190,6 +193,26 @@ await test('PROTECT: an AI job over the record hands the model the stand-ins, ne
     assert(prompt.includes('Soita'), `the model got the record: ${JSON.stringify(run)} ${prompt.slice(0, 300)}`);
     for (const detail of ['040 123 4567', '010190-123A', 'maija.meikalainen@example.com', 'Meikäläinen']) assert(!prompt.includes(detail), `${detail} reached the model: ${prompt.slice(0, 400)}`);
     assert(/\[phone-[0-9a-f]{8}\]/.test(prompt), `the stand-in reached it: ${prompt.slice(0, 400)}`);
+});
+
+await test('DROP: far reads the record without the name field and with the details removed; alice reads it whole', async () => {
+    assert((await setModes(['health=drop'])).status === 200, 'set drop');
+    const v = (await records(far.token, patients)).get('r1')?.value ?? {};
+    assert(!('name' in v), `the name field is left out: ${JSON.stringify(v)}`);
+    for (const detail of ['040 123 4567', '010190-123A', 'maija.meikalainen@example.com']) assert(!String(v.note).includes(detail), `${detail} left in: ${v.note}`);
+    assert(String(v.note).includes('[removed phone]') && String(v.note).includes('[removed person-id]') && String(v.note).includes('[removed email]'), `what was removed is named: ${v.note}`);
+    assert(!/\[phone-[0-9a-f]{8}\]/.test(String(v.note)), `no stand-in links it: ${v.note}`);
+    const own = (await records(alice.token, patients)).get('r1');
+    assert(own?.value?.name === NAME && own.value.note === NOTE, `POSITIVE CONTROL, alice on her own screen: ${JSON.stringify(own?.value)}`);
+    const rows = await marks('regulated', x => regulatedRow(x) && String(x.purpose).includes('(drop)'));
+    assert(rows.some(x => /details removed: .*phone \d/.test(String(x.purpose))), `the mark counts what was removed: ${JSON.stringify(rows).slice(0, 500)}`);
+});
+
+await test('DROP: an AI job over the record hands the model the rest of it, never the details', async () => {
+    await fire(alice.token, LATEST(patients, 'r1'));
+    const prompt = lastPrompt();
+    assert(prompt.includes('Soita') && prompt.includes('[removed phone]'), `the model got the rest: ${prompt.slice(0, 400)}`);
+    for (const detail of ['040 123 4567', '010190-123A', 'maija.meikalainen@example.com', 'Meikäläinen']) assert(!prompt.includes(detail), `${detail} reached the model: ${prompt.slice(0, 400)}`);
 });
 
 await test('LOCAL: far does not get the record (REST and MCP), near does; Plain is untouched', async () => {

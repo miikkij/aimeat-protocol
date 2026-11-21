@@ -17,6 +17,8 @@
  *   BreachSchema · DpiaSchema · FrameworkAnswersSchema · DOC_SCHEMAS · the inferred types
  * @usage const parsed = DOC_SCHEMAS.registers.safeParse(body);
  * @version-history
+ *   v1.7.0 — 2026-11-21 — A register's `aiMode` (notify, protect, drop, local, block): what an outside AI
+ *     model gets of its containers' content, when stricter than the operator's (feature audit item 1.3).
  *   v1.6.0 — 2026-11-19 — The document `aml` (Regulation (EU) 2024/1624): an obliged entity's declaration
  *     and a person's review of each anti-money-laundering finding (services/aml/).
  *   v1.5.0 — 2026-11-13 — Three documents from lia-schemas.ts: an app's balancing tests (`lias`), an
@@ -93,7 +95,7 @@ export const RegisterSchema = z.object({
    * stricter than the operator's mode for its domains (data/compliance-domains.ts RegulatedAiMode).
    * The strictest of the two holds, so a register can only tighten. Read only while `domains` names one.
    */
-  aiMode: z.enum(['notify', 'protect', 'local', 'block']).optional(),
+  aiMode: z.enum(['notify', 'protect', 'drop', 'local', 'block']).optional(),
   recipients: list().optional(),
   processors: z.array(z.string().max(120)).max(50).optional(),
   transfers: z.array(z.object({ country: z.string().max(60), basis: z.enum(['adequacy', 'scc', 'dpf', 'bcr', 'derogation', 'none']) })).max(30).optional(),
