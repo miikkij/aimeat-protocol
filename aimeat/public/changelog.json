@@ -4,6 +4,29 @@
     {
       "date": "2026-11-21",
       "kind": "feature",
+      "id": "2026-11-21-your-agents-cannot-make-your-decisions-for-you",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "developer"
+      ],
+      "title": {
+        "en": "Your agents cannot make your decisions for you",
+        "fi": "Agentti ei tee päätöksiäsi puolestasi"
+      },
+      "body": {
+        "en": "An extension can mark an action as yours to decide. When an agent calls it, you approve it with one press, and no app tool can wrap it.",
+        "fi": "Laajennus voi merkitä toiminnon sinun päätettäväksesi. Kun agentti kutsuu sitä, hyväksyt sen yhdellä painalluksella, eikä sovelluksen työkalu voi kääriä sitä."
+      },
+      "summary": {
+        "en": "An extension can mark an action as yours to decide. When an agent calls it, you approve it with one press, and no app tool can wrap it.",
+        "fi": "Laajennus voi merkitä toiminnon sinun päätettäväksesi. Kun agentti kutsuu sitä, hyväksyt sen yhdellä painalluksella."
+      }
+    },
+    {
+      "date": "2026-11-21",
+      "kind": "feature",
       "id": "2026-11-21-regulated-data-stays-where-the-law-wants-it",
       "highlight": false,
       "audience": [
