@@ -56,6 +56,8 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.72.1 — 2026-11-22 — --ak-main-max 100% → 100rem: the composition grid stops at 1600 px, so
+ *     a wide window no longer draws a main card far wider than its fields.
  *   v0.72.0 — 2026-11-22 — tour.css: the app's guided tour (spotlight, step card or bottom sheet,
  *     invitation, header button); the tour's rules left parts.css for it
  *     (wish-opastettu-kierros-sovelluksiin-monikielinen-tutorial-ja-oma-).
@@ -617,8 +619,11 @@
    * nobody chose. A page now takes the WHOLE window; the composition grid's spans own the line
    * lengths, and the looks that mean READING (editorial, broadsheet, gallery, terminal,
    * neon-dense) set their own measure, because a paragraph at 2000px is not a design choice.
-   * Going back to a lane is one token on the look or the app's signature. */
-  --ak-main-max:      100%;
+   * Going back to a lane is one token on the look or the app's signature.
+   * CAPPED AT 100rem (2026-11-22). On a 1920 px window a two-column page drew a main card of
+   * 1177 px around 768 px of fields, an empty band the developer asked to close. 100rem keeps a
+   * laptop and a 1600 px window full width and stops the grid there; billboard still says 100%. */
+  --ak-main-max:      100rem;
   /* The band is sized by what STANDS IN IT, not by a slice of the window. 30dvh meant a title
    * and one line ate a third of a laptop screen before anything was read; the poster looks
    * (poster, carnival, billboard, aurora) still declare their tall bands on purpose. */
