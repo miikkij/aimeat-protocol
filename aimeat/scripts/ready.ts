@@ -35,7 +35,14 @@
  *   cd aimeat && AIMEAT_SESSION=cc-alice-x pnpm ready         # check, test, sweep, push main
  *   cd aimeat && pnpm ready --no-merge                         # stop after a green run
  *   cd aimeat && pnpm ready --no-checks                        # skip the static checks (just run on this tree)
+ *   cd aimeat && pnpm ready --full                             # the full sweep even for a text change
+ *
+ *   HOW MUCH OF THE SWEEP. A change that reaches code runs the full sweep. A change of words only
+ *   (locales, docs, comments, the prose inside strings) runs the suites that changed or quote the
+ *   changed words, and none when no suite does (scripts/lib/ready-scope.ts; Jouni, 2026-11-22).
  * @version-history
+ *   v2.1.0 — 2026-11-22 — The sweep's size follows the change: full for code, the suites that quote
+ *     the changed words for text.
  *   v2.0.0 — 2026-11-22 — The whole run on this machine, and main the only ref pushed: the remote run
  *     needed a ready/<session> branch on the public repository.
  *   v1.1.0 — 2026-11-19 — The checks run here before the push (check:fast --before-push), and the sweep
@@ -44,6 +51,8 @@
  *   v1.0.0 — 2026-11-15 — Initial.
  */
 import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+import { readyScope } from './lib/ready-scope.js';
 
 const sh = (cmd: string, args: string[], opts: { inherit?: boolean } = {}): string =>
     execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: opts.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'] }) ?? '';
@@ -85,8 +94,22 @@ async function main(): Promise<void> {
         step('the checks (check:fast --before-push)', process.execPath, ['--import', 'tsx', 'scripts/check-fast.ts', '--before-push']);
     }
     step('the unit suite', 'pnpm', ['exec', 'vitest', 'run']);
-    step('the full E2E sweep on SQLite', 'pnpm', ['test:e2e:sqlite', '--retry-red']);
-    step('the full E2E sweep on PostgreSQL', 'pnpm', ['test:e2e:postgres-kysely', '--retry-red']);
+
+    // How much of the sweep the change needs (scripts/lib/ready-scope.ts): all of it for code, the
+    // suites that quote the changed words for text. --full runs all of it whatever the change is.
+    const scope = process.argv.includes('--full') ? { full: true, code: ['(--full)'], suites: [] } : readyScope(path.resolve('..'), 'origin/main');
+    if (scope.full) {
+        console.log(`\n[ready] the change reaches code (${scope.code.slice(0, 5).join(', ')}${scope.code.length > 5 ? ` and ${scope.code.length - 5} more` : ''}): the full sweep on both backends`);
+        step('the full E2E sweep on SQLite', 'pnpm', ['test:e2e:sqlite', '--retry-red']);
+        step('the full E2E sweep on PostgreSQL', 'pnpm', ['test:e2e:postgres-kysely', '--retry-red']);
+    } else if (scope.suites.length) {
+        const tests = scope.suites.map(s => `--test=${s}`);
+        console.log(`\n[ready] the change is text only: the ${scope.suites.length} suite(s) that changed or quote the changed words, on both backends: ${scope.suites.join(', ')}`);
+        step('the changed-text suites on SQLite', 'pnpm', ['test:e2e:sqlite', '--retry-red', ...tests]);
+        step('the changed-text suites on PostgreSQL', 'pnpm', ['test:e2e:postgres-kysely', '--retry-red', ...tests]);
+    } else {
+        console.log('\n[ready] the change is text only, and no E2E suite changed or quotes the changed words: no sweep. CI runs on main after the push.');
+    }
 
     const minutes = Math.round((Date.now() - started) / 60_000);
     if (git('rev-parse', 'HEAD') !== head) refuse('HEAD moved during the run; run pnpm ready again on the commit you mean.');

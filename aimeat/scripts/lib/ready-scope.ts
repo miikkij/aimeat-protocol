@@ -1,0 +1,175 @@
+/**
+ * @file scripts/lib/ready-scope.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Decides how much of the E2E sweep pnpm ready runs for the commits it brings: the whole
+ *   sweep when the change reaches code the server runs, and only the suites that name a changed text
+ *   when the change is text.
+ *
+ *   WHY. A change of words (locale files, docs, comments, the text inside a string) cannot break a
+ *   suite unless the suite quotes the old words or is itself changed, and the full sweep on this
+ *   machine takes about two hours. Ruled by the developer on 2026-11-22, after a terminology change
+ *   waited two hours for a sweep that could only find what a search of the tests had already found.
+ *
+ *   WHAT COUNTS AS TEXT. A file under a text path (locales, Markdown, docs, the session guides, the
+ *   checks and their ledgers, the tests, the hooks), or a code file whose tokens are the same before
+ *   and after once comments and the contents of its prose strings are set aside. A prose string has
+ *   a space in it; a string without one is a key, a route or an id, and changing it is code, as is a
+ *   new or removed string, a number or a name. package.json counts as text when only its scripts
+ *   changed. Anything the rule cannot read (a new file under src/, a binary) is code.
+ *
+ *   WHICH SUITES, FOR TEXT. Every E2E suite file that changed, and every suite that contains, word for
+ *   word, an English locale value or a string literal the change removed (at least eight characters).
+ * @structure changedFiles() · isTextOnly() · targetedSuites() · readyScope()
+ * @version-history
+ *   v1.0.0 — 2026-11-22 — Initial.
+ */
+import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import path from 'node:path';
+import ts from 'typescript';
+
+const git = (repo: string, ...args: string[]): string =>
+  execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+const gitShow = (repo: string, base: string, file: string): string | null => {
+  try { return git(repo, 'show', `${base}:${file}`); } catch { return null; }
+};
+
+/** Paths whose content is words for a person or a session, or the checks that read them. */
+const TEXT_PATH = /^(?:aimeat\/locales\/[a-z]{2}\.json$|.*\.md$|docs\/|\.claude\/|\.githooks\/|aimeat\/scripts\/|aimeat\/security\/|aimeat\/test\/|aimeat\/public\/data\/everything\.|aimeat\/public\/THIRD-PARTY-NOTICES\.md$|THIRD-PARTY-NOTICES\.md$|aimeat\/src\/services\/prompt-defaults\/shipped-hashes\.ts$)/;
+// shipped-hashes.ts lists the hash of every default prompt text; it changes only with that text, and
+// a unit test holds the two together.
+
+export function changedFiles(repo: string, base: string): string[] {
+  return git(repo, 'diff', '--name-only', `${base}...HEAD`).split('\n').filter(Boolean);
+}
+
+/** The code of a script with every comment dropped and every string literal's text blanked. */
+export function codeShape(source: string, file: string): { shape: string; strings: string[] } {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true,
+    file.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS);
+  const parts: string[] = [];
+  const strings: string[] = [];
+  const STRINGISH = new Set([ts.SyntaxKind.StringLiteral, ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+    ts.SyntaxKind.TemplateHead, ts.SyntaxKind.TemplateMiddle, ts.SyntaxKind.TemplateTail]);
+  // The parser's leaves are the tokens; comments are trivia and never a leaf. A JSDoc block is a
+  // child node in a .ts file, so it is skipped by kind.
+  const walk = (node: ts.Node): void => {
+    if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) return;
+    const children = node.getChildren(sf);
+    if (!children.length) {
+      // Only a string with a space in it is prose. A string with none is a key, a route, a class or an
+      // id (t('profile.x'), '/v1/apps'), and changing it changes what the code does.
+      const text = STRINGISH.has(node.kind) ? (node as ts.LiteralLikeNode).text : null;
+      if (text !== null && /\s/.test(text)) { strings.push(text); parts.push(`S${node.kind}`); }
+      else parts.push(node.getText(sf));
+      return;
+    }
+    for (const c of children) walk(c);
+  };
+  walk(sf);
+  return { shape: parts.join(' '), strings };
+}
+
+/** The tags of a page with comments dropped and the prose inside attribute values (alt, title) blanked. */
+export function htmlShape(source: string): string {
+  const tags = source.replace(/<!--[\s\S]*?-->/g, '').match(/<[^>]*>/g) ?? [];
+  return tags.map(t => t.replace(/=(["'])([^"']*\s[^"']*)\1/g, '=$1S$1')).join('');
+}
+
+/** True when the file changed only in words: comments, string contents, text between tags. */
+export function isTextOnly(repo: string, base: string, file: string): boolean {
+  if (TEXT_PATH.test(file)) return true;
+  const before = gitShow(repo, base, file);
+  const abs = path.join(repo, file);
+  if (before === null || !existsSync(abs)) return false; // a new or deleted file is code
+  const after = readFileSync(abs, 'utf8');
+  if (/\.(ts|js|mjs|cjs)$/.test(file)) return codeShape(before, file).shape === codeShape(after, file).shape;
+  if (/\.html$/.test(file)) return htmlShape(before) === htmlShape(after);
+  if (/\.css$/.test(file)) return before.replace(/\/\*[\s\S]*?\*\//g, '') === after.replace(/\/\*[\s\S]*?\*\//g, '');
+  if (/(^|\/)package\.json$/.test(file)) {
+    const strip = (s: string) => { const j = JSON.parse(s) as Record<string, unknown>; delete j.scripts; return JSON.stringify(j); };
+    try { return strip(before) === strip(after); } catch { return false; }
+  }
+  return false;
+}
+
+function flatStrings(o: unknown, out: Record<string, string> = {}, p = ''): Record<string, string> {
+  if (o && typeof o === 'object' && !Array.isArray(o)) {
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      const q = p ? `${p}.${k}` : k;
+      if (typeof v === 'string') out[q] = v; else flatStrings(v, out, q);
+    }
+  }
+  return out;
+}
+
+/** The texts the change took out: old English locale values and removed string literals. */
+function removedTexts(repo: string, base: string, files: string[]): string[] {
+  const texts = new Set<string>();
+  for (const f of files) {
+    const before = gitShow(repo, base, f);
+    const abs = path.join(repo, f);
+    if (before === null || !existsSync(abs)) continue;
+    const after = readFileSync(abs, 'utf8');
+    if (f === 'aimeat/locales/en.json') {
+      const a = flatStrings(JSON.parse(before)), b = flatStrings(JSON.parse(after));
+      for (const [k, v] of Object.entries(a)) if (b[k] !== v) texts.add(v);
+    } else if (/\.(ts|js|mjs|cjs)$/.test(f) && !f.startsWith('aimeat/test/')) {
+      const now = new Set(codeShape(after, f).strings);
+      for (const s of codeShape(before, f).strings) if (!now.has(s)) texts.add(s);
+    }
+  }
+  // Placeholders split a sentence the tests may quote in parts; a part shorter than 20 characters
+  // ("this site", "the paste") is in too many unrelated strings to point at a suite.
+  const parts = new Set<string>();
+  for (const t of texts) for (const p of t.split(/\{\{?\w+\}?\}|\$\{[^}]*\}/)) if (p.trim().length >= 20) parts.add(p.trim());
+  return [...parts];
+}
+
+/** A file's code with only its comments dropped: what a suite does, whatever its comments say. */
+function withoutComments(source: string, file: string): string {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const parts: string[] = [];
+  const walk = (node: ts.Node): void => {
+    if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) return;
+    const children = node.getChildren(sf);
+    if (!children.length) { parts.push(node.getText(sf)); return; }
+    for (const c of children) walk(c);
+  };
+  walk(sf);
+  return parts.join(' ');
+}
+
+/** The E2E suites (by name) a text change can reach. */
+export function targetedSuites(repo: string, base: string, files: string[]): string[] {
+  const testDir = path.join(repo, 'aimeat', 'test');
+  const suites = readdirSync(testDir).filter(n => /^e2e-.*\.ts$/.test(n));
+  const picked = new Set<string>();
+  // A suite whose code or strings changed runs; one whose comments alone changed does not.
+  for (const f of files) {
+    const m = /^aimeat\/test\/(e2e-[^/]*)\.ts$/.exec(f);
+    if (!m || !suites.includes(`${m[1]}.ts`)) continue;
+    const before = gitShow(repo, base, f);
+    const after = readFileSync(path.join(repo, f), 'utf8');
+    if (before === null || withoutComments(before, f) !== withoutComments(after, f)) picked.add(m[1]);
+  }
+  // A suite whose strings hold a text the change removed: it may assert the old words.
+  const texts = removedTexts(repo, base, files);
+  if (texts.length) {
+    for (const n of suites) {
+      const literals = codeShape(readFileSync(path.join(testDir, n), 'utf8'), n).strings.join('\n');
+      if (texts.some(t => literals.includes(t))) picked.add(n.replace(/\.ts$/, ''));
+    }
+  }
+  return [...picked].sort();
+}
+
+export interface ReadyScope { full: boolean; code: string[]; suites: string[] }
+
+/** The whole sweep when any changed file is code; otherwise the suites the text change can reach. */
+export function readyScope(repo: string, base: string): ReadyScope {
+  const files = changedFiles(repo, base);
+  const code = files.filter(f => !isTextOnly(repo, base, f));
+  return code.length ? { full: true, code, suites: [] } : { full: false, code: [], suites: targetedSuites(repo, base, files) };
+}
