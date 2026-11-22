@@ -558,7 +558,7 @@
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/public/css/theme.css",
         "aimeat/public/css/poster.css",
@@ -567,7 +567,7 @@
         "aimeat/src/services/app-ui/signature-tokens.ts",
         "aimeat/src/services/themes/tiilitaivas.ts"
       ],
-      "digest": "sha256:62e2be5d7ce46ff8ae13cd47",
+      "digest": "sha256:c8e453ec123ee53dac22aebb",
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
@@ -671,12 +671,12 @@
       "note": "Its verification runs against the shared stub harness; its contract is node:aimeat-subagent-brief, which the lead pastes into the brief."
     },
     "agent:note-writer": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "docs/pitfalls.md",
         ".claude/skills/aimeat-organism-records/SKILL.md"
       ],
-      "digest": "sha256:745c6d91f10ce26f527c8b0d",
+      "digest": "sha256:68f0e2c33bb5e180790606d5",
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
@@ -851,7 +851,7 @@
     },
     "project:aimeat-design-language": {
       "aimeat/public/css/theme.css": "ffbbc71080bb57ca",
-      "aimeat/public/css/poster.css": "3a32b3760fd32b41",
+      "aimeat/public/css/poster.css": "1a5ae68e3545e472",
       "aimeat/public/lib/aimeat-fonts.css": "5b1c4dde6b61c603",
       "aimeat/src/services/themes/tokens.ts": "7178b915f0c271ee",
       "aimeat/src/services/app-ui/signature-tokens.ts": "4464cc5e84122717",
@@ -1070,7 +1070,7 @@
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
     "agent:note-writer": {
-      "docs/pitfalls.md": "e8cafda01ef53bc5",
+      "docs/pitfalls.md": "59e37e962af95bf0",
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {

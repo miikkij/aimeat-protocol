@@ -37,9 +37,9 @@ version there, or in each file's own banner, rather than from this guide.
 - A contributor needs no toolchain to change a view.
 - The source in the debugger is the running code.
 
-Two parts of the frontend are built and are the exceptions: the served SDK libraries
-(`src/static/sdk-libs/`, `pnpm build:sdk`) and the app catalog (`pnpm build:app-catalog`). See
-`docs/pitfalls.md`, "An edit seems to have no effect".
+One part of the frontend is built and is the exception: the served SDK libraries
+(`src/static/sdk-libs/`, `pnpm build:sdk`). See `docs/pitfalls.md`, "An edit seems to have no
+effect".
 
 ### Type Checking (no build, still type-safe)
 
@@ -244,8 +244,7 @@ html`<${CopyButton} text=${gaii} label=${t('x.copyGaii')} copiedLabel=${t('x.cop
 The site has one dialog. `Modal` renders a native `<dialog class="dlg">` opened with `showModal()`:
 a header with the title and the X, a body that is the only part to scroll, and a footer for the
 actions. On a phone (560px and narrower) it is a sheet at the bottom edge. The look is
-`css/components/dialog.css` and the closing rules are `/js/dialog.js`; the app catalog uses the same
-two files through `src/static/app-catalog/js/dialogs.js`. Escape and a click on the page behind
+`css/components/dialog.css` and the closing rules are `/js/dialog.js`. Escape and a click on the page behind
 close the dialog only while nothing has been typed; the X always closes it.
 
 ```javascript

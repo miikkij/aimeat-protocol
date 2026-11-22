@@ -251,7 +251,7 @@ User-facing surfaces in the portal that are *clients* of the generic APIs, and s
 - **Calibrator** (`calibrator.ts`): a prompt-calibration workbench (projects, versions, batches, LLM editor, charts).
 - **Personal Access Tokens** (`access-tokens.ts`): owner-minted PATs, a credential path for agents and scripts outside device authorization.
 - **Moderation** (`flags.ts`, `appeals.ts`): content flagging and an appeal workflow, separate from work disputes.
-- **App catalog** (`src/static/app-catalog/` and `app-catalog.html`): a static catalog app shell built with **esbuild**, separate from the database-backed `apps.ts` and `app-store.ts`. Edit the sources under `src/static/app-catalog/`, not the built file.
+- **App catalog** (`public/views/appcat.js` and `public/views/appcat/`, at `/v1/appcat`): an SPA view on the component library over the database-backed `apps.ts` and `app-store.ts` routes. No build step.
 
 ### Operator Admin
 

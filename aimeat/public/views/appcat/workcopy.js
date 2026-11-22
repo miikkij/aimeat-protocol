@@ -7,14 +7,15 @@
  *   beside it a rolling history of checkpoints, the bytes each save replaced, kept as private memory
  *   records of the owner: the index `app-catalog.wc.{slug}` ({ version: 1, updatedAt, items: [{ id,
  *   at, note, size }] }, newest first, at most 8) and one body per checkpoint
- *   `app-catalog.wc.{slug}.b{id}` ({ html: base64 }). The keys and shapes are the old catalogue's
- *   (src/static/app-catalog/js/workcopy.js), so a checkpoint saved there is read here and back.
+ *   `app-catalog.wc.{slug}.b{id}` ({ html: base64 }). The keys keep the name the old catalogue
+ *   gave them, because stored records carry it; that page was removed on 2026-11-22.
  *   Also the app's bytes themselves: the published bytes, the draft's, as base64 and as text.
  * @structure slugFor · getCheckpoints · loadCheckpoints · saveWorkingCopy · readCheckpoint ·
  *   deleteCheckpoint · getDraft · putDraft · discardWorkingCopy · draftCall · fetchAppBytes ·
  *   b64ToText · textToB64
  * @usage import { saveWorkingCopy, loadCheckpoints } from '/views/appcat/workcopy.js'
  * @version-history
+ *   v1.0.1 — 2026-11-22 — Header: the old catalogue page is gone; the stored key names stay.
  *   v1.0.0 — 2026-09-27 — Initial: the old catalogue's workcopy.js on the SPA's api(), same keys.
  */
 import { api, apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';

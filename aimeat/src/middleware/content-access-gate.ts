@@ -45,6 +45,8 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.10 — 2026-11-22 — /app-catalog.html leaves the open shell files: the old page and its route
+ *     are removed (the app catalogue is /v1/appcat, a SPA page address).
  *   v1.4.9 — 2026-11-14 — A secret share's card and deposit card (GET) and its pickup with a code and
  *     deposit with a token (POST) are open: a person with no account picks up or deposits there.
  *   v1.4.8 — 2026-11-06 — GET /index.html is open beside /everything and /start: a constant 301 to the
@@ -111,7 +113,7 @@ function wholePaths(paths: readonly string[]): RegExp {
 export const OPEN_ROUTES: ReadonlyArray<{ method: string | null; path: RegExp; why: string }> = [
   // ── The SPA shell and its page addresses (no content in this mode, see the header) ──
   { method: 'GET', path: /^\/$/, why: 'the front page shell' },
-  { method: 'GET', path: /^\/(spa|app-silent|app-catalog)\.html$/, why: 'shell files' },
+  { method: 'GET', path: /^\/(spa|app-silent)\.html$/, why: 'shell files' },
   // /index.html: a constant 301 to `/` (server-bootstrap/static-files.ts, TARGET-091).
   { method: 'GET', path: /^\/(everything|start|index\.html)$/, why: 'redirects to shell pages' },
   { method: 'GET', path: /^\/v1\/(portal|echat)$/, why: 'SPA page addresses served outside the portal list' },

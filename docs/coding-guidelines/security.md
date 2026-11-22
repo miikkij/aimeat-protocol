@@ -168,7 +168,6 @@ base-uri 'self'
 
 Exceptions, each set in its own handler:
 
-- `/app-catalog.html` has a wider policy, because it hosts user apps that load CDN resources.
 - `/app-silent.html` drops `X-Frame-Options` and sets `frame-ancestors` to the app, portfolio and company host families, so an app origin can frame it for sign-in.
 - Published apps get their own CSP from the routes under `src/routes/apps/`.
 

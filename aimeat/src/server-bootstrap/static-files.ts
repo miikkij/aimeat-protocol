@@ -11,6 +11,8 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.20.0 -- 2026-11-22 -- The GET /app-catalog.html route and its own CSP are removed with the old
+ *     page; the app catalogue is the SPA view at /v1/appcat.
  *   v1.19.0 -- 2026-11-15 -- /not-found.html, the not-found page's template (middleware/not-found-page.ts),
  *     answers 301 to `/` like the other templates.
  *   v1.18.0 -- 2026-11-10 -- /sw-offline.js on an app origin: the worker of an app that opens with
@@ -173,7 +175,7 @@ export let nodeRobotsTxt: string | null = null;
 export function setupStaticFiles(app: express.Express, config: AimeatConfig): void {
   const __dirname = resolveServerDir();
 
-  // H-2: when apps are served from a separate app origin, the SPA + app-catalog must be
+  // H-2: when apps are served from a separate app origin, the SPA must be
   // allowed to FRAME that origin (the sandboxed opaque-origin app viewer loads it), otherwise
   // `frame-src 'self'` blocks the in-app launch. Allow the app host (bare + per-app subdomain,
   // with/without an explicit port) — scheme inherited from baseUrl. Empty when not enabled.
@@ -475,40 +477,11 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     }));
   }
 
-  // PWA manifest + app-catalog + silent-bridge pages. The service worker is NOT here: /sw.js
+  // PWA manifest + silent-bridge pages. The service worker is NOT here: /sw.js
   // resolves to public/sw.js, which the public/ mount above serves first. The list this reads
   // used to name only src/static, which the package does not carry: see asset-dirs.ts.
   const pwaStaticDir = resolveAssetDir('static', __dirname, process.cwd());
   if (pwaStaticDir) {
-    // Serve app-catalog.html with relaxed CSP — self-contained SPA with many inline event handlers
-    const appCatalogPath = join(pwaStaticDir, 'app-catalog.html');
-    if (existsSync(appCatalogPath)) {
-      const appOriginOn = config.appOriginEnabled && !!config.appHost;
-      app.get('/app-catalog.html', (_req, res) => {
-        let html = readFileSync(appCatalogPath, 'utf-8');
-        // H-2: tell the catalog whether the app origin is live, so it opens published apps
-        // TOP-LEVEL on apps.<domain> (clean full page) instead of the opaque-sandbox iframe.
-        // Also expose the app host (apps.<domain>) so subdomain chips show the real app URL
-        // (<sub>.apps.<domain>) instead of the bare apex — JSON-encoded to be injection-safe.
-        const appHostJs = JSON.stringify(appOriginOn ? config.appHost : '');
-        html = html.replace('</head>', `<script>window.__APP_ORIGIN_ENABLED=${appOriginOn ? 'true' : 'false'};window.__APP_HOST=${appHostJs};</script>\n</head>`);
-        // Override CSP: app-catalog hosts user-generated apps that load arbitrary CDN resources.
-        // Uses same permissive policy as apps.ts inline mode — allows any HTTPS script/style source.
-        res.setHeader('Content-Security-Policy', [
-          "default-src 'self'",
-          "script-src 'self' 'unsafe-inline' blob: https: http://localhost:*",
-          "style-src 'self' 'unsafe-inline' https: http://localhost:*",
-          "connect-src 'self' https: http://localhost:* wss: ws: data:",
-          "img-src * data: blob:",
-          "font-src 'self' data: https:",
-          `frame-src 'self' blob: data:${appFrameSrc}`,
-          "object-src 'none'",
-          "base-uri 'self'",
-        ].join('; '));
-        res.type('html').send(html);
-      });
-    }
-
     // H-2 seamless SSO: the silent bridge page must be FRAMABLE by app origins (a hidden iframe
     // inside an app), so override the global X-Frame-Options: SAMEORIGIN and pin frame-ancestors
     // to the app host family (*.appHost) — plus the portfolio host family when the portfolio

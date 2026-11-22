@@ -9,6 +9,7 @@
  *   pnpm lint
  *
  * @version-history
+ *   2026-11-22 — The src/static/app-catalog/** ignore goes with the removed old app catalogue.
  *   2026-11-21 — src/ refuses req.on('close') (Express 5 fires it when the body is read); test/
  *     refuses a Host header in a fetch (aimeat/no-fetch-host-header).
  *   2026-10-16 — aimeat/no-error-object-log-field on src/ (QA audit E1-04, F5-07, S5-07).
@@ -43,7 +44,6 @@ export default tseslint.config(
       // src/static is not our source EXCEPT the SDK-libs migration sources (real, JSDoc-typed
       // ESM under src/static/sdk-libs/, which we DO lint — 800-line + header rules apply). Keep
       // everything else under src/static ignored, and ignore the generated dist bundles.
-      'src/static/app-catalog/**',
       'src/static/*.js',
       'src/static/sdk-libs/dist/**',
       'src/generated/**',

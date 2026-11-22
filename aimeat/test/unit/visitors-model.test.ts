@@ -2,22 +2,26 @@
  * @file test/unit/visitors-model.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The arithmetic behind the App Catalog's Visitors section, and the header reader that
- *   feeds it a place.
+ * @description The arithmetic behind the app catalogue's world map (public/components/world-map/model.js),
+ *   and the header reader that feeds it a place.
  *
  *   THE JOIN TEST IS THE ONE THAT MATTERS. The reverse proxy names a country by two letters and the
  *   bundled atlas names it by number, and the table between them was written by hand. A wrong row
  *   shades the wrong country and nothing anywhere complains, so every numbered shape in the real
  *   atlas file is checked here against the table, and a spot list pins the ones a typo would hit.
  * @version-history
+ *   v1.1.0 — 2026-11-22 — Reads public/components/world-map/model.js, the map's half of the old
+ *     catalogue's visitors-model.js, which is removed with /app-catalog.html. The day-window and
+ *     bar cases go with it: their successors (views/appcat/sections/visitors.js clampWindow,
+ *     components/SlotBars.js slotsFromSeries) import Preact, which the unit runner does not load.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  ISO_NUMERIC, numericOf, alpha2Of, clampWindow, barsFromSeries, shadeStep, projectPoint, zoomBox, placesOfCountry,
-} from '../../src/static/app-catalog/js/visitors-model.js';
+  ISO_NUMERIC, numericOf, alpha2Of, shadeStep, projectPoint, zoomBox, placesOfCountry,
+} from '../../public/components/world-map/model.js';
 import { geoFromHeaders } from '../../src/utils/geo-headers.js';
 
 const ROOT = join(import.meta.dirname, '../..');
@@ -52,47 +56,6 @@ describe('the country table joins the proxy\'s codes to the atlas\'s shapes', ()
     expect(numericOf('constructor')).toBeNull();
     expect(numericOf('fi')).toBe('246');
     expect(alpha2Of('toString')).toBeNull();
-  });
-});
-
-describe('the day window', () => {
-  it('is 0 to 360, and anything unreadable is 30', () => {
-    expect(clampWindow(0)).toBe(0);
-    expect(clampWindow('0')).toBe(0);
-    expect(clampWindow(360)).toBe(360);
-    expect(clampWindow(9999)).toBe(360);
-    expect(clampWindow(-1)).toBe(30);
-    expect(clampWindow('abc')).toBe(30);
-    expect(clampWindow('')).toBe(30);
-    expect(clampWindow(7.5)).toBe(30);
-  });
-});
-
-describe('a sparse series becomes evenly spaced bars', () => {
-  const series = [
-    { day: '2026-09-01', signed_in: 2, anonymous: 1 },
-    { day: '2026-09-03', signed_in: 0, anonymous: 4 },
-  ];
-
-  it('gives every day of the window a slot, empty ones included', () => {
-    const out = barsFromSeries(series, '2026-09-01', '2026-09-05', ['signed_in', 'anonymous']);
-    expect(out.grain).toBe('day');
-    expect(out.bars.map((b: { total: number }) => b.total)).toEqual([3, 0, 4, 0, 0]);
-    expect(out.max).toBe(4);
-    expect(out.bars[0]).toMatchObject({ from: '2026-09-01', to: '2026-09-01', signed_in: 2, anonymous: 1 });
-  });
-
-  it('folds to weeks past 120 days, and loses nothing doing it', () => {
-    const out = barsFromSeries(series, '2025-09-24', '2026-09-18', ['signed_in', 'anonymous']);
-    expect(out.grain).toBe('week');
-    expect(out.bars.length).toBe(52);
-    expect(out.bars.reduce((n: number, b: { total: number }) => n + b.total, 0)).toBe(7);
-  });
-
-  it('an empty series is a row of empty bars and a max of zero', () => {
-    const out = barsFromSeries([], '2026-09-18', '2026-09-18', ['signed_in']);
-    expect(out.bars.length).toBe(1);
-    expect(out.max).toBe(0);
   });
 });
 
@@ -135,10 +98,12 @@ describe('the map\'s geometry', () => {
 
 describe('the places of one country', () => {
   it('are that country\'s only, most visits first', () => {
+    // The map reads `count`; appcat's Visitors section maps the node's `people` to it
+    // (public/views/appcat/sections/visitors.js).
     const places = [
-      { country: 'FI', region: 'Uusimaa', city: 'Helsinki', people: 2 },
-      { country: 'SE', region: 'Stockholm', city: 'Stockholm', people: 9 },
-      { country: 'FI', region: 'Pirkanmaa', city: 'Tampere', people: 5 },
+      { country: 'FI', region: 'Uusimaa', city: 'Helsinki', count: 2 },
+      { country: 'SE', region: 'Stockholm', city: 'Stockholm', count: 9 },
+      { country: 'FI', region: 'Pirkanmaa', city: 'Tampere', count: 5 },
     ];
     expect(placesOfCountry(places, 'FI').map((p: { city: string }) => p.city)).toEqual(['Tampere', 'Helsinki']);
     expect(placesOfCountry(undefined, 'FI')).toEqual([]);

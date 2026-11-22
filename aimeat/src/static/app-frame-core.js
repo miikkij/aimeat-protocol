@@ -3,7 +3,7 @@
  * @description What a page of the node does for an app it holds in an opaque-origin frame. Two pages
  *   hold one: the isolated frame's page on a node several people share with no app origin
  *   (app-frame.js), and the App Catalog's preview of code its owner has not published yet
- *   (app-catalog/js/preview-host.js, which esbuild bundles this into). Both ask the node for the
+ *   (public/views/appcat/viewer.js, which imports this from /app-frame-core.js). Both ask the node for the
  *   app's own grant, run the visible consent for it, and hand the frame the access token alone. The
  *   node's session stays on the page that imports this.
  *
@@ -19,6 +19,8 @@
  *   silentGrant(app, scope, opts) · consentWindow(app, scope, manage, redirectUri, onBlocked)
  * @usage import { silentGrant, consentWindow, frameSecret, bootName, fromFrame, FRAME_BOOT } from './app-frame-core.js';
  * @version-history
+ *   v1.2.1 — 2026-11-22 — Comment only: the preview that uses this is appcat's viewer.js; the old
+ *     catalogue's preview-host.js is removed.
  *   v1.2.0 — 2026-10-05 — frameSecret, bootName, fromFrame and FRAME_BOOT: the page admits a message
  *     only with its frame's secret (secaudit 2026-10, WEB-1). silentGrant takes { unpublished }: code
  *     that is not the published version (a draft, a checkpoint, a proposal) never approves its own

@@ -31,6 +31,8 @@
  *   and AIMEAT_SHOT_PASSWORD are set; AIMEAT_SHOT_ENV names another env file.
  * @structure SETTINGS · ADMIN · SLOW_MS · arg · launchBrowser · readShow · loginFromEnvFile · main
  * @version-history
+ *   v1.5.1 — 2026-11-22 — A show entry's `detailOf` is removed: it called window._launcher, which only
+ *     the old /app-catalog.html defined, and no entry used it. `click` opens a detail view on /v1/appcat.
  *   v1.5.0 — 2026-10-12 — Visibility, aimeat-design-lab and Themes & Styles join the menu pages, and
  *     a show entry may name controls to press before the shutter (`click`, one Playwright selector
  *     or a list pressed in order): the catalogue at /v1/appcat opens an app's own page from the
@@ -95,8 +97,8 @@ const SLOW_MS: Record<string, number> = {
 };
 
 type Name = string | Record<string, string>;
-interface ShowEntry { id: string; name: Name; app?: string; url?: string; settle?: number; detailOf?: string; click?: string | string[]; line?: Name }
-interface Target { where: 'settings' | 'admin' | 'apps' | 'front'; id: string; url: string; settle: number; detailOf?: string; click?: string | string[]; file?: string }
+interface ShowEntry { id: string; name: Name; app?: string; url?: string; settle?: number; click?: string | string[]; line?: Name }
+interface Target { where: 'settings' | 'admin' | 'apps' | 'front'; id: string; url: string; settle: number; click?: string | string[]; file?: string }
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -185,7 +187,7 @@ async function main(): Promise<void> {
     ...show.filter((e) => keep('apps', e.id)).map((e) => ({
       where: 'apps' as const, id: e.id,
       url: e.url ? (e.url.startsWith('http') ? e.url : `${base}${e.url}`) : appUrl(e.app as string),
-      settle: Math.max(settle, Number(e.settle) || 0), detailOf: e.detailOf, click: e.click,
+      settle: Math.max(settle, Number(e.settle) || 0), click: e.click,
     })),
     // The front page itself, for the last frame of "ten seconds under the hood": one level up from
     // the projector's folder, because it is not a slide of the projector.
@@ -230,16 +232,6 @@ async function main(): Promise<void> {
       try {
         await tab.goto(tgt.url, { waitUntil: 'load', timeout: 60_000 });
         await tab.waitForTimeout(tgt.settle);
-        if (tgt.detailOf) {
-          // The catalogue's details view has no address of its own; open it the way a row's ⋯ does.
-          const slash = tgt.detailOf.indexOf('/');
-          // Runs in the page; `globalThis` there is the window, and this file has no DOM types.
-          await tab.evaluate(([owner, filename]) => {
-            const launcher = (globalThis as unknown as { _launcher?: { openPublishedDetail?: (o: string, f: string, l: string, v: number) => void } })._launcher;
-            launcher?.openPublishedDetail?.(owner, filename, '', 0);
-          }, [tgt.detailOf.slice(0, slash), tgt.detailOf.slice(slash + 1)]);
-          await tab.waitForTimeout(Math.max(4_000, Math.floor(tgt.settle / 2)));
-        }
         // A view with no address of its own on a page of the SPA: press the controls that open it,
         // in order (a catalogue row first, then its Details button).
         for (const sel of tgt.click ? [tgt.click].flat() : []) {

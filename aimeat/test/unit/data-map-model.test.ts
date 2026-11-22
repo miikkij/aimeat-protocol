@@ -2,37 +2,25 @@
  * @file test/unit/data-map-model.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The data map's vocabulary: the two copies say the same thing, and the one check that
- *   pays for the whole feature actually fires.
+ * @description The data map's vocabulary, and the one check that pays for the whole feature actually
+ *   fires.
  *
  *   THE CONTRADICTION TEST IS THE POINT. An app that says several people share it, whose every row
  *   lands in one person's own memory, is the defect this exists to catch — four separate bugs in one
  *   CRM that were all the same bug. If that assertion ever goes green by accident, the map is
  *   decoration.
  * @version-history
+ *   v2.2.0 — 2026-11-22 — The byte-identical check against the old app catalogue's copy
+ *     (src/static/app-catalog/js/data-map-model.js) goes with that copy; one model file is left.
  *   v2.1.0 — 2026-11-01 — A static page that reads files somebody else writes is no contradiction, on
  *     both the page's copy and the server's check (WP10e C3).
  *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   labelKeyFor, orderRows, contradictionOf, placesOf, stateOf, VALUES, DATA_MAP_SPEC,
 } from '../../public/components/data-map/model.js';
 import { checkMap } from '../../src/services/data-map/data-map-check.js';
-
-const ROOT = join(import.meta.dirname, '../..');
-
-describe('the two copies of the model are the same file', () => {
-  it('the catalogue copy is byte-identical to the shared one', () => {
-    const shared = readFileSync(join(ROOT, 'public/components/data-map/model.js'));
-    const copy = readFileSync(join(ROOT, 'src/static/app-catalog/js/data-map-model.js'));
-    // Byte-identical, not "equivalent": the catalogue is a separate bundle with no import path back
-    // here, so a copy that drifts is two vocabularies telling a reader different things.
-    expect(copy.equals(shared)).toBe(true);
-  });
-});
 
 describe('labelKeyFor', () => {
   it('maps a known value to its key', () => {

@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.40.1 -- 2026-11-22 -- The @app-catalog range markers go with the build that read them (scripts/build-app-catalog.ts, removed with /app-catalog.html). The rules between them stay unchanged.
  *   v1.40.0 -- 2026-10-25 -- Library sizes (Jouni): the Status reads --text-2xs (11px, was .66rem, 10.6px); on a touch screen the action link and the tab take the finger in an area 44px high around their words, with no change to their look. Outside the app-catalog ranges.
  *   v1.39.0 -- 2026-10-21 -- .poster-action--control (Action `control`): the action link in a box as tall as the control cut, a touch target. Additive, outside the app-catalog ranges.
  *   v1.38.0 -- 2026-10-06 --.store-soon-ask ("Opens soon" pressed for the discount code, in the control's own shape) and .store-soon-code (the code in an ink frame with its copy button and when to use it). Additive: nothing carries them unless site.store_soon_code is set.
@@ -97,9 +98,6 @@
 /* A label on a line of its own (components/Mark.js Label `block`). */
 .poster-label--block { display: block; }
 
-/* @app-catalog:begin — the app catalog's build (scripts/build-app-catalog.ts) copies every range
-   between these markers into its page, so its dialogs draw the action link and the loud action from
-   these rules rather than from a copy. The tokens the ranges read are on that script's list. */
 /* Lifted from the home's ink-underlined action (formerly home.css .koti-link), including the unselected tab. */
 .poster-action, .poster-tab {
   display: inline-flex; align-items: center; gap: .4rem;
@@ -115,7 +113,6 @@
 /* An action that cannot be pressed yet is dimmed and does not answer the pointer (Jouni's decision
    "Step button"; the dimming is the control slab's). */
 .poster-action:disabled { opacity: 0.45; cursor: default; border-color: var(--shape-rule-colour); color: var(--text); }
-/* @app-catalog:end */
 /* The source's later on-sun correction keeps selected words ink in both themes. */
 .poster-tab.is-on { background: var(--sun); color: var(--on-sun); text-decoration: none; padding: .2rem .5rem; }
 /* A tab that cannot be chosen now (the page is saving, or it counts nothing) is dimmed like the
@@ -245,7 +242,6 @@
 }
 .poster-tab--glyph:hover, .poster-tab--glyph.is-on { border-color: var(--text); background: var(--sun); color: var(--on-sun); padding: 0; }
 
-/* @app-catalog:begin */
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
 .poster-slab {
   background: var(--text); color: var(--bg);
@@ -273,7 +269,6 @@
    with an ink shadow, in the values the dialog's footer gave .btn-danger-solid. */
 .poster-slab--danger { background: var(--accent); color: #fff; box-shadow: 4px 4px 0 var(--text); }
 .poster-slab--danger:hover { color: #fff; box-shadow: 2px 2px 0 var(--text); }
-/* @app-catalog:end */
 /* The loud action's words after its sign (Loud mark, appcat): on a phone the sign alone stands and
    the words stay for a screen reader (the old catalogue's "+ Create an app", 44px square). */
 @media (max-width: 900px) {

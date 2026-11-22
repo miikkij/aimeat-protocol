@@ -25,8 +25,7 @@ Settings & Controls page writes no class at all: it calls the components (`compo
 and a component draws only its own class names and the `poster.css` shapes below. The admin pages
 (since 2026-09-27) and appcat, the app catalogue rebuilt on the components at `/v1/appcat`, are
 drawn the same way; where the old app catalogue drew a thing in its own way, that look is a named
-option of the component reading the tokens (and `poster.css` holds its tones outside the
-`@app-catalog` ranges, which the old catalogue's build copies), so a theme reaches it too.
+option of the component reading the tokens, so a theme reaches it too.
 
 Type and colour tokens live in `aimeat/public/css/theme.css`, and nothing else does:
 `pnpm check:theme-tokens` refuses a rule there that is not a custom property. Font sizes and

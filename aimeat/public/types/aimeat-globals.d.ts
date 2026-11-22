@@ -9,6 +9,8 @@
  *   or "property does not exist" noise. It declares no runtime — types only.
  * @usage  Picked up automatically by tsconfig.frontend.json via its d.ts include glob.
  * @version-history
+ *   v1.1.1 — 2026-11-22 — Comment only: __APP_ORIGIN_ENABLED is injected into spa.html alone; the old
+ *     app-catalog.html is removed.
  *   v1.1.0 — 2026-10-18 — window.__BUILD_ID, the shell's build for the build watch.
  *   v1.0.0 — 2026-06-19 — Initial ambient declarations for frontend type-checking
  */
@@ -40,7 +42,7 @@ declare global {
     __B?: any;
     /** H-2: true when the node serves apps from a separate app origin — set the launchers to
      *  open published apps top-level (apex inline URL 301s to apps.<domain>) instead of the
-     *  opaque-sandbox iframe. Injected into spa.html / app-catalog.html by the server. */
+     *  opaque-sandbox iframe. Injected into spa.html by the server (routes/portal-spa.ts). */
     __APP_ORIGIN_ENABLED?: boolean;
     /** The build the shell was served with (routes/portal-spa.ts); live-updates.js watchBuild compares the stream's hello with it. */
     __BUILD_ID?: string;

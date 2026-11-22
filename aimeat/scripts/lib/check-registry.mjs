@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-22: check:app-catalog leaves FAST_CHECKS with the old /app-catalog.html and its build script.
  *  - 2026-11-21: check:single-entry reads public/ too and holds eight silent-drop rules (docs/pitfalls.md §9, 76 and 79 deleted; §12, 58, 81, 107 and 124 shrunk); check:field-reach reports a connector or CLI parameter no route reads (`unread:`, §44 shrunk).
  *  - 2026-11-21: check:scope-words, a scope word added to an MCP tool or REST route that already exists needs a keep-working step new in the same change, or a written reason (docs/pitfalls.md §119, now deleted).
  *  - 2026-11-21: check:overrides, a dependency override's value stays inside one major (docs/pitfalls.md §59, now deleted).
@@ -82,7 +83,6 @@ export const FAST_CHECKS = [
     { script: 'check:it-adoption', label: 'Every page of the IT adoption package was read against the code it describes, that code has not changed since, and the settings and tools it names exist' },
     { script: 'check:feature-reach', label: 'Every MCP tool, served library and seeded package is named in the feature list, the capability list an AI reads' },
     { script: 'check:feature-list', label: 'Every section of the feature list was read against the code it describes, that code has not changed since, and every promise of a refusal or a limit is held by a test' },
-    { script: 'check:app-catalog', label: 'app-catalog.html ↔ sources in sync' },
     { script: 'check:everything', label: 'everything.json ↔ docs/AIMEAT-Feature-List.md in sync' },
     { script: 'check:changelog', label: 'Landing change log parses + newest first' },
     { script: 'check:sdk', label: 'SDK-libs dist ↔ sources in sync' },

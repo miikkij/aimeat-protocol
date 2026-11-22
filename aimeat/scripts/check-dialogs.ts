@@ -3,19 +3,21 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The site has one dialog: public/css/components/dialog.css for the look, public/js/dialog.js for
- *   the closing rules, components/Modal.js for the SPA and src/static/app-catalog/js/dialogs.js for
- *   the catalog. Until 2026-09-13 the SPA and the catalog carried more than twenty hand-rolled
- *   overlays, each with its own frame, X, width, phone behaviour and way of scrolling, and every
- *   overflow fix had to be made again in each. This gate refuses a new one.
+ *   the closing rules and components/Modal.js for the SPA. Until 2026-09-13 the SPA and the old app
+ *   catalog carried more than twenty hand-rolled overlays, each with its own frame, X, width, phone
+ *   behaviour and way of scrolling, and every overflow fix had to be made again in each. This gate
+ *   refuses a new one.
  *   What a hand-rolled dialog looks like, and what is refused in the SPA (public/views, components,
- *   js, css) and in the app catalog (src/static/app-catalog): a stylesheet rule whose selector names
- *   an overlay, backdrop or modal and sets position: fixed; a ::backdrop styled outside dialog.css;
- *   a .showModal() call; role="dialog" or aria-modal; a <dialog> without the dlg class. Comments are
- *   read past. The four files above are where these belong, and ALLOWED names the few that are
- *   something else with a reason each; an entry there is a decision, not a way around the gate.
- * @structure dialogFindings(file, source) → string[] · main() walks the two trees
+ *   js, css): a stylesheet rule whose selector names an overlay, backdrop or modal and sets
+ *   position: fixed; a ::backdrop styled outside dialog.css; a .showModal() call; role="dialog" or
+ *   aria-modal; a <dialog> without the dlg class. Comments are read past. The three files above are
+ *   where these belong, and ALLOWED names the few that are something else with a reason each; an
+ *   entry there is a decision, not a way around the gate.
+ * @structure dialogFindings(file, source) → string[] · main() walks the SPA's trees
  * @usage pnpm check:dialogs
  * @version-history
+ *   v1.1.0 — 2026-11-22 — src/static/app-catalog leaves the scanned trees and its dialogs.js the
+ *     homes: the old /app-catalog.html and its sources are removed.
  *   v1.0.2 — 2026-09-27 — overlay.css allowed: appcat's full-window page layer (the detail view and
  *     the app viewer), the same kind as app-sandbox.css.
  *   v1.0.1 — 2026-09-13 — Comment stripping repeats until it changes nothing: one pass can join
@@ -33,7 +35,6 @@ const HOMES = new Set([
   'public/css/components/dialog.css',
   'public/js/dialog.js',
   'public/components/Modal.js',
-  'src/static/app-catalog/js/dialogs.js',
 ]);
 
 /** Files that match a shape and are not a dialog, each with what it is instead. */
@@ -49,7 +50,6 @@ const SCAN = [
   { dir: 'public/components', ext: ['.js', '.css'] },
   { dir: 'public/js', ext: ['.js'] },
   { dir: 'public/css', ext: ['.css'] },
-  { dir: 'src/static/app-catalog', ext: ['.js', '.css', '.html'] },
 ];
 
 /**
@@ -144,7 +144,7 @@ function main(): void {
   console.log(`Dialogs: ${files.size} files read; ${findings.length} hand-rolled, ${allowedHits} in ${Object.keys(ALLOWED).length} allowed file(s).`);
   if (findings.length) {
     for (const line of findings) console.error(line);
-    console.error('Use the one dialog: <Modal> from /components/Modal.js in the SPA, a <dialog class="dlg"> opened with openDlg() in the app catalog.');
+    console.error('Use the one dialog: <Modal> from /components/Modal.js.');
     process.exitCode = 1;
   }
 }

@@ -20,6 +20,7 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   2026-11-22 — GET /app-catalog.html leaves the open routes with the old page.
  *   2026-11-06 — GET /index.html joins the open routes: a constant 301 to the front page (TARGET-091).
  *   2026-11-05 — The shell test opens /v1/provenance-open, where an AI label's record link goes.
  *   2026-11-04 — GET /v1/health/live and /v1/health/ready are open (HA stage 1). The route list is read
@@ -86,7 +87,7 @@ const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
  */
 const OPEN_CODE_ROUTES = new Set<string>([
     // The shell, its files and the operator's own pages (no content in this mode).
-    'GET /', 'GET /spa.html', 'GET /app-silent.html', 'GET /app-catalog.html', 'GET /everything', 'GET /start', 'GET /v1/portal', 'GET /v1/echat',
+    'GET /', 'GET /spa.html', 'GET /app-silent.html', 'GET /everything', 'GET /start', 'GET /v1/portal', 'GET /v1/echat',
     // A constant 301 to `/`, which a stranger already reaches (TARGET-091, 2026-11-06).
     'GET /index.html',
     'GET /v1/portfolio/{}', 'GET /v1/use-with-ai/{}/{}', 'GET /v1/dataset/{}/{}', 'GET /v1/connect', 'GET /v1/connect/{}', 'GET /v1/connect/install', 'GET /v1/connect/mcp.json',

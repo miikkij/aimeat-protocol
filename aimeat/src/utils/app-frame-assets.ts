@@ -18,6 +18,8 @@
  *   import { appFrameHostHtml } from '../utils/app-frame-assets.js';
  *   const html = appFrameHostHtml(); if (html) res.send(html);
  * @version-history
+ *   v1.2.1 — 2026-11-22 — Comment only: appcat's viewer.js imports app-frame-core.js; the old
+ *     catalogue's bundle is removed.
  *   v1.2.0 — 2026-10-16 — The page frame's support script (src/static/page-frame-shim.js), put in
  *     front of an HTML page the same way: pageFrameShimSource() · withPageFrameShim(html). The two
  *     share one insertion rule (insertFirst). The page frame's holder and its script.
@@ -64,7 +66,7 @@ export function appFrameHostScript(): string | null {
   return staticFile('app-frame.js');
 }
 
-/** The grant and consent module that script imports, served at /app-frame-core.js (the App Catalog bundles it). */
+/** The grant and consent module that script imports, served at /app-frame-core.js (appcat's viewer.js imports it too). */
 export function appFrameCoreScript(): string | null {
   return staticFile('app-frame-core.js');
 }

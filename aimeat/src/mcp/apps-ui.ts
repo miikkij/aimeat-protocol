@@ -19,7 +19,7 @@
  *      look identical from outside, an empty frame with no error anywhere, and neither is
  *      reproducible without a real host. The library is the only party that knows this dialect.
  *
- *   The node has no build step for browser assets outside the app-catalog, so the library's
+ *   The node has no build step for browser assets outside the served SDK libs, so the library's
  *   self-contained browser bundle is read from node_modules at boot and inlined into the page.
  *   That makes the page large (~350 kB) for one resource read per app-open, which is the price of
  *   not maintaining a second implementation of somebody else's protocol.
@@ -33,6 +33,7 @@
  *   import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta } from './apps-ui.js';
  *   registerAppIndexUi(mcp);
  * @version-history
+ *   2026-11-22 — Comment only: the app-catalog build is removed; the served SDK libs are the one build.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.1 — 2026-08-09 — A node that cannot build the page offers none, instead of throwing from
  *     the resource handler. Prod had not installed the new dependency yet, and the throw reached

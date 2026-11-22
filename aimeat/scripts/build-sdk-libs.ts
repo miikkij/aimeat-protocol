@@ -5,7 +5,7 @@
  * @description Build step for the served browser SDK libraries. Bundles each componentized,
  *   JSDoc-typed ESM source under src/static/sdk-libs/ (one entry per library, sharing _core/)
  *   with esbuild into a classic IIFE, and writes it to src/static/sdk-libs/dist/aimeat-<name>.js.
- *   These generated bundles are committed (same model as src/static/app-catalog.html) and served
+ *   These generated bundles are committed and served
  *   verbatim at /v1/libs/aimeat-<name>.js with a tiny per-node config prelude prepended at serve
  *   time — replacing the old "JavaScript authored inside a TypeScript template string" approach.
  * @structure
@@ -15,6 +15,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.17.1 - 2026-11-22 - Comment only: the removed src/static/app-catalog.html is no longer named.
  *   v1.17.0 - 2026-11-10 - Register aimeat-offline (an app opens and keeps working with no connection).
  *   v1.16.0 - 2026-11-01 - Register aimeat-parties (an app's users without an account; plan D4.2).
  *   v1.15.0 - 2026-10-05 - Register aimeat-validate (input checked against a JSON Schema).

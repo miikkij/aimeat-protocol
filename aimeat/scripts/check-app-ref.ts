@@ -26,6 +26,8 @@
  *   cd aimeat && pnpm check:app-ref          # the gate
  *   cd aimeat && pnpm check:app-ref --list   # every finding, allowed or not
  * @version-history
+ *   v1.0.1 — 2026-11-22 — The content-access-gate entry follows its pattern, which lost app-catalog
+ *     with the old /app-catalog.html.
  *   v1.0.0 — 2026-11-20 — Initial (wish-sovelluksen-nimi-ilman-html-p-tett-kaikkialla).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -97,7 +99,7 @@ export function compareWithAllowed(
  */
 export const ALLOWED: Record<string, Record<string, string>> = {
   'src/middleware/content-access-gate.ts': {
-    '/^\\/(spa|app-silent|app-catalog)\\.html$/': 'The node\'s own pages, real files under public/, not app names.',
+    '/^\\/(spa|app-silent)\\.html$/': 'The node\'s own pages, real files under public/, not app names.',
     '/^\\/(everything|start|index\\.html)$/': 'The node\'s own pages, real files under public/, not app names.',
     '/^\\/([^/]+\\/[^/]+\\.html?)?$/i': 'A URL test on the app host for a members-only node: only the .html path is opened without a session. Widening it to any two-segment path would open /v1/... there; the short /<owner>/<name> path asks for a sign-in on such a node, and the app\'s subdomain serves it.',
   },

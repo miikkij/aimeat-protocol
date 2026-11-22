@@ -29,7 +29,7 @@ number is never reused.
 
 ## The five shapes
 
-1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 64, 75, 84, 98, 107, 122
+1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §4, 5, 64, 75, 84, 98, 107, 122
 2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §17, 18, 21, 26, 37, 45, 50, 54, 123, 126
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 44, 58, 81, 124, 128
 4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 43
@@ -39,7 +39,7 @@ number is never reused.
 
 | § | What you see | Shape |
 |---|---|---|
-| 1 | ReferenceError on a click for a function that exists; an edit that does not take | 1 |
+| 1 | An edit that does not take | · |
 | 2 | 404 on a route that exists, or F5 404 on a SPA view | · |
 | 3 | A form that always 400s after a route gained a required field | 3 |
 | 4 | Stale open view while typing; spacing silently collapsed to zero | 1 |
@@ -83,10 +83,9 @@ number is never reused.
 ---
 
 ## 1. Build, bundling & generated files
-*Symptoms: "works locally but errors in the built file", a `ReferenceError` for a function that exists, edits that don't take effect.*
+*Symptoms: "works locally but errors in the built file", edits that don't take effect.*
 
-- **`ReferenceError: X is not defined` for a function that clearly exists (app-catalog).** The app-catalog is a **modular esbuild build** (`aimeat/src/static/app-catalog/js/*.js` → generated `app-catalog.html`). A function CALLED but not imported from its owning module is **not a build error** — esbuild treats the unknown name as a free global, so it only throws at runtime, on the click. → After editing any module, run a **missing-import audit** (static: "name called here, exported by another module, but not imported/injected/local" — first strip string literals + comments so `window._launcher.X(...)` onclick strings and comment mentions aren't false positives; exclude `.X(` method access) **and** click every interactive path in the browser.
-- **An edit seems to have no effect.** Three different reloads: a file under `public/` is served `no-cache` with an ETag, so F5 is enough; a served SDK lib (`src/static/sdk-libs/`) and `app-catalog.html` are BUILT, so they need `pnpm build:sdk` / `pnpm build:app-catalog` first; a backend `src/` change needs a `pnpm dev` restart, because the dev server does not watch it. `pnpm dev` is not a full watcher: the rest of `src/static/*` is served fresh on F5, like `public/*`.
+- **An edit seems to have no effect.** Three different reloads: a file under `public/` is served `no-cache` with an ETag, so F5 is enough; a served SDK lib (`src/static/sdk-libs/`) is BUILT, so it needs `pnpm build:sdk` first; a backend `src/` change needs a `pnpm dev` restart, because the dev server does not watch it. `pnpm dev` is not a full watcher: the rest of `src/static/*` is served fresh on F5, like `public/*`.
 
 ## 2. Routing (Express + SPA)
 *Symptoms: 404 on a route that exists, F5 → 404 on a SPA view.*
@@ -97,7 +96,7 @@ number is never reused.
 ## 3. Frontend ↔ backend contract drift
 *Symptoms: a form that always 400s.*
 
-- **A backend `required` field silently 400s the forms that don't send it.** → When a route gains a required field, **grep for EVERY client form/service that POSTs there** — there are often several (e.g. the app-catalog publish modal `src/static/app-catalog/js/server-io.js` AND the Profile form `public/views/profile/apps-tab.js` + `public/js/services/apps.js`).
+- **A backend `required` field silently 400s the forms that don't send it.** → When a route gains a required field, **grep for EVERY client form/service that POSTs there** — there are often several (e.g. the App Catalog's dialogs under `public/views/appcat/dialogs/` AND the Profile form `public/views/profile/apps-tab.js` + `public/js/services/apps.js`).
 
 ## 4. Frontend rendering, cache & modules
 *Symptoms: stale data after an update, an edit that "didn't take" until reload, spacing that collapsed to zero.*
@@ -132,7 +131,7 @@ number is never reused.
 ## 12. Deploy, release & node-hosted apps
 *Symptoms: "I fixed it but prod still shows the bug", a child process that fails only under systemd.*
 
-- **Static node assets (`app-catalog.html`, the `public/` SPA, locales) reach prod only via a NODE redeploy** — there is NO per-file MCP shortcut for them, unlike a published app. A committed fix to these is live on `main` but not on prod until the node is redeployed.
+- **Static node assets (the `public/` SPA, `src/static/`, locales) reach prod only via a NODE redeploy** — there is NO per-file MCP shortcut for them, unlike a published app. A committed fix to these is live on `main` but not on prod until the node is redeployed.
 - **A child process under systemd** inherits the unit's `LD_PRELOAD`, `MALLOC_CONF` and `NODE_OPTIONS`: `pnpm check:single-entry` rule `child-env` lists every server-side spawn with the environment it gives, and its message says what the unit does. When something works from your terminal and fails under the unit, diff the environment first (`systemctl show aimeat -p Environment`).
 
 ## 13. Concurrency & worktrees
@@ -355,7 +354,7 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 *Symptoms: a document in a frame without its own origin shows its markup and nothing it loads: no picture, stylesheet, script or font. The browser console says `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin`. Every E2E test of the same files answers 200.*
 
 - **The case.** The page host (`aimeat/src/routes/page-host.ts`, `common()`) sent `Cross-Origin-Resource-Policy: same-origin` on every response, a page's own files included. A page runs under the CSP `sandbox allow-scripts allow-forms allow-modals` (`pageFrameCsp` in `aimeat/src/services/html-page.ts`), so its origin is opaque, and no response is same-origin to an opaque origin, not even one from the host that served the page. On aimeat.io every HTML page lost every file it loaded. `aimeat/test/e2e-html-pages.ts` asked for the files from Node, which applies no CORP, and saw 200; the earlier browser check of the frame loaded no page file. Fixed in 32b50a091: a page file answers CORP `cross-origin` and `Access-Control-Allow-Origin: *` (a font loads in cors mode, the opaque origin sends `Origin: null`, and the request carries no credentials).
-- **The rule.** A response that a document without its own origin loads carries CORP `cross-origin` or no CORP header, and a font or a `fetch` also needs CORS that admits `Origin: null`. The node has more such frames than the page host: the `sandbox` frames without `allow-same-origin` in `aimeat/public/views/portfolio.js`, `aimeat/public/views/portfolio/builder.js`, `aimeat/public/components/PagePreview.js`, `aimeat/public/views/appcat/viewer.js` and the app catalog's `#app-iframe` (`aimeat/src/static/app-catalog/_template.html`). They load from routes that send no CORP today, or `cross-origin` (`/v1/pub` in `aimeat/src/routes/storage-files.ts`), so a header hardening that adds CORP `same-origin` to every response (helmet's default) breaks all of them at once. Check that the files load in a real browser inside the real frame, and assert the headers in the suite, because a status check cannot see the block.
+- **The rule.** A response that a document without its own origin loads carries CORP `cross-origin` or no CORP header, and a font or a `fetch` also needs CORS that admits `Origin: null`. The node has more such frames than the page host: the `sandbox` frames without `allow-same-origin` in `aimeat/public/views/portfolio.js`, `aimeat/public/views/portfolio/builder.js`, `aimeat/public/components/PagePreview.js` and `aimeat/public/views/appcat/viewer.js`. They load from routes that send no CORP today, or `cross-origin` (`/v1/pub` in `aimeat/src/routes/storage-files.ts`), so a header hardening that adds CORP `same-origin` to every response (helmet's default) breaks all of them at once. Check that the files load in a real browser inside the real frame, and assert the headers in the suite, because a status check cannot see the block.
 - **The tell.** A test of a file that a sandboxed frame loads, which asserts the status and no header.
 
 ## 124. Signed in, and a page, picture, link or stream answers 401 on a signed-in-only node

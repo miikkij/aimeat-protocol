@@ -29,6 +29,7 @@
  *   node scripts/check-signed-in-browser.mjs --signed-out      # a stranger
  *   node scripts/check-signed-in-browser.mjs --json out.json   # every finding, for a diff of two runs
  * @version-history
+ *   v1.0.1 — 2026-11-22 — /app-catalog.html leaves the page list: the old page is removed.
  *   v1.0.0 — 2026-10-19 — Initial (the signed-in browser audit).
  */
 import { createRequire } from 'node:module';
@@ -63,7 +64,7 @@ function installedShell() {
 async function pages() {
   const list = [
     '/', '/v1/portal', '/v1/home', '/v1/home?agents=1', '/v1/home?computers=1', '/v1/home?history=1', '/v1/home?new-agent=1',
-    '/v1/profile', '/v1/chat', '/v1/fleet', '/v1/members', '/v1/admin', '/v1/admin/ui', '/v1/appcat', '/app-catalog.html', '/v1/app-store',
+    '/v1/profile', '/v1/chat', '/v1/fleet', '/v1/members', '/v1/admin', '/v1/admin/ui', '/v1/appcat', '/v1/app-store',
     '/v1/help', '/v1/aimeat-os', '/v1/classic', '/v1/how-it-works', '/v1/changelog', '/v1/everything', '/v1/glossary', '/v1/business',
     '/v1/transparency', '/v1/connect-your-ai', '/v1/how-an-app-builds', '/v1/portfolio', `/v1/portfolio/${owner.name}`,
     '/v1/publicknowledgeviewer', '/v1/connect', '/v1/spec', '/v1/docs', '/v1/echat',

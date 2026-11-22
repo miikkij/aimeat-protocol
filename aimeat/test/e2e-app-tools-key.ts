@@ -1,6 +1,6 @@
 /**
  * @file test/e2e-app-tools-key.ts
- * @description A tool published over MCP for an app shows in both app catalogues and can be called.
+ * @description A tool published over MCP for an app shows in the app catalogue and can be called.
  *
  *   WHY THIS SUITE EXISTS. aimeat_app_tools_publish wrote `apps.{app_id}.tools` with whatever id it
  *   was given, while the old catalogue (/app-catalog.html) and appcat (/v1/appcat) read the owner's
@@ -8,16 +8,18 @@
  *   `ai-slop-detector`, and no catalogue showed them. The key is now decided once, in the shared
  *   memory write (services/app/tools-key.ts), so every door lands the manifest under the filename.
  *
- *   WHAT A CATALOGUE READS. Both pages read `GET /v1/memory/apps.{filename}.tools` as the owner
- *   (public/views/appcat/sections/tools-manifest.js, src/static/app-catalog/). That exact read is
+ *   WHAT A CATALOGUE READS. appcat reads `GET /v1/memory/apps.{filename}.tools` as the owner
+ *   (public/views/appcat/sections/tools-manifest.js). That exact read is
  *   what this suite asserts, together with the call through aimeat_app_tool_invoke.
  * @structure
  *   - Phase 1: fixtures (the seller, who is the operator on the runner's empty database, an extension
  *     whose action the tool calls, the published app, the aggregate that registers the action)
- *   - Phase 2: the happy path (publish without the extension, both catalogue reads, the call)
+ *   - Phase 2: the happy path (publish without the extension, the catalogue read, the call)
  *   - Phase 3: the other doors and the refusals (REST, an id that names no app, another owner)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tools-key
  * @version-history
+ *   v1.1.1 — 2026-11-22 — Comment only: the old catalogue at /app-catalog.html is removed; appcat is
+ *     the one reader. The assertions are unchanged.
  *   v1.1.0 — 2026-11-20 — Test 8 asserted that an invoke by the name without `.html` is refused; that
  *     was the old design. A caller may now name the app without it (services/app/app-ref.ts,
  *     wish-sovelluksen-nimi-ilman-html-p-tett-kaikkialla), so 8 asserts the call goes through and 8b

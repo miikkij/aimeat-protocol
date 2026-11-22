@@ -57,6 +57,8 @@
  * @usage
  *   await removeAppLeftovers(storage, config, { ownerName, ownerGhii, filename, buckets: [app.ownerGaii] });
  * @version-history
+ *   v1.1.4 — 2026-11-22 — Comment only: the checkpoint slug's source is appcat's workcopy.js; the old
+ *     catalogue's copy is removed. The record key app-catalog.wc.<slug> is unchanged.
  *   v1.1.3 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
  *     of a regex of this file's own; no change in behaviour.
  *   v1.1.2 — 2026-11-19 — The grants and push devices steps remove by app id in storage
@@ -148,7 +150,7 @@ async function refsOf(storage: Storage, owner: string | null, key: string, child
   return rows.filter(r => (owner === null || r.ownerGaii === owner) && (r.key === key || (children && r.key.startsWith(`${key}.`))));
 }
 
-/** The App Catalog's checkpoint slug (src/static/app-catalog/js/workcopy.js slugFor), written in one place there. */
+/** The App Catalog's checkpoint slug (public/views/appcat/workcopy.js slugFor), written in one place there. */
 function catalogSlug(owner: string, filename: string): string {
   return `${owner}-${filename}`.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase().slice(0, 80);
 }

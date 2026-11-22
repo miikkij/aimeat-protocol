@@ -15,7 +15,7 @@
  *     - src/ and public/ outside src/static: the three original shapes at zero (eslint.config.js has
  *       the rule at `error` there), the fourth (substitute) per file against
  *       security/silent-catch-substitutes.json.
- *     - src/static (the served SDK libs, the app-catalog bundle, the standalone scripts): all four
+ *     - src/static (the served SDK libs and the standalone scripts): all four
  *       shapes per file and per shape against security/silent-catch-static-baseline.json. The rule
  *       is not on in eslint.config.js there, so a disable directive in a linted src/static file reads
  *       as unused to the repo lint; fix the handler instead.
@@ -35,6 +35,8 @@
  *   cd aimeat && pnpm exec tsx scripts/check-silent-catch.ts --area src/storage --list
  *   cd aimeat && pnpm exec tsx scripts/check-silent-catch.ts --seed substitutes|static|exemptions
  * @version-history
+ *   v1.3.1 — 2026-11-22 — The app-catalog bundle leaves the src/static description and the ignore
+ *     list: the old /app-catalog.html and its sources are removed.
  *   v1.3.0 — 2026-10-16 — src/static is gated (W25 "An error is not an empty result"): all four shapes
  *     per file and per shape against security/silent-catch-static-baseline.json, seeded from that
  *     day's 408 findings. Exemptions are counted: every finding an eslint-disable directive suppresses
@@ -202,7 +204,7 @@ async function main(): Promise<void> {
         // Vendored/minified/generated bundles are not ours to clean.
         ignores: [
           '**/node_modules/**', '**/*.min.js', 'public/lib/**', 'public/cortex-bundled/**',
-          'src/static/sdk-libs/**/dist/**', 'src/static/app-catalog/dist/**', '**/dist/**',
+          'src/static/sdk-libs/**/dist/**', '**/dist/**',
         ],
       },
     ],
@@ -323,7 +325,7 @@ async function main(): Promise<void> {
     } else if (seedTarget === 'static') {
       const file: ShapeBaseline = {
         note: 'How many silent catch handlers of each shape (empty, absence, discards, substitute) each '
-          + 'file under src/static is allowed to hold: the served SDK libs, the app-catalog bundle and the '
+          + 'file under src/static is allowed to hold: the served SDK libs and the '
           + 'standalone scripts, which check:silent-catch reported and did not gate until 2026-10-16. '
           + 'Seeded that day from the state of the tree, with the developer\'s approval of the W25 '
           + 'acceptance criterion ("the silent-catch ratchet extends to src/static"), and NOT REVIEWED: '

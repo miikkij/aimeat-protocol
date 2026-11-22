@@ -7,6 +7,8 @@
  *   The findings function is pure, so every case is a string in and a list out.
  * @usage cd aimeat && pnpm exec vitest run test/unit/check-dialogs.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-22 — The sample paths name SPA files instead of the removed src/static/app-catalog
+ *     sources; the inputs and the expected findings are unchanged.
  *   v1.0.0 — 2026-09-13 — Initial, with the gate (wish "Yksi dialogikomponentti kaikille dialogeille").
  */
 import { describe, it, expect } from 'vitest';
@@ -45,9 +47,9 @@ describe('check:dialogs findings', () => {
 
   it('accepts the component shape: a <dialog class="dlg …"> and one built with the dlg class', () => {
     const html = '<dialog id="help-overlay" class="dlg modal dlg--md"><header class="dlg-head"></header></dialog>';
-    expect(dialogFindings('src/static/app-catalog/_template.html', html)).toEqual([]);
+    expect(dialogFindings('public/views/x.html', html)).toEqual([]);
     const js = "var d = document.createElement('dialog');\nd.className = 'dlg modal dlg--md';\nopenDlg(d);";
-    expect(dialogFindings('src/static/app-catalog/js/server-io.js', js)).toEqual([]);
+    expect(dialogFindings('public/js/x.js', js)).toEqual([]);
   });
 
   it('finds a <dialog> built without the dlg class', () => {
@@ -66,12 +68,12 @@ describe('check:dialogs findings', () => {
     // block comment below. The gate then reads the "comment" as code and reports a dialog nobody
     // wrote. CodeQL calls this js/incomplete-multi-character-sanitization (alert #1628).
     const html = '<!<!-- -->-- <div role="dialog"> --> <p>real</p>';
-    expect(dialogFindings('src/static/app-catalog/_template.html', html)).toEqual([]);
+    expect(dialogFindings('public/views/x.html', html)).toEqual([]);
     const js = '//**/* aria-modal was here */ var a = 1;';
     expect(dialogFindings('public/views/x.js', js)).toEqual([]);
   });
 
   it('a function named showModal is not a call on a <dialog>', () => {
-    expect(dialogFindings('src/static/app-catalog/js/apps-io.js', 'function showModal() { openDlg("modal-overlay"); }\nshowModal();')).toEqual([]);
+    expect(dialogFindings('public/js/x.js', 'function showModal() { openDlg("modal-overlay"); }\nshowModal();')).toEqual([]);
   });
 });

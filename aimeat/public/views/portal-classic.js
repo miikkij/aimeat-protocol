@@ -26,6 +26,8 @@
  *     "copied" tick comes from the shared t('common.copied') rather than a literal ✔.
  *   v1.2.1 — 2026-09-29 — The launcher's open link goes to /v1/appcat (Jouni). The download link
  *     still gives /app-catalog.html, the one file that works offline.
+ *   v1.2.2 — 2026-11-22 — The download link is removed with /app-catalog.html; the open link to
+ *     /v1/appcat stays.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -438,7 +440,6 @@ export default function PortalClassicView({ navigate }) {
         </div>
         <div class="cl-catalog-links">
           <a href="/v1/appcat" class="cl-launcher-cta">\u{1F680} ${ct('cards.launcher.openBtn')}</a>
-          <a href="/app-catalog.html" download="app-catalog.html" class="cl-launcher-cta secondary">\u{1F4E5} ${ct('cards.launcher.downloadBtn')}</a>
         </div>
         <div class="cl-return-section">
           <div class="cl-return-title">${ct('cards.apps.returnTitle')}</div>

@@ -12,14 +12,6 @@
 
 * text=auto eol=lf
 
-# The app-catalog page is built (esbuild) from the modular sources under
-# aimeat/src/static/app-catalog/ into a single artifact. These two lines pre-date the rule above and
-# are kept explicit: `pnpm check:app-catalog` compares the built artifact byte for byte, so its
-# inputs and output must round-trip identically whatever a contributor's core.autocrlf says. The
-# blanket rule now covers them, and naming them again costs nothing and survives a change to it.
-aimeat/src/static/app-catalog.html      text eol=lf
-aimeat/src/static/app-catalog/**        text eol=lf
-
 # Windows shells parse these by line and want CRLF on disk.
 *.bat  text eol=crlf
 *.cmd  text eol=crlf

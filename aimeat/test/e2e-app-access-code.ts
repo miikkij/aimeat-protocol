@@ -14,6 +14,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-access-code
  * @version-history
+ *   v1.4.1 — 2026-11-22 — The /app-catalog.html case goes with the old page; the /v1/appcat cases stay.
  *   v1.4.0 — 2026-11-15 — Phase 6: a version fork with the code in the body the catalogues send, and
  *     the browser-free part of the Fork button's code ask on /app-catalog.html and /v1/appcat (the
  *     dialog, the request field access_code, the words in en, fi and es). Failed before the change.
@@ -248,26 +249,14 @@ await test('An agent of the owner with app:write forks the owner\'s protected ap
     assert(r.status === 201 || r.status === 202, `owner's agent fork ${r.status}: ${JSON.stringify(r.body?.error)}`);
 });
 
-console.log('\nPhase 6: both app catalogues ask for the code on Fork and send it as access_code (M093 follow-up)');
+console.log('\nPhase 6: the app catalogue asks for the code on Fork and sends it as access_code (M093 follow-up)');
 
-await test('Another user forks one version with the code, in the body both catalogues send', async () => {
+await test('Another user forks one version with the code, in the body the catalogue sends', async () => {
     // The Fork button on a version row sends { new_filename, version, access_code }.
     const r = await forkAs(tokenB, 'coded-version-fork.html', { version: 1, access_code: CODE });
     // 201: a person's fork asks no publish approval (askedStatus answers 202 only then).
     assert(r.status === 201, `version fork with the code ${r.status}: ${JSON.stringify(r.body?.error)}`);
     assert(r.body?.data?.filename === 'coded-version-fork.html', `fork filename: ${JSON.stringify(r.body?.data)}`);
-});
-
-await test('The /app-catalog.html page carries the access-code dialog of its Fork and its words in en and fi', async () => {
-    const res = await fetch(`${BASE}/app-catalog.html`);
-    assert(res.status === 200, `/app-catalog.html ${res.status}`);
-    const page = await res.text();
-    for (const id of ['fork-code-overlay', 'fork-code-input', 'fork-code-status', 'forkCodeSubmit']) {
-        assert(page.includes(id), `the page lacks ${id}`);
-    }
-    for (const word of ['fork.codeAsk', 'fork.codeWrong', 'Koodi ei ole oikea']) {
-        assert(page.includes(word), `the page lacks the words ${word}`);
-    }
 });
 
 await test('The /v1/appcat fork dialog asks for the code and sends it as access_code', async () => {

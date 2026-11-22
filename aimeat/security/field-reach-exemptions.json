@@ -288,8 +288,6 @@
     "unrouted:src/middleware/input-junk.ts#2": "ANSWERED 2026-10-27. The same guard tests the raw query text for a NUL; it is no door's field.",
     "unrouted:src/middleware/input-junk.ts#3": "ANSWERED 2026-10-27. The guard's walk reads a body array's length to visit each item; no record field.",
     "unrouted:src/middleware/input-junk.ts#4": "ANSWERED 2026-10-27. The guard's walk reads a query array's length to visit each item; no record field.",
-    "unrouted:src/static/app-catalog/js/detail.js#1": "ANSWERED 2026-11-15. Browser code of the app catalogue, not a route: the Fork action reads the node's refusal (error.code ACCESS_DENIED) to ask for the access code and sends it as access_code to POST /v1/apps/:owner/:filename/fork, which the node MCP tool and the connector tool also take (E2E audit M093).",
-    "unrouted:src/static/app-catalog.html#1": "ANSWERED 2026-11-15. The built copy of src/static/app-catalog/js/detail.js (pnpm build:app-catalog); the same Fork access-code read, no route.",
     "unrouted:src/middleware/input-junk.ts#5": "ANSWERED 2026-10-27. On /v1/mcp the guard reads `jsonrpc` to answer a JSON-RPC error instead of a REST envelope; the protocol's envelope, not a record field.",
     "unrouted:src/middleware/input-junk.ts#6": "ANSWERED 2026-10-27. On /v1/mcp the guard reads the JSON-RPC `id` to answer the request it refuses; the protocol's envelope, not a record field.",
     "unnamed:src/models/validation-issues.ts#1": "ANSWERED 2026-10-27. validationDetails follows a Zod issue's path into the parsed input to tell a missing field from a wrong one; the path is whichever field the schema refused, and nothing is stored.",

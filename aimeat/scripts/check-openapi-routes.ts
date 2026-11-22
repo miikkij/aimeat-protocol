@@ -25,6 +25,7 @@
  * @structure norm · contractPairs · codePairs · NOT_API · DECLARED_ELSEWHERE · main
  * @usage pnpm check:openapi-routes   (add --list to print every pair the code declares)
  * @version-history
+ *   v1.0.10 — 2026-11-22 — GET /app-catalog.html leaves NOT_API: the route is removed.
  *   v1.0.9 — 2026-11-06 — GET /index.html is a redirect to the front page (TARGET-091).
  *   v1.0.8 — 2026-11-01 — GET /v1/dataset/{owner}/{name} is a page (the public dataset page, WP9b).
  *   v1.0.7 — 2026-11-01 — GET /sitemap-datasets.xml is answered as a static document, like the portfolio sitemap.
@@ -57,7 +58,6 @@ const REDIRECT = 'Only redirects a browser to a page.';
 const ASSET = 'A static file a browser or a crawler fetches (icon, script, manifest, robots, sitemap, ownership file).';
 /** Every answer below was decided by reading the handler, on 2026-09-18. */
 const NOT_API: Record<string, string> = {
-    'GET /app-catalog.html': PAGE,
     'GET /app-silent.html': PAGE,
     'GET /spa.html': PAGE,
     'GET /v1/admin/setup': PAGE,

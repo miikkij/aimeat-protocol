@@ -10,7 +10,7 @@
  *     - the substitute baseline (security/silent-catch-substitutes.json): the fourth shape in the
  *       areas where the other three are already at zero;
  *     - the src/static baseline (security/silent-catch-static-baseline.json): all four shapes, per
- *       shape, for the served SDK libs, the app-catalog bundle and the standalone scripts, which were
+ *       shape, for the served SDK libs and the standalone scripts, which were
  *       reported and not gated until 2026-10-16;
  *     - the exemption baseline (security/silent-catch-exemptions.json): how many findings an
  *       `eslint-disable… aimeat/no-silent-catch` directive suppresses in each file. An exemption is
@@ -23,6 +23,7 @@
  *   countExemptions()
  * @usage import { compareCeilings, compareShapeCeilings, countExemptions } from './lib/silent-catch-ratchet.js';
  * @version-history
+ *   v1.0.1 — 2026-11-22 — Comment only: the app-catalog bundle is removed from src/static.
  *   v1.0.0 — 2026-10-16 — Initial: src/static gated per shape and per file, exemptions counted and
  *     ratcheted, a reasonless exemption refused (W25 "An error is not an empty result").
  */

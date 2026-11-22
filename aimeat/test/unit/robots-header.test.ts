@@ -6,6 +6,7 @@
  *   "Discovered but not crawled" for five months (2026-09-30). The e2e suite
  *   e2e-seo-noindex.ts proves the same rules on a served node.
  * @version-history
+ *   v1.0.1 — 2026-11-22 — /app-catalog.html leaves the noindex list: the old page is removed.
  *   v1.0.0 — 2026-09-30 — Initial (wish-bing-noindex-kirjautumissivut-ja-konetiedostot)
  */
 import { describe, it, expect } from 'vitest';
@@ -63,7 +64,7 @@ describe('robotsTagFor: HTML pages on the apex', () => {
     '/v1/admin', '/v1/appcat', '/v1/chat', '/v1/home', '/v1/profile', '/v1/fleet', '/v1/aimeat-os',
     '/v1/classic', '/v1/portfolio', '/v1/start', '/v1/app-grant', '/v1/invite', '/v1/connect-your-ai',
     '/v1/publicworkspaceviewer', '/v1/design-lab/frame', '/v1/agents/verify', '/v1/oauth/consent',
-    '/v1/setup/wizard', '/v1/admin/setup', '/spa.html', '/app-catalog.html',
+    '/v1/setup/wizard', '/v1/admin/setup', '/spa.html',
   ])('the page %s, which is not a content page, is noindex but followed', (path) => {
     expect(on({ path })).toBe('noindex, follow');
   });

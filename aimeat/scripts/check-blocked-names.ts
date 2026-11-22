@@ -18,9 +18,8 @@
  *   matched; rename the file. A match that is right to keep goes into ALLOWED with its reason.
  *
  *   THE ADDRESSES. public/<path> is served at /<path>. The library bundles in
- *   src/static/sdk-libs/dist/ are served at /lib/<name> and /v1/libs/<name>, and the app catalogue's
- *   files under src/static/app-catalog/ at /app-catalog/<path>; both are checked under those
- *   addresses.
+ *   src/static/sdk-libs/dist/ are served at /lib/<name> and /v1/libs/<name>, and are checked under
+ *   those addresses.
  *
  *   OFFLINE. With no network and a cached copy, the cached copy is used whatever its age. With no
  *   network and no copy, the check says so and passes: a gate that fails on a network blip gets
@@ -31,6 +30,8 @@
  *   cd aimeat && pnpm check:blocked-names --url /components/Fingerprint.js   # ask about one address
  *   cd aimeat && pnpm check:blocked-names --refresh                          # fetch the lists now
  * @version-history
+ *   v1.0.2 — 2026-11-22 — src/static/app-catalog leaves the served files: the old app catalogue's
+ *     sources are removed.
  *   v1.0.1 — 2026-11-11 — The lists are fetched uncompressed: a gzip answer crashed undici, locally and on CI.
  *   v1.0.0 — 2026-11-10 — Initial.
  */
@@ -56,15 +57,12 @@ const ALLOWED: Record<string, string> = {};
 
 /** Every tracked file the node serves, with the addresses a browser asks for it at. */
 function servedFiles(): Array<{ file: string; urls: string[] }> {
-    const tracked = execFileSync('git', ['ls-files', 'public', 'src/static/sdk-libs/dist', 'src/static/app-catalog'], { cwd: ROOT, encoding: 'utf8' })
+    const tracked = execFileSync('git', ['ls-files', 'public', 'src/static/sdk-libs/dist'], { cwd: ROOT, encoding: 'utf8' })
         .split('\n').map((s) => s.trim()).filter(Boolean);
     return tracked.map((file) => {
         if (file.startsWith('public/')) return { file, urls: [`/${file.slice('public/'.length)}`] };
-        if (file.startsWith('src/static/sdk-libs/dist/')) {
-            const name = file.slice('src/static/sdk-libs/dist/'.length);
-            return { file, urls: [`/lib/${name}`, `/v1/libs/${name}`] };
-        }
-        return { file, urls: [`/app-catalog/${file.slice('src/static/app-catalog/'.length)}`] };
+        const name = file.slice('src/static/sdk-libs/dist/'.length);
+        return { file, urls: [`/lib/${name}`, `/v1/libs/${name}`] };
     });
 }
 

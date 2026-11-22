@@ -16,6 +16,7 @@
  * @structure SPA_PAGE_PATHS
  * @usage import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
  * @version-history
+ *   v1.3.1 — 2026-11-22 — Comment only: the old /app-catalog.html beside /v1/appcat is removed.
  *   v1.3.0 — 2026-11-14 — /v1/secret-pickup and /v1/secret-deposit, the pages a secret share's link and
  *     a secret request's link open (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   v1.2.0 — 2026-11-05 — /v1/provenance-open, the page an AI label's record link reaches on a
@@ -41,7 +42,7 @@ export const SPA_PAGE_PATHS: readonly string[] = [
   '/v1/members',
   '/v1/admin',
   // appcat, the app catalogue on the component library (2026-09-27). Registered here AND in
-  // spa.html's ROUTES; the old /app-catalog.html stays as it is.
+  // spa.html's ROUTES. The old /app-catalog.html it replaced is removed (2026-11-22).
   '/v1/appcat',
   // One app's structure and status (views/appcat/structure.js, 2026-10-29). Here AND in spa.html.
   '/v1/appcat/structure',

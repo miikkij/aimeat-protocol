@@ -13,6 +13,8 @@
  *   shown to refuse it as well, so no correction is looser than the route.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openapi-body-contract-client-bodies.test.ts
  * @version-history
+ *   v1.3.1 — 2026-11-22 — Comment only: the ODPS sample sender is appcat's odps-tool.js; the old
+ *     catalogue's odps.js is removed. Same body, same cases.
  *   v1.3.0 — 2026-11-15 — A work request's input and a delivery's output are JSON objects (decision of
  *     2026-11-15): the two cases that took any JSON value now take an object, and two new cases refuse
  *     text, a number, an array and null. The route changed with them, so the contract still follows it.
@@ -315,7 +317,7 @@ describe('POST /v1/capabilities/{id}/invoke (profile Capabilities tab, the try p
 });
 
 describe('POST /v1/ext/{extName}/{actionId} and the instance path (app catalogue ODPS sample, capability invoke)', () => {
-    // app-catalog/js/odps.js sends JSON.parse(the sample input box) as the whole body, so an owner who
+    // views/appcat/sections/odps-tool.js sends JSON.parse(the sample input box) as the whole body, so an owner who
     // types ["Oulu"] sends an array, and a capability over an extension forwards an array input the
     // same way. express.json (server.ts) parses objects and arrays, and routes/extensions/actions.ts
     // runAction passes req.body to the action unchecked, so the action runs with the array.

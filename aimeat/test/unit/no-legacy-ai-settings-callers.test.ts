@@ -26,6 +26,8 @@
  *   LEGACY_FIRST, and the file must show it handles the 410 (handlesLegacyGone).
  * @usage cd aimeat && pnpm exec vitest run test/unit/no-legacy-ai-settings-callers.test.ts
  * @version-history
+ *   v1.3.0 — 2026-11-22 — The old app catalogue's detail.js and its built page leave ALLOWED: both
+ *     files are removed with /app-catalog.html.
  *   v1.2.0 — 2026-10-13 — The desktop app's ai_connector.rs leaves ALLOWED: it reads and saves the
  *     connection through GET /v1/ai/providers and PUT /v1/ai/providers/custom (cargo test, GNU toolchain).
  *   v1.1.0 — 2026-10-13 — LEGACY_FIRST: the AI page, the calibrator, the inbox voice hook, the app
@@ -53,7 +55,7 @@ const NOT_CALLERS = new Set(['aimeat/src/routes/openrouter.ts']);
  * answers 410 GONE, so a node where the routes still answer (3.x) sees exactly the calls it saw
  * before 2026-10-12 (ruled for the 4.0.0 sweep on 2026-10-13). Such a file must show that it handles
  * the 410: it calls legacyOr() from public/js/services/ai-connection.js, or, in a bundle that does
- * not load public/js (the old app catalogue), it tests a response's status against 410 itself.
+ * not load public/js, it tests a response's status against 410 itself.
  */
 const LEGACY_FIRST = 'legacy route first, provider path on 410 (3.x unchanged)';
 
@@ -67,9 +69,6 @@ const ALLOWED: Record<string, string> = {
     'aimeat/public/views/profile/inbox-tab/use-voice.js': LEGACY_FIRST,
     'aimeat/public/views/appcat/ai-calls.js': LEGACY_FIRST,
     'aimeat/public/js/services/offers.js': LEGACY_FIRST,
-    'aimeat/src/static/app-catalog/js/detail.js': LEGACY_FIRST,
-    // The old catalogue's built page: detail.js above, bundled by scripts/build-app-catalog.ts.
-    'aimeat/src/static/app-catalog.html': LEGACY_FIRST,
 };
 
 const SKIP_DIRS = new Set(['node_modules', 'target', 'vendor']);
@@ -89,7 +88,7 @@ function filesUnder(dir: string, out: string[] = []): string[] {
 /**
  * The files git tracks under a root, or every file under it when git cannot answer (a tarball).
  * Tracked only: a build directory left in a checkout (the desktop app's src-tauri/target) is not
- * what ships. A tracked build output is read: app-catalog.html and the SDK's dist are served.
+ * what ships. A tracked build output is read: the SDK's dist is served.
  */
 function trackedUnder(root: string): string[] {
     const all = filesUnder(join(REPO, root));

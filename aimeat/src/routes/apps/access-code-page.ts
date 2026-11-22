@@ -9,6 +9,8 @@
  * @structure accessCodeUnlockPage(req, wrongCode, nonce?)
  * @usage res.type('html').send(accessCodeUnlockPage(req, wrongCode, res.locals.cspNonce));
  * @version-history
+ *   v1.0.1 — 2026-11-22 — Comment only: the old catalogue's secret-field.js is removed; the page
+ *     carries its own copy of the eye and read nothing from that file.
  *   v1.0.0 — 2026-10-25 — Moved unchanged from routes/apps/read.ts (max-file-lines). Its history up to
  *     here is read.ts v1.4.0 (2026-08-07, the unlock page) and v1.11.0 (2026-09-26, the hidden field
  *     with the eye).
@@ -22,7 +24,7 @@ import { escapeHtml } from '../../utils/html-escape.js';
  * Accept-Language; `wrongCode` distinguishes a bad code from a missing one.
  *
  * The code is typed hidden, and an eye inside the field shows and hides it (Jouni, 2026-09-26),
- * the same control the App Catalog uses for the code (app-catalog/js/secret-field.js). The eye needs
+ * the same control the old App Catalog used for the code. The eye needs
  * a few lines of script, which run under the response's CSP nonce; without a nonce the page leaves
  * the eye out and the field simply stays hidden.
  */

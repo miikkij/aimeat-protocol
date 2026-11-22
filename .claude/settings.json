@@ -37,7 +37,6 @@
       "Read(./**/aimeat/public/lib/daisyui@*.css)",
       "Read(./**/aimeat/public/lib/tailwindcss@*.js)",
       "Read(./**/src/static/sdk-libs/dist/**/*)",
-      "Read(./**/src/static/app-catalog.html)",
       "Read(./**/THIRD-PARTY-NOTICES.md)",
       "Read(./**/pnpm-lock.yaml)",
       "Read(./**/uv.lock)",

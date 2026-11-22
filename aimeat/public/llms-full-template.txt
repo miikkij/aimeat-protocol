@@ -421,7 +421,7 @@ a call — the app becomes a seller on the same commerce core (TARGET-034):
    `ext:my-extension:summarize`) for a synchronous call; a tool WITHOUT it is
    fulfilled as an agent TASK instead — assigned to the manifest `agent` (bare
    name of the owner's agent), or to the owner themselves when none is named.
-   The app owner edits all of this in the app-catalog Detail view → Monetize.
+   The app owner edits all of this in the App Catalog (/v1/appcat): the app's page → Monetize.
 2. **Discover:** anyone reads it — browser: `await
    AIMEAT.commerce.getAppTools(ownerGhii, appId)`; agent/REST:
    `GET /v1/memory/{ownerGhii}/apps.{appId}.tools` (public, no auth). Priced

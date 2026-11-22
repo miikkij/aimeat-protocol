@@ -13,10 +13,10 @@
  *   its content up to the full height; the header and footer stay put while the body scrolls, the
  *   footer clears the home indicator, and with interactive-widget=resizes-content in the viewport
  *   the on-screen keyboard shortens the sheet instead of covering the footer.
- *   Behaviour is public/js/dialog.js; the Preact component is components/Modal.js. The app catalog
- *   gets this file copied into its page at build time (scripts/build-app-catalog.ts).
+ *   Behaviour is public/js/dialog.js; the Preact component is components/Modal.js.
  * @structure frame · header and X · body · footer and its actions · sizes · phone
  * @version-history
+ *   v1.4.2 — 2026-11-22 — Comment only: the old app catalog's build, which copied this file, is removed.
  *   v1.4.1 — 2026-11-21 — The root sets the body's font size, weight, style, letter spacing, case and
  *     alignment, so a dialog called inside a label or a heading no longer takes its text styles.
  *   v1.4.0 — 2026-09-24 — The frame, corner, shadow, title case and footer rule read the theme's shape
