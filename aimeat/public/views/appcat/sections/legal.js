@@ -8,7 +8,7 @@
  *   or HTML, or linked to where it already lives, and served at /terms, /privacy and so on under the
  *   app's own address. An aside says the server's readiness reason and how many pages are missing;
  *   then one row per kind in a fixed order: its name, "Recommended" when the server recommends it, its
- *   state (format and date with "Open →", "Missing" in coral, or "Not written"), the server's why, and
+ *   state (format and date with "Open →", "Missing" in coral, or "Not written"), why the page exists, and
  *   Write or Edit and Remove. The editor opens inside the row. Writes are PATCH /v1/apps/{filename}
  *   { legal: { kind: { format, content } | null } }; after one the legal state and the audit log are
  *   read again (legal-state.js), which also redraws the masthead's chip.
@@ -19,6 +19,9 @@
  * @structure meta · LegalSection({ d }) · Editor({ d, kind, doc, isNew, busy, onSave, onCancel })
  * @usage const mod = await import('./sections/legal.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.2.0 — 2026-11-22 — The readiness reason and each kind's why come from the locale
+ *     (appcat.legal.reason.*, appcat.legal.why.*): the server sends them in English, and a Finnish or
+ *     Spanish page showed them untranslated.
  *   v1.1.0 — 2026-09-27 — Parity with the old page (sections-c): the rows as .lg-row (List tone pages),
  *     the recommendation as the heavy tag, the state as typewriter words, "Open →" as the ink word, the
  *     editor as .lg-editor (Fields plain column, TextArea page, no autofocus), the aside and the grey
@@ -108,8 +111,10 @@ export default function LegalSection({ d }) {
   const r = data.readiness || { missing: [], recommended: [], reason: '' };
   const missing = r.missing || [];
   const recommended = r.recommended || [];
+  // The server's `reason` and each kind's `why` are English; the page says them in its own language.
+  // The server recommends the four sale pages only for an app that sells, so that list names the reason.
+  const reason = r.reason ? x(recommended.includes('refunds') ? 'legal.reason.sells' : 'legal.reason.basic') : '';
   const rows = KINDS.map((kind) => {
-    const info = (data.kinds && data.kinds[kind]) || { why: '' };
     const page = data.legal && data.legal[kind];
     const link = (data.links || []).find((l) => l.kind === kind) || null;
     let state;
@@ -125,7 +130,7 @@ export default function LegalSection({ d }) {
     const doc = (data.documents && data.documents[kind]) || null;
     return html`<${Row} key=${kind} below=${open ? html`<${Editor} kind=${kind} doc=${doc} isNew=${!page} busy=${busy}
         onSave=${(f, c) => save(kind, f, c)} onCancel=${() => setEditing(null)} />` : null}>
-      <${Name} tag=${recommended.includes(kind) ? html`<${Mark} tone="heavy">${x('legal.recommended')}<//>` : null} after=${state} desc=${info.why}>${x('legal.kind.' + kind)}<//>
+      <${Name} tag=${recommended.includes(kind) ? html`<${Mark} tone="heavy">${x('legal.recommended')}<//>` : null} after=${state} desc=${x('legal.why.' + kind)}>${x('legal.kind.' + kind)}<//>
       <${Doors}>${open ? null : html`
         <${Action} small disabled=${busy} onClick=${() => setEditing(kind)}>${x(page ? 'legal.edit' : 'legal.write')}<//>
         ${page ? html`<${Action} small disabled=${busy} onClick=${() => remove(kind)}>${x('legal.remove')}<//>` : null}`}<//>
@@ -134,6 +139,6 @@ export default function LegalSection({ d }) {
 
   return html`
     <${Note} kind="hint" chapter>${x('legal.intro')}<//>
-    <${Note} kind="aside" chapter>${r.reason} ${missing.length ? x('legal.readinessMissing', { n: missing.length }) : x('legal.readinessOk')}<//>
+    <${Note} kind="aside" chapter>${reason} ${missing.length ? x('legal.readinessMissing', { n: missing.length }) : x('legal.readinessOk')}<//>
     <${List} tone="pages" cols="name-doors">${rows}<//>`;
 }

@@ -64,15 +64,15 @@ export interface AppInfoScriptWords {
   draft: string;
   /** "{{who}} wrote this {{date}}". */
   draftBy: string;
-  /** "The working copy was saved {{date}}." */
+  /** "The draft was saved {{date}}." */
   draftSaved: string;
-  /** "Nobody has worked on the working copy for two weeks." */
+  /** "Nobody has worked on the draft for two weeks." */
   draftStale: string;
-  /** "Open the working copy". */
+  /** "Open the draft". */
   draftOpen: string;
-  /** "Tuck the marks away". */
+  /** "Hide the badges". */
   tuck: string;
-  /** "Keep the marks in view". */
+  /** "Keep the badges visible". */
   untuck: string;
   /** "Updated to version {{v}}". */
   reloaded: string;
