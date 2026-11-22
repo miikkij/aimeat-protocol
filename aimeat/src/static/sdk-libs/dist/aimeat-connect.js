@@ -247,7 +247,7 @@
   var PROVIDER_NOTES = {
     mastodon: {
       needs: "The address of your instance, for example mastodon.social.",
-      before: "Your account lives at one instance, and the same name at another instance is a different account."
+      before: "Your account is on one instance, and the same name at another instance is a different account."
     },
     youtube: {
       before: "Sign in with the Google account that owns the channel. A Google account with no YouTube channel will connect and then have nowhere to publish."
