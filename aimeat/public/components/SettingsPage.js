@@ -47,6 +47,8 @@
  *          strip=${strip} railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pages}
  *          after=${html`<${ctx.ConfirmUI} />`}>…the sections…<//>`
  * @version-history
+ *   v1.5.2 — 2026-11-22 — railFold takes the closed row's count from the first rail's `count` when
+ *     it has one (the App Catalog app detail, whose sections stand in several groups); additive.
  *   v1.5.1 — 2026-11-14 — railFold is exported: the home and the Settings & Controls overview draw
  *     the same closed row for their contents rail (components/ContentsRail.js).
  *   v1.5.0 — 2026-11-09 — On a narrow screen the rails are one closed row after the strip and before
@@ -93,7 +95,8 @@ export function settingsRail({ railTitle, sections, back, pages, pagesLabel, rai
  */
 export function railFold(rails) {
   const first = rails[0];
-  const count = (first.groups?.[0]?.items || []).filter((it) => it && !it.back).length;
+  // A rail whose sections stand in several groups (the App Catalog app detail) passes its own count.
+  const count = first.count ?? (first.groups?.[0]?.items || []).filter((it) => it && !it.back).length;
   // Closed in the capture phase, before the link's own handler scrolls: closed after it, the fold's
   // height left the page and the section stood that much above the screen.
   const close = (e) => { if (e.target.closest('button, a')) e.currentTarget.open = false; };

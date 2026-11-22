@@ -36,6 +36,9 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   2026-11-22 — Under 1100px, where the side rail is hidden, the same rail stands as one closed row
+ *     after the band and before the sections (railFold, as on the Settings pages). Before, a narrow
+ *     window showed no section menu at all.
  *   2026-11-06 — meta carries the owner's text about the app (manifest.about) for the About section
  *     (TARGET-093).
  *   2026-11-01 — The section "People registered without an account" after the builders (sections/people.js; WP9d).
@@ -74,6 +77,7 @@ import { useEffect, useErrorBoundary, useRef, useState } from 'preact/hooks';
 import htm from 'htm';
 import { Overlay } from '/components/Overlay.js';
 import { Rail } from '/components/Rail.js';
+import { railFold } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
 import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
@@ -273,7 +277,7 @@ function DetailView({ given, onClose }) {
   const total = two(visible.length);
 
   let n = 0;
-  const railNode = html`<${Rail} tone="ink" title=${x('detail.railTitle')} groups=${groups.map((g) => ({
+  const railGroups = groups.map((g) => ({
     label: x(groupTitle(g)),
     items: g.mods.map((mod) => {
       const i = n++;
@@ -281,7 +285,9 @@ function DetailView({ given, onClose }) {
       return { key: mod.meta.id, mark: two(i + 1), label: x(mod.meta.title), notice: !!why, title: why ? why.join(' · ') : undefined,
         on: rail.current === i, onClick: () => rail.goTo(i) };
     }),
-  }))} />`;
+  }));
+  const railData = { title: x('detail.railTitle'), tone: 'ink', groups: railGroups, count: visible.length };
+  const railNode = html`<${Rail} ...${railData} />`;
 
   // The toolbar (F57, F124): the icon, the name, and the pencil into the About editor while it is shut.
   return html`<${Overlay} normalLeading smallWords belowBar label=${meta.name} glyph=${meta.icon} title=${meta.name}
@@ -290,6 +296,7 @@ function DetailView({ given, onClose }) {
       closeLabel=${x('common.close')} rail=${railNode} bodyRef=${bodyRef}>
     <${DetailHead} d=${d} />
     <${DetailBand} d=${d} />
+    ${visible.length ? railFold([railData]) : null}
     ${visible.map(({ mod, group }, i) => {
       const Body = mod.default;
       const doors = typeof mod.meta.doors === 'function' ? mod.meta.doors(d) : null;
