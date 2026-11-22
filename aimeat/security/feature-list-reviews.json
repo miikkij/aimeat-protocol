@@ -44,7 +44,7 @@
       "digest": "sha256:01d2187d3c79d3ad3aabda2c"
     },
     "3. Agents and machine identity": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/agents/rekey.ts",
@@ -64,10 +64,10 @@
         "aimeat/src/routes/docsign.ts",
         "aimeat/src/routes/docsign-wallet.ts"
       ],
-      "digest": "sha256:734e451d2601300d0e3fe0a4"
+      "digest": "sha256:6f47f129606c443f7f78a0c8"
     },
     "4. Access, consent and sharing": {
-      "reviewedOn": "2026-11-20",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/services/access-guard.ts",
         "aimeat/src/services/consent.ts",
@@ -86,10 +86,10 @@
         "aimeat/src/routes/account-events.ts",
         "aimeat/src/routes/permissions.ts"
       ],
-      "digest": "sha256:555fc0f364df8be9ce2faa6e"
+      "digest": "sha256:2b74a8ec0773c22724ad7fda"
     },
     "5. Memory, files and search": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/routes/memory.ts",
         "aimeat/src/routes/memory/history.ts",
@@ -103,7 +103,7 @@
         "aimeat/src/routes/content.ts",
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:0b11ef282dc50d643551993f"
+      "digest": "sha256:170cd6e3e4895e05b0ab37c7"
     },
     "6. Organisms, workspaces and knowledge": {
       "reviewedOn": "2026-11-21",
@@ -168,7 +168,7 @@
       "digest": "sha256:fc900c87d4ec442f085ff270"
     },
     "9. AI on the node": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/tool-catalog/definitions/living.ts",
         "aimeat/src/tool-catalog/definitions/calibrator.ts",
@@ -194,7 +194,7 @@
         "aimeat/src/tool-catalog/definitions/ai-models.ts",
         "aimeat/src/tool-catalog/definitions/decide.ts"
       ],
-      "digest": "sha256:c30e939a1e51178cd9cac77b"
+      "digest": "sha256:87a581abed9b59d4b96a7f34"
     },
     "10. Apps": {
       "reviewedOn": "2026-11-21",
@@ -251,7 +251,7 @@
       "digest": "sha256:e650ba988c0d603cfeef5691"
     },
     "13. Notifications, boards and live updates": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/tool-catalog/definitions/boards.ts",
         "aimeat/src/routes/sse.ts",
@@ -270,7 +270,7 @@
         "aimeat/src/services/moderation",
         "aimeat/src/tool-catalog/definitions/moderation.ts"
       ],
-      "digest": "sha256:55a366e012c948cd48c3408d"
+      "digest": "sha256:1b911ebc2bb69903eb7f3281"
     },
     "14. Economy, marketplace and payments": {
       "reviewedOn": "2026-11-21",
@@ -339,7 +339,7 @@
       "digest": "sha256:23a589478e479ff6a7fe1241"
     },
     "18. Federation and your own node": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/routes/federation.ts",
         "aimeat/src/services/federation.ts",
@@ -350,7 +350,7 @@
         "aimeat/src/routes/federation-genesis.ts",
         "aimeat/src/services/personal-tunnel.ts"
       ],
-      "digest": "sha256:f364292a0c6231d193e89389"
+      "digest": "sha256:8b58e54ece2fe7f2c4138ef4"
     },
     "19. Operating a node": {
       "reviewedOn": "2026-11-21",
@@ -400,12 +400,12 @@
       "digest": "sha256:8d964b7e88361dba3229efcb"
     },
     "22. Companion projects": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "python/aimeat-crewai/pyproject.toml",
         "python/aimeat-crewai/README.md"
       ],
-      "digest": "sha256:1e8a1b1a332c2b70792d0ef0"
+      "digest": "sha256:216b7ad007fe0d5d9c3bbc86"
     },
     "23. Removed, and what replaced it": {
       "reviewedOn": "2026-11-19",
@@ -415,7 +415,7 @@
       "digest": "sha256:e5e051b90b29888d43b64f05"
     },
     "24. Data classification": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/services/classification/defaults.ts",
         "aimeat/src/services/classification/levels.ts",
@@ -426,7 +426,7 @@
         "aimeat/src/tool-catalog/definitions/classification.ts",
         "aimeat/src/services/classify-on-write.ts"
       ],
-      "digest": "sha256:c13fedde093f3210bcccbb0e"
+      "digest": "sha256:650aefb2db86b2151c61ff0f"
     }
   },
   "promises": [
@@ -565,7 +565,7 @@
       "aimeat/src/routes/agents/avatar.ts": "3763b0fbaf724693",
       "aimeat/src/routes/agents/permission-allow.ts": "66eac8b49cd632fc",
       "aimeat/src/services/agent/refusals.ts": "f8353846562df23f",
-      "aimeat/src/services/place-agent-scopes.ts": "ccb441241558cfe4",
+      "aimeat/src/services/place-agent-scopes.ts": "df815e2e75649ff2",
       "aimeat/src/routes/ecosystem-apps.ts": "4de20cfc792c45e2",
       "aimeat/src/routes/ecosystem-apps-reconnect.ts": "fe3694c59c04e72b",
       "aimeat/src/services/ecosystem/access.ts": "5116793e3d6ff610",
@@ -596,7 +596,7 @@
       "aimeat/src/routes/consent.ts": "6213aa166ff91905",
       "aimeat/src/routes/app-grants.ts": "06c88c7d284b3012",
       "aimeat/src/tool-catalog/definitions/exposure.ts": "a68011436a566c05",
-      "aimeat/src/services/publish-gate.ts": "f2a176eda6dee694",
+      "aimeat/src/services/publish-gate.ts": "cd5ee0a0b03ff157",
       "aimeat/src/services/internet-opening/opening-door.ts": "41a835d8a373d62d",
       "aimeat/src/services/internet-opening/opening-mark.ts": "927535d9d0538388",
       "aimeat/src/services/internet-opening/opening-notify.ts": "f1b63eb7d5640140",
@@ -632,7 +632,7 @@
       "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "5c906fac55b9a3ff",
       "aimeat/src/services/memory-bin-sweep.ts": "d6e51fe4277e7639",
       "aimeat/src/services/schema-lock-rule.ts": "cdd24287062eb450",
-      "aimeat/src/services/librarian.ts": "f30c7e684987a818",
+      "aimeat/src/services/librarian.ts": "894ec75b73852978",
       "aimeat/src/routes/file-store.ts": "82a5937b81b7ad97",
       "aimeat/src/routes/content.ts": "d08ccb790176e192",
       "aimeat/src/services/open-items.ts": "7f41fc9dab8fd03a"
@@ -733,12 +733,12 @@
       "aimeat/src/tool-catalog/definitions/calibrator.ts": "84eb10971edd9e5b",
       "aimeat/src/services/calibrator/projects.ts": "5211587c214e3e55",
       "aimeat/src/services/calibrator/templates.ts": "448f5fe229c721d1",
-      "aimeat/src/services/ai/routing.ts": "2233dd201cd0cd90",
+      "aimeat/src/services/ai/routing.ts": "2afc4763d5e75031",
       "aimeat/src/services/ai/roles.ts": "e2afb7ec8d3c1029",
       "aimeat/src/services/ai/policy-store.ts": "4f4c8e2abba6f06c",
       "aimeat/src/services/ai/gen-rules-store.ts": "2f8415970c2bfebb",
       "aimeat/src/services/operator/confirm.ts": "348eaf355869e551",
-      "aimeat/src/services/ai/allowance.ts": "e0e9920aa443c369",
+      "aimeat/src/services/ai/allowance.ts": "d77d33042b513f2a",
       "aimeat/src/services/ai/node-model-rules.ts": "270cb40ab665ef61",
       "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c",
       "aimeat/src/services/ai/transcription.ts": "994b10f23a26e665",
@@ -843,7 +843,7 @@
       "aimeat/src/services/notifications/answers.ts": "e8bcccb7bd187a61",
       "aimeat/src/services/notifications/create.ts": "49f7eef0b50f1394",
       "aimeat/src/services/notifications/links.ts": "f103b1adcd714296",
-      "aimeat/src/services/notifications/recipient-words.ts": "5563fea21ded8515",
+      "aimeat/src/services/notifications/recipient-words.ts": "b20b509a0664b61b",
       "aimeat/src/services/notifications/settings.ts": "d701520d4a83b2ea",
       "aimeat/src/services/notifications/sweeps.ts": "8e95bc8733b94507",
       "aimeat/src/services/notifications/templates.ts": "cb13371199c7ddd0",
@@ -950,7 +950,7 @@
       "aimeat/src/routes/federation-peer/peers.ts": "c7de3acfd2b2bed0",
       "aimeat/src/routes/federation-peer/policy-book.ts": "1c97de6cc38d4d22",
       "aimeat/src/routes/federation-peer/promotion.ts": "0533825a9bc7af91",
-      "aimeat/src/routes/federation-auth.ts": "38d9f0d9ea65d8fd",
+      "aimeat/src/routes/federation-auth.ts": "7a6412a382e3bad2",
       "aimeat/src/routes/federation-settlements.ts": "87490ac4d17d9d2d",
       "aimeat/src/routes/federation-genesis.ts": "f2f3fd01c920041d",
       "aimeat/src/services/personal-tunnel.ts": "83ec92d077dd4645"
@@ -1002,13 +1002,13 @@
     },
     "22. Companion projects": {
       "python/aimeat-crewai/pyproject.toml": "64a5d09c2d567d07",
-      "python/aimeat-crewai/README.md": "bedc4e00dbeb4332"
+      "python/aimeat-crewai/README.md": "234d55b91300434b"
     },
     "23. Removed, and what replaced it": {
       "aimeat/src/services/deprecation.ts": "8ff8f23db768c19d"
     },
     "24. Data classification": {
-      "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
+      "aimeat/src/services/classification/defaults.ts": "851cf51b1f331380",
       "aimeat/src/services/classification/levels.ts": "fdec7ded5eb8b0a5",
       "aimeat/src/services/classification/external-ai.ts": "6ce3e98eb475a54e",
       "aimeat/src/data/classification-packs.ts": "ffbb4b6a6349fce1",
