@@ -209,7 +209,7 @@ export function validateSignatureTokens(raw: unknown, look?: string): Record<str
       fail(`the value of ${name} must be a short CSS value string (at most ${TOKEN_VALUE_MAX} characters).`);
     }
     if (TOKEN_VALUE_FORBIDDEN.test(value)) {
-      fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value and nothing more.`);
+      fail(`the value of ${name} may not contain urls, comments or declaration characters — a token is one value and nothing more.`);
     }
     if (name === '--ak-accent') {
       out[name] = validateAccentPair(value, look);
@@ -254,7 +254,7 @@ export function validateImageryStyle(raw: unknown): { style: string; palette_wor
     fail('imagery.style is the illustration prompt fragment: 1-400 characters of art direction, like "soft watercolour wash, grainy paper, no text".');
   }
   if (TOKEN_VALUE_FORBIDDEN.test(style)) {
-    fail('imagery.style may not carry urls, comments or declaration characters — it is words for the image prompt and nothing more.');
+    fail('imagery.style may not contain urls, comments or declaration characters — it is words for the image prompt and nothing more.');
   }
   const out: { style: string; palette_words?: string } = { style };
   if (o.palette_words !== undefined) {

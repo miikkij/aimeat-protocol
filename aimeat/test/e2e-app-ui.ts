@@ -183,7 +183,7 @@ const GOOD_LAYOUT = {
             `a non-pair colour value is refused naming the pair form: ${colour.body.data.message}`);
 
         const vehicle = await validate({ v: 1, tokens: { '--ak-radius': 'url(https://evil.example/x)' }, blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
-        assert(vehicle.body.data.ok === false && /vehicle/.test(vehicle.body.data.message),
+        assert(vehicle.body.data.ok === false && /one value and nothing more/.test(vehicle.body.data.message),
             `a url value is refused: ${vehicle.body.data.message}`);
     });
 
@@ -317,7 +317,7 @@ const GOOD_LAYOUT = {
         const none = await validate({ v: 1, ambient: { preset: 'none', post: ['vhs'] }, blocks });
         assert(none.body.data.ok === false && /needs a preset/.test(none.body.data.message), `a post on none refuses: ${none.body.data.message}`);
         const block = await validate({ v: 1, ambient: { preset: 'waves', post: ['vignette'] }, blocks });
-        assert(block.body.data.ok === false && /lands on a block/.test(block.body.data.message), `a block effect named as a pass is pointed back: ${block.body.data.message}`);
+        assert(block.body.data.ok === false && /is applied to a block/.test(block.body.data.message), `a block effect named as a pass is pointed back: ${block.body.data.message}`);
     });
 
     await test('the catalogue carries the EFFECTS shelf: nine filters with their bounds, the hosts, the passes, and the three generators on the ambient shelf', async () => {

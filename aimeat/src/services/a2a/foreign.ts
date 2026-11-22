@@ -249,14 +249,14 @@ export async function identifyForeignCaller(
 
   // 2 before 1, because verifying the assertion needs the key and the card is where the key is.
   if (!await verifyCardJws(cardJws, card.publicKey)) {
-    return refuse(401, 'A2A_CARD_UNSIGNED', 'That card is not signed by the key it carries.');
+    return refuse(401, 'A2A_CARD_UNSIGNED', 'That card is not signed by the key it contains.');
   }
 
   const claims = decodeClaims(assertion);
   // An empty jti is refused here with the others: the spend below keys on it, and an id that is
   // the same for every assertion would make the second one read as "already used".
   if (!claims || typeof claims.sub !== 'string' || typeof claims.jti !== 'string' || !claims.jti) {
-    return refuse(401, 'A2A_ASSERTION_INVALID', 'The assertion must carry sub, aud, iat, exp and jti.');
+    return refuse(401, 'A2A_ASSERTION_INVALID', 'The assertion must contain sub, aud, iat, exp and jti.');
   }
   if (claims.sub !== card.gaii) {
     return refuse(401, 'A2A_IDENTITY_MISMATCH', 'The assertion and the card name different agents.');
@@ -281,7 +281,7 @@ export async function identifyForeignCaller(
   try {
     const header = decodeProtectedHeader(assertion);
     if (header.kid && header.kid !== card.publicKey.kid) {
-      return refuse(401, 'A2A_ASSERTION_KEY', 'The assertion names a different key than the card carries.');
+      return refuse(401, 'A2A_ASSERTION_KEY', 'The assertion names a different key than the card contains.');
     }
     const key = await importJWK({ kty: 'OKP', crv: 'Ed25519', x: card.publicKey.x }, 'EdDSA');
     await compactVerify(assertion, key, { algorithms: ['EdDSA'] });

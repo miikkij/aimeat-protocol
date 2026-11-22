@@ -444,7 +444,7 @@ function locs(xml: string): string[] {
         const org = terms.find(t => t.term === 'Organism');
         assert(org?.id === 'organism', `Organism id ${org?.id}`);
         assert(typeof org?.plain === 'string' && /yhteinen paikka/i.test(org.plain), `Organism plain is not Finnish: ${org?.plain}`);
-        assert(org!.definition.startsWith('Where work lives'), 'the technical definition must stay English');
+        assert(org!.definition.startsWith('Where work is kept'), 'the technical definition must stay English');
         const morsel = terms.find(t => t.term === 'Morsel');
         assert(/rahaa/.test(morsel?.plain ?? ''), `Morsel plain does not say it is not money, in Finnish: ${morsel?.plain}`);
         // GAII is where the registry defines an agent.

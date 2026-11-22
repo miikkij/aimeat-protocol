@@ -420,7 +420,7 @@ await test('18. A pattern with no key space behind it is refused rather than tri
 
 await test('19. A pattern reaching the node\'s own reserved keys is refused', async () => {
     const reserved = await callTool(aliceSession, 'aimeat_share_create', { group_id: groupId, key_pattern: 'openrouter.**' });
-    assert(reserved.isError && reserved.text.startsWith('RESERVED_KEY:') && reserved.text.includes('managed by the node on your behalf'),
+    assert(reserved.isError && reserved.text.startsWith('RESERVED_KEY:') && reserved.text.includes('managed by AIMEAT on your behalf'),
         `server-trusted config is not an owner's to hand out, and the refusal names its code: ${reserved.text.slice(0, 200)}`);
 });
 

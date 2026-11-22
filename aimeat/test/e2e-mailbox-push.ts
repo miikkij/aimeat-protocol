@@ -592,7 +592,7 @@ async function run(): Promise<void> {
         assert(r.body.data.channel === 'email', `only email can have succeeded: ${short(r.body.data)}`);
         cooldownSetAt = Date.now();   // notify() stamps its cooldown on a send that succeeded
         const mail = await smtp!.waitForMail(mailboxEmail, /pending message/i);
-        assert(/AIMEAT: 0 pending message\(s\) for your node/.test(mail.subject),
+        assert(/AIMEAT: 0 pending message\(s\) for your own server/.test(mail.subject),
             `the email_mailbox template subject: ${mail.subject}`);
         assert(mail.text.includes(personalNodeId), `the mail must name the node: ${mail.text.slice(0, 300)}`);
         assert(mail.text.includes('action_request'), `and the type that triggered it: ${mail.text.slice(0, 300)}`);

@@ -879,7 +879,7 @@ async function run() {
             body: JSON.stringify({ grant_id: grantC, cards: [forged, ...rest] }),
         });
         assert(r.status === 422, `expected 422, got ${r.status}`);
-        assert(JSON.stringify(r.body?.error?.details ?? {}).includes('not signed by the key it carries'),
+        assert(JSON.stringify(r.body?.error?.details ?? {}).includes('not signed by the key it contains'),
             `expected the signature defect, got ${JSON.stringify(r.body?.error?.details)}`);
     });
 

@@ -41,9 +41,11 @@ const gitShow = (repo: string, base: string, file: string): string | null => {
 };
 
 /** Paths whose content is words for a person or a session, or the checks that read them. */
-const TEXT_PATH = /^(?:aimeat\/locales\/[a-z]{2}\.json$|.*\.md$|docs\/|\.claude\/|\.githooks\/|aimeat\/scripts\/|aimeat\/security\/|aimeat\/test\/|aimeat\/public\/data\/everything\.|aimeat\/public\/THIRD-PARTY-NOTICES\.md$|THIRD-PARTY-NOTICES\.md$|aimeat\/src\/services\/prompt-defaults\/shipped-hashes\.ts$)/;
+const TEXT_PATH = /^(?:aimeat\/locales\/[a-z]{2}\.json$|.*\.md$|docs\/|\.claude\/|\.githooks\/|aimeat\/scripts\/|aimeat\/security\/|aimeat\/test\/|aimeat\/public\/data\/everything\.|aimeat\/public\/THIRD-PARTY-NOTICES\.md$|THIRD-PARTY-NOTICES\.md$|aimeat\/src\/services\/prompt-defaults\/shipped-hashes\.ts$|aimeat\/src\/services\/ui-library\/facts\.generated\.ts$)/;
 // shipped-hashes.ts lists the hash of every default prompt text; it changes only with that text, and
-// a unit test holds the two together.
+// a unit test holds the two together. facts.generated.ts is the component library's index of which
+// file uses which class and token, read from the source by pnpm build:ui-library and shown on the
+// library page; it follows the files it indexes, which this rule reads on their own.
 
 export function changedFiles(repo: string, base: string): string[] {
   return git(repo, 'diff', '--name-only', `${base}...HEAD`).split('\n').filter(Boolean);

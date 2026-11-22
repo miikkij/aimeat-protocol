@@ -166,7 +166,7 @@ await test('Published first, the same id binds with its provider, and a notify m
         `the binding names the action with its provider, got ${JSON.stringify(r.body.data.actions)}`);
     const row = rowOf(await hooks(opToken), 'post_settlement');
     assert(row.actions[0]?.published === true && row.actions[0]?.host === 'hooks.invalid', `the read says it is bound and published, got ${JSON.stringify(row.actions[0])}`);
-    assert(/told after the fact/.test(r.body.data.note) && !/refuses/.test(r.body.data.note), `a notify hook's note does not claim it refuses, got "${r.body.data.note}"`);
+    assert(/sent after the fact/.test(r.body.data.note) && !/refuses/.test(r.body.data.note), `a notify hook's note does not claim it refuses, got "${r.body.data.note}"`);
 });
 
 await test('An unknown moment and a bad list are refused', async () => {

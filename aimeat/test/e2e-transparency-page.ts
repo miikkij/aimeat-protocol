@@ -171,7 +171,7 @@ const FORBIDDEN: Array<[string, RegExp]> = [
 
     await test('the mirror scopes verification to bytes this node served', async () => {
         assert(/byte for byte/i.test(mirror.body), 'the mirror does not scope checking to the bytes the node served');
-        assert(/re-assembles a document on the way out/i.test(mirror.body),
+        assert(/re-assembles a document before sending it/i.test(mirror.body),
             'the mirror omits the limit Phase 9 found: a re-serialised document cannot be checked by hash');
     });
 

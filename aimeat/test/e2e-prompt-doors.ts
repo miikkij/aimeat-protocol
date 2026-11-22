@@ -205,7 +205,7 @@ await test('B1. English, no purpose: the prompt ASKS what the organism is for', 
     assert(!p.includes('What I want it for, in my own words'), 'and nothing is folded in');
     assert(p.includes('aimeat_organism_create') && p.includes('aimeat_workspace_create'), 'names both tools');
     assert(p.includes('Do not invent content on my behalf.'), 'and closes with the no-invention rule');
-    assert(/AIMEAT node \(https?:\/\/[^)]+\)/.test(p), `names the node it is connected to: ${p.slice(0, 300)}`);
+    assert(/connected to my AIMEAT \(https?:\/\/[^)]+\)/.test(p), `names the server it is connected to: ${p.slice(0, 300)}`);
     const links = body.hints?.next_actions;
     assert(Array.isArray(links) && links.some((l: any) => String(l.url).includes('instruction-block')),
         `next actions point at the block for the organism it creates: ${JSON.stringify(body.hints)}`);
@@ -410,7 +410,7 @@ await test('C3. An organism with no workspaces lists none; ?lang=fi answers in F
     const fi = await json(`/v1/prompts/ai-instructions?lang=fi&organism=${orgId}`, { headers: authH(A.token) });
     assert(fi.body.data.lang === 'fi', `lang: ${fi.body.data.lang}`);
     const b: string = fi.body.data.blocks.body;
-    assert(b.includes('Työskentelen AIMEAT-nodella'), 'Finnish opening');
+    assert(b.includes('Työskentelen omassa AIMEATissani osoitteessa'), 'Finnish opening');
     assert(b.includes('Workspacet:'), 'Finnish workspace heading');
     assert(b.includes('Tallentaminen on minun päätökseni.'), 'Finnish consent rule');
     assert(!b.includes('Saving is my decision.'), 'no English leaks through');

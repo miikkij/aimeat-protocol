@@ -200,12 +200,12 @@ export function registerAgentCardRoutes(router: Router, config: AimeatConfig, st
     const onRecord = Buffer.from(agent.publicKey, 'base64').toString('base64url');
     if (card.publicKey.x !== onRecord) {
       res.status(409).json(error(config.nodeId, 'KEY_CHANGED',
-        'That card carries a different key. A new key is a new identity: re-enrol instead of re-issuing.'));
+        'That card contains a different key. A new key is a new identity: re-enrol instead of re-issuing.'));
       return;
     }
     if (!await verifyCardJws(req.body.card as string, card.publicKey)) {
       res.status(422).json(error(config.nodeId, 'CARD_UNSIGNED',
-        'That card is not signed by the key it carries. Sign it with the same key the card names, then send it again.',
+        'That card is not signed by the key it contains. Sign it with the same key the card names, then send it again.',
         undefined, undefined,
         [{ description: 'The key this node holds for you', method: 'GET', url: `/v1/agents/${encodeURIComponent(agent.gaii)}/jwks.json` }]));
       return;
