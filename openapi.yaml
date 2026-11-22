@@ -20540,7 +20540,10 @@ paths:
                 DATAMAP_INVITES_UNSTATED. A held row may carry `publishable: true`: the family may be
                 published as a data package, and a data product's app source reads only the families
                 marked so; a `publishable` that is not a boolean is the finding
-                DATAMAP_ROW_BAD_PUBLISHABLE.
+                DATAMAP_ROW_BAD_PUBLISHABLE. A held row value outside the vocabulary is
+                DATAMAP_ROW_BAD_VALUE, a `leaves` entry that is not { what, to, recallable } is
+                DATAMAP_LEAVES_INCOMPLETE, and an `elsewhere` entry without a known status, where,
+                controlledBy and deletion is DATAMAP_ELSEWHERE_INCOMPLETE.
       responses:
         '200':
           description: Stored. `hints` says what is still unfinished; it never refuses.

@@ -148,10 +148,15 @@ The node never invents a map; it reads the stated one, folds it into one line fo
 what is missing. The findings, worst first: `DATAMAP_MISSING`, `DATAMAP_NO_PURPOSE`,
 `DATAMAP_NO_ARRANGEMENT`, `DATAMAP_FORM_UNSTATED`, `DATAMAP_FORM_CONTRADICTED`,
 `DATAMAP_ROW_NO_WHY`, `DATAMAP_NO_ROWS`, `DATAMAP_INVITES_UNSTATED`, `DATAMAP_REGISTERS_UNSTATED`, `DATAMAP_ROW_BAD_AGENT`, `DATAMAP_ROW_BAD_PUBLISHABLE`,
+`DATAMAP_ROW_BAD_VALUE`, `DATAMAP_LEAVES_INCOMPLETE`, `DATAMAP_ELSEWHERE_INCOMPLETE`,
 `DATAMAP_ROW_BAD_CLASSIFICATION`, `DATAMAP_ROW_BAD_DOMAIN`, `DATAMAP_PERSONAL_NO_DOMAIN`, `DATAMAP_AI_ACT_UNANSWERED`. The node reads the app's declared scopes for the invites finding,
 and an app with no map that asks for `organism:invite` has it beside `DATAMAP_MISSING`.
 `DATAMAP_AI_ACT_UNANSWERED` means that the map says the app uses AI (a model in its machinery, or
 something sent to an AI service) and `aiAct.answers` is empty.
+`DATAMAP_ROW_BAD_VALUE` names a held row's value outside the vocabulary above, field by field.
+`DATAMAP_LEAVES_INCOMPLETE` names a `leaves` entry that is not `{ what, to, recallable }`, a plain
+sentence included, and `DATAMAP_ELSEWHERE_INCOMPLETE` an `elsewhere` entry without a known `status`,
+`where`, `controlledBy` and `deletion`. The page shows such an entry as written.
 A finding never refuses a map. The owner sees it; everyone else reads the map without it.
 
 `PUT /v1/datamap/apps/{owner}/{filename}` answers with the stored map, its stamp and the findings.

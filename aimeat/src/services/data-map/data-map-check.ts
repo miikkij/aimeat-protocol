@@ -15,6 +15,12 @@
  * @structure summariseMap · checkMap · statesInvites · statesRegisters · stampFor · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.9.0 — 2026-11-22 — DATAMAP_ROW_BAD_VALUE (a held row's value outside the closed vocabulary),
+ *     DATAMAP_LEAVES_INCOMPLETE (a `leaves` entry without what, to and recallable, such as a plain
+ *     sentence) and DATAMAP_ELSEWHERE_INCOMPLETE (an `elsewhere` entry without a known status, where,
+ *     controlledBy and deletion). After the publishable one and before the classification one, and
+ *     never a refusal: the write keeps the map
+ *     as written, and the page showed these as raw words and empty lines.
  *   v1.8.2 — 2026-11-15 — The summary says a thing "is sent elsewhere", not that it "leaves the house".
  *   v1.8.1 — 2026-11-01 — DATAMAP_FORM_CONTRADICTED does not fire for a static page whose rows are files
  *     somebody else writes (writtenByThePage; Varoituskartta, WP10e C3).
@@ -45,7 +51,7 @@
  *   v1.0.0 — 2026-08-25 — Replaces data-map-derive.ts and data-map-lint.ts.
  */
 import {
-  DATA_MAP_SPEC, appDataMapKey,
+  DATA_MAP_SPEC, appDataMapKey, HELD_ROW_VOCABULARY, ELSEWHERE_STATUSES,
   type DataMap, type DataMapRow, type DataMapStamp, type DataMapGap, type DataLocation,
 } from './data-map-types.js';
 import { isValidAgentName } from '../../utils/gaii.js';
@@ -66,11 +72,51 @@ export const FINDING_CODES = [
   'DATAMAP_REGISTERS_UNSTATED',
   'DATAMAP_ROW_BAD_AGENT',
   'DATAMAP_ROW_BAD_PUBLISHABLE',
+  'DATAMAP_ROW_BAD_VALUE',
+  'DATAMAP_LEAVES_INCOMPLETE',
+  'DATAMAP_ELSEWHERE_INCOMPLETE',
   'DATAMAP_ROW_BAD_CLASSIFICATION',
   'DATAMAP_ROW_BAD_DOMAIN',
   'DATAMAP_PERSONAL_NO_DOMAIN',
   'DATAMAP_AI_ACT_UNANSWERED',
 ] as const;
+
+const filled = (v: unknown): boolean => typeof v === 'string' && v.trim() !== '';
+
+/**
+ * A held row's values outside the closed vocabulary, as "field: value". A missing field is not
+ * named here: the other findings and the page already say what a row leaves out.
+ */
+const badValues = (r: DataMapRow): string[] => {
+  const out: string[] = [];
+  for (const [field, allowed] of Object.entries(HELD_ROW_VOCABULARY)) {
+    const v = (r as unknown as Record<string, unknown>)[field];
+    if (v === undefined) continue;
+    const values = field === 'writers' && Array.isArray(v) ? v : [v];
+    for (const one of values) if (!(allowed as readonly unknown[]).includes(one)) out.push(`${field}: ${String(one)}`);
+  }
+  return out;
+};
+
+/** A `leaves` entry that does not say what goes, where to, and whether it can be called back. */
+const incompleteLeave = (l: unknown): boolean => {
+  const o = l && typeof l === 'object' && !Array.isArray(l) ? l as Record<string, unknown> : null;
+  return !o || !filled(o.what) || !filled(o.to) || typeof o.recallable !== 'boolean';
+};
+
+/** An `elsewhere` entry without a known status, where the real one is, who decides, and what deleting does. */
+const incompleteElsewhere = (e: unknown): boolean => {
+  const o = e && typeof e === 'object' && !Array.isArray(e) ? e as Record<string, unknown> : null;
+  return !o || !filled(o.what) || !(ELSEWHERE_STATUSES as readonly unknown[]).includes(o.status)
+    || !filled(o.where) || !filled(o.controlledBy) || !filled(o.deletion);
+};
+
+/** A short name for an entry in a finding: its `what`, or the start of a plain sentence. */
+const entryName = (e: unknown): string => {
+  const what = e && typeof e === 'object' ? (e as { what?: unknown }).what : e;
+  const s = typeof what === 'string' ? what : JSON.stringify(what);
+  return s.length > 60 ? `${s.slice(0, 57)}...` : s;
+};
 
 /**
  * The map says the app uses AI: a model in its machinery, or something sent to an AI service. The
@@ -358,6 +404,34 @@ export function checkMap(
         + 'domain it falls in. Add `domains` to each: "employment" for CVs, competence, staffing and HR, "health" for '
         + 'patient data, "children" for minors, or [] when none applies. The domain decides the classification floor, '
         + `whether an impact assessment is owed and the AI Act risk area. Rows: ${noDomain.map(r => r.what).join(', ')}.`,
+    });
+  }
+  const offVocabulary = map.held.filter(r => badValues(r).length > 0);
+  if (offVocabulary.length > 0) {
+    findings.push({
+      code: 'DATAMAP_ROW_BAD_VALUE',
+      message: `${offVocabulary.length} of ${map.held.length} rows use a value outside the map's vocabulary, so the page `
+        + `shows it as a raw word: ${offVocabulary.map(r => `${r.what} (${badValues(r).join(', ')})`).join('; ')}. `
+        + 'Pick from the allowed values: aimeat_handbook_get { tier: "build-app-atelier/data-map" } lists every one.',
+    });
+  }
+  const leaves = (map.leaves as unknown[]).filter(incompleteLeave);
+  if (leaves.length > 0) {
+    findings.push({
+      code: 'DATAMAP_LEAVES_INCOMPLETE',
+      message: `${leaves.length} of ${map.leaves.length} entries in \`leaves\` do not say what goes, where to, and whether it `
+        + 'can be called back. Write each as { "what": "the invoice PDF", "to": "the customer\'s e-mail", "recallable": false }. '
+        + `Entries: ${leaves.map(entryName).join('; ')}.`,
+    });
+  }
+  const elsewhere = (map.elsewhere as unknown[]).filter(incompleteElsewhere);
+  if (elsewhere.length > 0) {
+    findings.push({
+      code: 'DATAMAP_ELSEWHERE_INCOMPLETE',
+      message: `${elsewhere.length} of ${map.elsewhere.length} entries in \`elsewhere\` do not say their status, where the real `
+        + 'one is, who decides about it and what deleting our side does. Write each as { "what": "...", "status": '
+        + `"${ELSEWHERE_STATUSES.join('" | "')}", "where": "...", "controlledBy": "...", "deletion": "..." }. `
+        + `Entries: ${elsewhere.map(entryName).join('; ')}.`,
     });
   }
 

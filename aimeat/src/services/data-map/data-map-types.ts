@@ -24,6 +24,9 @@
  * @structure DataMap · DataMapRow · ElsewhereRow · InvitesStatement · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.9.0 — 2026-11-22 — Each closed axis is a list the code can read (DATA_KINDS, DATA_USES and the
+ *     rest, HELD_ROW_VOCABULARY, ELSEWHERE_STATUSES), and its type is read from the list, so the check
+ *     can name a value outside it. The values are unchanged.
  *   v2.8.0 — 2026-11-01 — The machinery word `registers-parties` and the optional app-level `registers`
  *     statement: the app lets people without an account register to it (plan doc-mvwxcas3dom3, D4.4).
  *     Additive, so the spec stays /2.
@@ -73,48 +76,80 @@ export const DATA_MAP_FORMS: readonly DataMapForm[] = [
 ] as const;
 
 /** Where a row's data actually lives. */
-export type DataLocation =
-  | 'nowhere' | 'browser-only' | 'owner-memory-private' | 'owner-memory-public'
-  | 'someone-elses-memory' | 'organism-workspace' | 'organism-rows' | 'organism-shared'
-  | 'organism-meta' | 'extension-namespace' | 'cortex' | 'file-storage' | 'app-published-record'
-  | 'another-node' | 'external-service';
+export const DATA_LOCATIONS = [
+  'nowhere', 'browser-only', 'owner-memory-private', 'owner-memory-public',
+  'someone-elses-memory', 'organism-workspace', 'organism-rows', 'organism-shared',
+  'organism-meta', 'extension-namespace', 'cortex', 'file-storage', 'app-published-record',
+  'another-node', 'external-service',
+] as const;
+export type DataLocation = typeof DATA_LOCATIONS[number];
 
 /** What kind of thing the data is. */
-export type DataKind =
-  | 'settings' | 'user-written' | 'ai-generated' | 'register' | 'event-log' | 'index'
-  | 'computed-or-cache' | 'fetched-copy' | 'foreign-identifier' | 'snapshot' | 'metrics'
-  | 'preferences' | 'draft' | 'outgoing-message' | 'file' | 'link-between-things'
-  | 'permissions' | 'secret';
+export const DATA_KINDS = [
+  'settings', 'user-written', 'ai-generated', 'register', 'event-log', 'index',
+  'computed-or-cache', 'fetched-copy', 'foreign-identifier', 'snapshot', 'metrics',
+  'preferences', 'draft', 'outgoing-message', 'file', 'link-between-things',
+  'permissions', 'secret',
+] as const;
+export type DataKind = typeof DATA_KINDS[number];
 
 /** What it is there FOR. The axis that keeps getting dropped, which is why it is required. */
-export type DataUse =
-  | 'app-cannot-run-without' | 'user-returns-to-read' | 'shown-as-a-list' | 'search-and-filter'
-  | 'calculation-and-reporting' | 'app-resumes-where-it-left' | 'to-share-with-others'
-  | 'to-send-out' | 'evidence-of-what-happened' | 'speed-only' | 'context-for-an-ai'
-  | 'backwards-compatibility';
+export const DATA_USES = [
+  'app-cannot-run-without', 'user-returns-to-read', 'shown-as-a-list', 'search-and-filter',
+  'calculation-and-reporting', 'app-resumes-where-it-left', 'to-share-with-others',
+  'to-send-out', 'evidence-of-what-happened', 'speed-only', 'context-for-an-ai',
+  'backwards-compatibility',
+] as const;
+export type DataUse = typeof DATA_USES[number];
 
-export type Ownership =
-  | 'person' | 'organism' | 'extension' | 'ecosystem-app' | 'someone-else' | 'external-controller'
-  | 'nobody';
+export const OWNERSHIPS = [
+  'person', 'organism', 'extension', 'ecosystem-app', 'someone-else', 'external-controller', 'nobody',
+] as const;
+export type Ownership = typeof OWNERSHIPS[number];
 
-export type Readers =
-  | 'owner-only' | 'owner-and-their-agents' | 'named-people' | 'organism-members' | 'anyone'
-  | 'the-app-itself' | 'a-recipient-elsewhere';
+export const READERS = [
+  'owner-only', 'owner-and-their-agents', 'named-people', 'organism-members', 'anyone',
+  'the-app-itself', 'a-recipient-elsewhere',
+] as const;
+export type Readers = typeof READERS[number];
 
-export type Writers =
-  | 'person-in-the-ui' | 'the-app-for-the-person' | 'an-agent' | 'a-schedule-unattended'
-  | 'an-extension-server-side' | 'install-seed' | 'a-foreign-system';
+export const WRITERS = [
+  'person-in-the-ui', 'the-app-for-the-person', 'an-agent', 'a-schedule-unattended',
+  'an-extension-server-side', 'install-seed', 'a-foreign-system',
+] as const;
+export type Writers = typeof WRITERS[number];
 
-export type RecordShape =
-  | 'one-record' | 'one-per-thing' | 'collection-under-one-key' | 'rolled-up-per-period'
-  | 'index-plus-bodies' | 'files' | 'no-record';
+export const RECORD_SHAPES = [
+  'one-record', 'one-per-thing', 'collection-under-one-key', 'rolled-up-per-period',
+  'index-plus-bodies', 'files', 'no-record',
+] as const;
+export type RecordShape = typeof RECORD_SHAPES[number];
 
-export type Retention =
-  | 'until-deleted' | 'ttl' | 'rolling-window' | 'version-capped' | 'append-only' | 'session-only';
+export const RETENTIONS = [
+  'until-deleted', 'ttl', 'rolling-window', 'version-capped', 'append-only', 'session-only',
+] as const;
+export type Retention = typeof RETENTIONS[number];
 
 /** What losing it would cost. Decides whether a placement is acceptable at all. */
-export type LossRisk =
-  | 'only-copy' | 'recoverable-from-source' | 'recomputable' | 'user-can-rewrite' | 'may-vanish';
+export const LOSS_RISKS = [
+  'only-copy', 'recoverable-from-source', 'recomputable', 'user-can-rewrite', 'may-vanish',
+] as const;
+export type LossRisk = typeof LOSS_RISKS[number];
+
+/**
+ * The closed vocabulary of a `held` row, field by field. A value outside it is kept as written
+ * (see above) and named by checkMap's DATAMAP_ROW_BAD_VALUE, because a page shows it raw and a
+ * reader in another language gets a machine word.
+ */
+export const HELD_ROW_VOCABULARY = {
+  kind: DATA_KINDS, usedFor: DATA_USES, where: DATA_LOCATIONS, owner: OWNERSHIPS, readers: READERS,
+  writers: WRITERS, shape: RECORD_SHAPES, keptFor: RETENTIONS, lossRisk: LOSS_RISKS,
+} as const;
+
+/** The states an `elsewhere` row may be in. */
+export const ELSEWHERE_STATUSES = [
+  'work-in-progress', 'copy-of-anothers-record', 'already-left', 'account-in-a-foreign-system',
+] as const;
 
 /**
  * Machinery the app leans on. Free-form beyond these; an unknown name is kept as written.
@@ -252,7 +287,7 @@ export interface DataMapRow {
 /** The second table: what is unresolved, or is not ours. */
 export interface ElsewhereRow {
   what: string;
-  status: 'work-in-progress' | 'copy-of-anothers-record' | 'already-left' | 'account-in-a-foreign-system';
+  status: typeof ELSEWHERE_STATUSES[number];
   /** Where the real one is. */
   where: string;
   /** Who decides about it. */

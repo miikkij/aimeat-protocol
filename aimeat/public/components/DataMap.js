@@ -27,6 +27,10 @@
  * @structure DataMap(props) · dataMapState(map)
  * @usage html`<${DataMap} map=${m} findings=${f} regulatedAi=${r} say=${(k) => x(k)} />`
  * @version-history
+ *   v1.3.0 — 2026-11-22 — A `leaves` entry written as a plain sentence shows that sentence, and
+ *     "cannot be recalled" shows only for `recallable: false` (it showed for every entry that left the
+ *     field out). An `elsewhere` row with an unknown status, or without where and controlledBy, shows
+ *     what it says instead of a raw locale key and empty labels.
  *   v1.2.0 — 2026-11-21 — A held row shows its regulated data domains and, from the read's
  *     `regulated_ai`, the mode an outside AI model gets of them and whether it is in force yet.
  *   v1.1.0 — 2026-10-18 — "Who it invites": the app invites people into organisms and an invitation
@@ -97,15 +101,39 @@ function HeldRow({ row, say, regulatedAi }) {
   </div>`;
 }
 
+/** The states an `elsewhere` row may name; the node's ELSEWHERE_STATUSES (data-map-types.ts). */
+const ELSEWHERE_STATUSES = ['work-in-progress', 'copy-of-anothers-record', 'already-left', 'account-in-a-foreign-system'];
+
+/**
+ * What the map says about a row that is not ours. A row that leaves a field out shows what it does
+ * say, with no label for the missing part: the node's check names the gap to the app's maker.
+ */
 function ElsewhereRow({ row, say }) {
+  const status = ELSEWHERE_STATUSES.includes(row.status) ? say('dataMap.elsewhere.' + row.status) : '';
+  const facts = [
+    row.where ? `${say('dataMap.elsewhere.whereLabel')} ${row.where}` : '',
+    row.controlledBy ? `${say('dataMap.elsewhere.controlledByLabel')} ${row.controlledBy}` : '',
+  ].filter(Boolean).join(' · ');
+  const note = row.deletion || row.why || '';
   return html`<div class="data-map-row">
     <div class="data-map-head">
       <span class="data-map-key">${row.what}</span>
-      <span class="data-map-holds">${say('dataMap.elsewhere.' + row.status)}</span>
+      <span class="data-map-holds">${status}</span>
     </div>
-    <div class="data-map-facts">${say('dataMap.elsewhere.whereLabel')} ${row.where} · ${say('dataMap.elsewhere.controlledByLabel')} ${row.controlledBy}</div>
-    <div class="data-map-why">${row.deletion || ''}</div>
+    ${facts ? html`<div class="data-map-facts">${facts}</div>` : null}
+    ${note ? html`<div class="data-map-why">${note}</div>` : null}
   </div>`;
+}
+
+/**
+ * One thing the app sends out. A map may write it as a plain sentence, and then the sentence is the
+ * whole answer. "Cannot be recalled" shows only when the map says so (`recallable: false`).
+ */
+function Leave({ entry, say }) {
+  if (typeof entry === 'string') return entry;
+  const what = entry && typeof entry.what === 'string' ? entry.what : '';
+  const to = entry && typeof entry.to === 'string' ? entry.to : '';
+  return html`${what}${to ? ` → ${to}` : null}${entry && entry.recallable === false ? html` <span class="data-map-norecall">${say('dataMap.leaves.noRecall')}</span>` : null}`;
 }
 
 const Part = ({ children }) => html`<h4 class="data-map-part">${children}</h4>`;
@@ -155,7 +183,7 @@ export function DataMap({ map, findings = [], say = t, loading, regulatedAi = nu
     ${rows.length ? html`<${Part}>${say('dataMap.rowsLabel')}<//>${rows.map((r, i) => html`<${HeldRow} key=${r.what || i} row=${r} say=${say} regulatedAi=${regulatedAi} />`)}` : null}
     ${(map.machinery || []).length ? html`<${Part}>${say('dataMap.machineryLabel')}<//><p class="data-map-text">${map.machinery.join(' · ')}</p>` : null}
     <${Invites} map=${map} say=${say} />
-    ${(map.leaves || []).length ? html`<${Part}>${say('dataMap.leavesLabel')}<//><ul class="data-map-bullets">${map.leaves.map((l, i) => html`<li key=${i}>${l.what} → ${l.to}${l.recallable ? null : html` <span class="data-map-norecall">${say('dataMap.leaves.noRecall')}</span>`}</li>`)}</ul>` : null}
+    ${(map.leaves || []).length ? html`<${Part}>${say('dataMap.leavesLabel')}<//><ul class="data-map-bullets">${map.leaves.map((l, i) => html`<li key=${i}><${Leave} entry=${l} say=${say} /></li>`)}</ul>` : null}
     ${(map.elsewhere || []).length ? html`<${Part}>${say('dataMap.elsewhereLabel')}<//>${map.elsewhere.map((r, i) => html`<${ElsewhereRow} key=${i} row=${r} say=${say} />`)}` : null}
     ${found}
   </div>`;
