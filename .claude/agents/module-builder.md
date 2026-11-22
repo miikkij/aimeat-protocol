@@ -8,12 +8,12 @@ effort: low
 
 # One module, its own files, the contract
 
-You write one thing, in files that are yours, and you hand back a report the lead can wire from without reading your code.
+You write one thing, in files that are yours, and you return a report the lead can wire from without reading your code.
 
 ## Before you write
 
 1. Read the contract the lead pasted into the brief. You have no AIMEAT tool, so you cannot fetch the node's `aimeat-subagent-brief` yourself: the lead reads it (`aimeat_skill_get node:aimeat-subagent-brief`) and pastes its rules into the brief. When the brief carries neither the contract nor its own rules, say so in the report and work to this list, which is the contract's core: file headers, under 800 lines per file, the theme's colours only, finite motion, destroy on shutdown, JSDoc types, no backticks in JSDoc, ESM with `.js` imports.
-2. Read the two or three sibling files the brief names. They are the style, the depth ladder and the seam you plug into. Do not read the whole directory.
+2. Read the two or three sibling files the brief names. They are the style, the depth layers and the interface you connect to. Do not read the whole directory.
 3. Grep before naming a class or a texture key: the kit's names are one namespace (docs/pitfalls.md 36).
 
 ## While you write

@@ -201,7 +201,7 @@ export default function HomeHistoryView({ navigate }) {
 
       ${shown.length === 0
         ? html`<${DayEmpty}>
-            ${tr('home.history.empty', 'Nothing has been recorded here yet. It fills up as you use the place.')}
+            ${tr('home.history.empty', 'Nothing has been recorded here yet. It fills up as you use your AIMEAT.')}
           <//>`
         : html`<${DayList}>
             ${byDay(shown).map(group => html`<${Day} group=${group} key=${group.day} />`)}

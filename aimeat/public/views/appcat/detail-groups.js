@@ -12,7 +12,7 @@
  *   - Building together: the roadmap, who else may build it, the audit log;
  *   - Publishing and visibility: server settings, opening to the internet on a closed node, visitors, search, marks, legal pages, promotion;
  *   - Money and agents: the EXCHANGE listing, tool sales, costs and contracts, bundled agents.
- *   Every group shows all its sections; nothing folds away (Jouni: "ettei aleta piilottelemaan mitään").
+ *   Every group shows all its sections; nothing folds away (Jouni).
  *
  *   A section asks for a look when the catalogue's own "something missing" test (model.js kunto)
  *   says the app lacks what that section fixes, when the design spec is missing or behind the app's

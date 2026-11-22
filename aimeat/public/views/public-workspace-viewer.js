@@ -188,7 +188,7 @@ export default function PublicWorkspaceViewer() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ws, password: pw }),
       });
-      if (res.status === 429) { setUnlockErr(t('pwv.passwordTooMany') || 'Too many attempts — try again in a few minutes.'); return; }
+      if (res.status === 429) { setUnlockErr(t('pwv.passwordTooMany') || 'Too many attempts. Try again in a few minutes.'); return; }
       const body = await res.json().catch(err => { swallowed('public-workspace-viewer: PublicWorkspaceViewer', err); return null; });
       if (!res.ok || !body?.data?.share_token) { setUnlockErr(t('pwv.passwordWrong') || 'Wrong password.'); return; }
       try { sessionStorage.setItem(shareTokenKey(org, ws), body.data.share_token); } catch { /* storage unavailable */ }   // eslint-disable-line aimeat/no-silent-catch -- storage unavailable
@@ -329,7 +329,7 @@ export default function PublicWorkspaceViewer() {
           <h2>${t('pwv.accountTitle') || 'Sign in to view this share'}</h2>
           <p>${t('pwv.accountDesc') || 'The owner shares these documents with signed-in users only. Sign in from the top-right corner of this page, then try again.'}</p>
           <button class="btn-primary btn-sm" onClick=${retry}>
-            ${t('pwv.accountRetry') || 'I signed in — try again'}
+            ${t('pwv.accountRetry') || 'I signed in, try again'}
           </button>
         </div>
       </div>

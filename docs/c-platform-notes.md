@@ -88,7 +88,7 @@ account, or through a connector that is already approved, the same prompts usual
 warning.
 
 Do not click past the warning out of habit. A prompt of unknown origin should not be run. Every
-prompt the node hands out is shown in full before it is copied, and every one is in this
+prompt the node gives is shown in full before it is copied, and every one is in this
 repository.
 
 Three routes, in this order:

@@ -139,14 +139,14 @@ function BuildCodeCard({ code, aimeatOrigin, chatPath }) {
       <//>
       <${IndexList} steps>
         <${IndexStep}>
-          ${fill(tr('home.buildWithYou.codeStepConnect', 'Connect your own AI (Claude, ChatGPT or Grok) to {host} and to this place.'), { host })}
+          ${fill(tr('home.buildWithYou.codeStepConnect', 'Connect your own AI (Claude, ChatGPT or Grok) to {host} and to your AIMEAT.'), { host })}
           <${Actions}>
             <${Action} small href=${`${aimeatOrigin}/v1/profile?tab=mcp`} newTab>${fill(tr('home.buildWithYou.codeConnectThere', 'Connect to {host}'), { host })} →<//>
-            <${Action} small href="/v1/profile?tab=mcp">${tr('home.buildWithYou.codeConnectHere', 'Connect to this place')} →<//>
+            <${Action} small href="/v1/profile?tab=mcp">${tr('home.buildWithYou.codeConnectHere', 'Connect to your AIMEAT')} →<//>
           <//>
           <${Note} kind="hint">${fill(tr('home.buildWithYou.codeFullAccess', 'When {host} asks, choose an agent with full access.'), { host })}<//>
           ${chatPath && html`
-            <${Note} kind="hint">${fill(tr('home.buildWithYou.codeChatPath', 'You can also use this place\'s chat: connect it to {host} under Access and security.'), { host })}<//>
+            <${Note} kind="hint">${fill(tr('home.buildWithYou.codeChatPath', 'You can also use the chat in your AIMEAT: connect it to {host} under Access and security.'), { host })}<//>
             <${Actions}>
               <${Action} small soft href="/v1/profile?tab=access&section=ac-mcp">${fill(tr('home.buildWithYou.codeChatButton', 'Connect the chat to {host}'), { host })} →<//>
             <//>`}
@@ -160,7 +160,7 @@ function BuildCodeCard({ code, aimeatOrigin, chatPath }) {
         <//>
       <//>
       <${Actions}>
-        <${Action} small soft href="/v1/home?trail=1">${tr('home.buildWithYou.trailLink', 'Everything done in your place')} →<//>
+        <${Action} small soft href="/v1/home?trail=1">${tr('home.buildWithYou.trailLink', 'Everything done in your AIMEAT')} →<//>
       <//>
     <//>`;
 }
@@ -232,7 +232,7 @@ function QueueStatus({ request }) {
       ${request.note && html`<${NamedRow} label=${tr('home.buildWithYou.noteLabel', 'Message from the builders')}>${request.note}<//>`}
       <${SpecRows} spec=${request.spec} />
       <${Actions}>
-        <${Action} small soft href="/v1/home?trail=1">${tr('home.buildWithYou.trailLink', 'Everything done in your place')} →<//>
+        <${Action} small soft href="/v1/home?trail=1">${tr('home.buildWithYou.trailLink', 'Everything done in your AIMEAT')} →<//>
       <//>
     <//>`;
 }
@@ -273,7 +273,7 @@ function InvitedGuide({ request, queueOrigin }) {
       ${request.note && html`<${NamedRow} label=${tr('home.buildWithYou.noteLabel', 'Message from the builders')}>${request.note}<//>`}
       <${SpecRows} spec=${request.spec} />
       <${Actions}>
-        <${Action} small soft href="/v1/home?trail=1">${tr('home.buildWithYou.trailLink', 'Everything done in your place')} →<//>
+        <${Action} small soft href="/v1/home?trail=1">${tr('home.buildWithYou.trailLink', 'Everything done in your AIMEAT')} →<//>
       <//>
     <//>`;
 }
@@ -283,10 +283,10 @@ function Finished() {
   return html`
     <${Band} title=${title()}>
       <${Note} kind="lead">${tr('home.buildWithYou.doneTitle', 'Your agent is ready and working.')}<//>
-      <${BandNote}>${tr('home.buildWithYou.continue', 'From here you can carry on alone with your own AI. Claude Code, Codex and a Grok bot can all connect to your place and keep developing what was built.')}<//>
+      <${BandNote}>${tr('home.buildWithYou.continue', 'From here you can carry on alone with your own AI. Claude Code, Codex and a Grok bot can all connect to your AIMEAT and keep developing what was built.')}<//>
       <${Actions}>
         <${Action} small href="/v1/help#outside">${tr('home.buildWithYou.continueLink', 'How to connect them')} →<//>
-        <${Action} small soft href="/v1/home?trail=1">${tr('home.buildWithYou.trailLink', 'Everything done in your place')} →<//>
+        <${Action} small soft href="/v1/home?trail=1">${tr('home.buildWithYou.trailLink', 'Everything done in your AIMEAT')} →<//>
       <//>
     <//>`;
 }

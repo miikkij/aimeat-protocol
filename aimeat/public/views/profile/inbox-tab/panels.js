@@ -28,7 +28,7 @@
  *     over the whole width, its tools under it, as main has it), a sent broadcast's row the
  *     ConversationRow (its date on the right again); the ways on, the marks and the quiet lines are the
  *     kit (Action, Loud, Icon, Mark, Code, Note): this file writes none of their classes.
- *   v2.14.0 — 2026-09-26 — A suggested reply waiting for your yes is readable in dark mode (it no longer takes your own message's dark words for the sun), its emoji go, Reject is the danger tone (Jouni: "dark mode totally unreadable").
+ *   v2.14.0 — 2026-09-26 — A suggested reply waiting for your yes is readable in dark mode (it no longer takes your own message's dark words for the sun), its emoji go, Reject is the danger tone (Jouni).
  *   v2.13.0 — 2026-09-26 — A broadcast recipient's ✕ is the Tag's remove mark (.poster-chip-x, poster.css): grey, coral under the pointer, where it turned red on a card ground (a unification: Jouni's decision "Remove mark").
  *   v2.12.0 — 2026-09-26 — A list of conversations is the chat's list (ThreadList's rows, .poster-thread): the name in bold, one quiet line with the time and the last message, the open one on the sun; a person's heading is its person tone (ThreadPerson) with the counts named; the row's archive square is the small icon button in the delete's place. Messages' rows, a broadcast's results list and an agent's Chat threads take it; their own row looks go (a unification: Jouni's decision "Conversation list").
  *   v2.11.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).

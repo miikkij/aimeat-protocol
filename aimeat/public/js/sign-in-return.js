@@ -8,7 +8,7 @@
  *
  *   WHY. Both connect pages carried a sign-in form of their own, and neither could register anyone.
  *   Someone without an account typed an address, was told a link may have been sent, and no mail ever
- *   came (Jouni, 2026-11-04: "tuossa vain rekisteröidään agentti sille tilille ja sillä selvä"). The
+ *   came (Jouni, 2026-11-04). The
  *   front page's dialog already follows the node's settings: the password policy, the emailed link,
  *   passkeys, SSO, and whether the node takes registrations.
  *

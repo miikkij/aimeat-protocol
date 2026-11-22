@@ -2,7 +2,7 @@
 
 This is the one place where the story of AIMEAT is written down. Every other description (the
 front page, the instructions an AI reads when it connects, the README, the feature list, the IT
-adoption package) says it in short and points here. The two short forms live in the locale files
+adoption package) says it in short and points here. The two short forms are in the locale files
 under `aimeatStory.oneLine` and `aimeatStory.paragraph` (English, Finnish and Spanish), and the
 node reads them from there, so a change to the story is made in this file and in those two keys,
 and nowhere else.

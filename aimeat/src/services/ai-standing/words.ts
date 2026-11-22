@@ -5,8 +5,8 @@
  * @description Which permissions an owner may give every one of their AIs at once ("Allow always"),
  *   and what the node lets them give.
  *
- *   WHY. Jouni, 2026-11-20: "jos tekoälylle on annettu oikeudet toimia itsenäisemmin niin silloin
- *   ihmishyväksyntää ei tarvita välissä ja se kirjataan vain semmoisenaan", configurable on the node
+ *   WHY. Jouni, 2026-11-20: when an AI has the right to act on its own, no human approval is needed
+ *   between and the act is only recorded, configurable on the node
  *   and by the owner (decision-ai-ei-kysy-kahdesti-itsen-isyys-s-det-n-noden-ja-omistajan-t). An
  *   agent holding `*` already does everything a wildcard carries. What still stops it is a word no
  *   wildcard carries (utils/scope-coverage.ts SCOPES_OUTSIDE_WILDCARD) or one of the powerful words

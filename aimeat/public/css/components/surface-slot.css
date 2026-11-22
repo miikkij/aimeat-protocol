@@ -7,7 +7,7 @@
  *   that has arrived lays out exactly as it did without them. While it waits, the slot shows the
  *   block's heading and the loading line (the Band and Note kind="loading" the Settings pages use),
  *   at the height the block had on the last visit in this browser, so nothing below it jumps when
- *   the data arrives (Jouni, 2026-11-09: "Heading + loading line").
+ *   the data arrives (Jouni, 2026-11-09).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
  *   v1.0.0 — 2026-11-09 — Initial.

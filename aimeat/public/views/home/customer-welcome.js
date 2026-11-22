@@ -19,7 +19,7 @@
  *   v1.3.1 — 2026-11-07 — The lead's fallback follows the new story (docs/AIMEAT-Story.md): connecting multiplies what the AI can do.
  *   v1.3.0 — 2026-11-01 — While the place's own chat answers (ai-credit.js chatWorks), step 2 is open
  *     with a link to the chat, not greyed as waiting for the outside AI.
- *   v1.2.0 — 2026-10-31 — Jouni's review of v31 (K26): "Tervetuloa omaan AIMEATiisi, <nimi>" with a
+ *   v1.2.0 — 2026-10-31 — the review of v31 (K26; Jouni) set the greeting "Tervetuloa omaan AIMEATiisi, <nimi>" with a
  *     real name only, never the account id; the address in small type; "oikea kätesi" in place of
  *     "esikuntapäällikkö", and MCP only behind "Mikä tämä on?"; the connect buttons are the one loud
  *     action; step 2 waits greyed until the AI is connected, and its sentence field is gone; step 3

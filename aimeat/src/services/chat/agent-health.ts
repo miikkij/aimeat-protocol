@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Whether the chat agent really starts on this node, found by starting it, before the
- *   chat page says the chat can answer (Jouni, 2026-11-07: "sen piti jo ilmoittaa se aiemmin eikä
- *   antaa edes käyttää jos ei pysty käyttää").
+ *   chat page says the chat can answer (Jouni, 2026-11-07: a chat that cannot work is reported
+ *   early, and the person cannot use it).
  *
  *   WHY. GET /v1/chat/status decided "ready" from the settings alone: a chat agent path is set and a
  *   key may pay. A path that names a program which is not goose passed, the page let the person type,

@@ -1,7 +1,7 @@
 # Building an AIMEAT-compatible ecosystem application
 
 **Audience:** anyone building or integrating an external service that connects to AIMEAT (a support
-desk, a table store, a collaborative editor), and the AI you hand the build to.
+desk, a table store, a collaborative editor), and the AI you give the build to.
 
 **What it answers:** what AIMEAT expects from an external app so that it is AIMEAT-compatible, how it
 joins, the contract it builds against today, how an owner automates the app's data with their own
@@ -27,7 +27,7 @@ agents, and a copy-paste prompt that produces a valid declaration.
 
 ## 0. What an ecosystem app is
 
-An **ecosystem application** is an external service that connects to AIMEAT. It lives on its own
+An **ecosystem application** is an external service that connects to AIMEAT. It runs on its own
 domain, can be written in any language on any stack and runs in its own environment. AIMEAT does not
 interfere with how it is built or where it runs, as long as it completes the handshake and behaves
 correctly. It is modelled on an AIMEAT agent connection: an external principal beside the agent, the
@@ -64,7 +64,7 @@ service stays language-agnostic.
 ## 1. Compatibility levels (each one optional and additive)
 
 An app that connects and declares nothing extra already works and is never penalised. The levels
-mirror the agent ladder; the last column says what the node enforces today.
+mirror the agent levels; the last column says what the node enforces today.
 
 | Level | What the app does | Built now? |
 |---|---|---|
@@ -255,11 +255,11 @@ is validated against **`EcoManifestSchema`**, which is what the node enforces to
 > **Design-target fields (not in the built schema; do not rely on them being enforced):** `price`,
 > `visibility`, `title` and `description` per capability, the level-3 workflow signals
 > (`success_signal`, `required_to_function`, `deliverable.location`), payload schemas per event, and a
-> `views` section for views the app ships. Until they land in `EcoManifestSchema` the node neither
+> `views` section for views the app ships. Until they are added to `EcoManifestSchema` the node neither
 > requires nor validates them. Including them is harmless (extra keys), but build against the fields
 > above for anything you depend on today.
 
-The published manifest lives in the GEAI's own `eco:` memory namespace, the way agents publish
+The published manifest is stored in the GEAI's own `eco:` memory namespace, the way agents publish
 `agents.{name}.offers`; the connector transmits it.
 
 ---
@@ -306,7 +306,7 @@ event type. A workflow trigger pins it, and on a major mismatch it does not fire
 ## 7. Automation: from the app's data to the owner's agent and back (built)
 
 This is what an owner sets up once an app is connected. The app and the owner's agents never talk to
-each other: AIMEAT sits between them, and nothing crosses unless the owner configured it.
+each other: AIMEAT is between them, and nothing is passed on unless the owner configured it.
 
 ```mermaid
 flowchart LR
@@ -348,7 +348,7 @@ once, and the trigger key under Advanced) saved with one button that writes both
 the recipe, and the latest run: when the app last published, which agents process it, and the
 advisories that wait, with Approve and Reject.
 
-**From the owner's own AI.** Because the data and the advisories live in AIMEAT, the owner asks about
+**From the owner's own AI.** Because the data and the advisories are stored in AIMEAT, the owner asks about
 them from any AI chat connected to the node over MCP, without opening the app: "Read what the feedback
 app published this week and summarise the top issues", then "Save your analysis to my product
 organism", and a month later "Compare it with this month's numbers: did the issues we flagged

@@ -1,7 +1,7 @@
 /**
  * @file e2e-package-account-sale.ts
  * @description E2E for an author selling their own package to another account of the same node
- *   (Jouni, 2026-10-31, "optio B"; wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
+ *   (Jouni, 2026-10-31, option B; wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  *   Owner A is the author, B the buyer, C another owner. The money moves on the node's test payment
  *   handler (test.money), never a real card.
  *

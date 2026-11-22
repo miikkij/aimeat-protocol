@@ -10,7 +10,7 @@
  *   holding help:answer: with the helper's level `off` it is refused; with `draft` its answer is stored
  *   as a draft the helper approves; with `auto` it is sent when the question's topics fall in the
  *   helper's own auto topics (and the operator allows it), and drafted otherwise. An answer an AI sent
- *   is marked as written by that agent in both mailboxes (Jouni, 2026-11-14: "ensimmäiseen versioon").
+ *   is marked as written by that agent in both mailboxes (Jouni, 2026-11-14: in the first version).
  *
  *   A REPLY IN THE THREAD COUNTS. A helper who simply answers in the message thread has answered:
  *   thread-reply.ts noteThreadReply is called by the message path after it delivers a message in a

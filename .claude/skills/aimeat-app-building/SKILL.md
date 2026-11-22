@@ -11,7 +11,7 @@ The moment the task is "build / make / publish an app on AIMEAT":
 
 > You have `aimeat_*` MCP tools. Follow the research-first flow: load `node:aimeat-app-builder-atelier` and call `aimeat_appdev_overview` first. Every app, new or changed, is built with the **Atelier specification** (`aimeat_handbook_get { tier: "build-app-atelier" }`, in parts, or `GET /v1/prompts/build-app-atelier`); its part `platform` lists the sections only some apps need. The level is `fine` unless the owner chose `proto` or `plain` in their own words; it is not asked. On `fine` (and when no level is stated) the build forks a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`); a `proto` or `plain` page starts from the shell `shell-atelier` with no genre and no register. The Classic track (its spec, skill and T1/T2/T3 shells) was retired on 2026-11-19; an app built on it is moved with the section `from-classic`.
 
-**One guide, the whole build.** On 2026-09-19 a model began on Atelier, judged the Classic shell quicker to start from, changed over, and handed Jouni an app with a hand-built header and a broken sign-in bar; it had accepted that because its own tests passed. That road is closed now. If the Atelier road stops you, say what stopped you and wait. The publish names a new page that is not an Atelier app (`app_hints`, pitfall `track-drift`), and a finished app is compared with the genre it was forked from before it is shown.
+**One guide, the whole build.** On 2026-09-19 a model began on Atelier, judged the Classic shell quicker to start from, changed over, and gave Jouni an app with a hand-built header and a broken sign-in bar; it had accepted that because its own tests passed. That option is closed now. If the Atelier track stops you, say what stopped you and wait. The publish names a new page that is not an Atelier app (`app_hints`, pitfall `track-drift`), and a finished app is compared with the genre it was forked from before it is shown.
 
 This is a hard precondition of the build, not an optional preamble, and it comes **before** reading repo source: existing published apps and the KB show which libs and patterns are already proven, so reuse beats re-deriving from lib sources. Skipping it once produced non-theming (hardcoded colours), meta-less, duplicate, low-polish apps.
 
@@ -39,7 +39,7 @@ Non-negotiables that flow enforces:
 - Include `<meta name="aimeat-scopes">`, and use only scopes that exist in the node's vocabulary. An invented scope means `INVALID_SCOPE` and nobody can log in.
 - AIMEAT SDK libs load from `/v1/libs/`; vendored styling from `/lib/`. Do not mix the two.
 - **Touch input goes through `aimeat-input`, never a hand-rolled `touchstart` listener.** `AIMEAT.input.tappable(el, fn)` for every button, card and row (built on `click`, so tap, mouse and Enter/Space each arrive once and a screen reader announces it); `AIMEAT.input.on(el, handlers, { axis })` when a click is not enough, declaring `axis` on anything that also scrolls. A hand-rolled touch listener fires twice, triggers mid-scroll, and locks out the keyboard. The mobile rules in the build-app prompt cover LAYOUT; this is the other half.
-- **Data on the node reaches the screen through an event, and a timer is the last resort.** `AIMEAT.live.subscribe(['agent-tasks'], …)`, the mosaic's `live` map (a `keyPrefix` for the owner's records, `domains` for the rest) and `AIMEAT.agents.watch` for one task. Both build specifications carry the rule, the domains an app may hear and the three places a timer belongs; the text and what happened without it are in `aimeat/src/services/builder/events-first.ts`. An app built from this repo read an agent task's stage every 30 seconds and showed it 37 seconds late on aimeat.io (Jouni, 2026-10-11: "pollaamisen pitää olla viimeisin konsti käyttöliittymäpuolella").
+- **Data on the node reaches the screen through an event, and a timer is the last resort.** `AIMEAT.live.subscribe(['agent-tasks'], …)`, the mosaic's `live` map (a `keyPrefix` for the owner's records, `domains` for the rest) and `AIMEAT.agents.watch` for one task. Both build specifications carry the rule, the domains an app may hear and the three places a timer belongs; the text and what happened without it are in `aimeat/src/services/builder/events-first.ts`. An app built from this repo read an agent task's stage every 30 seconds and showed it 37 seconds late on aimeat.io (Jouni, 2026-10-11).
 - Morsels are plain integers, never the meat emoji.
 - Check `aimeat_appdev_overview.apps` for an existing app or capability before building. Reuse beats duplicate.
 
@@ -70,7 +70,7 @@ Three habits keep them from being forgotten:
 
 There is one specification, **node-served**: `GET /v1/prompts/build-app-atelier` (over MCP `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts). Source of truth: `src/services/builder/atelier-prompt.ts` and its siblings `atelier-*.ts`. Its platform sections (`atelier-platform.ts`) are cut from the text `src/services/builder/app-prompt.ts` builds, which is served whole to nobody since the Classic track was retired on 2026-11-19; the old addresses (`/v1/prompts/build-app`, tier `build-app`) answer with the Atelier text (`classic-retired.ts`). `?delivery=paste` is the text for an AI that cannot connect.
 
-Consumers: the App Catalog's "Create" dialog (`public/views/appcat/dialogs/generate-prompt.js`) sends a connected AI to Atelier and folds the paste delivery for an AI that cannot connect; the front page's builder (`public/views/landing-builder.js`) does the same; the OpenHands app-builder (`tools/aimeat-openhands/`) fetches the spec at runtime. Agent-facing discovery is `/llms.txt` plus the bootstrap `app_building` block.
+Consumers: the App Catalog's "Create" dialog (`public/views/appcat/dialogs/generate-prompt.js`) sends a connected AI to Atelier and folds the prompt delivery for an AI that cannot connect; the front page's builder (`public/views/landing-builder.js`) does the same; the OpenHands app-builder (`tools/aimeat-openhands/`) fetches the spec at runtime. Agent-facing discovery is `/llms.txt` plus the bootstrap `app_building` block.
 
 **Improve app-building guidance in the node services (`atelier-*.ts`, and `app-prompt.ts` for a platform section cut from it), never in a client.**
 
@@ -103,8 +103,8 @@ does this answer?*
 | owner memory, `visibility: public` | what somebody not signed in must read (never people) | the person |
 | the extension's namespace | a rule enforced server-side with no human present | the extension |
 
-**Four rows nobody draws, and they are the ones an audit lands on.** The table above is what the
-node holds and can hand back. These are not, and each answers *can you delete it* differently:
+**Four rows nobody draws, and they are the ones an audit finds.** The table above is what the
+node holds and can return. These are not, and each answers *can you delete it* differently:
 
 | What | Where the real one is | What deleting it means |
 |---|---|---|

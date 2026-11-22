@@ -5,8 +5,8 @@
  * @description appcat's shared state: the node's app listing (own and community), the stars, the
  *   bound skills, and the few acts every part of the page needs (reload, star, notice, open the
  *   detail). One store for the page; a part reads it with useCatalog() and never keeps its own copy.
- *   Nothing about apps is kept in the browser's own storage (Jouni: "selaimen omaa tallennusta ei
- *   pitäisi olla"): the stars live on the node (the memory record app-catalog.favorites, which the
+ *   Nothing about apps is kept in the browser's own storage (Jouni):
+ *   the stars live on the node (the memory record app-catalog.favorites, which the
  *   home page reads too), the listing is read again on every load.
  *
  *   The listing (features.md F179): GET /v1/apps?limit=200&offset=n, page after page while a page is

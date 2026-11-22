@@ -322,8 +322,8 @@ export function registerDmMessageTools(
             const mapped = attachments?.length ? mapMessageAttachments(attachments, senderGhii, config.nodeId) : undefined;
             // The operator's agent holding operator:admin may send to a node-wide audience, as on REST:
             // POST /v1/messages/broadcast asks isOperatorCaller() of the same session, so both surfaces
-            // give the same principal the same answer (secaudit 2026-10, C2; Jouni 2026-10-05: "Agent
-            // must be capable of maintaining the system fully when using operator:admin rights").
+            // give the same principal the same answer (secaudit 2026-10, C2; Jouni 2026-10-05: an
+            // agent with operator:admin can maintain the whole system).
             // Any other agent is refused the audience by the service, as before.
             const isOperator = await caller().operator();
             const result = await broadcastFromPrincipal(ctx, {

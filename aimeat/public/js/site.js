@@ -122,7 +122,7 @@ export function customerNode() {
 }
 
 /**
- * Whether the footer shows the developer links: "For Developers", "Run your own node", GitHub and the
+ * Whether the footer shows the developer links: "For Developers", "Run your own AIMEAT", GitHub and the
  * row for machines (site.dev_links). 'auto' shows them except on a customer's node; 'show' and 'hide'
  * are the operator's own decision (Jouni, 2026-10-30).
  * @returns {boolean}

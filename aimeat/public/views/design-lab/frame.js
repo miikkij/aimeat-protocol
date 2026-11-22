@@ -23,7 +23,7 @@
  *     saved theme and style (the lab's picker), and `fk=` sends the frame's measurements (frame-checks.js).
  *   v1.3.0 — 2026-09-24 — The lab's sheet (css/design-lab-proposals.css) is loaded by this page only.
  *   v1.2.0 — 2026-09-23 — `solo=1`: only the element a decision is about, alone and up to twice its
- *     size (Jouni: "Show only the thing being decided"); the values on the window for the crop script.
+ *     size (Jouni); the values on the window for the crop script.
  *   v1.1.0 — 2026-09-23 — Decision variants (`id=decision:<id>`), and the drawn element's values
  *     (face, size, weight, case, tracking, padding, frame, radius, fill, colour by token) sent to the
  *     frame with its height.

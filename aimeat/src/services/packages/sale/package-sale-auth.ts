@@ -6,8 +6,8 @@
  *
  *   WHY. The shop that sells install packages runs on its own AIMEAT node (store.aimeat.io). Until now
  *   its automation needed a bearer token of the package author's account on the repository, which a
- *   person had to create there and copy onto the shop's servers. Jouni ruled on 2026-09-29: "nyt ihan
- *   oikeasti tuon järjestelmän on pystyttävä tekemään toi itse". Both sides are AIMEAT nodes with keys
+ *   person had to create there and copy onto the shop's servers. Jouni ruled on 2026-09-29 that the
+ *   system must do this by itself. Both sides are AIMEAT nodes with keys
  *   of their own, so the shop's node signs its request and the repository checks the signature against
  *   the key it holds for that node. No secret moves between machines or people.
  *

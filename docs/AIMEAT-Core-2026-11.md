@@ -160,7 +160,7 @@ Each term below has one meaning in this document.
 | **Morsel** | The unit of pacing (§8.1). A morsel is not money, not a price and not a credit. |
 | **Pacing amount** | The number of morsels one use of an offer moves from the user's owner to the provider's owner, with part of it burned (§8.2). |
 | **Peer** | Another node with which a node has a federation relationship (§9). |
-| **Tier** | The rung a peer stands on: `contact`, `visiting`, `member` or `genesis` (§9.1). |
+| **Tier** | The level a peer has: `contact`, `visiting`, `member` or `genesis` (§9.1). |
 | **Signed node request** | A message one node sends another, signed with the sender's node key and carrying the proof of §9.3. |
 | **Surface** | One MCP endpoint that exposes a named subset of the tools (§11.4). |
 | **Provenance record** | A document of type `aimeat.provenance/v1` that says how a piece of content was made (§10). |
@@ -605,7 +605,7 @@ A node meters different things with different units, and never converts one into
 
 ### 8.1 Morsels
 
-A morsel is the unit of pacing. It slows what agents push into the store and into other people's offers, so that what lands is refined rather than dumped. A large balance is a signal that the person has contributed something others found worth using. A morsel is not money, not a price and not a credit, and it buys nothing outside the node.
+A morsel is the unit of pacing. It slows what agents push into the store and into other people's offers, so that what is stored is refined rather than dumped. A large balance is a signal that the person has contributed something others found worth using. A morsel is not money, not a price and not a credit, and it buys nothing outside the node.
 
 - **PACE-01** A node MUST keep one morsel balance per owner, and MUST resolve a debit or a credit for an agent or an application to its owner's balance. An agent or application MUST NOT hold a balance of its own.
 - **PACE-02** A node MUST credit owners morsels over time without any action of theirs, up to a cap the node states, so that an idle owner regains capacity. (The reference node credits a daily allowance.)
@@ -786,7 +786,7 @@ The record is a JSON document with `spec` set to `aimeat.provenance/v1`.
 
 ### 10.2 Carriers
 
-A node serves both an attached mark, which travels with the content, and an addressable record, at its own URL and joined by content hash.
+A node serves both an attached mark, which goes with the content, and an addressable record, at its own URL and joined by content hash.
 
 | Carrier | Attached | Addressable |
 |---|---|---|
@@ -812,7 +812,7 @@ A node serves both an attached mark, which travels with the content, and an addr
 - **PROV-15** A node whose security profile is public MUST NOT turn visible labels off.
 - **PROV-16** A node MUST publish its transparency posture, the operator's identity, its supervisory authority and its detection endpoints at `/v1/ai-transparency`, and MUST report an unset authority as unstated.
 
-Machine-to-machine traffic (an agent's MCP call, federation, scheduled jobs) is not a conversation with a natural person, so the "you are talking to an AI" disclosure does not apply to it. The record still travels there, because a hop that drops it loses it for good.
+Machine-to-machine traffic (an agent's MCP call, federation, scheduled jobs) is not a conversation with a natural person, so the "you are talking to an AI" disclosure does not apply to it. The record is still sent there, because a hop that drops it loses it for good.
 
 ---
 

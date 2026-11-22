@@ -88,8 +88,8 @@ export function requireOperatorPrincipal(storage: Storage, scope: string = OPERA
  * The node operator's routes: the operator in person, or the operator's agent holding operator:admin,
  * asked through askOperator() as the MCP admin tools ask it. requireRole('operator') read the role off
  * the token, which an agent token never carries, so the operator's agent was refused on REST what it
- * was given on MCP (secaudit 2026-10, C2; Jouni 2026-10-05: "Agent must be capable of maintaining the
- * system fully when using operator:admin rights").
+ * was given on MCP (secaudit 2026-10, C2; Jouni 2026-10-05: an agent with operator:admin
+ * can maintain the whole system).
  */
 export function requireOperator(storage: Storage) {
   return requireOperatorPrincipal(storage, OPERATOR_ADMIN_SCOPE);

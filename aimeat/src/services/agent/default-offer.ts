@@ -11,8 +11,8 @@
  *   (crewaimeat: aimeat_crew.py "inline offer", crew_def.py crewspec_from_json). The node does not
  *   publish it; the definition only has to carry it. Until 2026-10-11 nothing that makes an agent
  *   here wrote one: the home's draft asked the model for no offer and the three ready definitions
- *   have none, so a new agent's Offerings row stayed empty (Jouni, 2026-10-11: "I thought this was
- *   built into the crew JSON so they come to the offers automatically").
+ *   have none, so a new agent's Offerings row stayed empty (Jouni, 2026-10-11: the crew definition must carry
+ *   an offer, so that a new agent shows on the Offerings page by itself).
  *
  *   WHAT THE RUNTIME NEEDS IN AN ENTRY. It builds the published offer from these keys and fails on
  *   a missing one: id, title, ask, example, cost, latency, repeatability, verification,

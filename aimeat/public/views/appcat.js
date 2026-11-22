@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description appcat: the app catalogue at /v1/appcat, the old /app-catalog.html rebuilt on the
- *   component library, the same page on the same data (Jouni: "täysin samanlainen kuin nykyinen
- *   app-catalogue … teemattavissa, preactia käyttävä ja komponentisoitu"). This file is the shell:
+ *   component library, the same page on the same data, themable, in Preact and built from components
+ *   (Jouni). This file is the shell:
  *   the index at the left, the masthead, the band, the search and order, the Active Extensions bar,
  *   the three lists and the foot, the page's keys and its deep links; it draws the dialog host, the
  *   detail view and the notice once. The site's own top bar, look picker and language switch stand in

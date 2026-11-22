@@ -10,8 +10,8 @@
  *   WHERE IT LIVES. The managed prompt `home-ideas` (services/prompt-defaults/home-ideas.ts seeds
  *   it): a JSON document in `content` (English) and one per language in `locales`. The operator
  *   edits it on the Prompts page like any managed prompt, and after the first seed the seeder never
- *   writes over the operator's text. Ruled by Jouni on 2026-10-14: "Mistä lista luetaan? Suositus:
- *   solmulla on yksi tietue, jota ylläpitäjä voi muokata" → "suosituksen mukaan".
+ *   writes over the operator's text. Ruled by Jouni on 2026-10-14: the node keeps one record, which
+ *   the operator can edit.
  *
  *   AN OPERATOR'S MISTAKE COSTS ONE ENTRY, NOT THE LIST. A document that is not JSON gives an empty
  *   list and says why; an entry that lacks a field the page needs is left out and named in

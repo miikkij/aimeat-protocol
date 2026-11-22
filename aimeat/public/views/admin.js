@@ -228,7 +228,7 @@ function AdminStart({ id, title }) {
 }
 
 // The pages that draw an index of their own and get no contents rail: Config lists its groups in
-// its own left index (Jouni, 2026-11-19: "se on special case").
+// its own left index, a special case (Jouni, 2026-11-19).
 const OWN_INDEX = new Set(['config']);
 
 // Page title lookup

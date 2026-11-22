@@ -173,7 +173,7 @@ function helpTermOf(block) {
 /* ── The waiting slot (`placeholders`, the home) ──────────────────────────────────────────────
  * While a block's code or data is on its way, its place shows the block's heading and the loading
  * line, at the height the block had when it last drew something in this browser, so the page does
- * not jump when the data arrives (Jouni, 2026-11-09: "Heading + loading line"). The wrappers draw no
+ * not jump when the data arrives (the heading-and-loading-line option; Jouni, 2026-11-09). The wrappers draw no
  * box (css/components/surface-slot.css), so a block that has arrived lays out as it did without them.
  * The heights are a per-browser convenience in localStorage: without them a slot waits at the
  * height of its heading and line. */

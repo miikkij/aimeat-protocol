@@ -12,7 +12,7 @@
     the write route and Sites.Selected.
   2026-09-26 — The agents' button is the owner's one tap, POST /v1/agents/{name}/read-through.
   2026-09-26 — An unverified alias is refused naming only the alias asked for; the one-time notice
-    names the owner's agents too, and an agent refused the read door is told the way.
+    names the owner's agents too, and an agent refused the read endpoint is told what to do.
   v1.0.0 — 2026-08-26 — Initial. The subsystem had shipped without a document, so the only way to
     learn it was to read providers.ts.
 -->
@@ -27,11 +27,11 @@ it stops everything at once.
 Two directions, and they are separate on purpose.
 
 **Reading** answers "what does my own account already know". Mail is the case that makes it obvious:
-a person forwards themselves an invoice, a booking, a meter reading, and it sits in a mailbox no
+a person forwards themselves an invoice, a booking, a meter reading, and it is in a mailbox no
 tool of theirs can see.
 
 **Sending** puts something out under their name — a post, a message, an email that leaves from their
-own address, carries their domain's SPF and DKIM, and lands in their own Sent folder.
+own address, carries their domain's SPF and DKIM, and is stored in their own Sent folder.
 
 ## Read and send are different consent
 
@@ -72,7 +72,7 @@ POST /v1/connections/start   { provider, mode: 'personal', return_url? }   → {
 
 The answer is an address for a **person** to open. They see at the provider exactly what is being
 asked for and approve it there. Nothing on this node can approve it for them, and fetching the
-address without handing it over does nothing.
+address without giving it to the person does nothing.
 
 **The callback finishes only in the browser that the round belongs to** (since 2026-10-09). When the
 owner starts the round on a page of this node, the answer sets an httpOnly cookie on the callback
@@ -80,7 +80,7 @@ path and `authorize_url` is the provider's address. When anybody else starts it 
 MCP tool), `authorize_url` is the node's own page `/v1/oauth-round?state=…` and `owner_confirms` is
 true: the owner opens it signed in, confirms (`POST /v1/oauth-rounds/{state}/approve`), and goes on to
 the provider from there. A callback from any other browser is refused with 403 and connects nothing,
-so an address handed to somebody else cannot put their account under the starter.
+so an address given to somebody else cannot put their account under the starter.
 
 **An agent's accounts are its own, and its owner sees them.** An agent connects under its own
 identity, so only that agent can use the account. The owner in person lists every account their
@@ -134,7 +134,7 @@ Narrow the query before widening it. The `query` parameter is the provider's own
 (`from:lasku@example.com has:attachment newer_than:90d`), and it is the difference between a useful
 answer and forty thousand messages. Reading a whole mailbox to see what is in it is not a search.
 
-Gmail hands back a message as a **tree of parts** with the text in base64url — which is not base64:
+Gmail returns a message as a **tree of parts** with the text in base64url — which is not base64:
 `-` for `+`, `_` for `/`, and the padding is usually missing. Prefer `text/plain` and fall back to
 stripping the HTML. Attachments come by reference; fetching one is a real download on the person's
 own allowance, and most of the time the answer is already in the text.
@@ -145,7 +145,7 @@ own allowance, and most of the time the answer is already in the text.
 POST /v1/outbound/send   { contact_id, subject, body, connection_id?, from_alias?, ai_disclosure? }
 ```
 
-**The outbound door stays the only sending path.** It owns the policy chain — a saved recipient
+**The outbound endpoint stays the only sending path.** It owns the policy chain — a saved recipient
 rather than a free address, suppression, opt-out on marketing, the rolling daily allowance, the
 unsubscribe link — and passing `connection_id` changes only how the accepted message physically
 leaves. Three ways, in order: the caller's own connected mailbox, the company's own SMTP, the node's
@@ -155,7 +155,7 @@ The connection is resolved and authorised **before the first gate**, so a refuse
 with the sender who attempted it. It must be the caller's own and must carry `send-mail`; otherwise
 the refusal names the repair. Scopes: `outbound:send` and `connections:use`, both.
 
-A send that did not go out is an error on every door, and it is still in the send log. Over REST
+A send that did not go out is an error on every endpoint and tool, and it is still in the send log. Over REST
 it is `SEND_FAILED`, with the log row and the reason in `error.details`
 (`{ message_id, status, channel, reason }`); a tool answers the same fields as an error result.
 The HTTP status says which of two things happened:
@@ -166,7 +166,7 @@ The HTTP status says which of two things happened:
 | **503** | The node had nothing to send through: no shared transport, and no mailbox or company server was named | `EMAIL_DISABLED` |
 
 Until 2026-09-13 the REST answer was a 200 with `data.status` "failed", which a caller reading the
-status took for a sent message. A 200 now means the message was handed over, which is still **not a
+status took for a sent message. A 200 now means the message was accepted for sending, which is still **not a
 delivery**: a bounce shows up on the contact afterwards.
 
 ### The Google alias, which is the button people mean
@@ -310,7 +310,7 @@ reads mail needs the owner to grant the new word, and there are two ways:
   The button is `POST /v1/app-grants/{grantId}/read-through`, the owner in person only: it adds that
   one word to that one grant, only to a grant that holds `connections:use`. `DELETE` on the same
   address takes it away, as does narrowing the grant on the Access page.
-- **The app asks.** An app refused the read door is told the word and the way: it adds
+- **The app asks.** An app refused read-through access is told the word and the way: it adds
   `connections:read-through` to its `<meta name="aimeat-scopes">`, and the owner approves it in the
   consent window.
 
@@ -320,7 +320,7 @@ run tells each owner whose agents hold `connections:use` by name beside a mailbo
 notification of its own that names those agents, with a button per agent (three at most). The
 button is `POST /v1/agents/{name}/read-through`, the owner in person only: it adds that one word to
 that one agent, only to an agent that holds `connections:use`, and `DELETE` on the same address
-takes it away. An agent refused the read door is told the word, and that its owner gives it on the
+takes it away. An agent refused read-through access is told the word, and that its owner gives it on the
 agent's page.
 
 A word the owner added by hand is recorded on the grant (`owner_added_scopes` in

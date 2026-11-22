@@ -45,7 +45,7 @@
  *   v1.46.1 — 2026-11-15 — Words only (Jouni: the prompts work better when they explain the thing):
  *     "an admin or monitoring screen" for the machine room, "the log view" for the log vane, "the one
  *     colour you set" for the one colour door.
- *   v1.46.0 — 2026-11-11 — ADDITIVE (Jouni approved it: "Tee"): Finishing gains one paragraph with
+ *   v1.46.0 — 2026-11-11 — ADDITIVE (Jouni approved it): Finishing gains one paragraph with
  *     two checks. The console is read with the browser's own warnings while the app works, and an
  *     app that computes every frame is run with the JavaScript compiler off. An app built from this
  *     spec went out with frames of 59 ms in a browser without its JIT and then with a WebGL warning

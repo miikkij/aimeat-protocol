@@ -3,10 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The standard every one-press approval on this node keeps, and the pieces the flows
- *   share to keep it (secaudit2026oct22; Jouni, 2026-10-25: "pitää olla käyttäjälle erittäin
- *   selkeä mitä tapahtuu ja että tässä varmistetaan asioita ... jos sitä ei hyväksytä käyttäjän on
- *   saatava siitä myös ilmoitus takaisin päin. sekä jos se hyväksyttiin niin siitäkin. muuten se
- *   näkyy vain pending.").
+ *   share to keep it (secaudit2026oct22; Jouni, 2026-10-25: the person sees clearly what happens and what
+ *   is checked, and is told the result both when the request is approved and when it is not, so it
+ *   never only shows as pending).
  *
  *   THE STANDARD.
  *     1. The one who answers gets a notice that says in plain words what is checked and why, with

@@ -190,10 +190,10 @@ const FRAMES = [
   ['landing2.ten3', 'An auction closed.'],
   ['landing2.ten4', 'The report went out.'],
   ['landing2.ten5', 'A 3D world got built.'],
-  ['landing2.ten6', 'An agent woke at seven and did it again.'],
+  ['landing2.ten6', 'An agent started at seven, on schedule, and did it again.'],
 ];
 const MORE = ['landing2.tenMore', 'And more. But why should you care?'];
-const ANSWER = ['landing2.tenAnswer', 'Because your AI gets these powers, and you get them through it.'];
+const ANSWER = ['landing2.tenAnswer', 'Because your AI gets these capabilities, and you get them through it.'];
 /** The last frame: this very page, as the proof of the claim. The picture is scripts/projector-shots.ts --only front. */
 const SELF = ['landing2.tenSelf', 'Including this page. Built here, with itself.'];
 const SELF_SHOT = '/img/frontdemo/front-page.png';
@@ -281,7 +281,7 @@ export function TenSeconds({ navigate }) {
           <button type="button" class="btn-outline ld-v2-replay" onClick=${replay}>${tr('landing2.tenReplay', 'Play it again')}</button>
         </div>`}
       <p class="ld-v2-ten-after">
-        ${tr('landing2.tenAfter', 'Nothing new to learn. You keep talking to the AI you already use, and it picks its powers up here.')}
+        ${tr('landing2.tenAfter', 'Nothing new to learn. You keep talking to the AI you already use, and it gets these capabilities here.')}
         ${' '}
         <a href="/v1/connect-your-ai" onClick=${(e) => { e.preventDefault(); navigate('/v1/connect-your-ai'); }}>${tr('landing2.plugIn', 'Plug in the AI you already use →')}</a>
       </p>
@@ -298,8 +298,8 @@ export function LinuxLine() {
   return html`
     <section class="ld-sh-box poster-aside ld-v2-linux">
       <h2 class="ld-sh-box-label">${tr('landing2.linuxLabel', 'You own your data and your AI memory.')}</h2>
-      <p>${tr('landing2.linuxText', 'Run your own AIMEAT on a server in the EU or on your own machine. Your data and saved AI memory are stored there. You decide who can access them.')}</p>
-      <p>${tr('landing2.linuxAi', 'Cloud AI processes the information you send to it, even when you use your own API key. A local model lets you keep AI processing on your own machine.')}</p>
+      <p>${tr('landing2.linuxText', 'Run your own AIMEAT on a server in the EU or on your own computer. Your data and saved AI memory are stored there. You decide who can access them.')}</p>
+      <p>${tr('landing2.linuxAi', 'Cloud AI processes the information you send to it, even when you use your own API key. A local model lets you keep AI processing on your own computer.')}</p>
       <p>${afterMit === undefined ? continuity : html`${beforeMit}<a href="https://github.com/miikkij/aimeat-protocol/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>${afterMit}`}</p>
       <a class="showroom-door" href="/v1/business">${tr('landing2.linuxBusiness', 'AIMEAT for your business →')}</a>
       <!-- "or on your own machine" above had no way to act on it until 2026-09-18: the desktop

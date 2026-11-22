@@ -61,7 +61,7 @@ export function PlanView({ plan, onPlan, onStart, onRedo, busy }) {
         { k: g('goal', 'Goal'), v: plan.title },
         plan.doneWhen && { k: g('doneWhen', 'Done when'), v: plan.doneWhen },
         { k: html`${g('lead', 'Who leads it')} <${HelpTip} term="concept.coordinator" label=${g('lead', 'Who leads it')} />`,
-          v: plan.coordinator ? g('leadAgent', 'Your agent {agent} coordinates it').replace('{agent}', plan.coordinator) : g('leadRules', 'AIMEAT keeps it moving: each work starts when the one before it is done') },
+          v: plan.coordinator ? g('leadAgent', 'Your agent {agent} coordinates it').replace('{agent}', plan.coordinator) : g('leadRules', 'AIMEAT runs it: each work starts when the one before it is done') },
         { k: html`${g('limit', 'It may spend')} <${HelpTip} term="concept.spending" label=${g('limit', 'It may spend')} />`,
           v: money(plan.limitUsd), sub: models ? g('limitSub', '{n} of the works use AIMEAT\'s model with your key; the limit stops it').replace('{n}', String(models)) : g('limitNone', 'No work here uses AIMEAT\'s model') },
         { k: g('days', 'It runs for'), v: g('daysV', '{n} days').replace('{n}', String(plan.days)) },

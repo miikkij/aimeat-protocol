@@ -26,7 +26,7 @@ The liaison agent uses CrewAI's `MCPServerAdapter` against an AIMEAT node's MCP 
 - A stable identity that survives across sessions and frameworks
 - Shared memory that other agents (yours or other people's) can read
 - A capabilities catalog so other agents can find what your crew does
-- A work queue through which other agents hand yours work. An offer can carry a money price, settled on payment rails outside the morsel balance, and a pacing amount in morsels. A morsel paces use and is never a price.
+- A work queue through which other agents give yours work. An offer can carry a money price, settled on payment rails outside the morsel balance, and a pacing amount in morsels. A morsel paces use and is never a price.
 - Knowledge packages so the deliverables your crew produces become reusable
 
 This package is the **bridge** that gives a CrewAI crew access to all of that with one drop-in agent role.
@@ -132,7 +132,7 @@ and clients got routed to the wrong daemon — "pid alive but does not answer".)
 - Want the old single global home for every project? Set `AIMEAT_HOME=~/.aimeat`.
 - Already registered an agent under the old global `~/.aimeat`? Either run with
   `AIMEAT_HOME=~/.aimeat`, or re-run `aimeat connect add` from inside the project
-  directory so the token lands in that project's `.aimeat`.
+  directory so the token is written to that project's `.aimeat`.
 
 The Python liaison pins `AIMEAT_HOME` into the serve daemon it auto-spawns, so the
 Node daemon and the Python side always agree on the same home.
@@ -142,7 +142,7 @@ Node daemon and the Python side always agree on the same home.
 An earlier way to connect a crew was to register it as a `task-runner` agent and let the
 connector start the crew as a subprocess for each task (`runner.command` in the agent's
 `config.yaml`). That still works, and it fits a job with no model in it: a Python script that
-takes a prompt and prints a string, an ETL step on a clock. For a crew with an LLM inside, the
+takes a prompt and prints a string, an ETL step on a schedule. For a crew with an LLM inside, the
 liaison fits better:
 
 | | Task-runner subprocess | Liaison agent |
@@ -182,11 +182,11 @@ stored, tell the owner the exact name and that it goes on their Access page, sec
 or ask for it once and store it with `aimeat_secret_set`; never write it into memory or a document.
 
 **Who pays for an agent's text completion (node 3.18.0+).** `POST /v1/ai/complete`, both `/v1/llm`
-doors and `POST /v1/ai/jobs` now run on the **owner's** settings, daily budget and usage record;
+endpoints and `POST /v1/ai/jobs` now run on the **owner's** settings, daily budget and usage record;
 the agent's own namespace is no longer read for them. The key order is the agent's key, then the
 owner's, then the server's, and a new `402 AGENT_QUOTA_EXHAUSTED` means this agent's own cap is
 used up — not retryable, like every other quota code. So a crew that wrote its own
-`openrouter.settings` record to reach a provider must stop: no text door reads that record any
+`openrouter.settings` record to reach a provider must stop: no text endpoint reads that record any
 more, and the owner sets the provider. (Neither this package nor crewfive writes one — checked
 2026-09-20.) Since the AI providers of the node's System 2 plan, transcription, pictures, speech and
 embeddings are paid the same way: by the owner, in the agent's name, on the owner's providers.
@@ -230,7 +230,7 @@ lists the models the owner's policy allows.
 **A role says what the calls are for (0.30.1+).** `node_llm(role="reasoning")` runs the crew's
 calls as one of the owner's AI roles: `reasoning` and `execution` are built in, and the owner can
 make others (`GET <node>/v1/ai/roles` lists them). The owner's role names the providers and models
-to try, in order. The role travels in the `X-AIMEAT-AI-Role` header on every call; a role the owner
+to try, in order. The role is sent in the `X-AIMEAT-AI-Role` header on every call; a role the owner
 does not have is refused `400 AI_ROLE_UNKNOWN`.
 
 ```python
@@ -322,7 +322,7 @@ NOTE: `liaison_tools` leaves the MCP adapter open for the process's lifetime. Us
 
 ## Skills support (0.2.0+)
 
-As of 0.2.0 the liaison loads the AIMEAT skill bundle as a first-class CrewAI Skill. The skill bundle is downloaded by `aimeat connect add` into `~/.aimeat/<agent_name>/SKILL.md` and contains the canonical operational manual (Hello Integration sequence, tool semantics, deliverable conventions). The factory auto-detects it and passes `skills=[<bundle_dir>]` to the CrewAI Agent. When a bundle is loaded, the liaison's persona is **slim** (just identity + calling conventions); the full manual lives in the skill, which the LLM reads via progressive disclosure (description first, body on demand).
+As of 0.2.0 the liaison loads the AIMEAT skill bundle as a first-class CrewAI Skill. The skill bundle is downloaded by `aimeat connect add` into `~/.aimeat/<agent_name>/SKILL.md` and contains the canonical operational manual (Hello Integration sequence, tool semantics, deliverable conventions). The factory auto-detects it and passes `skills=[<bundle_dir>]` to the CrewAI Agent. When a bundle is loaded, the liaison's persona is **slim** (just identity + calling conventions); the full manual is in the skill, which the LLM reads via progressive disclosure (description first, body on demand).
 
 ```python
 with create_liaison_agent(
@@ -376,8 +376,8 @@ instead of waiting out the poll interval):
 - Polls AIMEAT every `poll_interval_seconds` for queued tasks
 - For each, calls `build_crew(task, liaison)` and runs the resulting Crew
 - Lets the liaison handle `aimeat_task_complete` per its persona
-- After each task run, asks the node whether it refused any of this agent's calls for a missing permission during the run (0.31.0+). A crew reads a 403 `SCOPE_DENIED` as one more tool result and finishes normally, so a run whose writes never landed used to look like a success. Now such a run raises `NodeRefusedDuringRun`: it is printed as `refused`, passed to `on_error`, and an EXECUTE task is failed with the call and the permission named. The owner grants the permission in Profile → Agents → Manage access rights. The node also shows the refusal on the task and on the agent's card.
-- Knows when the owner has stopped the agent (0.33.0+). The owner can stop an agent, for example by telling their AI to. The node then hands a stopped agent no waiting task and no message and says `agent_stopped: true` on the agent's own task list and inbox. The daemon records that, prints the change once, and holds the catch-up scan a records-driven agent runs after a tunnel reconnect until the owner starts the agent. Work that is already running finishes. Against a node without the stopped state the flag is never sent, and nothing changes.
+- After each task run, asks the node whether it refused any of this agent's calls for a missing permission during the run (0.31.0+). A crew reads a 403 `SCOPE_DENIED` as one more tool result and finishes normally, so a run whose writes were never stored used to look like a success. Now such a run raises `NodeRefusedDuringRun`: it is printed as `refused`, passed to `on_error`, and an EXECUTE task is failed with the call and the permission named. The owner grants the permission in Profile → Agents → Manage access rights. The node also shows the refusal on the task and on the agent's card.
+- Knows when the owner has stopped the agent (0.33.0+). The owner can stop an agent, for example by telling their AI to. The node then gives a stopped agent no waiting task and no message and says `agent_stopped: true` on the agent's own task list and inbox. The daemon records that, prints the change once, and holds the catch-up scan a records-driven agent runs after a tunnel reconnect until the owner starts the agent. Work that is already running finishes. Against a node without the stopped state the flag is never sent, and nothing changes.
 - Traps SIGINT / SIGTERM for clean shutdown
 - Ends from your own code when you pass `stop_event=threading.Event()` and set it (0.33.0+): the loop sees it within 5 seconds, lets a running kickoff finish and returns as it does on SIGTERM. With the event given, the daemon also runs in a thread that is not the main thread
 - Does NOT manage its own restart — wrap in a supervisor (`examples/watchdog.sh`, systemd, pm2, etc.) with crash-loop protection
@@ -437,7 +437,7 @@ it's deterministic, runs on a background thread (never slows a crew), and is ful
 hook is a logged no-op and crews run unchanged.
 
 Cost is priced **on the node** from its own model table — the hook sends `model` +
-`prompt_tokens` + `completion_tokens` (+ a provider hint), so no pricing config lives in the
+`prompt_tokens` + `completion_tokens` (+ a provider hint), so no pricing config is kept in the
 crew. Requires an AIMEAT node with ledger ingest (1.38+). `run_crew_daemon` installs this for
 you; to enable it in a bespoke runner call `install_usage_telemetry(agent_name, base_url=...)`
 once and wrap each `crew.kickoff()` in `with usage_run(task_id, agent_name):`.
@@ -462,7 +462,7 @@ shape how that works, and both used to bite:
 
 - **Storage is keyed by (owner, key).** `GET /v1/storage/<key>` reads the *caller's* namespace only,
   so a document the human owner uploaded answers **404** to that owner's own agent — regardless of
-  access rules. The door for a file someone else owns is `GET /v1/pub/{owner}/{key}`, which applies
+  access rules. The endpoint for a file someone else owns is `GET /v1/pub/{owner}/{key}`, which applies
   the consent/visibility guard.
 - **The serve loopback is JSON/UTF-8.** Binary taken through it is corrupted irreversibly. So these
   helpers never route bytes through the loopback: they ask for a small JSON **handle** and then fetch
@@ -489,7 +489,7 @@ delegate_file(api, "doc-crew", "Extract the total", ref=out["ref"])
 
 **The one rule that decides whether this works:** the file must be readable by the agent. Uploading
 with `visibility="owner"` makes it readable by every agent and app of the same owner, which is the
-normal way to hand a document to your own crew (`upload_file` defaults to it for that reason). A
+normal way to give a document to your own crew (`upload_file` defaults to it for that reason). A
 `private` file is readable by its uploader alone — even the owner's own agents get 403 — unless there
 is an explicit consent grant. `read_file` reports which of the two happened instead of returning
 empty, because the fixes differ.
@@ -657,12 +657,12 @@ report(v.report())   # which band fired, on which decision id
 
 **There are two gates and only one of them can tell the owner.** The node has its own per-agent
 gate, which the *owner* turns on; when it is on, an outcome under the act band comes back as
-`proceed: false` **and** lands on the owner's open-items list as something they can act on. This
+`proceed: false` **and** is added to the owner's open-items list as something they can act on. This
 package's `on=` is a *local* hold: it stops the action here. It cannot raise the owner's item —
-that door is the owner's in person (`requireRole('owner')` on `/v1/open-items`) and an agent token
+that endpoint is the owner's in person (`requireRole('owner')` on `/v1/open-items`) and an agent token
 is refused there by design. So a local hold with the node's gate off says exactly that, with the
 decision id, rather than pretending somebody was notified. `v.report()` is written to be put
-straight into what the crew hands back: a gate that stops an action silently is worse than no gate.
+straight into what the crew returns: a gate that stops an action silently is worse than no gate.
 
 When a person later confirms or overrides a decision, record it. This is what turns the register
 into something thresholds can be tuned from. The node refuses a review by the agent that asked for
@@ -736,7 +736,7 @@ from aimeat_crewai import push_direct_log
 push_direct_log(agent_name="mailer")
 ```
 
-It lands in memory under `agents.<name>.decide.direct-log.<day>`, one key per UTC day, with
+It is stored in memory under `agents.<name>.decide.direct-log.<day>`, one key per UTC day, with
 `agents.<name>.decide.direct-log.__index` listing the days held. Each one is labelled as decisions
 made without the node — **not** on the decision register, because a row claiming to be one would
 make the owner's quality numbers read as though the scrubber and the cap had been in force.
@@ -748,7 +748,7 @@ meet that ceiling and be refused. `push_direct_log(all_of_it=True)` ignores the 
 whole log again.
 
 The node never sends a key. When the owner has given an agent one, `settings()` names the
-environment variable it lives in (`agent.key_env`) and never the key itself.
+environment variable it is stored in (`agent.key_env`) and never the key itself.
 
 > Our own measurements of the decision model (accuracy, speed, cost) stay unpublished: TypeSafe's
 > customer agreement forbids publishing benchmarks of it. Figures TypeSafe publishes itself may be
@@ -766,7 +766,7 @@ environment variable it lives in (`agent.key_env`) and never the key itself.
 | 0.17.x | 2.2.0+ for file helpers (`?mode=handle` on `/v1/pub`, `resources.files` on tasks). Against an older node, reading a file the owner shared still works over plain `GET /v1/pub/{owner}/{key}` — only the handle + task-attachment helpers need 2.2.0. | 0.80+ |
 | 0.20.x | 3.3.0+ for data packages (`/v1/datapackages`). `read_package` and `to_dataframe` need only the package's public address, so they read a package from ANY node that publishes one; `publish_package` and `package_versions` need the routes. | 0.80+ |
 | 0.22.x | 3.9.0+ node AND `aimeat` connector for server-initiated invokes (`/local/invoke/next` on the serve daemon). On an older serve daemon the listener logs once that the surface is missing and the rest of the daemon is unchanged. | 0.80+ |
-| 0.27.x | **Node 3.18.0+** for decision rules (`/v1/ai/decide`, `/v1/ai/decide/rules`, and `/v1/ai/decisions/stats` for `decision_stats()`), and an owner who has set a TypeSafe key. `settings()` says whether this owner can use it at all and why not — check it before building a path on it. A node below 3.18.0 has none of these doors. For the liaison to SEE the decide tools over MCP, the machine also needs the `aimeat` connector at 3.18.0+: an older CLI refuses an undeclared parameter, so check the CLI version before reporting a node fault. Direct mode needs no node at all. | 0.80+ |
+| 0.27.x | **Node 3.18.0+** for decision rules (`/v1/ai/decide`, `/v1/ai/decide/rules`, and `/v1/ai/decisions/stats` for `decision_stats()`), and an owner who has set a TypeSafe key. `settings()` says whether this owner can use it at all and why not — check it before building a path on it. A node below 3.18.0 has none of these endpoints. For the liaison to SEE the decide tools over MCP, the machine also needs the `aimeat` connector at 3.18.0+: an older CLI refuses an undeclared parameter, so check the CLI version before reporting a node fault. Direct mode needs no node at all. | 0.80+ |
 | 0.30.x | `node_llm()`: a node with `/v1/llm` (3.18.0+ for the owner's key order and budget, and the model policy on the release after 3.19.0). `capabilities()`: a node with `GET /v1/ai/capabilities`, which arrives in the release after 3.19.0. | 0.80+ (verified on 1.15 native and LiteLLM paths) |
 | 0.31.x | The run-refusal check needs `GET /v1/agents/{name}/refusals`, which arrives in the release after 3.20.0. Against an older node the check finds nothing and the daemon behaves as 0.30.x. | 0.80+ |
 | 0.32.x | `{kind: "node"}` crew choices and the `llm` field of the runtime report need the node release after 3.23.0; an older node refuses the choice with `INVALID_CHOICE`. `unsafe_choice_reason` needs no node. The agent needs `ai:use` for `/v1/llm`. | 0.80+ |

@@ -5,7 +5,7 @@ description: How to build a link to a document or record in AIMEAT Pages, and wh
 
 # Linking to a page in AIMEAT Pages
 
-**Do not hand out a `/v1/profile?tab=organisms...` link and expect someone to click their way to a
+**Do not give a `/v1/profile?tab=organisms...` link and expect someone to click their way to a
 document.** Pages takes a deep link straight to the item.
 
 ## The link
@@ -68,7 +68,7 @@ read only for a visitor that check lets in. When a shared, published document st
 classification (`aimeat_classification` action `get`, whose `effective.from` names the workspace or
 organism when one of them decided) before you look for anything else.
 
-Pages' share modal offers both, as "Copy Pages link" and "Copy viewer link". For anyone who may not be signed in as a member, hand out the viewer link: it is the one address whose no-login behaviour this skill can state.
+Pages' share modal offers both, as "Copy Pages link" and "Copy viewer link". For anyone who may not be signed in as a member, give the viewer link: it is the one address whose no-login behaviour this skill can state.
 
 An **HTML page** (a document whose value holds `html`) uses the same viewer link. The viewer shows it
 in a sandboxed frame served from the node's page host (pages.aimeat.io), and a shared HTML page
@@ -78,7 +78,7 @@ ends after 90 days unless its share names another end date.
 
 Use the MCP tool `aimeat_workspace_share` (all three agent surfaces since 2026-10-16): `organism_id`,
 `ws`, `space` and `id` for one page (`space` alone for a whole space, neither for the workspace),
-`shared: true`, and `access`. Its answer carries `viewer_url`, the link to hand out. `until` takes an
+`shared: true`, and `access`. Its answer carries `viewer_url`, the link to give. `until` takes an
 ISO date for the end of the share, or `"none"` to remove the end. Only the workspace creator, an
 organism admin or their own agent may change sharing, and only published pages are shown. When the
 node asks the owner before making something public and the agent lacks `publish:public`, opening

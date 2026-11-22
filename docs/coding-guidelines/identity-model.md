@@ -28,7 +28,7 @@ There is also a bare **Owner** name (`alice`) which is the account layer. It app
   data-area allowlist; it writes into its own `eco:` namespace and is consented like an agent
   ([Building an ecosystem app](../building-an-aimeat-compatible-ecosystem-app.md)).
 - **A hosted app** carries identity through a scoped app grant, which resolves `role:'app'` to the
-  owner but fences the app to the scopes the owner approved.
+  owner but limits the app to the scopes the owner approved.
 
 ## Authentication paths
 
@@ -69,15 +69,15 @@ A session signed in on another node is a VISITOR here. It holds the role `federa
 and it is named by its home GHII (`alice@home-node`) in `sub`, `owner` and `resolveIdentity()`.
 `verifyJWT()` reads every federated token that way, including one minted before 2026-09-24, when the
 mint still said `roles: ['owner']` and the bare local part. That old shape is why a visitor called
-`alice` passed as the LOCAL `alice` on any door that asked the role or looked her up by name.
+`alice` passed as the LOCAL `alice` on any endpoint that asked the role or looked her up by name.
 
-- **Ask `isForeignPrincipal(auth)`** (`src/utils/gaii.ts`) whenever a door needs to know. It is the
+- **Ask `isForeignPrincipal(auth)`** (`src/utils/gaii.ts`) whenever an endpoint needs to know. It is the
   one question; do not test `auth.federated` inline.
 - **Shorten an identity with `localAccountName()`**, never with `x.split('@')[0]`. It gives the bare
   account name of an identity on THIS node and returns another node's identity whole, because
   shortened it names the local account that shares its local part. `isSameOwner()` compares the
   node as well as the name for the same reason.
-- A visitor reaches a door on the scopes it holds (`requireScope` gives it no owner bypass), under
+- A visitor calls an endpoint with the scopes it holds (`requireScope` gives it no owner bypass), under
   its own home identity. It is never the local account holder: `requireRole('owner')`,
   `isOwnerPrincipal()` and `requireLocalSession()` refuse it.
 

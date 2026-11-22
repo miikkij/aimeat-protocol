@@ -8,7 +8,7 @@
  *   /v1/goals/waiting) and reads it again on the live stream (domain `goals`), so the band's other
  *   rows and their reader stay as they were.
  *
- *   TWO FIELDS, TWO THINGS (Jouni's choice 4 of 2026-10-25): "What should the agent do?" makes an
+ *   TWO FIELDS, TWO THINGS (choice 4 of 2026-10-25, Jouni): the field "What should the agent do?" makes an
  *   agent; "What do you want done?" here gives the agents a goal. A row with nothing to say is not
  *   drawn, as everywhere on the home.
  *   Composed from library components only; it has no sheet of its own.

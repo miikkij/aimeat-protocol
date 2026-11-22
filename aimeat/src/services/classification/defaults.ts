@@ -177,8 +177,8 @@ export const DEFAULT_LABELS: readonly ClassificationLabel[] = [
   {
     id: 'erittain-luottamuksellinen', name: { fi: 'Erittäin luottamuksellinen', en: 'Highly confidential', es: 'Altamente confidencial' }, rank: 30, color: '#c8453b', status: 'active',
     description: 'Credentials, keys, identity codes and anything whose leak causes harm. An AI sees it with a warning, and every use is audited.',
-    // Decided by Jouni 2026-09-30, option B: "Säilytetään tila 'piilotettu' omistajan valintana, mutta
-    // mikään oletusluokitus ei käytä sitä. Tekoäly näkee oletuksena kaiken." No default label hides
+    // Decided by Jouni 2026-09-30, option B: 'hidden' stays a choice of the owner, no default label
+    // uses it, and an AI sees everything by default. No default label hides
     // content from AI; an owner, an organism or the operator may still set 'hidden' on a label.
     aiVisibility: 'warning', audit: true, mayLeaveOrganism: false, lowerNeedsJustification: true,
   },

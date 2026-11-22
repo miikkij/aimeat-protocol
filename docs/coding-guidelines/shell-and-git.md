@@ -20,7 +20,7 @@ can only be corrected by rewriting history, so the damage is permanent.
 
 ## The rule
 
-**A multi-line string is never a shell argument.** Write it to a file, hand over the path.
+**A multi-line string is never a shell argument.** Write it to a file and pass the path.
 
 | You want to | Do this |
 |---|---|

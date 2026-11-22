@@ -33,7 +33,7 @@
  *     of the owner's agents (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-18 — publish:public, outside every wildcard: making something public without a request to
  *     the owner (plan doc-mvcn6c7e4e5q, V4.1).
- *   2026-10-17 — The standard preset holds messages:send (Jouni: "otetaan oletusoikeudet käyttöön").
+ *   2026-10-17 — The standard preset holds messages:send (Jouni).
  *   2026-10-15 — memory:read-as-owner, outside every wildcard: reading the owner's and the sibling
  *     agents' private records with owner_scope (feature-list audit #42).
  *   v1.15.0 — 2026-10-15 — connections:read-as-owner, outside every wildcard: reading what is in the

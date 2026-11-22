@@ -166,7 +166,7 @@ export default function Transparency({ navigate }) {
       <section class="ld-hero tp-hero">
         <h1 class="ld-h1">${tr('transparency.title', 'How this node marks AI-generated content')}</h1>
         <p class="ld-hero-sub">${tr('transparency.intro',
-          'When a model writes something here, the node records how it was made — which model, when, on whose account, and how much a person was involved — and keeps that record at an address of its own. Where a person reads that content on this node’s own pages, the record becomes a visible label: the official EU AI Office icon and a sentence in English or Finnish, beside the content, with a link to the full record. Software gets the same facts from the response itself, in the HTTP headers, the page metadata, and the markdown and MCP surfaces.')}</p>
+          'When a model writes something here, the node records how it was made (which model, when, on whose account, and how much a person was involved) and keeps that record at an address of its own. Where a person reads that content on this node’s own pages, the record becomes a visible label: the official EU AI Office icon and a sentence in English or Finnish, beside the content, with a link to the full record. Software gets the same facts from the response itself, in the HTTP headers, the page metadata, and the markdown and MCP surfaces.')}</p>
       </section>
 
       <!-- The boundary comes before the boast. Anything below this section is easier to believe
@@ -176,8 +176,8 @@ export default function Transparency({ navigate }) {
         <p class="tp-limits-lead">${tr('transparency.limitsLead', 'Read this before relying on anything above.')}</p>
         <ul class="tp-limits-list">
           <li>${tr('transparency.limit1', 'This node does not watermark text. It does not see the words as a model produces them, and that layer belongs to whoever runs the model. What the node does is record how a piece of content was made, and show it.')}</li>
-          <li>${tr('transparency.limit2', 'A mark can be removed by copying. Paste the words somewhere else and the label is gone. The record at its own address survives that, which is why there are two layers — but nothing here makes text tamper-proof, and we will not pretend otherwise.')}</li>
-          <li>${tr('transparency.limit3', 'Content made before this node started recording carries no record, and will not acquire one later. A statement about words nobody witnessed being written would be a fabrication.')}</li>
+          <li>${tr('transparency.limit2', 'A mark can be removed by copying. Paste the words somewhere else and the label is gone. The record at its own address survives that, which is why there are two layers, but nothing here makes text tamper-proof, and we will not pretend otherwise.')}</li>
+          <li>${tr('transparency.limit3', 'Content made before this node started recording has no record, and will not acquire one later. A statement about words nobody witnessed being written would be a fabrication.')}</li>
           <li>${tr('transparency.limit4', 'A missing record means nothing was stated. It never means a person wrote it.')}</li>
         </ul>
       </section>
@@ -213,18 +213,18 @@ export default function Transparency({ navigate }) {
           'Anyone can check content this node served, byte for byte, with no account and no key. Take the exact bytes you received, hash them with SHA-256, and ask:')}</p>
         <pre class="tp-code"><code>GET ${byHash}</code></pre>
         <p class="tp-p">${tr('transparency.checkLimit',
-          'This works where the node served you the same bytes it hashed. Where the node re-assembles a document on the way out, the hashed bytes cannot be rebuilt from what you received and the lookup will find nothing — use the record id from the response’s Link header instead. That is a real limit, not a lookup worth retrying.')}</p>
+          'This works where the node served you the same bytes it hashed. Where the node re-assembles a document on the way out, the hashed bytes cannot be rebuilt from what you received and the lookup will find nothing. Use the record id from the response’s Link header instead. That is a real limit, not a lookup worth retrying.')}</p>
         <p class="tp-p">${tr('transparency.checkAnswer',
-          'An answer covers content that is publicly readable on this node right now. Make the content private and its record stops resolving for strangers, so an empty answer is never an acquittal.')}</p>
+          'An answer covers content that is publicly readable on this node right now. Make the content private and its record stops resolving for strangers, so an empty answer proves nothing.')}</p>
       </section>
 
       <section class="tp-section">
-        <h2 class="tp-h2">${tr('transparency.reportTitle', 'If something should carry a label and does not')}</h2>
+        <h2 class="tp-h2">${tr('transparency.reportTitle', 'If something should have a label and does not')}</h2>
         <p class="tp-p">${tr('transparency.reportLead',
           'Anyone can report it. A visible label links to its own record, and that record id is what to report.')}</p>
         <pre class="tp-code"><code>${FLAG_SAMPLE}</code></pre>
         <p class="tp-p">${tr('transparency.reportReaches',
-          'Reports reach the node operator’s moderation queue — the one that already has reviewers and an appeal path — and an organism’s admins for content inside an organism. A decision can be appealed at POST /v1/flags/{flagId}/appeal.')}</p>
+          'Reports go to the node operator’s moderation queue, which already has reviewers and an appeal process, and to an organism’s admins for content inside an organism. A decision can be appealed at POST /v1/flags/{flagId}/appeal.')}</p>
         <p class="tp-p">${tr('transparency.reportContact', 'If you would rather write to a person, the operator’s address is above.')}</p>
       </section>
 

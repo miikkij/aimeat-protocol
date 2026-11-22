@@ -46,7 +46,7 @@
  *     lives one click away, on the page that can act on it. A count of worries is not what
  *     anyone comes home to.
  *   v1.1.0 — 2026-08-09 — The card says what the agent is actually doing, and the dot takes its
- *     colour from that. It printed "Connected and at home." unconditionally next to a dot that
+ *     colour from that. It printed "Connected and ready." unconditionally next to a dot that
  *     was green in CSS — about an agent the Agents tab could be calling a problem. It also says
  *     how many other agents there are, so one card cannot imply the fleet is one.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 4).
@@ -228,7 +228,7 @@ export function StepAgent({ onChanged, showToast }) {
 
         ${waiting && pending.length === 0 && html`
           <${WaitingNote} title=${tr('home.agent.waitTitle', 'Waiting for your agent to knock.')}>
-            ${tr('home.agent.waitBody', 'The next move is in your AI chat: it has to run the prompt and show you a code. When it does, its request appears here and you approve it.')}
+            ${tr('home.agent.waitBody', 'The next step is in your AI chat: it has to run the prompt and show you a code. When it does, its request appears here and you approve it.')}
           <//>`}
 
         ${/* The SAME component the profile Agents tab renders — one source, two places. */''}

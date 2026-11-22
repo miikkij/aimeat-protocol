@@ -145,7 +145,7 @@ export function SetupGuide({ poster = false, asideInstall = false, facts = false
   const [toolId, setToolId] = useState(rememberedTool);
   const [allTools, setAllTools] = useState(false);
   const pick = (id) => { setToolId(id); rememberTool(id); };
-  if (!tools) return html`<p class="setup-guide-note">${tr('setup.loadingTools', 'Reading the setup instructions from this node…')}</p>`;
+  if (!tools) return html`<p class="setup-guide-note">${tr('setup.loadingTools', 'Reading the setup instructions from this server…')}</p>`;
   if (!tools.length) return html`<p class="setup-guide-note">${tr('setup.toolsFailed', 'Could not read the setup instructions just now. The connect page has the same steps.')}</p>`;
   const tool = pickTool(tools, toolId);
   const cmd = tool.mcp.command || null;

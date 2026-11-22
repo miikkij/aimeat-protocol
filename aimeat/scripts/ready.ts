@@ -2,42 +2,42 @@
  * @file scripts/ready.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Finished work reaches main only after the full E2E run is green on it: this pushes the
- *   session's commits to its own branch `ready/<session>`, starts the full run there on GitHub (four
- *   shards per backend, the same workflow as the nightly) beside CI, which the push starts and which
- *   runs every check including the slow ones check:fast leaves to it, waits for both, and when it is green puts the
- *   commits on main and deletes the branch. When it is red it prints the red suites and stops; main is
- *   not touched.
+ * @description Finished work reaches main only after everything is green on it, and the whole run
+ *   happens on this machine: the checks, the whole unit suite and the full E2E sweep on both backends.
+ *   When it is green, the commits go to main, and main is the only ref this pushes. When it is red it
+ *   says what is red and stops; main is not touched.
  *
- *   WHY. Ruled by the developer on 2026-11-15: develop against the suites of the area only, run
- *   `pnpm check:fast` once when the work looks done and fix every red line in one go, then the full E2E
- *   run and a build before main, so that nothing reaches main red. The full run takes about 35 minutes
- *   on GitHub and hours on a laptop, and GitHub runs only what it has, so the work goes to a branch of
- *   its own first. The branch carries only work that already passed check:fast.
+ *   WHY ON THIS MACHINE. From 2026-11-15 to 2026-11-22 the sweep ran on GitHub, which runs only what
+ *   is pushed there, so every run put a ready/<session> branch on the public repository for half an
+ *   hour. The public repository takes no branch but main without the developer's permission (Jouni,
+ *   2026-11-22), and the pre-push hook refuses one. The local sweep takes about two hours instead of
+ *   35 minutes. CI still runs on main after the push, as it did before 2026-11-15.
  *
- *   WHAT IT REFUSES. A dirty tree (what is tested must be what is committed), no AIMEAT_SESSION (the
- *   branch is named by it), a HEAD behind origin/main (rebase first, then the run tests the work on
- *   today's main), and nothing to bring.
+ *   WHY AT ALL. Ruled by the developer on 2026-11-15: develop against the suites of the area only, run
+ *   `pnpm check:fast` once when the work looks done and fix every red line in one go, then the full run
+ *   before main, so that nothing reaches main red.
  *
- *   THE CHECKS FIRST, HERE. Before anything is pushed, every check but the CodeQL pass runs on this
- *   machine (`check:fast --before-push`, about three minutes). A red one stops here, nothing is pushed,
- *   and it costs minutes instead of a 40-minute run on GitHub. On 2026-11-19 two of one branch's four
- *   red runs were such checks: one of the slow ones check:fast leaves out, and check:fast itself, not
- *   run after a last fix. `--no-checks` skips them (when they were just run on this exact tree).
+ *   WHAT IT REFUSES. A dirty tree (what is tested must be what is committed), no AIMEAT_SESSION, a HEAD
+ *   behind origin/main (rebase first, then the run tests the work on today's main), and nothing to bring.
  *
- *   A SUITE RED FOR TIMING. The full sweep is dispatched with `retry_red`: a suite red in its shard runs
- *   once more, alone (test/run-e2e-retry.ts). Red again, the run is red. Green alone, it does not stop
- *   the merge, and this report lists it under FLAKY: its timing still needs a fix, and the nightly,
- *   which does not retry, keeps showing it red until it has one.
+ *   ONE RUN AT A TIME. The two E2E backends use the session's own port and database from its
+ *   .env.test.* files (pnpm test:env:init), so two sessions do not clear each other's data; the machine
+ *   still has one CPU, and two sweeps at once take longer than two in a row.
+ *
+ *   A SUITE RED FOR TIMING. The sweep runs with `--retry-red`: a red suite runs once more, alone
+ *   (test/run-e2e-retry.ts). Red again, the run is red. Green alone, it does not stop the merge, and the
+ *   runner prints it with the [e2e-flaky] mark: record each as an incident on Lifecycle Central.
  *
  *   MAIN MOVED DURING THE RUN. Other sessions push while the run is going. When origin/main is no longer
  *   under HEAD at the end, the commits are rebased onto it and pushed; CI runs on main as always. They
  *   are not tested a second time, or a busy day would never end.
  * @usage
- *   cd aimeat && AIMEAT_SESSION=cc-alice-x pnpm ready         # push, run, wait, merge
+ *   cd aimeat && AIMEAT_SESSION=cc-alice-x pnpm ready         # check, test, sweep, push main
  *   cd aimeat && pnpm ready --no-merge                         # stop after a green run
- *   cd aimeat && pnpm ready --no-checks                        # skip the local checks
+ *   cd aimeat && pnpm ready --no-checks                        # skip the static checks (just run on this tree)
  * @version-history
+ *   v2.0.0 — 2026-11-22 — The whole run on this machine, and main the only ref pushed: the remote run
+ *     needed a ready/<session> branch on the public repository.
  *   v1.1.0 — 2026-11-19 — The checks run here before the push (check:fast --before-push), and the sweep
  *     reruns a red suite alone (retry_red); a suite green alone is listed as FLAKY, not red
  *     (wish-pnpm-ready-slow-checks-locally-first-a-failed-suite-rerun-al).
@@ -46,22 +46,30 @@
 import { execFileSync } from 'node:child_process';
 
 const sh = (cmd: string, args: string[], opts: { inherit?: boolean } = {}): string =>
-    // A red run's --log-failed is many MB; the default 1 MB buffer answered ENOBUFS (2026-11-15).
     execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: opts.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'] }) ?? '';
 const git = (...args: string[]): string => sh('git', args).trim();
-const gh = (...args: string[]): string => sh('gh', args).trim();
-const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms));
-const WORKFLOW = 'e2e-full.yml';
 
 function refuse(msg: string): never {
     console.error(`[ready] ${msg}`);
     process.exit(1);
 }
 
+/** One step of the run; a red step stops the run with what to do. */
+function step(name: string, cmd: string, args: string[]): void {
+    const t0 = Date.now();
+    console.log(`\n[ready] ${name}`);
+    try {
+        execFileSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+    } catch {
+        refuse(`${name}: red (above). Main is not touched: fix every red line in one go, commit, and run pnpm ready again.`);
+    }
+    console.log(`[ready] ${name}: green in ${Math.round((Date.now() - t0) / 60_000)} min`);
+}
+
 async function main(): Promise<void> {
     const noMerge = process.argv.includes('--no-merge');
     const session = process.env.AIMEAT_SESSION?.trim();
-    if (!session) refuse('AIMEAT_SESSION is not set; the branch is named by it (ready/<session>).');
+    if (!session) refuse('AIMEAT_SESSION is not set.');
     if (git('status', '--porcelain', '--untracked-files=no')) refuse('the tree has uncommitted changes; commit them first, so the run tests what is committed.');
 
     git('fetch', '-q', 'origin', 'main');
@@ -69,75 +77,21 @@ async function main(): Promise<void> {
     if (behind > 0) refuse(`HEAD is ${behind} commit(s) behind origin/main: git rebase origin/main, then pnpm ready.`);
     const ahead = Number(git('rev-list', '--count', 'origin/main..HEAD'));
     if (ahead === 0) refuse('nothing to bring: HEAD is origin/main.');
-
-    // Every check but the CodeQL pass, here and before the push: a red one costs minutes, not a run.
-    if (!process.argv.includes('--no-checks')) {
-        console.log('[ready] the checks first, on this machine (check:fast --before-push; the CodeQL pass stays on GitHub)');
-        try {
-            execFileSync(process.execPath, ['--import', 'tsx', 'scripts/check-fast.ts', '--before-push'], { stdio: 'inherit' });
-        } catch {
-            refuse('a check is red (above). Nothing was pushed: fix every red line, commit, and run pnpm ready again.');
-        }
-    }
-
     const head = git('rev-parse', 'HEAD');
-    const branch = `ready/${session}`;
-    console.log(`[ready] ${ahead} commit(s), ${head.slice(0, 9)} → ${branch}`);
-    sh('git', ['push', '--force', 'origin', `HEAD:refs/heads/${branch}`], { inherit: true });
-
     const started = Date.now();
-    // retry_red: a suite red in its shard runs once more alone; green alone is FLAKY, not red.
-    gh('workflow', 'run', WORKFLOW, '--ref', branch, '-f', 'retry_red=true');
-    // Two runs answer for the work: the full E2E sweep (dispatched above) and CI, which the push to a
-    // ready/ branch starts and which runs every check, the slow ones check:fast skips here included.
-    const findRun = async (workflow: string): Promise<number> => {
-        for (let i = 0; i < 30; i++) {
-            await sleep(5000);
-            const runs = JSON.parse(gh('run', 'list', '--workflow', workflow, '--branch', branch, '--limit', '5', '--json', 'databaseId,headSha,createdAt')) as Array<{ databaseId: number; headSha: string; createdAt: string }>;
-            const id = runs.find(r => r.headSha === head && Date.parse(r.createdAt) >= started - 120_000)?.databaseId;
-            if (id) return id;
-        }
-        return refuse(`the ${workflow} run on ${branch} did not appear in 150 s; look at gh run list --workflow ${workflow} --branch ${branch}.`);
-    };
-    const runs = [{ workflow: WORKFLOW, id: await findRun(WORKFLOW) }, { workflow: 'ci.yml', id: await findRun('ci.yml') }];
-    for (const r of runs) console.log(`[ready] ${r.workflow}: ${gh('run', 'view', String(r.id), '--json', 'url', '--jq', '.url')}`);
+    console.log(`[ready] ${ahead} commit(s) at ${head.slice(0, 9)}: checks, unit suite and the full sweep on both backends, on this machine`);
 
-    const states = new Map<number, { status: string; conclusion: string }>();
-    while (runs.some(r => states.get(r.id)?.status !== 'completed')) {
-        await sleep(60_000);
-        for (const r of runs) {
-            try { states.set(r.id, JSON.parse(gh('run', 'view', String(r.id), '--json', 'status,conclusion'))); }
-            catch (err) { console.warn(`[ready] could not read ${r.workflow} (asked again in a minute): ${String((err as Error).message).split('\n')[0]}`); }
-        }
+    if (!process.argv.includes('--no-checks')) {
+        step('the checks (check:fast --before-push)', process.execPath, ['--import', 'tsx', 'scripts/check-fast.ts', '--before-push']);
     }
+    step('the unit suite', 'pnpm', ['exec', 'vitest', 'run']);
+    step('the full E2E sweep on SQLite', 'pnpm', ['test:e2e:sqlite', '--retry-red']);
+    step('the full E2E sweep on PostgreSQL', 'pnpm', ['test:e2e:postgres-kysely', '--retry-red']);
+
     const minutes = Math.round((Date.now() - started) / 60_000);
-    const red = runs.filter(r => states.get(r.id)?.conclusion !== 'success');
-    if (red.length) {
-        console.error(`[ready] RED after ${minutes} min (${red.map(r => r.workflow).join(', ')}). Main is not touched; ${branch} is kept.`);
-        for (const r of red) {
-            const jobs = gh('run', 'view', String(r.id), '--json', 'jobs', '--jq', '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name');
-            if (jobs) console.error(`  ${r.workflow}, red jobs:\n${jobs.split('\n').map(j => `    ${j}`).join('\n')}`);
-            try {
-                const log = sh('gh', ['run', 'view', String(r.id), '--log-failed']);
-                const lines = [...new Set(log.split('\n').filter(l => /❌|✗ |✖/.test(l)).map(l => l.replace(/^[^\t]*\t[^\t]*\t\S+ /, '').trim()))];
-                if (lines.length) console.error(`  ${r.workflow}, red lines:\n${lines.slice(0, 60).map(l => `    ${l}`).join('\n')}`);
-            } catch (err) { console.error(`  the failed log could not be read (${String((err as Error).message).split('\n')[0]}); it is on the run's page.`); }
-        }
-        console.error('  Fix every red line in one go, commit, and run pnpm ready again.');
-        process.exit(1);
-    }
-    console.log(`[ready] GREEN after ${minutes} min (full E2E and CI).`);
-    // The suites that were red in the sweep and green alone: not a stop, but each one's timing needs a
-    // fix, so they are named here for the session to record.
-    try {
-        const log = sh('gh', ['run', 'view', String(runs[0].id), '--log']);
-        const flaky = [...new Set(log.split('\n').map(l => /\[e2e-flaky\].*/.exec(l)?.[0]).filter((l): l is string => !!l))];
-        if (flaky.length) {
-            console.log(`[ready] FLAKY: ${flaky.length} suite(s) were red in the sweep and green alone. Not a stop; record each one as an incident on Lifecycle Central so its timing gets a fix:`);
-            for (const l of flaky) console.log(`    ${l}`);
-        }
-    } catch (err) { console.warn(`[ready] the sweep's log could not be read for flaky suites (${String((err as Error).message).split('\n')[0]}); they are on the run's page.`); }
-    if (noMerge) { console.log(`[ready] --no-merge: ${branch} is kept, main is not touched.`); return; }
+    if (git('rev-parse', 'HEAD') !== head) refuse('HEAD moved during the run; run pnpm ready again on the commit you mean.');
+    console.log(`\n[ready] GREEN after ${minutes} min. A suite marked [e2e-flaky] above was red once and green alone: record it as an incident on Lifecycle Central.`);
+    if (noMerge) { console.log('[ready] --no-merge: main is not touched.'); return; }
 
     git('fetch', '-q', 'origin', 'main');
     if (git('rev-list', '--count', 'HEAD..origin/main') !== '0') {
@@ -145,8 +99,7 @@ async function main(): Promise<void> {
         sh('git', ['rebase', 'origin/main'], { inherit: true });
     }
     sh('git', ['push', 'origin', 'HEAD:main'], { inherit: true });
-    sh('git', ['push', 'origin', '--delete', branch], { inherit: true });
-    console.log(`[ready] on main: ${git('rev-parse', '--short', 'HEAD')}; ${branch} deleted.`);
+    console.log(`[ready] on main: ${git('rev-parse', '--short', 'HEAD')}. CI runs there now.`);
 }
 
 await main();

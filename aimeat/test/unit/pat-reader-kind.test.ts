@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How a personal access token reads. Decided 2026-09-29 (TARGET-082 V4): every PAT is an
- *   AI reader. Ruled again 2026-11-04 (Jouni, "ihmiseksi"): an owner-level PAT is the person, as
+ *   AI reader. Ruled again 2026-11-04 (Jouni): an owner-level PAT is the person, as
  *   isOwnerInPerson already answered; a PAT narrower than owner level (role agent) stays an AI.
  *
  *   What this pins: readerKindOf reads an owner-level PAT as the person and a narrower one as an AI;

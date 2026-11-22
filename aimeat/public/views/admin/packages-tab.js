@@ -15,8 +15,8 @@
  *   - ReviewBoard lives in packages-tab.review.js
  *
  * @version-history
- *   v3.0.0 — 2026-09-27 — Library components only (Jouni, 2026-09-22: "all admin pages onto the
- *     shared set"): the sections are Section, the status column Verdict with Readings, the strip
+ *   v3.0.0 — 2026-09-27 — Library components only, as on every admin page (Jouni,
+ *     2026-09-22): the sections are Section, the status column Verdict with Readings, the strip
  *     FigureStrip (a coral figure for the installs, as before), the tables List with main's columns
  *     (each cell says its column on a phone: List labels), the parts the Name's marks, the store's
  *     three status chips a filter Tabs row with their counts, the suspend reason a TextField in the

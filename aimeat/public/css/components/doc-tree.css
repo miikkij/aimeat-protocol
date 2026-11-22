@@ -18,7 +18,7 @@
  *     tree had inside a workspace page (the only place it is drawn). A section's name is the Sub-heading
  *     (Jouni's decision "Sub-heading"); a coloured section or document shows its colour's rail (on main
  *     the tree's own line hid it on a document and on a nested section) (page migration G2b).
- *   v1.2.0 -- 2026-09-26 -- The index's 10px corner and a row's 6px corner read --shape-corner, a series' head's 6px --shape-corner-control; the open row's inset 3px coral shadow goes, its ground stays (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.2.0 -- 2026-09-26 -- The index's 10px corner and a row's 6px corner read --shape-corner, a series' head's 6px --shape-corner-control; the open row's inset 3px coral shadow goes, its ground stays (Jouni's note on the round's shape check, which asked for the same style as elsewhere).
  *   v1.1.0 -- 2026-09-26 -- A series' arrow (.pj-ov-chevron), a part of the tree left in views/profile.css, moved here unchanged (UI consolidation phase 5, a move).
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css and views/organism.css (UI consolidation phase 5, a move).
  */

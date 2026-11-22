@@ -23,8 +23,8 @@
  * @structure MsmTab (default) · RightNow · ReadyMade · WhatItTakes · ManifestList
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
- *   v3.0.0 — 2026-09-27 — Library components only (Jouni, 2026-09-22: "all admin pages onto the
- *     shared set"): Section, FigureStrip (the coral figure kept as its notice tone), SearchLine, the
+ *   v3.0.0 — 2026-09-27 — Library components only, as on every admin page (Jouni,
+ *     2026-09-22): Section, FigureStrip (the coral figure kept as its notice tone), SearchLine, the
  *     manifests a List with main's columns (each cell says its column on a phone), the sets a List
  *     whose rows open their manifests in the Panel, the ready-made ones two Lists in Columns, what it
  *     takes Facts, the boxes SettingBox, the delete dialog's field a TextField, the doors Action and

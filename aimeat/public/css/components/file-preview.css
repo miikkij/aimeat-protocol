@@ -12,7 +12,7 @@
  *     names (.file-preview, -img, -frame, -media, -text, -status and the dialog's .file-preview-dialog);
  *     the page's .pf-file-preview-* names and the .pf scope go, the values stay (the dialog's width is
  *     its --dlg-width, 920px as before; the fallback colours go, the tokens stay). Page group G3.
- *   v1.1.0 -- 2026-09-26 -- The ground's 8px corner and the 6px corners of an image, a frame and a video read --shape-corner (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.1.0 -- 2026-09-26 -- The ground's 8px corner and the 6px corners of an image, a frame and a video read --shape-corner (Jouni's note on the round's shape check, which asked for the same style as elsewhere).
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
  */
 

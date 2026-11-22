@@ -8,8 +8,8 @@
  *   WHY. A package installs under the OWNER whoever presses install, so a memory part writes into the
  *   owner's memory, and the memory door asks an agent memory:write and memory:write-as-owner for that
  *   (an app grant memory:write). Most agents hold packages:write and not those two, so an agent asked
- *   to take a package into use could only answer "I may not". Jouni's words: "When an agent lacks it,
- *   the install becomes a request that the owner approves with one tap. It never simply fails."
+ *   to take a package into use could only answer "I may not". Jouni ruled that the install then becomes a
+ *   request the owner approves with one press, and never simply fails.
  *
  *   ONE IMPLEMENTATION, EVERY DOOR. The HTTP doors (install, update, apply-migration, the request
  *   doors) and the MCP tools call these functions; neither decides anything the other does not.

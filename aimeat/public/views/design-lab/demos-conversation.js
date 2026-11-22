@@ -106,7 +106,7 @@ function Conversation({ list = false, empty = false, capped = false }) {
         <//>
         <${ConversationJump} onClick=${noop}>Jump to the latest<//>
         ${capped
-          ? html`<${ConversationCap} title="This conversation has used up its free ride." body="Two ways to keep going:"
+          ? html`<${ConversationCap} title="This conversation has used up its free share." body="Two ways to keep going:"
               ways=${[{ href: '#', label: 'Bring your own key →', loud: true }, { href: '#', label: 'Read how the free share works', newTab: true }]} />`
           : html`<${Composer} value="" onInput=${noop} onSend=${noop} onStop=${noop} onAttach=${noop} onDropAttachment=${noop} />`}
       <//>

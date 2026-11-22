@@ -156,7 +156,7 @@ export function labelActorOf(
  * A file's label address. A file shared into an organism workspace (`workspaceRef`, "org/ws", the
  * first binding when there are several) belongs to that organism's classification: its labels, its
  * "may not leave" and its audience apply, keyed under the workspace by holder and storage key so two
- * members' files never share a label (Jouni, 2026-10-05: "they should"; secaudit 2026-10, DATA-4).
+ * members' files never share a label (Jouni, 2026-10-05; secaudit 2026-10, DATA-4).
  * Any other file is its holder's.
  */
 export function fileTarget(ownerGaii: string, storageKey: string, workspaceRef?: string | null): ContentLabelTarget {

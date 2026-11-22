@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description The exceptions list of classification (TARGET-082, decided by Jouni 2026-09-30). An
  *   exception is an act against what a label says, kept with its reason, so an audit sees every such
- *   act and why in one place. Jouni's words: "jos käyttäjä päättää tehdä toisin, siihen on varmasti
- *   hyvä syy ja tämä syy kirjataan poikkeukset listaan, ja kun tehdään audit niin nähdään poikkeukset
- *   suoraan sieltä ja syyt".
+ *   act and why in one place. Jouni ruled that a person who acts against a label has a good
+ *   reason, the reason goes on the exceptions list, and an audit reads the exceptions and their
+ *   reasons there.
  *
  *   TWO KINDS.
  *   - A person's exception (auto false): a person, in their own session, lets one item leave

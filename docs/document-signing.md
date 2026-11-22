@@ -37,7 +37,7 @@ A wallet accepts a request only from a relying party whose access certificate it
 
 The certificate must name the node's host, the host of `AIMEAT_BASE_URL`:
 
-- **`URI:https://<host>`** (what the EU test registrar issues). The node uses `client_id_scheme` `x509_san_uri`, and the wallet then posts the signed PDF to exactly that address. The node answers `POST /` for that reason, and only for a wallet: a form whose `state` belongs to an open signing session. If a proxy sits in front of the node, it must pass `POST /` to the node.
+- **`URI:https://<host>`** (what the EU test registrar issues). The node uses `client_id_scheme` `x509_san_uri`, and the wallet then posts the signed PDF to exactly that address. The node answers `POST /` for that reason, and only for a wallet: a form whose `state` belongs to an open signing session. If a proxy is in front of the node, it must pass `POST /` to the node.
 - **`DNS:<host>`**. The node uses `x509_san_dns`, and each signing session gets its own response address under `/v1/docsign/wallet/`.
 
 A certificate naming another host is refused, and the status says what it names.
@@ -54,7 +54,7 @@ A certificate naming another host is refused, and the status says what it names.
 
 ### 4. Try it
 
-Create a signing request for a PDF in the signing app (`docsign.app_url`), open it as a party and press "Sign with your EU wallet". On a computer the page shows a QR code the wallet scans; on the phone it opens the wallet. A person's AI does the same with `aimeat_docsign_wallet_start { id, storage_key }` and `aimeat_docsign_wallet_status`. The signed PDF lands in the signer's files and every party can download it (`GET /v1/docsign/requests/{id}/signed-document`).
+Create a signing request for a PDF in the signing app (`docsign.app_url`), open it as a party and press "Sign with your EU wallet". On a computer the page shows a QR code the wallet scans; on the phone it opens the wallet. A person's AI does the same with `aimeat_docsign_wallet_start { id, storage_key }` and `aimeat_docsign_wallet_status`. The signed PDF is stored in the signer's files and every party can download it (`GET /v1/docsign/requests/{id}/signed-document`).
 
 ### What to expect from a test signature
 

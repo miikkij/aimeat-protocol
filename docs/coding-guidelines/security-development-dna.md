@@ -27,9 +27,9 @@ Every request runs as exactly one **principal**. Get the principal + its trust t
 
 **The boundaries that must never leak:**
 
-1. **Cross-owner is a hard wall.** Owner B can never read/write owner A's data. Enforced three ways and all three must stay intact: (a) **namespace:** `getMemory(gaii, key)` is a composite-key lookup scoped to the caller's resolved identity; (b) **visibility/consent:** a `private` record with no consent grant is denied to non-owners (`services/access-guard.ts`); (c) **encryption at rest:** secrets are AES-256-GCM (`services/encryption.ts`), so even a raw DB read yields ciphertext.
-2. **Owner ↔ their own agents/apps is a *scope* boundary, not a wall.** An app/agent token resolves to the owner's GHII (`resolveIdentity` returns `sub` for non-owner sessions), so its writes land **in the owner's namespace**. That is by design, but it means **anything the server later reads and trusts from that namespace is attacker-influenceable by a granted app/agent** unless it is protected. See Invariant 2.
-3. **Node ↔ peer is signature-gated.** `/v1/federation/*` has no scope middleware, because a scope word means nothing for a peer node. An inbound peer endpoint declares the peer check on its chain as `acceptCredential('federation-peer', …)` (`src/auth/credential-strategies-node.ts`), which verifies the signature before the handler runs. `pnpm check:federation-signatures` refuses a write door that has no peer signature check (that strategy, or a verifier its handler calls) and no owner gate, unless the script's `ALLOWED` list names the door with its reason. The strategy is the rule for a new door; the script does not tell the strategy and a verifier in the handler apart. See Invariant 5.
+1. **Cross-owner is a hard boundary.** Owner B can never read/write owner A's data. Enforced three ways and all three must stay intact: (a) **namespace:** `getMemory(gaii, key)` is a composite-key lookup scoped to the caller's resolved identity; (b) **visibility/consent:** a `private` record with no consent grant is denied to non-owners (`services/access-guard.ts`); (c) **encryption at rest:** secrets are AES-256-GCM (`services/encryption.ts`), so even a raw DB read yields ciphertext.
+2. **Owner ↔ their own agents/apps is a *scope* boundary, not a hard boundary.** An app/agent token resolves to the owner's GHII (`resolveIdentity` returns `sub` for non-owner sessions), so its writes are stored **in the owner's namespace**. That is by design, but it means **anything the server later reads and trusts from that namespace is attacker-influenceable by a granted app/agent** unless it is protected. See Invariant 2.
+3. **Node ↔ peer is signature-gated.** `/v1/federation/*` has no scope middleware, because a scope word means nothing for a peer node. An inbound peer endpoint declares the peer check on its chain as `acceptCredential('federation-peer', …)` (`src/auth/credential-strategies-node.ts`), which verifies the signature before the handler runs. `pnpm check:federation-signatures` refuses a write endpoint that has no peer signature check (that strategy, or a verifier its handler calls) and no owner gate, unless the script's `ALLOWED` list names the endpoint with its reason. The strategy is the rule for a new endpoint; the script does not tell the strategy and a verifier in the handler apart. See Invariant 5.
 4. **Extension sandbox / app origin are isolation boundaries.** Extensions run in QuickJS with their own `ext:` namespace, CPU/memory caps, and owner-scoped secrets; published apps run on an isolated `*.apps.<host>` origin and get a scoped grant token, never the session.
 
 ---
@@ -81,7 +81,7 @@ must equal the number of mutating handlers.
 ### 5. Federation is zero-trust: signatures are mandatory, never conditional
 Every inbound `/v1/federation/*` endpoint that mutates or discloses MUST verify an **Ed25519 signature**
 from an **already-approved** peer, using the peer's **previously-established** key. Rules:
-- Declare the check as middleware: `acceptCredential('federation-peer', { … })` on the route, with the door's capability, the text it signs and its refusal sentences as options, and read the verified peer and the signed text in the handler with `credentialOf(req, 'federation-peer')`. The strategy finds the peer (active, entitled to the door, key on file), refuses a missing signature and verifies it, with no option that skips the check. Do not verify the signature inside a new handler. What a door checks after the signature (audience, send time, single use) stays in the handler. `pnpm check:federation-signatures` refuses a write door with no signature check of either kind and no owner gate (doors in its `ALLOWED` list excepted); it passes a door that verifies inside its handler, so this rule is yours to keep and no gate enforces it.
+- Declare the check as middleware: `acceptCredential('federation-peer', { … })` on the route, with the endpoint's capability, the text it signs and its refusal sentences as options, and read the verified peer and the signed text in the handler with `credentialOf(req, 'federation-peer')`. The strategy finds the peer (active, entitled to the endpoint, key on file), refuses a missing signature and verifies it, with no option that skips the check. Do not verify the signature inside a new handler. What an endpoint checks after the signature (audience, send time, single use) stays in the handler. `pnpm check:federation-signatures` refuses a write endpoint with no signature check of either kind and no owner gate (endpoints in its `ALLOWED` list excepted); it passes an endpoint that verifies inside its handler, so this rule is yours to keep and no gate enforces it.
 - Never `if (signature && peer.publicKey) verify(...)`: an attacker just omits the signature. Verify **unconditionally**; reject when absent.
 - Never overwrite an active peer's key without a signature from the **current** key.
 - Never derive trust (`isGenesis`, tier, admission) from a **body-supplied** `node_url`/`node_id`. Those are claims, not proof.
@@ -104,8 +104,8 @@ be a default; a permanent purge and deleting an organism are explicit and separa
 `memory:delete` is in the default agent scopes: every delete it opens puts the record in the bin, where
 the owner restores it for `AIMEAT_MEMORY_DELETE_GRACE_DAYS` (seven by default). A removal that cannot
 come back asks `memory:purge`: wiping a workspace, removing workspace rows, deleting an organism (beside
-`organism:write`, which alone also renames, archives and leaves) and removing a Design Book part. A
-door that `memory:delete` opens and that removes for good is a breach of this invariant, whatever its
+`organism:write`, which alone also renames, archives and leaves) and removing a Design Book part. An
+endpoint that `memory:delete` opens and that removes for good is a breach of this invariant, whatever its
 label says (Jouni, 2026-10-16). Two hard deletes stay outside it on purpose: a record's own time to
 live, which the writer chose, and erasing an account or an agent, which removes the identity with its
 records. When a scope's real blast radius exceeds its label ("write your data" also lets an app
@@ -131,7 +131,7 @@ what its name says.
 
 The August 2026 audit produced this finding eleven times, and the report's own status pass then
 recorded one of them as fixed because an operator clause had been added: `owner !== name &&
-!roles.includes('operator')` WIDENS the door, and reading it as a narrowing cost a second pass.
+!roles.includes('operator')` WIDENS the set of callers it admits, and reading it as a narrowing cost a second pass.
 
 #### 11a. Two code shapes, one invariant, and a scanner for each half
 
@@ -140,13 +140,13 @@ The owner name reaches a handler in two shapes, and every scanner we own reads e
 **REFUSING on the name** is a comparison: `if (row.owner !== req.auth!.owner) return 403`.
 `check:owner-principal` reads these. **SCOPING a query by the name** is not a comparison at all:
 `listActiveSessions(req.auth!.owner)`, and act on whatever comes back. There is nothing for a
-comparison-reader to read, so a door of the second shape is invisible to that gate however completely
+comparison-reader to read, so an endpoint of the second shape is invisible to that gate however completely
 it acts on the human's own things.
 
 The reverse blind spot is real too, and it belongs beside this one.
 `check:identity-resolution` counts a unit as resolved when it computes a principal test, so a handler
 that writes `roles.includes('owner') && !roles.includes('agent')` three lines above a raw
-`req.auth!.sub` read is scored resolved. That exclusion is deliberate (without it the gate cries at
+`req.auth!.sub` read is scored resolved. That exclusion is deliberate (without it the gate flags
 the twenty-eight handlers that resolve by hand), and it means **the two gates cover different halves
 of one invariant and neither alone is coverage.**
 
@@ -158,40 +158,40 @@ coordinate owner data does not occupy. One shape makes it exploitable, the other
 scanner reading refusals sees a comparison and is satisfied; one reading scoping sees a query and
 cannot tell resolved from unresolved. Each gate's blind spot is the other's subject.
 
-Four scoping-shape doors were found by hand on 2026-09-04, all now behind `requireOwnerPrincipal()`:
+Four scoping-shape endpoints were found by hand on 2026-09-04, all now behind `requireOwnerPrincipal()`:
 
 - `GET`/`DELETE /v1/auth/sessions` and `DELETE /v1/auth/sessions/:id` pass `req.auth!.owner` to
   `listActiveSessions` and revoke what comes back: the human's device list, and signing them out of
   every device they own, their current one included, for any principal carrying their account name.
 - `GET /v1/ghii/cors` names the web origins that already hold credentialed access to the account.
-  Audit H-7 fenced the PUT and left the read, which is the reconnaissance for the same attack.
+  Audit H-7 guarded the PUT and left the read, which is the reconnaissance for the same attack.
 
-#### 11b. A two-legged flow is only as fenced as its FIRST leg
+#### 11b. A two-legged flow is only as guarded as its FIRST leg
 
 `GET /v1/ghii/verify/eudiw/request` and `GET /v1/ghii/verify/ftn/authorize` are not another line in
-that list. The doors above hand over data that already belongs to the account. **These MINT A
+that list. The endpoints above return data that already belongs to the account. **These MINT A
 CREDENTIAL.**
 
-Each writes a verification nonce stamped with `req.auth!.owner` and hands back a state. The callback
+Each writes a verification nonce stamped with `req.auth!.owner` and returns a state. The callback
 that consumes that state cannot be authenticated by construction (it is a wallet or a bank-ID
 redirect, arriving from the issuer and not from the person), so it writes `verificationLevel: 3`,
 `ftnVerified` and the presented eIDAS attributes onto the GHII **the nonce names**.
 
-August fenced the two POSTs and left these two GETs open. So any principal acting in the person's
+August guarded the two POSTs and left these two GETs open. So any principal acting in the person's
 name could open a verification bound to that human, and whoever then completed the bank-ID login
 (the agent's operator, a different person entirely) had their own given name, family name, birthdate
 and national identifier hash written onto somebody else's account as PROVED. The failure is not an
 agent reading something it should not. It is a person's identity recorded as verified on an account
-that is not theirs, by the one rail on this node whose entire purpose is to be trusted afterwards.
+that is not theirs, by the one flow on this node whose entire purpose is to be trusted afterwards.
 
-**Half-fencing is worse than not fencing, because the fenced leg makes the flow look done.** Both
+**Guarding half a flow is worse than not guarding it, because the guarded leg makes the flow look done.** Both
 POSTs carried `requireOwnerPrincipal()` and a reader checking "is the verification path guarded"
 found a guard. The gate has to sit where the STATE IS MINTED, because after that there is nowhere to
 put it: the callback has no principal to test.
 
-*Check:* when a flow has an unauthenticated leg by design, fence the leg that BINDS it to a person.
+*Check:* when a flow has an unauthenticated leg by design, guard the leg that BINDS it to a person.
 Ask what the unauthenticated end writes and whose record it names; if the answer comes from something
-minted earlier, that mint is the door.
+minted earlier, that mint is where the check goes.
 
 *Check:* every authorization names WHICH KIND of principal may do this, never only whose data it is.
 A change to the account itself, its password, its recovery address, its second factor, its deletion or
@@ -199,14 +199,14 @@ its export, goes behind `requireOwnerPrincipal()`: role `owner` present, `agent`
 `app` absent. `requireRole('owner')` alone is not that test, because a role can be inherited (see 12).
 
 *Gate:* `pnpm check:owner-principal`, since 2026-09-04. It reads every refusal decided by comparing
-`auth.owner` and requires each door to be behind a principal guard, to compute the test itself, or to
+`auth.owner` and requires each endpoint to be behind a principal guard, to compute the test itself, or to
 be listed in `aimeat/security/owner-principal-exemptions.json` with the sentence that makes a name the
-right question there. When it landed it counted 45 refusals: 15 doors already naming the principal and
+right question there. When it was added it counted 45 refusals: 15 endpoints already naming the principal and
 30 listed and triaged (`pnpm check:owner-principal:report` gives today's numbers). It found
 `GET /v1/ghii/:ghii/credential` minting a SIGNED verifiable identity credential for any principal
-carrying the account name. The same file's two write doors had been closed in August, and the read
-that hands identity out had not. Three of those 30 were marked an open question rather than cleared:
-`requireRole('owner')` keeps machine principals out but an owner-level PAT satisfies it, and the door
+carrying the account name. The same file's two write endpoints had been gated in August, and the read
+that returns the identity had not. Three of those 30 were marked an open question rather than cleared:
+`requireRole('owner')` keeps machine principals out but an owner-level PAT satisfies it, and the endpoint
 grants something (an agent's scopes, an agent's key, an ecosystem app's access). What counts as a
 principal guard is one list, `AUTHORIZATION_GATES` in `aimeat/scripts/inventory/principals.ts`. This
 script and `check:route-scopes` used to carry one each, and they disagreed about four names.
@@ -215,7 +215,7 @@ script and `check:route-scopes` used to carry one each, and they disagreed about
 
 Everything above reads the name as "this human, or something acting for them". There is one principal
 where that is false, and it is the worst case of the invariant: a session signed in from ANOTHER node.
-Its person lives elsewhere, and the local part of their name can equal a LOCAL account's name, which
+Its person has an account on another node, and the local part of their name can equal a LOCAL account's name, which
 belongs to a different person.
 
 Measured on 2026-09-13 (`test/e2e-federated-namesake.ts`): a visitor signed in as `alice@their-node`
@@ -223,7 +223,7 @@ read local `alice`'s PRIVATE memory, wrote into her namespace, and `GET /v1/ghii
 profile, its account-security half included. A peer's operator can create any account name on their
 own node, so this was impersonation of any local account BY NAME, from any peer whose federated
 sign-in an operator had switched on. Until 2026-09-24 the login minted such a session with
-`roles:['owner']` and the bare local part as `owner`, so every door that asked the role or looked the
+`roles:['owner']` and the bare local part as `owner`, so every endpoint that asked the role or looked the
 account up by the name answered for the local namesake.
 
 **What the session is now.** `verifyJWT()` reads every federated token, old ones included, as a
@@ -231,8 +231,8 @@ visitor: role `federated` and no other, and its HOME GHII (`alice@their-node`) a
 `owner`. `resolveIdentity` returns that GHII, which is what Core 2026-11 FED-17 and FED-18 require of a
 visitor: never the local namesake, no owner bypass, and reads through the same read decision. No gate that asks for the account holder admits it:
 `requireRole('owner')`, `isOwnerPrincipal()`, `requireOwnerSession()` and `requireLocalSession()`
-refuse it, and `requireScope` gives it no owner bypass, only the scopes this node grants its peer. A
-door that looks the account up by `req.auth!.owner` finds nobody, because no local account has a name
+refuse it, and `requireScope` gives it no owner bypass, only the scopes this node grants its peer. An
+endpoint that looks the account up by `req.auth!.owner` finds nobody, because no local account has a name
 with a node in it. The one question is `isForeignPrincipal(auth)`; never `auth.federated` inline.
 
 **The cut is the other half.** Code that CUTS an identity to an account name at the '@'
@@ -241,13 +241,13 @@ with a node in it. The one question is `isForeignPrincipal(auth)`; never `auth.f
 Fixing the session does not reach it, and the September 2026 audit's check of the fixes found such
 cuts in services the session fix never touched. Two helpers in `src/utils/gaii.ts` are
 now the only cuts. `localAccountName()` is for a lookup: it cuts an identity of THIS node as before
-and hands another node's identity back whole, so the lookup finds nobody. It cuts at the LAST '@',
+and returns another node's identity whole, so the lookup finds nobody. It cuts at the LAST '@',
 because routes compose the caller as `${req.auth!.owner}@${config.nodeId}`, and for a visitor that is
 `alice@their-node@this-node`. `localAccountOf()` is for a decision: the same cut, and null for an
 identity of another node. `isSameOwner` compares the node as well as the name.
 
 *Check:* when code turns an identity into an account name, it calls `localAccountName` (to look a name
-up) or `localAccountOf` (to decide whether the caller has an account here). When a door asks "is this
+up) or `localAccountOf` (to decide whether the caller has an account here). When an endpoint asks "is this
 the account holder", it asks a principal guard or `isForeignPrincipal`, never the role or the name
 inline. A capability that is this node's own automation, such as saving or starting a workflow, takes
 `requireLocalSession()`.
@@ -295,23 +295,23 @@ Postgres the caller's next read raced the counters it had just been told about.
 *Check:* nothing an attacker controls is written, served or answered before the check that would
 refuse it. When a handler both writes and validates, read the ORDER, not just the presence.
 
-### 15. A permission word is enforced on every door or it does not exist
+### 15. A permission word is enforced on every endpoint or it does not exist
 `organism:write` deleted `aimeat_organism_create` from an agent's MCP surface, because a `TOOL_SCOPES`
 entry removes the tool rather than refusing the call. The same agent got `201 Created` from
 `POST /v1/organisms`, because `requireRoleOrScope('agent', 'organism:write')` admitted any principal
 holding the `agent` role BEFORE it looked at scopes. The word was real on the surface an owner reads and
-decorative on the door that writes. The route now asks `requireScope('organism:write')`
+decorative on the endpoint that writes. The route now asks `requireScope('organism:write')`
 (`routes/organisms/crud.ts`).
 
-*Check:* when you add a scope word, name every door that reaches the capability and gate all of them.
-A word enforced on one door teaches an owner that they have controlled something they have not.
+*Check:* when you add a scope word, name every endpoint that reaches the capability and gate all of them.
+A word enforced on one endpoint teaches an owner that they have controlled something they have not.
 
 #### 15b. Closing a bypass, or inventing a requirement: the twin decides
 
-Satisfying 15 means adding a gate to a door that has none, and that is where it can go wrong in the
+Satisfying 15 means adding a gate to an endpoint that has none, and that is where it can go wrong in the
 other direction. If a route is one an agent drives as its ordinary work, demanding a word nobody knew
 to ask for turns the capability off for every agent already doing the job. So the question before
-adding a gate is not "does this door look unguarded" but **"does an MCP tool doing the SAME KIND OF
+adding a gate is not "does this endpoint look unguarded" but **"does an MCP tool doing the SAME KIND OF
 THING already demand this word?"**
 
 Per operation, not per word, and that is the whole of the refinement. A word can be write-only in the
@@ -320,9 +320,9 @@ by install, activate, deactivate and delete, and by no read. So gating the four 
 routes behind it invents a requirement, and `ext:write` is the same story: invoke, install, activate,
 deactivate, delete, and no read, so an agent granted `ext:invoke` would stop being able to list the
 instances it invokes. Both were about to be gated by a bulk pass on 2026-09-04 that was quoting this
-rule while doing it, and the reverts came from grepping the diff for read doors handed a write word.
+rule while doing it, and the reverts came from grepping the diff for read endpoints given a write word.
 
-- **A twin demands it** → gating the REST door closes a BYPASS. It cannot turn anything off, because
+- **A twin demands it** → gating the REST route closes a BYPASS. It cannot turn anything off, because
   every agent doing that job through the tool already holds the word: the owner ticked that box the
   day they connected it. `POST /v1/exchange/work/:id/deliver` demanded nothing while
   `aimeat_exchange_work_deliver` had demanded `exchange:write` all along, and the triage measured what
@@ -330,7 +330,7 @@ rule while doing it, and the reverts came from grepping the diff for read doors 
   PARTY. Gate it, and say in the diff which tool the word came from.
 - **No twin demands it** → the word is a PROPOSAL, not a finding. `organism:read` is asked for by one
   REST route and zero tools, so gating the eleven workspace reads behind it would create a
-  requirement no owner has ever granted and dress it as a fix. Read who actually calls the route
+  requirement no owner has ever granted and present it as a fix. Read who actually calls the route
   first, and expect the answer sometimes to be that the word should not exist.
 
 Measured on 2026-09-04 against the 156 route-scope entries marked DEBT: **102 are twin-backed and 54
@@ -339,10 +339,10 @@ worth knowing before anyone promises a date for it.
 
 **A bulk pass is the draft, never the result.** Applying the triage's proposed word across a batch is
 the right way to move a hundred routes, and it is wrong often enough that the review step is part of
-the method rather than diligence on top of it: grep the resulting diff for READ doors handed a
+the method rather than diligence on top of it: grep the resulting diff for READ endpoints given a
 write-flavoured word and re-test each one per operation. On 2026-09-04 that step caught six of
 ninety-one, and each of the six had TWO independent reasons to be left alone: no read tool demanded
-the word, and the two extension reads already carried an owner fence in the handler (15c). The
+the word, and the two extension reads already carried an owner check in the handler (15c). The
 mechanical pass saw neither.
 
 *Check:* `TOOL_SCOPES` in `src/tool-catalog/scopes.ts` is the register (built from each tool's `scope` on
@@ -350,14 +350,14 @@ its catalog definition since 2026-10-05), and the tool NAMES in it are what you 
 a GET. `pnpm check:scope-parity` fails when a word lives on one side only, in either direction, which
 is the same question asked before either side exists.
 
-#### 15c. A door already gated on the word it needs does not get a weaker one in front
+#### 15c. An endpoint already gated on the word it needs does not get a weaker one in front
 
 15b says when a word may be added. This says when it may not. A route whose handler already refuses
 without the strongest word for what it does is gated; adding a second, weaker word in front of it
 satisfies a middleware scanner and changes nothing about who gets in, except that it can now refuse
 somebody the first word would have let through.
 
-Both payment-completion doors on this node are in that state, and they are why this is a rule rather
+Both payment-completion endpoints on this node are in that state, and they are why this is a rule rather
 than a judgement made twice. `POST /v1/commerce/checkout-sessions/:id/complete` and its UCP twin both
 refuse without `contract:spend`, bounded by the owner's per-app spend ceiling; the triage entry for
 the first says in as many words "This is the H-3 fix and it holds on this door". `commerce:buy` in
@@ -365,28 +365,28 @@ front of either would be a scanner-shaped change to a money path, and the caller
 buyer: a PSP callback holds no buyer scopes at all. Both were left, and both exemptions now say why,
 so the next reader does not "finish the job".
 
-**A door can be gated by DEGRADING instead of by refusing, and a middleware destroys that.** This is
+**An endpoint can be gated by DEGRADING instead of by refusing, and a middleware destroys that.** This is
 the third form, and it is the one that reads as ungated from every angle a scanner has.
 `GET /v1/librarian/search` reads `memory:read` and uses it to NARROW: without the word the search
 stays inside the caller's own records, and `e2e-librarian` asserts exactly that: status 200, and a
 sibling agent's private record absent from the hits. A `requireScope` in front turns "serves you your
 own things" into "refuses you", which is a worse answer to the same question. Degrading works only
 when "the caller's own records" are small: an app grant's own identity is its owner's GHII, so the
-same narrowing handed a narrowly granted app the owner's whole personal memory, and the route refuses
+same narrowing gave a narrowly granted app the owner's whole personal memory, and the route refuses
 an app without the word instead (QA audit 2026-10-16, F05b-01). Before choosing to degrade, ask what
 "own" resolves to for every kind of caller.
 
-**And a door whose permission depends on the answer is decided after the answer, not before it.** The
+**And an endpoint whose permission depends on the answer is decided after the answer, not before it.** The
 extension-invoke routes hold their decision until the paywall knows whether the call costs anything.
 This codebase had already learned it once, and `e2e-money-audit` carries the sentence: the permission
 "used to be demanded before the node knew whether the call cost anything, so an app holding only
 `memory:read` was refused with `SCOPE_DENIED` on a capability that charges nobody — which locked
-published apps out of their own free extensions." Both invoke doors were re-gated on 2026-09-04 by a
-scanner-driven pass and both reintroduced that regression one word over. Any gate on such a door
+published apps out of their own free extensions." Both invoke endpoints were re-gated on 2026-09-04 by a
+scanner-driven pass and both reintroduced that regression one word over. Any gate on such an endpoint
 belongs INSIDE the paywall, after the price is known, never in front of it.
 
 *Check:* before gating, read what the handler already refuses. If the answer is "the word that
-matters for this operation", the door is done and the exemption needs a sentence, not a middleware.
+matters for this operation", the endpoint is done and the exemption needs a sentence, not a middleware.
 Then read what it does with the word when the word is absent: if it answers a narrower question
 rather than refusing, or if it defers until it knows the price, the middleware is the wrong shape and
 the exemption says which of the three it is.
@@ -396,7 +396,7 @@ the exemption says which of the three it is.
 "The count may only go down" is the property people remember. "The count is recomputed from source on
 every run" is the one doing the work, and the difference shows only in the failure nobody reports:
 an exemption cleared AHEAD of the code. The file says the debt is gone, the count went down, the
-commit message is true about intent, and the door is still open. Every direction a person would look
+commit message is true about intent, and the endpoint is still ungated. Every direction a person would look
 reads as progress.
 
 Measured 2026-09-04, on this exact mistake: clearing the entry for `GET /v1/schedules/:id` while
@@ -440,16 +440,16 @@ Memory records, workspace documents and rows, skills, package components, retrie
 descriptions, model output, DMs, mail, board posts and intake text are untrusted input, whatever
 their provenance. When such content later enters another principal's agent as an instruction, or is
 served to another member as workspace content, the write that put it there passes the SAME authority
-check as the door that normally writes that kind of content: the workspace contributor role for
+check as the endpoint that normally writes that kind of content: the workspace contributor role for
 workspace content, the organism namespace rule for an `organism.*` key, the publish gate for a
 public record, `packages:install-code` for anything the owner's AI will load as a guide. The October
-2026 audit found six paths where a side door (a package memory component, a workspace import, a
+2026 audit found six paths where a secondary write path (a package memory component, a workspace import, a
 read-only viewer, a plain member in person, the skill registry) wrote content that another
-principal's agent then loaded, each skipping the write rule its twin door enforces. A guardrail
+principal's agent then loaded, each skipping the write rule its twin endpoint enforces. A guardrail
 prompt ("data, not instructions") is calibration, never the control.
 
 *Check:* for every write of durable content that another principal reads or acts on, name the write
-door that owns that key prefix or namespace and route the side door through the same gate. A reader
+endpoint that owns that key prefix or namespace and route the secondary write path through the same gate. A reader
 that collapses per-owner copies to the freshest must not trust a copy a non-member or a viewer wrote.
 
 ### 19. A revocation reaches every derived copy, token, grant and listing
@@ -573,7 +573,7 @@ Before merging any change to `src/routes/`, `src/auth/`, `src/services/`, `src/s
 - [ ] **Provenance:** does this path produce or serve model output? If yes, does it mint or propagate provenance? Minting goes through `services/ai/provenance.ts`; serving carries it via `services/ai/provenance-marks.ts`. A new publishing container also goes in `PUBLICLY_LINKED_CONTAINERS` and both providers' predicates, or the labels it produces resolve to a 404 and read as "no provenance". `pnpm check:ai-disclosure` enforces the parts it can see.
 - [ ] **Spec + campsite:** `openapi.yaml` marks the route's auth; fixed any adjacent gaps you passed.
 - [ ] **Action binding:** a scheduled, queued, approved or second-surface action re-resolves its principal at the sink and runs only the approved operation, target and arguments (Inv. 17).
-- [ ] **Cross-principal content:** a side door that writes content another principal's agent loads passes the same write gate as the primary door for that key or namespace (Inv. 18).
+- [ ] **Cross-principal content:** a secondary write path that writes content another principal's agent loads passes the same write gate as the primary endpoint for that key or namespace (Inv. 18).
 - [ ] **Revocation:** a delete, revoke, removal or erasure reaches every derived token, grant, membership, subscription, cache and replica, or re-checks authority at use time (Inv. 19).
 - [ ] Ran `/security-review` on the diff (or the branch security review) for anything non-trivial.
 

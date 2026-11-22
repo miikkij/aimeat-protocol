@@ -2,8 +2,8 @@
  * @file src/routes/package-account-sales.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description An author sells their own package to accounts of this node (Jouni, 2026-10-31, "optio
- *   B"). The work is services/packages/sale/package-account-sale.ts; the MCP tools aimeat_package_price_set,
+ * @description An author sells their own package to accounts of this node (Jouni, 2026-10-31, option
+ *   B). The work is services/packages/sale/package-account-sale.ts; the MCP tools aimeat_package_price_set,
  *   aimeat_package_sales and aimeat_package_buy call the same functions, and the connector's CLI
  *   dispatch calls these endpoints.
  *

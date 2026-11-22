@@ -46,7 +46,7 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 
 const BEATS = [
   { id: 'say', label: () => tr('story.beat1', 'Say what you need') },
-  { id: 'carry', label: () => tr('story.beat2', 'Carry the prompt to any AI') },
+  { id: 'carry', label: () => tr('story.beat2', 'Paste the prompt into any AI') },
   { id: 'bring', label: () => tr('story.beat3', 'Bring the file back') },
   { id: 'wall', label: () => tr('story.beat4', 'It goes on the front page') },
 ];
@@ -55,8 +55,8 @@ const BEATS = [
 function BeatRail({ current }) {
   const go = (id) => (e) => { e.preventDefault(); document.getElementById('beat-' + id)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); };
   return html`
-    <nav class="bs-rail" aria-label=${tr('story.railLabel', 'The four beats')}>
-      <span class="bs-rail-label">${tr('story.railLabel', 'The four beats')}</span>
+    <nav class="bs-rail" aria-label=${tr('story.railLabel', 'The four steps')}>
+      <span class="bs-rail-label">${tr('story.railLabel', 'The four steps')}</span>
       ${BEATS.map((b, i) => html`
         <a key=${b.id} class=${`bs-rail-item ${current === b.id ? 'is-on' : ''}`} href=${'#beat-' + b.id} onClick=${go(b.id)}>
           <span class="bs-rail-num">${i + 1}</span>${b.label()}
@@ -121,7 +121,7 @@ export default function BuildStory({ navigate }) {
             <span>${tr('story.title1', 'From a sentence')}</span>
             <span>${tr('story.title2', 'to an app on the front page')}</span>
           </h1>
-          <p class="ld-sh-position">${tr('story.position', 'Four beats. Ten minutes. Any AI chat you already have.')}</p>
+          <p class="ld-sh-position">${tr('story.position', 'Four steps. Ten minutes. Any AI chat you already have.')}</p>
           <p class="bs-lead">${tr('story.lead', 'These are all the steps, shown once, with the real pieces. Read them through, or skip to the bottom where the builder is open and waiting.')}</p>
           <a class="ld-sh-door showroom-door" href="#bs-builder" onClick=${toBuilder}>${tr('story.skip', 'Skip to the builder ↓')}</a>
         </div>
@@ -140,7 +140,7 @@ export default function BuildStory({ navigate }) {
               <span class="bs-track-desc">${tr('landing.trackAtelierDesc', 'The new track: living looks (newspaper, gallery, neon console…), layouts your AI can rearrange later without republishing, motion built in.')}</span>
             </div>
           </div>
-          <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('story.b1PacksLabel', 'Packs, picked for you:')}</span> ${tr('landing.genPacksHint', 'Charts, editable flow diagrams, games, 3D. Self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.')}</div>
+          <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('story.b1PacksLabel', 'Packs, picked for you:')}</span> ${tr('landing.genPacksHint', 'Charts, editable flow diagrams, games, 3D. Self-hosted libraries with AI instructions included in the prompt. Your idea text pre-selects matching packs.')}</div>
         </div>
         <img class="bs-picture bs-picture--sun" src="/img/build-story/beat1-say.jpg" width="1200" height="900" loading="lazy"
           alt=${tr('story.b1Alt', 'A person at a bright workshop counter telling a friendly retro robot what they want; the robot writes it on a paper ticket')} />
@@ -151,12 +151,12 @@ export default function BuildStory({ navigate }) {
           alt=${tr('story.b2Alt', 'The person carries a glowing paper ticket across a sunny street toward a huge chat bubble on the wall of a building')} />
         <div class="bs-beat-copy">
           <span class="bs-num">2</span>
-          <h2 class="ld-sh-h2"><span>${tr('story.b2Title1', 'Carry the prompt')}</span><span class="ld-sh-accent">${tr('story.b2Title2', 'to any AI')}</span></h2>
-          <p class="ld-sh-text">${tr('story.b2Text', 'One button assembles the prompt: this place\'s own build guide, plus what you chose. Paste it into Claude, ChatGPT, Gemini, any chat. The AI asks a few questions, builds the app and hands you back one HTML file. Nothing here needs a connector.')}</p>
+          <h2 class="ld-sh-h2"><span>${tr('story.b2Title1', 'Paste the prompt')}</span><span class="ld-sh-accent">${tr('story.b2Title2', 'to any AI')}</span></h2>
+          <p class="ld-sh-text">${tr('story.b2Text', 'One button assembles the prompt: AIMEAT\'s own build guide, plus what you chose. Paste it into Claude, ChatGPT, Gemini, any chat. The AI asks a few questions, builds the app and gives you back one HTML file. Nothing here needs a connector.')}</p>
           <div class="bs-promptbox">
             <span class="bs-promptbox-label">${tr('landing.promptContains', 'This prompt contains')}</span>
             <div class="bs-chips">
-              <span>${tr('story.chipGuide', 'this place\'s build guide')}</span>
+              <span>${tr('story.chipGuide', 'AIMEAT\'s build guide')}</span>
               <span>${tr('story.chipIdea', 'your idea')}</span>
               <span>${tr('story.chipTemplate', 'a template, or none')}</span>
               <span>${tr('story.chipPacks', 'the packs you ticked')}</span>

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description The content class pipeline on arrival: when a file is stored, or a memory record or a
  *   workspace document is written, the item is inspected with the owner's settings
- *   (contentclass.settings: `onArrival`, `sources`, the stages). Jouni, 2026-10-20: "kun
- *   järjestelmään laitetaan se tieto", on or off, and the same pipeline on request for what is
+ *   (contentclass.settings: `onArrival`, `sources`, the stages). Jouni, 2026-10-20: when
+ *   the data arrives, on or off, and the same pipeline on request for what is
  *   already there (scan.ts).
  *
  *   OFF THE REQUEST PATH. The hooks only put the item in an in-process list and return; one worker,

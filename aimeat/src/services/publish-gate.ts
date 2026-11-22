@@ -7,8 +7,8 @@
  *   memory record, a stored file, a workspace share open to the link, an app anyone may open, an
  *   organism, a board, a skill, a package, a knowledge package, a data package, a portfolio.
  *
- *   THE RULE (Jouni, 2026-10-17): "ihminen voi komentaa agenttia tekemään niin ja silloin agentti
- *   toteuttaa sen, eli agentin on pystyttävä tekemään se jos sille on annettu oikeus toimia niin."
+ *   THE RULE (Jouni, 2026-10-17): a person may tell an agent to make something public, and an agent
+ *   that holds the permission must then be able to do it.
  *   The owner in person may always. An agent may when it holds publish:public, which the owner ticks
  *   on its own and no wildcard carries. An app grant or an ecosystem app may when it holds the same
  *   word, or when the node's gate does not cover apps. Everyone else's attempt becomes a request the

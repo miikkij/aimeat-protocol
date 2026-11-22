@@ -168,7 +168,7 @@ function Machine({ c, others, onChanged, confirm }) {
       ? html`<${Marks}>${tools.map((id) => html`<${Mark} key=${id}>${id}<//>`)}<//>`
       : silent ? m('canSilent', 'The computer did not answer. The program that runs agents on it may be stopped.')
         : m('canNone', 'Its runtime named no tools.'),
-      sub: models > 0 ? m('models', '{n} AI models are within its reach.').replace('{n}', String(models)) : undefined });
+      sub: models > 0 ? m('models', '{n} AI models are available to it.').replace('{n}', String(models)) : undefined });
   }
   if (c.reported_name && c.reported_name !== c.name) rows.push({ k: m('reported', 'Its own name'), v: c.reported_name, mono: true });
 
@@ -284,7 +284,7 @@ export default function MachinesView({ navigate }) {
       ${accepting
         ? html`
           ${have}
-          <${SubHeading} level=${2} desc=${m('addDesc', 'Your own laptop, computer or server. Agents run on it and can use the models it reaches. Run these two commands on it, approve the code it shows, and the computer appears on this page, where you give it a name.')}>
+          <${SubHeading} level=${2} desc=${m('addDesc', 'Your own laptop, computer or server. Agents run on it and can use the models it can access. Run these two commands on it, approve the code it shows, and the computer appears on this page, where you give it a name.')}>
             ${m('addTitle', 'Add a computer')}
           <//>
           <${ConnectorSteps} session=${session} accepting=${true} />

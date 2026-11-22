@@ -80,13 +80,13 @@ export function agentName(worker) {
 /** When an agent works, in the words the proposal page offers. */
 export function whenWords(worker) {
   if (worker.when === 'clock' && worker.schedule?.cron) {
-    return tr('home.agents.when.clockAt', 'By the clock, {words}')
+    return tr('home.agents.when.clockAt', 'On a schedule, {words}')
       .replace('{words}', cronWordsIn(worker.schedule.cron, worker.schedule.timezone));
   }
   if (worker.when === 'always') return tr('home.agents.when.always', 'Always on');
   if (worker.when === 'records') return tr('home.agents.when.records', 'When something new arrives in a workspace');
   if (worker.when === 'talk') return tr('home.agents.when.talk', 'When someone writes to it');
-  if (worker.when === 'clock') return tr('home.agents.when.clock', 'By the clock');
+  if (worker.when === 'clock') return tr('home.agents.when.clock', 'On a schedule');
   return tr('home.agents.when.ask', 'When I ask');
 }
 

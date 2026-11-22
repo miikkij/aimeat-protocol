@@ -10,8 +10,8 @@
  *   and the crew runtime can do. The first sorting proposed six new runtime tools (mail, a
  *   calendar, transcription, outside systems), because nothing an agent designer reads said that
  *   an app gives an agent its capability. Fourteen of the kinds moved to "possible now" once the
- *   rule was applied (Jouni, 2026-10-12: "applikaatio voi tehdä app-toolsin jonka kautta se voi
- *   hyödyntää aimeat:n kaikkia kyvykkyyksiä [...] ilman että paisutetaan crewaimeat:ia"). The
+ *   rule was applied (Jouni, 2026-10-12: an app can publish app tools through which it uses every
+ *   capability of the node, without growing the CrewAI package). The
  *   same mistake repeats in every session until the rule is where a designer reads it.
  *
  *   WHAT IT MUST AGREE WITH. models/app-tool-schemas.ts (a tool's fields and its two ways of

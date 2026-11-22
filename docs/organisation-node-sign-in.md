@@ -1,7 +1,7 @@
 # Gating a node to approved organisations
 
 *How to run one AIMEAT node for your company and the partner companies you approve, with Microsoft
-Entra ID as the way in.*
+Entra ID as the sign-in method.*
 
 **Version:** 1.5 — Section 6b step 9: everyone on the node sees each other (`AIMEAT_MEMBERS_SEE_EACH_OTHER`)
 **Date:** 2026-10-26
@@ -18,11 +18,11 @@ claim of the verified ID token against a list of Directory (tenant) GUIDs and re
 else, including personal Microsoft accounts.
 
 **Who may get an account here?** That is the registration mode. It is a different question, because
-the node also has doors that never touch Entra: the API registration endpoint, the web registration
+the node also has endpoints that never touch Entra: the API registration endpoint, the web registration
 form, the self-service invitation request, and member-minted invitations.
 
-Setting only the first leaves those doors open to the public internet. Setting only the second
-leaves the front door open to every Microsoft account in the world. The combination below is what an
+Setting only the first leaves those endpoints open to the public internet. Setting only the second
+leaves Entra sign-in open to every Microsoft account in the world. The combination below is what an
 organisation node wants.
 
 | `AIMEAT_REGISTRATION_MODE` | Password registration | First sign-in through a provider | Invitation |
@@ -76,7 +76,7 @@ and that is what an administrator reacts to.
 
 Publisher verification removes that warning. It needs a Microsoft Partner Network account with the
 app registration linked to it. Sign-in works without it, but some tenants are configured to refuse
-unverified publishers outright, and then verification is the only way in.
+unverified publishers outright, and then verification is the only way to sign in.
 
 ## 4. Configure the node
 
@@ -135,15 +135,15 @@ username, and the address is confirmed here like any other. Casdoor has the same
 ## 6. What the gate does not cover
 
 - **Other sign-in providers.** The tenant allowlist gates Entra only. If Google or Casdoor is also
-  enabled, that is a second front door with its own answer to "who may sign in", and under mode
+  enabled, that is a second sign-in method with its own answer to "who may sign in", and under mode
   `oauth` it creates accounts too. Turn them off on an organisation node.
 - **Guest accounts in your own directory.** A guest invited into your tenant carries YOUR `tid`, so
   they pass the gate. Anyone your Entra admins invite as a guest can sign in here. That is often
   what you want, and it should be a decision rather than a surprise.
 - **Invitations.** Under `oauth` and `invite`, any member of the node can mint an invitation and the
   invited person gets an account with a password, from any tenant or none. Members who should not be
-  handing out accounts are an organism-role question, not a sign-in question.
-- **The sign-in modal.** It still shows the registration form under every mode; the door behind it
+  giving out accounts are an organism-role question, not a sign-in question.
+- **The sign-in modal.** It still shows the registration form under every mode; the endpoint behind it
   answers 403. The modes have always behaved this way, and the SPA does not read the mode yet.
 - **Removing a tenant from the list locks out its people.** The `tid` check runs on every sign-in,
   not only the first, so people from a removed tenant can no longer get in. Their accounts, memory
@@ -305,7 +305,7 @@ node is in every other person's address book as a colleague, without anyone savi
 Contacts page, in the person picker of every form (who may build an app, organism and workspace
 members, app grants), and in what an AI reads with `aimeat_contact_list` or `GET /v1/contacts`. The
 member directory (`GET /v1/ghii/list`) lists everyone, without each person's opt-in. A colleague's
-first message lands in the inbox instead of the requests, and a colleague added to a group chat
+first message goes to the inbox instead of the requests, and a colleague added to a group chat
 joins at once. What stays: an agent or an app still asks first, a person someone blocked stays
 blocked, a disabled account is not shown, and a person signed in from another node sees the opt-in
 directory only. At most 2000 colleagues are listed in one address book; the answer says
@@ -330,9 +330,9 @@ not publish the customer list.
 The setup itself is a five-step playbook in the admin tab, and every step shows what the node has
 actually SEEN — metadata read, a real sign-in through, the directory calling the SCIM endpoint —
 rather than what was configured. The tab also carries Entra and Okta walkthroughs and a copyable
-brief for the operator's own AI. Two runtime switches govern the doors:
+brief for the operator's own AI. Two runtime switches govern the endpoints:
 
-- `sso.enabled` (`AIMEAT_SSO_ENABLED`, default false) — the public doors (SAML login, ACS, SCIM,
+- `sso.enabled` (`AIMEAT_SSO_ENABLED`, default false) — the public endpoints (SAML login, ACS, SCIM,
   SP metadata) answer 503 until it is on. Management works either way: configure first, enable second.
 - `sso.connections_locked` (`AIMEAT_SSO_CONNECTIONS_LOCKED`, default false) — freezes every
   connection write with 403. A host who wants "who may sign in" to take a deploy SEALS this key
@@ -353,7 +353,7 @@ Deactivate button on the Owners tab. A connection may only touch accounts it man
 account only when that account's locally verified email is in the connection's own domains. When
 an adopted account has two-step sign-in, the person's first SAML sign-in into it asks their code
 once; the sign-ins after that open the account without it. The
-same fence holds for an account the connection creates, by SCIM or at a first SAML sign-in: its
+same rule holds for an account the connection creates, by SCIM or at a first SAML sign-in: its
 address is recorded as verified only when it is in the connection's domains. A guest whose address
 is elsewhere gets an account without a verified address, and confirms the address later the way any
 member does.
@@ -364,7 +364,7 @@ must end with `?aadOptscim062020` — without it Entra's SCIM client departs fro
 tolerates its capitalised op verbs and string booleans either way). Okta: a SAML 2.0 app
 integration, same two values, metadata address from the Sign On tab.
 
-## 8. Where this lives in the code
+## 8. Where this is in the code
 
 | What | Where |
 |---|---|
@@ -377,7 +377,7 @@ integration, same two values, metadata address from the Sign On tab.
 | SAML SP wrapper + IdP metadata parsing | `aimeat/src/services/saml-sp.ts` |
 | SAML login routes (authorize/ACS/finalize) | `aimeat/src/routes/saml-login.ts` |
 | SSO connection management (one implementation) | `aimeat/src/services/sso/connections.ts`, routes `aimeat/src/routes/admin/sso.ts`, MCP `aimeat/src/mcp/admin-sso.ts` |
-| SCIM door + resource handlers | `aimeat/src/routes/scim.ts`, `aimeat/src/services/scim-users.ts` |
+| SCIM endpoint + resource handlers | `aimeat/src/routes/scim.ts`, `aimeat/src/services/scim-users.ts` |
 | Account deactivation (one implementation) | `aimeat/src/services/owner/lifecycle.ts` |
 | BR-04 tests | `aimeat/test/unit/saml-assertion.test.ts`, `aimeat/test/unit/scim-entra-compat.test.ts`, `aimeat/test/e2e-owner-deactivation.ts`, `aimeat/test/e2e-saml-login.ts`, `aimeat/test/e2e-scim-users.ts` |
 

@@ -65,7 +65,7 @@ export function useNews(session) {
 
   // A CUSTOMER'S NODE (site.js customerNode()) shows its buyer the news for people who use AIMEAT
   // only, never the operator's or the app builder's, and nothing before their AI is connected
-  // (Jouni, 2026-10-29: "Vain käyttäjän uutiset"). The buyer is their node's operator and owns apps,
+  // (Jouni, 2026-10-29). The buyer is their node's operator and owns apps,
   // but the band is for what they came to do, and the count on the header's Home link follows it.
   const customer = customerNode();
   // The same cache key the home's own state read uses (surface/home-state.js), so the Home asks

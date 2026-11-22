@@ -178,7 +178,7 @@ sequenceDiagram
   Serve-->>Crew: 200 envelope
 ```
 
-Since 2026-11-04 the forward makes no network connection: the node hands the
+Since 2026-11-04 the forward makes no network connection: the node passes the
 request to its own HTTP server in the same process
 (`aimeat/src/services/request/injector.ts`, called from
 `aimeat/src/services/connect-tunnel/forward.ts`). The request still passes the

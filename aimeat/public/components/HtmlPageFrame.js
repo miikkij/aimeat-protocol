@@ -89,7 +89,7 @@ export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading,
       </div>`;
   }
   // Who made the page is shown to the workspace's members only (Jouni, 2026-10-16); a visitor reads that a user made it.
-  const madeBy = author ? (t('pageFrame.madeBy') || '{name} made this page. It runs separately and cannot reach your account.').replace('{name}', author) : t('pageFrame.madeByUser');
+  const madeBy = author ? (t('pageFrame.madeBy') || '{name} made this page. It runs separately and cannot access your account.').replace('{name}', author) : t('pageFrame.madeByUser');
   return html`
     <div class=${fill ? 'html-page-frame html-page-frame--fill' : 'html-page-frame'} ref=${wrap}>
       <div class="html-page-frame-strip html-page-frame-bar">

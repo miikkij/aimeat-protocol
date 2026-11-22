@@ -3,8 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The avatar templates a node ships: SVG pictures an agent starts from when it makes
- *   its own avatar (Jouni, 2026-10-19: "tarjotaan jotain valmiita pohjia mistä ne voi rakentaa sille
- *   agentin avataria"). They are seeded into the Design Book as published `avatar` parts
+ *   its own avatar (Jouni, 2026-10-19). They are seeded into the Design Book as published `avatar` parts
  *   (services/design-book/lifecycle.ts), so an agent finds them with aimeat_designbook_search, reads
  *   one with aimeat_designbook_get, changes its colours, letters or shape, and writes the result to
  *   its own `agent.avatar` record. The built-in skill agent-avatar says how.

@@ -17,7 +17,7 @@
  *
  *   Tones, each a meaning and the look its page has on main:
  *   - 'draft': a reply your AI wrote that waits for your yes, on your side in a dashed box, with a line
- *     above the words and the page's actions under them (Jouni: "dark mode totally unreadable", so the
+ *     above the words and the page's actions under them (Jouni found them unreadable in dark mode, so the
  *     words take the text colour).
  *   - 'comment': a comment on a workspace record or document, framed on the grey ground: the head line
  *     (who, the notes after it, when), the words as written, the actions under them; `reply` indents

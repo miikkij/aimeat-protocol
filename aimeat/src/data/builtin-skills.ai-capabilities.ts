@@ -40,8 +40,8 @@
  *   v1.0.1 — 2026-09-28 — An extension of the owner's can be a provider (V6).
  *   v1.1.0 — 2026-09-28 — Embeddings are rare and the person's decision: never proposed by the AI,
  *     two tests first (does it fit one prompt, does word search find it), and the three conditions
- *     that make them truly needed (Jouni: "embeddings should be used rarely and only when user
- *     decides so and is really really needed").
+ *     that make them truly needed (Jouni: embeddings are used rarely, only when the user decides so
+ *     and they are truly needed).
  *   v1.2.1 — 2026-09-28 — Section 2b: role.<name>.context= passes a model over, a connection needs every
  *     capability, and AIMEAT.ai.roles() answers an app with its own roles only.
  *   v1.2.0 — 2026-09-28 — Section 2b, AI roles: an app declares what each kind of AI work is for, the

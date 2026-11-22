@@ -2,7 +2,7 @@
  * @file test/unit/pat-is-person.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description An owner-level personal access token is the person (Jouni, 2026-11-04: "ihmiseksi").
+ * @description An owner-level personal access token is the person (Jouni, 2026-11-04).
  *   isOwnerInPerson (utils/gaii.ts) already let it pass every requireScope as the person, while
  *   readerKindOf (services/classification/reader-kind.ts) called the same token an AI, so the
  *   PERSON_REQUIRED checks refused it a setting the person may loosen (codebase analysis 2026-11-03,

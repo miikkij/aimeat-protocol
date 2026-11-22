@@ -28,8 +28,7 @@
  *     (secaudit2026oct26 round 8c, memory-b-08).
  *   v1.2.0 — 2026-10-29 — An account does not install a new extension or cortex under a name that
  *     starts with aimeat- (secaudit2026oct26 round 8c, extensions-02).
- *   v1.1.0 — 2026-10-26 — The owner is added, nothing else changes (Jouni, 2026-10-26: "piti lisätä
- *     omistaja johonkin tohon ja pitää toi formaatti mahdollisimman samana").
+ *   v1.1.0 — 2026-10-26 — The owner is added, nothing else changes (Jouni, 2026-10-26).
  *   v1.0.0 — 2026-10-25 — Initial (owner namespaces wish, secaudit2026oct22).
  */
 import { registerOwner, tokenRoles } from './helpers/owner-login.js';

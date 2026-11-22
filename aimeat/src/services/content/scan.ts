@@ -3,9 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A scan: the content class pipeline over many items at once, for what is already on
- *   the node or what arrived while the pipeline was off (Jouni, 2026-10-20: "sen voi myös tehdä jo
- *   olemassa olevalle sisällölle jolle ei löydy tätä tietoa entuudestaan joko yksitellen tai sitten
- *   käydä jotkut tietyt läpi kerralla").
+ *   the node or what arrived while the pipeline was off (Jouni, 2026-10-20: content that has no class yet
+ *   is checked one item at a time, or a chosen set at once).
  *
  *   WHAT IT GOES THROUGH. The owner's files and their agents' (the owner sees what their agents
  *   hold), or exactly the keys named; filtered by kind; by default only the items without facts.

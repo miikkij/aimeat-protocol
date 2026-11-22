@@ -20,7 +20,7 @@
  * @version-history
  *   2026-11-21 — `decision: person` on an action: an agent's call waits for the person's approval
  *     (services/extension/person-decision.ts). Additive.
- *   2026-11-15 — Words only (Jouni's ruling): "four ways (the columns below)" and "an unattended run", not roads.
+ *   2026-11-15 — Words only (ruled by Jouni): the prompt says "four ways (the columns below)" and "an unattended run", not roads.
  *   2026-11-09 — ADDITIVE: the `ctx.changed({owners})` row.
  *   2026-11-08 — ADDITIVE: ctx.workspace.archiveRecords names the archived memory key limit and its
  *     QUOTA_EXCEEDED (secaudit2026nov08b round 15b).

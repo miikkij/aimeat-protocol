@@ -132,7 +132,7 @@ export function FrontDoor({ onNavigate }) {
         ${open && html`
           <div class="poster-door-after">
             <p>${tr('landing.agentDoorAfter', 'It will ask you for your email address and nothing else. You choose your own username afterwards, from the link.')}</p>
-            <p>${tr('landing.agentDoorMcp', 'Be ready to set up a connector for it later; that is the step that lets it reach your home directly.')}</p>
+            <p>${tr('landing.agentDoorMcp', 'Be ready to set up a connector for it later; that is the step that lets it connect to your home directly.')}</p>
             <p>${tr('landing.agentDoorCannot', 'If it says it cannot, that is a fine answer. Register below instead.')}</p>
           </div>`}
       </div>

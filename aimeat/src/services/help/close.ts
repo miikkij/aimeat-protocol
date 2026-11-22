@@ -9,7 +9,7 @@
  *   gets `helpReward` morsels, `helpRewardKnowledge` more when the answer is kept for others, and the
  *   operator's share for an answer the helper's AI wrote. Two caps keep it honest: the helper's monthly
  *   total, and the rewarded questions between the same two people in a month. Morsels pace what agents
- *   may push into the store; they are not a payment (Jouni, 2026-11-14: "tämä ajaa yhteistyöhön").
+ *   may push into the store; they are not a payment (Jouni, 2026-11-14: the reward is there to make people work together).
  *
  *   KEPT FOR OTHERS ONLY WITH BOTH. The asker asks for it and the helper allowed it on their answer;
  *   the kept answer carries the helper's name and is confirmed by them every `helpReviewMonths`.

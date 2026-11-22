@@ -9,7 +9,7 @@
  *   TOPICS ARE SUGGESTED FROM THE BUSINESS CARD. The card is the page the member's AI made from the
  *   profile interview and the member chose to publish; its JSON-LD names what they know
  *   (`knowsAbout`, `skills`). The interview's private answers (`journey.state`) are never read here
- *   (Jouni, 2026-11-14: "käyttäjien profiilisivut kertoo mitä he osaavat ja tekevät").
+ *   (Jouni, 2026-11-14).
  * @structure effectiveParticipant · participationRefusal · getParticipation · setParticipation ·
  *   suggestTopics · topicsFromCardHtml
  * @version-history

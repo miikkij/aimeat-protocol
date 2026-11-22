@@ -14,10 +14,9 @@
  * @usage import { CommandPalette } from '/views/command-palette.js';  html`<${CommandPalette} navigate=${navigate} />`
  * @version-history
  *   v1.3.0 — 2026-10-16 — The large dialog (840px); a hit names its workspace by name and shows its
- *     ids (key, workspace id) on a typewriter line; the emoji marks in front of a name are gone (Jouni:
- *     "sen pitää olla toimiva", "näytä nimi ja voi noi ID:tkin olla näkyvillä"). A hit in a workspace
- *     opens that document or record itself, not the shared place (Jouni: "se meni organismiin muttei
- *     baronaan"): the openDoc handoff carries its key, and `aimeat-open-doc` reaches an open workspace.
+ *     ids (key, workspace id) on a typewriter line; the emoji marks in front of a name are gone (Jouni).
+ *     A hit in a workspace opens that document or record itself, not the shared place (Jouni): the
+ *     openDoc handoff carries its key, and `aimeat-open-doc` reaches an open workspace.
  *   v1.2.0 — 2026-10-14 — The window event `aimeat-command-palette` ({ q }) opens it with the words
  *     already typed: the menu find's way on when no place in a menu matched.
  *   v1.1.0 — 2026-09-27 — The list is the QuickFind component (components/QuickFind.js), which owns

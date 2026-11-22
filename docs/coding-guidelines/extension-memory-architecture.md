@@ -60,8 +60,8 @@ ctx.workspace.{appendRows,readRows,readRow}
 
 The full contract is `ExtensionCtx` in `src/services/extension/ctx-contract.ts`.
 
-`ctx.workspace` is the one road from the sandbox into a namespace that is not `ext:`, and it does not
-open the fence above: nothing is read or written under the extension's own authority. The caller's
+`ctx.workspace` is the one code path from the sandbox into a namespace that is not `ext:`, and it does not
+bypass the namespace rule above: nothing is read or written under the extension's own authority. The caller's
 membership, the creator's contributor grant, the caller's scopes (`memory:write` to write or publish,
 `memory:purge` to remove records with `deleteRecords`, `organism:read` to read; an owner session
 needs none of them), the space's locked schema and the publish gate all apply exactly as they do on
@@ -190,7 +190,7 @@ const tr = await AIMEAT.myLib.getTranslations('fi');
    vault (`/v1/secrets`, table `Secret`) is the fourth place data can live here, and the only one
    nothing reads back: not the owner, not an export, not a tool. An extension asks for a secret by
    writing `{{secret:NAME}}` in an outbound HEADER VALUE, and `ctx.fetch` substitutes it after the
-   script has handed the request over. So the script can SEND a credential and cannot LEARN
+   script has passed the request on. So the script can SEND a credential and cannot LEARN
    one, which is what makes it safe for an AI to write the script and a stranger to open the page it
    renders.
 

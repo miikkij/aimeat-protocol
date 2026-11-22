@@ -7,8 +7,8 @@
  *   HTTP routes, the MCP tools on three surfaces, the SPA shell) comes through here, so the checks,
  *   the warnings and the refusals are written once.
  *
- *   TWO LEVELS. Jouni: "Tyyli kuuluu teemaan ... AIMEAT default teema, siinä on tyyleinä AIMEAT,
- *   CIrcuit, paper, voltage jne." A theme holds styles (styles.ts), its default style, which styles the
+ *   TWO LEVELS. Jouni ruled that a style belongs to a theme: the default AIMEAT theme holds the
+ *   styles AIMEAT, Circuit, Paper, Voltage and more. A theme holds styles (styles.ts), its default style, which styles the
  *   pill offers, its component CSS ({ componentId: css }) and its theme CSS. The built-in AIMEAT
  *   theme holds the six built-in styles, read from the sheets; it is read only and can be copied. A
  *   custom theme is one memory record under the node's own `system@<node>`, key `ui.theme.<id>`,
@@ -78,7 +78,7 @@ const DEFAULT_OFFERED: readonly string[] = [BUILTIN_THEME, TIILITAIVAS_ID];
 /**
  * AIMEAT's own interface: the pages a theme reaches. Everything else the shell serves (the front
  * page, help, members, the change log, the showroom pages) keeps behaving as it did before themes
- * (Jouni, Q3 and 2026-09-24: "keep the public pages as they behave today").
+ * (Jouni, Q3 and 2026-09-24).
  */
 export const INNER_PATHS = ['/v1/home', '/v1/chat', '/v1/profile', '/v1/admin', '/v1/fleet', '/v1/appcat'];
 

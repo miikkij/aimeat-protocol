@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description A goal's proposal from one sentence: the person's own model here writes the plan (who
  *   leads, who does each work, what is missing and why), the page shows it, and the person approves
- *   it with one press. Jouni, 2026-10-25: "nobody fills forms any more; the AI makes the decisions
- *   and advises, the person sees what happens and approves". The same call the new-agent page makes
+ *   it with one press, so the person fills in no form: the AI proposes and advises, and the person
+ *   sees what happens and approves (Jouni, 2026-10-25). The same call the new-agent page makes
  *   (POST /v1/ai/complete, app_id home-goals), so it costs what a draft of an agent costs.
  *
  *   WHAT THE MODEL IS TOLD. The person's agents with their tags and modes, which of them is the

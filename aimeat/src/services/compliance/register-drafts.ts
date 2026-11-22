@@ -7,8 +7,7 @@
  *   it keeps personal data while the app keeps no register, and the customer due diligence register
  *   of every anti-money-laundering obliged organism that lacks one. Nothing here is stored. The page counts
  *   these beside the stored registers and lists them, marked as unreviewed drafts, so a node with
- *   no stored register still shows what it holds instead of a bare 0 (Jouni, 2026-10-26: "mistä
- *   kukaan tietää mitään kun mitään ei näy missään").
+ *   no stored register still shows what it holds instead of a bare 0 (Jouni, 2026-10-26).
  *
  *   Drafted on every read from the data maps, so a draft follows the map and goes when the app or
  *   its personal data goes; once a register is stored, its place shows the stored one instead.

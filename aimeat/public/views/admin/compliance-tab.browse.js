@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The dialog a row of the records section (09) opens on the admin Compliance page (plan
- *   doc-mvlftkh9zmc9, C7.7, Jouni 2026-10-24: "miksen voi avata noita rekistereitä"): every place that
+ *   doc-mvlftkh9zmc9, C7.7, Jouni 2026-10-24): every place that
  *   keeps that kind of document, the installation first, then each shared place and each app by
  *   name with a way to its own page; and an entry opened from the list, with its details, what it
  *   leaves open, its status changes and the paste for the person's AI (compliance-tab.item.js).

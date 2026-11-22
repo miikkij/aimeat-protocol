@@ -48,10 +48,10 @@ const Q_AI_MEMORY = {
 
 const Q_AGENT_HOME = {
   id: 'agentHome',
-  title: { k: 'start.q3.title', f: "Where does your AI's work live?" },
+  title: { k: 'start.q3.title', f: "Where is your AI's work stored?" },
   options: [
-    { id: 'home', score: 3, text: { k: 'start.q3.home', f: 'In a shared home where the team and other agents can find it' } },
-    { id: 'disk', score: 1, text: { k: 'start.q3.disk', f: 'On my machine, in a folder called final_v3_REAL' } },
+    { id: 'home', score: 3, text: { k: 'start.q3.home', f: 'In a shared workspace where the team and other agents can find it' } },
+    { id: 'disk', score: 1, text: { k: 'start.q3.disk', f: 'On my computer, in a folder called final_v3_REAL' } },
     { id: 'scattered', score: 0, text: { k: 'start.q3.scattered', f: 'Scattered across chat histories. Nobody digs those up.' } },
   ],
 };
@@ -87,7 +87,7 @@ export const TIERS = [
   { id: 't1', min: 3, name: { k: 'start.t1.name', f: 'Level 1: In Therapy' },
     desc: { k: 'start.t1.desc', f: 'Your AI goes to therapy, not to work: you carry its context in every morning and it forgets everything by night. You hired a brilliant employee and gave it amnesia.' } },
   { id: 't2', min: 6, name: { k: 'start.t2.name', f: 'Level 2: Working Without a Manager' },
-    desc: { k: 'start.t2.desc', f: 'You have agents and they do things, but nothing sticks and nobody runs the whole. Missing: a home, a memory and a manager.' } },
+    desc: { k: 'start.t2.desc', f: 'You have agents and they do things, but nothing sticks and nobody runs the whole. Missing: a shared workspace, a memory and a manager.' } },
   { id: 't3', min: 8, name: { k: 'start.t3.name', f: 'Level 3: Goes to Work' },
     desc: { k: 'start.t3.desc', f: 'Your agents actually go to work. Rare. Congratulations. Your playbook shows how to scale this and own the whole chain yourself.' } },
 ];
@@ -114,14 +114,14 @@ export const Q_PATH = {
   title: { k: 'start.q4.title', f: 'How do you want to try this?' },
   options: [
     { id: 'hosted', text: { k: 'start.q4.hosted', f: 'Try it first: hosted aimeat.io, nothing to install' } },
-    { id: 'self', text: { k: 'start.q4.self', f: "I'll build it myself: my own node on my own hardware (MIT, free)" } },
+    { id: 'self', text: { k: 'start.q4.self', f: "I'll build it myself: my own AIMEAT on my own hardware (MIT, free)" } },
     { id: 'help', text: { k: 'start.q4.help', f: 'I want help: you do it ($$)' } },
   ],
 };
 
 export const Q_TOOL = {
   id: 'tool',
-  title: { k: 'start.q5.title', f: 'What tool does your AI live in?' },
+  title: { k: 'start.q5.title', f: 'What tool do you use your AI in?' },
   options: [
     { id: 'claude', text: { k: 'start.q5.claude', f: 'Claude (web or desktop)' } },
     { id: 'claudeCode', text: { k: 'start.q5.claudeCode', f: 'Claude Code (terminal)' } },
@@ -136,7 +136,7 @@ export const Q_NEED = {
   title: { k: 'start.q5n.title', f: 'What would you want agents to handle first?' },
   options: [
     { id: 'code', text: { k: 'start.q5n.code', f: 'Code and PRs' } },
-    { id: 'docs', text: { k: 'start.q5n.docs', f: 'Documentation and a home for knowledge' } },
+    { id: 'docs', text: { k: 'start.q5n.docs', f: 'Documentation and a shared knowledge base' } },
     { id: 'watch', text: { k: 'start.q5n.watch', f: "Monitoring and reporting: what's happening, every morning" } },
     { id: 'unsure', text: { k: 'start.q5n.unsure', f: "I don't know yet, that's why I'm asking" } },
   ],
@@ -221,18 +221,18 @@ export function buildPlaybook(answers, mcpUrl) {
   // Step 1 — account / own node
   if (path === 'self') {
     sections.push({
-      title: { k: 'start.pb.s1self.title', f: 'Step 1: Install your own node' },
+      title: { k: 'start.pb.s1self.title', f: 'Step 1: Install your own AIMEAT' },
       items: [
         { text: { k: 'start.pb.s1self.a', f: 'Clone and run the init wizard, it asks the rest:' },
           code: 'git clone https://github.com/miikkij/aimeat-protocol\ncd aimeat-protocol\npnpm install && pnpm aimeat init' },
-        { text: { k: 'start.pb.s1self.b', f: 'Everything below is then done against your own node: replace the aimeat.io address with yours. Your hardware, your keys, your data.' } },
+        { text: { k: 'start.pb.s1self.b', f: 'Everything below is then done against your own AIMEAT: replace the aimeat.io address with yours. Your hardware, your keys, your data.' } },
       ],
     });
   } else {
     sections.push({
-      title: { k: 'start.pb.s1.title', f: 'Step 1: An account and a home' },
+      title: { k: 'start.pb.s1.title', f: 'Step 1: An account' },
       items: [
-        { text: { k: 'start.pb.s1.a', f: "Create a free account. No card, no payment. The account is your agent's home and your permission for it to exist." },
+        { text: { k: 'start.pb.s1.a', f: "Create a free account. No card, no payment. The account is where your agent works, and your permission for it to exist." },
           link: { href: '/v1/portal', label: { k: 'start.pb.s1.link', f: 'Create account →' } } },
       ],
     });
@@ -252,7 +252,7 @@ export function buildPlaybook(answers, mcpUrl) {
       link: { href: '/v1/connect', label: { k: 'start.pb.s2.cursorLink', f: 'Open the connect page →' } } });
   } else {
     connect.items.push({ text: { k: 'start.pb.s2.other', f: 'If your tool supports Connectors / custom MCP, paste this address into it:' }, code: mcpUrl });
-    connect.items.push({ text: { k: 'start.pb.s2.otherNote', f: "No MCP support? AIMEAT also works prompt-driven: the app composes the prompts, you carry them to your chat and bring the answers back. Free, and works with any AI." } });
+    connect.items.push({ text: { k: 'start.pb.s2.otherNote', f: "No MCP support? AIMEAT also works prompt-driven: the app composes the prompts, you paste them into your chat and bring the answers back. Free, and works with any AI." } });
   }
   // Self-hosted on localhost? A cloud AI can't reach a localhost MCP address — point to the connector.
   if (/localhost|127\.0\.0\.1/.test(mcpUrl || '')) {
@@ -283,7 +283,7 @@ export function buildPlaybook(answers, mcpUrl) {
   // Step 5 — automation level
   const auto = { title: { k: 'start.pb.s5.title', f: 'Step 5: Automation level' }, items: [] };
   if (automation === 'continuous') {
-    auto.items.push({ text: { k: 'start.pb.s5.continuous', f: 'You picked: by itself. A connector serve daemon runs your agent in the background and tasks arrive as pushes, no polling. A fleet of 33 agents runs in production on this model.' },
+    auto.items.push({ text: { k: 'start.pb.s5.continuous', f: 'You picked: by itself. A connector serve daemon runs your agent in the background and tasks arrive as pushes, no polling. 33 agents run in production on this model.' },
       link: { href: '/v1/connect', label: { k: 'start.pb.s5.link', f: 'Connector docs →' } } });
   } else if (automation === 'routine') {
     auto.items.push({ text: { k: 'start.pb.s5.routine', f: 'You picked: an agreed routine. Agree a scheduled check with your AI that reads the task queue regularly. AIMEAT’s own schedules work as the wake-up call and reminder.' } });

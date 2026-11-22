@@ -497,7 +497,7 @@ You should see:
 ### Step 3: Trigger a deep dive
 
 Pick an agent, enter "Focus on transmission losses", click "Send to
-agent". A task lands in the agent's queue at
+agent". A task is added to the agent's queue at
 `GET /v1/agents/<agent>/tasks?status=queued`.
 
 ### Step 4: Agent completes the task, writes new findings

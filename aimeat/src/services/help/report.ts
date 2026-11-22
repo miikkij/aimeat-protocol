@@ -4,14 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description The operator's report about what people asked: which help was needed and where, which
  *   questions repeat, which topics have no helper, how the load spreads, and suggested next steps the
- *   operator can add to a development queue (Jouni, 2026-11-14: "mistä voitaisiin päätellä mitä
- *   seuraavia kehitysaskeleita otetaan").
+ *   operator can add to a development queue (Jouni, 2026-11-14).
  *
  *   THE JOB COUNTS; AN AI WRITES. The scheduled job `help-report` stores the figures of the week or
  *   month that ended, without names, and tells the operators. By default the operator's OWN AI writes
  *   the text with aimeat_help_report_data and aimeat_help_report_write (a dry run first, then the
- *   operator's yes), as the compliance report is written (Jouni, 2026-11-14: "sen voi ajaa kuka
- *   tahansa operaattori omalla älylläkin"). With `helpReportWriter` 'node-ai' the node's own model
+ *   operator's yes), as the compliance report is written (Jouni, 2026-11-14). With `helpReportWriter` 'node-ai' the node's own model
  *   writes it right after the figures are stored, paid as an operator's call.
  *
  *   WHAT THE WRITER READS is the operator's choice (`helpReportReads`): topics, times and states, or

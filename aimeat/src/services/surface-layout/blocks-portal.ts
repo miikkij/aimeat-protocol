@@ -55,7 +55,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'What this place is in one sentence, and three ways to start: let your AI register you, create an account, or sign in.',
+        summary: 'What this server is in one sentence, and three ways to start: let your AI register you, create an account, or sign in.',
     },
     {
         id: 'portal.pitch',
@@ -65,7 +65,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'One line saying what this site is, above everything that asks the visitor to do something.',
+        summary: 'One line saying what this server is, above everything that asks the visitor to do something.',
     },
     {
         id: 'portal.wish',
@@ -75,7 +75,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'One field where a visitor says what they need, and lands in a chat that starts on it.',
+        summary: 'One field where a visitor says what they need, and is taken to a chat that starts on it.',
     },
     {
         id: 'portal.build-invite',
@@ -111,7 +111,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['site'],
         props: {},
         maxPerSurface: 1,
-        summary: 'The newest entries from this site\'s change log, folded to one line.',
+        summary: 'The newest entries from this server\'s change log, folded to one line.',
     },
     {
         id: 'portal.gallery',
@@ -145,7 +145,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['apps', 'organisms', 'agents'],
         props: {},
         maxPerSurface: 1,
-        summary: 'How many apps, spaces and agents this site has.',
+        summary: 'How many apps, spaces and agents this server has.',
     },
     {
         id: 'portal.hero',
@@ -185,7 +185,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'What this site did today, and the line offering the same to the visitor.',
+        summary: 'What this server did today, and the line offering the same to the visitor.',
     },
     {
         id: 'portal.transparency',
@@ -195,7 +195,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'One line on how this site marks what a model wrote, and a link to the page that states it properly.',
+        summary: 'One line on how this server marks what a model wrote, and a link to the page that states it properly.',
     },
     {
         id: 'portal.text',
@@ -302,7 +302,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'What this site promises: every action signed, AI content labelled, consent you can withdraw, GDPR requests as buttons, and a link to how AI content is marked.',
+        summary: 'What this server promises: every action signed, AI content labelled, consent you can withdraw, GDPR requests as buttons, and a link to how AI content is marked.',
     },
     {
         id: 'portal.rooms',
@@ -322,7 +322,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'The closing words: this is free to try, with the way back up to the wish box and, when there is one, the shop.',
+        summary: 'The closing words: this is free to try, with a link back up to the wish box and, when there is one, the shop.',
     },
 
     // 5. The front page as the message frame says it (2026-09-14, TARGET-075): say what you want,
@@ -407,7 +407,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['apps'],
         props: {},
         maxPerSurface: 1,
-        summary: 'The apps published here, the ones other people built first and this site\'s own after them.',
+        summary: 'The apps published here, the ones other people built first and this server\'s own after them.',
     },
     {
         id: 'portal.frame-linux',

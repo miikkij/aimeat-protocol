@@ -122,7 +122,7 @@ describe('classification labels', () => {
       expect(row?.history.at(-1)).toMatchObject({ action: 'suggest', source: 'human-via-ai', humanSaid: SAID_LOWER, to: 'julkinen' });
     });
 
-    // Jouni 2026-09-30, "humanSaid saa nostaa luokitusta": a raise gives nothing away, so it applies
+    // Jouni 2026-09-30: relayed words (humanSaid) may raise a label; a raise gives nothing away, so it applies
     // over a label a person set as well; only a lowering waits for the person.
     it("a raise relayed over a label a person set applies as the person's", async () => {
       await setLabel(deps(), person, T, { label: 'sisainen' });

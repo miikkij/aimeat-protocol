@@ -29,7 +29,7 @@
  *     which writes their names into the agent's tasks.
  *   v1.1.0 — 2026-10-12 — The tick "Also work on the records that are already there", with how
  *     many published records the ticked spaces hold now, offered when the computer's agent program
- *     can do it (Jouni, 2026-10-12: "haluan myös valinnan käsittele myös vanhat"). A proposal's
+ *     can do it (Jouni, 2026-10-12). A proposal's
  *     space that asks for them says so.
  *   v1.0.0 — 2026-10-12 — Initial (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  */

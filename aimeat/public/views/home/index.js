@@ -31,7 +31,7 @@
  *     (away.js): what happened while the buyer was away (Jouni, 2.11 00.52, three visits).
  *   2026-11-02: Under the welcome, on a customer's node, the first visit's morning digest offer and the
  *     third visit's work made for the person (morning-digest.js, made-for-you.js, timed by visits.js;
- *     Jouni 2.11 00.52, "three visits" a and c).
+ *     the three-visits plan, items a and c; Jouni, 2026-11-02).
  *   2026-11-01: Under the welcome, on a customer's node, "Rakennamme kanssasi" (build-with-you.js):
  *     the offer once the node opens it, then the request's place in the queue (Jouni, 1.11 16.22).
  *   2026-10-31: The welcome takes no navigate: its sentence field went with v31 K26. It leaves once the

@@ -41,8 +41,8 @@
  *   v1.2.0 — 2026-10-17 — Each binding says whether it has a money price and its pacing amount, so the
  *     paywall asks for a contract only for a money price and paces a free tool. v1.1.0 meant that, and
  *     the paywall answered every offered tool with 402: Heidi could not acknowledge a test in the
- *     Kehitysputki app, whose free tools carry only a pacing amount (Jouni: "ei sen pitäisi vaatia
- *     mitään kontrakteja. kun ne on ilmaisia apptoolseja").
+ *     Kehitysputki app, whose free tools carry only a pacing amount (Jouni: a free app tool
+ *     needs no contract).
  */
 import type { Storage } from '../../storage/interface.js';
 import { AppToolsDocSchema, isToolOffered, isToolPriced, toolTollMorsels } from '../../models/app-tool-schemas.js';

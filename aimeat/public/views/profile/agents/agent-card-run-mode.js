@@ -14,7 +14,7 @@
  * @version-history
  *   v1.5.0 — 2026-09-26 — The three choices are the Choice (components/Choice.js: the tabs, the chosen
  *     one on the sun, the arrow keys, its hint under it); the page writes no class (page group G1a).
- *   v1.4.0 — 2026-09-26 — renderRunModeBadge goes: nothing called it (Jouni: "saat poistaa jos ne on oikeasti käyttämättömiä").
+ *   v1.4.0 — 2026-09-26 — renderRunModeBadge goes: nothing called it (Jouni: code that nothing uses may be removed).
  *   v1.3.0 — 2026-09-25 — Every row label is the Row label (.poster-label), a unification: Jouni's decision Row label.
  *   v1.2.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
  *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".

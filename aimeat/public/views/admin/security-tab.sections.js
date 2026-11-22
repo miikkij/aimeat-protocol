@@ -245,7 +245,7 @@ function labelUrls(label, appHost) {
 
 /**
  * An open subdomain address: each choice as a row that says, with both full addresses, what happens
- * when it is chosen, and its button at the end (Jouni, 2026-10-28: "jos sinä valitset näin tapahtuu näin").
+ * when it is chosen, and its button at the end (Jouni, 2026-10-28).
  */
 function SubdomainChoices({ i, e, appHost, onDecideEntry }) {
   const urls = labelUrls(e.params?.label || e.id, appHost);

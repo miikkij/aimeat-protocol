@@ -9,11 +9,10 @@
  *   name (/v1/cortex/<name>/libs) were node-wide keys. A name an owner uninstalled, or a name the
  *   node had not shipped yet, went to whoever installed it next, and with it every app that loaded
  *   it, every consent that named it and every pinned version number (secaudit2026oct22 leads 589 and
- *   2827; wish wish-cortex-and-extension-names-live-in-the-owner-s-namespace, Jouni 2026-10-25:
- *   "tämä on nyt fixattava!").
+ *   2827; wish wish-cortex-and-extension-names-live-in-the-owner-s-namespace, Jouni 2026-10-25).
  *
- *   THE RULE (Jouni, 2026-10-26: "piti lisätä omistaja johonkin tohon ja pitää toi formaatti
- *   mahdollisimman samana ... eikä nykyiset hajoa").
+ *   THE RULE (Jouni, 2026-10-26): the owner is added, the format stays as close to the old one as
+ *   possible, and no address that works now breaks.
  *   - An install keeps its bare name, as always, and the same name collisions are refused as always.
  *     Every answer keeps `name` and adds `owner` and `full_name` (withOwnerFields).
  *   - `<owner>/<name>` is the exact address everywhere: the record stored so, or the alias of the

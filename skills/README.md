@@ -1,8 +1,8 @@
 # Node skills kept in git
 
 The sources of the platform's node-scope skills that a node does not seed itself. The skills built
-into every node live in `aimeat/src/data/builtin-skills*.ts` and are not here. An app's own skill
-lives beside the app in the `aimeat-apps` repository (`<app>/skills/<name>/SKILL.md`) and is not
+into every node are in `aimeat/src/data/builtin-skills*.ts` and are not here. An app's own skill
+is kept beside the app in the `aimeat-apps` repository (`<app>/skills/<name>/SKILL.md`) and is not
 here either.
 
 **Why this folder exists.** These skills were published straight to aimeat.io and had no copy

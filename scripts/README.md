@@ -177,5 +177,5 @@ bash scripts/pack-connector.sh --verify     # and check what is inside it
 ```
 
 It builds `aimeat/` first and then runs `pnpm pack`, which uses the same `files` list as
-`npm publish`. The result lands in `dist-pack/`. Use it to try a connector fix on real machines
+`npm publish`. The result is written to `dist-pack/`. Use it to try a connector fix on real machines
 before a version number is spent on it: a version published to npm cannot be taken back.

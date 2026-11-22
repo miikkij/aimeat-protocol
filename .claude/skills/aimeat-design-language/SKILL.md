@@ -101,7 +101,7 @@ on 2026-08-29.
 headline reads `--font-poster-tracking` (`.01em`) and `--font-poster-leading` (`1`); a sheet never
 writes a tracking or a line-height for a headline of its own. The values that suited Archivo Black
 (`-.035em`, `.9`) made Fjalla One's letters touch and its lines collide the day the face changed
-(Jouni, 2026-08-29: "as if the letters ran into each other"), which is why they live beside the face.
+(Jouni, 2026-08-29), which is why they live beside the face.
 Under a headline, the running text stays lighter than the headline reads: rows and row names at
 `--font-poster-strong-weight` (600), never 800, so a list does not out-shout its own title.
 
@@ -149,10 +149,10 @@ is written for a palette.
    box** on `--card-bg`.
 3. **One loud action, and underlined words for the rest.** Poster: an ink slab, paper text,
    `4px 4px 0 --sun`, `.8rem` uppercase 600; hover moves it into its shadow. The home's one large
-   chat door is `.poster-slab--large`, `1.02rem`, with an `8px 8px 0 --sun` shadow. Showroom: a slab in
+   chat button is `.poster-slab--large`, `1.02rem`, with an `8px 8px 0 --sun` shadow. Showroom: a slab in
    the display face, `3px` ink frame, `6px 6px 0` ink shadow; the hot one is coral with white
-   words, the sun one is sun with ink words. One hot slab per page. Every other way on is a word
-   with an underline: 3px ink under a poster action, 3px coral under a showroom door; hover turns
+   words, the sun one is sun with ink words. One hot slab per page. Every other action is a word
+   with an underline: 3px ink under a poster action, 3px coral under a showroom link; hover turns
    it coral.
 4. **A chip is square and mono.** The shared chip has a 1px ink frame, JetBrains Mono `.68rem`,
    weight 500, no radius. The selected tab sits on the sun with ink words and the action's 3px
@@ -170,7 +170,7 @@ on 2026-08-29 and found Cancel only by reading). Escape. And a click on the dim 
 dialog. The last two close only while nothing has been typed: a half-filled form must never be
 lost to a stray click or key. Cancel under the form stays for the people who read.
 The footer's actions are the library's (Jouni's decision "Dialog actions", 2026-09-24): a way out or
-a side door (Cancel, "Change password…") is `.poster-action`, the one "do it" is
+a secondary action (Cancel, "Change password…") is `.poster-action`, the one "do it" is
 `.poster-slab.poster-slab--control`, and a delete adds `.poster-slab--danger`. On a phone the dark
 block takes the rest of the row.
 
@@ -199,7 +199,7 @@ prism: AI and ME, at work on something, and AI-MEAT, the substance an AI is made
 - No second loud action on a page. No colour in a single place written as a hex in a view sheet.
 - No font-family written out in a stylesheet or a component; the token, with its fallback stack,
   is the only spelling.
-- No element a person can neither use nor decide from: no tag wall that does nothing when pressed,
+- No element a person can neither use nor decide from: no list of tags that does nothing when pressed,
   no feature list in bullets. Each thing on a screen is something to do, or the fact a decision
   needs.
 - No word from the system's vocabulary before the person is doing the thing it names. Memory,
@@ -228,7 +228,7 @@ need a hand, and it is the checklist for the change.
 The four shapes above are the built-in theme's. Their corners, frames, shadows and letter case are
 tokens in `theme.css` (`--shape-*`), and every component sheet reads them instead of writing a
 value, so a theme that sets them reaches every component, the ones made later included (Jouni,
-2026-09-24: "katsoo että pebble syntyy myös niille uusille tehdyille komponenteille"). A theme sets
+2026-09-24). A theme sets
 them in Themes & Styles (the Shapes tab) or with `aimeat_theme_save` `shapes`; colours stay the
 style's, faces stay the style's.
 
@@ -294,24 +294,24 @@ An app on the Atelier track does not read `theme.css`; it reads the `--ak-*` con
 `aimeat/public/lib/aimeat-atelier.css`, where the looks are `[data-ak-look]` blocks and the pace of
 every entrance is four tokens, `--ak-motion` (how long), `--ak-ease` (the curve),
 `--ak-enter-distance` (how far a row rises) and `--ak-enter-stagger` (the beat between rows),
-with the spring hand beside them in `--ak-spring-*`, read off the element the kit is moving. Each
+with the spring tokens beside them in `--ak-spring-*`, read off the element the kit is moving. Each
 `--ak-*` token falls back to the matching AIMEAT theme token and then to a literal, so an app
-served with `theme.css` inherits the house and an app served without it still looks finished. The
+served with `theme.css` inherits the AIMEAT theme and an app served without it still looks finished. The
 same contract is documented to an AI in `aimeat/src/data/library-packs/sdk-ui.ts`, which is the
 `aimeat-atelier` pack's `aiDoc` and the answer an agent gets when it asks what the kit is. So the
 token map reaches the kit too: a value changes in one place, and the apps built on it follow.
 
 `--ak-tilt` belongs to an app's own register, not to this skill's flat poster face. The difference
 is scope, not disagreement: a genre that commits to a tilted photograph is that app's statement,
-and the house surfaces stay flat.
+and the node's own surfaces stay flat.
 
 A page that hardcodes its palette says so: `<meta name="aimeat-light" content="fixed">`, and the
 login pill's light/dark control renders disabled there and says why rather than doing nothing.
 Absent, or `content="follows"`, means the switch works, which is what a page whose every colour is
 a token wants. The signal is the page's own declaration and not its register, because the register
 names what a page IS while keeping a fixed palette is a fact about how it was built. And the kit's light `--ak-accent` carries a lightness cap,
-because white is the action ink on paper and the house coral at `#E8564A` measured 3.58:1 under it:
-inside the kit it deepens to `#cf3e35`; the house surfaces above keep the coral as it is.
+because white is the action ink on paper and the theme coral at `#E8564A` measured 3.58:1 under it:
+inside the kit it deepens to `#cf3e35`; the node's own surfaces above keep the coral as it is.
 
 A finished surface is verified in a real browser at 1280×900, 390×844 and 1280×460 (skill
 `aimeat-frontend-verify`), and the words on it follow `aimeat-writing`.

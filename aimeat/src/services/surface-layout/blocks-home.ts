@@ -179,7 +179,7 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['agents'],
         props: {},
         maxPerSurface: 1,
-        summary: 'How many of their agents are home and whether any of them is in trouble.',
+        summary: 'How many of their agents are online and whether any of them is in trouble.',
     },
     {
         // The account in one line of five figures (computers, agents, apps, knowledge, offerings),
@@ -248,7 +248,7 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
             },
         },
         maxPerSurface: 1,
-        summary: 'Named outcomes they can set up, each with its steps and the prompt that walks it.',
+        summary: 'Named outcomes they can set up, each with its steps and the prompt that runs them.',
     },
     {
         id: 'home.achievements',
@@ -340,6 +340,6 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['agents', 'portfolio', 'agent-onboarding'],
         props: {},
         maxPerSurface: 1,
-        summary: 'The setup path a new person walks before the account does anything. Its own order is not arrangeable.',
+        summary: 'The setup path a new person completes before the account does anything. Its own order is not arrangeable.',
     },
 ];

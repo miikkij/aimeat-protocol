@@ -5,8 +5,7 @@
  * @description One agent goal, as the home shows it (/v1/home?goal=<id>): what the person wanted, where
  *   it stands, what waits for them, what came out, and below that, quietly, how it got there.
  *
- *   RESULT FIRST, TRACES IF YOU WANT THEM (Jouni, 2026-10-25: "drill-in mennä syvemmälle jos haluaa,
- *   mut ei pakko"). The order is: the steps that wait for the person; what was produced; the works
+ *   RESULT FIRST, TRACES IF YOU WANT THEM (Jouni, 2026-10-25). The order is: the steps that wait for the person; what was produced; the works
  *   with their state, each with a quiet "What it did" that folds open the result and the way to the
  *   whole trace (the task's own page, /v1/home?agent=…&work=…); then subgoals, material, what happened
  *   and the changes, the last folded. The words a person may not know carry a question mark that
@@ -224,9 +223,9 @@ export default function GoalView({ navigate }) {
       <${Facts} wide rows=${[
         { k: g('state', 'State'), state: st.tone, v: st.word,
           sub: g('progress', '{done} of {total} done, {running} running').replace('{done}', String(p.done)).replace('{total}', String(p.total)).replace('{running}', String(p.running)) },
-        { k: titled(g('carrier', 'Who carries it'), 'concept.coordinator'),
+        { k: titled(g('carrier', 'Who runs it'), 'concept.coordinator'),
           v: goal.mode === 'coordinator' && goal.coordinator ? g('coordinatorIs', 'Coordinator: {agent}').replace('{agent}', goal.coordinator)
-            : goal.mode === 'plan' ? g('carrierPlan', 'A fixed plan') : g('carrierSingle', 'One agent takes the whole goal; agents hand on the next work') },
+            : goal.mode === 'plan' ? g('carrierPlan', 'A fixed plan') : g('carrierSingle', 'One agent takes the whole goal; agents give the next work to each other') },
         goal.done_when?.text && { k: g('doneWhen', 'Done when'), v: goal.done_when.text },
         { k: titled(g('spent', 'Spent'), 'concept.spending'),
           v: goal.limits.usd !== null ? `${money(goal.spent.usd)} / ${money(goal.limits.usd)}` : money(goal.spent.usd),
@@ -311,8 +310,8 @@ export default function GoalView({ navigate }) {
 
       ${goal.status === 'proposed' && actionError && html`<${ErrorNote} text=${actionError} />`}
       ${goal.status !== 'proposed' && html`
-      <${PageSection} group ends title=${g('controlTitle', 'Steer the goal')}>
-      <${PromptCard} label=${g('ownAi', 'Steer it from your own AI')} prompt=${goalPrompt(goal)} copyLabel=${g('copyPrompt', 'Copy the prompt')} />
+      <${PageSection} group ends title=${g('controlTitle', 'Manage the goal')}>
+      <${PromptCard} label=${g('ownAi', 'Manage it from your own AI')} prompt=${goalPrompt(goal)} copyLabel=${g('copyPrompt', 'Copy the prompt')} />
       ${actionError && html`<${ErrorNote} text=${actionError} />`}
       <${Actions}>
         ${goal.status === 'active' && html`<${Action} control disabled=${busy} onClick=${() => act('pause')}>${g('pause', 'Pause')}<//>`}

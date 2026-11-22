@@ -21,7 +21,7 @@
  *     literal (check:shape-tokens; fix pass).
  *   v1.2.0 -- 2026-09-26 --Drawn by components/FileDrop.js; its own names for the hidden field, the arrow,
  *     a row's mark, name and size, the keyboard ring and the closed area (component plan C5).
- *   v1.1.0 -- 2026-09-26 -- A file row's 8px corner reads --shape-corner (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.1.0 -- 2026-09-26 -- A file row's 8px corner reads --shape-corner (Jouni's note on the round's shape check, which asked for the same style as elsewhere).
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
  */
 

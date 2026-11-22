@@ -202,7 +202,7 @@ function parseNodeDay(v: unknown): NodeDay {
  * whatever model the call names; 'limits' keeps paying while the account's spend today and all
  * accounts' spend today stay under the operator's two daily limits. Before 2026-10-05 a text call
  * that named its model kept spending the node's key with no limit but the person's own daily budget
- * (secaudit 2026-10, AI-1; Jouni: "let operator to decide ... if limits then set limits").
+ * (secaudit 2026-10, AI-1; Jouni: the operator decides, and sets limits when they want limits).
  *
  * The daily figures are counted after each call (debitAllowance), so calls running side by side can
  * pass the limit by what they cost together; the limit stops the next call, not one in flight.

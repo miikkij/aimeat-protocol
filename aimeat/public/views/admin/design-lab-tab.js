@@ -8,8 +8,8 @@
  *   and dark side by side, at a phone width, and beside them its name, what it is for, the data it
  *   takes, its use, the theme tokens it reads, the pages that draw it and its history.
  *
- *   Jouni: "I cannot judge 71 component names without seeing them. Every decision I make needs
- *   pictures." Built only from library components (the Specimen frame is one of them).
+ *   Every component is drawn, because a decision about one needs a picture of it
+ *   (Jouni). Built only from library components (the Specimen frame is one of them).
  * @structure DesignLabTab (default: the library / decisions switch) · Library · Overview · PartDetail
  * @usage Mounted by the admin dashboard tab router (views/admin.js), group Design.
  * @version-history

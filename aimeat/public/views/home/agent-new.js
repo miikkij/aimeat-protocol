@@ -49,15 +49,15 @@
  *   v1.8.0 — 2026-10-13 — "Which model it uses", before the agent starts: the models the
  *     chosen computer reaches, and the person's pick, which goes with the approval so the first
  *     work already uses it. With no pick the page says the computer uses its own setting and that
- *     this can be a small model (Jouni, 2026-10-13: "miksi se käyttää heikkoa mallia"; on aimeat.io
+ *     this can be a small model (Jouni, 2026-10-13; on aimeat.io
  *     that day a new agent's first work ran on gpt-oss-120b and saved three invented findings).
  *   v1.7.0 — 2026-10-13 — A draft or a proposal whose definition lets a browser open web sites
  *     (`browser_domains`) shows the sites before the person approves, with what the browser does
- *     not do (the October agents plan, P5; Jouni, 2026-10-13: "näytä sitten se").
+ *     not do (the October agents plan, P5; Jouni, 2026-10-13).
  *   v1.6.0 — 2026-10-12 — An agent that works on a workspace's records is added to the agents of
  *     that workspace's organism when it is approved (POST /v1/organisms/:id/agents), and the page
  *     says so before the person approves. The organism's Agents section then lists it (Jouni,
- *     2026-10-12: "laita sitten näkymään jos koet että sen pitäisi näkyä"), and an organism that
+ *     2026-10-12), and an organism that
  *     admits only listed agents lets it read the workspace, which it refused before without
  *     anyone seeing why.
  *   v1.5.1 — 2026-10-12 — The names of the watched workspace's spaces go into the agent's tasks
@@ -65,7 +65,7 @@
  *     2026-10-12 an agent wrote its answers into the space it watched, because its definition
  *     named no space.
  *   v1.5.0 — 2026-10-12 — Under the watched spaces, the tick "Also work on the records that are
- *     already there" (Jouni, 2026-10-12: "haluan myös valinnan käsittele myös vanhat"), offered
+ *     already there" (Jouni, 2026-10-12), offered
  *     when the computer's agent program names `record_backfill`. What a computer's agent program
  *     can do is read from the computer's own row first (`features` of GET /v1/home/agents, which
  *     the connector presents when it connects), so a computer with no agent on it can be chosen
@@ -573,8 +573,8 @@ export default function AgentNewView({ navigate }) {
           <${WatchedFacts} spaces=${proposalWatches} places=${places} />`}
 
         ${proposal
-          ? html`<${Facts} wide rows=${[{ k: n('reach', 'What it reaches'), v: areaLine(scopes, t) }]} />`
-          : html`<${Choice} label=${n('reach', 'What it reaches')} hint=${areaLine(scopes, t)}
+          ? html`<${Facts} wide rows=${[{ k: n('reach', 'What it can access'), v: areaLine(scopes, t) }]} />`
+          : html`<${Choice} label=${n('reach', 'What it can access')} hint=${areaLine(scopes, t)}
               value=${draft.reach} onChange=${set('reach')}
               options=${[['readonly', n('reachRead', 'Reads only')], ['standard', n('reachWrite', 'Reads and writes')]]} />`}
 
@@ -609,12 +609,12 @@ export default function AgentNewView({ navigate }) {
           <${Choice} boxed cols=${2} label=${n('machine', 'On which computer')} value=${machine} onChange=${setMachine}
             options=${machines.map((c) => ({
               value: c.id, label: machineName(c),
-              hint: c.online ? n('machineOn', 'Connected.') : n('machineOff', 'Not connected. The agent is made now and starts when this computer comes back.'),
+              hint: c.online ? n('machineOn', 'Connected.') : n('machineOff', 'Not connected. The agent is made now and starts when this computer connects again.'),
             }))} />`}
         ${machines.length === 1 && html`
           <${Facts} wide rows=${[{
             k: n('machine', 'On which computer'), v: machineName(machines[0]),
-            sub: machines[0].online ? n('machineOn', 'Connected.') : n('machineOff', 'Not connected. The agent is made now and starts when this computer comes back.'),
+            sub: machines[0].online ? n('machineOn', 'Connected.') : n('machineOff', 'Not connected. The agent is made now and starts when this computer connects again.'),
           }]} />`}
         ${machines.length === 0 && html`
           <${Note} kind="aside" size="small">
@@ -623,8 +623,8 @@ export default function AgentNewView({ navigate }) {
             ${' '}<${Action} tone="more" href="/v1/home?computers=1">${tr('home.agents.noMachineDoor', 'Add a computer →')}<//>
           <//>`}
 
-        ${/* Which model the agent thinks with, shown before it starts (Jouni, 2026-10-13: "miksi se
-             käyttää heikkoa mallia"). The list is the chosen computer's own; with no pick the
+        ${/* Which model the agent thinks with, shown before it starts (Jouni, 2026-10-13).
+             The list is the chosen computer's own; with no pick the
              computer uses the model in its own settings, and the page says what that can mean. */''}
         ${machines.length > 0 && (llm.models.length > 0
           ? html`<${Select} label=${n('model', 'Which model it uses')} help="crew.agent_model" value=${model} onChange=${setModel}
@@ -635,7 +635,7 @@ export default function AgentNewView({ navigate }) {
               options=${llm.models.map((m) => ({ value: `model:${m.label}`, label: m.label }))} />`
           : html`<${Facts} wide rows=${[{
               k: n('model', 'Which model it uses'), v: n('modelComputer', 'The computer picks'),
-              sub: n('modelNoList', 'No agent on this computer is connected to say which models it reaches, so the computer uses the model in its own settings. You can choose a model on the agent\'s page after it has started.'),
+              sub: n('modelNoList', 'No agent on this computer is connected to say which models it can use, so the computer uses the model in its own settings. You can choose a model on the agent\'s page after it has started.'),
             }]} />`)}
 
         ${/* What the agent offers, as it will read on the Offerings page once the agent has started.

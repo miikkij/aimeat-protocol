@@ -163,7 +163,7 @@ export async function normalizeDocValueImages(
  * Found by the AI triage of 2026-09-13. So rewriting changes no visibility, and the caller calls this
  * once every refusal has passed and the value has landed.
  *
- * WHOSE IMAGE, AND NEVER NARROWER (Jouni, 2026-10-30: "korjaa samalla tavalla kuin liitteet"). Each
+ * WHOSE IMAGE, AND NEVER NARROWER (Jouni, 2026-10-30: the same fix as for attachments). Each
  * image goes through record-files.ts bindFileToWorkspace, the rule a record's linked files follow: a
  * person's session opens their own and their agents' images, an agent, app or ecosystem app only its
  * own, and a public, members, group or organism image keeps its reach. Until then any identity of the

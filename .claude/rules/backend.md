@@ -25,7 +25,7 @@ paths:
 - **ESM imports keep the `.js` extension:** `import { foo } from '../services/foo.js'`.
 - **Express 5:** `req.params` returns `string | string[]`, cast with `as string`.
 - **Starting the node on one backend:** `pnpm start -- --db postgres-kysely --db-url postgresql://localhost:5432/aimeat` or `pnpm start -- --db sqlite --db-path ./data/aimeat.db`. (Moved from CLAUDE.md on 2026-11-15.)
-- **Where an agent finds its way in.** Machine-readable discovery is `aimeat/src/routes/bootstrap.ts` at `GET /`. Managed system prompts are in the database and served by `aimeat/src/routes/prompts.ts` at `/v1/prompts/:name`. The copy-paste connect instructions are `aimeat/public/views/profile/agents/connect-prompts.js` (`buildAgentPrompt()`, `PLATFORMS`). A new tool or a changed onboarding step is checked against all three. (Moved from CLAUDE.md on 2026-11-15.)
+- **Where an agent discovers how to connect.** Machine-readable discovery is `aimeat/src/routes/bootstrap.ts` at `GET /`. Managed system prompts are in the database and served by `aimeat/src/routes/prompts.ts` at `/v1/prompts/:name`. The copy-paste connect instructions are `aimeat/public/views/profile/agents/connect-prompts.js` (`buildAgentPrompt()`, `PLATFORMS`). A new tool or a changed onboarding step is checked against all three. (Moved from CLAUDE.md on 2026-11-15.)
 
 ## Gates for this area
 

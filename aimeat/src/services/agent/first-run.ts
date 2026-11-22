@@ -5,8 +5,7 @@
  * @description The one task a new agent gets the moment it is made, so its owner sees that it works
  *   and has a first result to look at.
  *
- *   WHY EVERY NEW AGENT RUNS ONCE (Jouni, 2026-10-11: "when the agent is created its task should
- *   always run once, to see that it works and to get the structure"). An agent that works on a
+ *   WHY EVERY NEW AGENT RUNS ONCE (Jouni, 2026-10-11). An agent that works on a
  *   clock would otherwise show nothing until its first hour comes, and one that works when asked
  *   shows nothing at all; in both cases a person cannot tell a working agent from a broken one, and
  *   nothing that reads the agent's results (the app offer on the home, an app built on its work)

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description A goal's work that the node's own model does (`runner: 'model'`), for a person with no
  *   agent or computer that fits, or a work that needs none: research from what the model knows,
- *   writing, a summary, a comparison. Jouni's choice of 2026-10-25: "with no suitable agent the
- *   OpenRouter way should be enough", inside the goal's spending limit.
+ *   writing, a summary, a comparison. Jouni's choice of 2026-10-25: with no suitable agent, the
+ *   node's OpenRouter model does the work, inside the goal's spending limit.
  *
  *   HOW IT RUNS. The work is taken by MODEL_TAKER on the goal's version (the same limits a take
  *   counts: works per day and the spending limit), then started as a background AI job

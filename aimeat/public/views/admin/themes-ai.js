@@ -2,9 +2,9 @@
  * @file public/views/admin/themes-ai.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Themes & Styles' "Ask your AI" section. Jouni, 2026-10-02: "eikö themes & styles
- *   pitänyt olla AI kiihdytetyä niin että AI pystyy tekemään noi teemaukset suoraan ? ... en näe
- *   missään tuolla copy prompt nappia minkä voisin antaa AI:lle".
+ * @description Themes & Styles' "Ask your AI" section: an AI makes the themes directly,
+ *   and the page has a button that copies the prompt to give to an AI
+ *   (Jouni, 2026-10-02).
  *
  *   The chat path comes first: an AI connected to this node over MCP makes the theme itself with
  *   the aimeat_theme_* tools, and this section only hands over the prompt. An AI without that

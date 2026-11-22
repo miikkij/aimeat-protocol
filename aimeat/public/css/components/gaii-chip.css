@@ -14,7 +14,7 @@
  * @version-history
  *   v1.2.0 — 2026-09-26 — The component's own names (gaii-chip, was pf-agd-gaii) without the .pf scope, now that
  *     the control is components/GaiiChip.js; the values are unchanged (page group G1a).
- *   v1.1.0 — 2026-09-26 — The 4px corner reads --shape-corner-control, a button's corner; the skin's square corner overrides it on every page, so nothing on screen changes (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.1.0 — 2026-09-26 — The 4px corner reads --shape-corner-control, a button's corner; the skin's square corner overrides it on every page, so nothing on screen changes (Jouni's note on the round's shape check, which asked for the same style as elsewhere).
  *   v1.0.0 — 2026-09-25 — Moved out of views/agents-detail.css and views/profile-poster.css (UI consolidation phase 5, a move).
  */
 

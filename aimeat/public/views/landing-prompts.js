@@ -146,7 +146,7 @@ function BuildAgentPrompt() {
   return html`
     <section class="ld-askai">
       <h2 class="ld-askai-title">${tr('landing.agentBuildTitle', 'Build an agent in 10 minutes. Copy this prompt')}</h2>
-      <p class="ld-askai-sub">${tr('landing.agentBuildSub', 'Paste into Claude, ChatGPT or any AI. It builds a local AI agent that runs on your own machine with no API keys, connected to your node, and shows you how to share it. For coders and tinkerers; beginners can use the desktop app instead.')}</p>
+      <p class="ld-askai-sub">${tr('landing.agentBuildSub', 'Paste into Claude, ChatGPT or any AI. It builds a local AI agent that runs on your own computer with no API keys, connected to your AIMEAT, and shows you how to share it. For coders and tinkerers; beginners can use the desktop app instead.')}</p>
       <div class="ld-askai-box">
         <pre class="ld-askai-prompt">${prompt}</pre>
         <${ManagedEnvNote} compact=${true} />

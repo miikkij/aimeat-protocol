@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Shared set-up for the classification unit tests. Since 2026-09-30 no default label
- *   hides content from an AI (option B, decided by Jouni: "Säilytetään tila 'piilotettu' omistajan
- *   valintana, mutta mikään oletusluokitus ei käytä sitä."), so a test that proves what happens to
+ *   hides content from an AI (option B, decided by Jouni: 'hidden' stays a choice of the
+ *   owner and no default label uses it), so a test that proves what happens to
  *   hidden content first stores a node policy in which the operator chose 'hidden' for a label.
  *   hideFromAiOnNode() is that operator's choice, written straight to the node's policy record.
  * @structure HIDDEN_LABEL · hideFromAiOnNode()

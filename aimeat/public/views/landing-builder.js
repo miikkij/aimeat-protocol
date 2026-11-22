@@ -164,7 +164,7 @@ function OtherAi({ idea }) {
 
   return html`
     <div class="ld-gen-other">
-      <p class="ld-gen-hint">${tr('landing.genOtherHint', 'Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself.')}</p>
+      <p class="ld-gen-hint">${tr('landing.genOtherHint', 'Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it contains the build instructions, the AI gives you one HTML file, and you add that file here yourself.')}</p>
       ${selected.length ? html`<p class="ld-gen-contains">${tr('landing.genOtherPacks', 'Included for your idea')}: ${selected.map(pk => pk.title || pk.id).join(' · ')}.</p>` : ''}
       <div class="ld-gen-preview-label">${tr('landing.genPreview', 'Prompt preview')}</div>
       <div class="ld-gen-preview">${prompt || tr('landing.buildLoading', 'Loading the build prompt from this node…')}</div>

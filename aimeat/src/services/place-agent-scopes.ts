@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description On a node the store sold (site.purchase_plan set), an agent has the place's tools by
  *   default: every permission word a tool on this node asks for, except the words the owner keeps.
- *   Jouni, 2026-11-02 07.42 and 09.08 (via the Chief of Staff): "anna sille täyspääsy", so a run does not
+ *   Jouni, 2026-11-02 07.42 and 09.08 (via the Chief of Staff): the agent gets full access, so a run does not
  *   fail on a refused tool call; security, secrets, payments, sharing and permission changes stay with
  *   the owner (the help's sentence he accepted on 1.11 at 13.50). On crew64 a morning digest's run failed
  *   whole because one call (notify) was refused for a word its agent did not hold.

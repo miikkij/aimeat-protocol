@@ -200,7 +200,7 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
               is to leave. */''}
         <${SettingsDoor} href="/v1/profile"
           title=${tr('home.settings.allControls', 'All settings and controls') + ' →'}
-          hint=${tr('home.settings.allControlsHint', 'Agents, memory, apps, access, billing: everything behind the home.')} />
+          hint=${tr('home.settings.allControlsHint', 'Agents, memory, apps, access, billing: all the settings of your AIMEAT.')} />
       <//>
     <//>`;
 }

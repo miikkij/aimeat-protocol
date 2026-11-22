@@ -117,7 +117,7 @@ Each provider carries a sentence that says where its data goes ("The prompt goes
 
 When classification is on, content at a level with `externalAi: refused` (every TL and NATO class) goes only into a call whose model reference is `local:<model id>`. Any other model is refused with `CLASSIFIED` (`aimeat/src/services/classification/external-ai.ts`). A role can also require a local provider (`requires-local` in `aimeat/src/services/ai/route-plan.ts`). Detail: [Data classification](../data-classification.md), [05 Data protection](05-data-protection.md).
 
-Content of a regulated data domain (a register of processing names the domain and the organism, workspace or app the content sits in) follows the operator's setting `AIMEAT_COMPLIANCE_REGULATED_AI_MODES`, whether classification is on or off. Entries are `domain=mode`, such as `health=local,export-controlled=block`. The default is empty, and that changes nothing for the AI: every domain is `notify`, so the content goes to an outside model as before, and each send writes a `regulated` row to the classification audit.
+Content of a regulated data domain (a register of processing names the domain and the organism, workspace or app the content is in) follows the operator's setting `AIMEAT_COMPLIANCE_REGULATED_AI_MODES`, whether classification is on or off. Entries are `domain=mode`, such as `health=local,export-controlled=block`. The default is empty, and that changes nothing for the AI: every domain is `notify`, so the content goes to an outside model as before, and each send writes a `regulated` row to the classification audit.
 
 | Mode | What a model outside this server gets |
 |---|---|

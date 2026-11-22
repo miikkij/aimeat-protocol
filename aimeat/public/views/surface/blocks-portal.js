@@ -68,7 +68,7 @@ export function PitchBlock(/** @type {{ ctx?: any, props?: Record<string, any>, 
   return html`
     <section class="ld-pitch">
       <p class="ld-pitch-line">
-        ${title || tr('aimeatStory.oneLine', 'AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.')}
+        ${title || tr('aimeatStory.oneLine', 'AIMEAT multiplies what AI can do and makes those capabilities easy to use, so people and their AIs can work together in a controlled, safe and reliable way.')}
       </p>
     </section>`;
 }
@@ -125,7 +125,7 @@ export function TransparencyBlock(/** @type {{ ctx?: any, props?: Record<string,
   const navigate = nav(ctx);
   return html`
     <p class="ld-transline">
-      ${tr('landing.transLine', 'Content a model wrote here carries a record of how it was made, and a label where a person reads it.')}
+      ${tr('landing.transLine', 'Content a model wrote here has a record of how it was made, and a label where a person reads it.')}
       ${' '}
       <a href="/v1/transparency" onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>
         ${tr('landing.transCta', 'How this node marks AI content →')}

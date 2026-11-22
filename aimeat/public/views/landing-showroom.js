@@ -108,7 +108,7 @@ export function ShowroomHero({ navigate, picture = true }) {
         <span>${tr('landing.showTitle1', 'Try it all.')}</span>
         <span>${tr('landing.showTitle2', 'Then own it.')}</span>
       </h1>
-      <p class="ld-sh-position">${tr('aimeatStory.oneLine', 'AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.')}</p>
+      <p class="ld-sh-position">${tr('aimeatStory.oneLine', 'AIMEAT multiplies what AI can do and makes those capabilities easy to use, so people and their AIs can work together in a controlled, safe and reliable way.')}</p>
       <div class="ld-sh-hero-cols">
         <p class="ld-sh-sub">
           ${tr('landing.showSub', 'This is a fully working AIMEAT you can drive today, free. Build a whole system in an hour, bring every AI you already use under one roof, and let agents carry the repeat work. When you like what you see, take one home on an address with your name on it.')}

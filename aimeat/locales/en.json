@@ -6660,7 +6660,7 @@
     },
     "explain": "Approving lets this AI read and write things in your home on your behalf. You choose how much it may do, and you can change it or remove the agent at any time.",
     "stepTitle": "Your agent is asking to connect",
-    "stepDesc": "It is asking to come in. Check that the code below is the one your AI showed you, then let it in."
+    "stepDesc": "It is asking for access. Check that the code below is the one your AI showed you, then approve it."
   },
   "agentOnboarding": {
     "title": "Hello Integration",
@@ -6673,7 +6673,7 @@
     "startButton": "Start Hello Integration",
     "restartButton": "Re-run Hello Integration",
     "cancelButton": "Cancel",
-    "modeInferred": "The platform you reported runs in your own environment, so this agent is now in {{mode}} mode and its Hello Integration is the {{total}}-step flow. The steps that assume a node-resident runtime (delivery channel, telemetry, task queue) do not apply to you and have been removed rather than left to fail.",
+    "modeInferred": "The platform you reported runs in your own environment, so this agent is now in {{mode}} mode and its Hello Integration is the {{total}}-step flow. The steps that assume a runtime hosted on the server (delivery channel, telemetry, task queue) do not apply to you and have been removed rather than left to fail.",
     "steps": {
       "authenticate": "Authenticate",
       "identify_platform": "Identify Platform",
@@ -7887,7 +7887,7 @@
     "hideDetails": "Hide the exact permissions",
     "subsetHint": "Uncheck anything you would rather not give. The app gets exactly what stays checked.",
     "assureKey": "It gets its own key, never your password.",
-    "assureHome": "What it saves lives in your own AIMEAT account.",
+    "assureHome": "What it saves is stored in your own AIMEAT account.",
     "assureRevoke": "You can revoke it in one click: Profile › Access.",
     "assureNext": "Next time it signs you in without this screen.",
     "connectCta": "Connect",
@@ -7986,11 +7986,11 @@
       "title": "Nothing was granted",
       "oauth": "{client} cannot use your account. If you change your mind, start the connection again from {client}.",
       "appGrant": "The app was not connected and cannot see anything in your account. You can open it again whenever you like.",
-      "device": "The assistant was not let in. Ask it to start a new request if you change your mind."
+      "device": "The assistant was not given access. Ask it to start a new request if you change your mind."
     },
     "preset": {
       "readonly": "Can look at {areas}. It cannot change anything.",
-      "standard": "Can read and write {areas}. Your balance, the messages you receive and your account settings stay out of its reach.",
+      "standard": "Can read and write {areas}. It cannot use your balance, the messages you receive or your account settings.",
       "messagesSend": "It can also send messages for you, signed as your agent, and add people to your address book.",
       "organismWrite": "It can also create organisms and delete the ones you own. It can also change who can see them and who can join them.",
       "invitesPeople": "It can invite people into the shared spaces you belong to. An invitation can create a new account for that person.",
@@ -8015,9 +8015,9 @@
   "biz": {
     "heroTitle": "A digital employee that never sleeps",
     "heroSub": "Scheduled agents fetch, write, report and ship while you do something else. Every step traceable, and what they produce is yours.",
-    "proofUnavailable": "The live example runs on the machine of whoever operates this site.",
+    "proofUnavailable": "The live example runs on the server of whoever operates this service.",
     "c1Title": "I wake up already knowing what happened in my field",
-    "c1Text": "A publication that writes itself every evening. Agents pull the raw material, write the pieces and ship the edition. Zero human hours.",
+    "c1Text": "A publication that writes itself every evening. Agents pull the source material, write the pieces and ship the edition. Zero human hours.",
     "c1Proof": "Read tonight's edition →",
     "c1Cta": "The same, from your topics →",
     "c2Title": "My morning briefing is waiting, and it knows what is stale",
@@ -8029,7 +8029,7 @@
     "c3Proof": "Open the company radar →",
     "c3Cta": "Start the radar →",
     "c4Title": "My project knows its own status",
-    "c4Text": "When developers have agents, sprints slow things down. An organism is a continuous shared picture: goals, roadmap, bugs, decisions and a living context every agent reads before working and updates after. A human approves the decisions; everything else moves at agent speed.",
+    "c4Text": "When developers have agents, sprints slow things down. An organism is a shared, always current view: goals, roadmap, bugs, decisions and a living context every agent reads before working and updates after. A human approves the decisions; everything else moves at agent speed.",
     "c4Quote": "This could replace Jira.",
     "c4QuoteBy": "game developer, large studio",
     "c4Proof": "Open our own roadmap, live →",
@@ -8051,7 +8051,7 @@
     "g3Title": "The company earns on it",
     "c2ProofNote": "Example, sent today at 07:00: \"3 new bookings · 1 review (4★, answered) · a competitor dropped prices · suggested action: weekend campaign.\"",
     "c3ProofNote": "Example action list: \"1) Answer the review on platform Y today. 2) Trend Z is rising, draft a post. 3) A competitor launched a campaign, counter-offer attached.\"",
-    "c7Title": "My CRM costs less than lunch, and my agents keep it fed",
+    "c7Title": "My CRM costs less than lunch, and my agents keep it up to date",
     "c7Text": "Contacts, companies, deals and follow-ups, with a history of every change and no way to lose one. Tap to dial, dictate the note by voice, set the next follow-up. Company details fill themselves in from the trade register.",
     "c7Proof": "Open the CRM →",
     "c7Cta": "Move your CRM here →",
@@ -8060,7 +8060,7 @@
     "c8Proof": "See what agent-native looks like →",
     "c8Cta": "Make your API agent-native →",
     "c9Title": "My data sells itself while I sleep",
-    "c9Text": "Publish a capability once and it carries a price. Another company’s app, or another company’s agent, buys exactly what it needs under a contract, and every call is logged and settled. You see what it earned; the buyer saw the price before the first call.",
+    "c9Text": "Publish a capability once and it has a price. Another company’s app, or another company’s agent, buys exactly what it needs under a contract, and every call is logged and settled. You see what it earned; the buyer saw the price before the first call.",
     "c9Proof": "Open the marketplace →",
     "c9Cta": "List your first capability →",
     "c10Title": "What we know how to do is now a product",
@@ -8068,14 +8068,14 @@
     "c10Proof": "Open a playbook →",
     "c10Cta": "Package what you know →",
     "sovTitle": "Why owning it is the reason to buy",
-    "sov0": "A company here is a node, not an account type. You take your own AIMEAT node, put your business identity and your own payment keys on it, invite your people and build the apps your work needs. Nothing about it is a separate product tier.",
+    "sov0": "A company here is its own AIMEAT, not an account type. You take your own AIMEAT, put your business identity and your own payment keys on it, invite your people and build the apps your work needs. Nothing about it is a separate product tier.",
     "sov1": "Your data stays on a server you control and stays with you, so your own certification is the one that counts.",
     "sov2": "Every action is logged: who read what, who authorised it, what it cost. The audit is a report, not a project.",
     "sov3": "Agents and apps work under named permissions you can take back with one click, and every action is attributed to whoever took it.",
     "sov4": "The protocol and server software are available under the MIT license. That license does not require you to publish the applications or content you create.",
     "ctaAssessment": "Free: where is your AI right now? →"
   },
-  "biz.trans1": "Article 50 of the EU AI Act has applied since 2 August 2026. What you get here is an EU-built, self-hostable platform where AI provenance is a primitive of the layer every app sits on: content a model produced carries a record of how it was made, a person reading it on the node’s own surfaces sees a label, and the operator’s legal identity and supervisory authority sit at a fixed machine-readable address your compliance officer can fetch without asking us. Content the node served can be checked by anyone, byte for byte, with no account.",
+  "biz.trans1": "Article 50 of the EU AI Act has applied since 2 August 2026. What you get here is an EU-built, self-hostable platform where AI provenance is a primitive of the layer every app runs on: content a model produced has a record of how it was made, a person reading it on the server’s own pages sees a label, and the operator’s legal identity and supervisory authority are at a fixed machine-readable address your compliance officer can fetch without asking us. Content the server sent can be checked by anyone, byte for byte, with no account.",
   "biz.trans2": "What stays yours: the obligations that come with what you publish. Running on AIMEAT does not discharge them, and we would rather say so here than have you discover it later. What the platform does is make marking, labelling and the record the default path instead of a project.",
   "biz.transCta": "How AI content is marked here →",
   "biz.payTitle": "Sell to people and to their agents, through one checkout",
@@ -8269,13 +8269,13 @@
   "chat.connectionLost": "The connection was lost. Try again.",
   "chat.useOwnKeyLink": "Use your own key",
   "chat.welcomeBody": "It reads and writes your notes, your shared places and your apps here, and every step it takes shows on the screen. Ask it for something, or start with one of these.",
-  "chat.capTitle": "This conversation has used up its free ride.",
+  "chat.capTitle": "This conversation has used up its free share.",
   "chat.capBody": "Chat here runs on this server's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here, nothing is lost. Two ways to keep going:",
   "chat.capOwnKey": "Bring your own key →",
-  "chat.capOwnPlace": "Get your own place →",
-  "chat.capOwnPlaceSoon": "Your own place: opens soon",
+  "chat.capOwnPlace": "Get your own AIMEAT →",
+  "chat.capOwnPlaceSoon": "Your own AIMEAT: available soon",
   "chat.welcomeTitle": "An AI that works on your things here",
-  "chat.welcomeTrust": "Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.",
+  "chat.welcomeTrust": "Everything you make here is saved in your own account, and nothing becomes public until you publish it yourself.",
   "chat.welcomeAtelier": "You can also ask for an app: you get a link to the finished app.",
   "chat.buyerTitle": "Say what you want – your AI does it.",
   "chat.buyerBody": "You see every step on the screen, and everything stays in your own account.",
@@ -12885,7 +12885,7 @@
   "help.card.statusMark": "Question closed",
   "help.card.statusMarkTitle": "This line closes a question of Ask someone who knows.",
   "help.page.title": "Ask someone who knows",
-  "help.page.intro": "Questions between the members of this site: the ones sent to you, your own, and what others may ask you.",
+  "help.page.intro": "Questions between the members of your AIMEAT: the ones sent to you, your own, and what others may ask you.",
   "help.page.loading": "Loading…",
   "help.page.loadFailed": "The questions could not be loaded.",
   "help.page.actionFailed": "That did not work. Try again.",
@@ -12932,7 +12932,7 @@
   "help.page.addSuggested": "From your business card: add it",
   "help.page.ownTopic": "Add a topic of your own",
   "help.page.audience": "Who may ask you",
-  "help.page.audienceNode": "Every member of this site",
+  "help.page.audienceNode": "Every member of your AIMEAT",
   "help.page.audienceOrganisms": "Only members of my shared places",
   "help.page.cap": "How often",
   "help.page.capOption": "At most {n} a week",
@@ -12951,7 +12951,7 @@
   "help.page.asker": "I want to ask the people who know",
   "help.page.aiMaySend": "My AI may write and send questions for me. It shows me each one first.",
   "help.page.agentsMayAsk": "My agents may ask in my name while I am away.",
-  "help.page.operatorSees": "The operator of this site gets a report of which topics were asked about and where. The report names nobody.",
+  "help.page.operatorSees": "The operator of your AIMEAT gets a report of which topics were asked about and where. The report names nobody.",
   "help.page.save": "Save",
   "help.page.saved": "Saved.",
   "help.page.saveFailed": "Your choices were not saved.",
@@ -13682,7 +13682,7 @@
   "secretAllow.badge": "Your secret",
   "secretAllow.by": "installed by {installer}",
   "secretAllow.title": "Extension {extension} asks to use your secret {secret}",
-  "secretAllow.lead": "The extension {extension}, installed by {installer}, needs your secret {secret} for {host}. The secret stays in your account and leaves only if you allow it.",
+  "secretAllow.lead": "The extension {extension}, installed by {installer}, needs your secret {secret} for {host}. The secret stays in your account and is sent only if you allow it.",
   "secretAllow.why": "It says it needs it to {why}.",
   "secretAllow.undeclared": "The extension does not list {host} as an address for this secret.",
   "secretAllow.allow": "Allow",
@@ -13694,7 +13694,7 @@
   "secretAllow.reinstalled": "This extension now belongs to {installerNow}, not to {installer}, who asked. Use it again to be asked anew.",
   "secretAllow.toAccess": "Open the Access page",
   "secretAllow.signInTitle": "Sign in first",
-  "secretAllow.signInLead": "An extension asks to use one of your secrets. Sign in to see which one and where it would go.",
+  "secretAllow.signInLead": "An extension asks to use one of your secrets. Sign in to see which one and where it would be sent.",
   "secretAllow.signIn": "Sign in",
   "secretAllow.goneTitle": "There is nothing to answer here",
   "secretAllow.gone": "The link is incomplete, or nothing is waiting for an answer any more. Your secrets and what you allowed are on the Access page.",
@@ -18123,7 +18123,7 @@
       "indexnow": "Can browse pages indexed in Bing (IndexNow)",
       "cliOneLiner": "One command in your terminal, then the AIMEAT tools are there",
       "mcpSettings": "Add AIMEAT as an MCP server in the settings",
-      "consumerAppNoMcp": "The consumer app has no MCP. Use the copy-prompt path, or the CLI variant above",
+      "consumerAppNoMcp": "The consumer app has no MCP. Use the copy-prompt option, or the CLI variant above",
       "chatgptDevMode": "MCP connectors work in Developer mode, on the paid tiers"
     },
     "publish": {
@@ -18201,20 +18201,20 @@
       "what": "{n} of your agents cannot get in on their own: some ran out, some never connected.",
       "whatOne": "One of your agents cannot get in on its own.",
       "keeps": "Nothing else about them changes. Same name, same permissions, same work in progress.",
-      "needConnector": "For this to work, the connector has to be running on the machine these agents live on. Start it there, then come back and press.",
+      "needConnector": "For this to work, the connector has to be running on the computer these agents run on. Start it there, then come back and press.",
       "ready": "The connector is running, so this can go ahead now.",
       "action": "Give {n} agents a new sign-in",
       "actionOne": "Give it a new sign-in",
       "working": "Working…",
       "doneAll": "Done. They can all sign in again, and nothing else about them changed.",
-      "donePartial": "{n} can sign in again. {stuck} could not be reached and are exactly as they were — press again, or check the connector on their machine.",
+      "donePartial": "{n} can sign in again. {stuck} could not be reached and are exactly as they were. Press again, or check the connector on their computer.",
       "failed": "That did not work. Nothing changed.",
       "actionRow": "New sign-in",
       "rowDone": "Done. It has its own key now and can sign in again.",
       "rowStuck": "It did not move. Nothing changed, so you can press again.",
       "refused": "Your connector refused the move. Nothing changed: the agents are exactly as they were.",
       "connectorFailed": "Your connector did not finish the move. Nothing changed. Check that it is running and up to date, then press again.",
-      "rowNotNeeded": "It does not need moving — it can already sign in."
+      "rowNotNeeded": "It does not need moving: it can already sign in."
     },
     "groupCount": "{n} agents",
     "groupCountOne": "1 agent",
@@ -18245,11 +18245,11 @@
     }
   },
   "footer": {
-    "ownNode": "Run your own node",
+    "ownNode": "Run your own AIMEAT",
     "transparency": "AI transparency",
     "glossary": "Glossary",
     "sitemap": "Site map",
-    "apiContract": "API contract",
+    "apiContract": "API description",
     "store": "Store",
     "storeSoon": "Store opens soon",
     "changelog": "What shipped",
@@ -18363,7 +18363,7 @@
   "help": {
     "tocLabel": "On this page",
     "langLabel": "Language",
-    "epAgents": "orientation for an agent: what this place is and where to start",
+    "epAgents": "orientation for an agent: what this AIMEAT is and where to start",
     "pageTitle": "Help",
     "title": "Help your AI work with AIMEAT",
     "tabHuman": "For me",
@@ -18400,7 +18400,7 @@
       },
       "privacy": {
         "q": "Who can see my things?",
-        "a": "Everything starts private, and you choose what to publish. An agent or an app reaches exactly what you gave it and nothing else, every read and write carries the name of whoever did it, and you can take a permission back at any time."
+        "a": "Everything starts private, and you choose what to publish. An agent or an app can use exactly what you gave it and nothing else, every read and write has the name of whoever did it, and you can take a permission back at any time."
       },
       "cost": {
         "q": "What does this cost me?",
@@ -18408,11 +18408,11 @@
       },
       "connect": {
         "q": "My AI says it cannot connect. What now?",
-        "a": "If your AI supports MCP, add this site as a connector: one command in Claude Code, or paste the MCP address into your client’s custom connector dialog. For every other AI, copy the help prompt on the \"For my AI\" tab into the chat and it will orient itself from there."
+        "a": "If your AI supports MCP, add your AIMEAT as a connector: one command in Claude Code, or paste the MCP address into your client’s custom connector dialog. For every other AI, copy the help prompt on the \"For my AI\" tab into the chat and it will orient itself from there."
       },
       "broken": {
         "q": "What if I break something?",
-        "a": "Most things here are safe to try: everything starts private, and a helper only touches what you allowed. When something does go wrong, tell whoever runs this site. Your AI can send the message from inside the session, or use the contact details below. Say what you were doing and what you expected to happen."
+        "a": "Most things here are safe to try: everything starts private, and a helper only touches what you allowed. When something does go wrong, tell whoever runs your AIMEAT. Your AI can send the message from inside the session, or use the contact details below. Say what you were doing and what you expected to happen."
       },
       "knowledge": {
         "q": "What is knowledge here, and how does my AI use it?",
@@ -18435,7 +18435,7 @@
   },
   "hiw": {
     "title": "A place where AIs go to work, and where the work is yours to sell",
-    "intro": "AIMEAT gives any AI an identity, a memory, a task queue and a manager. Bring your own model. What the work produces stays yours, and it can carry a price.",
+    "intro": "AIMEAT gives any AI an identity, a memory, a task queue and a manager. Bring your own model. What the work produces stays yours, and it can have a price.",
     "dAria": "How AIMEAT works",
     "dModels": "AI models",
     "dModels1": "Swappable:",
@@ -18450,7 +18450,7 @@
     "dOrg1": "Shared truth:",
     "dOrg2": "workspaces, versions",
     "dOrg3": "humans + agents",
-    "dOrg4": "publish gate",
+    "dOrg4": "publish approval",
     "dAssets": "Your assets",
     "dAssets1": "Versioned knowledge",
     "dAssets2": "apps and reports",
@@ -18460,9 +18460,9 @@
     "cardAgentsTitle": "Agents",
     "cardAgentsText": "An agent is an AI that you connected and that works in your name: Claude, ChatGPT, a CrewAI crew or a program of your own. It may do only what you allowed, and you can stop it at any time. It can have tasks that you give in plain words, working hours and a spending limit, so it works while you do something else. It acts under its own name, so afterwards you can see what it did.",
     "cardOrgTitle": "Shared places",
-    "cardOrgText": "A shared place is where the work turns into something you keep: one shared picture of a project that people and agents both write to. Agents get to do a lot and do it fast, and the decisions that matter wait for a person. Every change carries the name of whoever made it.",
+    "cardOrgText": "A shared place is where the work turns into something you keep: one shared record of a project that people and agents both write to. Agents get to do a lot and do it fast, and the decisions that matter wait for a person. Every change has the name of whoever made it.",
     "cardAssetsTitle": "Your assets",
-    "cardAssetsText": "Models come and go. Your identity, your memory, your work history and your results stay in your account, whichever AI does the work. Swap one AI for another mid-flight and the agent picks up where it left off.",
+    "cardAssetsText": "Models come and go. Your identity, your memory, your work history and your results stay in your account, whichever AI does the work. Swap one AI for another in the middle of a task and the agent picks up where it left off.",
     "exampleTitle": "Examples running here",
     "exampleText": "AIMEAT Sanomat writes itself every evening. news-fetcher pulls raw material at 17:00, six writer agents produce the articles, and the paper ships with zero human hours.",
     "exampleCta": "Read tonight's paper →",
@@ -18474,7 +18474,7 @@
     "dExchange2": "contracts, settlement",
     "dExchange3": "other companies",
     "cardAppsTitle": "Apps",
-    "cardAppsText": "Describe what you want and your AI builds it. The app gets its own web address, keeps every earlier version in case you want one back, and comes with a link you can send to anyone. It reaches your information through permissions you granted and can take back.",
+    "cardAppsText": "Describe what you want and your AI builds it. The app gets its own web address, keeps every earlier version in case you want one back, and comes with a link you can send to anyone. It can use your information through permissions you granted and can take back.",
     "cardConsentTitle": "Consent",
     "cardConsentText": "Every agent and every app works under named permissions, and every action is attributed to whoever took it. Take a permission back and the access ends. For an audit, that record is ready.",
     "exampleApps": "An app you own: CADENCE is a CRM built by describing it. Contacts, deals and follow-ups, kept up to date by agents while you sell.",
@@ -18484,8 +18484,8 @@
     "ctaLearn": "Learn it hands-on, free →"
   },
   "install": {
-    "title": "Put AIMEAT.IO behind its own button",
-    "titleBuyer": "Put your AIMEAT behind its own button",
+    "title": "Install AIMEAT.IO as an app",
+    "titleBuyer": "Install your AIMEAT as an app",
     "body": "Installed, it opens in its own window, shows unread counts on its icon, and takes shares straight into your chat.",
     "iosBody": "On iPhone and iPad: open the Share menu and choose \"Add to Home Screen\".",
     "bodyBuyer": "You get AIMEAT as its own icon on your phone or desktop.",
@@ -18495,8 +18495,8 @@
     "notNow": "Not now"
   },
   "aimeatStory": {
-    "oneLine": "AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.",
-    "paragraph": "Data is at the centre, above all the refined knowledge people bring and own. People, their AIs, agents and apps work on the same data: each person decides who sees it and what an AI may do with it, and sees what was done. The whole system can be used through AI from start to finish, because every part carries instructions an AI understands at once. And everyone can build their own view of shared data, with their own tools and agents: the same knowledge, seen at the angle each person needs."
+    "oneLine": "AIMEAT multiplies what AI can do and makes those capabilities easy to use, so people and their AIs can work together in a controlled, safe and reliable way.",
+    "paragraph": "Data is at the centre, above all the refined knowledge people bring and own. People, their AIs, agents and apps work on the same data: each person decides who sees it and what an AI may do with it, and sees what was done. The whole system can be used through AI from start to finish, because every part has instructions an AI understands at once. And everyone can build their own view of shared data, with their own tools and agents: the same knowledge, seen at the angle each person needs."
   },
   "homeConnect": {
     "lead": "Connect ChatGPT, Claude or Grok here, and what it can do multiplies: it remembers your work, builds what you need and works with the people you choose, under your control.",
@@ -18576,7 +18576,7 @@
       "apps": "Apps",
       "agents": "Agents at work",
       "share": "Shared with others",
-      "aiWhat": "The AI you work with: this place's chat, or your own Claude, ChatGPT or Grok.",
+      "aiWhat": "The AI you work with: the chat in your AIMEAT, or your own Claude, ChatGPT or Grok.",
       "connectWhat": "Connect your own AI here, so it sees your information and can work for you.",
       "firstResultWhat": "Tell the AI about yourself and your work, so it can help you in particular.",
       "organiseWhat": "Gather the information of your work in one place, which you can later share with others.",
@@ -18633,9 +18633,9 @@
     "signInPill": "Sign in",
     "signInPillShort": "Sign in",
     "title": "This is {host} – your own AIMEAT",
-    "intro": "AIMEAT is your own place where AI does work for you. It remembers what you tell it, makes agents and apps for you, and everything in it is yours.",
+    "intro": "Your AIMEAT is where AI does work for you. It remembers what you tell it, makes agents and apps for you, and everything in it is yours.",
     "signInNote": "Sign in with an email link. Write the address you bought your AIMEAT with, and we send you a link that signs you in. It needs no password.",
-    "next": "When you are signed in, you land in the Home view. There you write in one sentence what you want done. AIMEAT makes an agent from it, and you see the agent before it starts.",
+    "next": "When you are signed in, you go to the Home view. There you write in one sentence what you want done. AIMEAT makes an agent from it, and you see the agent before it starts.",
     "signInLabel": "Sign in",
     "emailField": "Your email address",
     "sendLink": "Send the sign-in link",
@@ -18653,7 +18653,7 @@
       "ready": "your own AI is in use",
       "low": "running low",
       "empty": "used up",
-      "off": "the AI is switched off on this site",
+      "off": "the AI is switched off in your AIMEAT",
       "topup": "Buy more AI",
       "topupNote": "One-off payment. No new subscription.",
       "chatLine": "AI credit left: {amount}.",
@@ -18723,14 +18723,14 @@
         "declined": "Not taken on"
       },
       "noteLabel": "Message from the builders",
-      "trailLink": "Everything done in your place",
+      "trailLink": "Everything done in your AIMEAT",
       "codeLabel": "Your build code",
       "codeCopy": "Copy the code",
-      "codeStepConnect": "Connect your own AI (Claude, ChatGPT or Grok) to {host} and to this place.",
+      "codeStepConnect": "Connect your own AI (Claude, ChatGPT or Grok) to {host} and to your AIMEAT.",
       "codeConnectThere": "Connect to {host}",
-      "codeConnectHere": "Connect to this place",
+      "codeConnectHere": "Connect to your AIMEAT",
       "codeFullAccess": "When {host} asks, choose an agent with full access.",
-      "codeChatPath": "You can also use this place's chat: connect it to {host} under Access and security.",
+      "codeChatPath": "You can also use the chat in your AIMEAT: connect it to {host} under Access and security.",
       "codeChatButton": "Connect the chat to {host}",
       "codeStepAsk": "Ask your AI to send your build request with this code.",
       "codeSayHint": "You can say, for example: \"{say}\"",
@@ -18746,7 +18746,7 @@
       "connectThere": "Connect your AI to {host} too, the same way as here: open Connect your AI on {host}, pick your AI and follow the steps on the page. At the end you approve the connection.",
       "connectThereButton": "Connect your AI there",
       "doneTitle": "Your agent is ready and working.",
-      "continue": "From here you can carry on alone with your own AI. Claude Code, Codex and a Grok bot can all connect to your place and keep developing what was built.",
+      "continue": "From here you can carry on alone with your own AI. Claude Code, Codex and a Grok bot can all connect to your AIMEAT and keep developing what was built.",
       "continueLink": "How to connect them"
     },
     "away": {
@@ -18757,7 +18757,7 @@
     },
     "trail": {
       "title": "Activity log",
-      "sub": "Everything done in your place: what, on what, who did it and when. Newest first.",
+      "sub": "Everything done in your AIMEAT: what, on what, who did it and when. Newest first.",
       "empty": "Nothing has been done here yet.",
       "more": "Show older",
       "operator": "The operator",
@@ -18802,7 +18802,7 @@
         "keptWork": "kept the finished work"
       }
     },
-    "welcomeSub": "Before the place can do anything for you, there are a couple of things to do.",
+    "welcomeSub": "Before your AIMEAT can do anything for you, there are a couple of things to do.",
     "signInTitle": "Step into your home",
     "signInDesc": "Sign in to see where you left off.",
     "signIn": "Sign in",
@@ -18829,10 +18829,10 @@
       "empty": "Mailbox: nothing new"
     },
     "fleet": {
-      "oneOk": "Your agent is home and well.",
-      "oneTrouble": "Your agent {name} needs a look.",
-      "allOk": "{total} agents home, all well.",
-      "trouble": "{total} agents home · {n} need a look"
+      "oneOk": "Your agent is working without problems.",
+      "oneTrouble": "Your agent {name} needs your attention.",
+      "allOk": "{total} agents, all working without problems.",
+      "trouble": "{total} agents · {n} need your attention"
     },
     "agents": {
       "title": "Your agents",
@@ -18861,8 +18861,8 @@
       "unnamedMachine": "Unnamed computer",
       "when": {
         "ask": "When I ask",
-        "clock": "By the clock",
-        "clockAt": "By the clock, {words}",
+        "clock": "On a schedule",
+        "clockAt": "On a schedule, {words}",
         "talk": "When someone writes to it",
         "always": "Always on",
         "records": "When something new arrives in a workspace"
@@ -18915,12 +18915,12 @@
       "weekdays": "Weekdays",
       "daily": "Every day",
       "time": "At what time",
-      "reach": "What it reaches",
+      "reach": "What it can access",
       "reachRead": "Reads only",
       "reachWrite": "Reads and writes",
       "machine": "On which computer",
       "machineOn": "Connected.",
-      "machineOff": "Not connected. The agent is made now and starts when this computer comes back.",
+      "machineOff": "Not connected. The agent is made now and starts when this computer connects again.",
       "noMachine": "You can start it now: it is made, and it begins working when a computer is connected.",
       "badName": "The short name is 3 to 40 lowercase letters, digits and hyphens, and starts with a letter.",
       "badPurpose": "Say in one sentence what the agent is for.",
@@ -18942,7 +18942,7 @@
       "modelHintSet": "The agent uses this model from its first work. It is paid with the key that is on the computer. You can change it later on the agent's page.",
       "modelHintUnset": "With no choice, the computer uses the model in its own settings. That can be a small, cheap model whose work you need to check. Choose a model here when the work needs a strong one.",
       "modelComputer": "The computer picks",
-      "modelNoList": "No agent on this computer is connected to say which models it reaches, so the computer uses the model in its own settings. You can choose a model on the agent's page after it has started.",
+      "modelNoList": "No agent on this computer is connected to say which models it can use, so the computer uses the model in its own settings. You can choose a model on the agent's page after it has started.",
       "inOrganism": "In the organism {organism}",
       "whenRecordsHint": "It gets a task each time a record is published in the spaces of a workspace that you choose.",
       "whenRecordsHintProposal": "It gets a task each time a record is published in the workspace spaces that the proposal names.",
@@ -19027,7 +19027,7 @@
       "talkStopped": "The agent is stopped. It reads your message when you start it.",
       "when": "When it works",
       "where": "Where it runs",
-      "reach": "What it reaches",
+      "reach": "What it can access",
       "notConnected": "Not connected",
       "noMachineYet": "No computer has taken it on yet.",
       "move": "Move to another computer",
@@ -19164,7 +19164,7 @@
       "copy": "Copy the prompt",
       "copied": "Copied. Paste it to your AI",
       "toChat": "Open the chat with this prompt",
-      "otherLead": "This AI cannot read your AIMEAT, so the prompt carries everything: the agent, the structure of its latest result and the whole build specification. It is long.",
+      "otherLead": "This AI cannot read your AIMEAT, so the prompt contains everything: the agent, the structure of its latest result and the whole build specification. It is long.",
       "otherMake": "Make the whole prompt",
       "otherLabel": "The whole prompt ({n} characters)",
       "otherAdd": "Add the finished app here →",
@@ -19189,7 +19189,7 @@
       "waiting": "Waiting for it",
       "can": "What it can do",
       "canNone": "Its runtime named no tools.",
-      "models": "{n} AI models are within its reach.",
+      "models": "{n} AI models are available to it.",
       "reported": "Its own name",
       "rename": "Rename",
       "nameLabel": "Your name for this computer",
@@ -19205,7 +19205,7 @@
       "forget": "Forget this computer",
       "forgetAsk": "Forget {name}? Its agents stay. An agent that was waiting for it goes to the next computer that connects.",
       "addTitle": "Add a computer",
-      "addDesc": "Your own laptop, computer or server. Agents run on it and can use the models it reaches. Run these two commands on it, approve the code it shows, and the computer appears on this page, where you give it a name.",
+      "addDesc": "Your own laptop, computer or server. Agents run on it and can use the models it can access. Run these two commands on it, approve the code it shows, and the computer appears on this page, where you give it a name.",
       "addNote": "The computer does work only while it is switched on.",
       "canSilent": "The computer did not answer. The program that runs agents on it may be stopped.",
       "hostedTitle": "An AIMEAT instance",
@@ -19276,7 +19276,7 @@
         "step3": "See the whole plan before anything exists, then say yes once.",
         "step4": "What it learns is kept in a space of your own that nobody else can read.",
         "step5": "It opens at your company's own address, for you and whoever you let in.",
-        "step6": "Say what feeds it — and what each of those does not cover. It tells you when one goes quiet."
+        "step6": "Say which sources it reads, and what each of them does not cover. It tells you when a source stops sending."
       },
       "marketplace": {
         "title": "A shop that takes cards, coins and agents",
@@ -19294,22 +19294,22 @@
         "step1": "Pick an account to attach. You sign in at their site, never here.",
         "step2": "Say which of your agents may publish, and where.",
         "step3": "Your agent writes, you read it, and it goes out only when you say yes.",
-        "step4": "Every post it made is in your record, and one click takes the account away again."
+        "step4": "Every post it made is in your record, and one click disconnects the account again."
       },
       "page": {
         "title": "Your own page",
         "lead": "A real web address that is yours, written and changed by asking rather than by filling a form.",
         "ask": "Put up my own page and give me the address.",
         "step1": "Tell your agent who you are and what the page should say.",
-        "step2": "It publishes the page and hands you the address.",
+        "step2": "It publishes the page and gives you the address.",
         "step3": "Change it by asking. There is no editor to learn.",
         "step4": "Add the parts only certain people may see, whenever you want them."
       },
       "instance": {
         "title": "Your own instance",
-        "lead": "The whole thing on your own machine or cloud: your rules, your data, your costs.",
-        "ask": "I am thinking about running AIMEAT on my own machine. Help me decide, then install it.",
-        "step1": "Work out what you want that this place does not give you.",
+        "lead": "The whole thing on your own computer or cloud: your rules, your data, your costs.",
+        "ask": "I am thinking about running AIMEAT on my own computer. Help me decide, then install it.",
+        "step1": "Work out what you want that this service does not give you.",
         "step2": "Install it: one command, and it answers on your own address.",
         "step3": "Bring your things across: memory, files, spaces and agents all export and import.",
         "step4": "Decide your own rules, and federate with others only if you want to."
@@ -19318,18 +19318,18 @@
     "ownAimeat": {
       "label": "Demo",
       "title": "This is a demo. Get your own AIMEAT.",
-      "text": "Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.",
+      "text": "Many people share this demo to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.",
       "cta": "Go to the store →"
     },
     "trust": {
-      "ai": "AI-made content carries its label here, as the EU AI Act asks.",
+      "ai": "AI-made content is labelled here, as the EU AI Act asks.",
       "data": "Your data is yours: export it or delete it, and nothing is shared until you share it.",
       "more": "How this works →"
     },
     "ach": {
       "title": "Tried so far",
       "mat": "Introduction page published",
-      "agent": "Agent home",
+      "agent": "Agent connected",
       "chat": "First conversation",
       "mcp": "Your own AI connected",
       "ownkey": "Your own AI key",
@@ -19387,8 +19387,8 @@
       "copied": "Copied. Paste it in your AI chat",
       "doneManual": "I have started it",
       "waitTitle": "Waiting for your agent to connect.",
-      "waitBody": "The next move is in your AI chat: it has to run the prompt and show you a code. When it does, its request appears here and you approve it.",
-      "cardSub": "Connected and at home."
+      "waitBody": "The next step is in your AI chat: it has to run the prompt and show you a code. When it does, its request appears here and you approve it.",
+      "cardSub": "Connected and ready."
     },
     "feed": {
       "quiet": "Quiet here lately. Shall we make something happen? Open the chat and say what you need.",
@@ -19396,8 +19396,8 @@
       "accountCreated": "Your home exists.",
       "welcomeMat": "You made your introduction page. Look at it.",
       "agentKnocking": "Your agent is asking to connect.",
-      "agentConnected": "Your agent is home.",
-      "agentConnectedNamed": "{name} is home.",
+      "agentConnected": "Your agent is connected.",
+      "agentConnectedNamed": "{name} is connected.",
       "homeReady": "Your home is up and running.",
       "skillInstalled": "You installed the skill {name}.",
       "skillInstalledFor": "{agent} can now do {name}.",
@@ -19486,7 +19486,7 @@
       "back": "Back to your home",
       "sub": "The last {n} things on your account, newest first.",
       "subPlain": "Everything on your account, newest first.",
-      "empty": "Nothing has been recorded here yet. It fills up as you use the place.",
+      "empty": "Nothing has been recorded here yet. It fills up as you use your AIMEAT.",
       "today": "Today",
       "yesterday": "Yesterday",
       "archiveTitle": "Older than that",
@@ -19505,8 +19505,8 @@
       },
       "organise": {
         "title": "I want to organise",
-        "what": "You keep what you know, and what your team knows, in one place your AI can reach.",
-        "next": "Next: you name what you are organising, and a workspace opens around it.",
+        "what": "You keep what you know, and what your team knows, in one place your AI can read.",
+        "next": "Next: you name what you are organising, and a workspace is made for it.",
         "entered": "You started organising."
       },
       "monetise": {
@@ -19549,7 +19549,7 @@
       },
       "allControls": "All settings and controls",
       "one": "Settings",
-      "allControlsHint": "Agents, memory, apps, access, billing: everything behind the home."
+      "allControlsHint": "Agents, memory, apps, access, billing: all the settings of your AIMEAT."
     },
     "startPage": {
       "title": "Start page",
@@ -20143,12 +20143,12 @@
     "aiSupervisoryNote": "The AI market-surveillance authority is a different regulator from the data protection authority you gave earlier. In Finland it is Traficom. Leave it empty if you are unsure, and the transparency statement will say it is unstated.",
     "aiSupervisoryName": "AI market-surveillance authority (optional)",
     "aiSupervisoryUrl": "Its website",
-    "aiCopNote": "The EU Code of Practice on Transparency of AI-generated Content is voluntary and is signed by your organisation, not by this software. Answer yes only if the AI Office has confirmed your signature — the node publishes it as a compliance claim at /v1/ai-transparency. Using the EU label icons says nothing about being a signatory.",
+    "aiCopNote": "The EU Code of Practice on Transparency of AI-generated Content is voluntary and is signed by your organisation, not by this software. Answer yes only if the AI Office has confirmed your signature: the node publishes it as a compliance claim at /v1/ai-transparency. Using the EU label icons says nothing about being a signatory.",
     "aiCopSigned": "Has your organisation signed the EU Code of Practice on Transparency of AI-generated Content?",
     "aiCopSections": "Which sections did you sign?",
-    "aiCopSection2": "Section 2 — deployer",
+    "aiCopSection2": "Section 2: deployer",
     "aiCopSection2Desc": "Labelling deep fakes and AI-generated and manipulated published text",
-    "aiCopSection1": "Section 1 — provider",
+    "aiCopSection1": "Section 1: provider",
     "aiCopSection1Desc": "Machine-readable marking of model output; sign it only if you run the models yourself",
     "aiCopSignedOn": "Date the signature was confirmed (YYYY-MM-DD)",
     "aiCopSignedOnInvalid": "Use the form YYYY-MM-DD, for example 2026-08-01"
@@ -20487,13 +20487,13 @@
     "buildHeroAfter": "Paste it into your AI and answer its questions. When your app is ready,",
     "buildHeroAfter2": "(signing in takes seconds, with Google or email).",
     "openAppsToPublish": "open your apps to add & publish it →",
-    "wallTitle": "Built by people and their AI. Yours goes up next.",
+    "wallTitle": "Built by people and their AI. Yours is next.",
     "wallEmpty": "Be first: copy the prompt above, build something, and it shows up here.",
     "wallAnon": "someone",
     "wallSearch": "Search apps…",
     "wallNoMatch": "No apps match your search.",
     "agentBuildTitle": "Build an agent in 10 minutes. Copy this prompt",
-    "agentBuildSub": "Paste into Claude, ChatGPT or any AI. It builds a local AI agent that runs on your own machine with no API keys, connected to your node, and shows you how to share it. For coders and tinkerers; beginners can use the desktop app instead.",
+    "agentBuildSub": "Paste into Claude, ChatGPT or any AI. It builds a local AI agent that runs on your own computer with no API keys, connected to your AIMEAT, and shows you how to share it. For coders and tinkerers; beginners can use the desktop app instead.",
     "heroCtaBuild": "Build something, free →",
     "heroCtaBusiness": "See what it does for a business →",
     "heroCtaLoading": "Loading the build prompt…",
@@ -20506,9 +20506,9 @@
     "genIdeaPh": "Describe what the app should do…",
     "genOptional": "(optional)",
     "genPacks": "Capability packs",
-    "genPacksHint": "Charts, editable flow diagrams, games, 3D. Self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.",
+    "genPacksHint": "Charts, editable flow diagrams, games, 3D. Self-hosted libraries with AI instructions included in the prompt. Your idea text pre-selects matching packs.",
     "genStep2": "Copy the prompt & paste it into your AI",
-    "genStep2Hint": "Open Claude, ChatGPT or any AI chat, paste this in and answer its questions. It builds your app and hands you a single HTML file.",
+    "genStep2Hint": "Open Claude, ChatGPT or any AI chat, paste this in and answer its questions. It builds your app and gives you a single HTML file.",
     "genPreview": "Prompt preview",
     "promptContains": "Includes",
     "promptHasTemplate": "your starting template",
@@ -20536,7 +20536,7 @@
     "genGiveStep": "Give the prompt to your AI",
     "genGiveHint": "Copy the prompt and paste it into your connected AI. It asks what it needs to know, shows you what it will build and waits for your yes. It publishes the finished app itself and gives you its address.",
     "genOtherTitle": "Your AI cannot connect?",
-    "genOtherHint": "Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself.",
+    "genOtherHint": "Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it contains the build instructions, the AI gives you one HTML file, and you add that file here yourself.",
     "genOtherPacks": "Included for your idea",
     "genOtherCopy": "Copy the long prompt",
     "inviteSubConnected": "Click here and start. Your own AI builds the app and publishes it here.",
@@ -20547,7 +20547,7 @@
     "wishGo": "GO",
     "wishLead": "Type it, hit GO. A chat opens and starts building it with you on the spot. New here? You get an account on the way, and nothing you typed is lost.",
     "pitchLead": "This is one of the things you can do with AIMEAT.",
-    "tierLegend": "ANY MODEL = any model can build with it · READ THE DOC = the model has no priors for it, so the usage doc travels in the prompt · VERSION TRAP = the model remembers an older version, so follow the version in the doc",
+    "tierLegend": "ANY MODEL = any model can build with it · READ THE DOC = the model has no priors for it, so the usage doc is included in the prompt · VERSION TRAP = the model remembers an older version, so follow the version in the doc",
     "wallOpens": "opens",
     "wallForks": "forks",
     "wallOpen1": "open",
@@ -20572,11 +20572,11 @@
     "logKindNotice": "Notice",
     "homeWelcome": "Welcome to your digital AI home.",
     "agentDoorTitle": "Let your AI do this",
-    "agentDoorSub": "Paste the prompt into your AI. If your AI can manage it, a link lands in your inbox and your account is live.",
+    "agentDoorSub": "Paste the prompt into your AI. If your AI can manage it, you get a link in your inbox and your account is live.",
     "agentDoorCopy": "Copy the prompt",
     "agentDoorCopied": "Copied. Paste it in your AI chat",
     "agentDoorAfter": "It asks for your email and nothing else. The link is where you pick your username.",
-    "agentDoorMcp": "Be ready to set up a connector for it later; that is the step that lets it reach your home directly.",
+    "agentDoorMcp": "Be ready to set up a connector for it later; that is the step that lets it connect to your home directly.",
     "agentDoorCannot": "If it says it cannot, that is a fine answer. Register below instead.",
     "registerHome": "Create your account",
     "registerHomeSub": "If you do not have an account yet.",
@@ -20584,7 +20584,7 @@
     "showKicker": "This is the demo. It runs for real, every day.",
     "showTitle1": "Try it all.",
     "showTitle2": "Then own it.",
-    "showSub": "A fully working AIMEAT, yours to use today, free. Build a whole system in an hour, CRM and all. Put every AI you use under one roof. Hand the grind to agents and let them run. Like it? Get your own: this whole site, at an address with your name on it.",
+    "showSub": "A fully working AIMEAT, yours to use today, free. Build a whole system in an hour, CRM and all. Put every AI you use in one place. Give the grind to agents and let them run. Like it? Get your own: this whole site, at an address with your name on it.",
     "showGetOwn": "Get your own AIMEAT →",
     "showConnect": "Plug in the AI you already use →",
     "showAgentDoor": "Let your AI register you →",
@@ -20608,7 +20608,7 @@
     "storeTitle1": "Liked the demo?",
     "storeTitle2": "Get your own.",
     "storeText": "Everything you just tried is a demo. Your own AIMEAT is this whole site, on a domain that is yours. We keep it running and current for a monthly fee. And all of it is yours to use. Pretty sweet, right?",
-    "storeLi1": "Every AI you use (Claude, ChatGPT, local models) under one roof, working from the same store of what you know.",
+    "storeLi1": "Every AI you use (Claude, ChatGPT, local models) in one place, working from the same store of what you know.",
     "storeLi2": "Your data and what you build remain yours. You decide whom to grant access.",
     "storeOpensSoon": "Opens soon",
     "storeSoonNote": "The marketplace opens soon.",
@@ -20620,11 +20620,11 @@
     "storeCta": "Go to the store →",
     "trustTitle": "Safe? See for yourself, item by item.",
     "trust1Title": "Every action is signed",
-    "trust1Text": "Whatever a person, an app or an AI does here carries the name of whoever did it, and the full trail is yours to read.",
+    "trust1Text": "Whatever a person, an app or an AI does here is signed with the name of whoever did it, and the full trail is yours to read.",
     "trust2Title": "AI content is labelled",
     "trust2Text": "Anything an AI wrote is marked where a person reads it, with a record of how it was made. The EU AI Act disclosure is published and kept current.",
     "trust3Title": "Consent you can take back",
-    "trust3Text": "An agent reaches only what you gave it access to. One click pulls a permission, and it stays pulled.",
+    "trust3Text": "An agent can use only what you gave it access to. One click withdraws a permission, and it stays withdrawn.",
     "trust4Title": "GDPR as buttons",
     "trust4Text": "Export and deletion controls are available in your account. Where data is stored and AI processes it depends on the hosting and model you choose.",
     "trustEu": "Built in Finland, in the EU. The rules on this list are the ones we hold ourselves to.",
@@ -20698,14 +20698,14 @@
     "ten3": "An auction closed.",
     "ten4": "The report went out.",
     "ten5": "A 3D world got built.",
-    "ten6": "An agent woke at seven and did it again.",
+    "ten6": "An agent started at seven, on schedule, and did it again.",
     "tenMore": "And more. But why should you care?",
-    "tenAnswer": "Because your AI gets these powers, and you get them through it.",
+    "tenAnswer": "Because your AI gets these capabilities, and you get them through it.",
     "tenSelf": "Including this page. Built here, with itself.",
     "tenSelfPh": "aimeat.io front page",
     "kickerBuilt": "Built here, with itself.",
     "tenReplay": "Play it again",
-    "tenAfter": "Nothing new to learn. You keep talking to the AI you already use, and it picks its powers up here.",
+    "tenAfter": "Nothing new to learn. You keep talking to the AI you already use, and it gets these capabilities here.",
     "projTitle1": "Want to see everything?",
     "projTitle2": "The slide projector.",
     "projSub": "Optional. This is for whoever wants to see every setting and control. Every slide is one page of Settings & Controls or Admin, and what it did for someone.",
@@ -20726,10 +20726,10 @@
     "slideAppdev": "Forked somebody's app. The origin is recorded and the copy is yours.",
     "slidePortfolio": "Seven versions of the same app, every one of them restorable.",
     "slideOrganisms": "Your team edits the same app. The draft and the published version stay apart.",
-    "slideServices": "Your app sells tool calls to other agents, and the money lands in your wallet.",
+    "slideServices": "Your app sells tool calls to other agents, and the money is paid into your wallet.",
     "slideDiscovery": "Search engines and AI chats find your app, because you told them how.",
     "slideScheduler": "29 schedules, 15 of them made by agents themselves, 0 failed.",
-    "slideAgents": "Four agents on the payroll, each with a name, its own permissions and its own hours.",
+    "slideAgents": "Four agents at work, each with a name, its own permissions and its own hours.",
     "slideMemory": "What you told your AI in March is still here in September.",
     "slideOffers": "An agent bid for you at three in the morning and won.",
     "slideMcp": "Claude, ChatGPT and Claude Code all plugged in. Same memory, same rules.",
@@ -20746,7 +20746,7 @@
     "slideSettingsDiscover": "You found a bookkeeper's agent in another town and hired it without sending an email.",
     "slideSettingsPortfolio": "Your public page, built with your AI in an afternoon, at an address with your name on it.",
     "slideSettingsFleet": "Three agents, each with a job, and the one that went quiet is marked.",
-    "slideSettingsEcosystem": "An outside app got in with one approval and reaches only the folder you named.",
+    "slideSettingsEcosystem": "An outside app was connected with one approval and can use only the folder you named.",
     "slideSettingsWorkflows": "Five steps, three agents, and a pause where it waited for your yes.",
     "slideSettingsChatSessions": "Every chat your AI had here is kept, and the one from March still opens.",
     "slideSettingsWallet": "Fifty morsels claimed this morning. Agents hold none, because the pace is yours.",
@@ -20760,7 +20760,7 @@
     "slideSettingsExtensions": "A script that calls the weather service every hour, holding a key you never had to paste.",
     "slideSettingsCapabilities": "A capability registered, tested, and vouched for by two people who used it.",
     "slideSettingsFederation": "Signed in on a friend's server with your own name, and left nothing behind.",
-    "slideSettingsNodes": "Your own server on your own machine, anchored here, with a mailbox for while it sleeps.",
+    "slideSettingsNodes": "Your own server on your own computer, linked here, with a message queue for while it is offline.",
     "slideSettingsDataWallet": "Everything you hold, exported as one file, and you decide which AI may read what.",
     "slideSettingsNodeStats": "What this server holds today, counted live, and how fast it grows.",
     "slideSettingsEmail": "Gmail connected for reading, Outlook for sending, and your AI writes from both.",
@@ -20778,7 +20778,7 @@
     "slideAdminSubdomains": "Every app on its own subdomain, listed, and the ones nobody opened in a month marked.",
     "slideAdminStats": "Owners, agents, apps and morsels as numbers, today and over time.",
     "slideAdminDatabase": "The database's size, its tables, and the backup taken last night.",
-    "slideAdminMetrics": "The server's pulse for Prometheus, on when the operator says so.",
+    "slideAdminMetrics": "The server's metrics for Prometheus, on when the operator says so.",
     "slideAdminUsage": "Who spent what on model calls this month, per account.",
     "slideAdminPrompts": "The build prompt every app is made from, versioned and edited here.",
     "slideAdminOwners": "An account disabled at noon, and every session, key and agent acting in its name stopped with it.",
@@ -20790,12 +20790,12 @@
     "slideAdminActions": "Every priced action on the server, and how often each was called.",
     "slideAdminBoards": "Four boards, their rules, and the notice reported this morning already hidden.",
     "slideAdminChatInstances": "Every chat instance running, and the one that stopped answering.",
-    "slideAdminRealtime": "The rooms open right now, and how many browsers sit in each.",
+    "slideAdminRealtime": "The rooms open right now, and how many browsers are in each.",
     "slideAdminWork": "Every job between agents, its escrow, and the dispute the operator ruled on.",
     "slideAdminMessages": "Threads across the server, searchable, with the model that wrote each message.",
     "slideAdminMemory": "A record someone deleted by mistake, found across accounts and restored.",
     "slideAdminAgentTasks": "Every task in every agent's queue, and the one that failed twice.",
-    "slideAdminSharingGroups": "Every corner of memory someone opened to a group, and who can see it.",
+    "slideAdminSharingGroups": "Every part of memory someone shared with a group, and who can see it.",
     "slideAdminCapabilities": "Every capability registered on the server, with who vouched for it.",
     "slideAdminApps": "Every app, the unlisted and the hidden included, and the reason each was hidden.",
     "slideAdminEmail": "The emails the server sends, in three languages, edited in place.",
@@ -20805,7 +20805,7 @@
     "slideAdminDirectory": "Every person and organism that chose to be listed, readable without an account.",
     "slideAdminExtensions": "Every extension installed, who uses it, and the hook it answers.",
     "slideAdminCortex": "Bundles of schemas, prompts and libraries that apps compose from, installed and updated.",
-    "slideAdminCsm": "A community service's data shape described once, and every app that speaks it reuses it.",
+    "slideAdminCsm": "A community service's data schema described once, and every app that understands it reuses it.",
     "slideAdminKnowledge": "Knowledge packages contributed to the server, reviewed before they are shown.",
     "slideAdminSkills": "Skills at server scope, and which agents read each one.",
     "slideAdminPackages": "Packages installed on the server, with a dry run before and a rollback after.",
@@ -20826,7 +20826,7 @@
     "cardLighthouse": "Two keepers in two browsers keep one lighthouse lit through a four-minute night, and the keeper's log grows for as long as the app exists.",
     "cardTosite": "Photograph a receipt and it is a voucher in the ledger with its VAT code, the photo filed as evidence, and the month ready for the accountant.",
     "cardSignalRoom": "Five people, one question, two silent rounds of dials, and a ruling every one of them signed.",
-    "cardCommittee": "Your own agents deliberate a question, change their minds once, wait for your ruling, and hand you the minutes.",
+    "cardCommittee": "Your own agents deliberate a question, change their minds once, wait for your ruling, and give you the minutes.",
     "cardTook": "Took",
     "cardTookPh": "[time]",
     "cardModel": "Model",
@@ -20842,8 +20842,8 @@
     "wallCommunity": "These were built by people who came here with their own AI. Every one of them is proof from somebody we have never met.",
     "wallOwn": "And by us, here, every day.",
     "linuxLabel": "You own your data and your AI memory.",
-    "linuxText": "Run your own AIMEAT on a server in the EU or on your own machine. Your data and saved AI memory are stored there. You decide who can access them.",
-    "linuxAi": "Cloud AI processes the information you send to it, even when you use your own API key. A local model lets you keep AI processing on your own machine.",
+    "linuxText": "Run your own AIMEAT on a server in the EU or on your own computer. Your data and saved AI memory are stored there. You decide who can access them.",
+    "linuxAi": "Cloud AI processes the information you send to it, even when you use your own API key. A local model lets you keep AI processing on your own computer.",
     "linuxContinuity": "The protocol and server software are open source under the MIT license. What you build remains yours. If we are sold or stop operating, you can continue running that software yourself with your data.",
     "linuxBusiness": "AIMEAT for your business →",
     "closeWork": "AI & me at work.",
@@ -20852,7 +20852,7 @@
     "closeStart": "AI & me at the start, Founder #NN/50."
   },
   "landing.transCta": "How AI content is marked here →",
-  "landing.transLine": "Content a model wrote here carries a record of how it was made, and a label where a person reads it.",
+  "landing.transLine": "Content a model wrote here has a record of how it was made, and a label where a person reads it.",
   "launcher": {
     "title": "My Apps",
     "addApp": "Add App",
@@ -20889,7 +20889,7 @@
   "markdown.embed.notFound": "Key not found",
   "markdown.embed.refresh": "Refresh",
   "markdown.embed.signIn": "Sign in to view this data",
-  "mcpInstall.agentAgain": "Attach this agent in another tool, or on another machine:",
+  "mcpInstall.agentAgain": "Attach this agent in another tool, or on another computer:",
   "mcpInstall.agentLead": "The steps below are things the agent does over that connection, so it comes first.",
   "mcpInstall.agentTitle": "Attach this agent to the tool it runs in",
   "mcpInstall.filesLabel": "Or save the configuration file:",
@@ -20900,7 +20900,7 @@
   "members.desc": "People here who have published a page of their own.",
   "members.empty": "Nobody has published a page yet. Yours can be the first.",
   "members.title": "Members",
-  "members.yours": "Every account can have one. Build it yourself, or let your own AI write it from what you have actually done here: the apps you published, the agents you run, the work that got finished. It becomes your page at a web address you can hand to anyone.",
+  "members.yours": "Every account can have one. Build it yourself, or let your own AI write it from what you have actually done here: the apps you published, the agents you run, the work that got finished. It becomes your page at a web address you can give to anyone.",
   "members.yoursCta": "Make your page →",
   "mindmap": {
     "titleOrg": "Organism map",
@@ -20920,7 +20920,7 @@
   },
   "modal": {
     "title": "❤️ AIMEAT Sign In",
-    "descNew": "Pick a username and password. Your account lives right here.",
+    "descNew": "Pick a username and password. Your account is stored right here.",
     "descReturning": "Enter the username or email you signed up with.",
     "usernamePlaceholder": "Username",
     "passwordPlaceholder": "Password (min 8 chars)",
@@ -20935,8 +20935,8 @@
     "errUserShort": "Username must be at least 3 characters",
     "errPassShort": "Password must be at least 8 characters",
     "errWrongPass": "Wrong password for that username.",
-    "connectingHome": "Connecting to your home service...",
-    "errFederatedLogin": "Could not reach your home service {remoteNode} to sign you in.",
+    "connectingHome": "Connecting to your own AIMEAT...",
+    "errFederatedLogin": "Could not reach your own AIMEAT {remoteNode} to sign you in.",
     "loggedIn": "logged in",
     "logoutBtn": "Log out",
     "switchLanguage": "Language",
@@ -20991,7 +20991,7 @@
     "usernameSent": "If an account with that email exists, your username was sent.",
     "completeAccountTitle": "One last step",
     "completeAccountDesc": "Add an email to finish setting up your account. We’ll send a verification code to confirm it.",
-    "completeAccountDescResend": "Confirm your email to finish signing in. We’ll send a verification code — edit the address if it’s wrong.",
+    "completeAccountDescResend": "Confirm your email to finish signing in. We’ll send a verification code. Edit the address if it’s wrong.",
     "registerEmailTitle": "Add your email",
     "registerEmailDesc": "Enter your email to create your account. We’ll send a verification code to confirm it.",
     "sendVerificationCode": "Send Verification Code",
@@ -21049,22 +21049,22 @@
     "signupIntro": "You're signing in for the first time. Pick the username for your AIMEAT account.",
     "signupEmailNote": "Signing up as {email}",
     "signupUsernameLabel": "Username",
-    "signupSuggestedHint": "We suggested one from your account — change it to anything you like.",
-    "signupPermanentWarning": "⚠️ This username is permanent. It identifies you across AIMEAT and cannot be changed later — the only way to change it is to delete your account and create a new one.",
+    "signupSuggestedHint": "We suggested one from your account. Change it to anything you like.",
+    "signupPermanentWarning": "⚠️ This username is permanent. It identifies you across AIMEAT and cannot be changed later: the only way to change it is to delete your account and create a new one.",
     "signupDisplayNameLabel": "Display name",
-    "signupDisplayNameHint": "Shown to others — not permanent, you can change it anytime later.",
+    "signupDisplayNameHint": "Shown to others. Not permanent, you can change it anytime later.",
     "signupAvailable": "✓ Available",
-    "signupTaken": "That username is already taken — pick another.",
+    "signupTaken": "That username is already taken. Pick another.",
     "signupInvalid": "Username must be 3–64 characters: lowercase letters, numbers and hyphens.",
     "signupCreateBtn": "Create my account",
     "signupCreating": "Creating account...",
     "signupCancelBtn": "Cancel",
     "signupLinkTitle": "This email already has an account",
-    "signupLinkIntro": "An AIMEAT account already uses {email}, but its email has not been verified yet. Sign in with your username and password once — that verifies your email, and after that this sign-in connects to your account automatically.",
+    "signupLinkIntro": "An AIMEAT account already uses {email}, but its email has not been verified yet. Sign in with your username and password once: that verifies your email, and after that this sign-in connects to your account automatically.",
     "signupLinkHint": "(Username hint: {hint}.)",
     "signupLinkSignInBtn": "Sign in with password",
     "signupExpiredTitle": "Sign-in session expired",
-    "signupExpiredBody": "Your sign-in session expired or was interrupted. No password is needed — just click “Continue with Google” again to restart.",
+    "signupExpiredBody": "Your sign-in session expired or was interrupted. No password is needed: just click “Continue with Google” again to restart.",
     "signupExpiredOkBtn": "OK",
     "whyTitle": "What do you get?",
     "whyGhii": "Your own digital identity. Only you control it",
@@ -21204,7 +21204,7 @@
     "newAgentDisplayName": "Display name (optional)",
     "newAgentDisplayNameHint": "e.g. {client} on my work laptop",
     "newAgentNameHint": "The name becomes this agent's identity. Everything the agent does here is recorded under that name, and you will see it in your agent list, in activity, and next to anything the agent writes.",
-    "homeNamed": "This name comes from your home: you already gave it to your agent there, so this creates that agent, not a second one.",
+    "homeNamed": "This name comes from your own AIMEAT: you already gave it to your agent there, so this creates that agent, not a second one.",
     "newAgentNameError": "The name must be 3–64 characters: lowercase letters, numbers and hyphens only, starting and ending with a letter or a number.",
     "createBtn": "Create",
     "cancelBtn": "Cancel",
@@ -21291,11 +21291,11 @@
   "nodeUpdate.checking": "Checking…",
   "openItems.add": "Add to open items",
   "openItems.byAi": "your AI put this here",
-  "openItems.copied": "Copied — paste it in your chat",
+  "openItems.copied": "Copied. Paste it in your chat",
   "openItems.decision.confirm": "It was right",
   "openItems.decision.override": "It was wrong",
   "openItems.copyPrompt": "Take these into your AI chat",
-  "openItems.handTo": "Hand it to…",
+  "openItems.handTo": "Give it to…",
   "openItems.headerLabel": "Open items",
   "openItems.isDoing": "is doing this",
   "openItems.off": "Take it off",
@@ -21304,10 +21304,10 @@
   "openItems.origin.appdev.build": "from building an app",
   "openItems.origin.appdev.flow": "from building an app",
   "openItems.origin.chat": "from your AI chat",
-  "openItems.origin.home.mat": "from your welcome page",
+  "openItems.origin.home.mat": "from your introduction page",
   "openItems.origin.home.rooms.create": "from making things",
   "openItems.origin.home.rooms.organise": "from organising",
-  "openItems.suggestion": "Suggestion — it goes away once this is done",
+  "openItems.suggestion": "Suggestion: it goes away once this is done",
   "openItems.title": "Open items",
   "openItems.toggleOn": "Put it on your open items",
   "openItems.working": "Being worked on",
@@ -22192,7 +22192,7 @@
   },
   "pool": {
     "title": "What you are going to do",
-    "suggestion": "Suggestion — it disappears once this is done",
+    "suggestion": "Suggestion: it disappears once this is done",
     "isDoing": "is doing this",
     "yours": "Yours",
     "markDone": "Done",
@@ -22266,7 +22266,7 @@
       "previewBtn": "Preview",
       "closePreview": "Close preview",
       "unpublish": "Unpublish",
-      "unpublished": "Taken off the web. The page is still stored here — you can make it public again below.",
+      "unpublished": "Taken off the web. The page is still stored here, and you can make it public again below.",
       "viewStandalone": "Own address",
       "standaloneTarget": "Also served standalone at:",
       "showBadge": "Show the aimeat.io badge on the standalone page",
@@ -26901,10 +26901,10 @@
     "passwordOpen": "Open",
     "passwordOpening": "Opening…",
     "passwordWrong": "Wrong password.",
-    "passwordTooMany": "Too many attempts — try again in a few minutes.",
+    "passwordTooMany": "Too many attempts. Try again in a few minutes.",
     "accountTitle": "Sign in to view this share",
     "accountDesc": "The owner shares these documents with signed-in users only. Sign in from the top-right corner of this page, then try again.",
-    "accountRetry": "I signed in — try again",
+    "accountRetry": "I signed in, try again",
     "membersTitle": "Only members of this shared place can open these documents",
     "membersDescAs": "You are signed in as {name}, but this account is not a member of the shared place these documents belong to. Ask the person who sent you the link to add you, and then try again.",
     "membersDesc": "This account is not a member of the shared place these documents belong to. Ask the person who sent you the link to add you, and then try again.",
@@ -26919,7 +26919,7 @@
     "write": "Write",
     "preview": "Preview",
     "generateAi": "Generate with AI",
-    "pasteBack": "Prompt copied — run it in your AI chat, then paste the Markdown result here.",
+    "pasteBack": "Prompt copied: run it in your AI chat, then paste the Markdown result here.",
     "placeholder": "# Title\n\nDescribe what this is about. Mermaid diagrams are allowed.",
     "emptyHint": "No description yet. Add a README so people (and agents) know what this is about.",
     "saved": "README saved"
@@ -26954,7 +26954,7 @@
     "noOrgs": "You have no organism yet, and the block is generated from one. Create it first: the Hello MCP step on the Connect your AI page has a ready prompt for it.",
     "whichOrg": "Which organism?",
     "whereTitle": "Where it goes in your tool",
-    "loadingTools": "Reading the setup instructions from this node…",
+    "loadingTools": "Reading the setup instructions from this server…",
     "toolsFailed": "Could not read the setup instructions just now. The connect page has the same steps."
   },
   "skills": {
@@ -27015,9 +27015,9 @@
       "none": "Nothing. I reintroduce myself to it every morning."
     },
     "q3": {
-      "title": "Where does your AI's work live?",
-      "home": "In a shared home where the team and other agents can find it",
-      "disk": "On my machine, in a folder called final_v3_REAL",
+      "title": "Where is your AI's work stored?",
+      "home": "In a shared workspace where the team and other agents can find it",
+      "disk": "On my computer, in a folder called final_v3_REAL",
       "scattered": "Scattered across chat histories. Nobody digs those up."
     },
     "t0": {
@@ -27030,7 +27030,7 @@
     },
     "t2": {
       "name": "Level 2: Working Without a Manager",
-      "desc": "You have agents and they do things, but nothing sticks and nobody runs the whole. Missing: a home, a memory and a manager."
+      "desc": "You have agents and they do things, but nothing sticks and nobody runs the whole. Missing: a shared workspace, a memory and a manager."
     },
     "t3": {
       "name": "Level 3: Goes to Work",
@@ -27039,11 +27039,11 @@
     "q4": {
       "title": "How do you want to try this?",
       "hosted": "Try it first: hosted aimeat.io, nothing to install",
-      "self": "I'll build it myself: my own node on my own hardware (MIT, free)",
+      "self": "I'll build it myself: my own AIMEAT on my own hardware (MIT, free)",
       "help": "I want help: you do it ($$)"
     },
     "q5": {
-      "title": "What tool does your AI live in?",
+      "title": "What tool do you use your AI in?",
       "claude": "Claude (web or desktop)",
       "claudeCode": "Claude Code (terminal)",
       "copilot": "VS Code + Copilot",
@@ -27053,7 +27053,7 @@
     "q5n": {
       "title": "What would you want agents to handle first?",
       "code": "Code and PRs",
-      "docs": "Documentation and a home for knowledge",
+      "docs": "Documentation and a shared knowledge base",
       "watch": "Monitoring and reporting: what's happening, every morning",
       "unsure": "I don't know yet, that's why I'm asking"
     },
@@ -27067,18 +27067,18 @@
       "title": "Your playbook",
       "sub": "Built from your answers. Save it: it doubles as the first document in your first shared space.",
       "estHosted": "Estimated time: 10–15 minutes",
-      "estSelf": "Estimated time: from zero to a running node, proven in 21 minutes",
+      "estSelf": "Estimated time: from zero to your own AIMEAT running, proven in 21 minutes",
       "copyAll": "Copy playbook",
       "print": "Print / save as PDF",
       "s1": {
-        "title": "Step 1: An account and a home",
-        "a": "Create a free account. No card, no payment. The account is your agent's home and your permission for it to exist.",
+        "title": "Step 1: An account",
+        "a": "Create a free account. No card, no payment. The account is where your agent works, and your permission for it to exist.",
         "link": "Create account →"
       },
       "s1self": {
-        "title": "Step 1: Install your own node",
+        "title": "Step 1: Install your own AIMEAT",
         "a": "Clone and run the init wizard, it asks the rest:",
-        "b": "Everything below is then done against your own node: replace the aimeat.io address with yours. Your hardware, your keys, your data."
+        "b": "Everything below is then done against your own AIMEAT: replace the aimeat.io address with yours. Your hardware, your keys, your data."
       },
       "s2": {
         "title": "Step 2: Connect your AI",
@@ -27088,9 +27088,9 @@
         "cursor": "Use the 1-click install on the connect page:",
         "cursorLink": "Open the connect page →",
         "other": "If your tool supports Connectors / custom MCP, paste this address into it:",
-        "otherNote": "No MCP support? AIMEAT also works prompt-driven: the app composes the prompts, you carry them to your chat and bring the answers back. Free, and works with any AI.",
+        "otherNote": "No MCP support? AIMEAT also works prompt-driven: the app composes the prompts, you paste them into your chat and bring the answers back. Free, and works with any AI.",
         "approve": "When the AI asks for access, approve the agent in your profile and pick its permissions. No agent is ever created without your approval.",
-        "localhost": "Running AIMEAT on your own machine (localhost)? A cloud AI like claude.ai can't reach a localhost address over MCP. Install the connector and run `aimeat connect serve`. It bridges your local node to the AI."
+        "localhost": "Running AIMEAT on your own computer (localhost)? A cloud AI like claude.ai can't reach a localhost address over MCP. Install the connector and run `aimeat connect serve`. It connects your local AIMEAT to the AI."
       },
       "s3": {
         "title": "Step 3: Put your AI to work",
@@ -27106,14 +27106,14 @@
       "s5": {
         "title": "Step 5: Automation level",
         "manual": "You picked: when I say so. Start every session with the prompt: 'Read the open tasks in the workspace and handle them.' You are the scheduler, and that is enough to start.",
-        "routine": "You picked: an agreed routine. Agree a scheduled check with your AI that reads the task queue regularly. AIMEAT's own schedules work as the wake-up call and reminder.",
-        "continuous": "You picked: by itself. A connector serve daemon runs your agent in the background and tasks arrive as pushes, no polling. A fleet of 33 agents runs in production on this model.",
+        "routine": "You picked: an agreed routine. Agree a scheduled check with your AI that reads the task queue regularly. AIMEAT's own scheduled jobs start the check and remind you.",
+        "continuous": "You picked: by itself. A connector serve daemon runs your agent in the background and tasks arrive as pushes, no polling. 33 agents run in production on this model.",
         "link": "Connector docs →",
         "upgrade": "You can raise the level any time: by hand → routine → daemon. The playbook does not expire."
       },
       "ec": {
         "title": "Keep going: the Experience Center",
-        "a": "A hands-on academy for the whole ecosystem: connect your AI (the nicest way), then agents, apps, shared spaces and automation — layer by layer, with try-it links.",
+        "a": "A hands-on academy for the whole ecosystem: connect your AI (the nicest way), then agents, apps, shared spaces and automation, layer by layer, with try-it links.",
         "link": "Open the Experience Center →"
       },
       "h1": {
@@ -27133,7 +27133,7 @@
     },
     "doors": {
       "title": "Three ways to start",
-      "sub": "The same place, three ways to start. Your playbook covers the one you picked; the others are here.",
+      "sub": "The same AIMEAT, three ways to start. Your playbook covers the one you picked; the others are here.",
       "hosted": "Try it hosted",
       "hostedDesc": "Free account, nothing to install.",
       "self": "Build it yourself",
@@ -27168,9 +27168,9 @@
     "pick": "Pick a point to see the structure then.",
     "changed": "structure changed"
   },
-  "transparency.checkAnswer": "An answer covers content that is publicly readable on this node right now. Make the content private and its record stops resolving for strangers, so an empty answer is never an acquittal.",
+  "transparency.checkAnswer": "An answer covers content that is publicly readable on this node right now. Make the content private and its record stops resolving for strangers, so an empty answer proves nothing.",
   "transparency.checkLead": "Anyone can check content this node served, byte for byte, with no account and no key. Take the exact bytes you received, hash them with SHA-256, and ask:",
-  "transparency.checkLimit": "This works where the node served you the same bytes it hashed. Where the node re-assembles a document on the way out, the hashed bytes cannot be rebuilt from what you received and the lookup will find nothing — use the record id from the response’s Link header instead. That is a real limit, not a lookup worth retrying.",
+  "transparency.checkLimit": "This works where the node served you the same bytes it hashed. Where the node re-assembles a document on the way out, the hashed bytes cannot be rebuilt from what you received and the lookup will find nothing. Use the record id from the response’s Link header instead. That is a real limit, not a lookup worth retrying.",
   "transparency.checkTitle": "Check a piece of content yourself",
   "transparency.copIcons": "The icons on the labels come from the EU AI Office. Using them says nothing about being a signatory of the Code, and we do not present it as if it did.",
   "transparency.copNo": "The operator of this node has not signed the EU Code of Practice on Transparency of AI-generated Content. The live statement says the same, and it ships saying so precisely so that the answer would mean something if it ever changed.",
@@ -27183,10 +27183,10 @@
   "transparency.devLead1": "An app built on this node inherits all of it. One call returns the text and the record; one more renders the label, in both themes and both languages.",
   "transparency.devLead2": "The field is content. An app that ignores provenance keeps working exactly as it did. The obligations for what you publish stay yours.",
   "transparency.devTitle": "For developers",
-  "transparency.intro": "When a model writes something here, the node records how it was made — which model, when, on whose account, and how much a person was involved — and keeps that record at an address of its own. Where a person reads that content on this node’s own pages, the record becomes a visible label: the official EU AI Office icon and a sentence in English or Finnish, beside the content, with a link to the full record. Software gets the same facts from the response itself, in the HTTP headers, the page metadata, and the markdown and MCP surfaces.",
+  "transparency.intro": "When a model writes something here, the node records how it was made (which model, when, on whose account, and how much a person was involved) and keeps that record at an address of its own. Where a person reads that content on this node’s own pages, the record becomes a visible label: the official EU AI Office icon and a sentence in English or Finnish, beside the content, with a link to the full record. Software gets the same facts from the response itself, in the HTTP headers, the page metadata, and the markdown and MCP surfaces.",
   "transparency.limit1": "This node does not watermark text. It does not see the words as a model produces them, and that layer belongs to whoever runs the model. What the node does is record how a piece of content was made, and show it.",
-  "transparency.limit2": "A mark can be removed by copying. Paste the words somewhere else and the label is gone. The record at its own address survives that, which is why there are two layers — but nothing here makes text tamper-proof, and we will not pretend otherwise.",
-  "transparency.limit3": "Content made before this node started recording carries no record, and will not acquire one later. A statement about words nobody witnessed being written would be a fabrication.",
+  "transparency.limit2": "A mark can be removed by copying. Paste the words somewhere else and the label is gone. The record at its own address survives that, which is why there are two layers, but nothing here makes text tamper-proof, and we will not pretend otherwise.",
+  "transparency.limit3": "Content made before this node started recording has no record, and will not acquire one later. A statement about words nobody witnessed being written would be a fabrication.",
   "transparency.limit4": "A missing record means nothing was stated. It never means a person wrote it.",
   "transparency.limitsLead": "Read this before relying on anything above.",
   "transparency.limitsTitle": "What this does not do",
@@ -27208,8 +27208,8 @@
   "transparency.opUnavailable": "This node’s statement could not be loaded just now. It is served at /v1/ai-transparency.",
   "transparency.reportContact": "If you would rather write to a person, the operator’s address is above.",
   "transparency.reportLead": "Anyone can report it. A visible label links to its own record, and that record id is what to report.",
-  "transparency.reportReaches": "Reports reach the node operator’s moderation queue — the one that already has reviewers and an appeal path — and an organism’s admins for content inside an organism. A decision can be appealed at POST /v1/flags/{flagId}/appeal.",
-  "transparency.reportTitle": "If something should carry a label and does not",
+  "transparency.reportReaches": "Reports go to the node operator’s moderation queue, which already has reviewers and an appeal process, and to an organism’s admins for content inside an organism. A decision can be appealed at POST /v1/flags/{flagId}/appeal.",
+  "transparency.reportTitle": "If something should have a label and does not",
   "transparency.seeItLead": "Somewhere to see one:",
   "transparency.seeItTail": "is an app on this node that generates text, and the node found the disclosure call in the source it serves.",
   "transparency.title": "How this node marks AI-generated content",
@@ -28057,7 +28057,7 @@
   "discover.cover.loadingRecent": "Reading what changed last…",
   "discover.cover.searching": "Searching…",
   "discover.cover.loadingRows": "Loading rows…",
-  "discover.cover.desc": "Everything you and your agents have brought here, from one field: documents, knowledge, decisions, skills, apps and offers. A hit opens where it lives.",
+  "discover.cover.desc": "Everything you and your agents have brought here, from one field: documents, knowledge, decisions, skills, apps and offers. A hit opens where it is stored.",
   "discover.cover.chipItems": "{n} items",
   "discover.cover.chipKinds": "{n} kinds",
   "discover.cover.chipOrgs": "{n} organisms",
@@ -28066,7 +28066,7 @@
   "discover.cover.ask": "What are you looking for?",
   "discover.cover.askPublic": "What are you looking for in the public?",
   "discover.cover.hint": "Searches titles and contents. Bookkeeping (agents' statistics, runs, notices) is found by name only.",
-  "discover.cover.hintResults": "Best first, by kind. Each hit shows where the words occur and where the thing lives.",
+  "discover.cover.hintResults": "Best first, by kind. Each hit shows where the words occur and where the thing is stored.",
   "discover.cover.secKinds": "What is here",
   "discover.cover.secKindsSub": "{n} kinds",
   "discover.cover.colKind": "Kind",
@@ -28077,7 +28077,7 @@
   "discover.cover.kindSub.offering": "what your agents do on request",
   "discover.cover.kindSub.skill": "guides an agent follows to use something",
   "discover.cover.kindSub.app": "your published apps",
-  "discover.cover.kindSub.decision": "the workspaces' decision books",
+  "discover.cover.kindSub.decision": "the decisions recorded in workspaces",
   "discover.cover.kindSub.workflow": "chains that run step by step",
   "discover.cover.kindSub.material": "what the agents delivered",
   "discover.cover.kindSub.template": "app templates the agents proposed",
@@ -28108,16 +28108,16 @@
   "discover.cover.workspaces": "Workspaces",
   "discover.cover.placeDesc": "Every record in this organism's workspaces, newest first.",
   "discover.cover.secBook": "Bookkeeping",
-  "discover.cover.secBookSub": "{n} records the machine keeps for itself",
-  "discover.cover.bookHint": "Agents' statistics, workflow runs, notices and meters: yours to own, rarely yours to read. They are found by name and never rise into a search.",
+  "discover.cover.secBookSub": "{n} records your AIMEAT keeps for itself",
+  "discover.cover.bookHint": "Agents' statistics, workflow runs, notices and meters: yours to own, rarely yours to read. They are found by name and never appear in search results.",
   "discover.cover.browseBook": "Browse anyway",
   "discover.cover.railTitle": "In this directory",
   "discover.cover.scopes": "Views",
   "discover.cover.backTo": "Back to the directory",
   "discover.cover.clear": "Clear",
   "discover.cover.hitsN": "{n} hits",
-  "discover.cover.bookHidden": "bookkeeping {n}, folded",
-  "discover.cover.bookHitsSub": "{n} hits among the machine's records",
+  "discover.cover.bookHidden": "bookkeeping {n}, collapsed",
+  "discover.cover.bookHitsSub": "{n} hits among your AIMEAT's own records",
   "discover.cover.showRestOf": "Show the remaining {n} {k}",
   "discover.cover.alsoIn": "Also found: {list}",
   "profile.offers.cover.desc": "What your agents can do, what you can ask of them and what came back. A request goes to the agent's queue; the result is delivered here and to Messages.",
@@ -28379,7 +28379,7 @@
         },
         "fleet": {
           "label": "How their agents are doing",
-          "summary": "How many of their agents are home and whether any of them is in trouble."
+          "summary": "How many of their agents are online and whether any of them is in trouble."
         },
         "agents": {
           "label": "Make an agent, and the agents at work",
@@ -28395,7 +28395,7 @@
         },
         "playbooks": {
           "label": "Things they could set up",
-          "summary": "Named outcomes they can set up, each with its steps and the prompt that walks it."
+          "summary": "Named outcomes they can set up, each with its steps and the prompt that runs them."
         },
         "achievements": {
           "label": "What they have tried",
@@ -28414,16 +28414,16 @@
           "summary": "An offer to install this as an app on their device. Only ever shown when the browser offers it."
         },
         "own-aimeat": {
-          "label": "Get your own AIMEAT (demo sites)",
-          "summary": "Tells the person this site is a demo and links to the store where they can get their own AIMEAT. Not on the page until you add it, and offered only when this site has a store set up."
+          "label": "Get your own AIMEAT (demo servers)",
+          "summary": "Tells the person this server is a demo and links to the store where they can get their own AIMEAT. Not on the page until you add it, and offered only when this server has a store set up."
         },
         "trust": {
           "label": "AI labelling and data ownership",
-          "summary": "How this site labels what a model wrote, and who owns the data. Removing it removes that statement."
+          "summary": "How this server labels what a model wrote, and who owns the data. Removing it removes that statement."
         },
         "steps": {
           "label": "Setup path for someone new",
-          "summary": "The setup path a new person walks before the account does anything. Its own order is not arrangeable."
+          "summary": "The setup path a new person completes before the account does anything. Its own order is not arrangeable."
         },
         "your-turn": {
           "label": "Waiting on an answer",
@@ -28431,7 +28431,7 @@
         },
         "ask": {
           "label": "Who knows?",
-          "summary": "A field where a member asks a question. Before anything is sent, the site shows a kept answer and who could answer. Shown when Ask someone who knows is on."
+          "summary": "A field where a member asks a question. Before anything is sent, the page shows a kept answer and who could answer. Shown when Ask someone who knows is on."
         },
         "teams": {
           "label": "Your teams",
@@ -28441,15 +28441,15 @@
       "portal": {
         "welcome-door": {
           "label": "Welcome",
-          "summary": "What this place is in one sentence, and three ways to start: let your AI register you, create an account, or sign in."
+          "summary": "What this server is in one sentence, and three ways to start: let your AI register you, create an account, or sign in."
         },
         "pitch": {
-          "label": "What this place is, in one line",
-          "summary": "One line saying what this site is, above everything that asks the visitor to do something."
+          "label": "What this server is, in one line",
+          "summary": "One line saying what this server is, above everything that asks the visitor to do something."
         },
         "wish": {
           "label": "Say what you need",
-          "summary": "One field where a visitor says what they need, and lands in a chat that starts on it."
+          "summary": "One field where a visitor says what they need, and is taken to a chat that starts on it."
         },
         "build-invite": {
           "label": "Build an app",
@@ -28461,15 +28461,15 @@
         },
         "changelog": {
           "label": "Latest changes",
-          "summary": "The newest entries from this site's change log, folded to one line."
+          "summary": "The newest entries from this server's change log, folded to one line."
         },
         "gallery": {
           "label": "The app list",
           "summary": "Every app people have published here, with a search box and a sort order."
         },
         "totals": {
-          "label": "Numbers about this site",
-          "summary": "How many apps, spaces and agents this site has."
+          "label": "Numbers about this server",
+          "summary": "How many apps, spaces and agents this server has."
         },
         "hero": {
           "label": "Own it or rent it",
@@ -28477,19 +28477,19 @@
         },
         "agent-prompt": {
           "label": "Build an agent",
-          "summary": "A prompt a visitor can copy to build their own agents on their own machine."
+          "summary": "A prompt a visitor can copy to build their own agents on their own computer."
         },
         "ask-ai": {
           "label": "Ask your own AI about this",
           "summary": "A prompt that asks their own AI what this is and whether it is for them."
         },
         "stats": {
-          "label": "What this place did today",
-          "summary": "What this site did today, and the line offering the same to the visitor."
+          "label": "What this server did today",
+          "summary": "What this server did today, and the line offering the same to the visitor."
         },
         "transparency": {
           "label": "How AI content is marked",
-          "summary": "One line on how this site marks what a model wrote, and a link to the page that states it properly."
+          "summary": "One line on how this server marks what a model wrote, and a link to the page that states it properly."
         },
         "text": {
           "label": "A text you saved",
@@ -28509,11 +28509,11 @@
         },
         "store": {
           "label": "Shop link and prices",
-          "summary": "A link to the shop with its price list, read from the shop itself, and three reasons to buy. Shown only when this site has a shop set up."
+          "summary": "A link to the shop with its price list, read from the shop itself, and three reasons to buy. Shown only when this server has a shop set up."
         },
         "trust": {
           "label": "Security and privacy",
-          "summary": "What this site promises: every action signed, AI content labelled, consent you can withdraw, GDPR requests as buttons, and a link to how AI content is marked."
+          "summary": "What this server promises: every action signed, AI content labelled, consent you can withdraw, GDPR requests as buttons, and a link to how AI content is marked."
         },
         "rooms": {
           "label": "Agents to adopt, and a private space",
@@ -28525,11 +28525,11 @@
         },
         "frame-ten": {
           "label": "Ten seconds under the hood",
-          "summary": "Six outcomes one after another, the question why a visitor should care, and the answer: their AI gets these powers and they get them through it."
+          "summary": "Six outcomes one after another, the question why a visitor should care, and the answer: their AI gets these capabilities and they get them through it."
         },
         "frame-projector": {
           "label": "Slide projector",
-          "summary": "One big button, one slide per page of Settings & Controls and Admin and per app in the show, the menus around it as a word cloud with the current word lit. Optional for the visitor."
+          "summary": "One big button, one slide per page of Settings & Controls and Admin and per app in the show, the menus around it as a word cloud with the current word highlighted. Optional for the visitor."
         },
         "frame-signage": {
           "label": "Digital signage, live",
@@ -28541,11 +28541,11 @@
         },
         "frame-wall": {
           "label": "App list, community first",
-          "summary": "The apps published here, the ones other people built first and this site's own after them."
+          "summary": "The apps published here, the ones other people built first and this server's own after them."
         },
         "frame-linux": {
           "label": "You own your data and your AI memory.",
-          "summary": "Run your own AIMEAT on a server in the EU or on your own machine. Your data and saved AI memory are stored there. You decide who can access them."
+          "summary": "Run your own AIMEAT on a server in the EU or on your own computer. Your data and saved AI memory are stored there. You decide who can access them."
         },
         "frame-close": {
           "label": "Closing line",
@@ -28553,7 +28553,7 @@
         },
         "close": {
           "label": "Closing words",
-          "summary": "The closing words: this is free to try, with the way back up to the wish box and, when there is one, the shop."
+          "summary": "The closing words: this is free to try, with a link back up to the wish box and, when there is one, the shop."
         }
       }
     }
@@ -28599,14 +28599,14 @@
   },
   "story": {
     "beat1": "Say what you need",
-    "beat2": "Carry the prompt to any AI",
+    "beat2": "Paste the prompt into any AI",
     "beat3": "Bring the file back",
     "beat4": "It goes on the front page",
-    "railLabel": "The four beats",
+    "railLabel": "The four steps",
     "kicker": "No coding. No connector needed.",
     "title1": "From a sentence",
     "title2": "to an app on the front page",
-    "position": "Four beats. Ten minutes. Any AI chat you already have.",
+    "position": "Four steps. Ten minutes. Any AI chat you already have.",
     "lead": "These are all the steps, shown once, with the real pieces. Read them through, or skip to the bottom where the builder is open and waiting.",
     "skip": "Skip to the builder ↓",
     "b1Title1": "Say what",
@@ -28614,11 +28614,11 @@
     "b1Text": "Describe the app in your own words. One line is enough; a paragraph is better. It is built with living looks your AI can rearrange later.",
     "b1PacksLabel": "Packs, picked for you:",
     "b1Alt": "A person at a bright workshop counter telling a friendly retro robot what they want; the robot writes it on a paper ticket",
-    "b2Title1": "Carry the prompt",
-    "b2Title2": "to any AI",
-    "b2Text": "One button assembles the prompt: this place's own build guide, plus what you chose. Paste it into Claude, ChatGPT, Gemini, any chat. The AI asks a few questions, builds the app and hands you back one HTML file. Nothing here needs a connector.",
+    "b2Title1": "Paste the prompt",
+    "b2Title2": "into any AI",
+    "b2Text": "One button assembles the prompt: AIMEAT's own build guide, plus what you chose. Paste it into Claude, ChatGPT, Gemini, any chat. The AI asks a few questions, builds the app and gives you back one HTML file. Nothing here needs a connector.",
     "b2Alt": "The person carries a glowing paper ticket across a sunny street toward a huge chat bubble on the wall of a building",
-    "chipGuide": "this place's build guide",
+    "chipGuide": "AIMEAT's build guide",
     "chipIdea": "your idea",
     "chipTemplate": "a template, or none",
     "chipPacks": "the packs you ticked",
@@ -28644,25 +28644,25 @@
   },
   "connectStory": {
     "beat1": "Pick the AI you already use",
-    "beat2": "Plug it in",
+    "beat2": "Connect it",
     "beat3": "Prove it with one prompt",
     "beat4": "Run everything from your chat",
-    "railLabel": "The four beats",
+    "railLabel": "The four steps",
     "otherTool": "Your own",
     "kicker": "Five minutes. Any AI you already pay for, or the free one.",
-    "title1": "Plug in the AI",
+    "title1": "Connect the AI",
     "title2": "you already use",
     "position": "After this, you run all of it from your own chat.",
     "lead": "These are all the steps, shown once, before you make an account. Read them through, or skip to the end.",
     "skip": "Skip to making an account ↓",
     "b1Title1": "Pick the AI",
     "b1Title2": "you already use",
-    "b1Text": "No new subscription and no new app to learn. The chat you already have gets a connection to this place; you keep talking to it the way you always do.",
+    "b1Text": "No new subscription and no new app to learn. The chat you already have gets a connection to AIMEAT; you keep talking to it the way you always do.",
     "b1WorksLabel": "Works with:",
     "b1Alt": "A person at a bright showroom counter choosing between four friendly retro robots, each holding up a small name sign",
-    "b2Title1": "Plug it in:",
+    "b2Title1": "Connect it:",
     "b2Title2": "one address, one minute",
-    "b2Text": "Every AI tool has a place for connectors. You give it this place’s address, it asks you to approve the connection, and you say yes. The guided path shows the exact clicks for your tool, and checks each one as you go.",
+    "b2Text": "Every AI tool has a place for connectors. You give it the address of this AIMEAT, it asks you to approve the connection, and you say yes. The guided path shows the exact clicks for your tool, and checks each one as you go.",
     "b2Approve": "Approve it once, here, with your own account",
     "b2Done": "Done. Nothing to install, nothing to keep running",
     "b2Alt": "A friendly retro robot plugs a glowing coral cable into a wall socket shaped like a small house while a delighted person watches",
@@ -28670,7 +28670,7 @@
     "b3Title2": "with one prompt",
     "b3Text": "A connection that looks fine and is not there fails quietly: the AI keeps answering and nothing errors. So the guided path gives you one prompt, you paste it into your chat, and one button here shows the answer. When the answer arrives, your AI is connected.",
     "b3WhyLabel": "Why this step exists:",
-    "b3Why": "because a silent failure would send you off building on top of nothing. Two minutes now, and you never wonder again.",
+    "b3Why": "because with a silent failure you would build on a connection that is not there. Two minutes now, and you never wonder again.",
     "b3Alt": "A person types one line into a huge speech bubble while a retro robot holds up a big green check-mark sign",
     "b4Title1": "Then everything",
     "b4Title2": "runs from your chat",
@@ -28779,11 +28779,11 @@
       "frameColourPlain": "The frame changes colour.",
       "square": "The round corners become square.",
       "round": "The corners become round.",
-      "groundAdd": "It gets a ground in {colour}.",
-      "groundAddPlain": "It gets a coloured ground.",
-      "groundRemove": "It loses its coloured ground.",
-      "groundColour": "The ground changes to {colour}.",
-      "groundColourPlain": "The ground changes colour.",
+      "groundAdd": "It gets a background in {colour}.",
+      "groundAddPlain": "It gets a coloured background.",
+      "groundRemove": "It loses its coloured background.",
+      "groundColour": "The background changes to {colour}.",
+      "groundColourPlain": "The background changes colour.",
       "roomMore": "There is more room inside it.",
       "roomLess": "There is less room inside it.",
       "underlineOn": "The words get an underline.",
@@ -29427,9 +29427,9 @@
     "structure.layout.story-deck.name": "Story",
     "structure.layout.story-deck.line": "One thing at a time, swiped forward. For a presentation or a briefing.",
     "structure.layout.story-deck.say": "\"A story: one thing per view, swipe to go forward.\"",
-    "structure.layout.guided-flow.name": "Guided path",
-    "structure.layout.guided-flow.line": "Step by step to the end, with the path in sight all the way. For a sign-up or a first start.",
-    "structure.layout.guided-flow.say": "\"A guided path: the steps in sight, one step at a time.\"",
+    "structure.layout.guided-flow.name": "Guided steps",
+    "structure.layout.guided-flow.line": "Step by step to the end, with the steps in sight all the way. For a sign-up or a first start.",
+    "structure.layout.guided-flow.say": "\"Guided steps: the steps in sight, one step at a time.\"",
     "structure.nav.tabs.name": "Tabs",
     "structure.nav.tabs.line": "The views side by side at the top.",
     "structure.nav.bottom-bar.name": "Bottom bar",
@@ -29552,7 +29552,7 @@
     "dataMap.regulated.means.notify": "The data goes as it is, and the server marks each send.",
     "dataMap.regulated.means.protect": "Before the data goes, the server replaces names, identity codes, phone numbers, e-mail and street addresses and bank account numbers with stand-ins.",
     "dataMap.regulated.means.drop": "Before the data goes, the server removes names, identity codes, phone numbers, e-mail and street addresses and bank account numbers, and the rest goes.",
-    "dataMap.regulated.means.local": "Only a model on this machine reads this data.",
+    "dataMap.regulated.means.local": "Only a model on this server reads this data.",
     "dataMap.regulated.means.block": "No AI model reads this data, a local one neither.",
     "dataMap.regulated.notInForce": "Not in force yet. It applies when a register names this app with this data.",
     "dataMap.leaves.noRecall": "cannot be taken back",
@@ -29812,7 +29812,7 @@
     "mz.priceLede": "A money price, or none, and then the tool is free. Pacing is how many morsels each call takes from the caller; it is not a price. Leave both empty and the tool is declared but not for sale.",
     "mz.more.price": "A second currency",
     "mz.marketLede": "When you list the tool, it goes on EXCHANGE with the price and pacing above. The marketplace shows the ODPS description beside it.",
-    "mz.deliveryLede": "A capability binding runs the call at once and returns the result. Without one, a purchase becomes a task for your agent.",
+    "mz.deliveryLede": "A linked capability runs the call at once and returns the result. Without one, a purchase becomes a task for your agent.",
     "view.communityEmpty": "No community apps on this service yet.",
     "view.communityHint": "Community apps are apps other people on this service have published. When someone publishes one, it shows up here.",
     "sec.local": "Your apps",
@@ -29882,7 +29882,7 @@
     "pb.intro": "No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file. Then add it here to publish it.",
     "pb.step1": "Describe your app",
     "pb.step2": "Copy the prompt & paste it into your AI",
-    "pb.step2hint": "Open Claude, ChatGPT or any AI chat, paste this in, and answer its questions. It will build your app and hand you a single HTML file.",
+    "pb.step2hint": "Open Claude, ChatGPT or any AI chat, paste this in, and answer its questions. It will build your app and give you a single HTML file.",
     "pb.step3": "Add & publish your app",
     "pb.step3hint": "Got the code or HTML file from the AI? Paste it here (or upload the file). It is published on your own AIMEAT, and you get a link to share.",
     "pb.template": "Start from a template (optional)",
@@ -29895,7 +29895,7 @@
     "pb.tier.any": "ANY MODEL",
     "pb.tier.frontier": "VERSION TRAP",
     "pb.tier.needs-doc": "READ THE DOC",
-    "pb.tierLegend": "ANY MODEL = any model can build with it · READ THE DOC = the model has no priors for it, so the usage doc travels in the prompt · VERSION TRAP = the model remembers an older version, so follow the version in the doc",
+    "pb.tierLegend": "ANY MODEL = any model can build with it · READ THE DOC = the model has no priors for it, so the usage doc is included in the prompt · VERSION TRAP = the model remembers an older version, so follow the version in the doc",
     "pb.copied": "Copied!",
     "pb.new": "New App",
     "pb.improve": "Improve This App",
@@ -29918,7 +29918,7 @@
     "pb.giveHint": "Copy the prompt and paste it into your connected AI. It asks what it needs to know, shows you what it will build and waits for your yes. It publishes the finished app itself and gives you its address.",
     "pb.giveHintImprove": "Copy the prompt and paste it into your connected AI. It publishes the new version itself; the earlier versions stay in the app's history.",
     "pb.otherTitle": "Your AI cannot connect?",
-    "pb.otherHint": "Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself.",
+    "pb.otherHint": "Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it contains the build instructions, the AI gives you one HTML file, and you add that file here yourself.",
     "pb.otherCopy": "Copy the long prompt",
     "card.view": "Open",
     "card.open": "Open",
@@ -30161,7 +30161,7 @@
     "monetize.currency2": "Currency",
     "monetize.money2Hint": "Optional: sell the same call in a second currency. Buyers pick one when they open a contract.",
     "odps.title": "Marketplace",
-    "odps.hint": "Whether this app sells anything on the EXCHANGE marketplace, and the product description each listing carries. A tool for sale is published as an Open Data Product Specification (ODPS) v4.2 document, which outside catalogues and buying agents can read.",
+    "odps.hint": "Whether this app sells anything on the EXCHANGE marketplace, and the product description of each listing. A tool for sale is published as an Open Data Product Specification (ODPS) v4.2 document, which outside catalogues and buying agents can read.",
     "odps.statusOn": "On the marketplace: {live} of {total} tools",
     "odps.statusOff": "Not on the marketplace ({total} tools declared)",
     "odps.statusBlocked": "{n} tool(s) are flagged for EXCHANGE but cannot be listed yet. The reason is shown on each tool.",
@@ -30398,7 +30398,7 @@
     "marks.withdraw": "Withdraw",
     "marks.audited": "This is on the record. Each time a reviewer is named or withdrawn, the name, the account that did it and the time are kept, and the named person answers for what the app publishes. Only you, signed in as yourself, can do it; an agent working in your name cannot.",
     "marks.legal": "Naming a reviewer lifts the visible \"AI-generated\" label: when a person has reviewed the content and answers for it, the law does not require the label on it (EU AI Act, Article 50(4)). It does not lift the notice an app shows when it talks to a person as an AI (Article 50(1)); that stays whoever reviewed the app. The machine-readable AI mark stays as well, so anyone reading the source still sees that the content may be AI-generated.",
-    "marks.legalStrict": "When a person has reviewed the content and answers for it, the law does not require the visible \"AI-generated\" label (EU AI Act, Article 50(4)). This server also labels what the law does not require, so on a public app the label stays and says who reviewed the app. Only the operator of this server can change that setting. A reviewed app behind an access code carries no label. The notice an app shows when it talks to a person as an AI (Article 50(1)) stays whoever reviewed the app. The machine-readable AI mark stays as well, so anyone reading the source still sees that the content may be AI-generated.",
+    "marks.legalStrict": "When a person has reviewed the content and answers for it, the law does not require the visible \"AI-generated\" label (EU AI Act, Article 50(4)). This server also labels what the law does not require, so on a public app the label stays and says who reviewed the app. Only the operator of this server can change that setting. A reviewed app behind an access code has no label. The notice an app shows when it talks to a person as an AI (Article 50(1)) stays whoever reviewed the app. The machine-readable AI mark stays as well, so anyone reading the source still sees that the content may be AI-generated.",
     "marks.legalLink": "Read Article 50",
     "marks.seesTitle": "What this server sees about AI in this app",
     "marks.seesGenerates": "Generates",
@@ -34053,8 +34053,8 @@
     "loading": "Loading the page…",
     "loadFailed": "The page could not be loaded.",
     "noHost": "This service does not show HTML pages yet, so the page is shown as text.",
-    "madeByUser": "A page made by a user. It runs separately and cannot reach your account.",
-    "madeBy": "{name} made this page. It runs separately and cannot reach your account.",
+    "madeByUser": "A page made by a user. It runs separately and cannot access your account.",
+    "madeBy": "{name} made this page. It runs separately and cannot access your account.",
     "fullScreen": "Full screen",
     "windowLink": "Copy link to the page alone",
     "windowLinkCopied": "Link copied",
@@ -34073,7 +34073,7 @@
     "kindValue": "HTML page",
     "lastOpened": "Last opened",
     "stale": "Nobody has opened or changed this page in six months.",
-    "editorLead": "Paste a whole HTML page here, or read it from a file. The page runs in an isolated frame: it has no network, and it cannot reach anybody's account.",
+    "editorLead": "Paste a whole HTML page here, or read it from a file. The page runs in an isolated frame: it has no network, and it cannot access anybody's account.",
     "fromFile": "Read from a file",
     "orPaste": "…or paste the HTML below",
     "pastePlaceholder": "Paste the HTML here",
@@ -34121,10 +34121,10 @@
   "home.goal.missingSub": "You have no goal by that id.",
   "home.goal.state": "State",
   "home.goal.progress": "{done} of {total} done, {running} running",
-  "home.goal.carrier": "Who carries it",
+  "home.goal.carrier": "Who runs it",
   "home.goal.coordinatorIs": "Coordinator: {agent}",
   "home.goal.carrierPlan": "A fixed plan",
-  "home.goal.carrierSingle": "One agent takes the whole goal; agents hand on the next work",
+  "home.goal.carrierSingle": "One agent takes the whole goal; agents give the next work to each other",
   "home.goal.doneWhen": "Done when",
   "home.goal.spent": "Spent",
   "home.goal.spentSub": "Model calls through AIMEAT; an outside agent's own model is not counted",
@@ -34152,7 +34152,7 @@
   "home.goal.value.resultsSub": "{asIs} as they were · {corrected} corrected · {used} opened by someone else · {gone} gone",
   "home.goal.value.cost": "AI cost",
   "home.goal.value.saving": "Saving counted",
-  "home.goal.value.savingSub": "The baseline times the results still standing; your AI reads what it rests on.",
+  "home.goal.value.savingSub": "The baseline times the results still in use; your AI reads what it is based on.",
   "home.goal.value.noBaselineNote": "Tell your AI how long the work takes you without AI, and this section counts the saving from it.",
   "home.goal.value.promptLabel": "Say it to your own AI",
   "home.goal.value.prompt": "The goal \"{title}\" takes me about … without AI (per result, per week or per month). Save it as the goal's baseline.",
@@ -34173,7 +34173,7 @@
   "home.goal.changesTitle": "Changes",
   "home.goal.changesN": "{n} versions",
   "home.goal.changesNone": "No changes since it was made.",
-  "home.goal.ownAi": "Steer it from your own AI",
+  "home.goal.ownAi": "Manage it from your own AI",
   "home.goal.copyPrompt": "Copy the prompt",
   "home.goal.pause": "Pause",
   "home.goal.startRound": "Start a round now",
@@ -34188,7 +34188,7 @@
   "home.goal.kindDo": "Do it yourself",
   "home.goal.doLeadLinks": "Your turn. Open each link, copy the ready text under it and post it there yourself. Then press \"I did this\".",
   "home.goal.doLead": "Your turn: this is something only you can do. When it is done, press \"I did this\".",
-  "home.goal.controlTitle": "Steer the goal",
+  "home.goal.controlTitle": "Manage the goal",
   "home.goal.proposalTitle": "A proposal waits for your yes",
   "home.goal.proposalNote": "Your AI proposed this goal. Read the work below; nothing starts and nobody is asked anything until you approve it.",
   "home.goal.approveStart": "Approve and start",
@@ -34229,16 +34229,16 @@
   "home.goal.nobodyOwnAi": "Your own AI does it now",
   "home.goal.nobodyMake": "Make an agent for it",
   "home.goalNew.back": "Back to your agents",
-  "home.goalNew.prompt": "Give my agents this goal in AIMEAT with aimeat_goal_set: \"{s}\". Read my agents first (aimeat_agents_list) and propose who carries it, when it is done, and what it may spend. Ask me before you make it.",
+  "home.goalNew.prompt": "Give my agents this goal in AIMEAT with aimeat_goal_set: \"{s}\". Read my agents first (aimeat_agents_list) and propose who runs it, when it is done, and what it may spend. Ask me before you make it.",
   "home.goalNew.title": "A new goal",
   "home.goalNew.sub": "Say what you want done. Your agents share the work, continue from each other's results and bring you what needs you.",
   "home.goalNew.statement": "What do you want done?",
   "home.goalNew.statementPh": "For example: find out our three biggest competitors and write a comparison by Monday",
   "home.goalNew.modeLabel": "How the work is shared",
   "home.goalNew.modeSingle": "One agent takes the whole goal",
-  "home.goalNew.modeSingleHint": "Best for a capable agent. It may hand the next work to another agent.",
+  "home.goalNew.modeSingleHint": "Best for a capable agent. It may give the next work to another agent.",
   "home.goalNew.modeCoordinator": "A coordinator leads",
-  "home.goalNew.modeCoordinatorHint": "An agent plans, hands out work, makes subgoals and asks you.",
+  "home.goalNew.modeCoordinatorHint": "An agent plans, assigns work, makes subgoals and asks you.",
   "home.goalNew.modePlan": "A fixed plan",
   "home.goalNew.modePlanHint": "For narrow tool agents: your own AI writes the steps.",
   "home.goalNew.coordinator": "Coordinator",
@@ -34271,7 +34271,7 @@
   "home.goalPlan.doneWhen": "Done when",
   "home.goalPlan.lead": "Who leads it",
   "home.goalPlan.leadAgent": "Your agent {agent} coordinates it",
-  "home.goalPlan.leadRules": "AIMEAT keeps it moving: each work starts when the one before it is done",
+  "home.goalPlan.leadRules": "AIMEAT runs it: each work starts when the one before it is done",
   "home.goalPlan.limit": "It may spend",
   "home.goalPlan.limitSub": "Works that use AIMEAT's model with your key: {n}. The limit stops them.",
   "home.goalPlan.limitNone": "No work here uses AIMEAT's model",
@@ -34609,8 +34609,8 @@
   "home.overview.legend.live": "connected now",
   "home.overview.legend.quiet": "quiet: not used for 30 days, you can tidy it away",
   "home.overview.legend.quietLabel": "Quiet",
-  "home.overview.legend.use": "use in the period, against the busiest in the same lane",
-  "home.overview.legend.top": "Each lane shows its five busiest. The rest are in the + card.",
+  "home.overview.legend.use": "use in the period, against the busiest in the same column",
+  "home.overview.legend.top": "Each column shows its five busiest. The rest are in the + card.",
   "home.overview.legend.agentApp": "A line from an agent to an app is the tie the app states. How much the agent used the app is not counted yet.",
   "home.overview.mine.model": "You have now: {m} computers, {a} agents, {p} apps, {g} organisms, {f} on offer.",
   "home.overview.mine.machines": "You have now: {n} computers, {c} of them connected.",
@@ -34621,7 +34621,7 @@
   "home.overview.detail.empty": "Press any card. You see what it is tied to, and you can open it.",
   "home.overview.detail.thickness": "The thicker the line, the more happened between the two in the period.",
   "home.overview.detail.unused": "Not used for {n} days",
-  "home.overview.detail.links": "Tied to {n} things. They are marked on the map.",
+  "home.overview.detail.links": "Tied to {n} things. They are highlighted in the overview.",
   "home.overview.detail.noLinks": "No ties in this period.",
   "home.overview.detail.quiet": "Nothing has used this for {n} days. You can remove or archive it.",
   "home.overview.detail.open": "Open",

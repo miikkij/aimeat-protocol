@@ -15,7 +15,7 @@
  *   THE RULES ARE READ BY ONE FUNCTION, rulesFor(call). Today it returns the owner's rules for every
  *   call. The record carries `version: 1` so that conditional rule sets (for one app, one agent, one
  *   capability or some hours) can be added inside rulesFor later without any caller changing
- *   (Jouni, 2026-09-28: "pidetään tämä kuitenkin joustavana").
+ *   (Jouni, 2026-09-28: the rules stay flexible).
  * @structure
  *   ROUTING_KEY · agentRoutingKey · RoutingRules · DEFAULT_RULES · RoutingRecord · readRouting ·
  *   rulesFor · defaultsFor · normaliseRoutingInput · setRouting

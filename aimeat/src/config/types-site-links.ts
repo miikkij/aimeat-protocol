@@ -121,7 +121,7 @@ export interface SiteLinksConfig {
    * mints the key and again as a total on every top-up: the AI credit after the store's fee divided
    * by the dollar limit, which is the day's EUR-per-USD rate the store converted at. A decimal as
    * text, or empty: the pages then count a dollar as a euro, which is how the keys minted before
-   * 2026-10-31 were made (Jouni's C, 2026-10-31: "Asiakkaan UI näyttää saldon euroina").
+   * 2026-10-31 were made (Jouni's C, 2026-10-31: the customer's UI shows the credit in euros).
    */
   aiCreditEurPerUsd: string;
   /** The owner's orders and invoices in the store, set by the fleet service. The node adds `lang`. Empty hides the link. */
@@ -139,7 +139,7 @@ export interface SiteLinksConfig {
    */
   defaultLocale: string;
   /**
-   * Whether the footer shows the developer links ("For Developers", "Run your own node", GitHub and the
+   * Whether the footer shows the developer links ("For Developers", "Run your own AIMEAT", GitHub and the
    * row for machines: glossary, site map, llms.txt, AGENTS.md, API contract). 'auto' shows them except
    * on a customer's node (purchasePlan set); 'show' and 'hide' decide for every node.
    */

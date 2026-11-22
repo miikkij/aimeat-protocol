@@ -16,7 +16,7 @@
  *     for components/ColorPicker.js; .pj-cp* go with views/profile/organisms/workspace/color-picker.js
  *     (now a re-export). The old .pj-tag-* and .pj-colored stay only while the design lab's demo
  *     (views/design-lab/demos-settings.js, "dots and rails") writes them (page migration G2b).
- *   v1.1.0 -- 2026-09-26 -- The swatch row's 8px corner reads --shape-corner-dialog and its soft shadow --shape-shadow (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.1.0 -- 2026-09-26 -- The swatch row's 8px corner reads --shape-corner-dialog and its soft shadow --shape-shadow (Jouni's note on the round's shape check, which asked for the same style as elsewhere).
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
  */
 

@@ -3,7 +3,7 @@
 A [Tauri](https://tauri.app) desktop application that does what only a program on the person's own machine
 can do. Two things, in this order:
 
-1. **The front door ([src/index.html](src/index.html)).** Which AI tools on this computer are attached to the
+1. **The Your AI tools page ([src/index.html](src/index.html)).** Which AI tools on this computer are attached to the
    person's AIMEAT. Named personal, work and local environments keep addresses separate. The app checks
    the selected address before adding it, preserves other connections, and removes only the selected
    name and address. A guided first read follows the tool's own sign-in. Without Desktop this means installing Node.js and
@@ -12,17 +12,17 @@ can do. Two things, in this order:
    run anything. The work is in [src-tauri/src/connectors.rs](src-tauri/src/connectors.rs), which reads and
    edits each tool's own config file; nothing it writes holds a secret, because the node authenticates MCP
    over OAuth 2.1 with dynamic client registration.
-2. **The machine room ([src/server.html](src/server.html)).** Run an AIMEAT of their own on this computer
+2. **The server page ([src/server.html](src/server.html)).** Run an AIMEAT of their own on this computer
    without a terminal: start and stop it, choose the AI that runs on this computer (LM Studio, Ollama or an
    address of their own), change its settings and read its log. Starting, ready, stopping and failed are
    separate states. A saved port stays pending until restart. Data is stored in **persistent SQLite**;
    the backup and restore controls include its configuration, private keys and stored files.
 
-> Everything else a person does with their AIMEAT happens in its own web pages, which the machine room opens
+> Everything else a person does with their AIMEAT happens in its own web pages, which the server page opens
 > in the browser (`http://localhost:41050/v1/portal`). The app does not copy them. Until 2026-09-29 it did:
 > a home screen of prompt cards, a chat and a local agent runner, plus a local CrewAI path that needed git,
 > uv, Ollama and an npm command on the person's machine. All of it was removed on that date, by decision,
-> because it rebuilt the terminal wall the front door takes down and duplicated pages that already exist.
+> because it again required the terminal that the Your AI tools page makes unnecessary, and duplicated pages that already exist.
 
 The direction, the use cases behind it and what this app deliberately does not do are in the wish bucket on
 the node: wish `wish-ty-p-yt-sovellus-uusiksi-liitin-etuovena-kaikki-k-ytt-j-rjes` and its brief
@@ -193,7 +193,7 @@ a dmg, Linux a deb and an AppImage. CI builds all three on their own runners
   revisions and cached under `src-tauri/target/rust-license-cache`.
 
 After `tauri build`, [scripts/report-bundles.mjs](scripts/report-bundles.mjs) lists what was built. On
-Windows the installers land in:
+Windows the installers are written to:
 
 ```
 src-tauri/target/release/bundle/nsis/    *-setup.exe   (recommended)
@@ -226,8 +226,8 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
 
 | Path | Purpose |
 |------|---------|
-| [src/index.html](src/index.html) | The front door: which AI tools on this computer are attached, and the two verbs |
-| [src/server.html](src/server.html) | The machine room: run an AIMEAT on this computer, its AI, its settings and its log |
+| [src/index.html](src/index.html) | The Your AI tools page: which AI tools on this computer are attached, and the two verbs |
+| [src/server.html](src/server.html) | The server page: run an AIMEAT on this computer, its AI, its settings and its log |
 | [src/house.css](src/house.css) | The house poster face both pages share: faces, tokens and shapes, as literal values |
 | [src/fonts/](src/fonts/) | The three design-language faces, self-hosted (SIL OFL, see `fonts/LICENSE.md`); nothing here fetches a font |
 | [src-tauri/src/main.rs](src-tauri/src/main.rs) | Tauri entry point + command registration |
@@ -264,7 +264,7 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
   carries the old address compiled in and will never see an update: that one has to be replaced by hand.
 - **Claude Desktop is attached in its own settings, and only to an AIMEAT the internet can reach.** It takes a
   remote MCP server as a custom connector (Settings → Connectors → Add custom connector) on every plan, so it
-  needs no bridge and no file on this machine, and the app hands over the address to paste. But "Claude
+  needs no bridge and no file on this machine, and the app gives the address to paste. But "Claude
   connects to your remote MCP server from Anthropic's cloud infrastructure, rather than from your local
   device", and a server "behind a VPN, or blocked by a firewall won't connect, even if you can reach it from
   your own machine" (support.claude.com article 11175166, read 2026-09-18). So a person running their own
@@ -286,7 +286,7 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
   as a top-level resource. If it ever goes missing, run `pnpm stage:webview2` and rebuild. (MSVC links it
   statically and never needs the DLL.) Note this is the *loader*; the Edge **WebView2 runtime** itself ships with
   Windows 11 / is auto-installed by the installer.
-- **Logs** — read the **Log** section of the machine room, or open
+- **Logs** — read the **Log** section of the server page, or open
   `%APPDATA%\com.overscale.aimeat-desktop\aimeat-node.log` directly.
-- **Port already in use** — another process holds `41050`. Stop it, or change the port in the machine
-  room's **Settings** section.
+- **Port already in use** — another process holds `41050`. Stop it, or change the port in the server
+  page's **Settings** section.

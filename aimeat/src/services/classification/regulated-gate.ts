@@ -22,8 +22,7 @@
  *     block    held back from every model.
  *   A person's 'ai-send' exception in force for the item (Data Wallet) opens protect and drop (the
  *   content goes with its details) and local, and its use is recorded. It does not open block: the attempt is written as
- *   an `exception` mark that says so (Jouni, 2026-11-21: "poikkeus ei avaa estä-tilaa vaan se merkitään
- *   poikkeukselliseksi").
+ *   an `exception` mark that says so (Jouni, 2026-11-21).
  *
  *   LONG LISTS. Marks of one scope, action and domain set past MARK_ROWS items are one audit row with
  *   their count, as the reader does for shown rows.

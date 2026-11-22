@@ -317,8 +317,8 @@ export default function OverviewView({ navigate }) {
         <span class="ovp-legend-item"><span class="ovp-legend-dot" aria-hidden="true"></span>${o('legend.live', 'connected now')}</span>
         <span class="ovp-legend-item"><span class="ovp-legend-dash" aria-hidden="true"></span>${o('legend.quiet', 'quiet: not used for 30 days, you can tidy it away')}
           <${HelpTip} term="overview.quiet" label=${o('legend.quietLabel', 'Quiet')} /></span>
-        <span class="ovp-legend-item"><span class="ovp-legend-bar" aria-hidden="true"></span>${o('legend.use', 'use in the period, against the busiest in the same lane')}</span>
-        <span class="ovp-legend-item">${o('legend.top', 'Each lane shows its five busiest. The rest are in the + card.')}</span>
+        <span class="ovp-legend-item"><span class="ovp-legend-bar" aria-hidden="true"></span>${o('legend.use', 'use in the period, against the busiest in the same column')}</span>
+        <span class="ovp-legend-item">${o('legend.top', 'Each column shows its five busiest. The rest are in the + card.')}</span>
         ${view.partial?.includes('agent-app-use') ? html`<span class="ovp-legend-item">${o('legend.agentApp', 'A line from an agent to an app is the tie the app states; how much the agent used the app is not counted yet.')}</span>` : null}
       </div>
     <//>`;
@@ -368,7 +368,7 @@ function DetailStrip({ node, near, cardText, rangeLabel, open, onToggle, onClear
       </div>
       <div class="ovp-detail-facts">
         <div class="ovp-mono">${quiet && item.use === 0 ? o('detail.unused', 'Not used for {n} days', { n: item.quiet_days }) : use}</div>
-        <div>${near.size ? o('detail.links', 'Tied to {n} things. They are marked on the map.', { n: near.size }) : o('detail.noLinks', 'No ties in this period.')}</div>
+        <div>${near.size ? o('detail.links', 'Tied to {n} things. They are highlighted in the overview.', { n: near.size }) : o('detail.noLinks', 'No ties in this period.')}</div>
         ${quiet ? html`<div class="poster-aside poster-aside--small">${o('detail.quiet', 'Nothing has used this for {n} days. You can remove or archive it.', { n: item.quiet_days })}</div>` : null}
       </div>
       <div class="ovp-detail-acts">

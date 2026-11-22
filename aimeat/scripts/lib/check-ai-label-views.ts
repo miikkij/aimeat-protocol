@@ -10,8 +10,8 @@
  *   drew the label on few of them: the public workspace viewer took each page's `ai_provenance` and
  *   showed nothing, an HTML page's frame had no place for it, the front page dropped a passage's
  *   record, and every item a workspace share served was decided as private, so the label said
- *   "nothing owed" even where it was drawn (Jouni: "AI merkintä jos sivuilla on AI generoitua
- *   sisältöä ja se täytyy kertoa"). Each line below is a view or a route that was fixed then; removing
+ *   "nothing owed" even where it was drawn (Jouni: a page that shows
+ *   AI-generated content must carry the AI label). Each line below is a view or a route that was fixed then; removing
  *   the label from one of them fails this check.
  *
  *   A VIEW passes when its source, comments stripped, imports AiLabel from components/ai-label.js and

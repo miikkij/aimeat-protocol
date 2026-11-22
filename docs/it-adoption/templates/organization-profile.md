@@ -81,7 +81,7 @@ Classification is off on a new node (`AIMEAT_CLASSIFICATION`, values `off`, `own
 | Scheme | In use | AIMEAT fact and source |
 |---|---|---|
 | AIMEAT's four levels: Public, Internal, Confidential, Highly confidential | [ORGANIZATION] *yes or no; map each of your own classes to one level.* | Levels and what each allows: [data classification](../../data-classification.md), "Levels"; defaults `aimeat/src/services/classification/defaults.ts` |
-| Your own labels inside those levels | [ORGANIZATION] *Label names, the level each sits in, and who may read it.* | Labels with an audience and detection rules, at node, owner or organism level (`aimeat/src/services/classification/levels.ts`) |
+| Your own labels inside those levels | [ORGANIZATION] *Label names, the level each belongs to, and who may read it.* | Labels with an audience and detection rules, at node, owner or organism level (`aimeat/src/services/classification/levels.ts`) |
 | Finnish security classes (TL IV to TL I) | [ORGANIZATION] *yes or no, and the highest class switched on (upTo).* | Pack `tl` (`aimeat/src/data/classification-packs.ts`) |
 | NATO classes (NATO RESTRICTED to COSMIC TOP SECRET) | [ORGANIZATION] *yes or no, and the highest class switched on.* | Pack `nato` (`aimeat/src/data/classification-packs.ts`) |
 | Accreditation of this installation | [ORGANIZATION] *Accreditation decision and authority, or "not accredited".* | The packs mark and restrict content; they do not make the node an accredited system (`aimeat/src/services/compliance/processing.ts`, limit `not-accredited`) |

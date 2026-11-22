@@ -157,7 +157,7 @@ ontology (Li et al., *Sensors* 2017, 17(3):569) made and listed as future work; 
 shape is that paper's, the refusal to reuse anything is not.
 
 **A domain vocabulary links in through the core.** An app's, a cortex's or an organism's own sanasto
-declares its `@type` as a kind of a core class or a schema.org class, and travels to the rest of the
+declares its `@type` as a kind of a core class or a schema.org class, and connects to the rest of the
 graph along the relations above. Nothing about that requires editing the core.
 
 AIMEAT does not restrict which ontologies can be used. The `@context` field accepts any valid JSON-LD context mapping. The following ontologies are used in the reference implementation:

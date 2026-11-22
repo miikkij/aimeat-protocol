@@ -96,4 +96,4 @@ cancelled         — owner cancelled; deregistered
 ## How an AI advances the work (the common case)
 > Only the owner, or an agent of the owner, can make the contract fire. Such an AI reads the record at `watch.key` in the owner's account, does the work, then writes the record back with `status: "done"` and a `resolution` field. The node then sends the reply to the original reporter.
 
-An AI of any other account cannot fire the contract. When it writes a record with the same key, that record sits in its own account, and the node never reads it (rule 2). A record in an organism workspace fires the contract only when the owner or one of the owner's agents wrote it; a record another member wrote does not.
+An AI of any other account cannot fire the contract. When it writes a record with the same key, that record is in its own account, and the node never reads it (rule 2). A record in an organism workspace fires the contract only when the owner or one of the owner's agents wrote it; a record another member wrote does not.

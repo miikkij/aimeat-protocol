@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How much money each of the owner's agents may spend on purchases in a day, and what it
- *   has spent today (decision D5 of the user-journey review, ruled by Jouni 2026-10-02: "Agentin
- *   ostoille päiväraja: sinä asetat rajan agentin kortilla" → "rakenna").
+ *   has spent today (decision D5 of the user-journey review, ruled by Jouni 2026-10-02: build
+ *   a daily limit on an agent's purchases, which the owner sets on the agent's card).
  *
  *   WHY. An agent completing a checkout charged the owner with no limit at all: appSpendRefusal fences
  *   granted APPS (contract:spend and a per-app morsel cap), and nothing fenced an agent. Now an agent

@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The fields a model picked out of a stored file for one content class, in the file's
- *   fold (memory-tab/file-facts.js). Jouni, 2026-10-21: "Where do I see the extracted invoice
- *   fields?", and he did not see the OWL, the extracted content in that form, nor how to correct it.
+ *   fold (memory-tab/file-facts.js). Jouni, 2026-10-21: the page did not show the invoice fields a
+ *   model extracted, the OWL, the extracted content in that form, nor how to correct it.
  *
  *   One part per class: the class's name, then one row per property of the class (its `properties`:
  *   its label in the page language, its `describe` on the line under it) with the value the

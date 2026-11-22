@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A theme's components (S4) and the styling of one of them (S5), in Themes & Styles.
- *   Jouni: "nähtävissä nämä komponentit + lisättävissä omat css:t per teema ja tyylitellä asioita
- *   mitenkä halutaan jotain komponentteja tuoda sinne ilman että niiden toiminnallisuus muuttuu".
+ *   The components are visible, and a theme can add its own CSS to style them without a change to
+ *   how they work (Jouni).
  *
  *   S4: every component of the catalogue drawn live in this theme, in the style and the mode chosen
  *   at the top, filtered by what it is used for, by page and by words. Each says whether it has

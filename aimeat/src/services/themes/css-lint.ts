@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operator's CSS, read: component CSS and theme CSS (Themes & Styles, 07 "What the
- *   operator's CSS may do"). Jouni: "Mahdollisimman muokattavaksi nyt heti kättelyssä, ei kukaan halua
- *   sabotoida ja hajottaa omaa systeemiään". So the node refuses only CSS that does not parse, and
+ *   operator's CSS may do"). Jouni ruled that the operator's CSS is as open to change as possible
+ *   from the start, because no operator wants to break their own system. So the node refuses only CSS that does not parse, and
  *   warns, in plain words and with the line, about what can hide a control or block a click, an
  *   animation that ignores reduced motion, a literal colour (it looks the same in every style and
  *   mode), a face the node does not serve, and, for component CSS, a selector that reaches outside

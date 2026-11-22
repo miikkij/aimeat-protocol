@@ -12,7 +12,7 @@ Copy the rows into your application register, CMDB or ISMS form; most such forms
 |---|---|---|
 | Application name | AIMEAT node | `aimeat/package.json` |
 | Version | 4.2.0 at the time of checking; the running version is in `GET /v1/build` | `aimeat/package.json`, [upgrading](../../operations/upgrading.md) |
-| Short description | A self-hosted store for the knowledge people and their AI agents bring and own: records, files, shared workspaces, small web apps and agents, used mainly through AI chat over MCP and through a web control room | [01 Overview](../01-overview.md) |
+| Short description | A self-hosted store for the knowledge people and their AI agents bring and own: records, files, shared workspaces, small web apps and agents, used mainly through AI chat over MCP and through web pages for status and settings | [01 Overview](../01-overview.md) |
 | Purpose in this organisation | [ORGANIZATION] *The business use, e.g. "shared knowledge base for project teams, used through their own AI assistants".* | |
 | Business owner | [ORGANIZATION] *Person and unit accountable for the use.* | |
 | System owner | [ORGANIZATION] *Person accountable for operation and security.* | |

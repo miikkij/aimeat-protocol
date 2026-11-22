@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An app answers `?format=md` itself: an action of its owner's own extension returns the
- *   markdown, and the node serves it (Jouni, 2026-10-02: "applikaatio itse hoitaa format=md:n ja se on
- *   application configuationissa joka näkyy appcat:n application detailissa").
+ *   markdown, and the node serves it (Jouni, 2026-10-02: the app handles format=md
+ *   itself, and the setting is in the app's configuration, shown in the app catalogue's app detail).
  *
  *   WHY. `?format=md` served the stored agent face (`apps.{filename}.agentface`) or, without one, the
  *   app's HTML converted. An app whose content is built in the browser from records converts to its

@@ -4,8 +4,8 @@
  *   public/css/components/*.css): a corner, a frame width, a shadow or a letter case written as a
  *   value where a theme's shape value exists (src/services/themes/shapes.ts). A component that
  *   writes its own corner or shadow keeps the built-in look inside every other theme, which is what
- *   Jouni ruled against on 2026-09-24: "katsoo että pebble syntyy myös niille uusille tehdyille
- *   komponenteille mitä tullaan tekemään kun tehdään settings & controls kirjastoon."
+ *   Jouni ruled against on 2026-09-24: a theme such as Pebble must also reach the components that
+ *   the Settings & Controls library adds later.
  *
  *   Counted, per declaration (comments and strings excluded):
  *   - corner: a border-radius (or a corner longhand) with no var(), except 50% (a circle is the
@@ -15,7 +15,7 @@
  *   - shadow: a box-shadow that is not `none` and does not start from var();
  *   - case: a text-transform of uppercase, lowercase or capitalize.
  *   The baseline records debt, never approval: a file may only go down. Seeded 2026-09-24 on Jouni's
- *   word ("a ratchet seeded at today's count that only falls"); re-seeding needs his decision.
+ *   word, at that day's count; re-seeding needs his decision.
  * @usage pnpm check:shape-tokens [--report | --record]
  * @version-history
  *   v1.0.0 -- 2026-09-24 -- Initial (07 "New components follow the theme", item 4).

@@ -9,8 +9,8 @@
  *
  *   Per sample: `measure` is the element the preview page measures, so the values in Details are
  *   read from the drawn element, never written by hand; `solo` (default: `measure`) is the element
- *   or elements the decision is about, which the lab shows alone and large (Jouni: "Show only the
- *   thing being decided"); `after` draws the same element with the same words as the proposal
+ *   or elements the decision is about, which the lab shows alone and large (Jouni);
+ *   `after` draws the same element with the same words as the proposal
  *   would, or is 'same' when the proposal keeps its look. The lab computes what changes from the
  *   measured difference between the two, so its words cannot disagree with its pictures.
  *

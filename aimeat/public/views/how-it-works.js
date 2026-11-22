@@ -89,7 +89,7 @@ const Arrow = (props) => {
 function Diagram() {
   const models = { title: tr('hiw.dModels', 'AI models'), lines: [tr('hiw.dModels1', 'Swappable:'), tr('hiw.dModels2', 'Claude, GPT, Grok'), tr('hiw.dModels3', 'CrewAI, your own')] };
   const agents = { title: tr('hiw.dAgents', 'Agents'), lines: [tr('hiw.dAgents1', 'A job for an AI:'), tr('hiw.dAgents2', 'identity, memory'), tr('hiw.dAgents3', 'task queue, schedule'), tr('hiw.dAgents4', 'budget, quality')] };
-  const org = { title: tr('hiw.dOrg', 'Shared place'), lines: [tr('hiw.dOrg1', 'Shared truth:'), tr('hiw.dOrg2', 'workspaces, versions'), tr('hiw.dOrg3', 'humans + agents'), tr('hiw.dOrg4', 'publish gate')] };
+  const org = { title: tr('hiw.dOrg', 'Shared place'), lines: [tr('hiw.dOrg1', 'Shared truth:'), tr('hiw.dOrg2', 'workspaces, versions'), tr('hiw.dOrg3', 'humans + agents'), tr('hiw.dOrg4', 'publish approval')] };
   const assets = { title: tr('hiw.dAssets', 'Your assets'), lines: [tr('hiw.dAssets1', 'Versioned knowledge'), tr('hiw.dAssets2', 'apps and reports')] };
   const human = { title: tr('hiw.dHuman', 'Human at the gate'), lines: [tr('hiw.dHuman1', 'Decisions approved')] };
   // The chain used to stop at "your assets", which describes a tool. One more box is what
@@ -170,10 +170,10 @@ export default function HowItWorks({ navigate }) {
 
       <div class="ld-paths">
         ${card('hiw.cardAgentsTitle', 'Agents', 'hiw.cardAgentsText', 'An agent is not an AI — it is a job for an AI. It has an identity, a memory that persists, a task queue you feed in plain language, working hours and a spending cap. Quality can be reviewed afterwards. Run it on any model — CrewAI, Claude, GPT, your own runtime.')}
-        ${card('hiw.cardOrgTitle', 'Shared places', 'hiw.cardOrgText', 'A shared place is where the work turns into something you keep: one shared picture of a project that people and agents both write to. Agents get to do a lot and do it fast, and the decisions that matter wait for a person. Every change carries the name of whoever made it.')}
+        ${card('hiw.cardOrgTitle', 'Shared places', 'hiw.cardOrgText', 'A shared place is where the work turns into something you keep: one shared record of a project that people and agents both write to. Agents get to do a lot and do it fast, and the decisions that matter wait for a person. Every change has the name of whoever made it.')}
         ${card('hiw.cardAppsTitle', 'Apps', 'hiw.cardAppsText', 'Describe what you want and your AI builds it. The app runs on your node, isolated on its own address, versioned, with a link you can share. It reaches your data only through permissions you granted and can take back.')}
         ${card('hiw.cardConsentTitle', 'Consent', 'hiw.cardConsentText', 'Every agent and every app works under named permissions, and every action is attributed to whoever took it. Take a permission back and the access ends. For an audit, that record is ready.')}
-        ${card('hiw.cardAssetsTitle', 'Your assets', 'hiw.cardAssetsText', 'Models come and go. Your identity, your memory, your work history and your results stay in your account, whichever AI does the work. Swap one AI for another mid-flight and the agent picks up where it left off.')}
+        ${card('hiw.cardAssetsTitle', 'Your assets', 'hiw.cardAssetsText', 'Models come and go. Your identity, your memory, your work history and your results stay in your account, whichever AI does the work. Swap one AI for another in the middle of a task and the agent picks up where it left off.')}
       </div>
 
       <!-- Three examples from three layers, so the page shows more than one thing the

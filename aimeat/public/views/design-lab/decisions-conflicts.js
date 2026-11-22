@@ -3,9 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The conflicts round of Settings & Controls, as decision data: each a kind of thing
- *   drawn in two or more ways that no majority decides (Jouni, 2026-09-25: "Bring to the lab only
- *   real conflicts (two looks used about equally, or a look that exists nowhere), all of them in one
- *   round."). The fields and the two registers are the ones decisions-data.js describes; that file
+ *   drawn in two or more ways that no majority decides (Jouni, 2026-09-25: only real conflicts come
+ *   to the lab, two looks used about equally or a look that exists nowhere, all of them in one
+ *   round). The fields and the two registers are the ones decisions-data.js describes; that file
  *   spreads this list into DECISIONS, so every reader still takes the one list from it.
  * @structure CONFLICT_DECISIONS — [the DECISIONS shape] · CONFLICT_NOTES — [{ title, text }]
  * @usage import { CONFLICT_DECISIONS, CONFLICT_NOTES } from './decisions-conflicts.js';
@@ -41,9 +41,9 @@ const chatThread = (n, selector) => ({ url: '/v1/chat', eval: `document.querySel
 const agentTab = (tab, selector, more = []) => ({ url: '/v1/profile?tab=agents&agent=bot', click: [`.open-card-tabs .poster-tab:has-text("${tab}")`, ...more], selector });
 
 export const CONFLICT_DECISIONS = [
-  // ── The conflicts round of Settings & Controls (Jouni, 2026-09-25: "Bring to the lab only real
-  //    conflicts (two looks used about equally, or a look that exists nowhere), all of them in one
-  //    round."). In each, one kind of thing is drawn two ways, each on one page. Measured on the
+  // ── The conflicts round of Settings & Controls (Jouni, 2026-09-25): only real conflicts come to
+  //    the lab (two looks used about equally, or a look that exists nowhere), all of them in one
+  //    round. In each, one kind of thing is drawn two ways, each on one page. Measured on the
   //    sandbox at 1280px wide, light mode.
   {
     id: 'person-head',
@@ -98,7 +98,7 @@ export const CONFLICT_DECISIONS = [
       { page: 'Wallet, Calibrator, MCP, Nodes, Ecosystem apps, AI: if you also say yes to the second question', what: 'Each list of steps becomes the home\'s rows: every step is a row with its number, its words in the home\'s larger, bolder letters, and a thick line under it. Each row also gets the home\'s arrow, which says the row opens something, although a step opens nothing. The small grey lists of AI and Nodes get much larger and turn from grey to ink. On Nodes each step shows its number once. The ecosystem steps leave their grey box. The notes of your own AI use get numbers instead of bullets. The links in the Wallet steps stay.' },
       { page: 'Agents: if you also say yes to the second question', what: 'The basic agents and the steps to connect an AI get the home\'s rows. The number stays in small coral typewriter letters; the arrow and the thick line under each row are new. Each agent keeps the line under its name and its tags. The word at the end of the row that says you have the agent is not in the picture; it would stay, before the arrow.' },
     ],
-    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal, and it covers the eight other lists of steps in Settings too: \"numeroidun listan kohdalla hyväksytty ehdotus\" (Jouni).","decidedBy":"Jouni","decidedAt":"2026-09-26"},
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal, and it covers the eight other lists of steps in Settings too (Jouni).","decidedBy":"Jouni","decidedAt":"2026-09-26"},
   },
   {
     id: 'conversation-list',
@@ -485,7 +485,7 @@ export const CONFLICT_DECISIONS = [
       { page: 'Workflows: a question waiting for you', what: 'The box loses its yellow ground and keeps its dark frame. The answers become tabs, and the one you choose turns yellow. The words of the question and the Answer and go button stay.' },
       { page: 'If you accept the dark tabs instead', what: 'The box stays yellow. The answers become tabs drawn in dark, and the one you choose becomes a dark block with yellow words.' },
     ],
-    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: the box on the page's ground, the answers as tabs. \"työnkulun kysymyslaatikko hyväksytty ja vastattu\" (Jouni).","decidedBy":"Jouni","decidedAt":"2026-09-26"},
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: the box on the page's ground, the answers as tabs (Jouni).","decidedBy":"Jouni","decidedAt":"2026-09-26"},
   },
   // ── Wave 4 (2026-09-26). ──
   {
@@ -517,6 +517,6 @@ export const CONFLICT_DECISIONS = [
 export const CONFLICT_NOTES = [
   {
     title: 'Round corners that came with the moves',
-    text: 'When page parts moved into the library (the colour tag, the document tree, the file drop, the file preview, the activity calendar, two chips that name an agent, the search hits, the comments, the ecosystem automation, the organism row, the record row, the schedule calendar), 28 round corners and 3 shadows came with them. The check that holds every corner and shadow to the shape values did not read those page sheets, and it reads the library sheets, so it now counts 14 files that went up. Decided (Jouni, 2026-09-26): "tee samankaltaiseksi tyyli kuin muuallakin". Those corners and shadows take the shape values, as everywhere else, so they become square and flat like the rest; the check does not accept them as they are.',
+    text: 'When page parts moved into the library (the colour tag, the document tree, the file drop, the file preview, the activity calendar, two chips that name an agent, the search hits, the comments, the ecosystem automation, the organism row, the record row, the schedule calendar), 28 round corners and 3 shadows came with them. The check that holds every corner and shadow to the shape values did not read those page sheets, and it reads the library sheets, so it now counts 14 files that went up. Decided (Jouni, 2026-09-26): those corners and shadows take the shape values, as everywhere else, so they become square and flat like the rest; the check does not accept them as they are.',
   },
 ];

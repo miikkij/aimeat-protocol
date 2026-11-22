@@ -222,7 +222,7 @@ export const OPERATOR_DEMOS = {
   'own-aimeat': { variants: [
     { name: 'on a demo node', render: () => html`<${OwnAimeat} href="https://store.example.com" label="Demo"
       title="This is a demo. Get your own AIMEAT."
-      text="Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you."
+      text="Many people share this demo to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you."
       cta="Go to the store →" />` },
     { name: 'store opens soon', render: () => html`<${OwnAimeat} href="https://store.example.com" label="Demo"
       title="This is a demo. Get your own AIMEAT."

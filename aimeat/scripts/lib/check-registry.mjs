@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-22: check:quotes, no tracked file quotes the developer's own words; check:picture-words reads the Markdown a person or an AI reads too.
  *  - 2026-11-22: check:app-catalog leaves FAST_CHECKS with the old /app-catalog.html and its build script.
  *  - 2026-11-21: check:single-entry reads public/ too and holds eight silent-drop rules (docs/pitfalls.md §9, 76 and 79 deleted; §12, 58, 81, 107 and 124 shrunk); check:field-reach reports a connector or CLI parameter no route reads (`unread:`, §44 shrunk).
  *  - 2026-11-21: check:scope-words, a scope word added to an MCP tool or REST route that already exists needs a keep-working step new in the same change, or a written reason (docs/pitfalls.md §119, now deleted).
@@ -109,7 +110,8 @@ export const FAST_CHECKS = [
     // Plan doc-mvcn6c7e4e5q, V6.4: each view printed its kind's stored word for who can read a thing.
     { script: 'check:audience-badge', label: 'Every view that shows the owner their content says who can read it with the AudienceBadge' },
     { script: 'check:locales', label: 'Language files agree with en.json' },
-    { script: 'check:picture-words', label: 'No new door, road, way in, machine room or showroom in the strings of the code' },
+    { script: 'check:picture-words', label: 'No new picture word in the strings of the code or the Markdown a person reads' },
+    { script: 'check:quotes', label: 'No tracked file quotes the developer\'s own words' },
     { script: 'check:licenses', label: 'Licences allowed, every served file accounted for' },
     { script: 'check:notices', label: 'Third-party notices match the tree' },
     { script: 'check:protocol-versions', label: 'Protocol versions declared vs current' },

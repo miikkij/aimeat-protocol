@@ -55,8 +55,8 @@ export function InstallCta({ compact = false, id, title, body }) {
         <div class="install-cta ${compact ? 'install-cta--compact' : ''}" role="note">
             <div class="install-cta-text">
                 <span class="install-cta-title">${title || (customerNode()
-                    ? tr('install.titleBuyer', 'Put your AIMEAT behind its own button')
-                    : tr('install.title', 'Put AIMEAT.IO behind its own button'))}</span>
+                    ? tr('install.titleBuyer', 'Install your AIMEAT as an app')
+                    : tr('install.title', 'Install AIMEAT.IO as an app'))}</span>
                 ${!compact && html`<span class="install-cta-body">
                     ${offer
                         ? body || (customerNode()

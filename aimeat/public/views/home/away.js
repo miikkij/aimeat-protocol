@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description "Sillä aikaa kun olit poissa": when a buyer comes back to the Home after a while away,
  *   a few lines on what happened meanwhile, newest first: what their agents did and anything new from
- *   the node or its operator (Jouni, 2.11 00.52, "three visits", visit 2).
+ *   the node or its operator (the three-visits plan, visit 2; Jouni, 2026-11-02).
  *
  *   TWO EXISTING SOURCES, NO NEW ONE. What happened on the account is the Home feed's record
  *   (GET /v1/home/feed, its sentences from feed.js line()), and what the node or the operator said is

@@ -167,8 +167,8 @@ await test('7. a public file linked in a record stays public (never narrowed)', 
     assert(await readAs(C.token, agentGaii, PUB_KEY) === 200, 'C reads a public file as before');
 });
 
-// A document's embedded images follow the same rule (Jouni, 2026-10-30: "korjaa samalla tavalla kuin
-// liitteet"). Before it, any identity of the owner opened any of the owner's images.
+// A document's embedded images follow the same rule (Jouni, 2026-10-30).
+// Before it, any identity of the owner opened any of the owner's images.
 const IMG_OWNER_KEY = `kuvat/${stamp}/owner.png`;
 const IMG_AGENT_KEY = `kuvat/${stamp}/agent.png`;
 const writePage = (token: string, markdown: string) => json(`/v1/organisms/${orgId}/workspace/drafts`, {

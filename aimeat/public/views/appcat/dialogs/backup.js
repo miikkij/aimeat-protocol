@@ -16,7 +16,7 @@
  *   Nothing is kept in the browser: the download's object address is let go 5 s after it was handed
  *   over. The old page's third export is not here: the one-time JSON download of apps left in the
  *   retired browser-local catalogue (F275, F355) read the browser's IndexedDB, and appcat reads no
- *   browser storage (Jouni: "selaimen omaa tallennusta ei pitäisi olla"). The old page still offers it.
+ *   browser storage (Jouni). The old page still offers it.
  * @structure BackupMenu() · exportBackup(setBusy?) · BackupDialog({ close }) (default)
  * @usage import { BackupMenu } from '/views/appcat/dialogs/backup.js'; html`<${BackupMenu} />`
  * @version-history

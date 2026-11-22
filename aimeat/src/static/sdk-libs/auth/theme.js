@@ -181,8 +181,7 @@ function modeButtonParts(i) {
 }
 
 /**
- * The MODE control: ONE button (Jouni, 2026-11-07: "toi light dark voisi olla yksi nappi jota
- * painaa niin se vaihtaa tilaa"). It shows the mode the page is in and a press turns to the other.
+ * The MODE control: ONE button (Jouni, 2026-11-07). It shows the mode the page is in and a press turns to the other.
  * "Automatic" (follow the device) is no longer a third segment: it is the first row of the look
  * picker (palette.js autoRow), where the rest of the look is chosen.
  *

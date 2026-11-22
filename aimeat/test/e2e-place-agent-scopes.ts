@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description On a store place an agent has the place's tools by default (services/place-agent-scopes.ts;
- *   Jouni 2.11 07.42, "anna sille täyspääsy"), so a run does not fail on a refused tool call: on crew64 a
+ *   Jouni 2.11 07.42: full access), so a run does not fail on a refused tool call: on crew64 a
  *   morning digest failed whole because notify was refused. An agent holding only memory:read signs in on
  *   a store place and sends a notification, reads and writes its way through its tools over REST and MCP,
  *   and its record shows what it got. The words the owner keeps stay out of the token, and a node that is

@@ -6798,7 +6798,7 @@
     },
     "explain": "Hyväksyntä antaa tälle tekoälylle luvan lukea ja kirjoittaa asioita kotiisi puolestasi. Sinä valitset kuinka paljon se saa tehdä, ja voit muuttaa sitä tai poistaa agentin milloin tahansa.",
     "stepTitle": "Agenttisi pyytää yhteyttä",
-    "stepDesc": "Se pyytää päästä sisään. Tarkista, että alla oleva koodi on sama jonka tekoälysi näytti, ja päästä se sisään."
+    "stepDesc": "Se pyytää pääsyä. Tarkista, että alla oleva koodi on sama, jonka tekoälysi näytti, ja hyväksy se."
   },
   "agentOnboarding": {
     "title": "Hello-integraatio",
@@ -6811,7 +6811,7 @@
     "startButton": "Aloita Hello-integraatio",
     "restartButton": "Suorita uudelleen",
     "cancelButton": "Peruuta",
-    "modeInferred": "Ilmoittamasi alusta toimii käyttäjän omassa ympäristössä, joten tämä agentti on nyt {{mode}}-moodissa ja sen Hello-integraatio on {{total}}-askelinen. Askeleet, jotka olettavat nodella asuvan ajoympäristön (toimituskanava, telemetria, tehtäväjono), eivät koske sinua, ja ne on poistettu sen sijaan että ne jäisivät epäonnistumaan.",
+    "modeInferred": "Ilmoittamasi alusta toimii käyttäjän omassa ympäristössä, joten tämä agentti on nyt {{mode}}-tilassa ja sen Hello-integraatio on {{total}}-askelinen. Askeleet, jotka olettavat palvelimella toimivan ajoympäristön (toimituskanava, telemetria, tehtäväjono), eivät koske sinua, ja ne on poistettu sen sijaan että ne jäisivät epäonnistumaan.",
     "steps": {
       "authenticate": "Tunnistaudu",
       "identify_platform": "Tunnista alusta",
@@ -6824,7 +6824,7 @@
       "accept_test_task": "Hyväksy testitehtävä",
       "complete_test_task": "Suorita testitehtävä",
       "publish_commands": "Julkaise slash-komennot",
-      "publish_config": "Julkaise runtime-konfiguraatio",
+      "publish_config": "Julkaise ajoympäristön asetukset",
       "declare_services": "Ilmoita palvelut",
       "declare_offerings": "Ilmoita tarjoukset",
       "make_workflow_compatible": "Tee tarjouksesta työnkulkuyhteensopiva",
@@ -6840,10 +6840,10 @@
       "send_test_message": "POST /messages todistaa viestikanavan toimivuuden",
       "configure_delivery": "Webhook rekisteröity TAI MCP havaittu TAI pollaus vahvistettu",
       "report_telemetry": "Vähintään yksi telemetriatapahtuma nollasta poikkeavalla datalla",
-      "accept_test_task": "Agentti ehdottaa todoja testitehtävälle",
+      "accept_test_task": "Agentti ehdottaa testitehtävälle työvaiheet",
       "complete_test_task": "Agentti suorittaa ja viimeistelee testitehtävän",
       "publish_commands": "agents.{name}.commands -muistissa on epätyhjä { name, description, category } -taulu",
-      "publish_config": "Vähintään yksi agents.config.{name}.* -muistitietue kuvaa tätä runtimea",
+      "publish_config": "Vähintään yksi agents.config.{name}.* -muistitietue kuvaa tätä ajoympäristöä",
       "declare_services": "Agentti ilmoittaa tarjoamansa palvelut (valinnainen)",
       "declare_offerings": "Agentti julkaisee vähintään yhden tarjouksen (id + title + ask) avaimeen agents.{name}.offers, jotta omistaja löytää mitä se tekee (valinnainen)",
       "make_workflow_compatible": "Vähintään yksi tarjous määrittää success_signal + required_to_function + deliverable.location, jolloin se voi olla työnkulun vaihe (valinnainen)",
@@ -6861,7 +6861,7 @@
       "noOnboardingRecord": "Perehdytystietuetta ei löydy",
       "invalidLevel": "Tason on oltava jokin näistä: basic, standard, full, expert",
       "testTaskTitle": "Perehdytyksen vahvistus",
-      "testTaskDescription": "Tämä on Hello-integraation aikana luotu testitehtävä. Ehdota todoja, saa hyväksyntä, suorita ja viimeistele."
+      "testTaskDescription": "Tämä on Hello-integraation aikana luotu testitehtävä. Ehdota työvaiheet, saa hyväksyntä, suorita ja viimeistele."
     },
     "readiness": {
       "title": "Valmius",
@@ -8745,7 +8745,7 @@
       "device": "Tekoälyavustaja pyytää lupaa toimia AIMEAT-tililläsi agenttinasi. Sinä päätät, kuinka paljon se saa tehdä."
     },
     "boundary": {
-      "reach": "Tämä koskee vain AIMEAT-tiliäsi täällä. Se ei voi avata tietokonettasi, koneellasi olevia tiedostoja eikä mitään muualla olevaa tiliäsi.",
+      "reach": "Tämä koskee vain AIMEAT-tiliäsi täällä. Se ei voi avata tietokonettasi, tietokoneellasi olevia tiedostoja eikä mitään muualla olevaa tiliäsi.",
       "visibility": "Mikään ei näy muille ihmisille ennen kuin itse jaat sen.",
       "control": "Jokainen toimi kirjataan, ja voit perua pääsyn milloin tahansa: Profiili › Pääsy."
     },
@@ -8753,11 +8753,11 @@
       "title": "Mitään ei myönnetty",
       "oauth": "{client} ei voi käyttää tiliäsi. Jos muutat mielesi, aloita yhdistäminen uudelleen palvelusta {client}.",
       "appGrant": "Sovellusta ei yhdistetty, eikä se näe tililtäsi mitään. Voit avata sen uudelleen milloin haluat.",
-      "device": "Avustajaa ei päästetty sisään. Pyydä sitä aloittamaan uusi pyyntö, jos muutat mielesi."
+      "device": "Avustaja ei saanut pääsyä. Pyydä sitä aloittamaan uusi pyyntö, jos muutat mielesi."
     },
     "preset": {
       "readonly": "Voi katsella: {areas}. Se ei voi muuttaa mitään.",
-      "standard": "Voi lukea ja kirjoittaa: {areas}. Saldosi, saamasi viestit ja tilisi asetukset pysyvät sen ulottumattomissa.",
+      "standard": "Voi lukea ja kirjoittaa: {areas}. Se ei voi käyttää saldoasi, saamiasi viestejä eikä tilisi asetuksia.",
       "messagesSend": "Se voi myös lähettää viestejä puolestasi agenttisi nimissä ja lisätä ihmisiä osoitekirjaasi.",
       "organismWrite": "Se voi myös luoda organismeja ja poistaa omistamiasi organismeja. Lisäksi se voi muuttaa, kuka niitä näkee ja kuka niihin voi liittyä.",
       "invitesPeople": "Se voi kutsua ihmisiä jaettuihin tiloihin, joissa olet mukana. Kutsu voi luoda kutsutulle uuden tilin.",
@@ -8782,9 +8782,9 @@
   "biz": {
     "heroTitle": "Digityöntekijä joka ei nuku",
     "heroSub": "Ajastetut agentit hakevat, kirjoittavat, raportoivat ja julkaisevat sillä aikaa kun teet muuta. Jokainen askel jää jäljitettäväksi, ja tulos on sinun.",
-    "proofUnavailable": "Elävä esimerkki pyörii sen koneella joka ylläpitää tätä sivustoa.",
+    "proofUnavailable": "Elävä esimerkki toimii tämän palvelun ylläpitäjän palvelimella.",
     "c1Title": "Herään ja tiedän mitä alallani tapahtui",
-    "c1Text": "Julkaisu joka kirjoittaa itsensä joka ilta. Agentit hakevat raaka-aineen, kirjoittavat jutut ja julkaisevat numeron. Nolla ihmistuntia.",
+    "c1Text": "Julkaisu joka kirjoittaa itsensä joka ilta. Agentit hakevat lähdeaineiston, kirjoittavat jutut ja julkaisevat numeron. Nolla ihmistuntia.",
     "c1Proof": "Lue tämän illan numero →",
     "c1Cta": "Sama sinun aiheistasi →",
     "c2Title": "Aamubriiffini odottaa, ja se tietää mikä on vanhentunut",
@@ -8796,13 +8796,13 @@
     "c3Proof": "Avaa yritystutka →",
     "c3Cta": "Käynnistä tutka →",
     "c4Title": "Projektini tietää itse missä mennään",
-    "c4Text": "Kun kehittäjillä on agentit, sprintit hidastavat. Organismi on jatkuva tilannekuva: goalit, roadmap, bugit, päätökset ja elävä konteksti jonka jokainen agentti lukee ennen työtä ja päivittää työn jälkeen. Ihminen hyväksyy päätökset, muu liikkuu agenttivauhtia.",
+    "c4Text": "Kun kehittäjillä on agentit, sprintit hidastavat. Organismi on jatkuva tilannekuva: tavoitteet, roadmap, bugit, päätökset ja elävä konteksti jonka jokainen agentti lukee ennen työtä ja päivittää työn jälkeen. Ihminen hyväksyy päätökset, muu liikkuu agenttivauhtia.",
     "c4Quote": "Tällä pääsisi Jirasta eroon.",
     "c4QuoteBy": "pelinkehittäjä, iso studio",
     "c4Proof": "Avaa oma roadmappimme livenä →",
     "c4Cta": "Tee projektistasi organismi →",
     "c5Title": "Käyttäjäni idea oli tuotannossa samana päivänä",
-    "c5Text": "Käyttäjä jätti idean aamulla. Agentti triagesi sen tehtäväksi, toteutti sen, ajoi testit, päivitti tilannesivun ja merkitsi palautteen ratkaistuksi. Ihminen varmisti että se toimii. Koko ketju on jäljitettävissä: palaute → tehtävä → julkaisu.",
+    "c5Text": "Käyttäjä jätti idean aamulla. Agentti luokitteli sen tehtäväksi, toteutti sen, ajoi testit, päivitti tilannesivun ja merkitsi palautteen ratkaistuksi. Ihminen varmisti että se toimii. Koko ketju on jäljitettävissä: palaute → tehtävä → julkaisu.",
     "c5Proof": "Seuraa yhtä ideasta julkaisuun →",
     "c5Cta": "Avaa palautesilmukka asiakkaillesi →",
     "c6Title": "Kokonainen yritys omalla palvelimellaan",
@@ -8842,7 +8842,7 @@
     "sov4": "Protokolla ja palvelinohjelmisto ovat saatavilla MIT-lisenssillä. Lisenssi ei velvoita julkaisemaan rakentamiasi sovelluksia tai sisältöä.",
     "ctaAssessment": "Ilmainen: missä tekoälynne on nyt? →"
   },
-  "biz.trans1": "EU:n tekoälyasetuksen 50 artiklaa on sovellettu 2.8.2026 alkaen. Täällä saat eurooppalaisen alustan, jota voit ylläpitää itse ja jossa tekoälyn alkuperätieto kuuluu siihen kerrokseen, jonka päällä jokainen sovellus toimii: mallin tuottama sisältö kantaa mukanaan tiedon siitä, miten se syntyi, palvelimen omilla sivuilla lukija näkee merkinnän, ja ylläpitäjän oikeushenkilö sekä valvova viranomainen ovat kiinteässä koneluettavassa osoitteessa, josta vastuuhenkilösi voi hakea ne kysymättä meiltä. Palvelimen lähettämän sisällön voi kuka tahansa tarkistaa tavu tavulta ilman tiliä.",
+  "biz.trans1": "EU:n tekoälyasetuksen 50 artiklaa on sovellettu 2.8.2026 alkaen. Täällä saat eurooppalaisen alustan, jota voit ylläpitää itse ja jossa tekoälyn alkuperätieto kuuluu siihen kerrokseen, jonka päällä jokainen sovellus toimii: mallin tuottama sisältö sisältää tiedon siitä, miten se syntyi, palvelimen omilla sivuilla lukija näkee merkinnän, ja ylläpitäjän oikeushenkilö sekä valvova viranomainen ovat kiinteässä koneluettavassa osoitteessa, josta vastuuhenkilösi voi hakea ne kysymättä meiltä. Palvelimen lähettämän sisällön voi kuka tahansa tarkistaa tavu tavulta ilman tiliä.",
   "biz.trans2": "Sinulle jää vastuu siitä mitä itse julkaiset. AIMEATin päällä ajaminen ei poista sitä, ja sanomme sen mieluummin tässä kuin annamme sinun huomata sen myöhemmin. Alusta tekee sen, että merkitseminen, tallentaminen ja näyttäminen on oletustie eikä projekti.",
   "biz.transCta": "Näin tekoälysisältö merkitään täällä →",
   "biz.payTitle": "Myy ihmisille ja heidän agenteilleen, saman kassan läpi",
@@ -8938,7 +8938,7 @@
       "customizeTitle": "Tee oma versio",
       "customizeDesc": "Lataa app-catalog.html-tiedosto ja anna se mille tahansa tekoälylle alla olevan kehotteen kanssa. Tekoäly muokkaa siitä juuri sellaisen kuin haluat: omat värit, oma asettelu, oma kieli. Tuloksena on yksi HTML-tiedosto, joka toimii ilman verkkoyhteyttä, kotiverkossa tai missä vain.",
       "step1": "Lataa app-catalog.html alta",
-      "step2": "Kopioi muokkauskehotep",
+      "step2": "Kopioi muokkauskehote",
       "step3": "Liitä molemmat mihin tahansa AI-chattiin (ChatGPT, Claude, Grok...) ja kerro mitä haluat muuttaa",
       "downloadBtn": "Lataa HTML",
       "badgeOffline": "Toimii offline",
@@ -9036,11 +9036,11 @@
   "chat.connectionLost": "Yhteys katkesi. Yritä uudelleen.",
   "chat.useOwnKeyLink": "Käytä omaa avainta",
   "chat.welcomeBody": "Se lukee ja kirjoittaa muistiinpanojasi, yhteisiä paikkojasi ja sovelluksiasi täällä, ja näet ruudulla jokaisen askeleen, jonka se ottaa. Pyydä siltä jotain tai aloita jostakin näistä.",
-  "chat.capTitle": "Tämä keskustelu on käyttänyt ilmaisen kyytinsä.",
-  "chat.capBody": "Chat kulkee täällä tämän palvelimen omalla AI-budjetilla, ja tämä istunto on käyttänyt osuutensa (noin 50 000 tokenia). Keskustelu pysyy tallessa tässä, mitään ei katoa. Kaksi tapaa jatkaa:",
+  "chat.capTitle": "Tämä keskustelu on käyttänyt ilmaisen osuutensa.",
+  "chat.capBody": "Chat käyttää täällä tämän palvelimen omaa AI-budjettia, ja tämä istunto on käyttänyt osuutensa (noin 50 000 tokenia). Keskustelu pysyy tallessa tässä, mitään ei katoa. Kaksi tapaa jatkaa:",
   "chat.capOwnKey": "Tuo oma avaimesi →",
-  "chat.capOwnPlace": "Hanki oma paikkasi →",
-  "chat.capOwnPlaceSoon": "Oma paikkasi: aukeaa pian",
+  "chat.capOwnPlace": "Hanki oma AIMEAT →",
+  "chat.capOwnPlaceSoon": "Oma AIMEAT: saatavilla pian",
   "chat.welcomeTitle": "Tekoäly, joka työskentelee asioidesi parissa",
   "chat.welcomeTrust": "Kaikki mitä täällä teet on omalla tililläsi, eikä mikään ole julkista ennen kuin itse julkaiset sen.",
   "chat.welcomeAtelier": "Voit myös pyytää sovellusta: saat linkin valmiiseen sovellukseen.",
@@ -13532,7 +13532,7 @@
   "help.msg.topics": "Aiheet:",
   "help.msg.why": "Kysymys tuli sinulle, koska aiheisiisi kuuluu {{topics}}.",
   "help.msg.solved": "Merkitty ratkenneeksi. Kiitos, että autoit.",
-  "help.msg.solvedReward": "Merkitty ratkenneeksi. Sait {{morsels}} murua avusta.",
+  "help.msg.solvedReward": "Merkitty ratkenneeksi. Sait {{morsels}} murusta avusta.",
   "help.msg.cancelled": "Kysyjä perui tämän kysymyksen.",
   "help.msg.expired": "Tämä kysymys päättyi ratkeamatta.",
   "profile.tabs.help": "Kysy osaajalta",
@@ -13652,7 +13652,7 @@
   "help.card.statusMark": "Kysymys suljettu",
   "help.card.statusMarkTitle": "Tämä rivi sulkee Kysy osaajalta -kysymyksen.",
   "help.page.title": "Kysy osaajalta",
-  "help.page.intro": "Tämän sivuston jäsenten väliset kysymykset: sinulle tulleet, omasi ja se, mistä sinulta saa kysyä.",
+  "help.page.intro": "Oman AIMEATisi jäsenten väliset kysymykset: sinulle tulleet, omasi ja se, mistä sinulta saa kysyä.",
   "help.page.loading": "Ladataan…",
   "help.page.loadFailed": "Kysymyksiä ei voitu ladata.",
   "help.page.actionFailed": "Tämä ei onnistunut. Yritä uudelleen.",
@@ -13699,7 +13699,7 @@
   "help.page.addSuggested": "Käyntikortistasi: lisää se",
   "help.page.ownTopic": "Lisää oma aihe",
   "help.page.audience": "Kuka saa kysyä sinulta",
-  "help.page.audienceNode": "Kaikki tämän sivuston jäsenet",
+  "help.page.audienceNode": "Kaikki oman AIMEATisi jäsenet",
   "help.page.audienceOrganisms": "Vain yhteisten paikkojeni jäsenet",
   "help.page.cap": "Kuinka usein",
   "help.page.capOption": "Enintään {n} viikossa",
@@ -13713,12 +13713,12 @@
   "help.page.aiDraft": "Kirjoittaa luonnoksen",
   "help.page.aiDraftHint": "Se luonnostelee vastauksen muististani. Minä luen sen ja lähetän sen.",
   "help.page.aiAuto": "Vastata itse valitsemissani aiheissa",
-  "help.page.aiAutoHint": "Muissa aiheissa se kirjoittaa luonnoksen. Sen vastaus merkitään tekoälyn kirjoittamaksi, ja murut tulevat sinulle.",
+  "help.page.aiAutoHint": "Muissa aiheissa se kirjoittaa luonnoksen. Sen vastaus merkitään tekoälyn kirjoittamaksi, ja muruset tulevat sinulle.",
   "help.page.autoTopicsHint": "Valitse aiheet, joissa tekoälysi vastaa itse.",
   "help.page.asker": "Haluan kysyä osaajilta",
   "help.page.aiMaySend": "Tekoälyni saa kirjoittaa ja lähettää kysymyksiä puolestani. Se näyttää jokaisen minulle ensin.",
   "help.page.agentsMayAsk": "Agenttini saavat kysyä nimissäni, kun olen poissa.",
-  "help.page.operatorSees": "Tämän sivuston ylläpito saa raportin siitä, mistä aiheista kysyttiin ja missä. Raportissa ei ole nimiä.",
+  "help.page.operatorSees": "Oman AIMEATisi ylläpito saa raportin siitä, mistä aiheista kysyttiin ja missä. Raportissa ei ole nimiä.",
   "help.page.save": "Tallenna",
   "help.page.saved": "Tallennettu.",
   "help.page.saveFailed": "Valintojasi ei tallennettu.",
@@ -14449,7 +14449,7 @@
   "secretAllow.badge": "Salaisuutesi",
   "secretAllow.by": "asentaja: {installer}",
   "secretAllow.title": "Laajennus {extension} pyytää lupaa käyttää salaisuuttasi {secret}",
-  "secretAllow.lead": "Laajennus {extension} (asentaja: {installer}) tarvitsee salaisuuttasi {secret} palvelussa {host}. Salaisuus pysyy tililläsi, ja se lähtee vain, jos sallit.",
+  "secretAllow.lead": "Laajennus {extension} (asentaja: {installer}) tarvitsee salaisuuttasi {secret} palvelussa {host}. Salaisuus pysyy tililläsi, ja se lähetetään vain, jos sallit.",
   "secretAllow.why": "Laajennus kertoo käyttävänsä salaisuutta tähän: {why}.",
   "secretAllow.undeclared": "Laajennus ei ilmoita osoitetta {host} tämän salaisuuden osoitteeksi.",
   "secretAllow.allow": "Salli",
@@ -14461,7 +14461,7 @@
   "secretAllow.reinstalled": "Laajennus kuuluu nyt käyttäjälle {installerNow}, ei käyttäjälle {installer}, joka kysyi. Käytä laajennusta uudelleen, niin se kysyy sinulta uudestaan.",
   "secretAllow.toAccess": "Avaa Pääsy-sivu",
   "secretAllow.signInTitle": "Kirjaudu ensin sisään",
-  "secretAllow.signInLead": "Laajennus pyytää lupaa käyttää yhtä salaisuuttasi. Kirjaudu sisään, niin näet, mitä salaisuutta se pyytää ja minne se lähtisi.",
+  "secretAllow.signInLead": "Laajennus pyytää lupaa käyttää yhtä salaisuuttasi. Kirjaudu sisään, niin näet, mitä salaisuutta se pyytää ja minne se lähetettäisiin.",
   "secretAllow.signIn": "Kirjaudu sisään",
   "secretAllow.goneTitle": "Tähän ei ole mitään vastattavaa",
   "secretAllow.gone": "Linkki on vajaa, tai mikään ei enää odota vastausta. Salaisuutesi ja antamasi luvat ovat Pääsy-sivulla.",
@@ -18721,7 +18721,7 @@
   },
   "dev": {
     "crumb": "Kehittäjille",
-    "title": "Yhdistä tekoälysi tähän nodeen",
+    "title": "Yhdistä tekoälysi kotiisi",
     "subtitle": "Yksi rivi jos tekoälysi osaa MCP:n, kopioitava kehote kaikelle muulle. Sen jälkeen rakenna päälle tai pystytä oma node.",
     "repos": {
       "protocol": "aimeat-protocol GitHubissa",
@@ -18750,7 +18750,7 @@
       "title": "Pidä tekoälysi synkassa",
       "lead": "Kytkentä on puolet työstä. Ilman pysyvää ohjetta AI unohtaa tämän noden sessioiden välillä ja ajautuu hiljaa pois synkasta. Liitä tämä rivi projektisi CLAUDE.md:hen, AGENTS.md:hen tai chatin omiin ohjeisiin:",
       "prefilledNote": "Oletko kirjautunut? Asetustesi Yhdistä tekoälysi -sivu tekee tämän lohkon valmiiksi täytettynä omilla organismeillasi ja työtiloillasi.",
-      "prefilledLink": "Hae esitäytetty blokkisi →"
+      "prefilledLink": "Hae esitäytetty lohkosi →"
     },
     "step1": {
       "label": "Valitse AI-alustasi"
@@ -18797,7 +18797,7 @@
       "upgradeForApi": "Käytä Sovellukset-välilehteä: tämä tilaus luo valmiin verkkosovelluksen kehotteesta."
     },
     "download": "Lataa",
-    "upload": "Lähetä solmuun",
+    "upload": "Lähetä palvelimelle",
     "uploading": "Lähetetään...",
     "uploaded": "Lähetetty!",
     "uploadFailed": "Lähetys epäonnistui",
@@ -18968,13 +18968,13 @@
       "what": "{n} agenttiasi ei pääse itse sisään: osalta kirjautuminen vanheni, osa ei ole koskaan yhdistänyt.",
       "whatOne": "Yksi agenteistasi ei pääse itse sisään.",
       "keeps": "Muuten mikään ei muutu. Sama nimi, samat oikeudet, samat kesken olevat työt.",
-      "needConnector": "Tämä onnistuu vain jos konnektori on käynnissä sillä koneella, jolla nämä agentit asuvat. Käynnistä se siellä ja palaa painamaan.",
+      "needConnector": "Tämä onnistuu vain jos konnektori on käynnissä sillä koneella, jolla nämä agentit toimivat. Käynnistä se siellä ja palaa painamaan.",
       "ready": "Konnektori on käynnissä, joten tämän voi tehdä nyt.",
       "action": "Anna {n} agentille uusi kirjautuminen",
       "actionOne": "Anna sille uusi kirjautuminen",
       "working": "Tehdään…",
       "doneAll": "Valmis. Ne pääsevät taas sisään, eikä niissä muuttunut mitään muuta.",
-      "donePartial": "{n} pääsee taas sisään. {stuck} jäi tavoittamatta, ja ne ovat tasan ennallaan — paina uudestaan tai katso konnektori niiden koneella.",
+      "donePartial": "{n} pääsee taas sisään. {stuck} jäi tavoittamatta, ja ne ovat tasan ennallaan. Paina uudestaan tai katso konnektori niiden koneella.",
       "failed": "Ei onnistunut. Mikään ei muuttunut.",
       "actionRow": "Uusi kirjautuminen",
       "rowDone": "Valmis. Sillä on nyt oma avain ja se pääsee taas sisään.",
@@ -19012,11 +19012,11 @@
     }
   },
   "footer": {
-    "ownNode": "Aja oma node",
+    "ownNode": "Asenna oma AIMEAT",
     "transparency": "Tekoälyn läpinäkyvyys",
     "glossary": "Sanasto",
     "sitemap": "Sivukartta",
-    "apiContract": "API-sopimus",
+    "apiContract": "API-kuvaus",
     "store": "Kauppa",
     "storeSoon": "Kauppa aukeaa pian",
     "changelog": "Mitä on julkaistu",
@@ -19058,7 +19058,7 @@
     "forMeDesc": "Kokeile heti. Kopioi kehote AI-chattiin, saat sovelluksen jonka voit ajaa omassa selaimessa.",
     "forMeSteps": "1. Kopioi kehote. 2. Liitä mihin tahansa AI-chattiin. 3. Vastaa kysymyksiin. 4. Lataa ja avaa HTML-tiedosto selaimessa.",
     "forAgents": "Minun AI Agenteilleni",
-    "forAgentsDesc": "Automatisoi tiedon virtaus AIMEAT:iin. Anna AI-agenttisi seurata, kerätä, päättää ja toimia puolestasi.",
+    "forAgentsDesc": "Automatisoi tiedon virtaus AIMEATiin. Anna AI-agenttisi seurata, kerätä, päättää ja toimia puolestasi.",
     "forAgentsCopy": "Kopioi agenttikehote",
     "forBuilders": "Palveluiden tekijöille",
     "forBuildersDesc": "Rekisteröi palvelumäärittelyjä (CSM/MSM), hallitse skeemoja ja suostumuksia. Vaatii rekisteröitymisen.",
@@ -19130,7 +19130,7 @@
   "help": {
     "tocLabel": "Tällä sivulla",
     "langLabel": "Kieli",
-    "epAgents": "agentin perehdytys: mikä tämä paikka on ja mistä aloittaa",
+    "epAgents": "agentin perehdytys: mikä tämä AIMEAT on ja mistä aloittaa",
     "pageTitle": "Ohjeet",
     "title": "Auta tekoälyäsi työskentelemään AIMEATissa",
     "tabHuman": "Minulle",
@@ -19175,11 +19175,11 @@
       },
       "connect": {
         "q": "Tekoälyni sanoo ettei se saa yhteyttä. Mitä nyt?",
-        "a": "Jos tekoälysi osaa MCP:n, lisää tämä sivusto liittimeksi: yksi komento Claude Codessa, tai liitä MCP-osoite asiakkaan omaan liitindialogiin. Kaikilla muilla tekoälyillä kopioi \"Tekoälylleni\"-välilehden ohjekehote chattiin, niin se ottaa selvää lopusta itse."
+        "a": "Jos tekoälysi osaa MCP:n, lisää oma AIMEATisi liittimeksi: yksi komento Claude Codessa, tai liitä MCP-osoite asiakkaan omaan liitindialogiin. Kaikilla muilla tekoälyillä kopioi \"Tekoälylleni\"-välilehden ohjekehote chattiin, niin se ottaa selvää lopusta itse."
       },
       "broken": {
         "q": "Entä jos rikon jotain?",
-        "a": "Useimpia asioita voi kokeilla huoletta: kaikki on aluksi yksityistä, ja apuri koskee vain siihen, minkä sallit. Kun jokin silti hajoaa, kerro sille, joka ylläpitää tätä sivustoa. Tekoälysi voi lähettää viestin suoraan istunnosta, tai käytä alla olevia yhteystietoja. Kerro, mitä olit tekemässä ja mitä odotit tapahtuvan."
+        "a": "Useimpia asioita voi kokeilla huoletta: kaikki on aluksi yksityistä, ja apuri koskee vain siihen, minkä sallit. Kun jokin silti hajoaa, kerro sille, joka ylläpitää omaa AIMEATiasi. Tekoälysi voi lähettää viestin suoraan istunnosta, tai käytä alla olevia yhteystietoja. Kerro, mitä olit tekemässä ja mitä odotit tapahtuvan."
       },
       "knowledge": {
         "q": "Mitä tieto täällä on, ja miten tekoälyni käyttää sitä?",
@@ -19217,7 +19217,7 @@
     "dOrg1": "Yhteinen totuus:",
     "dOrg2": "työtilat, versiot",
     "dOrg3": "ihmiset + agentit",
-    "dOrg4": "julkaisuportti",
+    "dOrg4": "julkaisun hyväksyntä",
     "dAssets": "Sinun omaisuutesi",
     "dAssets1": "Versioitu tieto",
     "dAssets2": "sovellukset ja raportit",
@@ -19227,7 +19227,7 @@
     "cardAgentsTitle": "Agentit",
     "cardAgentsText": "Agentti on tekoäly, jonka olet yhdistänyt ja joka toimii nimissäsi: Claude, ChatGPT, CrewAI-tiimi tai oma ohjelmasi. Se saa tehdä vain sen, minkä olet sallinut, ja voit pysäyttää sen milloin tahansa. Sillä voi olla tehtäviä, jotka annat tavallisella kielellä, työajat ja kulukatto, joten se tekee työtä sillä aikaa, kun teet muuta. Se toimii omalla nimellään, joten näet jälkikäteen, mitä se on tehnyt.",
     "cardOrgTitle": "Yhteiset paikat",
-    "cardOrgText": "Yhteisessä paikassa työstä tulee jotain, mikä jää: yksi jaettu kuva projektista, johon sekä ihmiset että agentit kirjoittavat. Agentit saavat tehdä paljon ja nopeasti, ja merkittävät päätökset odottavat ihmistä. Jokaisessa muutoksessa on tekijänsä nimi.",
+    "cardOrgText": "Yhteisessä paikassa työstä tulee jotain, mikä jää: yksi yhteinen tietopohja projektista, johon sekä ihmiset että agentit kirjoittavat. Agentit saavat tehdä paljon ja nopeasti, ja merkittävät päätökset odottavat ihmistä. Jokaisessa muutoksessa on tekijänsä nimi.",
     "cardAssetsTitle": "Sinun omaisuutesi",
     "cardAssetsText": "Mallit tulevat ja menevät. Identiteettisi, muistisi, työhistoriasi ja tuloksesi pysyvät tililläsi, teki työn mikä tekoäly tahansa. Vaihda tekoäly toiseen kesken kaiken, ja agentti jatkaa siitä, mihin jäi.",
     "exampleTitle": "Esimerkkejä jotka pyörivät täällä",
@@ -19251,8 +19251,8 @@
     "ctaLearn": "Opi käytännössä, ilmaiseksi →"
   },
   "install": {
-    "title": "Laita AIMEAT.IO oman napin taakse",
-    "titleBuyer": "Laita oma AIMEATisi oman napin taakse",
+    "title": "Asenna AIMEAT.IO sovellukseksi",
+    "titleBuyer": "Asenna oma AIMEATisi sovellukseksi",
     "body": "Asennettuna se avautuu omaan ikkunaansa, näyttää lukemattomien määrän kuvakkeessa ja ottaa jaot suoraan chattiisi.",
     "iosBody": "iPhonella ja iPadilla: avaa jakovalikko ja valitse \"Lisää Koti-valikkoon\".",
     "bodyBuyer": "Saat AIMEATin omaksi kuvakkeeksi puhelimeen tai työpöydälle.",
@@ -19343,7 +19343,7 @@
       "apps": "Sovellukset",
       "agents": "Agentit töissä",
       "share": "Jaettu muille",
-      "aiWhat": "Tekoäly, jolla teet työtä: tämän paikan chat tai oma Claude, ChatGPT tai Grok.",
+      "aiWhat": "Tekoäly, jolla teet työtä: oman AIMEATisi chat tai oma Claude, ChatGPT tai Grok.",
       "connectWhat": "Yhdistä oma tekoälysi tänne, niin se näkee tietosi ja saa tehdä työtä puolestasi.",
       "firstResultWhat": "Kerro tekoälylle itsestäsi ja työstäsi, niin se osaa auttaa juuri sinua.",
       "organiseWhat": "Kokoa työsi tiedot yhteen paikkaan, jonka voit myöhemmin jakaa muille.",
@@ -19400,7 +19400,7 @@
     "signInPill": "Kirjaudu sisään",
     "signInPillShort": "Kirjaudu",
     "title": "Tämä on {host} – oma AIMEAT",
-    "intro": "AIMEAT on sinun oma paikkasi, jossa tekoäly tekee työtä puolestasi. Se muistaa, mitä kerrot, tekee sinulle agentteja ja sovelluksia, ja kaikki tieto on sinun.",
+    "intro": "Oma AIMEATisi on palvelu, jossa tekoäly tekee työtä puolestasi. Se muistaa, mitä kerrot, tekee sinulle agentteja ja sovelluksia, ja kaikki tieto on sinun.",
     "signInNote": "Kirjaudu sisään sähköpostilinkillä. Kirjoita osoite, jolla ostit AIMEATin. Lähetämme siihen linkin, joka kirjaa sinut sisään ilman salasanaa.",
     "next": "Kun olet kirjautunut, pääset Koti-näkymään. Siellä kirjoitat yhdellä lauseella, mitä haluat saada tehdyksi. AIMEAT tekee lauseesta agentin, ja näet agentin ennen kuin se aloittaa.",
     "signInLabel": "Kirjaudu sisään",
@@ -19420,7 +19420,7 @@
       "ready": "oma tekoälysi on käytössä",
       "low": "saldo on vähissä",
       "empty": "saldo on loppu",
-      "off": "tekoäly ei ole käytössä tällä sivustolla",
+      "off": "tekoäly ei ole käytössä omassa AIMEATissasi",
       "topup": "Osta lisää tekoälyä",
       "topupNote": "Kertamaksu. Ei uutta tilausta.",
       "chatLine": "Tekoälysaldoa jäljellä {amount}.",
@@ -19490,14 +19490,14 @@
         "declined": "Ei oteta työn alle"
       },
       "noteLabel": "Viesti rakentajilta",
-      "trailLink": "Kaikki, mitä paikassasi on tehty",
+      "trailLink": "Kaikki, mitä omassa AIMEATissasi on tehty",
       "codeLabel": "Rakennuskoodisi",
       "codeCopy": "Kopioi koodi",
-      "codeStepConnect": "Yhdistä oma tekoälysi (Claude, ChatGPT tai Grok) {host}:hon ja tähän paikkaan.",
+      "codeStepConnect": "Yhdistä oma tekoälysi (Claude, ChatGPT tai Grok) {host}:hon ja omaan AIMEATiisi.",
       "codeConnectThere": "Yhdistä {host}:hon",
-      "codeConnectHere": "Yhdistä tähän paikkaan",
+      "codeConnectHere": "Yhdistä omaan AIMEATiisi",
       "codeFullAccess": "Kun {host} kysyy, valitse agentti, jolla on täydet oikeudet.",
-      "codeChatPath": "Voit käyttää myös tämän paikan chatia. Yhdistä se {host}:hon sivulla Pääsy ja turvallisuus.",
+      "codeChatPath": "Voit käyttää myös oman AIMEATisi chatia. Yhdistä se {host}:hon sivulla Pääsy ja turvallisuus.",
       "codeChatButton": "Yhdistä chat {host}:hon",
       "codeStepAsk": "Pyydä tekoälyäsi lähettämään rakennuspyyntösi tällä koodilla.",
       "codeSayHint": "Voit sanoa esimerkiksi: ”{say}”",
@@ -19510,10 +19510,10 @@
       "acceptAccountButton": "Avaa kutsu",
       "follow": "Seuraa työtä palvelussa {host}.",
       "followButton": "Avaa se palvelussa {host}",
-      "connectThere": "Yhdistä tekoälysi myös palveluun {host} samalla tavalla kuin tähän paikkaan: avaa siellä Yhdistä tekoälysi, valitse tekoälysi ja seuraa sivun ohjeita. Lopuksi hyväksyt yhteyden.",
+      "connectThere": "Yhdistä tekoälysi myös palveluun {host} samalla tavalla kuin omaan AIMEATiisi: avaa siellä Yhdistä tekoälysi, valitse tekoälysi ja seuraa sivun ohjeita. Lopuksi hyväksyt yhteyden.",
       "connectThereButton": "Yhdistä tekoälysi siellä",
       "doneTitle": "Agenttisi on valmis ja toimii.",
-      "continue": "Tästä eteenpäin voit jatkaa itse omalla tekoälylläsi. Claude Code, Codex ja Grok-botti voivat kaikki yhdistyä paikkaasi ja kehittää tehtyä työtä eteenpäin.",
+      "continue": "Tästä eteenpäin voit jatkaa itse omalla tekoälylläsi. Claude Code, Codex ja Grok-botti voivat kaikki yhdistyä omaan AIMEATiisi ja kehittää tehtyä työtä eteenpäin.",
       "continueLink": "Näin yhdistät ne"
     },
     "away": {
@@ -19524,7 +19524,7 @@
     },
     "trail": {
       "title": "Toimintaloki",
-      "sub": "Kaikki, mitä paikassasi on tehty: mitä, mihin, kuka ja milloin. Uusin ensin.",
+      "sub": "Kaikki, mitä omassa AIMEATissasi on tehty: mitä, mihin, kuka ja milloin. Uusin ensin.",
       "empty": "Täällä ei ole vielä tehty mitään.",
       "more": "Näytä vanhemmat",
       "operator": "Palvelun ylläpitäjä",
@@ -19569,7 +19569,7 @@
         "keptWork": "otti talteen valmiin työn"
       }
     },
-    "welcomeSub": "Jotta saat kodin supervoimat käyttöösi, tehdään pari asiaa ensiksi.",
+    "welcomeSub": "Ennen kuin oma AIMEATisi voi tehdä mitään puolestasi, tehdään pari asiaa.",
     "signInTitle": "Astu kotiisi",
     "signInDesc": "Kirjaudu sisään, niin näet mihin jäit.",
     "signIn": "Kirjaudu kotiisi",
@@ -19596,10 +19596,10 @@
       "empty": "Postilaatikko: ei uutta"
     },
     "fleet": {
-      "oneOk": "Agenttisi on kotona ja kunnossa.",
-      "oneTrouble": "Agenttisi {name} tarvitsee katseen.",
-      "allOk": "{total} agenttia kotona, kaikki kunnossa.",
-      "trouble": "{total} agenttia kotona · {n} tarvitsee katseen"
+      "oneOk": "Agenttisi toimii ilman ongelmia.",
+      "oneTrouble": "Agenttisi {name} vaatii huomiota.",
+      "allOk": "{total} agenttia, kaikki toimivat ilman ongelmia.",
+      "trouble": "{total} agenttia · {n} vaatii huomiota"
     },
     "agents": {
       "title": "Agenttisi",
@@ -19628,8 +19628,8 @@
       "unnamedMachine": "Nimetön tietokone",
       "when": {
         "ask": "Kun pyydän",
-        "clock": "Kellon mukaan",
-        "clockAt": "Kellon mukaan, {words}",
+        "clock": "Ajastettuna",
+        "clockAt": "Ajastettuna, {words}",
         "talk": "Kun joku kirjoittaa sille",
         "always": "Aina päällä",
         "records": "Kun työtilaan tulee jotain uutta"
@@ -19687,7 +19687,7 @@
       "reachWrite": "Lukee ja kirjoittaa",
       "machine": "Millä tietokoneella",
       "machineOn": "Yhteydessä.",
-      "machineOff": "Ei yhteyttä. Agentti tehdään nyt, ja se käynnistyy, kun tämä tietokone palaa.",
+      "machineOff": "Ei yhteyttä. Agentti tehdään nyt, ja se käynnistyy, kun tämä tietokone on taas yhteydessä.",
       "noMachine": "Voit käynnistää sen nyt: agentti tehdään, ja se alkaa tehdä työtä, kun tietokone on yhteydessä.",
       "badName": "Lyhyessä nimessä on 3–40 merkkiä: pieniä kirjaimia, numeroita ja yhdysmerkkejä, ja se alkaa kirjaimella.",
       "badPurpose": "Kerro yhdellä lauseella, mitä varten agentti on.",
@@ -19709,7 +19709,7 @@
       "modelHintSet": "Agentti käyttää tätä mallia ensimmäisestä työstään alkaen. Malli maksetaan avaimella, joka on tietokoneella. Voit vaihtaa mallin myöhemmin agentin sivulla.",
       "modelHintUnset": "Jos et valitse, tietokone käyttää omien asetustensa mallia. Se voi olla pieni ja halpa malli, jonka työ pitää tarkistaa. Valitse malli tästä, kun työ vaatii vahvan mallin.",
       "modelComputer": "Tietokone päättää",
-      "modelNoList": "Tällä tietokoneella ei ole yhteydessä agenttia, joka kertoisi, mihin malleihin tietokone yltää. Siksi tietokone käyttää omien asetustensa mallia. Voit valita mallin agentin sivulla, kun agentti on käynnistynyt.",
+      "modelNoList": "Tällä tietokoneella ei ole yhteydessä agenttia, joka kertoisi, mitä malleja tietokone voi käyttää. Siksi tietokone käyttää omien asetustensa mallia. Voit valita mallin agentin sivulla, kun agentti on käynnistynyt.",
       "inOrganism": "Organismissa {organism}",
       "whenRecordsHint": "Se saa tehtävän aina, kun valitsemaasi työtilan tilaan julkaistaan tietue.",
       "whenRecordsHintProposal": "Se saa tehtävän aina, kun ehdotuksen nimeämiin työtilan tiloihin julkaistaan tietue.",
@@ -19724,7 +19724,7 @@
       "title": "Ideoita, joista aloittaa",
       "tabAgents": "Agentit",
       "tabApps": "Sovellus ja agentti",
-      "agentsLead": "Agentteja, jotka on tehty yhdellä lauseella ja ajettu oikeasti. Valitse yksi: sen lause tulee laatikkoon, ja voit muuttaa sitä ennen kuin mitään tehdään.",
+      "agentsLead": "Agentteja, jotka on tehty yhdellä lauseella ja ajettu oikeasti. Valitse yksi: sen lause tulee tekstikenttään, ja voit muuttaa sitä ennen kuin mitään tehdään.",
       "groups": "Missä se auttaa",
       "uses": "Käyttää sovellusta",
       "noApp": "Ei tarvitse sovellusta",
@@ -19977,7 +19977,7 @@
       "canSilent": "Tietokone ei vastannut. Ohjelma, joka ajaa agentteja tietokoneella, voi olla pysähdyksissä.",
       "hostedTitle": "Oma AIMEAT",
       "hostedDesc": "Oma AIMEAT pilvessä. Me pidämme sen päällä, se ajaa agenttisi, eikä sinun tarvitse asentaa mitään. Ostat sen kaupasta.",
-      "order": "Astu kauppaan →",
+      "order": "Siirry kauppaan →",
       "orderSoon": "Kauppa avautuu pian.",
       "programs": {
         "title": "Ohjelmat, jotka se saa käynnistää",
@@ -20017,7 +20017,7 @@
     },
     "playbooks": {
       "title": "Mitä haluaisit perustaa?",
-      "lead": "Jokainen näistä on oikeasti tehtävissä täällä, ja mukana tulevat askeleet ja kehote joka vie perille.",
+      "lead": "Jokainen näistä on oikeasti tehtävissä täällä, ja mukana tulevat askeleet ja kehote, jolla asia hoituu.",
       "row": "Pystytettävää",
       "ask": "Pyydä agenttiani",
       "copy": "Kopioi omalle tekoälylleni",
@@ -20026,12 +20026,12 @@
       "tour": "Etkö ole varma mihin tämä pystyy? Käy kierroksella →",
       "businesslauncher": {
         "title": "Kauppa joka on auki iltapäivällä",
-        "lead": "Yksi kyllä pystyttää kaupan jota kuka tahansa voi selata, takahuoneen josta sitä pyöritetään, ja varaston joka ei myy samaa kappaletta kahdesti.",
+        "lead": "Yksi kyllä pystyttää kaupan jota kuka tahansa voi selata, hallintanäkymän josta sitä pyöritetään, ja varaston joka ei myy samaa kappaletta kahdesti.",
         "ask": "Haluan avata kaupan. Ohjaa minut läpi.",
         "step1": "Kerro mitä myyt ja kuka ostaa. Se yksi vastaus ratkaisee loput.",
         "step2": "Näet koko suunnitelman ennen kuin mitään on olemassa, ja sanot kerran kyllä.",
         "step3": "Tuotteet, hinnat ja sivut saavat oman tilansa jota kukaan muu ei näe.",
-        "step4": "Täytä sen verran kuin jaksat. Takahuone näyttää mitä puuttuu ja missä järjestyksessä.",
+        "step4": "Täytä sen verran kuin jaksat. Hallintanäkymä näyttää mitä puuttuu ja missä järjestyksessä.",
         "step5": "Ota kortit käyttöön silloin kun itse haluat. Sitä kysytään erikseen eikä oleteta."
       },
       "brain": {
@@ -20043,7 +20043,7 @@
         "step3": "Näet koko suunnitelman ennen kuin mitään on olemassa, ja sanot kyllä kerran.",
         "step4": "Se mitä se oppii säilyy omassa tilassasi jota kukaan muu ei voi lukea.",
         "step5": "Se avautuu yrityksesi omassa osoitteessa, sinulle ja niille jotka päästät sisään.",
-        "step6": "Kerro mikä sitä ruokkii, ja mitä kukin niistä ei kata. Se kertoo kun jokin hiljenee."
+        "step6": "Kerro, mistä lähteistä se saa tietonsa ja mitä kukin lähde ei kata. Se kertoo, kun jokin lähde lakkaa lähettämästä tietoa."
       },
       "marketplace": {
         "title": "Kauppa jossa maksavat kortit, kolikot ja agentit",
@@ -20061,7 +20061,7 @@
         "step1": "Valitse liitettävä tili. Kirjaudut heidän sivullaan, et koskaan täällä.",
         "step2": "Kerro kuka agenteistasi saa julkaista ja minne.",
         "step3": "Agentti kirjoittaa, sinä luet, ja se lähtee vasta kun sanot kyllä.",
-        "step4": "Jokainen julkaisu näkyy kirjauksissasi, ja yhdellä klikkauksella tili irtoaa taas."
+        "step4": "Jokainen julkaisu näkyy kirjauksissasi, ja yhdellä klikkauksella katkaiset tilin yhteyden taas."
       },
       "page": {
         "title": "Oma sivusi",
@@ -20074,9 +20074,9 @@
       },
       "instance": {
         "title": "Oma instanssisi",
-        "lead": "Koko homma omalla koneellasi tai pilvessäsi: omat sääntösi, oma datasi, omat kulusi.",
-        "ask": "Mietin AIMEATin ajamista omalla koneellani. Auta päättämään, ja asenna se sitten.",
-        "step1": "Mieti mitä haluat, mitä tämä paikka ei sinulle anna.",
+        "lead": "Koko homma omalla tietokoneellasi tai pilvessäsi: omat sääntösi, oma datasi, omat kulusi.",
+        "ask": "Mietin AIMEATin ajamista omalla tietokoneellani. Auta päättämään, ja asenna se sitten.",
+        "step1": "Mieti mitä haluat, mitä tämä palvelu ei sinulle anna.",
         "step2": "Asenna se: yksi komento, ja se vastaa omassa osoitteessasi.",
         "step3": "Tuo tavarasi mukana: muistit, tiedostot, tilat ja agentit kaikki siirtyvät.",
         "step4": "Päätä omat sääntösi, ja federoi muiden kanssa vain jos haluat."
@@ -20085,20 +20085,20 @@
     "ownAimeat": {
       "label": "Demo",
       "title": "Tämä on demo. Hanki oma AIMEAT.",
-      "text": "Moni käyttää tätä sivustoa asioiden kokeiluun. Oma AIMEAT on sama kokonaisuus omassa osoitteessasi ja sinun nimelläsi. Me pidämme sen käynnissä ja ajan tasalla kuukausimaksua vastaan, ja kaikki sen sisältö on sinun.",
-      "cta": "Astu kauppaan →"
+      "text": "Moni käyttää tätä demoa asioiden kokeiluun. Oma AIMEAT on sama kokonaisuus omassa osoitteessasi ja sinun nimelläsi. Me pidämme sen käynnissä ja ajan tasalla kuukausimaksua vastaan, ja kaikki sen sisältö on sinun.",
+      "cta": "Siirry kauppaan →"
     },
     "trust": {
-      "ai": "Tekoälyn tekemä sisältö kantaa täällä merkintänsä, kuten EU:n tekoälyasetus edellyttää.",
+      "ai": "Tekoälyn tekemä sisältö on täällä merkitty, kuten EU:n tekoälyasetus edellyttää.",
       "data": "Tietosi ovat sinun: vie ne pois tai poista ne, eikä mitään jaeta ennen kuin itse jaat.",
       "more": "Näin se toimii →"
     },
     "ach": {
       "title": "Kokeiltu tähän asti",
       "mat": "Esittelysivu julkaistu",
-      "agent": "Agentti kotona",
+      "agent": "Agentti yhdistetty",
       "chat": "Ensimmäinen keskustelu käyty",
-      "mcp": "Oma äly kytketty",
+      "mcp": "Oma tekoäly yhdistetty",
       "ownkey": "Oma AI-avain",
       "app": "Sovellus julkaistu",
       "space": "Jaetussa tilassa mukana",
@@ -20114,7 +20114,7 @@
     "step3Dim": "Aukeaa kun sinulla on sovellus joka osaa avata yhteyden.",
     "mat": {
       "title": "Profiilisi",
-      "lede": "Tekoälysi haastattelee sinua työstäsi ja tekee vastauksistasi yhden sivun käyntikortin, jonka ihmiset ja muut tekoälyt voivat lukea. Kopioi alla oleva kehote tekoälychattiisi, liitä sen vastaus laatikkoon ja paina nappia.",
+      "lede": "Tekoälysi haastattelee sinua työstäsi ja tekee vastauksistasi yhden sivun käyntikortin, jonka ihmiset ja muut tekoälyt voivat lukea. Kopioi alla oleva kehote tekoälychattiisi, liitä sen vastaus tekstikenttään ja paina nappia.",
       "promptLabel": "Kehote",
       "promptShort": "Lyhyempi kehote",
       "copy": "Kopioi kehote",
@@ -20125,7 +20125,7 @@
       "submit": "Tässä profiilini",
       "sending": "Luetaan…",
       "view": "Katso se",
-      "errEmpty": "Laatikko oli tyhjä.",
+      "errEmpty": "Tekstikenttä oli tyhjä.",
       "errEmptyPage": "Se oli sivu, mutta siinä ei ollut mitään. Pyydä tekoälyäsi kirjoittamaan siihen sisältöä.",
       "errGeneric": "En löytänyt sivua liittämästäsi tekstistä.",
       "errMissing": "En löytänyt sivua liittämästäsi tekstistä. Etsin {list}.",
@@ -20134,7 +20134,7 @@
       "missBody": "<body>-tagia",
       "listComma": ", ",
       "listAnd": " ja ",
-      "errKept": "Tekstisi on yhä laatikossa. Pyydä tekoälyltäsi koko HTML-tiedosto yhdessä koodilohkossa ja liitä uudestaan.",
+      "errKept": "Tekstisi on yhä tekstikentässä. Pyydä tekoälyltäsi koko HTML-tiedosto yhdessä koodilohkossa ja liitä uudestaan.",
       "attempts": "Yrityksiä tähän mennessä: {n}.",
       "tryShorter": "Näytä lyhyempi kehote"
     },
@@ -20154,8 +20154,8 @@
       "copied": "Kopioitu. Liitä se tekoälychattiisi",
       "doneManual": "Olen aloittanut",
       "waitTitle": "Odotetaan, että agenttisi ottaa yhteyttä.",
-      "waitBody": "Seuraava siirto on tekoälychatissasi: sen pitää ajaa kehote ja näyttää sinulle koodi. Kun se tekee niin, pyyntö ilmestyy tähän ja sinä hyväksyt sen.",
-      "cardSub": "Kytketty ja kotona."
+      "waitBody": "Seuraava vaihe on tekoälychatissasi: sen pitää ajaa kehote ja näyttää sinulle koodi. Kun se tekee niin, pyyntö ilmestyy tähän ja sinä hyväksyt sen.",
+      "cardSub": "Yhdistetty ja valmiina."
     },
     "feed": {
       "quiet": "Täällä on ollut hiljaista. Laitetaanko jotain tapahtumaan? Avaa chat ja sano, mitä tarvitset.",
@@ -20163,9 +20163,9 @@
       "accountCreated": "Kotisi on olemassa.",
       "welcomeMat": "Teit esittelysivusi. Katso se.",
       "agentKnocking": "Agenttisi pyytää yhteyttä.",
-      "agentConnected": "Agenttisi on kotona.",
-      "agentConnectedNamed": "{name} on kotona.",
-      "homeReady": "Kodin supervoimat ovat käytössä.",
+      "agentConnected": "Agenttisi on yhdistetty.",
+      "agentConnectedNamed": "{name} on yhdistetty.",
+      "homeReady": "Kotisi on valmis.",
       "skillInstalled": "Asensit taidon {name}.",
       "skillInstalledFor": "{agent} osaa nyt taidon {name}.",
       "extensionInstalled": "Asensit laajennuksen {name}.",
@@ -20253,7 +20253,7 @@
       "back": "Takaisin kotiin",
       "sub": "Tilisi {n} viimeisintä tapahtumaa, uusin ensin.",
       "subPlain": "Kaikki mitä tililläsi on tapahtunut, uusin ensin.",
-      "empty": "Tänne ei ole vielä kertynyt mitään. Se täyttyy sitä mukaa kun käytät paikkaa.",
+      "empty": "Tänne ei ole vielä kertynyt mitään. Se täyttyy sitä mukaa kun käytät omaa AIMEATiasi.",
       "today": "Tänään",
       "yesterday": "Eilen",
       "archiveTitle": "Tätä vanhemmat",
@@ -20272,8 +20272,8 @@
       },
       "organise": {
         "title": "Haluan organisoida",
-        "what": "Pidät sen mitä tiedät, ja sen mitä tiimisi tietää, yhdessä paikassa johon tekoälysi yltää.",
-        "next": "Seuraavaksi: nimeät mitä organisoit, ja työtila aukeaa sen ympärille.",
+        "what": "Pidät sen mitä tiedät, ja sen mitä tiimisi tietää, yhdessä paikassa, jota tekoälysi voi lukea.",
+        "next": "Seuraavaksi: nimeät mitä organisoit, ja sille tehdään työtila.",
         "entered": "Aloitit organisoinnin."
       },
       "monetise": {
@@ -20316,7 +20316,7 @@
       },
       "allControls": "Kaikki asetukset ja hallinta",
       "one": "Asetukset",
-      "allControlsHint": "Agentit, muisti, sovellukset, pääsy ja laskutus: kaikki, mitä kodin takana on."
+      "allControlsHint": "Agentit, muisti, sovellukset, pääsy ja laskutus: kaikki oman AIMEATisi asetukset."
     },
     "startPage": {
       "title": "Aloitussivu",
@@ -20843,7 +20843,7 @@
     "siteMaxTemplateSizeKb": "Sivupohjan enimmäiskoko (Kt)",
     "siteMaxTemplateSizeKbHint": "Suurin sallittu koko HTML-sivupohjan lataukselle",
     "siteCacheTtlSeconds": "Sivupohjan välimuistin elinaika (sekuntia)",
-    "siteCacheTtlSecondsHint": "Kuinka kauan resolvattua sivupohjaa säilytetään välimuistissa (0 = ei välimuistia)",
+    "siteCacheTtlSecondsHint": "Kuinka kauan valmiiksi täytettyä sivupohjaa säilytetään välimuistissa (0 = ei välimuistia)",
     "storage_label": "Tallennustausta",
     "storage_hint": "Mihin data tallennetaan",
     "storage_memory": "Muistissa (vain kehitys, data häviää uudelleenkäynnistyksessä)",
@@ -20851,7 +20851,7 @@
     "storage_postgresql": "PostgreSQL (tuotanto, vaatii erillisen palvelimen)",
     "sqlite_path_label": "SQLite-tietokannan polku",
     "sqlite_path_hint": "Tietokantatiedoston polku (luodaan automaattisesti)",
-    "pushEnabled": "Ota käyttöön push-ilmoitukset henkilökohtaisille nodeille?",
+    "pushEnabled": "Ota käyttöön push-ilmoitukset henkilökohtaisille solmuille?",
     "vapidPublicKey": "VAPID-julkinen avain",
     "vapidPublicKeyHint": "Luo komennolla: npx web-push generate-vapid-keys",
     "vapidPrivateKey": "VAPID-yksityinen avain",
@@ -20910,12 +20910,12 @@
     "aiSupervisoryNote": "Tekoälyn markkinavalvontaviranomainen on eri viranomainen kuin aiemmin antamasi tietosuojaviranomainen. Suomessa se on Traficom. Jätä tyhjäksi, jos et ole varma, niin läpinäkyvyysseloste kertoo, ettei viranomaista ole ilmoitettu.",
     "aiSupervisoryName": "Tekoälyn markkinavalvontaviranomainen (vapaaehtoinen)",
     "aiSupervisoryUrl": "Sen verkkosivu",
-    "aiCopNote": "EU:n käytännesäännöt tekoälysisällön läpinäkyvyydestä ovat vapaaehtoiset, ja ne allekirjoittaa organisaatiosi, ei tämä ohjelmisto. Vastaa kyllä vain, jos AI Office on vahvistanut allekirjoituksesi — node julkaisee sen osoitteessa /v1/ai-transparency vaatimustenmukaisuusväitteenä. EU:n merkintäkuvakkeiden käyttö ei kerro allekirjoittajuudesta mitään.",
+    "aiCopNote": "EU:n käytännesäännöt tekoälysisällön läpinäkyvyydestä ovat vapaaehtoiset, ja ne allekirjoittaa organisaatiosi, ei tämä ohjelmisto. Vastaa kyllä vain, jos AI Office on vahvistanut allekirjoituksesi: palvelin julkaisee sen osoitteessa /v1/ai-transparency vaatimustenmukaisuusväitteenä. EU:n merkintäkuvakkeiden käyttö ei kerro allekirjoittajuudesta mitään.",
     "aiCopSigned": "Onko organisaatiosi allekirjoittanut EU:n käytännesäännöt tekoälysisällön läpinäkyvyydestä?",
     "aiCopSections": "Mitkä osiot allekirjoititte?",
-    "aiCopSection2": "Osio 2 — käyttöönottaja",
+    "aiCopSection2": "Osio 2: käyttöönottaja",
     "aiCopSection2Desc": "Syvähuijausten sekä tekoälyn tuottaman ja muokatun julkaistun tekstin merkitseminen",
-    "aiCopSection1": "Osio 1 — tarjoaja",
+    "aiCopSection1": "Osio 1: tarjoaja",
     "aiCopSection1Desc": "Mallin tuotoksen konelukuinen merkintä; allekirjoita vain, jos ajat mallit itse",
     "aiCopSignedOn": "Päivä, jona allekirjoitus vahvistettiin (VVVV-KK-PP)",
     "aiCopSignedOnInvalid": "Käytä muotoa VVVV-KK-PP, esimerkiksi 2026-08-01"
@@ -20926,9 +20926,9 @@
       "claude": "CLAUDE.md",
       "agents": "AGENTS.md"
     },
-    "copy": "Kopioi blokki",
+    "copy": "Kopioi lohko",
     "from": "Generoitu lähteestä",
-    "workspaces": "workspacea",
+    "workspaces": "työtilaa",
     "loading": "Luetaan rakennetta…",
     "failed": "Tämän organismin rakennetta ei juuri nyt saatu luettua. Yritä hetken päästä uudelleen."
   },
@@ -21273,7 +21273,7 @@
     "genIdeaPh": "Kerro, mitä sovelluksen pitäisi tehdä…",
     "genOptional": "(valinnainen)",
     "genPacks": "Kyvykkyyspaketit",
-    "genPacksHint": "Kaaviot, muokattavat vuokaaviot, pelit, 3D. Itse ylläpidettyjä kirjastoja, joiden AI-ohjeet leipoutuvat kehotteeseen. Ideatekstisi esivalitsee sopivat paketit.",
+    "genPacksHint": "Kaaviot, muokattavat vuokaaviot, pelit, 3D. Itse ylläpidettyjä kirjastoja, joiden AI-ohjeet sisältyvät kehotteeseen. Ideatekstisi esivalitsee sopivat paketit.",
     "genStep2": "Kopioi kehote ja liitä se tekoälyllesi",
     "genStep2Hint": "Avaa Claude, ChatGPT tai mikä tahansa tekoälykeskustelu, liitä tämä sinne ja vastaa sen kysymyksiin. Se rakentaa sovelluksesi ja antaa sinulle yhden HTML-tiedoston.",
     "genPreview": "Kehotteen esikatselu",
@@ -21303,7 +21303,7 @@
     "genGiveStep": "Anna kehote tekoälyllesi",
     "genGiveHint": "Kopioi kehote ja liitä se kytkettyyn tekoälyysi. Tekoäly kysyy, mitä sen pitää tietää, näyttää, mitä se aikoo rakentaa, ja odottaa lupaasi. Valmiin sovelluksen se julkaisee itse ja antaa sinulle sen osoitteen.",
     "genOtherTitle": "Eikö tekoälysi voi kytkeytyä?",
-    "genOtherHint": "Esimerkiksi Microsoft 365 Copilot ei voi kytkeytyä. Kopioi silloin tämä pidempi kehote: rakennusohjeet kulkevat sen mukana. Tekoäly antaa sinulle yhden HTML-tiedoston, ja sinä lisäät sen tänne itse.",
+    "genOtherHint": "Esimerkiksi Microsoft 365 Copilot ei voi kytkeytyä. Kopioi silloin tämä pidempi kehote: se sisältää rakennusohjeet. Tekoäly antaa sinulle yhden HTML-tiedoston, ja sinä lisäät sen tänne itse.",
     "genOtherPacks": "Ideaasi varten mukana",
     "genOtherCopy": "Kopioi pitkä kehote",
     "inviteSubConnected": "Klikkaa tästä ja aloita. Oma tekoälysi rakentaa sovelluksen ja julkaisee sen tänne.",
@@ -21314,7 +21314,7 @@
     "wishGo": "GO",
     "wishLead": "Kirjoita se ja paina GO. Chatti aukeaa, ja tekoäly alkaa rakentaa sitä sun kanssa saman tien. Uusi täällä? Tili syntyy siinä sivussa, eikä mitään kirjoittamaasi katoa.",
     "pitchLead": "Tämä on yksi asia jonka voit tehdä AIMEATilla.",
-    "tierLegend": "KAIKILLE MALLEILLE = mikä tahansa malli osaa rakentaa sillä · LUE DOKUMENTTI = mallilla ei ole siitä ennakkotietoa, joten käyttöohje kulkee kehotteen mukana · VERSIOANSA = malli muistaa vanhemman version, joten seuraa ohjeen versiota",
+    "tierLegend": "KAIKILLE MALLEILLE = mikä tahansa malli osaa rakentaa sillä · LUE DOKUMENTTI = mallilla ei ole siitä ennakkotietoa, joten käyttöohje on mukana kehotteessa · VERSIOANSA = malli muistaa vanhemman version, joten seuraa ohjeen versiota",
     "wallOpens": "avausta",
     "wallForks": "kopiota",
     "wallOpen1": "avaus",
@@ -21343,7 +21343,7 @@
     "agentDoorCopy": "Kopioi kehote",
     "agentDoorCopied": "Kopioitu. Liitä se tekoälychattiisi",
     "agentDoorAfter": "Se kysyy sun sähköpostiosoitteen eikä muuta. Käyttäjänimen valitset itse linkin takana.",
-    "agentDoorMcp": "Varaudu konfiguroimaan sille konnektori myöhemmin; se on se askel joka päästää sen kotiisi suoraan.",
+    "agentDoorMcp": "Varaudu konfiguroimaan sille konnektori myöhemmin; se on se askel, jolla se saa suoran yhteyden kotiisi.",
     "agentDoorCannot": "Jos se sanoo ettei pysty, se on ihan kelpo vastaus. Rekisteröidy silloin alta.",
     "registerHome": "Luo tili",
     "registerHomeSub": "Jos sinulla ei vielä ole tiliä.",
@@ -21351,7 +21351,7 @@
     "showKicker": "Tää on demo. Ja se pyörii ihan oikeasti, joka päivä.",
     "showTitle1": "Kokeile kaikkea.",
     "showTitle2": "Ota sitten omaksi.",
-    "showSub": "Täysin toimiva AIMEAT, sun käytössä tänään, ilmaiseksi. Rakenna kokonainen järjestelmä tunnissa, vaikka oma CRM. Tuo kaikki tekoälyt, joita jo käytät, saman katon alle. Anna rutiinit agenteille ja anna niiden painaa. Kun kelpaa, hanki oma: koko tää sivusto sun omassa osoitteessa, sun nimellä.",
+    "showSub": "Täysin toimiva AIMEAT, sun käytössä tänään, ilmaiseksi. Rakenna kokonainen järjestelmä tunnissa, vaikka oma CRM. Tuo kaikki tekoälyt, joita jo käytät, samaan paikkaan. Anna rutiinit agenteille ja anna niiden painaa. Kun kelpaa, hanki oma: koko tää sivusto sun omassa osoitteessa, sun nimellä.",
     "showGetOwn": "Hanki oma AIMEAT →",
     "showConnect": "Kytke tekoäly, jota jo käytät →",
     "showAgentDoor": "Anna tekoälysi hoitaa rekisteröinti →",
@@ -21375,7 +21375,7 @@
     "storeTitle1": "Vakuuttiko demo?",
     "storeTitle2": "Hanki oma.",
     "storeText": "Kaikki, mitä sä just kokeilit, on esittelykappale. Sun oma AIMEAT on koko tää sivusto sun omassa osoitteessa, sun nimellä. Me pidetään se käynnissä ja ajan tasalla kuukausimaksua vastaan. Ja kaikki tämä on sinun käytössäsi, eiks oo siistiä vai mitä?",
-    "storeLi1": "Kaikki sun tekoälyt, Claude, ChatGPT ja paikalliset mallit, saman katon alla ja samalla muistilla: minkä kerrot yhdelle, sen muut tietää.",
+    "storeLi1": "Kaikki sun tekoälyt, Claude, ChatGPT ja paikalliset mallit, samassa paikassa ja samalla muistilla: minkä kerrot yhdelle, sen muut tietää.",
     "storeLi2": "Tietosi ja rakentamasi sovellukset ovat sinun. Sinä päätät, kenelle annat niihin pääsyn.",
     "storeOpensSoon": "Aukeaa pian",
     "storeSoonNote": "Kauppapaikka aukeaa pian.",
@@ -21391,7 +21391,7 @@
     "trust2Title": "Tekoälysisältö merkitty",
     "trust2Text": "Tekoälyn kirjoittama teksti on merkitty siinä, missä ihminen sen lukee, ja mukana on tieto siitä, miten se syntyi. EU:n tekoälyasetuksen mukainen ilmoitus on luettavissa, livenä.",
     "trust3Title": "Suostumus, jonka voi perua",
-    "trust3Text": "Agentti pääsee vain siihen, mihin sä annoit sille pääsyn. Vedä lupa pois, ja se pysyy poissa. Yksi klikkaus.",
+    "trust3Text": "Agentti pääsee vain siihen, mihin sä annoit sille pääsyn. Peru lupa, ja se pysyy peruttuna. Yksi klikkaus.",
     "trust4Title": "GDPR nappeina",
     "trust4Text": "Tililläsi on toiminnot tietojen vientiin ja poistoon. Tietojen säilytys- ja käsittelypaikat riippuvat valitsemastasi palvelimesta ja tekoälymallista.",
     "trustEu": "Tehty Suomessa, EU:ssa. Tämän listan säännöt on ne, joiden mukaan me itse eletään.",
@@ -21465,7 +21465,7 @@
     "ten3": "Huutokauppa päättyi.",
     "ten4": "Raportti lähti.",
     "ten5": "3D-maailma rakentui.",
-    "ten6": "Agentti heräsi seitsemältä ja teki sen taas.",
+    "ten6": "Agentti käynnistyi ajastettuna seitsemältä ja teki sen taas.",
     "tenMore": "Ja enemmän. Mutta miksi sinun pitäisi välittää?",
     "tenAnswer": "Koska sinun tekoälysi saa nämä kyvyt, ja sinä saat ne sen kautta.",
     "tenSelf": "Myös tämä sivu. Rakennettu täällä, itsellään.",
@@ -21500,7 +21500,7 @@
     "slideMemory": "Se minkä kerroit tekoälyllesi maaliskuussa on tallessa vielä syyskuussa.",
     "slideOffers": "Agentti huusi puolestasi kolmelta yöllä ja voitti.",
     "slideMcp": "Claude, ChatGPT ja Claude Code kaikki kytkettynä. Sama muisti, samat säännöt.",
-    "slideCompanies": "Kaksi yritystä, erilliset kirjat, yksi kirjautuminen.",
+    "slideCompanies": "Kaksi yritystä, erillinen kirjanpito, yksi kirjautuminen.",
     "slidePnl": "Jokainen euro jonka agentti käytti, ja sen vieressä mitä se tienasi.",
     "slideUsage": "Jokainen mallikutsu, ja kuka pyysi ja mitä se maksoi.",
     "slideSecurity": "Kaksivaiheinen kirjautuminen päällä, ja jokainen istunto listattuna laitteittain.",
@@ -21513,7 +21513,7 @@
     "slideSettingsDiscover": "Löysit kirjanpitäjän agentin toiselta paikkakunnalta ja palkkasit sen lähettämättä sähköpostia.",
     "slideSettingsPortfolio": "Oma julkinen sivusi, tehty tekoälysi kanssa yhdessä iltapäivässä, osoitteessa jossa on sinun nimesi.",
     "slideSettingsFleet": "Kolme agenttia, jokaisella oma työ, ja se joka hiljeni on merkitty.",
-    "slideSettingsEcosystem": "Ulkopuolinen sovellus pääsi sisään yhdellä hyväksynnällä ja yltää vain siihen kansioon jonka nimesit.",
+    "slideSettingsEcosystem": "Ulkopuolinen sovellus yhdistettiin yhdellä hyväksynnällä, ja se saa käyttää vain sitä kansiota, jonka nimesit.",
     "slideSettingsWorkflows": "Viisi askelta, kolme agenttia, ja yksi pysähdys jossa se odotti sinun kyllä-sanaasi.",
     "slideSettingsChatSessions": "Jokainen keskustelu jonka tekoälysi kävi täällä on tallessa, ja maaliskuinen aukeaa yhä.",
     "slideSettingsWallet": "Viisikymmentä murusta lunastettu tänä aamuna. Agenteilla ei ole yhtään, koska tahti on sinun.",
@@ -21527,11 +21527,11 @@
     "slideSettingsExtensions": "Skripti joka kutsuu sääpalvelua joka tunti ja pitää hallussaan avainta jota sinun ei tarvinnut liittää mihinkään.",
     "slideSettingsCapabilities": "Kyvykkyys rekisteröity, testattu ja kahden käyttäjän takaama.",
     "slideSettingsFederation": "Kirjauduit kaverin palvelimelle omalla nimelläsi etkä jättänyt sinne mitään.",
-    "slideSettingsNodes": "Oma palvelin omalla koneellasi, ankkuroitu tänne, ja postilaatikko sen nukkuessa.",
+    "slideSettingsNodes": "Oma palvelin omalla koneellasi, liitetty tänne, ja viestijono sille ajalle, kun se ei ole verkossa.",
     "slideSettingsDataWallet": "Kaikki tietosi saat ulos yhtenä tiedostona, ja sinä päätät, mikä tekoäly saa lukea mitäkin.",
     "slideSettingsNodeStats": "Mitä tämä palvelin pitää sisällään tänään, laskettuna livenä, ja kuinka nopeasti se kasvaa.",
     "slideSettingsEmail": "Gmail kytketty lukemiseen, Outlook lähettämiseen, ja tekoälysi kirjoittaa molemmista.",
-    "slideSettingsNotifications": "Kello kertoo kuka lähetti mitä, tönäisee yhdeksältä eikä kolmelta, ja pysyy hiljaa niiden kohdalla jotka mykistit.",
+    "slideSettingsNotifications": "Kello kertoo kuka lähetti mitä, ilmoittaa yhdeksältä eikä kolmelta, ja pysyy hiljaa niiden kohdalla jotka mykistit.",
     "slideSettingsAi": "Omat tekoälytilisi rinnakkain: mitä tiliä mihinkin käytetään, mitkä mallit ovat sallittuja, ja jos yksi ei vastaa, vuoro siirtyy seuraavalle.",
     "slideSettingsCalibrator": "Kehote viritetty neljällä kierroksella, ja voittanut versio on merkitty.",
     "slideSettingsPackages": "Valmis kokonaisuus omaan käyttöösi yhdellä painalluksella: sovellukset, agentit ja asetukset. Päivität silloin kun itse haluat.",
@@ -21545,7 +21545,7 @@
     "slideAdminSubdomains": "Jokainen sovellus omassa aliverkkotunnuksessaan, listattuna, ja ne, joita kukaan ei avannut kuukauteen, merkittyinä.",
     "slideAdminStats": "Omistajat, agentit, sovellukset ja muruset lukuina, tänään ja ajan mittaan.",
     "slideAdminDatabase": "Tietokannan koko, sen taulut, ja viime yönä otettu varmuuskopio.",
-    "slideAdminMetrics": "Palvelimen pulssi Prometheukselle, päällä kun operaattori niin sanoo.",
+    "slideAdminMetrics": "Palvelimen metriikat Prometheukselle, päällä kun operaattori niin sanoo.",
     "slideAdminUsage": "Kuka käytti mitä mallikutsuihin tässä kuussa, tileittäin.",
     "slideAdminPrompts": "Rakennuskehote, josta jokainen sovellus tehdään, versioituna ja täällä muokattuna.",
     "slideAdminOwners": "Tili suljettu keskipäivällä, ja jokainen sen nimissä toiminut istunto, avain ja agentti pysäytetty samalla.",
@@ -21557,22 +21557,22 @@
     "slideAdminActions": "Jokainen hinnoiteltu toiminto palvelimella, ja kuinka usein kutakin kutsuttiin.",
     "slideAdminBoards": "Neljä taulua, niiden säännöt, ja tänä aamuna ilmoitettu viesti jo piilotettuna.",
     "slideAdminChatInstances": "Jokainen pyörivä chat-instanssi, ja se joka lakkasi vastaamasta.",
-    "slideAdminRealtime": "Juuri nyt avoinna olevat huoneet, ja montako selainta kussakin istuu.",
+    "slideAdminRealtime": "Juuri nyt avoinna olevat huoneet, ja montako selainta kussakin on.",
     "slideAdminWork": "Jokainen agenttien välinen työ, sen sulkutili, ja riita jonka operaattori ratkaisi.",
     "slideAdminMessages": "Keskustelut koko palvelimelta, haettavissa, ja jokaisen viestin kirjoittanut malli.",
     "slideAdminMemory": "Vahingossa poistettu merkintä, löydetty tilien yli ja palautettu.",
     "slideAdminAgentTasks": "Jokainen tehtävä jokaisen agentin jonossa, ja se joka epäonnistui kahdesti.",
-    "slideAdminSharingGroups": "Jokainen muistin nurkka jonka joku avasi ryhmälle, ja kuka sen näkee.",
+    "slideAdminSharingGroups": "Jokainen muistin osa, jonka joku jakoi ryhmälle, ja kuka sen näkee.",
     "slideAdminCapabilities": "Jokainen palvelimelle rekisteröity kyvykkyys, ja kuka sen takasi.",
     "slideAdminApps": "Jokainen sovellus, myös listalta poistetut ja piilotetut, ja syy, miksi kukin piilotettiin.",
     "slideAdminEmail": "Sähköpostit jotka palvelin lähettää, kolmella kielellä, muokattuina paikan päällä.",
-    "slideAdminPush": "Tönäisyt jokaiseen laitteeseen joka niitä pyysi, ja ne jotka pomppasivat takaisin.",
+    "slideAdminPush": "Push-ilmoitukset jokaiseen laitteeseen, joka niitä pyysi, ja ne, jotka palautuivat.",
     "slideAdminConsul": "Yksi asetuskokonaisuus viety ulos ja tuotu kahdellekymmenelle palvelimelle.",
     "slideAdminScheduler": "Jokainen taustatyö, milloin se viimeksi ajettiin, ja yksi käynnistetty käsin.",
     "slideAdminDirectory": "Jokainen ihminen ja organismi joka halusi listalle, luettavissa ilman tiliä.",
     "slideAdminExtensions": "Jokainen asennettu laajennus, kuka sitä käyttää, ja mihin koukkuun se vastaa.",
     "slideAdminCortex": "Skeemojen, kehotteiden ja kirjastojen niput, joista sovellukset kootaan, asennettuina ja päivitettyinä.",
-    "slideAdminCsm": "Yhteisöpalvelun tietomuoto kuvattu kerran, ja jokainen sitä ymmärtävä sovellus käyttää samaa.",
+    "slideAdminCsm": "Yhteisöpalvelun skeema kuvattu kerran, ja jokainen sitä ymmärtävä sovellus käyttää samaa.",
     "slideAdminKnowledge": "Palvelimelle tuodut tietopaketit, katselmoitu ennen kuin ne näytetään.",
     "slideAdminSkills": "Palvelintason taidot, ja mitkä agentit lukevat kutakin.",
     "slideAdminPackages": "Palvelimelle asennetut paketit, koeajo ennen ja peruutus jälkeen.",
@@ -21619,7 +21619,7 @@
     "closeStart": "AI & me at the start, Founder #NN/50."
   },
   "landing.transCta": "Näin tekoälysisältö merkitään täällä →",
-  "landing.transLine": "Täällä mallin kirjoittama sisältö kantaa mukanaan tiedon siitä, miten se on tehty, ja merkinnän siellä missä ihminen sen lukee.",
+  "landing.transLine": "Täällä mallin kirjoittamassa sisällössä on tieto siitä, miten se on tehty, ja merkintä siellä, missä ihminen sen lukee.",
   "launcher": {
     "title": "Omat Sovellukset",
     "addApp": "Lisää sovellus",
@@ -21627,7 +21627,7 @@
     "search": "Hae sovelluksia...",
     "noApps": "Ei sovelluksia vielä",
     "noAppsHint": "Lisää ensimmäinen sovellus +-painikkeella",
-    "importAimeat": "Tuo AIMEAT:sta",
+    "importAimeat": "Tuo AIMEATista",
     "export": "Vie varmuuskopio",
     "import": "Tuo varmuuskopio",
     "clearAll": "Tyhjennä kaikki",
@@ -21678,7 +21678,7 @@
     "chartTd": "Vuokaavio ↓",
     "level": "Taso",
     "levelWs": "Työtilat",
-    "levelSpaces": "+ Spacet",
+    "levelSpaces": "+ Tilat",
     "levelCounts": "+ Määrät",
     "showUsers": "Käyttäjät",
     "showActivity": "Aktiviteetti",
@@ -21687,7 +21687,7 @@
   },
   "modal": {
     "title": "❤️ AIMEAT Kirjaudu",
-    "descNew": "Valitse käyttäjänimi ja salasana. Tilisi asuu täällä.",
+    "descNew": "Valitse käyttäjänimi ja salasana. Tilisi tallennetaan tänne.",
     "descReturning": "Kirjoita käyttäjänimi tai sähköposti, jolla rekisteröidyit.",
     "usernamePlaceholder": "Käyttäjänimi",
     "passwordPlaceholder": "Salasana (vähintään 8 merkkiä)",
@@ -21702,8 +21702,8 @@
     "errUserShort": "Käyttäjänimen tulee olla vähintään 3 merkkiä",
     "errPassShort": "Salasanan tulee olla vähintään 8 merkkiä",
     "errWrongPass": "Väärä salasana tälle käyttäjänimelle.",
-    "connectingHome": "Yhdistetään kotipalveluusi...",
-    "errFederatedLogin": "Kotipalveluusi {remoteNode} ei saatu yhteyttä kirjautumista varten.",
+    "connectingHome": "Yhdistetään omaan AIMEATiisi...",
+    "errFederatedLogin": "Omaan AIMEATiisi {remoteNode} ei saatu yhteyttä kirjautumista varten.",
     "loggedIn": "kirjautuneena",
     "logoutBtn": "Kirjaudu ulos",
     "switchLanguage": "Kieli",
@@ -21758,7 +21758,7 @@
     "usernameSent": "Jos sähköpostiosoitteella on tili, käyttäjätunnus lähetettiin.",
     "completeAccountTitle": "Vielä yksi vaihe",
     "completeAccountDesc": "Lisää sähköpostiosoite viimeistelläksesi tilisi. Lähetämme vahvistuskoodin sen vahvistamiseksi.",
-    "completeAccountDescResend": "Vahvista sähköpostiosoitteesi kirjautuaksesi sisään. Lähetämme vahvistuskoodin — muokkaa osoitetta, jos se on väärin.",
+    "completeAccountDescResend": "Vahvista sähköpostiosoitteesi kirjautuaksesi sisään. Lähetämme vahvistuskoodin. Muokkaa osoitetta, jos se on väärin.",
     "registerEmailTitle": "Lisää sähköpostiosoitteesi",
     "registerEmailDesc": "Anna sähköpostiosoitteesi luodaksesi tilisi. Lähetämme vahvistuskoodin sen vahvistamiseksi.",
     "sendVerificationCode": "Lähetä vahvistuskoodi",
@@ -21816,22 +21816,22 @@
     "signupIntro": "Kirjaudut ensimmäistä kertaa. Valitse AIMEAT-tilisi käyttäjätunnus.",
     "signupEmailNote": "Rekisteröidyt osoitteella {email}",
     "signupUsernameLabel": "Käyttäjätunnus",
-    "signupSuggestedHint": "Ehdotimme tunnusta tilisi perusteella — voit vaihtaa sen mihin tahansa.",
-    "signupPermanentWarning": "⚠️ Tämä käyttäjätunnus on pysyvä. Se tunnistaa sinut koko AIMEATissa eikä sitä voi vaihtaa jälkikäteen — ainoa tapa muuttaa se on poistaa tili ja luoda uusi.",
+    "signupSuggestedHint": "Ehdotimme tunnusta tilisi perusteella. Voit vaihtaa sen mihin tahansa.",
+    "signupPermanentWarning": "⚠️ Tämä käyttäjätunnus on pysyvä. Se tunnistaa sinut koko AIMEATissa eikä sitä voi vaihtaa jälkikäteen: ainoa tapa muuttaa se on poistaa tili ja luoda uusi.",
     "signupDisplayNameLabel": "Näyttönimi",
-    "signupDisplayNameHint": "Näkyy muille — ei pysyvä, voit vaihtaa sen milloin tahansa myöhemmin.",
+    "signupDisplayNameHint": "Näkyy muille. Ei pysyvä, voit vaihtaa sen milloin tahansa myöhemmin.",
     "signupAvailable": "✓ Vapaa",
-    "signupTaken": "Tämä käyttäjätunnus on jo varattu — valitse toinen.",
+    "signupTaken": "Tämä käyttäjätunnus on jo varattu. Valitse toinen.",
     "signupInvalid": "Käyttäjätunnuksen pituus 3–64 merkkiä: pieniä kirjaimia, numeroita ja väliviivoja.",
     "signupCreateBtn": "Luo tilini",
     "signupCreating": "Luodaan tiliä...",
     "signupCancelBtn": "Peruuta",
     "signupLinkTitle": "Tällä sähköpostilla on jo tili",
-    "signupLinkIntro": "AIMEAT-tili käyttää jo osoitetta {email}, mutta sähköpostia ei ole vielä vahvistettu. Kirjaudu kerran käyttäjätunnuksella ja salasanalla — se vahvistaa sähköpostisi, ja sen jälkeen tämä kirjautumistapa yhdistyy tiliisi automaattisesti.",
+    "signupLinkIntro": "AIMEAT-tili käyttää jo osoitetta {email}, mutta sähköpostia ei ole vielä vahvistettu. Kirjaudu kerran käyttäjätunnuksella ja salasanalla: se vahvistaa sähköpostisi, ja sen jälkeen tämä kirjautumistapa yhdistyy tiliisi automaattisesti.",
     "signupLinkHint": "(Vihje käyttäjätunnuksesta: {hint}.)",
     "signupLinkSignInBtn": "Kirjaudu salasanalla",
     "signupExpiredTitle": "Kirjautumisistunto vanheni",
-    "signupExpiredBody": "Kirjautumisistuntosi vanheni tai keskeytyi. Salasanaa ei tarvita — napsauta ”Jatka Googlella” uudelleen aloittaaksesi alusta.",
+    "signupExpiredBody": "Kirjautumisistuntosi vanheni tai keskeytyi. Salasanaa ei tarvita: napsauta ”Jatka Googlella” uudelleen aloittaaksesi alusta.",
     "signupExpiredOkBtn": "OK",
     "whyTitle": "Mitä saat?",
     "whyGhii": "Oma digitaalinen identiteetti. Vain sinä hallitset sitä",
@@ -21971,7 +21971,7 @@
     "newAgentDisplayName": "Näyttönimi (valinnainen)",
     "newAgentDisplayNameHint": "esim. {client} työkoneella",
     "newAgentNameHint": "Nimestä tulee agentin tunniste: kaikki, mitä agentti täällä tekee, kirjataan sen nimiin, ja sama nimi näkyy agenttilistassasi, tapahtumissa ja agentin kirjoittamien tietojen vieressä.",
-    "homeNamed": "Nimi tulee kodistasi: annoit sen agentillesi jo siellä, joten tässä syntyy se sama agentti, ei toista.",
+    "homeNamed": "Nimi tulee omasta AIMEATistasi: annoit sen agentillesi jo siellä, joten tässä syntyy se sama agentti, ei toista.",
     "newAgentNameError": "Nimen on oltava 3–64 merkkiä: pienet kirjaimet, numerot ja väliviivat. Nimen alku ja loppu kirjaimella tai numerolla.",
     "createBtn": "Luo",
     "cancelBtn": "Peruuta",
@@ -22071,7 +22071,7 @@
   "openItems.origin.appdev.build": "sovelluksen rakentamisesta",
   "openItems.origin.appdev.flow": "sovelluksen rakentamisesta",
   "openItems.origin.chat": "tekoälychatistasi",
-  "openItems.origin.home.mat": "tervetulosivultasi",
+  "openItems.origin.home.mat": "esittelysivultasi",
   "openItems.origin.home.rooms.create": "kohdasta Haluan tehdä asioita",
   "openItems.origin.home.rooms.organise": "kohdasta Haluan järjestää",
   "openItems.suggestion": "Ehdotus, katoaa itsestään kun tämä on tehty",
@@ -22959,7 +22959,7 @@
   },
   "pool": {
     "title": "Mitä aiot tehdä",
-    "suggestion": "Ehdotus — katoaa itsestään kun tämä on tehty",
+    "suggestion": "Ehdotus: katoaa itsestään kun tämä on tehty",
     "isDoing": "tekee tätä",
     "yours": "Sinun",
     "markDone": "Tehty",
@@ -23027,13 +23027,13 @@
       "flow3": "Liitä valmis HTML takaisin ja julkaise",
       "selectedOf": "{sel}/{total} valittu",
       "selectAll": "Valitse kaikki",
-      "generateDisabledHint": "Valitse vähintään yksi kohde stepissä 1",
+      "generateDisabledHint": "Valitse vähintään yksi kohde vaiheessa 1",
       "charCount": "{n} merkkiä",
       "publishTarget": "Julkaistaan osoitteeseen:",
       "previewBtn": "Esikatsele",
       "closePreview": "Sulje esikatselu",
       "unpublish": "Poista julkaisusta",
-      "unpublished": "Otettu pois verkosta. Sivu on yhä tallessa — voit julkaista sen uudelleen alta.",
+      "unpublished": "Otettu pois verkosta. Sivu on yhä tallessa, ja voit julkaista sen uudelleen alta.",
       "viewStandalone": "Oma osoite",
       "standaloneTarget": "Tarjotaan myös omassa osoitteessa:",
       "showBadge": "Näytä aimeat.io-badge omalla sivulla",
@@ -27668,10 +27668,10 @@
     "passwordOpen": "Avaa",
     "passwordOpening": "Avataan…",
     "passwordWrong": "Väärä salasana.",
-    "passwordTooMany": "Liian monta yritystä — yritä uudelleen muutaman minuutin päästä.",
+    "passwordTooMany": "Liian monta yritystä. Yritä uudelleen muutaman minuutin päästä.",
     "accountTitle": "Kirjaudu sisään nähdäksesi tämän jaon",
     "accountDesc": "Omistaja jakaa nämä dokumentit vain kirjautuneille käyttäjille. Kirjaudu sisään sivun oikeasta yläkulmasta ja yritä sitten uudelleen.",
-    "accountRetry": "Kirjauduin sisään — yritä uudelleen",
+    "accountRetry": "Kirjauduin sisään, yritä uudelleen",
     "membersTitle": "Vain tämän yhteisen paikan jäsenet voivat avata nämä dokumentit",
     "membersDescAs": "Olet kirjautunut käyttäjänä {name}, mutta tämä tili ei ole sen yhteisen paikan jäsen, johon dokumentit kuuluvat. Pyydä linkin lähettäjää lisäämään sinut jäseneksi ja yritä sitten uudelleen.",
     "membersDesc": "Tämä tili ei ole sen yhteisen paikan jäsen, johon dokumentit kuuluvat. Pyydä linkin lähettäjää lisäämään sinut jäseneksi ja yritä sitten uudelleen.",
@@ -27698,14 +27698,14 @@
     "clear": "Tyhjennä",
     "noMatches": "Ei osumia",
     "paletteTitle": "Hae kaikkea",
-    "palettePlaceholder": "Hae organismeja, työtiloja, recordeja…",
+    "palettePlaceholder": "Hae organismeja, työtiloja, tietueita…",
     "recents": "Viimeisimmät",
     "results": "Tulokset",
     "openHint": "↵ avaa · Esc sulje",
     "searching": "Haetaan…"
   },
   "setup": {
-    "pickTool": "Mihin AI-työkaluun kytket? Askeleet eroavat sen verran että yleisversiosta ei ole hyötyä.",
+    "pickTool": "Minkä AI-työkalun yhdistät? Askeleet eroavat sen verran että yleisversiosta ei ole hyötyä.",
     "moreTools": "Muut tekoälytyökalut ({n})",
     "ifItFails": "Jos se ei toimi",
     "recommendedBadge": "suositus aloitukseen",
@@ -27714,14 +27714,14 @@
     "leaveEmpty": "jätä tyhjäksi",
     "officialDocs": "Viralliset ohjeet:",
     "instrBtn": "AI-chatin ohjeet",
-    "instrBtnHint": "Blokki jonka liität AI-chattisi ohjeisiin, ja mihin kohtaan se sinun työkalussasi menee",
+    "instrBtnHint": "Lohko jonka liität AI-chattisi ohjeisiin, ja mihin kohtaan se sinun työkalussasi menee",
     "instrTitle": "AI-chatin ohjeet",
     "instrLead": "Liitä tämä tekoälysi ohjeisiin, niin jokainen keskustelu alkaa tietäen rakenteesi. Lakkaat selittämästä sitä uudelleen, tekoäly lakkaa arvailemasta mihin asiat kuuluvat, agenttisi kirjoittavat samoihin paikkoihin joten ne voivat jatkaa toistensa työstä, ja sama konteksti lakkaa kulumasta tokeneina joka chatissa.",
     "loadingOrgs": "Luetaan organismejasi…",
     "noOrgs": "Sinulla ei ole vielä organismia, ja lohko tehdään sellaisen pohjalta. Luo se ensin: Yhdistä tekoälysi -sivun Hello MCP -vaiheessa on siihen valmis kehote.",
     "whichOrg": "Mikä organismi?",
     "whereTitle": "Mihin se menee sinun työkalussasi",
-    "loadingTools": "Luetaan asennusohjeita tältä nodelta…",
+    "loadingTools": "Luetaan asennusohjeita tältä palvelimelta…",
     "toolsFailed": "Asennusohjeita ei juuri nyt saatu luettua. Connect-sivulla on samat askeleet."
   },
   "skills": {
@@ -27749,11 +27749,11 @@
   "start": {
     "jira": {
       "title": "Kuinka kuollut sun JIRA on?",
-      "sub": "Diagnoosi kestää 90 sekuntia. Ei sähköpostiporttia, ei lomaketta, ei myyjän soittoa. Lopussa saat tuomion ja playbookin, jolla kokeilet hoitoa itse."
+      "sub": "Diagnoosi kestää 90 sekuntia. Ei sähköpostiosoitteen kysymistä, ei lomaketta, ei myyjän soittoa. Lopussa saat tuomion ja playbookin, jolla kokeilet hoitoa itse."
     },
     "def": {
       "title": "Missä jamassa sun agentit on?",
-      "sub": "Diagnoosi kestää 90 sekuntia. Ei sähköpostiporttia, ei lomaketta, ei myyjän soittoa. Lopussa saat tuomion ja playbookin, jolla kokeilet hoitoa itse."
+      "sub": "Diagnoosi kestää 90 sekuntia. Ei sähköpostiosoitteen kysymistä, ei lomaketta, ei myyjän soittoa. Lopussa saat tuomion ja playbookin, jolla kokeilet hoitoa itse."
     },
     "startCta": "Aloita diagnoosi",
     "meta": "3 kysymystä · tuomio · playbook",
@@ -27782,8 +27782,8 @@
       "none": "Ei mitään. Esittelen itseni sille joka aamu uudestaan."
     },
     "q3": {
-      "title": "Missä sun tekoälyn tuotokset asuu?",
-      "home": "Yhteisessä kodissa, josta tiimi ja muut agentit löytää ne",
+      "title": "Mihin sun tekoälyn tuotokset tallentuu?",
+      "home": "Yhteisessä työtilassa, josta tiimi ja muut agentit löytää ne",
       "disk": "Mun koneella, kansiossa nimeltä final_v3_OIKEA",
       "scattered": "Pitkin chat-historioita. Ei niitä kukaan kaiva."
     },
@@ -27797,7 +27797,7 @@
     },
     "t2": {
       "name": "Taso 2: Töissä ilman pomoa",
-      "desc": "Agentteja on ja jotain ne tekevätkin, mutta mikään ei jää talteen eikä kukaan johda kokonaisuutta. Puuttuu koti, muisti ja pomo."
+      "desc": "Agentteja on ja jotain ne tekevätkin, mutta mikään ei jää talteen eikä kukaan johda kokonaisuutta. Puuttuu yhteinen työtila, muisti ja pomo."
     },
     "t3": {
       "name": "Taso 3: Käy töissä",
@@ -27806,7 +27806,7 @@
     "q4": {
       "title": "Miten haluat kokeilla?",
       "hosted": "Testaan ensin: hostattu aimeat.io, ei asennusta",
-      "self": "Väkerrän itse: oma node omalle raudalle (MIT, ilmainen)",
+      "self": "Väkerrän itse: oma AIMEAT omalle raudalle (MIT, ilmainen)",
       "help": "Haluan apua: tehkää te ($$)"
     },
     "q5": {
@@ -27820,7 +27820,7 @@
     "q5n": {
       "title": "Mitä haluaisit agenttien hoitavan ensimmäisenä?",
       "code": "Koodia ja PR:iä",
-      "docs": "Dokumentaatiota ja tiedon kotia",
+      "docs": "Dokumentaatiota ja yhteinen tietopankki",
       "watch": "Seurantaa ja raportointia: mitä tapahtuu, joka aamu",
       "unsure": "En tiedä vielä, siksi kysynkin"
     },
@@ -27834,18 +27834,18 @@
       "title": "Sun playbook",
       "sub": "Muodostui vastauksistasi. Tallenna tämä: se on samalla ensimmäisen jaetun tilasi ensimmäinen dokumentti.",
       "estHosted": "Arvioitu aika: 10–15 minuuttia",
-      "estSelf": "Arvioitu aika: tyhjästä pyörivään nodeen, todistetusti 21 minuuttia",
+      "estSelf": "Arvioitu aika: tyhjästä toimivaan omaan AIMEATiin, todistetusti 21 minuuttia",
       "copyAll": "Kopioi playbook",
       "print": "Tulosta / tallenna PDF",
       "s1": {
-        "title": "Vaihe 1: Tili ja koti",
-        "a": "Luo ilmainen tili. Ei korttia, ei maksua. Tili on agenttisi koti ja sinun lupasi sille että se on olemassa.",
+        "title": "Vaihe 1: Tili",
+        "a": "Luo ilmainen tili. Ei korttia, ei maksua. Tilillä agenttisi tekee työnsä, ja tili on sinun lupasi sille että se on olemassa.",
         "link": "Luo tili →"
       },
       "s1self": {
-        "title": "Vaihe 1: Asenna oma node",
+        "title": "Vaihe 1: Asenna oma AIMEAT",
         "a": "Kloonaa ja aja init-wizard, se kysyy loput:",
-        "b": "Kaikki alla oleva tehdään sen jälkeen omaa nodeasi vasten: korvaa aimeat.io-osoite omallasi. Sun rauta, sun avaimet, sun data."
+        "b": "Kaikki alla oleva tehdään sen jälkeen omaa AIMEATiasi vasten: korvaa aimeat.io-osoite omallasi. Sun rauta, sun avaimet, sun data."
       },
       "s2": {
         "title": "Vaihe 2: Yhdistä tekoälysi",
@@ -27855,14 +27855,14 @@
         "cursor": "Käytä yhden klikkauksen asennusta connect-sivulta:",
         "cursorLink": "Avaa connect-sivu →",
         "other": "Jos työkalussasi on Connectors / custom MCP -tuki, liitä siihen tämä osoite:",
-        "otherNote": "Eikö tekoälysi tue MCP:tä? AIMEAT toimii myös kehotteilla: sovellus kirjoittaa kehotteet, sinä viet ne chattiin ja tuot vastaukset takaisin. Se on ilmaista ja toimii minkä tahansa tekoälyn kanssa.",
+        "otherNote": "Eikö tekoälysi tue MCP:tä? AIMEAT toimii myös kehotteilla: sovellus kirjoittaa kehotteet, sinä liität ne chattiin ja tuot vastaukset takaisin. Se on ilmaista ja toimii minkä tahansa tekoälyn kanssa.",
         "approve": "Kun AI pyytää pääsyä, hyväksy agentti profiilissasi ja valitse sen oikeudet. Yhtään agenttia ei synny ilman sinun hyväksyntääsi.",
-        "localhost": "Ajatko AIMEATia omalla koneellasi (localhost)? Pilvessä toimiva tekoäly, kuten claude.ai, ei tavoita localhost-osoitetta MCP:n kautta. Asenna liitin ja aja `aimeat connect serve`. Se välittää yhteyden omalta koneeltasi tekoälylle."
+        "localhost": "Ajatko AIMEATia omalla tietokoneellasi (localhost)? Pilvessä toimiva tekoäly, kuten claude.ai, ei tavoita localhost-osoitetta MCP:n kautta. Asenna liitin ja aja `aimeat connect serve`. Se välittää yhteyden omalta tietokoneeltasi tekoälylle."
       },
       "s3": {
         "title": "Vaihe 3: Laita tekoälysi töihin",
         "lead": "Kopioi tämä kehote tekoälyllesi:",
-        "prompt": "Olet kytketty AIMEAT-alustaan MCP:llä. Luo minulle organismi nimeltä 'Oma toimitalo' ja siihen workspace. Lue sitten mitä siellä on, kysy minulta mitä haluan sinun tekevän, ja kirjaa vastaukseni ensimmäiseksi taskiksi workspaceen. Kuittaa kun taski on tallessa.",
+        "prompt": "Olet kytketty AIMEAT-alustaan MCP:llä. Luo minulle organismi nimeltä 'Oma toimisto' ja siihen työtila. Lue sitten mitä siellä on, kysy minulta mitä haluan sinun tekevän, ja kirjaa vastaukseni ensimmäiseksi tehtäväksi työtilaan. Kuittaa kun tehtävä on tallessa.",
         "check": "Tarkista profiilistasi: tehtävä ilmestyi. Näit juuri koko silmukan: idea → muisti → työjono. Ilman seremonioita."
       },
       "s4": {
@@ -27873,7 +27873,7 @@
       "s5": {
         "title": "Vaihe 5: Automaatiotaso",
         "manual": "Valitsit: kun käsken. Aloita jokainen keskustelu kehotteella: 'Lue työtilan avoimet tehtävät ja hoida ne.' Sinä olet ajastin, ja se riittää alkuun.",
-        "routine": "Valitsit: sovittu rutiini. Sovi tekoälysi kanssa ajastettu tarkistus, joka lukee työjonon säännöllisesti. AIMEATin omat ajastukset herättävät ja muistuttavat.",
+        "routine": "Valitsit: sovittu rutiini. Sovi tekoälysi kanssa ajastettu tarkistus, joka lukee työjonon säännöllisesti. AIMEATin omat ajastukset käynnistävät tarkistuksen ja muistuttavat.",
         "continuous": "Valitsit: itsestään. Connector serve -daemon ajaa agenttiasi taustalla ja tehtävät tulevat pushina, ei pollausta. Tällä mallilla toimii tuotannossa 33 agenttia.",
         "link": "Connector-ohjeet →",
         "upgrade": "Tasoa voi nostaa milloin vain: käsin → rutiini → daemon. Playbook ei vanhene."
@@ -27900,7 +27900,7 @@
     },
     "doors": {
       "title": "Kolme tapaa aloittaa",
-      "sub": "Sama paikka, kolme tapaa aloittaa. Playbookisi kattaa valitsemasi, muut ovat tässä.",
+      "sub": "Sama AIMEAT, kolme tapaa aloittaa. Playbookisi kattaa valitsemasi, muut ovat tässä.",
       "hosted": "Testaa hostattuna",
       "hostedDesc": "Ilmainen tili, ei asennusta.",
       "self": "Väkerrä itse",
@@ -27935,9 +27935,9 @@
     "pick": "Valitse kohta nähdäksesi rakenteen silloin.",
     "changed": "rakenne muuttui"
   },
-  "transparency.checkAnswer": "Vastaus koskee sisältöä joka on juuri nyt julkisesti luettavissa tällä nodella. Kun sisällön piilottaa, sen alkuperätieto lakkaa vastaamasta ulkopuolisille — tyhjä vastaus ei siis ole todiste mistään.",
+  "transparency.checkAnswer": "Vastaus koskee sisältöä joka on juuri nyt julkisesti luettavissa tällä nodella. Kun sisällön piilottaa, sen alkuperätieto lakkaa vastaamasta ulkopuolisille, joten tyhjä vastaus ei ole todiste mistään.",
   "transparency.checkLead": "Kuka tahansa voi tarkistaa noden lähettämän sisällön tavu tavulta ilman tiliä ja ilman avainta. Ota vastaanottamasi tavut sellaisinaan, laske niistä SHA-256-tiiviste ja kysy:",
-  "transparency.checkLimit": "Tämä toimii silloin kun node lähetti sinulle samat tavut jotka se tiivisti. Jos node kokoaa dokumentin uudelleen lähtiessään, tiivistettyjä tavuja ei saa takaisin vastauksesta eikä haku löydä mitään — käytä silloin vastauksen Link-otsakkeen tunnusta. Tämä on todellinen rajoitus, ei haku jota kannattaisi yrittää uudestaan.",
+  "transparency.checkLimit": "Tämä toimii silloin kun node lähetti sinulle samat tavut jotka se tiivisti. Jos node kokoaa dokumentin uudelleen lähtiessään, tiivistettyjä tavuja ei saa takaisin vastauksesta eikä haku löydä mitään. Käytä silloin vastauksen Link-otsakkeen tunnusta. Tämä on todellinen rajoitus, ei haku jota kannattaisi yrittää uudestaan.",
   "transparency.checkTitle": "Tarkista sisältö itse",
   "transparency.copIcons": "Merkinnöissä käytetyt kuvakkeet ovat EU:n tekoälytoimistolta. Niiden käyttö ei kerro allekirjoittamisesta mitään, emmekä esitä sitä niin.",
   "transparency.copNo": "Tämän noden ylläpitäjä ei ole allekirjoittanut EU:n käytännesääntöjä tekoälysisällön läpinäkyvyydestä. Elävä ilmoitus kertoo saman, ja se kertoo sen juuri siksi, että vastauksella olisi merkitystä jos se joskus muuttuu.",
@@ -27952,7 +27952,7 @@
   "transparency.devTitle": "Kehittäjälle",
   "transparency.intro": "Kun malli kirjoittaa täällä jotain, node tallentaa miten se syntyi: mikä malli, milloin, kenen tunnuksella ja kuinka paljon ihminen oli mukana. Tämä alkuperätieto saa oman osoitteensa. Siellä missä ihminen lukee sisältöä tämän noden omilla sivuilla, alkuperätiedosta tulee näkyvä merkintä: EU:n tekoälytoimiston virallinen kuvake ja lyhyt lause suomeksi tai englanniksi sisällön vieressä, ja linkki koko alkuperätietoon. Ohjelmat saavat samat tiedot suoraan vastauksesta: HTTP-otsakkeista, sivun metatiedoista sekä markdown- ja MCP-pinnoilta.",
   "transparency.limit1": "Tämä node ei vesileimaa tekstiä. Se ei näe sanoja siinä vaiheessa kun malli tuottaa niitä, ja se kerros kuuluu sille joka mallia ajaa. Node tallentaa miten sisältö syntyi ja näyttää sen.",
-  "transparency.limit2": "Merkinnän saa pois kopioimalla. Liitä sanat toiseen paikkaan, ja merkintä on poissa. Omassa osoitteessaan oleva alkuperätieto jää — juuri siksi kerroksia on kaksi — mutta mikään täällä ei tee tekstistä väärentämätöntä, emmekä väitä muuta.",
+  "transparency.limit2": "Merkinnän saa pois kopioimalla. Liitä sanat toiseen paikkaan, ja merkintä on poissa. Omassa osoitteessaan oleva alkuperätieto jää, ja juuri siksi kerroksia on kaksi, mutta mikään täällä ei tee tekstistä väärentämätöntä, emmekä väitä muuta.",
   "transparency.limit3": "Ennen tallennuksen alkua tehdyllä sisällöllä ei ole alkuperätietoa, eikä sitä saa jälkikäteen. Väite tavuista, joiden syntyä kukaan ei nähnyt, olisi keksitty.",
   "transparency.limit4": "Puuttuva alkuperätieto tarkoittaa, ettei asiasta ole sanottu mitään. Se ei koskaan tarkoita, että kirjoittaja oli ihminen.",
   "transparency.limitsLead": "Lue tämä ennen kuin nojaat mihinkään yllä olevaan.",
@@ -27999,7 +27999,7 @@
   },
   "chat.allowanceElsewhere": "Saldoa jäljellä {n} USD, ja se on kaikkea muuta kuin tätä chattia varten.",
   "chat.ownKeyNotForChat": "Oma avaimesi ei maksa tätä chattia. Se maksaa sovelluksesi ja muut tekoälypyyntösi tämän palvelimen kautta.",
-  "chat.poweredBy": "Moottorina goose",
+  "chat.poweredBy": "Tekniikka: goose",
   "chat.aboutEngine": "Mikä tässä vastaa",
   "chat.back": "Takaisin",
   "chat.busyThinking": "miettii",
@@ -28016,21 +28016,21 @@
   "chat.starterPageAsk": "Laita kotisivuni pystyyn. Pidä se yksinkertaisena ja kerro osoite, kun se on julkaistu.",
   "chat.starterCompany": "Ota yritykseni käyttöön",
   "chat.starterCompanyAsk": "Ota yritykseni käyttöön täällä ja anna sille oma muisti.",
-  "chat.starterConnect": "Kytke oma tekoälyni",
-  "chat.starterConnectAsk": "Maksan jo tekoälytilauksesta. Miten kytken sen tänne niin että se tekee tämän työn?",
+  "chat.starterConnect": "Yhdistä oma tekoälyni",
+  "chat.starterConnectAsk": "Maksan jo tekoälytilauksesta. Miten yhdistän sen tänne niin että se tekee tämän työn?",
   "chat.card.open": "Avaa",
   "chat.card.page": "Sivu",
   "chat.card.app": "Sovellus",
   "chat.card.image": "Kuva",
   "chat.card.file": "Tiedosto",
   "chat.card.memory": "Tallennettu tietue",
-  "chat.card.workspace": "Workspace-dokumentti",
+  "chat.card.workspace": "Työtilan dokumentti",
   "chat.choicesNote": "tai sano jotain muuta",
   "chat.aiMore": "Mitä se tarkoittaa?",
   "chat.aiDialogTitle": "Puhut tekoälylle",
   "chat.aiDialogWhat": "Jokainen vastaus tässä on kielimallin tuottama. Se kirjoitetaan joka kerta uudestaan eikä haeta mistään, ja se voi olla väärässä tavalla joka kuulostaa varmalta.",
   "chat.aiDialogCheck": "Tarkista se mikä on tärkeää. Jokaisen vastauksen alla oleva työloki listaa jokaisen työkalukutsun, joten sen mitä agentti kertoo tehneensä voi tarkistaa eikä tarvitse uskoa.",
-  "chat.aiDialogLaw": "Tämä ilmoitus on EU:n tekoälyasetuksen artikla 50(1): ihmisellä on oikeus tietää asioivansa koneen kanssa. Täältä julkaistu sisältö kantaa oman merkintänsä ja virallisen EU-ikonin aina kun siitä on olemassa tieto siitä miten se tehtiin.",
+  "chat.aiDialogLaw": "Tämä ilmoitus on EU:n tekoälyasetuksen artikla 50(1): ihmisellä on oikeus tietää asioivansa koneen kanssa. Täältä julkaistulla sisällöllä on oma merkintänsä ja virallinen EU-ikoni aina kun siitä on olemassa tieto siitä miten se tehtiin.",
   "chat.aiNoticeBody": "Se voi olla väärässä, joten tarkista se mikä on tärkeää. Jokainen sen tekemä työkalukutsu näkyy vastauksen alla.",
   "chat.attachTitle": "Liitä tiedosto",
   "chat.attachUploading": "lähetetään…",
@@ -28820,11 +28820,11 @@
   "knowledge.cover.pubRelated": "Liittyvät paketit",
   "knowledge.cover.pubLoading": "Ladataan kirjastoa…",
   "knowledge.cover.pubEmpty": "Mitään ei ole vielä julkaistu.",
-  "discover.cover.loading": "Lasketaan hakemistoa: jokainen tietue luetaan kerran, ja isolla varastolla se kestää hetken.",
+  "discover.cover.loading": "Lasketaan hakemistoa: jokainen tietue luetaan kerran, ja isossa tallennustilassa se kestää hetken.",
   "discover.cover.loadingRecent": "Luetaan viimeksi muuttuneita…",
   "discover.cover.searching": "Haetaan…",
   "discover.cover.loadingRows": "Ladataan rivejä…",
-  "discover.cover.desc": "Kaikki, mitä sinä ja agenttisi olette tuoneet tänne, yhdestä kentästä: dokumentit, tieto, päätökset, taidot, sovellukset ja tarjoukset. Osuma aukeaa siellä, missä se asuu.",
+  "discover.cover.desc": "Kaikki, mitä sinä ja agenttisi olette tuoneet tänne, yhdestä kentästä: dokumentit, tieto, päätökset, taidot, sovellukset ja tarjoukset. Osuma aukeaa siellä, mihin se on tallennettu.",
   "discover.cover.chipItems": "{n} kohdetta",
   "discover.cover.chipKinds": "{n} lajia",
   "discover.cover.chipOrgs": "{n} organismia",
@@ -28833,7 +28833,7 @@
   "discover.cover.ask": "Mitä etsit?",
   "discover.cover.askPublic": "Mitä etsit julkisesta?",
   "discover.cover.hint": "Hakee otsikoista ja sisällöstä. Kirjanpito (agenttien tilastot, ajot, ilmoitukset) löytyy vain nimellä.",
-  "discover.cover.hintResults": "Parhaat ensin lajeittain. Osumassa näkyy kohta, jossa sana esiintyy, ja paikka, jossa kohde asuu.",
+  "discover.cover.hintResults": "Parhaat ensin lajeittain. Osumassa näkyy kohta, jossa sana esiintyy, ja paikka, johon kohde on tallennettu.",
   "discover.cover.secKinds": "Mitä täällä on",
   "discover.cover.secKindsSub": "{n} lajia",
   "discover.cover.colKind": "Laji",
@@ -28844,7 +28844,7 @@
   "discover.cover.kindSub.offering": "mitä agenttisi tekevät pyynnöstä",
   "discover.cover.kindSub.skill": "ohjeet, joilla agentti käyttää jotakin",
   "discover.cover.kindSub.app": "julkaistut sovelluksesi",
-  "discover.cover.kindSub.decision": "työtilojen päätöskirjat",
+  "discover.cover.kindSub.decision": "työtiloihin kirjatut päätökset",
   "discover.cover.kindSub.workflow": "ketjut, jotka ajavat askel askeleelta",
   "discover.cover.kindSub.material": "agenttien toimitukset",
   "discover.cover.kindSub.template": "sovelluspohjat, joita agentit ehdottivat",
@@ -28875,16 +28875,16 @@
   "discover.cover.workspaces": "Työtilat",
   "discover.cover.placeDesc": "Kaikki tämän organismin työtilojen tietueet, uusin ensin.",
   "discover.cover.secBook": "Kirjanpito",
-  "discover.cover.secBookSub": "{n} tietuetta, jotka kone pitää itselleen",
-  "discover.cover.bookHint": "Agenttien tilastot, työnkulkujen ajot, ilmoitukset ja mittarit: sinun omiasi, mutta harvoin luettaviasi. Ne löytyvät nimellä eivätkä nouse hakuun.",
+  "discover.cover.secBookSub": "{n} tietuetta, jotka oma AIMEAT pitää itselleen",
+  "discover.cover.bookHint": "Agenttien tilastot, työnkulkujen ajot, ilmoitukset ja mittarit: sinun omiasi, mutta harvoin luettaviasi. Ne löytyvät nimellä eivätkä näy hakutuloksissa.",
   "discover.cover.browseBook": "Selaa silti",
   "discover.cover.railTitle": "Tässä hakemistossa",
   "discover.cover.scopes": "Näkymät",
   "discover.cover.backTo": "Takaisin hakemistoon",
   "discover.cover.clear": "Tyhjennä",
   "discover.cover.hitsN": "{n} osumaa",
-  "discover.cover.bookHidden": "kirjanpito {n}, taitteessa",
-  "discover.cover.bookHitsSub": "{n} osumaa koneen tietueissa",
+  "discover.cover.bookHidden": "kirjanpito {n}, piilotettu",
+  "discover.cover.bookHitsSub": "{n} osumaa oman AIMEATin tietueissa",
   "discover.cover.showRestOf": "Näytä loput {n}: {k}",
   "discover.cover.alsoIn": "Löytyy myös: {list}",
   "profile.offers.cover.desc": "Mitä agenttisi osaavat, mitä voit heiltä pyytää ja mitä tuli takaisin. Pyyntö menee agentin jonoon, ja tulos tulee tänne ja Viesteihin.",
@@ -29142,11 +29142,11 @@
         },
         "chat-door": {
           "label": "Pääsy keskusteluun",
-          "summary": "Valitse kytketylle tekoälylle hyödyllinen työ, kopioi sen kehote ja katso tulos. Toimii myös ilman sivuston omaa keskustelua."
+          "summary": "Valitse kytketylle tekoälylle hyödyllinen työ, kopioi sen kehote ja katso tulos. Toimii myös ilman sisäänrakennettua keskustelua."
         },
         "fleet": {
           "label": "Miten agentit voivat",
-          "summary": "Montako henkilön agenteista on paikalla, ja onko jollakin ongelmia."
+          "summary": "Montako henkilön agenteista on verkossa, ja onko jollakin ongelmia."
         },
         "agents": {
           "label": "Tee agentti, ja töissä olevat agentit",
@@ -29181,16 +29181,16 @@
           "summary": "Tarjous asentaa tämä sovellukseksi laitteelle. Näkyy vain, kun selain tarjoaa asennusta."
         },
         "own-aimeat": {
-          "label": "Hanki oma AIMEAT (demosivustot)",
-          "summary": "Kertoo, että sivusto on demo, ja ohjaa kauppaan, josta saa oman AIMEATin. Osa ei ole sivulla ennen kuin lisäät sen, ja se on tarjolla vain, jos sivustolle on asetettu kauppa."
+          "label": "Hanki oma AIMEAT (demopalvelimet)",
+          "summary": "Kertoo, että palvelin on demo, ja ohjaa kauppaan, josta saa oman AIMEATin. Osa ei ole sivulla ennen kuin lisäät sen, ja se on tarjolla vain, jos palvelimelle on asetettu kauppa."
         },
         "trust": {
           "label": "Tekoälymerkintä ja tietojen omistajuus",
-          "summary": "Miten sivusto merkitsee mallin kirjoittaman tekstin, ja kenelle data kuuluu. Kun poistat osan, tämä ilmoitus poistuu sivulta."
+          "summary": "Miten palvelin merkitsee mallin kirjoittaman tekstin, ja kenelle data kuuluu. Kun poistat osan, tämä ilmoitus poistuu sivulta."
         },
         "steps": {
           "label": "Aloittajan polku",
-          "summary": "Käyttöönoton polku, jonka uusi henkilö kulkee ennen kuin tili tekee mitään. Polun omaa järjestystä ei voi muuttaa."
+          "summary": "Käyttöönoton polku, jonka uusi henkilö käy läpi ennen kuin tili tekee mitään. Polun omaa järjestystä ei voi muuttaa."
         },
         "your-turn": {
           "label": "Odottavat vastausta",
@@ -29198,7 +29198,7 @@
         },
         "ask": {
           "label": "Kuka osaa?",
-          "summary": "Kenttä, josta jäsen kysyy. Ennen lähetystä sivusto näyttää säilytetyn vastauksen ja sen, kuka voisi vastata. Näkyy, kun Kysy osaajalta on päällä."
+          "summary": "Kenttä, josta jäsen kysyy. Ennen lähetystä sivu näyttää säilytetyn vastauksen ja sen, kuka voisi vastata. Näkyy, kun Kysy osaajalta on päällä."
         },
         "teams": {
           "label": "Tiimisi",
@@ -29208,11 +29208,11 @@
       "portal": {
         "welcome-door": {
           "label": "Tervetuloa",
-          "summary": "Mikä tämä paikka on yhdellä lauseella, ja kolme tapaa aloittaa: anna tekoälysi rekisteröidä sinut, luo tili tai kirjaudu sisään."
+          "summary": "Mikä tämä palvelin on yhdellä lauseella, ja kolme tapaa aloittaa: anna tekoälysi rekisteröidä sinut, luo tili tai kirjaudu sisään."
         },
         "pitch": {
-          "label": "Mikä tämä paikka on, yhdellä rivillä",
-          "summary": "Yksi rivi siitä mikä tämä sivusto on, kaiken sen yläpuolella mikä pyytää kävijää tekemään jotain."
+          "label": "Mikä tämä palvelin on, yhdellä rivillä",
+          "summary": "Yksi rivi siitä mikä tämä palvelin on, kaiken sen yläpuolella mikä pyytää kävijää tekemään jotain."
         },
         "wish": {
           "label": "Kerro mitä tarvitset",
@@ -29228,15 +29228,15 @@
         },
         "changelog": {
           "label": "Viimeisimmät muutokset",
-          "summary": "Sivuston muutoslokin uusimmat merkinnät yhdelle riville taitettuna."
+          "summary": "Palvelimen muutoslokin uusimmat merkinnät yhdelle riville taitettuna."
         },
         "gallery": {
           "label": "Sovelluslista",
           "summary": "Jokainen täällä julkaistu sovellus, hakukentän ja järjestyksen kanssa."
         },
         "totals": {
-          "label": "Sivuston luvut",
-          "summary": "Montako sovellusta, tilaa ja agenttia tällä sivustolla on."
+          "label": "Palvelimen luvut",
+          "summary": "Montako sovellusta, tilaa ja agenttia tällä palvelimella on."
         },
         "hero": {
           "label": "Omista vai vuokraa",
@@ -29252,11 +29252,11 @@
         },
         "stats": {
           "label": "Mitä täällä tehtiin tänään",
-          "summary": "Mitä sivustolla tehtiin tänään, ja rivi joka tarjoaa samaa kävijälle."
+          "summary": "Mitä palvelimella tehtiin tänään, ja rivi joka tarjoaa samaa kävijälle."
         },
         "transparency": {
           "label": "Miten tekoälysisältö merkitään",
-          "summary": "Yksi rivi siitä miten sivusto merkitsee mallin kirjoittaman tekstin, ja linkki sivulle joka kertoo sen kunnolla."
+          "summary": "Yksi rivi siitä miten palvelin merkitsee mallin kirjoittaman tekstin, ja linkki sivulle joka kertoo sen kunnolla."
         },
         "text": {
           "label": "Tallentamasi teksti",
@@ -29276,11 +29276,11 @@
         },
         "store": {
           "label": "Kaupan linkki ja hinnat",
-          "summary": "Linkki kauppaan hinnastoineen, luettuna kaupasta itsestään, ja kolme syytä ostaa. Näkyy vain jos sivustolle on asetettu kauppa."
+          "summary": "Linkki kauppaan hinnastoineen, luettuna kaupasta itsestään, ja kolme syytä ostaa. Näkyy vain jos palvelimelle on asetettu kauppa."
         },
         "trust": {
           "label": "Turvallisuus ja yksityisyys",
-          "summary": "Mitä sivusto lupaa: jokainen toiminto allekirjoitetaan, tekoälysisältö merkitään, suostumuksen voi perua, GDPR-pyynnöt ovat painikkeita, ja linkki siihen miten tekoälysisältö merkitään."
+          "summary": "Mitä palvelin lupaa: jokainen toiminto allekirjoitetaan, tekoälysisältö merkitään, suostumuksen voi perua, GDPR-pyynnöt ovat painikkeita, ja linkki siihen miten tekoälysisältö merkitään."
         },
         "rooms": {
           "label": "Adoptoitavat agentit ja oma tila",
@@ -29308,7 +29308,7 @@
         },
         "frame-wall": {
           "label": "Sovelluslista, yhteisö ensin",
-          "summary": "Täällä julkaistut sovellukset, ensin muiden rakentamat ja niiden jälkeen tämän palvelun omat."
+          "summary": "Täällä julkaistut sovellukset, ensin muiden rakentamat ja niiden jälkeen tämän palvelimen omat."
         },
         "frame-linux": {
           "label": "Omistat tietosi ja tekoälysi muistin.",
@@ -29366,7 +29366,7 @@
   },
   "story": {
     "beat1": "Sano mitä tarvitset",
-    "beat2": "Vie kehote mihin tahansa tekoälyyn",
+    "beat2": "Liitä kehote mihin tahansa tekoälyyn",
     "beat3": "Tuo tiedosto takaisin",
     "beat4": "Se päätyy etusivulle",
     "railLabel": "Neljä vaihetta",
@@ -29381,11 +29381,11 @@
     "b1Text": "Kuvaile sovellus omin sanoin. Yksi rivi riittää, kappale on parempi. Sovellus saa eläviä ulkoasuja, joita tekoälysi voi järjestellä myöhemmin.",
     "b1PacksLabel": "Paketit, valittu puolestasi:",
     "b1Alt": "Ihminen valoisan verstaan tiskillä kertomassa ystävälliselle retrorobotille, mitä haluaa; robotti kirjoittaa sen paperilapulle",
-    "b2Title1": "Vie kehote",
+    "b2Title1": "Liitä kehote",
     "b2Title2": "mihin tahansa tekoälyyn",
-    "b2Text": "Yksi painike kokoaa kehotteen: tämän paikan oma rakennusohje ja se, mitä valitsit. Liitä se Claudeen, ChatGPT:hen, Geminiin tai mihin tahansa keskusteluun. Tekoäly kysyy muutaman kysymyksen, rakentaa sovelluksen ja antaa takaisin yhden HTML-tiedoston. Mikään tässä ei tarvitse liitintä.",
+    "b2Text": "Yksi painike kokoaa kehotteen: AIMEATin oma rakennusohje ja se, mitä valitsit. Liitä se Claudeen, ChatGPT:hen, Geminiin tai mihin tahansa keskusteluun. Tekoäly kysyy muutaman kysymyksen, rakentaa sovelluksen ja antaa takaisin yhden HTML-tiedoston. Mikään tässä ei tarvitse liitintä.",
     "b2Alt": "Ihminen kantaa hohtavaa paperilappua aurinkoisen kadun yli kohti valtavaa puhekuplaa talon seinällä",
-    "chipGuide": "tämän paikan rakennusohje",
+    "chipGuide": "AIMEATin rakennusohje",
     "chipIdea": "sinun ideasi",
     "chipTemplate": "malli, tai ei mallia",
     "chipPacks": "valitsemasi paketit",
@@ -29399,7 +29399,7 @@
     "b3Alt": "Ihminen kävelee takaisin näyttelytilaan hohtava kehystetty verkkosivu kainalossa; retrorobotti tiskillä leimaa sen",
     "b4Title1": "Se päätyy",
     "b4Title2": "etusivulle",
-    "b4Text": "Korttisi ilmestyy muiden joukkoon nimesi, päivämäärän ja elävän avausmäärän kanssa. Kuka tahansa voi avata sen; kuka tahansa, jolle se kelpaa, voi kopioida sen omakseen, samoin kuin sinä voit kopioida heidän. Tästä eteenpäin tekoälysi voi pitää sen käynnissä, ja kun se on hyvä, voit myydä sen.",
+    "b4Text": "Korttisi ilmestyy muiden joukkoon nimesi, päivämäärän ja reaaliaikaisen avausmäärän kanssa. Kuka tahansa voi avata sen; kuka tahansa, jolle se kelpaa, voi kopioida sen omakseen, samoin kuin sinä voit kopioida heidän. Tästä eteenpäin tekoälysi voi pitää sen käynnissä, ja kun se on hyvä, voit myydä sen.",
     "b4ThenLabel": "Ja sitten:",
     "b4Then": "yhdistä tekoäly, jota jo käytät, niin seuraava sovellus, seuraava muutos ja itse julkaiseminen tapahtuvat omasta keskustelustasi.",
     "b4Alt": "Valoisa galleriaseinä täynnä kehystettyjä sovelluskuvia; retrorobotti tikkailla ripustaa uusinta kehystä keltaisella nauhalla pienen yleisön taputtaessa",
@@ -29411,13 +29411,13 @@
   },
   "connectStory": {
     "beat1": "Valitse tekoäly, jota jo käytät",
-    "beat2": "Kytke se",
+    "beat2": "Yhdistä se",
     "beat3": "Todista yhdellä kehotteella",
     "beat4": "Hoida kaikki omasta chatista",
     "railLabel": "Neljä askelta",
     "otherTool": "Oma",
     "kicker": "Viisi minuuttia. Mikä tahansa tekoäly, josta jo maksat, tai se ilmainen.",
-    "title1": "Kytke tekoäly,",
+    "title1": "Yhdistä tekoäly,",
     "title2": "jota jo käytät",
     "position": "Sen jälkeen hoidat kaiken tämän omasta chatistasi.",
     "lead": "Tässä ovat kaikki vaiheet kerralla, ennen kuin teet tilin. Lue läpi tai hyppää suoraan loppuun.",
@@ -29427,9 +29427,9 @@
     "b1Text": "Ei uutta tilausta eikä uutta sovellusta opeteltavaksi. Chatti, joka sulla jo on, saa yhteyden tänne, ja sä juttelet sen kanssa niin kuin ennenkin.",
     "b1WorksLabel": "Toimii näiden kanssa:",
     "b1Alt": "Ihminen valoisan näyttelytiskin ääressä valitsemassa neljän ystävällisen retrorobotin välillä, joilla jokaisella on pieni nimikyltti",
-    "b2Title1": "Kytke se:",
+    "b2Title1": "Yhdistä se:",
     "b2Title2": "yksi osoite, yksi minuutti",
-    "b2Text": "Jokaisessa tekoälytyökalussa on paikka liittimille. Annat sille tämän paikan osoitteen, se pyytää sua hyväksymään yhteyden, ja sä sanot kyllä. Ohjattu polku näyttää sun työkalulle tarkat klikkaukset ja tarkistaa jokaisen sitä mukaa.",
+    "b2Text": "Jokaisessa tekoälytyökalussa on paikka liittimille. Annat sille tämän AIMEATin osoitteen, se pyytää sua hyväksymään yhteyden, ja sä sanot kyllä. Ohjattu polku näyttää sun työkalulle tarkat klikkaukset ja tarkistaa jokaisen sitä mukaa.",
     "b2Approve": "Hyväksy se kerran, täällä, omalla tililläsi",
     "b2Done": "Valmis. Ei mitään asennettavaa, ei mitään pidettävää käynnissä",
     "b2Alt": "Ystävällinen retrorobotti työntää hehkuvan korallinvärisen johdon pieneen talon muotoiseen pistorasiaan, ja ilahtunut ihminen katsoo",
@@ -29437,11 +29437,11 @@
     "b3Title2": "yhdellä kehotteella",
     "b3Text": "Yhteys, joka näyttää toimivan mutta ei ole olemassa, pettää hiljaa: tekoäly vastaa edelleen eikä mikään anna virhettä. Siksi ohjattu polku antaa sulle yhden kehotteen, sä liität sen chattiisi, ja yksi nappi täällä näyttää vastauksen. Kun vastaus tulee, sun tekoäly on kytketty.",
     "b3WhyLabel": "Miksi tämä askel on olemassa:",
-    "b3Why": "koska hiljainen vika lähettäisi sut rakentamaan tyhjän päälle. Kaksi minuuttia nyt, eikä sun tarvitse enää koskaan epäillä.",
+    "b3Why": "koska hiljaisen vian takia rakentaisit yhteyden varaan, jota ei ole. Kaksi minuuttia nyt, eikä sun tarvitse enää koskaan epäillä.",
     "b3Alt": "Ihminen kirjoittaa yhden rivin valtavaan puhekuplaan, ja retrorobotti pitää vieressä pystyssä isoa vihreää OK-kylttiä",
     "b4Title1": "Sitten kaikki",
     "b4Title2": "hoituu sun chatista",
-    "b4Text": "Sun muistiinpanot, dokumentit, tiimin tieto, rakentamasi sovellukset ja adoptoimasi agentit: sun tekoäly lukee ja kirjoittaa niitä täällä, sun omassa tilassa, luvilla, jotka sä annoit ja voit ottaa pois. Sun ei tarvitse enää koskaan avata tätä sivustoa saadaksesi töitä tehtyä. Se on täällä, kun haluat katsoa.",
+    "b4Text": "Sun muistiinpanot, dokumentit, tiimin tieto, rakentamasi sovellukset ja käyttöön ottamasi agentit: sun tekoäly lukee ja kirjoittaa niitä täällä, sun omassa tilassa, luvilla, jotka sä annoit ja voit ottaa pois. Sun ei tarvitse enää koskaan avata tätä sivustoa saadaksesi töitä tehtyä. Se on täällä, kun haluat katsoa.",
     "b4Alt": "Rento ihminen chattailee puhelimella puutarhatuolissa, ja pieni retrorobottien porukka kantaa muistiinpanoja, dokumentteja ja kehystettyjä verkkosivuja valoisaan pikkutaloon",
     "doorTitle": "Oma tilisi",
     "doorLead": "Yhteys tehdään SUN tilaasi, joten sellainen pitää olla: tili vie minuutin, ja ohjattu polku aukeaa heti perään.",
@@ -29995,7 +29995,7 @@
   },
   "appcat": {
     "aiAct.title": "Tekoälyasetuksen kysymykset",
-    "aiAct.lead": "Tämä sovellus käyttää tekoälyä, joten EU:n tekoälyasetus kysyy siitä muutaman kysymyksen. Sinä tunnet sovelluksen parhaiten: vastaa jokaiseen kysymykseen ja kerro yhdellä lauseella miksi. Palvelimen ylläpitäjä hyväksyy vastaukset vaatimustenmukaisuuden kirjanpitoon.",
+    "aiAct.lead": "Tämä sovellus käyttää tekoälyä, joten EU:n tekoälyasetus kysyy siitä muutaman kysymyksen. Sinä tunnet sovelluksen parhaiten: vastaa jokaiseen kysymykseen ja kerro yhdellä lauseella miksi. Palvelimen ylläpitäjä hyväksyy vastaukset vaatimustenmukaisuusrekisteriin.",
     "aiAct.notAi": "Sovellus ei omien tietojensa mukaan käytä tekoälyä, joten tekoälyasetuksen kysymyksiä ei ole.",
     "aiAct.aiTitle": "Anna tekoälysi vastata",
     "aiAct.aiNote": "Kopioi kehote omaan tekoälykeskusteluusi. Tekoäly lukee sovelluksen ja kysymykset, näyttää vastauksensa perusteluineen ja tallentaa ne, kun hyväksyt.",
@@ -30006,7 +30006,7 @@
     "aiAct.notePlaceholder": "Miksi, yhdellä tai kahdella lauseella",
     "aiAct.save": "Tallenna vastaukset",
     "aiAct.saving": "Tallennetaan…",
-    "aiAct.saved": "Tallennettu. Palvelimen ylläpitäjä näkee vastauksesi vaatimustenmukaisuuden kirjanpidossa.",
+    "aiAct.saved": "Tallennettu. Palvelimen ylläpitäjä näkee vastauksesi vaatimustenmukaisuusrekisterissä.",
     "aiAct.saveFailed": "Vastauksia ei tallennettu.",
     "started.title": "Aloitettu, ei vielä julkaistu",
     "started.foot": "Vain sinä ja muut kehittäjät näette nämä. Jokainen näyttää vaiheensa ja sen, mikä on vielä auki.",
@@ -30194,9 +30194,9 @@
     "structure.layout.story-deck.name": "Tarina",
     "structure.layout.story-deck.line": "Yksi asia kerrallaan, pyyhkäisten eteenpäin. Esitykseen ja katsaukseen.",
     "structure.layout.story-deck.say": "\"Tarina: yksi asia näkymää kohti, pyyhkäisy eteenpäin.\"",
-    "structure.layout.guided-flow.name": "Ohjattu polku",
-    "structure.layout.guided-flow.line": "Askel kerrallaan loppuun, ja polku näkyy koko ajan. Ilmoittautumiseen ja käyttöönottoon.",
-    "structure.layout.guided-flow.say": "\"Ohjattu polku: vaiheet näkyvissä, yksi askel kerrallaan.\"",
+    "structure.layout.guided-flow.name": "Ohjatut vaiheet",
+    "structure.layout.guided-flow.line": "Askel kerrallaan loppuun, ja vaiheet näkyvät koko ajan. Ilmoittautumiseen ja käyttöönottoon.",
+    "structure.layout.guided-flow.say": "\"Ohjatut vaiheet: vaiheet näkyvissä, yksi askel kerrallaan.\"",
     "structure.nav.tabs.name": "Välilehdet",
     "structure.nav.tabs.line": "Näkymät rinnakkain ylhäällä.",
     "structure.nav.bottom-bar.name": "Alapalkki",
@@ -30319,7 +30319,7 @@
     "dataMap.regulated.means.notify": "Tieto lähtee sellaisenaan, ja palvelin kirjaa jokaisen lähetyksen.",
     "dataMap.regulated.means.protect": "Ennen lähetystä palvelin korvaa nimet, henkilötunnukset, puhelinnumerot, sähköposti- ja katuosoitteet sekä tilinumerot korvaavilla tunnisteilla.",
     "dataMap.regulated.means.drop": "Ennen lähetystä palvelin poistaa nimet, henkilötunnukset, puhelinnumerot, sähköposti- ja katuosoitteet sekä tilinumerot, ja muu tieto lähtee.",
-    "dataMap.regulated.means.local": "Vain tällä koneella toimiva malli lukee tämän tiedon.",
+    "dataMap.regulated.means.local": "Vain tällä palvelimella toimiva malli lukee tämän tiedon.",
     "dataMap.regulated.means.block": "Mikään tekoälymalli ei lue tätä tietoa, ei paikallinenkaan.",
     "dataMap.regulated.notInForce": "Ei vielä voimassa. Tila on voimassa, kun rekisteri nimeää tämän sovelluksen ja tämän tiedon.",
     "dataMap.leaves.noRecall": "ei saa takaisin",
@@ -30579,7 +30579,7 @@
     "mz.priceLede": "Rahahinta tai ei hintaa, jolloin työkalu on maksuton. Tahdistus kertoo, montako murusta jokainen kutsu ottaa kutsujan saldosta; se ei ole hinta. Jos jätät molemmat tyhjiksi, työkalu on määritelty mutta ei myynnissä.",
     "mz.more.price": "Toinen valuutta",
     "mz.marketLede": "Kun listaat työkalun, se tulee EXCHANGEen yllä olevalla hinnalla ja tahdistuksella. Kauppapaikka näyttää ODPS-kuvauksen sen vieressä.",
-    "mz.deliveryLede": "Kyvykkyyssidonta ajaa kutsun heti ja palauttaa tuloksen. Ilman sitä ostosta syntyy tehtävä agentillesi.",
+    "mz.deliveryLede": "Linkitetty kyvykkyys ajaa kutsun heti ja palauttaa tuloksen. Ilman sitä ostosta syntyy tehtävä agentillesi.",
     "view.communityEmpty": "Tässä palvelussa ei ole vielä yhteisön sovelluksia.",
     "view.communityHint": "Yhteisön sovellukset ovat sovelluksia, joita tämän palvelun muut käyttäjät ovat julkaisseet. Kun joku julkaisee sellaisen, se näkyy täällä.",
     "sec.local": "Omat sovellukset",
@@ -30662,7 +30662,7 @@
     "pb.tier.any": "KAIKILLE MALLEILLE",
     "pb.tier.frontier": "VERSIOANSA",
     "pb.tier.needs-doc": "LUE DOKUMENTTI",
-    "pb.tierLegend": "KAIKILLE MALLEILLE = mikä tahansa malli osaa rakentaa sillä · LUE DOKUMENTTI = mallilla ei ole siitä ennakkotietoa, joten käyttöohje kulkee kehotteen mukana · VERSIOANSA = malli muistaa vanhemman version, joten seuraa ohjeen versiota",
+    "pb.tierLegend": "KAIKILLE MALLEILLE = mikä tahansa malli osaa rakentaa sillä · LUE DOKUMENTTI = mallilla ei ole siitä ennakkotietoa, joten käyttöohje on mukana kehotteessa · VERSIOANSA = malli muistaa vanhemman version, joten seuraa ohjeen versiota",
     "pb.copied": "Kopioitu!",
     "pb.new": "Uusi sovellus",
     "pb.improve": "Paranna tätä sovellusta",
@@ -30685,7 +30685,7 @@
     "pb.giveHint": "Kopioi kehote ja liitä se yhdistettyyn tekoälyysi. Tekoäly kysyy, mitä sen pitää tietää, näyttää, mitä se aikoo rakentaa, ja odottaa lupaasi. Valmiin sovelluksen se julkaisee itse ja antaa sinulle sen osoitteen.",
     "pb.giveHintImprove": "Kopioi kehote ja liitä se yhdistettyyn tekoälyysi. Tekoäly julkaisee uuden version itse. Aiemmat versiot säilyvät sovelluksen historiassa.",
     "pb.otherTitle": "Eikö tekoälyäsi voi yhdistää?",
-    "pb.otherHint": "Esimerkiksi Microsoft 365 Copilotia ei voi yhdistää. Kopioi silloin tämä pidempi kehote: rakennusohjeet kulkevat sen mukana. Tekoäly antaa sinulle yhden HTML-tiedoston, ja sinä lisäät sen tänne itse.",
+    "pb.otherHint": "Esimerkiksi Microsoft 365 Copilotia ei voi yhdistää. Kopioi silloin tämä pidempi kehote: se sisältää rakennusohjeet. Tekoäly antaa sinulle yhden HTML-tiedoston, ja sinä lisäät sen tänne itse.",
     "pb.otherCopy": "Kopioi pitkä kehote",
     "card.view": "Avaa",
     "card.open": "Avaa",
@@ -30725,7 +30725,7 @@
     "agents.manage": "Katso agentit",
     "agents.none": "Tämän sovelluksen mukana ei tule agentteja.",
     "agents.declares": "Nämä agentit tulevat sovelluksen mukana. Näet jokaisesta, mitä se tekee ja mitä se saa tehdä. Lisäämäsi agentti odottaa hyväksyntääsi ja toimii vain sinun tililläsi.",
-    "agents.crew": "Työryhmä",
+    "agents.crew": "Crew",
     "agents.tasks": "Tehtävät",
     "agents.hostedTitle": "Kenellä se on käytössä",
     "agents.hostedNone": "Agentti ei ole vielä kenelläkään käytössä.",
@@ -30973,7 +30973,7 @@
     "odps.qualityPlaceholder": "accuracy 99 percentage — Nimet täsmäävät rekisteriin",
     "odps.toolAttestation": "Tämän kyvykkyyden alkuperä",
     "odps.toolAttestationHint": "Vain se mikä poikkeaa sovelluksen oletuksista. Tyhjänä sovellustason vakuutus pätee.",
-    "odps.transformations": "Mitä raaka-aineelle tehtiin",
+    "odps.transformations": "Mitä raaka-aineistolle tehtiin",
     "odps.transformationsPlaceholder": "Nimet normalisoitu, kuntakoodit liitetty, lakanneet yritykset poistettu.",
     "odps.suggest": "Luonnostele tekoälyllä",
     "odps.suggesting": "Luonnostellaan…",
@@ -34914,7 +34914,7 @@
   "home.goal.value.per.month": "kuukausi",
   "home.goal.value.setAt": "Kerroit sen {d}",
   "home.goal.value.noBaseline": "Et ole vielä kertonut",
-  "home.goal.value.measure": "Pitäisi liikuttaa",
+  "home.goal.value.measure": "Mihin pitäisi vaikuttaa",
   "home.goal.value.results": "Tulokset",
   "home.goal.value.resultsSub": "{asIs} sellaisenaan · {corrected} korjattu · {used} jonkun muun avaama · {gone} poissa",
   "home.goal.value.cost": "Tekoälyn kulu",
@@ -35038,7 +35038,7 @@
   "home.goalPlan.doneWhen": "Valmis, kun",
   "home.goalPlan.lead": "Kuka johtaa",
   "home.goalPlan.leadAgent": "Agenttisi {agent} koordinoi sitä",
-  "home.goalPlan.leadRules": "AIMEAT pitää sen liikkeessä: jokainen työ alkaa, kun edellinen on valmis",
+  "home.goalPlan.leadRules": "AIMEAT huolehtii etenemisestä: jokainen työ alkaa, kun edellinen on valmis",
   "home.goalPlan.limit": "Saa käyttää",
   "home.goalPlan.limitSub": "Töitä, jotka käyttävät AIMEAT:n mallia avaimellasi: {n}. Raja pysäyttää ne.",
   "home.goalPlan.limitNone": "Yksikään työ ei käytä AIMEAT:n mallia",
@@ -35388,7 +35388,7 @@
   "home.overview.detail.empty": "Paina mitä tahansa korttia. Näet, mihin se liittyy, ja pääset avaamaan sen.",
   "home.overview.detail.thickness": "Mitä paksumpi viiva, sitä enemmän kahden asian välillä tapahtui valitulla aikavälillä.",
   "home.overview.detail.unused": "Ei käyttöä {n} päivään",
-  "home.overview.detail.links": "Liittyy {n} asiaan. Ne on korostettu kartalla.",
+  "home.overview.detail.links": "Liittyy {n} asiaan. Ne on korostettu kokonaiskuvassa.",
   "home.overview.detail.noLinks": "Ei yhteyksiä tällä aikavälillä.",
   "home.overview.detail.quiet": "Tätä ei ole käytetty {n} päivään. Voit poistaa tai arkistoida sen.",
   "home.overview.detail.open": "Avaa",

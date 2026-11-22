@@ -14,8 +14,8 @@
  * @usage html`<${StoreDoor} class="ld-sh-door showroom-door" label=${tr('landing.showGetOwn', 'Get your own →')} />`
  * @version-history
  *   v1.1.0 — 2026-10-06 — With site.store_soon_code set, "Opens soon" is pressable and shows the shared
- *     discount code (StoreSoonCode) with a copy button (Jouni: "When you click we should give them
- *     discount code").
+ *     discount code (StoreSoonCode) with a copy button (Jouni asked that a press shows the
+ *     discount code).
  *   v1.0.0 — 2026-10-06 — Initial: site.store_status "soon" on aimeat.io while the store's payments are
  *     in test mode.
  */

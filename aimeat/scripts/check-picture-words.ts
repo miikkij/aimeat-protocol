@@ -32,7 +32,8 @@
  *   v1.1.0 — 2026-11-22 — The words the Settings and admin pages were rewritten away from (turned
  *     away and torjua for refused, the federation book, rung, welcome mat, the paste, the eleven
  *     moments, miehistö, naapuri, kylvää, tarjoilla and the like), so a prompt, a tool description
- *     or a skill cannot bring one back after the locale files lost it.
+ *     or a skill cannot bring one back after the locale files lost it. The Markdown a person or an
+ *     AI reads (every README, docs/, CLAUDE.md and .claude/) is read too, outside code fences.
  *   v1.0.0 — 2026-11-15 — Initial, after the sweep of door, road, way in and showroom outside the
  *     locale files.
  */
@@ -88,9 +89,38 @@ function linesOf(file: string, text: string, out: Hit[]): void {
   }
 }
 
-/** Every hit in the visible text of the HTML pages and in the string literals of the code. */
+/**
+ * The Markdown a person or an AI reads: every README, the docs, CLAUDE.md and the session rules,
+ * skills and agents. History is left out (the change log, the superseded RFCs), and so is the text
+ * inside a code fence or backticks, which names code.
+ */
+const REPO = path.join(ROOT, '..');
+const MD_SKIP = /node_modules|[\\/]\.git[\\/]|[\\/]\.worktrees[\\/]|[\\/]dist[\\/]|[\\/]public[\\/]lib[\\/]|[\\/]public[\\/]data[\\/]|memory-archive|cold-agent[\\/]fixtures|[\\/]aeb[\\/]results[\\/]|AIMEAT-RFC-v4\.0-|CHANGELOG\.md$|LICENSE[^\\/]*\.md$|VENDORED\.md$/;
+function* markdownFiles(dir: string, all: boolean): Generator<string> {
+  for (const name of readdirSync(dir)) {
+    const p = path.join(dir, name);
+    // Tested on the path inside the repository: a worktree's own path contains .worktrees.
+    if (MD_SKIP.test(path.sep + path.relative(REPO, p))) continue;
+    if (statSync(p).isDirectory()) yield* markdownFiles(p, all || /^(docs|\.claude)$/.test(name) && dir === REPO);
+    else if (/\.md$/i.test(name) && (all || /^README/i.test(name) || (dir === REPO && /^(CLAUDE|AGENTS)\.md$/.test(name)))) yield p;
+  }
+}
+function markdownHits(out: Hit[]): void {
+  for (const abs of markdownFiles(REPO, false)) {
+    const file = path.relative(ROOT, abs).replace(/\\/g, '/');
+    let fence = false;
+    const visible = readFileSync(abs, 'utf8').split('\n').map((line) => {
+      if (/^\s*```/.test(line)) { fence = !fence; return ''; }
+      return fence ? '' : line.replace(/`[^`]*`/g, ' ').replace(/\]\([^)]*\)/g, ']');
+    }).join('\n');
+    linesOf(file, visible, out);
+  }
+}
+
+/** Every hit in the visible text of the HTML pages and Markdown files, and in the string literals of the code. */
 export function scan(): Hit[] {
   const out: Hit[] = [];
+  markdownHits(out);
   for (const base of ['src', 'public']) {
     for (const abs of walk(path.join(ROOT, base))) {
       const file = path.relative(ROOT, abs).replace(/\\/g, '/');

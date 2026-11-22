@@ -8,8 +8,7 @@
  *   WHY IT EXISTS. A row of "Latest work" on the agent's home page (views/home/agent.js) used to
  *   open the agent in Settings & Controls, where the result is behind the task list, the task's
  *   own panel and a "Show" button. A person who made the agent with one sentence wants to see what
- *   it did from the place they made it (Jouni, 2026-10-11: "it went to such a confusing menu that
- *   users get scared").
+ *   it did from the place they made it (Jouni, 2026-10-11).
  *
  *   THE RESULT is what the Tasks tab shows as the task's output, read the same way
  *   (js/services/offers.js getDeliverableValue: the key the task names, else what the run tagged

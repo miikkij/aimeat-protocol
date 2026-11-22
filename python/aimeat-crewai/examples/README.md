@@ -52,7 +52,7 @@ The daemon picks up the queued task within `poll_interval_seconds` (default 30s)
 
 ## `decide_gate.py` — decision rules as tools, and a gate on the irreversible step
 
-A support agent that sorts an incoming message with one of the owner's **decision rules**, drafts a reply, and then runs a second rule as a **gate** before sending — the step that cannot be undone. Below the act band it does not send: it hands the draft back with the decision id, and the owner decides.
+A support agent that sorts an incoming message with one of the owner's **decision rules**, drafts a reply, and then runs a second rule as a **gate** before sending — the step that cannot be undone. Below the act band it does not send: it returns the draft with the decision id, and the owner decides.
 
 Shows the whole shape: check `settings()` before building on the model, mint one tool per allowed rule with `decide_tools()`, gate the irreversible step, report which band fired, and record a person's verdict with `review()`.
 

@@ -14,7 +14,7 @@
  *
  *   THE WORDS ARE PLAIN, ON PURPOSE. "Default", "your own layout", "your own HTML page", "texts you
  *   have saved". Someone who runs a node once a month should not have to work out what a sentence
- *   means (Jouni, 2026-09-12: "miksei toi voi puhua normaalia").
+ *   means (Jouni, 2026-09-12).
  *
  *   ONE DARK BUTTON, AND IT FOLLOWS YOU. The arrangement waits for Save, and the pinned row keeps
  *   the count of unsaved changes and the button itself under the topbar wherever you have scrolled.

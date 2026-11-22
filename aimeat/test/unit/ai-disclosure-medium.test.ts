@@ -90,7 +90,7 @@ describe('buildDisclosure words a model-made item by its medium', () => {
     expect(longOf(rec('original', 'full-human', { mediaKind: 'text' }), privatePage)).toBe(en('aiLabel.originalLong'));
   });
 
-  // Jouni ruled the reviewed app chip on 2026-09-26: "AI-drafted, reviewed by X". Code is drafted,
+  // The reviewed app chip reads "AI-drafted, reviewed by X" (Jouni, 2026-09-26). Code is drafted,
   // as text is; "Made with AI" is for media a model made whole.
   it('a strict-policy label on reviewed code keeps the ruled "AI-drafted, reviewed by" wording', () => {
     const d = buildDisclosure(rec('ai-generated', 'editorial-control', { mediaKind: 'code' }), publicPage, 'strict');

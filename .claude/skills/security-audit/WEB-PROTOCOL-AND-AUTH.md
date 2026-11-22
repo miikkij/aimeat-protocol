@@ -91,7 +91,7 @@ Expired, revoked, missing, or renewal-failed certificates cause silent fallback 
 ## Universal moves (apply across the above)
 
 - Walk issue → store → transmit → consume → refresh → revoke for every credential and challenge. Compare normal, error, retry, migration, legacy, and account-switch paths.
-- Enumerate every door to the same identity and every route to the same sensitive operation. The effective policy is the weakest parallel path, not the most polished UI.
+- Enumerate every entry point to the same identity and every route to the same sensitive operation. The effective policy is the weakest parallel path, not the most polished UI.
 - Diff parser, proxy, router, cache, and application normalization side by side. For local validation, feed identical bounded request fixtures into each component rather than sending traffic to a live deployment.
 - For recovery and linking, draw the account before/after graph. Each edge must name the current principal, proof of the new identity, required assurance, callback/session binding, and revocation effect.
 

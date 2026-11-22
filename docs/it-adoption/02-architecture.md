@@ -207,7 +207,7 @@ For availability, use a process manager restart, a second process as a standby o
 - The code has no support for an outbound HTTP proxy; no proxy agent is configured for the node's own fetch calls.
 - Neither compose file keeps the node key on a volume, and the Docker image's `HEALTHCHECK` (`/v1/health/ready`) asks 127.0.0.1, so a node bound to another address needs its own ([Production deployment](../operations/production-deployment.md#process-manager)).
 - Calls to OpenRouter carry `HTTP-Referer: https://aimeat.io` and `X-Title: AIMEAT` (`aimeat/src/services/ai/adapters/sdk.ts`, `aimeat/src/services/openrouter.ts`): OpenRouter sees the software name, not the organisation.
-- The default STUN server handed to browsers is Google's (`stun:stun.l.google.com:19302`, `aimeat/src/config.ts`); change `AIMEAT_STUN_SERVERS` if browsers must not contact it.
+- The default STUN server given to browsers is Google's (`stun:stun.l.google.com:19302`, `aimeat/src/config.ts`); change `AIMEAT_STUN_SERVERS` if browsers must not contact it.
 - No Docker image is published by the project; the image is built from `aimeat/Dockerfile`.
 
 ## Open questions

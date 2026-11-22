@@ -36,7 +36,7 @@
  *   v1.2.1 -- 2026-10-06 -- A signed verify request passes once (signedMessageRefusal): the password is
  *     not signed, so a captured signature carried other passwords for five minutes (secaudit 2026-10
  *     follow-up, A7).
- *   v1.2.0 -- 2026-10-05 -- Hardened (secaudit 2026-10, D1; Jouni: "harden it"). Before, any caller
+ *   v1.2.0 -- 2026-10-05 -- Hardened (secaudit 2026-10, D1; ruled by Jouni). Before, any caller
  *     could name any requesting_node in the body and test passwords with only a per-IP limit: no
  *     account lock, no second factor, no peer signature, and 401 for a wrong password against 403 for
  *     a right one without consent. Now: an active peer of a tier that may carry sign-in, a signature

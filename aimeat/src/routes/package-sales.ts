@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Selling install packages node to node, with no token (install packages, phase 5).
- *   Jouni, 2026-09-29: "nyt ihan oikeasti tuon järjestelmän on pystyttävä tekemään toi itse".
+ *   Jouni, 2026-09-29: the system must do this on its own.
  *
  *   ON THE REPOSITORY:
  *   - the author names the nodes that sell their packages (GET, PUT, DELETE /v1/package-sellers);

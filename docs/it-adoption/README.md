@@ -56,7 +56,7 @@ Pre-filled with what AIMEAT can state about itself; the organisation's own field
 
 ## With the operator's AI
 
-An operator who works through an AI chat connected over MCP does not have to read the go-live checklist alone. Every node serves the skill `aimeat-node-operations`, and its section "Before the node goes online" walks the same checks with the node's own admin tools (`aimeat_admin_security_overview`, `aimeat_admin_config`, `aimeat_admin_sso_list`, `aimeat_ai_providers`, `aimeat_seo_status` and others) and reports what is ready, what is missing and who provides it (`aimeat/src/data/builtin-skills.runbooks.ts`). The AI needs the operator's `operator:admin` permission for those tools.
+An operator who works through an AI chat connected over MCP does not have to read the go-live checklist alone. Every node serves the skill `aimeat-node-operations`, and its section "Before the node goes online" runs the same checks with the node's own admin tools (`aimeat_admin_security_overview`, `aimeat_admin_config`, `aimeat_admin_sso_list`, `aimeat_ai_providers`, `aimeat_seo_status` and others) and reports what is ready, what is missing and who provides it (`aimeat/src/data/builtin-skills.runbooks.ts`). The AI needs the operator's `operator:admin` permission for those tools.
 
 ## How this package stays current
 

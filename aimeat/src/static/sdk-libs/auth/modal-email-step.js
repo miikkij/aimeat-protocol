@@ -54,7 +54,7 @@ export function wireEmailStep(ctx) {
       if (titleEl) titleEl.textContent = i.completeAccountTitle || 'One last step';
       if (desc) {
         desc.textContent = hasEmail
-          ? (i.completeAccountDescResend || 'Confirm your email to finish signing in. We’ll send a verification code — edit the address if it’s wrong.')
+          ? (i.completeAccountDescResend || 'Confirm your email to finish signing in. We’ll send a verification code. Edit the address if it’s wrong.')
           : (i.completeAccountDesc || 'Add an email to finish setting up your account. We’ll send a verification code to confirm it.');
       }
     }

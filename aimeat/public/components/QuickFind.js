@@ -16,7 +16,7 @@
  *   busy=${busy} busyLabel=${…} emptyLabel=${nothing ? t('search.noMatches') : null} onPick=${open} />`
  * @version-history
  *   v1.1.0 — 2026-10-16 — An item's `meta`: the ids that address it (a key, a workspace id), in
- *     typewriter letters under the snippet (Jouni: "ID:tkin olla näkyvillä jollain tavalla").
+ *     typewriter letters under the snippet (Jouni asked for the ids to be visible).
  *   v1.0.0 — 2026-09-27 — Initial: the command palette's list (views/command-palette.js, .cmdk*) as
  *     a component with its keys and its choice (page group G9).
  */

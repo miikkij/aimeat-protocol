@@ -35,7 +35,7 @@
  *     lisää tekoälyä" is a small button (Jouni's review of v34, A3).
  *   2026-10-31: OverviewBlock, the account at a glance and the way to the Overview page
  *     (views/home/overview-band.js, GET /v1/overview).
- *   2026-10-31: Jouni's v32 approval (K26): "Tekoälysaldo X € · oma tekoälysi on käytössä · Osta lisää
+ *   2026-10-31: the v32 approval (K26; Jouni) set the line "Tekoälysaldo X € · oma tekoälysi on käytössä · Osta lisää
  *     tekoälyä", and under it "Kertamaksu. Ei uutta tilausta." (home.credit.topupNote).
  *   2026-10-31: Jouni's review of v31 (K26): on a node the store sold the nameplate shows no name
  *     while the only name is the account id; the credit line reads "AI-saldo X € · oma tekoälysi on
@@ -43,7 +43,7 @@
  *   2026-10-31: The credit line's "Buy more credit" is there at all times, in the page's language,
  *     not only when the credit runs low (v28 #19).
  *   2026-10-31: The credit line ends with "what is this?", a link to the help page's cost section,
- *     so the term is explained where it first appears (Jouni's "teach during use").
+ *     so the term is explained where it first appears (Jouni's rule that a term is taught while it is used).
  *   2026-10-31: On a node the store sold, NameplateBlock carries the AI credit in euros under the
  *     name, with whether the AI is ready and the store's top-up link when it runs low; the "this is
  *     a demo" block draws nothing there (Jouni v27 P3, P6).
@@ -131,7 +131,7 @@ function CreditPlate() {
     ready: tr('home.credit.ready', 'your AI is ready'),
     low: tr('home.credit.low', 'running low'),
     empty: tr('home.credit.empty', 'used up'),
-    off: tr('home.credit.off', 'the AI is switched off on this site'),
+    off: tr('home.credit.off', 'the AI is switched off in your AIMEAT'),
   }[credit.state];
   const topup = topupHref(getLocale());
   // The credit in euros in the page's own type, never as a count of messages (Jouni, 1.11 04.00); the
@@ -462,7 +462,7 @@ export function OwnAimeatBlock() {
     <${OwnAimeat} href=${store}
       label=${tr('home.ownAimeat.label', 'Demo')}
       title=${tr('home.ownAimeat.title', 'This is a demo. Get your own AIMEAT.')}
-      text=${tr('home.ownAimeat.text', 'Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.')}
+      text=${tr('home.ownAimeat.text', 'Many people share this demo to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.')}
       cta=${tr('home.ownAimeat.cta', 'Go to the store →')}
       soon=${storeOpensSoon()} code=${storeSoonCode()} />`;
 }

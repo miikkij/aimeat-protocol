@@ -391,7 +391,7 @@ Both failure directions have happened:
 | Direction | What happens |
 |---|---|
 | A colour leaks into a daisyUI context | The `calc()` becomes invalid at computed-value time. Paddings collapse to 0 and toggles render as slivers. Bridge v1.0.0 to v1.2.0 did this by mapping the colour at `:root`, and it broke every page that loaded the bridge |
-| A shared component lands in a daisyUI app | `border: 1px solid var(--border)` resolves to `1px solid 1px`, the browser drops the declaration, and the component loses its edge with no error |
+| A shared component is used in a daisyUI app | `border: 1px solid var(--border)` resolves to `1px solid 1px`, the browser drops the declaration, and the component loses its edge with no error |
 
 **The rule: a component that may render inside a vendored-styling app declares its own `--border`
 in a rule scoped to the component's own class.** Never rely on the ambient value, and never map it
@@ -540,7 +540,7 @@ toggle, breadcrumb) is chrome the user does not need during the task.
   lock the page behind: `body:has(.your-fullscreen-class) { overflow: hidden; }`.
 - **Give a Back control** that removes the is-active class. The overlay goes and the shell returns.
   No new route is needed.
-- **Leave desktop as it is.** Every rule above sits inside `@media (max-width: 760px)`, so the
+- **Leave desktop as it is.** Every rule above is inside `@media (max-width: 760px)`, so the
   desktop layout (for example, a two-pane messenger) does not change. Check that `position` is
   `static` on desktop.
 

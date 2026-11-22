@@ -94,7 +94,7 @@ export function ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind, nam
         ${preview
           ? html`<${Markdown} text=${draft} small />`
           : html`<${TextArea} rows=${14} value=${draft} placeholder=${t('readme.placeholder') || '# Title\n\nDescribe what this is about. Mermaid diagrams are allowed.'} onInput=${setDraft} />`}
-        ${copied ? html`<${HeadDesc}>${t('readme.pasteBack') || 'Prompt copied — run it in your AI chat, then paste the Markdown result here.'}<//>` : null}
+        ${copied ? html`<${HeadDesc}>${t('readme.pasteBack') || 'Prompt copied: run it in your AI chat, then paste the Markdown result here.'}<//>` : null}
       <//>`;
   }
 

@@ -14,7 +14,7 @@
    @version-history
      v1.48.0 — 2026-10-25 — --text-2xs from .68rem (10.9px) to .6875rem (11px), the smallest text a page may show; every part that reads it (the time, the tooltip, the thread list…) follows (Jouni: library sizes).
      v1.47.0 — 2026-09-27 — Four shape values for what the app catalogue draws in its own way, each at today's look so nothing changes in AIMEAT and a theme can set them: --shape-corner-soft (8px), --shape-corner-card (10px), --shape-ring (3px, a spinner's ring) and --shape-chosen-ground (the ground of a chosen row, the sun) (Jouni: appcat is themable).
-     v1.46.0 — 2026-09-26 — --ink-ground and --on-ink-ground: a dark block that stays dark in dark mode (the contents rail, the page thumbnail), so its sun labels read (Jouni: "yellow text on so light colored background. unreadable").
+     v1.46.0 — 2026-09-26 — --ink-ground and --on-ink-ground: a dark block that stays dark in dark mode (the contents rail, the page thumbnail), so its sun labels read (Jouni found the yellow text on a light ground unreadable).
      v1.41.0 — 2026-09-24 — The shape tokens (--shape-corner…, --shape-frame…, --shape-shadow…,
        --shape-case…): the poster's corners, frames, shadows and letter case as values a theme sets,
        with today's values, read by the component sheets (a move).
@@ -283,7 +283,7 @@
   --font-poster-strong-weight: 600;
   /* How the headline face is set. Archivo Black wanted to be squeezed (-.035em, line-height .9);
      Fjalla One is condensed already and its letters touch at that tracking and its lines collide
-     at that leading (Jouni, 2026-08-29: "as if the letters ran into each other"). Every poster
+     at that leading (Jouni, 2026-08-29). Every poster
      headline reads these two, so a change of face brings its own spacing here, not in ten sheets. */
   --font-poster-tracking: 0.01em;
   --font-poster-leading: 1;

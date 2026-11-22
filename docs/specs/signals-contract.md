@@ -13,7 +13,7 @@
 # Signals: counting what was reached
 
 One counter behind every channel. An email opened, a link clicked, a published page fetched, a QR
-scanned, an app's own event: all of it lands in the same record shape, so a report can hold them
+scanned, an app's own event: all of it is stored in the same record shape, so a report can hold them
 side by side instead of each surface keeping its own tally in its own format.
 
 ## What a person gets
@@ -27,8 +27,8 @@ crawler was building an index.
 ## The two records
 
 **The stream** — `signals.stream.<streamId>` — is what an owner deliberately measures: a campaign, a
-page, a channel. It is server-trusted (an unauthenticated door reads it before agreeing to write),
-so it lives under the reserved `signals.` prefix and is written only by `/v1/signals/streams`, never
+page, a channel. It is server-trusted (an unauthenticated endpoint reads it before agreeing to write),
+so it is stored under the reserved `signals.` prefix and is written only by `/v1/signals/streams`, never
 through the memory API.
 
 It holds no destination URL. A redirect target stored here would make the node an open redirect for
@@ -103,7 +103,7 @@ keep the totals.
 ## What each number is worth
 
 Carried in the report payload itself (`reading`), not left to whoever renders it, because a number
-that travels without its meaning gets repeated to a customer as something it is not.
+that is passed on without its meaning gets repeated to a customer as something it is not.
 
 - **A click is an act.** Somebody chose the link. Known mail scanners are counted as machines.
 - **An open is an estimate.** Mail apps fetch images on the reader's behalf: Gmail proxies them,
@@ -113,7 +113,7 @@ that travels without its meaning gets repeated to a customer as something it is 
   product on the market has it, and most do not say so.
 - **An AI name ending in `:asked`** means a person asked an AI something and it fetched this page to
   answer. A name without the suffix is a crawler building a model or an index. The first is a lead,
-  the second is shelf presence.
+  the second means the page is in a crawler's index.
 
 ## Counting a page nobody clicked on
 
@@ -122,12 +122,12 @@ A published page is counted when a stream named after it already exists: `cadenc
 measured until the owner creates the stream. Serving a page nobody measures costs no database read,
 and creating the stream takes effect on the next request rather than when a cache expires.
 
-This is the only door that sees an AI crawler at all, because those clients run no JavaScript and
+This is the only route that sees an AI crawler at all, because those clients run no JavaScript and
 load no images.
 
-## The doors
+## The endpoints
 
-| Door | Auth | For |
+| Endpoint | Auth | For |
 |---|---|---|
 | `POST /v1/signals/streams` | `signals:write` | define what is measured |
 | `GET /v1/signals/streams` | `signals:read` | list streams and their public addresses |

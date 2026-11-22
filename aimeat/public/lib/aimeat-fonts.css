@@ -32,8 +32,8 @@
  *     Fonts, latin + latin-ext subsets) for a Commodore 64 theme, and Selawik 1.01 (Microsoft's
  *     open-source face with Segoe UI's metrics, five static cuts from its GitHub release, each file
  *     whole) for an Azure portal theme. Both SIL OFL 1.1, rows in /lib/fonts/LICENSE.md.
- *   v1.2.0 — 2026-10-02 — Eleven more faces a theme may choose (Jouni: "if fonts are short, put
- *     more in the package"): Instrument Serif (roman and italic), Instrument Sans, Schibsted
+ *   v1.2.0 — 2026-10-02 — Eleven more faces a theme may choose (Jouni asked for more faces in
+ *     the package): Instrument Serif (roman and italic), Instrument Sans, Schibsted
  *     Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono and Martian Mono from
  *     Google Fonts as latin + latin-ext subsets, and Mona Sans and Hubot Sans from GitHub's
  *     releases as one variable file each (width and weight axes; no subset is published, the

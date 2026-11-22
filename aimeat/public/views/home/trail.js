@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The place's activity log: every action done in it, by whom, on what and when, as a
- *   plain list day by day, newest first (Jouni, 1.11 16.22, "Rakennamme kanssasi" part 3). It reads
+ *   plain list day by day, newest first (the build-with-you plan, part 3; Jouni, 2026-11-01). It reads
  *   GET /v1/build-with-you/trail, which pages with `next`; the page's look is the full record's
  *   (history.js): the same day groups and timeline rows.
  *
@@ -377,7 +377,7 @@ export default function HomeTrailView({ navigate }) {
         ↩ ${tr('home.history.back', 'Back to your home')}
       <//>
       <${PageIntro} title=${tr('home.trail.title', 'Activity log')}
-        sub=${tr('home.trail.sub', 'Everything done in your place: what, on what, who did it and when. Newest first.')} />
+        sub=${tr('home.trail.sub', 'Everything done in your AIMEAT: what, on what, who did it and when. Newest first.')} />
       ${hasReads && html`
         <${Check} checked=${showReads} onChange=${setShowReads}>
           ${tr('home.trail.showReads', 'Show reads too')}

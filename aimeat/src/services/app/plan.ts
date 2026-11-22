@@ -25,8 +25,8 @@
  *   only, because the Design Book is data an operator edits. Layout and navigation also take
  *   `custom` with a note, for a screen no preset fits.
  *
- *   THE AI DRAWS OPTIONS OF ITS OWN (Jouni, 2026-10-30: "miksei tekoäly pysty tekemään niitä eri
- *   asetteluja ja muovaamaan dynaamisesti", and the presets stay beside them). `proposals.layout` and
+ *   THE AI DRAWS OPTIONS OF ITS OWN (Jouni, 2026-10-30: the AI draws layouts of
+ *   its own and shapes them as it goes, and the presets stay beside them). `proposals.layout` and
  *   `proposals.nav` hold up to four options the building AI drew for this one app, each a name, a
  *   sentence and a sketch in the rows LayoutSketch draws. The page offers them first and the presets
  *   after, and a choice's value may name one. A person's choice may carry a note: what they want

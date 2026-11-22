@@ -30,7 +30,7 @@
  *   v1.2.0 — 2026-10-31 — `terms` lists glossary entries, `mine` the person's own figures, and every
  *     dialog ends with "Ask your AI more" (Jouni, 2026-10-31; wish-kokonaiskuva-koneet-agentit-sovellukset-tieto-ja-tarjoukset-).
  *   v1.1.0 — 2026-10-27 — `tipLabel`, so a notice, a Security page incident and a waiting request can
- *     explain themselves with the same dialog (Jouni, 2026-10-27: "kysymysmerkki + help dialogi").
+ *     explain themselves with the same dialog (Jouni, 2026-10-27).
  *   v1.0.0 — 2026-10-02 — Initial, extracted from HelpTip so a link or a menu can open the same
  *     explanation (wish "Ohjenappi ja vihjeteksti asetuksille").
  */

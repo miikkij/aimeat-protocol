@@ -124,8 +124,8 @@ export function line(item) {
       return tr('home.feed.agentKnocking', 'Your agent is asking to connect.');
     case 'agent_connected':
       return d.name
-        ? tr('home.feed.agentConnectedNamed', '{name} is home.').replace('{name}', d.name)
-        : tr('home.feed.agentConnected', 'Your agent is home.');
+        ? tr('home.feed.agentConnectedNamed', '{name} is connected.').replace('{name}', d.name)
+        : tr('home.feed.agentConnected', 'Your agent is connected.');
     case 'home_initialized':
       return tr('home.feed.homeReady', 'Your home is up and running.');
     case 'room_entered':

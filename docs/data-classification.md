@@ -186,7 +186,7 @@ missing one a gap. What an AI model outside this server gets of a domain's conte
 operator's mode for that domain, in the next section; the floor alone refuses no model.
 
 **Regulated data and outside AI models.** Content is regulated when a register names a domain and
-the content sits in a container the register names (an organism, a workspace, an app). The
+the content is in a container the register names (an organism, a workspace, an app). The
 operator's setting `compliance.regulated_ai_modes` (`AIMEAT_COMPLIANCE_REGULATED_AI_MODES`) gives
 each domain a mode, as `domain=mode` entries such as `health=local,export-controlled=block`. A domain
 no entry names is `notify`, and the setting is empty by default.
@@ -232,7 +232,7 @@ page opens each row of its records section into that list, and its status action
 PATCH. A processor's `agreement` ({ agreementId, version, status, signedAt }) is the slot the
 processing agreements fill.
 
-**Drafts and gaps.** `GET /v1/compliance/draft` hands a filled draft: the node's own registers
+**Drafts and gaps.** `GET /v1/compliance/draft` returns a filled draft: the node's own registers
 (accounts, the sign-in and security log, the consent ledger, the AI usage ledger), an organism's member
 register, or an app's register read from its data map. `GET /v1/compliance/gaps` lists what a scope
 leaves open, and the operator's report carries every scope's gaps under `processing`.

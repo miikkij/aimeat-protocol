@@ -11,7 +11,7 @@
  *   v1.10.0 — 2026-11-01 — buildCodeFromEnv(): the store's build code for a place (format in utils/build-code.ts).
  *   v1.9.0 — 2026-11-01 — AIMEAT_SITE_BUILD_QUEUE_URL: the operator's build queue for "build it with you".
  *   v1.8.0 — 2026-11-01 — AIMEAT_SITE_AI_EUR_PER_MESSAGE removed the same night: no message counts
- *     are shown to a customer (Jouni, 1.11 04.00: "lupaukset eivät koskaan pidä paikkaansa").
+ *     are shown to a customer (Jouni, 1.11 04.00: no promises about what the credit lasts).
  *   v1.7.0 — 2026-11-01 — AIMEAT_SITE_AI_EUR_PER_MESSAGE, kept only when it is a positive decimal up to 1.
  *   v1.6.0 — 2026-10-31 — AIMEAT_SITE_AI_CREDIT_EUR_PER_USD, kept only when it is a positive decimal.
  *   v1.5.0 — 2026-10-30 — AIMEAT_SITE_DEV_LINKS ('auto' unless it says 'show' or 'hide').

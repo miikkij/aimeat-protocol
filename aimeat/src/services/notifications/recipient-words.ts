@@ -14,7 +14,7 @@
  * @usage const words = await notifWords(storage, recipientGhii, input.i18n, { title, body });
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial: notifications are written in the recipient's language
- *     (Jouni, 2026-11-14: "ilmoitukset pitäisi luoda lukijan kielelle").
+ *     (Jouni, 2026-11-14).
  */
 import type { Storage } from '../../storage/interface.js';
 import { createT, toLocale, type Locale } from '../../i18n.js';

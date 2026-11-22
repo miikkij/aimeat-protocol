@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The record of a package an author sells to accounts of this node, and the one question
  *   every read, export, install and update of such a package asks: does this account hold a paid
- *   purchase of it? (Jouni, 2026-10-31, "optio B"; wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu.)
+ *   purchase of it? (Jouni, 2026-10-31, option B; wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu.)
  *
  *   ONE RECORD PER PACKAGE GROUP, `sale.<groupId>`, in the system namespace `package-account-sales`: a
  *   literal with no `@`, so no principal can address it through the memory API. The author's price

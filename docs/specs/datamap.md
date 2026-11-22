@@ -116,7 +116,7 @@ One row per key family or record type, never one per key: `news.<date>.*`, not 3
 
 **Why the domain is on the row.** The domain decides what follows the data: the lowest
 classification its container may carry, whether an impact assessment is owed, whether an outside
-model may read it, and which area of the EU AI Act's Annex III an AI use of it lands in. CVs,
+model may read it, and which area of the EU AI Act's Annex III an AI use of it falls under. CVs,
 competence ratings and staffing decisions are `employment`; an app that uses AI on them is a
 candidate for the high-risk class (Annex III point 4), and the register draft proposes exactly that.
 Written on the row, the domain reaches the app's record of processing and its AI Act entry without

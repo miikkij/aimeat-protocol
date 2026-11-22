@@ -30,7 +30,7 @@ For an organisation node, set `AIMEAT_APP_DEFAULT_ACCESS=signed-in`, `AIMEAT_APP
 - An app reaches the person's data only through an app grant: the owner approves named scopes on a consent screen, and the app gets a short access token with role `app` and a rotating refresh token. The scopes are enforced on every request, and the owner can narrow or revoke the grant (`aimeat/src/routes/app-grants.ts`).
 - An AI job waits in a queue, so its starter is asked again when the job runs. A job that an app, an ecosystem app or an agent queued ends before the provider is called, and nothing is paid, when the owner has revoked that app's grant, disconnected that ecosystem app, deleted that agent, or taken `ai:use` from it since. The job's error names the page where the owner gives the permission back (`aimeat/src/services/ai-jobs/run-gate.ts`).
 - An app can never hold `account:security` (`aimeat/src/auth/account-security.ts`). It holds `app:write` only when the owner approved that word on the app's consent screen (`aimeat/src/services/app/grant-vocabulary.ts`, `APP_GRANTABLE_SCOPES`).
-- When an app goes away, its address stays held for its owner for `AIMEAT_APP_HELD_LABEL_DAYS` (90), because its visitors' browser data lives on that origin (`aimeat/.env.example`).
+- When an app goes away, its address stays held for its owner for `AIMEAT_APP_HELD_LABEL_DAYS` (90), because its visitors' browser data is stored under that origin (`aimeat/.env.example`).
 
 ### What an app keeps in the browser, and apps that work with no connection
 
@@ -75,7 +75,7 @@ flowchart LR
 | The owner's view and close | `aimeat_app_internet_opening_get`, `aimeat_app_internet_close` | `aimeat/src/routes/internet-opening.ts` |
 | The operators' list and decision | `aimeat_admin_internet_openings`, `aimeat_admin_internet_opening_decide` | `aimeat/src/routes/internet-opening.ts` |
 | Owners trusted to open without asking | `aimeat_admin_internet_opener_set` | `aimeat/src/routes/internet-opening.ts` |
-| Which apps qualify | Its own setting lets anyone open it, it has no access code, it is not parked and no operator hid it | `aimeat/src/services/internet-opening/opening-service.ts` |
+| Which apps qualify | Its own setting lets anyone open it, it has no access code, it is not unlisted and no operator hid it | `aimeat/src/services/internet-opening/opening-service.ts` |
 | Record | Every opening has a reason, a requester, a time and an end date; every change is an event in its history | `aimeat/src/services/internet-opening/opening-service.ts` |
 
 ### App data maps

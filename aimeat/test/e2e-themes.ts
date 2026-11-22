@@ -9,7 +9,7 @@
  *   person's own choice, and the shipped optional theme Tiilitaivas.
  *
  *   The ones that matter most: the operator's CSS is refused ONLY when it does not parse (Jouni,
- *   Q2: "mahdollisimman muokattavaksi"), and nobody but the operator writes a theme.
+ *   Q2), and nobody but the operator writes a theme.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=themes
  * @version-history
  *   v1.3.0 — 2026-11-04 — Tiilitaivas: offered beside AIMEAT with the default unchanged, read only and
@@ -119,7 +119,7 @@ await test('POST /v1/themes — a copy of the AIMEAT theme, its styles under new
 });
 
 await test('A theme name another theme has → 409 NAME_TAKEN, retired themes and the built-in one included', async () => {
-    // Jouni 2026-09-24: "a save with a name another theme has is refused with a plain reason; retired themes count too".
+    // A save under a name another theme has is refused with a plain reason, retired themes included (Jouni, 2026-09-24).
     const same = await json('/v1/themes', op(post({ name: 'harbour ', basedOn: 'aimeat' })));
     assert(same.status === 409 && same.body.error?.code === 'NAME_TAKEN', `copy named like Harbour: ${same.status} ${same.body.error?.code}`);
     assert(/Harbour/.test(same.body.error?.message ?? ''), `the reason names the other theme: ${same.body.error?.message}`);

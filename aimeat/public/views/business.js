@@ -120,7 +120,7 @@ export default function Business({ navigate }) {
       <${Group} title=${tr('biz.g1Title', 'The work happens without you')}>
         <${Case} id="case-news"
           title=${tr('biz.c1Title', 'I wake up already knowing what happened in my field')}
-          text=${tr('biz.c1Text', 'A publication that writes itself every evening. Agents pull the raw material, write the pieces and ship the edition. Zero human hours.')}
+          text=${tr('biz.c1Text', 'A publication that writes itself every evening. Agents pull the source material, write the pieces and ship the edition. Zero human hours.')}
           proofHref=${paperHref}
           proofLabel=${tr('biz.c1Proof', "Read tonight's edition →")}
           ctaLabel=${tr('biz.c1Cta', 'The same, from your topics →')} ctaHref=${CONTACT} />
@@ -143,14 +143,14 @@ export default function Business({ navigate }) {
       <${Group} title=${tr('biz.g2Title', 'The company runs on it')}>
         ${hasSite('crm') ? html`
           <${Case} id="case-crm"
-            title=${tr('biz.c7Title', 'My CRM costs less than lunch, and my agents keep it fed')}
+            title=${tr('biz.c7Title', 'My CRM costs less than lunch, and my agents keep it up to date')}
             text=${tr('biz.c7Text', 'Contacts, companies, deals and follow-ups as versioned records you own. Tap to dial, dictate the note by voice, set the next follow-up. Company cards enrich themselves from the trade register.')}
             proofHref=${siteLink('crm')}
             proofLabel=${tr('biz.c7Proof', 'Open the CRM →')}
             ctaLabel=${tr('biz.c7Cta', 'Move your CRM here →')} ctaHref=${CONTACT} />` : ''}
         <${Case} id="case-dev"
           title=${tr('biz.c4Title', 'My project knows its own status')}
-          text=${tr('biz.c4Text', 'When developers have agents, sprints slow things down. An organism is a continuous shared picture: goals, roadmap, bugs, decisions and a living context every agent reads before working and updates after. A human approves the decisions; everything else moves at agent speed.')}
+          text=${tr('biz.c4Text', 'When developers have agents, sprints slow things down. An organism is a shared, always current view: goals, roadmap, bugs, decisions and a living context every agent reads before working and updates after. A human approves the decisions; everything else moves at agent speed.')}
           quote=${tr('biz.c4Quote', 'This could replace Jira.')} quoteBy=${tr('biz.c4QuoteBy', 'game developer, large studio')}
           proofHref=${siteLink('roadmap')}
           proofLabel=${tr('biz.c4Proof', 'Open our own roadmap, live →')}
@@ -176,7 +176,7 @@ export default function Business({ navigate }) {
         ${hasSite('exchange') ? html`
           <${Case} id="case-exchange"
             title=${tr('biz.c9Title', 'My data sells itself while I sleep')}
-            text=${tr('biz.c9Text', 'Publish a capability once and it carries a price. Another company’s app, or another company’s agent, buys exactly what it needs under a contract, and every call is logged and settled. You see what it earned; the buyer saw the price before the first call.')}
+            text=${tr('biz.c9Text', 'Publish a capability once and it has a price. Another company’s app, or another company’s agent, buys exactly what it needs under a contract, and every call is logged and settled. You see what it earned; the buyer saw the price before the first call.')}
             proofHref=${siteLink('exchange')}
             proofLabel=${tr('biz.c9Proof', 'Open the marketplace →')}
             ctaLabel=${tr('biz.c9Cta', 'List your first capability →')} ctaHref=${CONTACT} />` : ''}
@@ -202,7 +202,7 @@ export default function Business({ navigate }) {
       <section class="ld-sovereignty ld-band--ink">
         <h2 class="ld-casegroup-title">${tr('biz.sovTitle', 'Why owning it is the reason to buy')}</h2>
         <ul class="ld-sov-list">
-          <li>${tr('biz.sov0', 'A company here is a node, not an account type. You take your own AIMEAT node, put your business identity and your own payment keys on it, invite your people and build the apps your work needs. Nothing about it is a separate product tier.')}</li>
+          <li>${tr('biz.sov0', 'A company here is its own AIMEAT, not an account type. You take your own AIMEAT, put your business identity and your own payment keys on it, invite your people and build the apps your work needs. Nothing about it is a separate product tier.')}</li>
           <li>${tr('biz.sov1', 'Your data stays on a server you control. We do not see it and do not keep it, so your own certification is the one that counts.')}</li>
           <li>${tr('biz.sov2', 'Every action is logged: who read what, who authorised it, what it cost. The audit is a report, not a project.')}</li>
           <li>${tr('biz.sov3', 'Agents and apps work under named permissions you can take back with one click, and every action is attributed to whoever took it.')}</li>
@@ -233,7 +233,7 @@ export default function Business({ navigate }) {
            discredits everything above it. -->
       <section class="ld-sovereignty">
         <h2 class="ld-casegroup-title">${tr('biz.transTitle', 'AI transparency your compliance officer can read')}</h2>
-        <p class="ld-case-text">${tr('biz.trans1', 'Article 50 of the EU AI Act has applied since 2 August 2026. What you get here is an EU-built, self-hostable platform where AI provenance is a primitive of the layer every app sits on: content a model produced carries a record of how it was made, a person reading it on the node’s own surfaces sees a label, and the operator’s legal identity and supervisory authority sit at a fixed machine-readable address your compliance officer can fetch without asking us. Content the node served can be checked by anyone, byte for byte, with no account.')}</p>
+        <p class="ld-case-text">${tr('biz.trans1', 'Article 50 of the EU AI Act has applied since 2 August 2026. What you get here is an EU-built, self-hostable platform where AI provenance is a primitive of the layer every app runs on: content a model produced has a record of how it was made, a person reading it on the server’s own pages sees a label, and the operator’s legal identity and supervisory authority are at a fixed machine-readable address your compliance officer can fetch without asking us. Content the server sent can be checked by anyone, byte for byte, with no account.')}</p>
         <p class="ld-case-text">${tr('biz.trans2', 'What stays yours: the obligations that come with what you publish. Running on AIMEAT does not discharge them, and we would rather say so here than have you discover it later. What the platform does is make marking, labelling and the record the default path instead of a project.')}</p>
         <a class="ld-path-cta" href="/v1/transparency"
           onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>${tr('biz.transCta', 'How this node marks AI content →')}</a>

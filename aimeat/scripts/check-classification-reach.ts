@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The gate that keeps stored content from reaching a caller around the classification
- *   check (TARGET-082, spec §13.2, decided by Jouni 2026-09-29: "Tee yksi komponentti mitä käytetään
- *   useammassa kohtaa tarkistus mukaan lukien ettei synny duplikaatti patheja").
+ *   check (TARGET-082, spec §13.2, decided by Jouni 2026-09-29: one component that every place uses, with
+ *   the check in it, so that no duplicate paths come into being).
  *
  *   WHAT IT READS. Every `.ts` file under src/ except the storage layer itself, the browser code and
  *   the generated types, parsed with the compiler, so a comment or a string that names a method is

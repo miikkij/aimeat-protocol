@@ -96,7 +96,7 @@ function nameLike(s: unknown): s is string {
  * Best-effort human title for a record value (schema-agnostic): a named field, the document's first
  * heading, then the record's own id or first short text field, and only then the key. The key's
  * last segment was the title before 2026-10-16, which is how a workspace draft showed as "draft" and
- * a meta record as a bare UUID in the search (Jouni: "näytä nimi").
+ * a meta record as a bare UUID in the search (Jouni: show the name).
  */
 export function titleOf(value: unknown, fallbackKey: string): string {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -157,7 +157,7 @@ function snippetOf(text: string, tokens: string[]): string {
     if (i >= 0 && (at < 0 || i < at)) at = i;
   }
   // A window of about 420 characters around the first found word: enough for a record's whole note,
-  // which a 180-character window lost behind a long address (Jouni: "tietohan siinä on tärkeää").
+  // which a 180-character window lost behind a long address (Jouni: the information in it is what matters).
   if (at < 0) return clip(text.slice(0, 420), 420);
   const start = Math.max(0, at - 80);
   const end = Math.min(text.length, at + 340);

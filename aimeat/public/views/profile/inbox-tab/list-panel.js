@@ -16,8 +16,7 @@
  *   v1.14.0 — 2026-11-14 — A thread a question of Ask someone who knows opened carries the Question
  *     chip (openedKind help-question).
  *   v1.13.0 — 2026-11-10 — "Unread" is the top section: a row with a message the owner has not opened
- *     leaves its own section for it and goes back once opened (Jouni: "sinulla on huomaamatta vielä
- *     tämä").
+ *     leaves its own section for it and goes back once opened (Jouni).
  *   v1.12.0 — 2026-11-10 — A section shows its first 25 entries and "Show N more" adds 50 (report item
  *     2.4); the heading's counts stay the whole section's.
  *   v1.11.0 — 2026-11-08 — A request opens to its whole first message (`body` from the server) with

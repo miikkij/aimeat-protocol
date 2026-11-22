@@ -13144,7 +13144,7 @@ Finnish ä/ö render.
 
 Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock,
 Geist Mono, Martian Mono, Mona Sans and Hubot Sans vendored 2026-10-02, so a theme has display and
-text faces beyond the house ones (Jouni: "if fonts are short, put more in the package"). The nine
+text faces beyond the house ones (Jouni asked for more faces in the package). The nine
 from Google Fonts are its latin and latin-ext subsets, unchanged. Mona Sans and Hubot Sans are not
 on Google Fonts: each is the variable woff2 file of GitHub's own release, unchanged, which carries
 latin and latin-ext in one file and so has no `unicode-range` in `aimeat-fonts.css`. Both carry a

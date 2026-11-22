@@ -5,8 +5,8 @@
  * @description The line on the owner's feed when one of their AIs did something without asking: what it
  *   did, on which permission, and who gave that permission and when.
  *
- *   WHY. Jouni, 2026-11-20: when an AI may act on its own, "se kirjataan vain semmoisenaan että
- *   tämmöisen asetuksen voimin tekoäly teki tämmöisen tempun ja se näkyy jossain audit logissa". The
+ *   WHY. Jouni, 2026-11-20: when an AI may act on its own, the act is only recorded, with the
+ *   setting that allowed it, and the record shows in an audit log. The
  *   words this covers are the ones a person gives by name (./words.ts standingCandidates): an act on
  *   any of them is one the person would otherwise have been asked about.
  *

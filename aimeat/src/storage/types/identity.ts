@@ -309,8 +309,7 @@ export interface AgentRecord {
    * the owner; services/agent/task-rules.ts TASK_START_FLOOR) never starts a task by itself: each
    * one waits for the owner's press. When the owner has decided that this agent's work should run on
    * its own anyway, paid or free, they name those permissions here, and the floor stops holding the
-   * agent for them (Jouni, 2026-10-23: "Oli se maksullinen tai ilmainen niin pitää olla mahdollista
-   * tehdä se automaattisesti jos niin on päätetty."). A floor permission granted later and not named
+   * agent for them (Jouni, 2026-10-23). A floor permission granted later and not named
    * here still holds, and so does a stopped agent.
    *
    * Set and cleared by the owner in person only: not by an app, not by another agent, never by the

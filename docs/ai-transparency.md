@@ -22,7 +22,7 @@ Picking only one is the expensive mistake, so there are two and they fail indepe
 
 | Layer | What it is | Survives |
 |---|---|---|
-| **Attached** | the mark travels with the document — an `AI-Disclosure` header, a `<meta name="ai-disclosure">`, an `ai-disclosure` attribute on the document element, schema.org JSON-LD, YAML frontmatter on a markdown face | the record being unreachable |
+| **Attached** | the mark goes with the document — an `AI-Disclosure` header, a `<meta name="ai-disclosure">`, an `ai-disclosure` attribute on the document element, schema.org JSON-LD, YAML frontmatter on a markdown face | the record being unreachable |
 | **Addressable** | a provenance record at its own URL, joined to the content by a SHA-256 of the exact bytes | the served document being stripped |
 
 ### The record
@@ -120,7 +120,7 @@ Three distinct legal persons commonly touch one piece of content here. Fuller an
 the private role-analysis notes (not distributed in this repository).
 
 **You are a deployer, by default.** You run the systems on your node. Article 50(4) — deepfakes and
-text on matters of public interest — lands on the account that publishes, which on a multi-tenant node
+text on matters of public interest — applies to the account that publishes, which on a multi-tenant node
 is often an owner rather than you. Autonomous publishing (a scheduled agent job that writes and
 publishes with nobody reading the substance) is precisely the case the editorial-control carve-out
 does *not* cover.
@@ -149,7 +149,7 @@ Ours (Finland) is **Traficom** (Liikenne- ja viestintävirasto). Yours depends o
 we decline to guess it for you.
 
 This is **not** the data protection authority. Naming that one here would put a false statement into a
-compliance artefact, which is why the two live in two different config fields:
+compliance artefact, which is why the two are in two different config fields:
 
 ```bash
 AIMEAT_AI_SUPERVISORY_NAME="Liikenne- ja viestintävirasto Traficom"   # AI Act market surveillance
@@ -262,7 +262,7 @@ Two things follow, and both are load-bearing:
   the watermarking commitment we explicitly declined. `/v1/ai-transparency` publishes `sections`,
   `signed_on` and `not_signed` with the reason, in that spirit — copy it in marketing and listings.
 - **This is configuration, not a property of the software.** The signature belongs to *Overscale
-  Solutions Oy*, not to the code, and this repository is MIT-licensed. So the value lives in
+  Solutions Oy*, not to the code, and this repository is MIT-licensed. So the value is in
   `AIMEAT_AI_COP_SECTIONS` / `AIMEAT_AI_COP_SIGNED_ON`, empty by default: a node someone else runs
   reports `signatory: false` until its own operator signs and sets it. A `true` written into a source
   file would publish our compliance claim from their node.

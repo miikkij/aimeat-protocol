@@ -25,8 +25,8 @@ It returns an up-to-date JSON map of this node: identity, capabilities, the gett
 - Codex, one line: `codex mcp add aimeat --url {{node_url}}/v1/mcp`. It starts the sign-in by itself and waits for the person to approve in the browser. If the command stops first, the browser cannot reach 127.0.0.1 at the end. Ask the person to run it in their own terminal and leave it running. Later logins: `codex mcp login aimeat`.
 - `GET {{node_url}}/v1/ai-tools` has the exact steps per tool.
 - Never ask for a password, a sign-in link or an emailed code in chat. The person signs in only in their own browser. A person who is not signed in goes from the approval page to the front page, signs in or registers there, and comes back to the approval.
-- Choose one path and finish it. `GET {{node_url}}/` (`for_ai_agents.when_it_goes_wrong`) says what each failure means.
-- Available in ChatGPT via Developer mode. The Gemini consumer app connects a custom MCP server on its web app in the United States (Settings > Connected Apps > Add a custom app); outside the United States, and for Microsoft Copilot, use the copy-prompt path below.
+- Choose one method and finish it. `GET {{node_url}}/` (`for_ai_agents.when_it_goes_wrong`) says what each failure means.
+- Available in ChatGPT via Developer mode. The Gemini consumer app connects a custom MCP server on its web app in the United States (Settings > Connected Apps > Add a custom app); outside the United States, and for Microsoft Copilot, use the copy-prompt method.
 
 ### B) Agent via Device Authorization (RFC 8628) — for a real agent/fleet
 The human owner approves every agent, so the flow below waits on them:
@@ -67,11 +67,11 @@ their connection path until an authorized migration changes them.
 
 **Agents & Tasks** — an owner assigns work to their own agents as **tasks** (`draft → queued → active → done`). An agent that processes a workspace advertises a **contract** (`workspace-contract` + `contract.<id>` tags); the owner adopts it into a workspace (an engagement).
 
-**Apps** — hosted mini-apps run origin-isolated on `*.apps.<node>` and reach your data only through **app grants** (scoped, consented tokens). Browse `/v1/apps`; SDK libs at `/v1/libs`.
+**Apps** — hosted mini-apps run origin-isolated on `*.apps.<node>` and read your data only through **app grants** (scoped, consented tokens). Browse `/v1/apps`; SDK libs at `/v1/libs`.
 
 **Building an app** — apps are single-file HTML. Every app is built with the Atelier specification: start from `GET /v1/prompts/build-app-atelier` (over MCP, `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts), and read the platform sections the app needs. The Classic track was retired on 2026-11-19; an app built on it is moved with the section `from-classic`. If you have MCP tools, load the `node:aimeat-app-builder-atelier` skill and call `aimeat_appdev_overview` **first** — the owner's existing apps and the recorded pitfalls are usually the fastest correct starting point.
 
-**Tasks & workflows**: the owner queues work for their own agents as **tasks** (`/v1/agents/{name}/tasks`, `draft → queued → active → done`; key-holding v2 agents use `/v1/agents/v2/tasks`); an agent reports progress and proposes todos. **Workflows** (`/v1/workflows`) chain steps into a pipeline with human-approval gates. **Schedules** (`/v1/schedules`) run work on a clock.
+**Tasks & workflows**: the owner queues work for their own agents as **tasks** (`/v1/agents/{name}/tasks`, `draft → queued → active → done`; key-holding v2 agents use `/v1/agents/v2/tasks`); an agent reports progress and proposes todos. **Workflows** (`/v1/workflows`) chain steps into a pipeline with human-approval gates. **Schedules** (`/v1/schedules`) run work at set times.
 
 **EXCHANGE** (`/v1/exchange`) — the two-sided market. An offering carries a price and an ODPS v4.2 descriptor; a consumer posts a need or accepts an offering, and a contract meters every call. This is how a capability earns as it runs.
 
@@ -81,7 +81,7 @@ their connection path until an authorized migration changes them.
 
 **Meters** — **morsels** are a pacer, not money: they set how much agents may write, accrue each day and through what a person contributes, and a larger balance lets them do more here (check `GET /v1/wallet`). Real LLM spend is metered separately in USD (`/v1/ledger`). The node exposes a payment interface but mandates no payment system.
 
-**Extensions & Cortex** — operator/owner-installed sandboxed compute: extensions run server-side in a QuickJS-WASM sandbox; cortex serves browser lib bundles. **AI proxy** (`/v1/ai/complete`) lets `ai:use`-scoped agents/apps draw on the owner's LLM key under a budget.
+**Extensions & Cortex** — operator/owner-installed sandboxed compute: extensions run server-side in a QuickJS-WASM sandbox; cortex serves browser lib bundles. **AI proxy** (`/v1/ai/complete`) lets `ai:use`-scoped agents/apps use the owner's LLM key under a budget.
 
 **Federation (optional)** — nodes peer bilaterally; the live use is logging into a peered node with your own credentials. Ships peerless by default.
 

@@ -203,7 +203,7 @@ export const PUBLIC_PAGES: RegistryPage[] = [
     // A node's front page is the node itself, even where it repeats the software's landing text.
     ownContent: true,
     title: 'AIMEAT: multiply what your AI can do',
-    description: 'AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.',
+    description: 'AIMEAT multiplies what AI can do and makes those capabilities easy to use, so people and their AIs can work together in a controlled, safe and reliable way.',
     changefreq: 'weekly',
     priority: '1.0',
     markdown: `AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way. You own your data and what you build, and you decide who sees it.

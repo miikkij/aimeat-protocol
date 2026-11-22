@@ -12,7 +12,7 @@ forbidden, and how a row is added or changed. `language-context.md` lists the ot
 | the morsels one use takes | the second value an offer, app, tool, action or EXCHANGE offering carries beside its optional money price: each use takes this many morsels from the user's balance, part is burned and the rest goes to the provider. Never a price, a cost, a fee or a charge; a line says the money price or Free, then the pacing: "Free · pacing 5 morsels" (ruling 2026-10-11) | pacing amount (in a line: pacing N morsels) | tahdistus (rivillä: tahdistus N murusta) | ritmo (en una línea: N morsels de ritmo) |
 | more morsels bought with money | the pack the operator sells at a money price when a person's balance runs out; the morsels pace use like any others | pacing pack / pacing capacity | tahdistuspaketti / lisää tahdistusta | paquete de ritmo / capacidad de ritmo |
 | an item with no money price | free to use; its pacing amount still applies | Free | Maksuton | Gratis |
-| granted model spend | real money the house fronts, and it runs out | AI allowance | tekoälysaldo | saldo de IA |
+| granted model spend | real money the operator pays in advance, and it runs out | AI allowance | tekoälysaldo | saldo de IA |
 | a model that answers closed questions | yes or no, pick one, a scale, with probabilities; writes no text; beside the text model, never in its list | decision model | päätösmalli | modelo de decisión |
 | the states a document or a process moves through | a named set of states and the events that move between them; in a living document the `machine` node | state machine | tilakone | máquina de estados |
 | the bar a decision must reach | the confidence or probability under which the decision model moves nothing and a person decides | threshold | kynnys | umbral |
@@ -65,7 +65,7 @@ forbidden, and how a row is added or changed. `language-context.md` lists the ot
 | what was brought to a goal | files, records, links, texts and earlier results the owner or the agents added | material | aineisto | material |
 | two agents handing work to each other | a coder and a reviewer; it has its own limit, separate from the chain length | back and forth | edestakaisin | ida y vuelta |
 | the steps only the owner can take | choose, approve, answer, do it yourself, or give a file or a fact | waiting for you | odottaa sinua | te espera |
-| the agent that leads a goal | plans, hands out work, makes subgoals and asks the owner; any agent of the owner's, on any model | coordinator | koordinaattori | coordinador |
+| the agent that leads a goal | plans, assigns work, makes subgoals and asks the owner; any agent of the owner's, on any model | coordinator | koordinaattori | coordinador |
 | a party's objection to delivered work | the requester or the provider opens it on delivered work; the two settle it, or it waits for the operator when one escalates it or 30 days pass | dispute | riita | disputa |
 | the operator's decision on a dispute | shares out the morsels delivery paid the provider (back to the requester, removed from circulation, kept) and closes the dispute for good | ruling (verb: rule) | ratkaisu (ratkaista) | decisión (decidir) |
 | the two parties of a work item | the one who asked for the work and the one who delivered it | requester / provider | tilaaja / toimittaja | solicitante / proveedor |

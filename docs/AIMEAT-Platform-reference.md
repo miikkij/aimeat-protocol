@@ -35,7 +35,7 @@ On top of Core the reference node adds seven clusters:
 
 ### Data out, and data spaces
 
-Every road out of the node ends in one of two grants that already exist: a named share (a consent whose recipient is an outside party) or a marketplace contract. The Dataspace Protocol adds no third kind. A data space participant becomes an outside party of the package owner, identified by its DID; an agreement it negotiates is a named share to that party, or for a priced offer a contract the owner approves, because the protocol moves no money. The data plane is the node's own OData and CSV reads, and the token a transfer hands out is the party's purpose token, bound to that one share, so ending the agreement, the share or the transfer ends the next read. The protocol endpoints take a participant's credential and never a node session; the owner's side of a negotiation is an agent tool like every other decision.
+Every way data leaves the node ends in one of two grants that already exist: a named share (a consent whose recipient is an outside party) or a marketplace contract. The Dataspace Protocol adds no third kind. A data space participant becomes an outside party of the package owner, identified by its DID; an agreement it negotiates is a named share to that party, or for a priced offer a contract the owner approves, because the protocol moves no money. The data plane is the node's own OData and CSV reads, and the token a transfer gives is the party's purpose token, bound to that one share, so ending the agreement, the share or the transfer ends the next read. The protocol endpoints take a participant's credential and never a node session; the owner's side of a negotiation is an agent tool like every other decision.
 
 ## 2. The shared living surface
 
@@ -74,7 +74,7 @@ These parts of Core v4.0 are not in Core 2026-11, because a second implementatio
 | §8 The payment principles | §8.6 |
 | §9 Deprecations | Appendix B |
 
-The rest of the Platform document was inventory, coding advice, screens or product status. Its facts now live in the feature list, the coding guidelines, the skills on the node and the changelog.
+The rest of the Platform document was inventory, coding advice, screens or product status. Its facts are now in the feature list, the coding guidelines, the skills on the node and the changelog.
 
 ## 6. Where to look next
 
@@ -87,4 +87,4 @@ The rest of the Platform document was inventory, coding advice, screens or produ
 
 ## 7. How this note stays true
 
-It names no counts, no endpoint paths beyond the feature list's own entry point, no configuration variables, no screens and no release states. Those live in the feature list, `openapi.yaml` and the [configuration reference](b-config.md), which have their own checks. This note is reviewed when a cluster is added or removed, and its version line is updated at every node release.
+It names no counts, no endpoint paths beyond the feature list's own entry point, no configuration variables, no screens and no release states. Those are in the feature list, `openapi.yaml` and the [configuration reference](b-config.md), which have their own checks. This note is reviewed when a cluster is added or removed, and its version line is updated at every node release.

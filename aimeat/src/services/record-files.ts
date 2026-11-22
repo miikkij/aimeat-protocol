@@ -6,8 +6,7 @@
  *   value may carry the owner-addressed address of a stored file, `/v1/pub/<owner>/<key>` (an
  *   extension's attachment field, a link an agent wrote). The file stays at its upload visibility,
  *   usually private, so every reader of the record but the uploader got 403 on the link. Jouni ruled
- *   on 2026-10-30: "jos se on työtilassa niin silloin se saa näkyä työtilalaisille" (a file in the
- *   workspace may be seen by the workspace's members). So once a record has been written or published
+ *   on 2026-10-30 that a file in the workspace may be seen by the workspace's members. So once a record has been written or published
  *   into a workspace, each file it links that the WRITER controls is bound to that workspace.
  *
  *   Three rules, each against a way this could widen too much:
@@ -19,7 +18,7 @@
  *   - Never narrower. 'private' and 'owner' become 'workspace'; 'workspace' gains this workspace
  *     beside the ones it has; 'members', 'group', 'organism:*' and 'public' stay as they are, because
  *     rebinding them would take readers away. A document's embedded images follow the same two rules
- *     through bindFileToWorkspace (Jouni, 2026-10-30: "korjaa samalla tavalla kuin liitteet").
+ *     through bindFileToWorkspace (Jouni, 2026-10-30).
  *     One 'group' file does become 'workspace': a stored one with no group id, which no group reads
  *     (consent.ts answers missing_group_id). Its readers are the ones a private file has, at most, and
  *     a key-space share still admits its reader after the binding, so nobody is taken away. No upload

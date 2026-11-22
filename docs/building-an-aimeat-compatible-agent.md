@@ -1,7 +1,7 @@
 # Building an AIMEAT-compatible agent
 
 **Audience:** anyone building an AIMEAT agent (a crew like crewaimeat, a single autonomous agent, an
-interactive workstation agent), and the AI you hand the build to.
+interactive workstation agent), and the AI you give the build to.
 
 **What it answers:** what we expect from an agent so that it is AIMEAT-compatible, can be priced and
 paced, and can take part in Agent Workflows, how it talks to the other principals of its account and
@@ -82,7 +82,7 @@ is the only current one. A tool answers a refusal as a value, not an exception, 
 message (`INVALID_STATE: TODOs can only be proposed on …`) names both what went wrong and what would
 have been accepted.
 
-**Completion gates only on the 12 required steps.** The optional offers-ladder steps (14–16),
+**Completion gates only on the 12 required steps.** The optional offer-level steps (14–16),
 `declare_services` (13) and `set_avatar` (17) auto-mark `skipped` once the required set passes; they
 never block completion. Your avatar is your picture wherever your owner sees you, and it is public:
 see the built-in skill `agent-avatar` and the Design Book's avatar templates (`aimeat_designbook_search { kind: "avatar" }`).
@@ -99,14 +99,14 @@ and a simple agent that declares nothing is never broken or penalised.
 
 | Level | What the agent does | What it unlocks | Required fields |
 |-------|--------------------|-----------------|-----------------|
-| **0, Connected** | Device-auth (RFC 8628) or Agent v2 keys, has a GAII, reads/writes its own memory, runs tasks | The baseline. Owner can hand it tasks. | *(none: this is just being an agent)* |
+| **0, Connected** | Device-auth (RFC 8628) or Agent v2 keys, has a GAII, reads/writes its own memory, runs tasks | The baseline. Owner can give it tasks. | *(none: this is just being an agent)* |
 | **1, Offering** | Publishes `agents.{name}.offers` | Appears in the owner's goal-first **Offers** surface ("what can I do with my agents") + the Inbox/rating loop | `id`, `title`, `ask` per offer |
 | **2, Billable** | Adds a money price and/or pacing + `visibility:"public"` + `callable` to an offer | A *different* owner can use it: a money price is paid through the checkout, and each use takes the pacing in morsels | `priceMoney` and/or `tollMorsels`, `visibility`, `callable.action_id`/`webhook_url` |
 | **3, Workflow-compatible** | Adds `success_signal` + `required_to_function` + `deliverable.location` to an offer | The offer can be a **step in an Agent Workflow** (chained, signal-checked pipelines) | `success_signal`, `required_to_function`, `deliverable.location` |
 
 You can be level-3 without being level-2 (a private workflow over your own agents needs no pricing), or
 level-2 without level-3 (a billable one-shot offer that isn't part of a pipeline). They're independent
-axes that happen to live on the same descriptor.
+axes that happen to be on the same descriptor.
 
 **An agent is "AIMEAT-compatible" in the full sense when it reaches level 3 on at least one offer**:
 it's legible (level 1), and its output is *machine-checkable* and *locatable*, which is exactly what
@@ -128,8 +128,8 @@ lets the node verify "did it produce" and what lets other agents build on it.
   named offer). One record, three consumers, never a human-only storefront.
 - **Not sure how to draft one?** `GET /v1/prompts/draft-offer` returns a guided, node-filled prompt
   your own LLM uses to draft a valid offer (offering → workflow signals → optional pricing) before you
-  publish it. Prompt-driven: the node hands you the prompt, you publish the result yourself.
-- **Onboarding ladder:** the Hello Integration steps `declare_offerings`, `make_workflow_compatible`,
+  publish it. Prompt-driven: the node gives you the prompt, you publish the result yourself.
+- **Onboarding levels:** the Hello Integration steps `declare_offerings`, `make_workflow_compatible`,
   and `price_offer` (all optional) **auto-tick** the moment your published offers satisfy each level,
   on the next `aimeat_onboarding_status` / `GET …/onboarding`. They never block readiness; they're a
   legible progress marker for the levels in §1.
@@ -295,7 +295,7 @@ publish_offers(build_offers_doc([offer]), agent_name="research-bot")  # writes a
 - Check offline before publishing: `aimeat-offers check --file offers.json` (the shell command), or
   the `aimeat_offers_check` CrewAI tool: both report which levels each offer reaches and what's
   missing, mirroring the node's gate.
-- The liaison agent's persona already explains this ladder, so a CrewAI liaison can author + publish
+- The liaison agent's persona already explains these levels, so a CrewAI liaison can author + publish
   its own offers.
 
 ## 5c. When the owner stops your agent
@@ -314,7 +314,7 @@ is nothing to re-enrol. What your runtime sees while it is stopped:
 | reads the roster (`GET /v1/agents`, `aimeat_agents_list`) | `stopped: true`, `stopped_at`, `stopped_by` on its row |
 
 The rule for your code is short: **finish what you started, and start nothing new while
-`agent_stopped` is true.** The node already hands you nothing new, so a runtime that only acts on
+`agent_stopped` is true.** The node already gives you nothing new, so a runtime that only acts on
 what it is given needs no change. A runtime that starts work by its own decision (a timer of its
 own, a catch-up scan after a reconnect, a watch on a folder) must read the flag before it does.
 

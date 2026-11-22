@@ -5,8 +5,8 @@
  * @description appcat's Settings dialog (features F119, F135): "Appearance" with Theme (Dark / Light,
  *   applied on Save) and Language (applied at once, on the change), and "AIMEAT Server" with the Server
  *   URL, read-only, always the address that served the page. Cancel and Save.
- *   appcat keeps nothing in the browser's own storage (Jouni: "selaimen omaa tallennusta ei pitäisi
- *   olla"), so the theme is the site's own (js/theme.js setTheme, the same choice the site's look
+ *   appcat keeps nothing in the browser's own storage (Jouni),
+ *   so the theme is the site's own (js/theme.js setTheme, the same choice the site's look
  *   picker makes) and the language is the site's own language switch (js/i18n.js switchLocale). The
  *   old page's copy of both in localStorage.appLauncherConfig is gone with it, and so is its
  *   preference sync (F353): that wrote the choice into a new anonymous principal's memory on every

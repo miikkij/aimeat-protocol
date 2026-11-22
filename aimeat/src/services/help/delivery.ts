@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description How a question, an answer and the closing line travel: as ordinary direct messages in a
  *   thread of their own, so the helper reads and answers them where they read every other message
- *   (Jouni, 2026-11-14: "tämä vain olisi erilainen message tyyppi tai sisältö siellä messages
- *   threadissa"). The question is sent in the ASKER's name with `kind: 'help-question'`; the line that
+ *   (Jouni, 2026-11-14). The question is sent in the ASKER's name with `kind: 'help-question'`; the line that
  *   closes it carries `kind: 'help-status'`. Both kinds are set here and nowhere a client reaches.
  *
  *   THE HELPER CHOSE TO RECEIVE QUESTIONS, so the first-contact gate does not hold the question back:

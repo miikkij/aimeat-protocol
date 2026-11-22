@@ -40,8 +40,7 @@
  * @version-history
  *   v1.8.0 — 2026-10-13 — A space an agent writes only through the app's own tool (`tool_only`):
  *     withSpaceNote() says so on that space's line, and withToolOnlySpaces() gives every member
- *     "app_tools". The node refuses the direct write from the same day (Jouni: "sovelluksen
- *     tietuetila ottaa agentin kirjoituksen vain sovelluksen oman laajennuksen kautta").
+ *     "app_tools". The node refuses the direct write from the same day (Jouni).
  *     withToolSkus(): an app's address with no tool part gets the addresses of the tools the task
  *     names, the third form the production draft model writes.
  *   v1.7.1 — 2026-11-10 — joinsAgentList's comment: the node no longer narrows a member's listed
@@ -67,7 +66,7 @@
  *     page does this, so the model names no space.
  *   v1.2.0 — 2026-10-12 — `backfill`: a watch can ask for the records that are already in its
  *     spaces, written per item of `record_spaces` and read back by recordSpacesOf (Jouni,
- *     2026-10-12: "haluan myös valinnan käsittele myös vanhat"). BACKFILL_FEATURE names the
+ *     2026-10-12). BACKFILL_FEATURE names the
  *     runtime feature the page offers it on.
  *   v1.1.0 — 2026-10-12 — An agent that works when a record is published in a workspace: the text
  *     the draft prompt gets for it (only for a runtime whose menu names the feature), the workspace

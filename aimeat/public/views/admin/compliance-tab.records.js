@@ -72,8 +72,8 @@ function gapWhy(g) {
 /**
  * Section 08: what the records leave open, one reading per kind, and each kind opens the list of
  * its gaps: the app, shared place or law each one names, what it leaves open, and the way to the
- * app's own page, where its data map says what it keeps (plan C1.6; Jouni, 2026-10-26: "miksi en
- * pääse näkemään näitä listoja").
+ * app's own page, where its data map says what it keeps, so the lists can be seen
+ * (plan C1.6; Jouni, 2026-10-26).
  */
 export function RecordsGapsSection({ gaps }) {
   const [open, setOpen] = useState(null);

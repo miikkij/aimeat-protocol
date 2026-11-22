@@ -2,7 +2,7 @@
 
 The skills registry makes **expertise a first-class, portable unit**: a `SKILL.md` pack in the
 [Agent Skills format](https://agentskills.io/specification) (the format Claude Code, Claude.ai,
-Cursor, Copilot, CrewAI and the other clients read) that lives in a scoped registry on the node and
+Cursor, Copilot, CrewAI and the other clients read) that is stored in a scoped registry on the node and
 is loaded by agents **by reference** — never copied into prompts by hand.
 
 Core principle: **skill (content) ≠ registry (scope) ≠ attachment (consumer).**
@@ -115,7 +115,7 @@ prompt: what the app is for, its data keys, its quirks, the right workflow. Bind
 to the app lets ANY agent that is about to use the app fetch exactly that expertise on
 demand — progressive disclosure at the app level.
 
-**How to set it (the skill author does this — the binding lives in the SKILL's frontmatter,
+**How to set it (the skill author does this — the binding is in the SKILL's frontmatter,
 so it survives export/clone/republish):**
 
 ```markdown

@@ -205,8 +205,8 @@ export function timeShort(s) {
 }
 /**
  * The stamp for a LIST row, where the date is the information: a bare clock time on a week-old
- * conversation reads as "today" and answers the wrong question (found by Jouni: "mistään en näe
- * päiväystä, vain kellonajan"). Today → the time; yesterday → the word; the last week → the
+ * conversation reads as "today" and answers the wrong question (found by Jouni: a list row
+ * showed the time and no date). Today → the time; yesterday → the word; the last week → the
  * weekday; older → the date, with the year only when it differs. Rows inside an open thread keep
  * timeShort — the day separators already carry the date there.
  */

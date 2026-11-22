@@ -68,8 +68,8 @@ export function ManualGoalForm({ statement, agents, navigate }) {
   return html`
     <${Fields}>
       <${Choice} label=${g('modeLabel', 'How the work is shared')} value=${mode} onChange=${setMode} boxed cols=${3} dot name="goal-mode" options=${[
-        { value: 'single', label: g('modeSingle', 'One agent takes the whole goal'), hint: g('modeSingleHint', 'Best for a capable agent. It may hand the next work to another agent.') },
-        { value: 'coordinator', label: g('modeCoordinator', 'A coordinator leads'), hint: g('modeCoordinatorHint', 'An agent plans, hands out work, makes subgoals and asks you.') },
+        { value: 'single', label: g('modeSingle', 'One agent takes the whole goal'), hint: g('modeSingleHint', 'Best for a capable agent. It may give the next work to another agent.') },
+        { value: 'coordinator', label: g('modeCoordinator', 'A coordinator leads'), hint: g('modeCoordinatorHint', 'An agent plans, assigns work, makes subgoals and asks you.') },
         { value: 'plan', label: g('modePlan', 'A fixed plan'), hint: g('modePlanHint', 'For narrow tool agents: your own AI writes the steps.') },
       ]} />
       ${mode === 'coordinator' && html`

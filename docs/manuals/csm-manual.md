@@ -967,7 +967,7 @@ ui_hints:
 
 ## 6. How AI Uses Your CSM
 
-When you hand a CSM file to an AI assistant, here is what happens:
+When you give a CSM file to an AI assistant, here is what happens:
 
 **Step 1: AI reads the schema.** It looks at `data_schema` to understand what information the service needs. Required fields become mandatory questions; optional fields become follow-up prompts.
 

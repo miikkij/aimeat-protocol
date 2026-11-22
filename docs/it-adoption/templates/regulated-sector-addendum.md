@@ -49,7 +49,7 @@ The requirements below are quoted or summarised from the official texts: US FDA 
 
 | Question | AIMEAT fact (source) | Your decision |
 |---|---|---|
-| May quality records live in AIMEAT | Not without validation for that use (section 3). AIMEAT does not hold a supplier quality certificate | [ORGANIZATION] *Yes with validation reference, or no.* |
+| May quality records be kept in AIMEAT | Not without validation for that use (section 3). AIMEAT does not hold a supplier quality certificate | [ORGANIZATION] *Yes with validation reference, or no.* |
 | May the node hold copies or working drafts | Content can be labelled and kept from leaving its group or reaching an outside model when classification is on ([data classification](../../data-classification.md)) | [ORGANIZATION] *Rule for copies, and which system is the record.* |
 | Are AI-generated texts used in regulated documents | Each generated text carries a provenance record, including how far a person was involved ([AI transparency](../../ai-transparency.md)) | [ORGANIZATION] *Review and approval rule before such text enters a controlled document.* |
 

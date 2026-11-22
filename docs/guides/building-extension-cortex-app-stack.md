@@ -28,7 +28,7 @@ memory namespace (no one else writes there). It can fetch external APIs,
 run scheduled jobs, and read other namespaces via `ctx.memory.getPublic()`.
 It is the only layer trusted to call out to the internet. It does not act
 on the node in the caller's name: `ctx.fetch` carries no session, and there
-is no `ctx.api` or `ctx.task`. Work for an agent is handed over by the
+is no `ctx.api` or `ctx.task`. Work for an agent is passed on by the
 cortex, in the person's own session (§5.2).
 
 **Cortex lib** is a browser IIFE registered as a JavaScript module on the
@@ -48,7 +48,7 @@ several feature cortexes that share auth, i18n, settings.
 `/v1/apps/<gaii>/<filename>?mode=inline`. It is allowed to call cortex
 public methods only — never extensions directly, never raw memory routes.
 Its job is presentation, navigation, layout, responsive behavior. All
-data and logic live one layer down.
+data and logic are one layer down.
 
 ---
 
@@ -252,7 +252,7 @@ no Node built-ins and no network except `ctx.fetch`. On a schedule a
 normal return counts as success whatever it contains, so a failed
 precondition must `throw`.
 
-### 4.3 Handing work to an agent
+### 4.3 Giving work to an agent
 
 An extension cannot create an agent's task. The sandbox has no `ctx.task`
 and no `ctx.api`, and `ctx.fetch` carries no session, so a script cannot
@@ -625,7 +625,7 @@ scopes include `ext:invoke`, the scope it needs to call the extension at all.
 An extension can name only its own domain, never another extension's or a
 core domain. One call counts as one outbound call of the action's budget
 (`limits.max_api_calls`). This works on a scheduled run too, so an extension
-whose data lives in an outside service tells the open pages when a sync
+whose data is stored in an outside service tells the open pages when a sync
 brings in something new.
 
 The `extensions` domain that an action call raises reaches the owner's own

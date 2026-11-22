@@ -13,7 +13,7 @@
  *   the same principal, `fonts/<slug>/<file>`, so they belong to the node and survive the account of
  *   whoever uploaded them. The registry this process holds is replaced after every write.
  *
- *   NO LIMITS (Jouni, 2026-10-03: "ei rajoja. älä laita rajoja."): no cap on a family's files or on
+ *   NO LIMITS (Jouni, 2026-10-03): no cap on a family's files or on
  *   the number of families; a file's size is bounded only by the node's existing upload setting. The
  *   one check on the bytes is that they are woff2 (the signature wOF2).
  *

@@ -3,9 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A theme's shapes in Themes & Styles: its corners, frames, shadows and letter case,
- *   the values every component reads (07 "New components follow the theme"). Jouni: "katsoo että
- *   pebble syntyy myös niille uusille tehdyille komponenteille mitä tullaan tekemään kun tehdään
- *   settings & controls kirjastoon."
+ *   the values every component reads (07 "New components follow the theme"). A theme such as Pebble
+ *   reaches the new components too, the ones the Settings & Controls library will add (Jouni).
  *
  *   Each value is named by what it shapes, with the built-in value beside it; an empty field keeps
  *   the built-in one. The frames show the edited shapes live on the sample page and on the

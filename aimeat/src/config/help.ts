@@ -9,7 +9,7 @@
  *   services/config/schema-help.ts.
  *
  *   MORSELS ARE A PACER, NOT A PAYMENT. A helper earns them for a solved question; they buy nothing,
- *   and the operator decides whether and how many (Jouni, 2026-11-14: "tämä ajaa yhteistyöhön").
+ *   and the operator decides whether and how many (Jouni, 2026-11-14).
  *   The monthly cap and the pair cap keep two people from feeding each other.
  *
  *   THE REPORT IS WRITTEN BY THE OPERATOR'S OWN AI BY DEFAULT. The scheduled job only counts, without

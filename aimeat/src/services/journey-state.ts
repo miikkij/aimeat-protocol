@@ -80,7 +80,7 @@ const MERGE_ATTEMPTS = 10;
  * In the order a newcomer meets them. The profile comes first: the interview runs in any AI through
  * a copied prompt, so it needs no connection, and connecting is offered right after it. Sharing with
  * someone is fourth, before the shared place, apps and agents: working with other people is what
- * makes the rest worth having (Jouni, 2026-11-14: "Siirretäänkö polkusi-vaihe ...? <- siirretään").
+ * makes the rest worth having (Jouni, 2026-11-14).
  */
 export const JOURNEY_STAGES = ['first-result', 'ai', 'connect', 'share', 'organise', 'apps', 'agents'] as const;
 export type JourneyStageId = typeof JOURNEY_STAGES[number];
@@ -136,8 +136,8 @@ export interface JourneySignals {
     workers: number;
     /**
      * Of those, the ones that have done work: a finished task other than their onboarding's test
-     * task. An approved agent that has not run yet is not "at work" (Jouni, v31 K27, 2026-10-31:
-     * "Agentit töissä" was ticked with zero agents working).
+     * task. An approved agent that has not run yet is not "at work" (Jouni, v31 K27, 2026-10-31;
+     * the "Agents at work" stage was ticked with zero agents working).
      */
     workersRun: number;
 }
@@ -228,7 +228,7 @@ export function isWorker(a: { mode?: string; runMode?: string | null }): boolean
  * A worker the person made, for the "agents at work" stage. The basic agents (tag `crew.basic`,
  * data/basic-agents.ts) are created with the account and run from the start, so counting them ticked
  * the stage on a node bought a minute earlier, before the person had asked any agent for anything
- * (Jouni v27 P6, 2026-10-31: "Agentit töissä" must not be pre-ticked).
+ * (Jouni v27 P6, 2026-10-31: the "Agents at work" stage must not be pre-ticked).
  */
 export function isOwnWorker(a: { mode?: string; runMode?: string | null; tags?: readonly string[] | null }): boolean {
     return isWorker(a) && !(Array.isArray(a.tags) && a.tags.includes('crew.basic'));

@@ -24,6 +24,10 @@
 #   5. Push an organisation node's names. scripts/check-private-terms.mjs reads the commits being
 #      pushed, messages and added lines, against the list in git's common directory (the commit-msg
 #      hook checks each commit as it is made; this catches commits made without the hook).
+#   6. Push a branch to the public repository. The origin is public, and nothing but main goes
+#      there: no branch, for anyone, without the developer's own permission (Jouni, 2026-11-22,
+#      after a ready/<session> branch stood on GitHub during a run). Deleting a branch and pushing
+#      a tag pass. The developer's own exception is his to take, with git push --no-verify.
 #
 # It also lists, for an agent session (CLAUDECODE or AIMEAT_SESSION set, lib-session.sh), the commits
 # about to go that carry no Session: trailer.
@@ -43,6 +47,20 @@ REMOTE="$1"
 REFS="$(cat)"
 . "$(dirname "$0")/lib-pnpm.sh"
 . "$(dirname "$0")/lib-session.sh"
+
+# 6. Nothing but main to the public repository. Each stdin line is
+#    "<local ref> <local sha> <remote ref> <remote sha>"; a delete has an all-zero local sha.
+case "$2" in
+  *github.com[:/]miikkij/aimeat-protocol|*github.com[:/]miikkij/aimeat-protocol.git)
+    BRANCHES="$(printf '%s\n' "$REFS" | awk '$3 ~ /^refs\/heads\// && $3 != "refs/heads/main" && $2 !~ /^0+$/ {print $3}')"
+    if [ -n "$BRANCHES" ]; then
+      echo "[pre-push] refused: the public repository takes no branch but main, and this push would create or move:" >&2
+      printf '%s\n' "$BRANCHES" | sed 's/^/  /' >&2
+      echo "  No branch goes to the public repository without the developer's own permission (Jouni, 2026-11-22)." >&2
+      exit 1
+    fi
+    ;;
+esac
 
 printf '%s\n' "$REFS" | node "$ROOT/aimeat/scripts/check-rewritten-history.mjs"
 printf '%s\n' "$REFS" | node "$ROOT/aimeat/scripts/check-private-terms.mjs" --push "$REMOTE"

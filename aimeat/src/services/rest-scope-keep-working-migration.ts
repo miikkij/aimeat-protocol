@@ -6,8 +6,8 @@
  *   ecosystem app that existed before a node first starts as 4.0.x gets each scope word the 4.0.0
  *   gates started to check and it does not hold, so what worked on 3.x keeps working on 4.0.x.
  *
- *   THE RULING. Jouni, 2026-10-13: "miksei tässä ole migraatiota? jos ne oli entuudestaan niiden
- *   pitäisi toimia nytkin. en mä ala käymään 70 agenttia läpi." Recorded as
+ *   THE RULING. Jouni, 2026-10-13: what worked before keeps working, through a migration and not
+ *   by a pass over each agent by hand. Recorded as
  *   decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san (Lifecycle Central, locked).
  *   It overrides the rule of the two earlier steps (services/rest-scope-gates-migration.ts), which
  *   gave only the words that did not exist before the gates, because the other words also open other

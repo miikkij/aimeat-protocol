@@ -21,7 +21,7 @@
  *   v1.5.0 — 2026-11-01 — chatWorks(status): the Home's steps that go through the chat are open while
  *     the place's chat answers, before an outside AI is connected (commercial's crew52 check).
  *   v1.4.0 — 2026-11-01 — messagesFor removed: the credit is shown in euros only, never as messages
- *     (Jouni, 1.11 04.00: "lupaukset eivät koskaan pidä paikkaansa").
+ *     because a number of messages is a promise that does not hold (Jouni, 1.11 04.00).
  *   v1.3.0 — 2026-11-01 — messagesFor(eur): the messages the credit buys, by the store's price of one
  *     message (site.ai_eur_per_message), so the store and the place say the same N (Jouni's review A3).
  *   v1.2.0 — 2026-10-31 — topupHref(locale) adds the page's language, as the server's notice does

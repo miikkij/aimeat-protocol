@@ -2059,7 +2059,7 @@
             ${/* The developer links follow site.dev_links: hidden on a customer's node unless the
                   operator decides otherwise (Jouni, 2026-10-30). */''}
             ${devLinksShown() && html`<a href="/v1/portal?view=dev" onClick=${(e) => go(e, '/v1/portal?view=dev')}>${tr('nav.devView', 'For Developers')}</a>`}
-            ${devLinksShown() && html`<a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('footer.ownNode', 'Run your own node')}</a>`}
+            ${devLinksShown() && html`<a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('footer.ownNode', 'Run your own AIMEAT')}</a>`}
             <a href="/v1/transparency" onClick=${(e) => go(e, '/v1/transparency')}>${tr('footer.transparency', 'AI transparency')}</a>
             ${/* The privacy policy and the terms are the server's own pages, one per language the
                   node ships (English at the bare path). No onClick: the router's interceptor leaves

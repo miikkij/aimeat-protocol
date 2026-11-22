@@ -115,7 +115,7 @@ function Playbook({ answers, tier, onBack, onRestart }) {
     [sections],
   );
   const estimate = answers.path === 'hosted' ? tr('start.pb.estHosted', 'Estimated time: 10–15 minutes')
-    : answers.path === 'self' ? tr('start.pb.estSelf', 'Estimated time: from zero to a running node, proven in 21 minutes')
+    : answers.path === 'self' ? tr('start.pb.estSelf', 'Estimated time: from zero to your own AIMEAT running, proven in 21 minutes')
     : null;
 
   return html`
@@ -142,7 +142,7 @@ function Playbook({ answers, tier, onBack, onRestart }) {
       </div>
       <div class="st-doors st-no-print">
         <h3 class="st-doors-title">${tr('start.doors.title', 'Three ways to start')}</h3>
-        <p class="st-doors-sub">${tr('start.doors.sub', 'The same place, three ways to start. Your playbook covers the one you picked; the others are here.')}</p>
+        <p class="st-doors-sub">${tr('start.doors.sub', 'The same AIMEAT, three ways to start. Your playbook covers the one you picked; the others are here.')}</p>
         <div class="st-doors-grid">
           <a class="st-door" href="/v1/portal">
             <span class="st-door-name">${tr('start.doors.hosted', 'Try it hosted')}</span>

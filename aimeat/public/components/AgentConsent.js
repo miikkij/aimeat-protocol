@@ -221,7 +221,7 @@ export function AgentConsent({ requests, onApprove, onDeny, busyCode = null, var
                : t('profile.agents.pendingRequests.title')}
       </div>
       <p>
-        ${step ? tr('agentConsent.stepDesc', 'It is asking to come in. Check that the code below is the one your AI showed you, then let it in.')
+        ${step ? tr('agentConsent.stepDesc', 'It is asking for access. Check that the code below is the one your AI showed you, then approve it.')
                : t('profile.agents.pendingRequests.desc')}
       </p>
       ${list.map(req => html`

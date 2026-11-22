@@ -82,7 +82,7 @@ function showGoogleSignupModal(pending, i) {
       : '';
     showSignupNoticeModal(i, {
       title: i.signupLinkTitle || 'This email already has an account',
-      body: fillTemplate(i.signupLinkIntro || 'An AIMEAT account already uses {email}, but its email has not been verified yet. Sign in with your username and password once — that verifies your email, and after that this sign-in connects to your account automatically.', { email: pending.email || '' }) + hint,
+      body: fillTemplate(i.signupLinkIntro || 'An AIMEAT account already uses {email}, but its email has not been verified yet. Sign in with your username and password once: that verifies your email, and after that this sign-in connects to your account automatically.', { email: pending.email || '' }) + hint,
       primaryLabel: i.signupLinkSignInBtn || 'Sign in with password',
       showCancel: true,
       onPrimary: function () { showLoginModal({ i18n: i }, function () {}); },
@@ -118,11 +118,11 @@ function showGoogleSignupModal(pending, i) {
     + '<label class="aimeat-label" for="aimeat-su-name">' + escHtml(i.signupUsernameLabel || 'Username') + '</label>'
     + '<input id="aimeat-su-name" class="aimeat-inp" autocomplete="off" autocapitalize="none" spellcheck="false" value="' + escHtml(pending.suggested || '') + '">'
     + '<p id="aimeat-su-status" style="margin:6px 0 0;font-size:13px;min-height:18px"></p>'
-    + '<p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;line-height:1.45">' + escHtml(i.signupSuggestedHint || 'We suggested one from your account — change it to anything you like.') + '</p>'
+    + '<p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;line-height:1.45">' + escHtml(i.signupSuggestedHint || 'We suggested one from your account. Change it to anything you like.') + '</p>'
     + '<div style="margin:16px 0 0;padding:12px 14px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;font-size:13px;color:#9A3412;line-height:1.5">' + escHtml(i.signupPermanentWarning || 'This username is permanent. It identifies you across AIMEAT and cannot be changed later — the only way to change it is to delete your account and create a new one.') + '</div>'
     + '<label class="aimeat-label" for="aimeat-su-display" style="margin-top:16px">' + escHtml(i.signupDisplayNameLabel || 'Display name') + '</label>'
     + '<input id="aimeat-su-display" class="aimeat-inp" autocomplete="off" maxlength="80" value="' + escHtml(pending.displayName || '') + '">'
-    + '<p style="margin:6px 0 0;font-size:12px;color:#9CA3AF;line-height:1.45">' + escHtml(i.signupDisplayNameHint || 'Shown to others — not permanent, you can change it anytime later.') + '</p>'
+    + '<p style="margin:6px 0 0;font-size:12px;color:#9CA3AF;line-height:1.45">' + escHtml(i.signupDisplayNameHint || 'Shown to others. Not permanent, you can change it anytime later.') + '</p>'
     + '<div style="display:flex;gap:10px;margin-top:20px">'
     + '<button id="aimeat-su-create" class="aimeat-go">' + escHtml(i.signupCreateBtn || 'Create my account') + '</button>'
     + '<button id="aimeat-su-cancel" class="aimeat-cancel">' + escHtml(i.signupCancelBtn || 'Cancel') + '</button>'
@@ -163,7 +163,7 @@ function showGoogleSignupModal(pending, i) {
           if (!d || (input.value || '').trim().toLowerCase() !== lastChecked) return; // stale
           if (d.valid && d.available) { createBtn.disabled = false; setStatus(i.signupAvailable || '✓ Available', '#16a34a'); }
           else if (!d.valid) { createBtn.disabled = true; setStatus(i.signupInvalid || d.reason || 'Invalid username', '#ef4444'); }
-          else { createBtn.disabled = true; setStatus(i.signupTaken || 'That username is already taken — pick another.', '#ef4444'); }
+          else { createBtn.disabled = true; setStatus(i.signupTaken || 'That username is already taken. Pick another.', '#ef4444'); }
         })
         .catch(function () { /* network blip — allow submit; finalize re-validates */ createBtn.disabled = false; setStatus('', '#6B7280'); });
     }, 350);
@@ -223,7 +223,7 @@ export function maybeShowGoogleSignup() {
     function open(i) {
       showSignupNoticeModal(i || {}, {
         title: (i && i.signupExpiredTitle) || 'Sign-in session expired',
-        body: (i && i.signupExpiredBody) || 'Your sign-in session expired or was interrupted. No password is needed — just click “Continue with Google” again to restart.',
+        body: (i && i.signupExpiredBody) || 'Your sign-in session expired or was interrupted. No password is needed: just click “Continue with Google” again to restart.',
         primaryLabel: (i && i.signupExpiredOkBtn) || 'OK',
         showCancel: false,
       });

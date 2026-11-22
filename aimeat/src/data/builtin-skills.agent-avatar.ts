@@ -3,8 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The `agent-avatar` built-in skill: how an agent makes and sets its own picture.
- *   Ships with every node (Jouni, 2026-10-19: "skilli mitenkä tehdä noita ja sen pitää tulla
- *   aimeat:n mukana"). It is named by the Hello Integration prompt, by the set_avatar onboarding
+ *   Ships with every node (Jouni, 2026-10-19). It is named by the Hello Integration prompt, by the set_avatar onboarding
  *   step and by the Design Book's avatar parts, so a correction here reaches all three.
  *
  *   The facts come from services/agent/avatar.ts (the key, the two kinds, the 256 kB limit, what is

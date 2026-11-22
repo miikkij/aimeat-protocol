@@ -233,7 +233,7 @@ export default function AgentAppView({ navigate }) {
         ${builder === 'chat' && html`
           <${FormActions}><${Loud} control onClick=${toChat}>${p('toChat', 'Open the chat with this prompt')}<//><//>`}
         ${builder === 'other' && html`
-          <${Note} kind="quiet">${p('otherLead', 'This AI cannot read your AIMEAT, so the prompt carries everything: the agent, the structure of its latest result and the whole build specification. It is long.')}<//>
+          <${Note} kind="quiet">${p('otherLead', 'This AI cannot read your AIMEAT, so the prompt contains everything: the agent, the structure of its latest result and the whole build specification. It is long.')}<//>
           ${full.state === 'none' && html`<${FormActions}><${Loud} control onClick=${loadFull}>${p('otherMake', 'Make the whole prompt')}<//><//>`}
           ${full.state === 'loading' && html`<${Spinner} />`}
           ${full.state === 'failed' && html`<${Note} kind="message" error>${full.text}<//>`}

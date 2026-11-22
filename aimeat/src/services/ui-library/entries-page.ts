@@ -236,7 +236,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         module: '/views/surface/renderer.js', sheet: '/css/components/surface-slot.css',
         classes: ['surface-slot', 'surface-slot-content', 'surface-slot-wait'],
         data: { shape: 'SurfaceRenderer({ layout, ctx, placeholders: true })', fields: { placeholders: 'draw each block in a slot that waits with its heading and the loading line (the home); without it the blocks draw as before' } },
-        useFor: ['The home, where blocks fetch their own data and the frame draws before it arrives (Jouni, 2026-11-09: "Heading + loading line").'],
+        useFor: ['The home, where blocks fetch their own data and the frame draws before it arrives (Jouni, 2026-11-09).'],
         variants: [{ name: 'waiting', class: 'surface-slot-wait', prop: 'placeholders', when: 'the block\'s code or data is still on its way' }],
         example: { placeholders: true },
     },

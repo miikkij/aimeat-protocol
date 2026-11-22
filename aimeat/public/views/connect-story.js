@@ -56,8 +56,8 @@ const GUIDED_PATH = '/v1/profile?tab=mcp';
 function BeatRail({ current }) {
   const go = (id) => (e) => { e.preventDefault(); document.getElementById('beat-' + id)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); };
   return html`
-    <nav class="bs-rail" aria-label=${tr('connectStory.railLabel', 'The four beats')}>
-      <span class="bs-rail-label">${tr('connectStory.railLabel', 'The four beats')}</span>
+    <nav class="bs-rail" aria-label=${tr('connectStory.railLabel', 'The four steps')}>
+      <span class="bs-rail-label">${tr('connectStory.railLabel', 'The four steps')}</span>
       ${BEATS.map((b, i) => html`
         <a key=${b.id} class=${`bs-rail-item ${current === b.id ? 'is-on' : ''}`} href=${'#beat-' + b.id} onClick=${go(b.id)}>
           <span class="bs-rail-num">${i + 1}</span>${b.label()}
@@ -108,7 +108,7 @@ export default function ConnectStory({ navigate }) {
         <div class="bs-head-copy">
           <span class="ld-sh-kicker">${tr('connectStory.kicker', 'Five minutes. Any AI you already pay for, or the free one.')}</span>
           <h1 class="bs-title">
-            <span>${tr('connectStory.title1', 'Plug in the AI')}</span>
+            <span>${tr('connectStory.title1', 'Connect the AI')}</span>
             <span>${tr('connectStory.title2', 'you already use')}</span>
           </h1>
           <p class="ld-sh-position">${tr('connectStory.position', 'After this, you run all of it from your own chat.')}</p>
@@ -122,7 +122,7 @@ export default function ConnectStory({ navigate }) {
         <div class="bs-beat-copy">
           <span class="bs-num">1</span>
           <h2 class="ld-sh-h2"><span>${tr('connectStory.b1Title1', 'Pick the AI')}</span><span class="ld-sh-accent">${tr('connectStory.b1Title2', 'you already use')}</span></h2>
-          <p class="ld-sh-text">${tr('connectStory.b1Text', 'No new subscription and no new app to learn. The chat you already have gets a connection to this place; you keep talking to it the way you always do.')}</p>
+          <p class="ld-sh-text">${tr('connectStory.b1Text', 'No new subscription and no new app to learn. The chat you already have gets a connection to AIMEAT; you keep talking to it the way you always do.')}</p>
           <div class="cs-platforms" role="list">
             ${PLATFORMS.map(p => html`
               <span key=${p.id} class="cs-platform" role="listitem">
@@ -142,7 +142,7 @@ export default function ConnectStory({ navigate }) {
         <div class="bs-beat-copy">
           <span class="bs-num">2</span>
           <h2 class="ld-sh-h2"><span>${tr('connectStory.b2Title1', 'Plug it in:')}</span><span class="ld-sh-accent">${tr('connectStory.b2Title2', 'one address, one minute')}</span></h2>
-          <p class="ld-sh-text">${tr('connectStory.b2Text', 'Every AI tool has a place for connectors. You give it this place’s address, it asks you to approve the connection, and you say yes. The guided path shows the exact clicks for your tool, and checks each one as you go.')}</p>
+          <p class="ld-sh-text">${tr('connectStory.b2Text', 'Every AI tool has a place for connectors. You give it the address of this AIMEAT, it asks you to approve the connection, and you say yes. The guided path shows the exact clicks for your tool, and checks each one as you go.')}</p>
           <div class="cs-steps">
             <span class="cs-step"><span class="cs-step-n">1</span>${tr('landing.connectLoop1', 'Add this service as a connector in your AI tool')}</span>
             <span class="cs-step"><span class="cs-step-n">2</span>${tr('connectStory.b2Approve', 'Approve it once, here, with your own account')}</span>
@@ -156,7 +156,7 @@ export default function ConnectStory({ navigate }) {
           <span class="bs-num">3</span>
           <h2 class="ld-sh-h2"><span>${tr('connectStory.b3Title1', 'Prove it')}</span><span class="ld-sh-accent">${tr('connectStory.b3Title2', 'with one prompt')}</span></h2>
           <p class="ld-sh-text">${tr('connectStory.b3Text', 'A connection that looks fine and is not there fails quietly: the AI keeps answering and nothing errors. So the path hands you one prompt, you paste it into your chat, and one button here shows the answer. When it lands, you are in.')}</p>
-          <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('connectStory.b3WhyLabel', 'Why this step exists:')}</span> ${tr('connectStory.b3Why', 'because a silent failure would send you off building on top of nothing. Two minutes now, and you never wonder again.')}</div>
+          <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('connectStory.b3WhyLabel', 'Why this step exists:')}</span> ${tr('connectStory.b3Why', 'because with a silent failure you would build on a connection that is not there. Two minutes now, and you never wonder again.')}</div>
         </div>
         <img class="bs-picture bs-picture--ink" src="/img/connect-story/beat3-prove.jpg" width="1200" height="900" loading="lazy"
           alt=${tr('connectStory.b3Alt', 'A person types one line into a huge speech bubble while a retro robot holds up a big green check-mark sign')} />

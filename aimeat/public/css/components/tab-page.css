@@ -18,7 +18,7 @@
  *     "Suljettuna". Wider screens are unchanged.
  *   v1.7.0 — 2026-10-05 — The ink tone stands on the ink ground in both themes, as every contents rail
  *     does since theme.css v1.46.0: in the dark theme it had turned light, and its sun group labels and
- *     numbers measured 1.5:1 and its coral notices 2.35:1 on it (Jouni: "näkyy paskasti"). A notice
+ *     numbers measured 1.5:1 and its coral notices 2.35:1 on it (Jouni found it hard to read). A notice
  *     line reads at full strength, since it is the line that asks for a look.
  *   v1.6.0 — 2026-09-27 — The rail's ink tone (.og-rail--ink, Rail tone="ink"): the old app catalogue's
  *     detail rail, which turns light in the dark theme (appcat parity); additive.

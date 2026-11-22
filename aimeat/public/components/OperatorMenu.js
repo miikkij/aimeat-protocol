@@ -26,8 +26,8 @@
  *   v1.1.0 — 2026-10-14 — `find`: the menu find under the node id, wrapping the groups (additive; with
  *     no `find` the menu draws what it drew).
  *   v1.0.0 — 2026-09-27 — Initial: moved out of views/admin.js (.adm-sidebar, .adm-nav-group,
- *     .adm-nav-item, .cnt, .node-id) with its look unchanged, plus the heading Jouni asked for: "minusta
- *     olisi hyvä mainita vielä siinä että tämä on operator menu, eli operaattorin valikko".
+ *     .adm-nav-item, .cnt, .node-id) with its look unchanged, plus the heading "Operator menu"
+ *     (Jouni).
  */
 import { h } from 'preact';
 import htm from 'htm';

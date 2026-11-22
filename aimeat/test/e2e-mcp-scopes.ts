@@ -407,8 +407,8 @@ await test("An agent the operator ticked operator:admin for is offered them, and
         `the overview came back without its reading: ${JSON.stringify(overview).slice(0, 200)}`);
 });
 
-// Secaudit 2026-10, C2 (Jouni, 2026-10-05: "everything had to go through same logics when using mcp or
-// rest"): the HTTP admin routes ask askOperator as the tools do, so the agent holding operator:admin
+// Secaudit 2026-10, C2 (Jouni, 2026-10-05: MCP and REST follow the same rules): the HTTP
+// admin routes ask askOperator as the tools do, so the agent holding operator:admin
 // passes them and the one without the word does not.
 await test('The HTTP admin routes answer as the tools do: the operator in person and the agent with operator:admin pass, the agent without it does not', async () => {
     const inPerson = await json('/v1/admin/security/overview', { headers: { Authorization: `Bearer ${opToken}` } });

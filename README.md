@@ -22,7 +22,7 @@ AIMEAT began at the end of February 2026 as the AI Memory Exchange and Action Tr
 
 **Try it first, without an account.** The [Experience Center](https://experience-center.apps.aimeat.io/) is a free tour in English, Finnish and Spanish. It shows what AIMEAT gets done, with examples from real apps, and gives you steps to try with your own AI as you go.
 
-## Three ways in
+## Three ways to start
 
 ### 1. Connect the AI you already use
 
@@ -50,7 +50,7 @@ Sign in when your AI asks, and choose what it may do: read only, standard, full,
 - **An AI that cannot connect over MCP** (a consumer Gemini app outside the United States, Copilot without Copilot Studio) still works. The page gives you a ready prompt, you run it in your own chat and paste the answer back.
 - **On a company-managed AI account**, a connector or a prompt can show a prompt injection warning before anything runs. [What it means and what to do](https://github.com/miikkij/aimeat-protocol/blob/main/docs/c-platform-notes.md#prompt-injection-warnings-on-company-managed-accounts).
 
-aimeat.io is the demonstration node. It is free to try and it runs for real, and the [Experience Center](https://experience-center.apps.aimeat.io/) takes you through it level by level. To keep your knowledge on a machine of your own, take the second way in.
+aimeat.io is the demonstration node. It is free to try and it runs for real, and the [Experience Center](https://experience-center.apps.aimeat.io/) takes you through it level by level. To keep your knowledge on a machine of your own, choose option 2.
 
 ### 2. Run your own node
 
@@ -59,7 +59,7 @@ npx aimeat init     # asks a few questions and writes .env: storage, the node's 
 npx aimeat start    # serves http://localhost:40050
 ```
 
-You need Node.js 24 or later. SQLite needs no database server; PostgreSQL is the production backend. Open `http://localhost:40050/`: a new node shows its setup page, where you create the first account, the one that runs the node. Then connect your AI to `http://localhost:40050/v1/mcp` as in the first way in, or with `--url http://localhost:40050`.
+You need Node.js 24 or later. SQLite needs no database server; PostgreSQL is the production backend. Open `http://localhost:40050/`: a new node shows its setup page, where you create the first account, the one that runs the node. Then connect your AI to `http://localhost:40050/v1/mcp` as in option 1, or with `--url http://localhost:40050`.
 
 - **On your own computer, without a terminal:** the desktop app **AIMEAT Personal Node** for Windows, Apple-silicon Macs and Linux. It attaches the AI tools on the computer to your AIMEAT (aimeat.io or your own), and it can run a node of your own on port 41050. The installers are on the [desktop-latest release](https://github.com/miikkij/aimeat-protocol/releases/tag/desktop-latest). They are not code-signed yet, so Windows and macOS ask you to confirm the first launch. Details: [aimeat-desktop/README.md](https://github.com/miikkij/aimeat-protocol/blob/main/aimeat-desktop/README.md).
 - **From source or with Docker**, and what to back up: [Build and operate a node](https://github.com/miikkij/aimeat-protocol/blob/main/docs/coding-guidelines/getting-started.md#build-and-operate-a-node).

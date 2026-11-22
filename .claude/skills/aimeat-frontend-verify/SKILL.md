@@ -32,8 +32,8 @@ If you could not drive the browser (MCP unavailable, server down, no credentials
 
 ## A change to the look is one of two kinds, and says which
 
-Jouni: "ulkoasun pitää pysyä samannäköisenä, mutta meidän on alettava käyttämään samannäköisiä
-komponentteja joka puolella." Every step of UI work is one of two kinds, never both in one step:
+The look stays as it is, and one kind of thing uses the same component on every page
+(Jouni). Every step of UI work is one of two kinds, never both in one step:
 
 - **A move.** Code, class names and CSS change place (into a component, into a shared sheet);
   nothing is decided about the look. Criterion: **no visible difference from the old code**.
@@ -84,7 +84,7 @@ The same gate is served to app builders in `src/services/builder/app-prompt.ts` 
 
 ## An Atelier app is accepted beside the genre it forked
 
-For an app on the Atelier track the numbers above are the floor, not the verdict. Screenshot it at **390 and 1440, in both themes**, open the genre it names in `<meta name="aimeat-register">` (`/v1/app-templates/genre-<id>`, or the shelf at `/v1/designbook?kind=genre`), and place the two pictures **side by side**. Then ask, while looking: **would this pass beside the genre?**
+For an app on the Atelier track the numbers above are the minimum, not the verdict. Screenshot it at **390 and 1440, in both themes**, open the genre it names in `<meta name="aimeat-register">` (`/v1/app-templates/genre-<id>`, or the genre list at `/v1/designbook?kind=genre`), and place the two pictures **side by side**. Then ask, while looking: **would this pass beside the genre?**
 
 That question is the acceptance criterion, and it exists because the metrics answered yes on pages the developer then rejected: three Design Book showcase pages passed element counts, overflow zero and a green contrast matrix while reading as "the same dashboard in new paint". A screenshot beside the genre is what catches a costume.
 

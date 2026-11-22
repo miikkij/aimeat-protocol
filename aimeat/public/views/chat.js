@@ -71,8 +71,8 @@
  *     the box, at the end of the sentence. Jouni: the sentence was there but the focus was not.
  *   2026-09-13 -- V2z: compose the welcome section heading with the shared B1 class.
  *   v2.0.1 — 2026-09-03 — The bring-your-own-key link goes to ?tab=ai, the AI page's route id.
- *   v2.0.0 — 2026-08-28 — The poster chat, vertical space first (Jouni: "the chat space is what
- *     matters, and the input at the bottom"). Everything that is not the conversation moves into
+ *   v2.0.0 — 2026-08-28 — The poster chat, vertical space first (Jouni: the conversation
+ *     gets the space, and the input sits at the bottom). Everything that is not the conversation moves into
  *     the rail: the conversation's name, the status line, Copy conversation, Reset session, the AI
  *     notice and the goose credit sit under the thread list, which on a phone is the drawer. The
  *     head row stays for the phone only (back, the name, the drawer toggle, copy), and the
@@ -488,8 +488,8 @@ export default function ChatView() {
     const onDesktop = typeof window !== 'undefined'
         && window.matchMedia?.('(pointer: fine)').matches
         && (navigator.maxTouchPoints ?? 0) === 0;
-    // Not in the person's first conversation (Jouni, 2026-10-30: "Älä näytä puhelinsovelluksen
-    // banneria ensimmäisessä keskustelussa"): the phone and the install suggestion wait for a second
+    // Not in the person's first conversation (Jouni, 2026-10-30): the phone and the install
+    // suggestion wait for a second
     // conversation, and in it for the AI's answer. A refused turn is not an answer (measured on
     // crew26, where the nudge showed above a refused first turn).
     const hasTalked = threads.length > 1 && (thread?.turns ?? []).some((turn) => turn.role === 'agent' && turn.text);
@@ -714,7 +714,7 @@ export default function ChatView() {
                         <${ConversationWelcome}
                             title=${customerNode() ? tr('chat.buyerTitle', 'Say what you want – your AI does it.') : t('chat.welcomeTitle')}
                             body=${customerNode() ? tr('chat.buyerBody', 'You see every step on the screen, and everything stays in your own account.') : `${t('chat.welcomeBody')} ${tr('chat.welcomeAtelier', '')}`.trim()}
-                            trust=${customerNode() ? tr('chat.welcomeAtelier', '') : tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}>
+                            trust=${customerNode() ? tr('chat.welcomeAtelier', '') : tr('chat.welcomeTrust', 'Everything you make here is saved in your own account, and nothing becomes public until you publish it yourself.')}>
                             <!-- One concrete thing to ask for, not a menu. An empty box asks a person
                                  to invent a task for a system they have not used; a first request
                                  that ends in a real address they can open answers "what is this for"
@@ -748,15 +748,15 @@ export default function ChatView() {
 
                 ${disabled && status?.state ? html`<${ChatUnavailable} status=${status} />` : capped ? html`
                     <${ConversationCap}
-                        title=${tr('chat.capTitle', 'This conversation has used up its free ride.')}
+                        title=${tr('chat.capTitle', 'This conversation has used up its free share.')}
                         body=${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}
                         ways=${[
                             { loud: true, href: '/v1/profile?tab=ai', label: tr('chat.capOwnKey', 'Bring your own key →') },
                             // The store is the one price door; a node without one offers only the key.
                             // While the store does not take orders the way is named, and leads nowhere.
                             storeHref() ? (storeOpensSoon()
-                                ? { soon: true, label: tr('chat.capOwnPlaceSoon', 'Your own place: opens soon') }
-                                : { href: storeHref(), newTab: true, label: tr('chat.capOwnPlace', 'Get your own place →') }) : null,
+                                ? { soon: true, label: tr('chat.capOwnPlaceSoon', 'Your own AIMEAT: available soon') }
+                                : { href: storeHref(), newTab: true, label: tr('chat.capOwnPlace', 'Get your own AIMEAT →') }) : null,
                         ]} />` : html`
                 <${Composer}
                     value=${draft}

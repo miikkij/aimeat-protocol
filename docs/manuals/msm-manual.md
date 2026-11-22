@@ -128,7 +128,7 @@ The tables say, for each field, what the parser keeps and what the validator ref
 | `param_name` | Required for `query_param` | The query parameter that carries the key |
 | `token_url` | Required for `oauth2` | The token endpoint |
 | `header` | For `api_key`, one of `header`, `param_name` or `env_var` is required | The header that carries the key |
-| `env_var`, `env_var_secret` | Optional | A name for the credential, so the builder knows what to ask for. The public read leaves both out. On a node the value lives in the extension (section 7), never in an environment variable |
+| `env_var`, `env_var_secret` | Optional | A name for the credential, so the builder knows what to ask for. The public read leaves both out. On a node the value is stored in the extension (section 7), never in an environment variable |
 
 ### `actions[]`
 

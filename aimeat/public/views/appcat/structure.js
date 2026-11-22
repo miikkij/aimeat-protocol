@@ -10,7 +10,7 @@
  *
  *   WHY (Jouni, 2026-10-29): a person who starts an app sees what they get and how the app is put
  *   together, can follow it at a glance, and picks a layout or a look by seeing them; the choice goes
- *   back to the AI that builds. It is help and never a gate: "tätä ei ole pakko käyttää".
+ *   back to the AI that builds. It is help and never a gate: using it is optional.
  *
  *   THE CANVAS IS THE SPEC: the design accepted on 2026-10-29 (claude.ai artifact "Sovelluksesi
  *   rakenne", board 2). The status comes from the node (services/app-structure.ts), which the AI reads
@@ -23,8 +23,7 @@
  * @usage routed at /v1/appcat/structure by spa.html (and portal.ts spaRoutes).
  * @version-history
  *   v1.2.0 — 2026-11-01 — When the app is published and no step waits, the next-step box says so and
- *     carries "Open the app", which opens the published app in a new tab (Jouni, 2026-11-01: "kun
- *     kaikki on valmiina niin voisi olla nappi että avaa applikaatio").
+ *     carries "Open the app", which opens the published app in a new tab (Jouni, 2026-11-01).
  *   v1.1.0 — 2026-11-01 — The page opens the live stream (relayLiveUpdates). Until now it listened for
  *     `aimeat-live-update` and nothing on the route dispatched it, so an open page kept the state it
  *     loaded with: QUANTA showed 4/8 and "working" after it was published at 8/8 (Jouni, 2026-11-01).

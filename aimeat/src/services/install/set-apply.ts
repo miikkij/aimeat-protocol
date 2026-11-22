@@ -61,8 +61,8 @@
  *     federation switch (I18). Both secaudit 2026-10-10.
  *   v1.9.0 — 2026-10-05 — An apply into an account that existed before writes the operator trail in
  *     that account (recordOperatorAction, area install-set): its holder reads in their feed which set
- *     was installed and how many apps were given permissions (secaudit 2026-10, S4; Jouni: "this
- *     exception should be just logged and user notified about this change by operator").
+ *     was installed and how many apps were given permissions (secaudit 2026-10, S4; Jouni ruled
+ *     that the operator's change is logged and the holder is told).
  *   v1.8.1 — 2026-10-05 — The record keeps `landing_path`, the path the owner's welcome link opens
  *     (no token), so a test can check the landing without reading the mail (aimeat-commercial).
  *   v1.8.0 — 2026-10-04 — After the apps are linked to their workspaces, the owner's grant for each

@@ -9,7 +9,7 @@
  *   unset, and nothing re-encrypts what is stored. Until 2026-11-02 the moment the data key was added,
  *   every AI provider key, MCP server credential, connected account and payment key written under the
  *   TOTP key stopped opening; only the TOTP secrets and secret Config settings tried both keys (IT
- *   adoption review, 2026-11-01; Jouni, 2026-11-02: "korjaa kaikki nämä puutteet").
+ *   adoption review, 2026-11-01; Jouni, 2026-11-02: fix every gap the review found).
  *
  *   FIRST FAIL: against encryption.ts v1.1.0, "a value written under the TOTP key opens with the
  *   key getEncryptionKey now returns" throws "Unsupported state or unable to authenticate data" for

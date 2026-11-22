@@ -202,7 +202,7 @@ Fuller reference: **[MSM Manual](./msm-manual.md)**.
 
 ## 4. Extensions: code that runs on the node
 
-An extension is the answer whenever something cannot live in a browser: an outbound call that needs a
+An extension is the answer whenever something cannot run in a browser: an outbound call that needs a
 credential, work that must survive the tab closing, a rule that must be *enforced* rather than
 displayed, or a capability you intend to sell. An app calls an extension; it never becomes one.
 
@@ -260,7 +260,7 @@ script per action, 20 extensions installed. A manifest may ask for less, never m
 **Who may install:** `AIMEAT_EXT_INSTALL_ROLE` decides. With the default `owner`, every account holder in person, and an agent holding `ext:write`. With `operator`, only the operator's account writes extension code: the operator in person and the operator's agents holding `ext:write`; another account's agent is refused an install, a redeploy and a script change, and the refusal names the setting and the operator. An app running under an app
 grant cannot: `ext:write` is deliberately outside the grantable scope vocabulary, because an
 extension outlives the grant that created it and can charge money in the owner's name. An app may
-*write* a manifest and hand it over; a human or an authorised agent installs it.
+*write* a manifest and pass it on; a human or an authorised agent installs it.
 
 **Selling it.** An action carries two values. `tollMorsels` is its pacing amount, morsels per call,
 which the node charges the caller and credits to the installer less the burn rate's share. The

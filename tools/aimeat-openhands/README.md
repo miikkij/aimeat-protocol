@@ -35,7 +35,7 @@ bash scripts/setup.sh
 3. render `config.toml`, install the skill, and `docker compose up -d`.
 
 Then open **http://localhost:3000** and say *"Build an AIMEAT app that …"*. It fetches the
-spec, builds, publishes over MCP, and hands you the live URL.
+spec, builds, publishes over MCP, and gives you the live URL.
 
 The UI listens on this computer only (`OPENHANDS_PORT_BIND=127.0.0.1:3000` in `.env`): it has no
 login, it can run code on the host, and it holds your agent token. From another machine, use

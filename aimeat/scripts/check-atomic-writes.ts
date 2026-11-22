@@ -12,8 +12,8 @@
  *   commerce/session-claim.ts. Nothing made new code use it. The quality round of 2026-10-18 found
  *   sixteen read, check and write code paths in code written after the A04 fix of 2026-09-27, most
  *   of them on money routes; commit 4c9fd43b5 fixed seven of them. This gate is what stops the next
- *   one. Jouni, 2026-10-18: "luulin että tätä varten oli se versiointi tehty jo tukemaan että huomaa
- *   että voiko päivittää jos versio päivittyy välissä, ehkä tätä on parannettava."
+ *   one (Jouni, 2026-10-18: the record versions must stop a write when the version changed in
+ *   between).
  *
  *   WHAT IT READS, AND WHAT IT CANNOT. scripts/inventory/atomic-writes.ts has the detection rule and
  *   its limits. In short: one unit, one key expression, a read through `getMemory` (or a wrapper of

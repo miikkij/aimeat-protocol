@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The paragraph of the privacy policy about account holders' own analytics, shown only
  *   while at least one account holder on this node uses Microsoft Clarity or Google Analytics on
- *   the pages they publish (Jouni, 2026-10-11: "show it only when a user takes a Clarity id into
- *   use, because it goes to their apps").
+ *   the pages they publish (Jouni, 2026-10-11).
  *
  *   WHY IT IS CONDITIONAL. The policy says the service's own pages use no third-party analytics, and
  *   that stays true. What can change is whether an app or a page somebody published here carries

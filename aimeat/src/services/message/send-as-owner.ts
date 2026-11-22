@@ -11,8 +11,8 @@
  *   words an agent wrote and sent, and the recipient saw only the owner. The connector's copy posted
  *   to POST /v1/messages with the agent's own token, so the same tool sent as the AGENT there. And the
  *   MCP tool did not resolve a group address, so a reply into a support thread was written as a 1:1 to
- *   `support@operators` and stayed queued. Jouni: "agenttina lähetetyt mitkä on lähetetty minuna
- *   pitäisi näkyä että agentti lähetti ne" (2026-10-17); the recipient sees it too.
+ *   `support@operators` and stayed queued. Jouni ruled that a message an agent sent in the owner's
+ *   name shows that the agent sent it (2026-10-17); the recipient sees it too.
  *
  *   WHAT IT DOES. The sender is the agent's OWN owner, derived from the agent's identity and never
  *   taken from the request, so an agent can speak only for its own owner. The address is resolved as

@@ -101,7 +101,7 @@
  *   v1.3.0 — 2026-09-25 — The Status's uses.
  *   v1.2.0 — 2026-09-25 — The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v1.1.0 — 2026-09-25 — The parts of Settings & Controls: settings-frame, side-menu (UI consolidation phase 5).
- *   v1.0.0 — 2026-09-24 — Initial (Jouni's audit: "use" is a fixed word list).
+ *   v1.0.0 — 2026-09-24 — Initial (Jouni's audit: the use field is a fixed word list).
  */
 import type { UiUse } from './types.js';
 

@@ -5,8 +5,8 @@
  * @description The privacy policy's paragraph about where the node's AI provider processes a
  *   person's request: the OpenRouter region of the node's key, what happens to a model the region
  *   does not offer, whether a person may choose, and the transfer that happens whatever is chosen.
- *   Jouni, 2026-10-31: "tärkeintä että ollaan läpinäkyviä ja kaikki on tietoisia ja pystyvät
- *   tekemään valintoja".
+ *   Jouni, 2026-10-31: the policy states this openly, so that every person knows it and can
+ *   choose.
  *
  *   It is written from the node's settings (services/ai/openrouter-region.ts), so the page states
  *   what this node does and changes when the operator changes it. A node without its own OpenRouter

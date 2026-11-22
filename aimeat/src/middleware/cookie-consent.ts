@@ -249,7 +249,7 @@ export function cookieConsentSnippet(config: BannerConfig, opts: CookieBannerOpt
  * ONLY WHEN THERE IS SOMETHING TO ASK. The service's own pages (home, settings, admin, chat) set
  * the cookies they need to work and nothing else, and those need no consent. With the operator's
  * list at `necessary` alone, which is the default, they get no banner: it asked a question with one
- * possible answer on every page (Jouni, 2026-10-11: "it asked there too, what it should not ask").
+ * possible answer on every page (Jouni, 2026-10-11).
  * The banner shows there only when the operator lists a category a visitor can refuse.
  */
 export function cookieConsentMiddleware(config: AimeatConfig): RequestHandler {

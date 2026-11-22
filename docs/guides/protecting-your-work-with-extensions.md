@@ -22,8 +22,8 @@ at the full mechanics.
 | **Cortex lib** (browser IIFE) | the browser | Yes — served from `/v1/cortex/*/libs/*` | **Yes** | Shared *browser* helpers (charts, forms, viewers) — convenience, never secrets |
 | **Extension** (WASM sandbox) | the **server** | **No** — `scriptContent` is never sent to the browser | **No** | Business logic, secret API keys, proprietary algorithms, enforced rules, and the compute behind valuable data |
 
-The app and cortex layers are the shop window — visible and copyable by design. The
-extension layer is the safe in the back room.
+The app and cortex layers are public: visible and copyable by design. The
+extension layer is private: its code stays on the server.
 
 ---
 
@@ -118,7 +118,7 @@ method.
 
 ## Why the moat actually holds
 
-- **Action code is never shipped.** An extension action's source lives only on the server,
+- **Action code is never shipped.** An extension action's source is stored only on the server,
   runs in a QuickJS WASM sandbox with a controlled `ctx` (no Node globals), and is reachable
   only via `POST /v1/ext/{name}/{action}` — and only if the extension is installed and active
   on that node. The call needs an account unless the manifest marks the action

@@ -2,10 +2,9 @@
  * @file public/views/admin/themes-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Themes & Styles (07-themes-and-styles.md). Jouni: "themes & styles on siis hallinta
- *   näkymä useille teemoille ja tyyleille että niitä voi muokata ja luoda uusia teemoja ja tyylejä
- *   joita sitten käyttäjätkin voivat valita sieltä pill:stä missä on teemat. light & dark on otettava
- *   huomioon tässä myös."
+ * @description Themes & Styles (07-themes-and-styles.md). The view manages several themes and
+ *   styles: they can be edited and new ones made, and a person then picks one in the look picker.
+ *   Light and dark both count here too (Jouni).
  *
  *   A theme holds styles. This file is the view's first screen and its map: the themes (S1), each
  *   with its styles' colours, what it is and what can be done with it, "Back to the version of" one

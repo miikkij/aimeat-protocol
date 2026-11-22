@@ -177,11 +177,11 @@ export function FleetLine({ agent }) {
     <${StatLine} href="/v1/profile?tab=agents" tone=${ok ? 'ok' : 'trouble'} dot=${true}>
       ${total === 1
         ? (ok
-          ? tr('home.fleet.oneOk', 'Your agent is home and well.')
-          : tr('home.fleet.oneTrouble', 'Your agent {name} needs a look.').replace('{name}', agent.name || ''))
+          ? tr('home.fleet.oneOk', 'Your agent is working without problems.')
+          : tr('home.fleet.oneTrouble', 'Your agent {name} needs your attention.').replace('{name}', agent.name || ''))
         : (ok
-          ? bigNumber(tr('home.fleet.allOk', '{total} agents home, all well.'), '{total}', total)
-          : bigNumber(tr('home.fleet.trouble', '{total} agents home · {n} need a look').replace('{n}', String(problems)), '{total}', total))}
+          ? bigNumber(tr('home.fleet.allOk', '{total} agents, all working without problems.'), '{total}', total)
+          : bigNumber(tr('home.fleet.trouble', '{total} agents · {n} need your attention').replace('{n}', String(problems)), '{total}', total))}
     <//>`;
 }
 
@@ -395,7 +395,7 @@ export function TrustLine() {
     <${InkFoot}>
       ${/* The explicit space matters: HTM collapses the line break, and the link sat glued to the
             sentence's full stop ("...asks.How this works"). */''}
-      <p>${tr('home.trust.ai', 'AI-made content carries its label here, as the EU AI Act asks.')}${' '}
+      <p>${tr('home.trust.ai', 'AI-made content is labelled here, as the EU AI Act asks.')}${' '}
         <a href="/v1/transparency">${tr('home.trust.more', 'How this works →')}</a></p>
       <p>${tr('home.trust.data', 'Your data is yours: export it or delete it, and nothing is shared until you share it.')}</p>
     <//>`;

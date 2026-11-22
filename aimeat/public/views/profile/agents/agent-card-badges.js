@@ -11,7 +11,7 @@
  * @version-history
  *   v1.4.0 — 2026-09-26 — The badges are the Mark component (components/Mark.js: a tag, or a status
  *     with its tone); stepStatusClass becomes stepTone, the tone rather than a class (page group G1a).
- *   v1.3.0 — 2026-09-26 — renderDeliveryIndicator goes: nothing called it (Jouni: "saat poistaa jos ne on oikeasti käyttämättömiä").
+ *   v1.3.0 — 2026-09-26 — renderDeliveryIndicator goes: nothing called it (Jouni: code that nothing uses may be removed).
  *   v1.2.0 — 2026-09-25 — Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
  *   v1.1.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
  *   v1.0.0 — 2026-09-06 — Extracted from agent-card.js, which reached 801 lines when the GAII

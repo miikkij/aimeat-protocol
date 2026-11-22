@@ -80,7 +80,7 @@ The `matching-round` schedule runs `run-matching` every 6 hours via cron (`0 */6
 | `suggestion.{gaii}.{otherGaii}` | Match suggestion for a user. Private |
 | `accepted.{gaii}.{otherGaii}` | Accepted match record. Private |
 
-All keys live in the instance's namespace, `ext:matching-behaviors.{instanceId}`.
+All keys are in the instance's namespace, `ext:matching-behaviors.{instanceId}`.
 
 ## Required APIs
 

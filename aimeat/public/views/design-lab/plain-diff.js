@@ -18,7 +18,7 @@
  *     or a ground; an unnamed face is "the letters change" (second review).
  *   v1.1.0 — 2026-09-23 — A box that becomes words is said once, not as frame, corner and room
  *     changes; colour words that hold in both themes; no font names (review of the second batch).
- *   v1.0.0 — 2026-09-23 — Initial (Jouni: "can they tell from the pictures alone what changes").
+ *   v1.0.0 — 2026-09-23 — Initial (Jouni: a reader must be able to tell from the pictures alone what changes).
  */
 import { t } from '/js/i18n.js';
 
@@ -120,11 +120,11 @@ export function plainDiff(today, after) {
     if (today.radius !== after.radius && (isBox(today) || isBox(after))) say(after.radius === 'none' ? 'square' : 'round', after.radius === 'none' ? 'The round corners become square.' : 'The corners become round.');
     if (today.fill === 'none' && after.fill !== 'none') {
       const c = colourWord(after.fill);
-      if (c) say('groundAdd', 'It gets a ground in {colour}.', { colour: c }); else say('groundAddPlain', 'It gets a coloured ground.');
-    } else if (today.fill !== 'none' && after.fill === 'none') say('groundRemove', 'It loses its coloured ground.');
+      if (c) say('groundAdd', 'It gets a background in {colour}.', { colour: c }); else say('groundAddPlain', 'It gets a coloured background.');
+    } else if (today.fill !== 'none' && after.fill === 'none') say('groundRemove', 'It loses its coloured background.');
     else if (!sameColour(today.fill, after.fill)) {
       const c = colourWord(after.fill);
-      if (c) say('groundColour', 'The ground changes to {colour}.', { colour: c }); else say('groundColourPlain', 'The ground changes colour.');
+      if (c) say('groundColour', 'The background changes to {colour}.', { colour: c }); else say('groundColourPlain', 'The background changes colour.');
     }
     if (differs(room(today.padding), room(after.padding), 0.15)) {
       const more = room(after.padding) > room(today.padding);

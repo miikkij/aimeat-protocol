@@ -40,7 +40,7 @@ Numbers are the invariants in `docs/coding-guidelines/security-development-dna.m
 | 1 — authorize against the resolved identity | ast-grep rule + Semgrep taint | `resolve-identity` |
 | 6 — optionalAuth is not a gate (`if (!req.auth)`) | ast-grep rule | `optional-auth-not-a-gate` |
 | 11 — the owner name is not a principal | ast-grep rule (review-level) | `owner-name-is-not-a-principal` |
-| 15 — a permission word is enforced on every door | ast-grep rule | `permission-word-on-every-door` |
+| 15 — a permission word is enforced on every endpoint | ast-grep rule | `permission-word-on-every-door` |
 | 2 — server-read keys unreachable by scoped principals | audit-gate ratchet | `check:trusted-keys` |
 | 3 — non-constant outbound HTTP via safeFetch | audit-gate ratchet | `check:outbound-fetch` |
 | 4 — every mutating route gated | audit-gate ratchet | `check:route-scopes` |
@@ -57,13 +57,13 @@ Numbers are the invariants in `docs/coding-guidelines/security-development-dna.m
 ### The four rules that exist
 
 - **resolve-identity** — `req.auth!.sub` reaching a `storage.*` call without being resolved. On an
-  owner session `sub` is the bare owner name, so owner data lands under the wrong key. Sanitizers:
+  owner session `sub` is the bare owner name, so owner data is stored under the wrong key. Sanitizers:
   `resolveIdentity(...)`, inline GHII construction, and the attribution fields that legitimately hold
   a raw principal id.
 - **owner-name-is-not-a-principal** — the `owner !== name && !roles.includes('operator')` widening.
-  A review prompt: if the guarded door changes the ACCOUNT itself, it needs `requireOwnerPrincipal()`.
+  A review prompt: if the guarded route changes the ACCOUNT itself, it needs `requireOwnerPrincipal()`.
 - **permission-word-on-every-door** — `requireRoleOrScope('agent', <scope>)`, where the agent role is
-  admitted before the scope, so the scope word is decorative on that door.
+  admitted before the scope, so the scope word is decorative on that route.
 - **optional-auth-not-a-gate** — `if (!req.auth)` used as a gate in a route. optionalAuth injects a
   (possibly anonymous) identity, so this admits the anonymous principal; use requireAuth().
 
@@ -90,7 +90,7 @@ First run over `src/routes`: 22 findings across the four rules.
 |---|---|---|
 | resolve-identity | 12 | 0 real — all agent-session branches, attribution fields, or inline GHII construction |
 | owner-name-is-not-a-principal | 3 | 2 to confirm (`owners.ts`, `owners/export.ts`), 1 legitimate (instance ownership) |
-| permission-word-on-every-door | 4 | 4 to confirm (`organism:invite` doors) |
+| permission-word-on-every-door | 4 | 4 to confirm (`organism:invite` routes) |
 | optional-auth-not-a-gate | 3 | 3 to confirm (`apps/read.ts`, `stats.ts`) — is requireAuth also present, or is `if (!req.auth)` the only gate? |
 
 No confirmed live defect from the resolve-identity pass — the cross-owner boundary is handled
@@ -107,7 +107,7 @@ the newest Claude Code editor extension):
 1. **Finding triage** — each unacknowledged finding is classified with its surrounding code:
    `legit` (a known-safe pattern, with a one-sentence reason) or `confirm` (a human must look).
    Findings come from ast-grep (local scan) AND from the Semgrep taint alerts the CI job uploaded
-   to code scanning (fetched via `gh api`). Verdicts land in `triage-store.json` (committed).
+   to code scanning (fetched via `gh api`). Verdicts are written to `triage-store.json` (committed).
    Version 2 fingerprints bind the exact occurrence and rule to a digest of shipped source,
    security policy and scanner definitions. This deliberately invalidates approvals on any
    shipped source change: dynamically assembled middleware and runtime registries cannot be

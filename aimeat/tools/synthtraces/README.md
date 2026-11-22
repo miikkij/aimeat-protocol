@@ -62,7 +62,7 @@ gitignored.
 ## API keys
 
 Keys are read from an env var first, else from a gitignored `*.log` file at the
-**repo root** — keys never live in code and are never printed:
+**repo root** — keys are never stored in code and are never printed:
 
 | Provider | env var | key file (repo root) | default model |
 |----------|---------|----------------------|---------------|

@@ -16,7 +16,7 @@
  *   v1.3.1 -- 2026-09-27 -- The poster skin reads the shape values (--shape-corner, --shape-frame, --shape-rule-colour: 0, 2px and ink in AIMEAT, so nothing changes there; a theme such as Pebble reaches the calendar).
  *   v1.3.0 -- 2026-09-27 -- The component's own class names: .sch-cal → .schedule-calendar, every .sch-cal-* → .schedule-calendar-*, .sch-muted → .schedule-calendar-muted. The calendar's poster rules in views/profile-poster.css (.pf .sch-cal-freq in the sections group; .pf .sch-cal-cell, -weekcol, their --today, -weekcol-head and -head) move in under the same .pf scope and in the same order, so they still win over the rules here. Every declaration kept (Jouni: components draw only their own class names, a move).
  *   v1.2.0 -- 2026-09-26 -- Drawn by components/ScheduleCalendar.js, which takes data; .sch-muted moves in from views/scheduler.css, its only user is the calendar (page group G5).
- *   v1.1.0 -- 2026-09-26 -- The corners read the shape corners (3px, 6px and 8px --shape-corner; a run's 4px and 3px --shape-corner-control; the strip's 999px --shape-corner-pill); today's 1px inset coral ring goes, its coral border stays (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.1.0 -- 2026-09-26 -- The corners read the shape corners (3px, 6px and 8px --shape-corner; a run's 4px and 3px --shape-corner-control; the strip's 999px --shape-corner-pill); today's 1px inset coral ring goes, its coral border stays (Jouni's note on the round's shape check, which asked for the same style as elsewhere).
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/scheduler.css (UI consolidation phase 5, a move).
  */
 

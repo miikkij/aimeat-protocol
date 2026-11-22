@@ -7,7 +7,7 @@ secrets, the money price and the pacing amount) is in the built-in skill
 **`aimeat-extension-builder`**, which every node serves: `aimeat_skill_get { name: "aimeat-extension-builder" }`
 over MCP, or `GET /v1/skills/aimeat-extension-builder?scope=node`. The full `ctx` table and manifest
 reference is the node's own build guide, `GET /v1/prompts/build-extension`. Both are read by the AI
-that builds the extension, so they live on the node and not in this repository. This manual keeps
+that builds the extension, so they are kept on the node and not in this repository. This manual keeps
 what the operator does.
 
 ## What is a Service Extension?
@@ -83,7 +83,7 @@ Every extension is an `extension.yaml` manifest plus its scripts. Before install
 | `network.host_fields` | Hosts the installer supplies per install (a customer's own server). |
 | `workspace` | `{ read, write }`: the extension acts on the caller's organism workspace as the caller. |
 | `config` with `type: secret` | A credential you set after installing; encrypted at rest, never returned in plain text. |
-| `schedules` | Jobs the node runs on a clock once the extension is active. `cron: "@activate"` runs at every activation. |
+| `schedules` | Jobs the node runs on a schedule once the extension is active. `cron: "@activate"` runs at every activation. |
 | `actions[].tollMorsels` | The pacing amount in morsels per call, which the node charges the caller (capped by `AIMEAT_EXT_MAX_DEBIT`, default 100). Part burns and the rest is credited to the installer. |
 | `actions[].commercial.payMoney` | A money price per call, paid through the node's checkout. |
 | `actions[].commercial.payMorsels` | The 3.x name of the pacing amount. Read as pacing until node 4.0.0 and refused from 4.0.0. A morsel is never a price. |
@@ -169,13 +169,13 @@ Three rules:
    the new manifest. The status is theirs too: a builtin somebody switched off stays off.
 
 A builtin goes through the same manifest validator and the same write path an upload does, so there
-is no side door: a mistake in the shipped YAML is a refusal at boot naming the field, logged, and
+is no other code path: a mistake in the shipped YAML is a refusal at boot naming the field, logged, and
 the node boots without it rather than failing to boot. `installedBy` is `system`, which is not an
 account anyone signs in as, so only an operator can manage one.
 
 ### living-hooks
 
-The one builtin today: the two doors a living document uses to talk to the world.
+The one builtin today: the two endpoints a living document uses to call outside services.
 
 - `POST /v1/ext/living-hooks/send` — `{ url, method?, headers?, body }` → `{ ok, status, ms }`.
   Sends the whole state of a document to an address its owner allowed. Needs `memory:write`.
@@ -216,7 +216,7 @@ anything beginning `X-Living-`.
 
 `secrets` is node-level, because extension config is: there is no per-owner config for a plain
 extension, so on a shared node the operator sets what everyone's documents may use. `allow_hosts`
-is per owner because it lives in the owner's own record, and a list of hostnames is not a secret.
+is per owner because it is stored in the owner's own record, and a list of hostnames is not a secret.
 
 ### The four bundled examples
 

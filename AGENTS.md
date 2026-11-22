@@ -107,7 +107,7 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
 - **Look for a browser before you say you have none, and never let its absence hold a publish
   back.** List your tools and search them for `playwright`, `browser` and `chrome`: this machine
   has a Playwright MCP server driving Chrome, and a session that has it and does not look is the
-  failure seen three builds in a row. With no browser, publish anyway, hand over the address, and
+  failure seen three builds in a row. With no browser, publish anyway, give the address, and
   say in one line what you could not check yourself.
 - **Done means all of what was agreed.** Check every requirement against the result before you say
   done. Jouni is not the quality check you left out.
