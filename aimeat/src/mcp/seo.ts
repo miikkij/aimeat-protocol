@@ -104,7 +104,7 @@ export function registerSeoTools(
         const why = out.reason === 'no_key'
           ? 'No IndexNow key is set on this node (AIMEAT_INDEXNOW_KEY); whoever installed it is the one to ask.'
           : out.reason === 'indexing_off'
-            ? 'Search engines are turned away on this node (seo.indexing is off), so there is nothing to announce.'
+            ? 'Search engines are blocked on this node (seo.indexing is off), so there is nothing to announce.'
             : 'There is nothing to send: no pages and no findable application.';
         return { content: [{ type: 'text' as const, text: why }], isError: true };
       }

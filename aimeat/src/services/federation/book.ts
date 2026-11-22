@@ -289,7 +289,7 @@ export async function assembleBook(config: AimeatConfig, storage: Storage, peers
   const nodeKey = await storage.getNodeKey();
   if (nodeKey) book.signature = await sign(nodeKey.privateKey, bookSignString(book));
   await storeActiveBook(storage, book);
-  logger.info('Federation book assembled', { nodes: nodes.length, version: book.book_version });
+  logger.info('Federation directory assembled', { nodes: nodes.length, version: book.book_version });
   return book;
 }
 

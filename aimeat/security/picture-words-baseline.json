@@ -115,5 +115,11 @@
   "src/storage/providers/sqlite/schema-tables-4.ts::door::4879830ba6bf": "A comment inside shipped source text (SQL, a package manifest, an app or a template): developers read it, never a person on a page.",
   "src/storage/providers/sqlite/schema-tables-4.ts::door::58fc652beaec": "A comment inside shipped source text (SQL, a package manifest, an app or a template): developers read it, never a person on a page.",
   "src/storage/providers/sqlite/schema-tables-4.ts::door::60dfd295aaa8": "A comment inside shipped source text (SQL, a package manifest, an app or a template): developers read it, never a person on a page.",
-  "src/storage/providers/sqlite/schema-tables-4.ts::roads::d09adaec2c46": "A comment inside shipped source text (SQL, a package manifest, an app or a template): developers read it, never a person on a page."
+  "src/storage/providers/sqlite/schema-tables-4.ts::roads::d09adaec2c46": "A comment inside shipped source text (SQL, a package manifest, an app or a template): developers read it, never a person on a page.",
+  "src/services/welcome/mat-parse.ts::welcome mat::04eb3af21e4a": "A marker the parser finds in the HTML an AI pastes back; pages already published carry it, so it is a protocol token, not words a person reads.",
+  "src/services/welcome/mat-parse.ts::welcome mat::1c22dd4a1a66": "A marker the parser finds in the HTML an AI pastes back; pages already published carry it, so it is a protocol token, not words a person reads.",
+  "public/privacy.fi.html::torjunta::ad2b80e741ed": "The legal purpose of processing in the Finnish words of data protection texts (väärinkäytösten ja petosten torjunta), not a refused request.",
+  "public/views/design-lab/decisions-data.js::welcome mat::7b0799326914": "A record of a past design decision quotes the words the page had when it was made.",
+  "public/views/design-lab/decisions-data.js::welcome mat::7f9181b60a9f": "A record of a past design decision quotes the words the page had when it was made.",
+  "public/views/design-lab/decisions-data.js::welcome mat::673104e33df5": "A record of a past design decision quotes the words the page had when it was made."
 }

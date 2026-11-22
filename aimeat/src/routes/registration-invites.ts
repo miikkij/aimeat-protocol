@@ -173,7 +173,7 @@ export function registrationInvitesRouter(config: AimeatConfig, storage: Storage
                 // If they said which app they are in and we know it, say so now: it is the field
                 // that decides what they will be asked to do after the account exists.
                 mcp_client_recognised: resolvedClient.kind === 'known' ? resolvedClient.id : null,
-                next: 'The account is the beginning, not the end. After it: a welcome mat, then connecting you as an agent.',
+                next: 'The account is the beginning, not the end. After it: an introduction page, then connecting you as an agent.',
             }, [
                 { description: 'What the person does after the link', method: 'GET', url: '/v1/home' },
                 { description: 'How to connect yourself as an agent afterwards', method: 'GET', url: '/auth.md' },

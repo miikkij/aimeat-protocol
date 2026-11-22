@@ -455,7 +455,7 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'irreversible', prop: 'irreversible', when: 'an act that cannot be undone: the solid frame (.poster-aside--irreversible)' },
         ],
         example: { label: 'Leave', row: 'You can come back when invited.' },
-        note: 'Its module is Box.js, which the box entry shares: SettingBox, SettingRow and SettingConfirm draw these classes. On 2026-09-27 the admin pages moved onto SettingBox (main\'s .og-box-label, and the paste boxes .adm-st-paste and .adm-us-paste became the label on its own line and pre). .og-box-label keeps its rule, which no page writes now.',
+        note: 'Its module is Box.js, which the box entry shares: SettingBox, SettingRow and SettingConfirm draw these classes. On 2026-09-27 the admin pages moved onto SettingBox (main\'s .og-box-label, and the boxes for pasted text .adm-st-paste and .adm-us-paste became the label on its own line and pre). .og-box-label keeps its rule, which no page writes now.',
     },
     {
         id: 'code-block', name: 'Code block', kind: 'component', status: 'active',

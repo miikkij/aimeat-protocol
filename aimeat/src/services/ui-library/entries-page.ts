@@ -62,7 +62,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         data: { shape: 'ActionRow({ children })', fields: { children: 'the buttons, the next move first' } },
         useFor: ['The actions at the foot of a step or a card.'],
         variants: [],
-        example: one('<button class="btn-primary">Here is my welcome mat</button>'),
+        example: one('<button class="btn-primary">Here is my profile</button>'),
     },
     {
         id: 'hint', name: 'Hint', kind: 'component', status: 'active',
@@ -203,7 +203,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         data: { shape: 'LinkLine({ label, href, text })', fields: { label: 'the words before the link', href: 'where it goes', text: 'the link words' } },
         useFor: ['An address a person may want to open or share, said in a sentence.'],
         variants: [],
-        example: { label: 'Your welcome mat is at', href: 'https://alice.aimeat.io/mat', text: 'alice.aimeat.io/mat' },
+        example: { label: 'Your introduction page is at', href: 'https://alice.aimeat.io/mat', text: 'alice.aimeat.io/mat' },
     },
     {
         id: 'stat-line', name: 'StatLine', kind: 'component', status: 'active',

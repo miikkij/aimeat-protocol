@@ -416,7 +416,7 @@ export function Achievements({ state, usage, markers, chatStatus, orgs, packages
   if (prefs?.hideAchievements) return null;
   const has = (k) => !!markers?.has(k);
   const list = [
-    { id: 'mat', done: !!state.mat?.done, key: 'home.ach.mat', fallback: 'Welcome mat up', href: '/v1/home' },
+    { id: 'mat', done: !!state.mat?.done, key: 'home.ach.mat', fallback: 'Introduction page published', href: '/v1/home' },
     { id: 'agent', done: !!state.agent, key: 'home.ach.agent', fallback: 'Agent home', href: '/v1/profile?tab=agents' },
     { id: 'chat', done: has('onboarding.first_chat_turn'), key: 'home.ach.chat', fallback: 'First conversation', href: '/v1/chat' },
     { id: 'mcp', done: has('onboarding.first_mcp_call') || has('onboarding.hello_mcp'), key: 'home.ach.mcp', fallback: 'Your own AI connected', href: '/v1/profile?tab=mcp' },

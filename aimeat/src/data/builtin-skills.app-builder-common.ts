@@ -66,7 +66,7 @@ you keep here, and nothing else" says the same thing and can be argued with. Say
 sentence first; the identifier, if it earns its place at all, comes after it as evidence.
 
 **When something stops, say what you are doing about it, not that it stopped.** A refused
-publish is your problem to solve, and the response tells you how. Three rungs, in order:
+publish is your problem to solve, and the response tells you how. Three steps, in order:
 
 1. **Fix it and carry on.** \`APP_ARTIFACT_BROKEN\` names the finding and the pitfall id. Fix,
    publish again, and tell the person only the outcome. They do not need the round trip.

@@ -553,11 +553,11 @@ export async function initializeServices(
     // One process per round, as every sweep below (services/process-lease.ts claimSweepTick).
     const tick = claimedSweep(storage, config, 'federation-book', BOOK_INTERVAL_MS, () => {
       if (isPrimary) {
-        assembleBook(config, storage, peers).catch(err => logger.warn('Federation book assembly failed', { error: String(err) }));
+        assembleBook(config, storage, peers).catch(err => logger.warn('Federation directory assembly failed', { error: String(err) }));
       } else {
         pullBook(config, storage, peers).then(r => {
-          if (r.applied) logger.info('Federation book mirrored from genesis', { version: r.book_version });
-        }).catch(err => logger.warn('Federation book pull failed', { error: String(err) }));
+          if (r.applied) logger.info('Federation directory mirrored from genesis', { version: r.book_version });
+        }).catch(err => logger.warn('Federation directory pull failed', { error: String(err) }));
       }
     });
     setTimeout(tick, 15_000); // initial run shortly after boot

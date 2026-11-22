@@ -252,7 +252,7 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
             standalone_url: portfolioStandaloneUrl(config, owner),
             state,
         }, [
-            { description: 'Look at your welcome mat', method: 'GET', url: `/v1/portfolio/${encodeURIComponent(owner)}` },
+            { description: 'Look at your introduction page', method: 'GET', url: `/v1/portfolio/${encodeURIComponent(owner)}` },
             { description: 'Where your home stands now', method: 'GET', url: '/v1/home/state' },
         ]));
         emitChange('portfolio');

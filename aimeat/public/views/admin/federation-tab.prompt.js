@@ -42,9 +42,9 @@ Start with aimeat_admin_federation. Read \`needs\` before the counts: it is the 
   - What this node gives. \`offer\` counts only things somebody ticked Federate on. If \`gives_nothing\` is true I am reading the federation and putting nothing back, which is almost never a decision anybody made on purpose.
 
 == 3. Then use your judgement on the part I cannot count ==
-  - Does the power each peer has here match how much I should trust it? A peer that may settle morsels and replicate memory is holding more than one that may only carry messages. Name any peer whose switches look more generous than its rung.
+  - Does the power each peer has here match how much I should trust it? A peer that may settle morsels and replicate memory is holding more than one that may only relay messages. Name any peer whose switches look more generous than its tier.
   - Is anything switched on that looks like it was switched on once for a test? Relay points outward, which is the one switch that lets this node forward traffic TO a peer rather than the other way round.
-  - Is the federation book stale, and does it matter? It is a signed directory mirrored from the node that keeps it. If the version I run is newer than most of the book, say what that means for what I can rely on the others to understand.
+  - Is the federation directory stale, and does it matter? It is a signed directory mirrored from the node that keeps it. If the version I run is newer than most of the directory, say what that means for what I can rely on the others to understand.
 
 == 4. One paragraph, then a short list ==
 Open with whether anything needs me today, in one sentence. Then at most five items, each one a thing to do with the node it is about. If nothing needs me, say that first and stop; do not pad it out.

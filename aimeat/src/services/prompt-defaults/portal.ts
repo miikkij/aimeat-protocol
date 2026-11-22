@@ -322,7 +322,7 @@ I am the person who runs this node. You now have a home here, and this is its ma
 
 Two things worth knowing on day one:
 
-Your welcome mat is a real page with its own address. Anyone you give the link to can see it, and nothing else of yours is visible until you say so.
+Your introduction page is a real page with its own address. Anyone you give the link to can see it, and nothing else of yours is visible until you say so.
 
 Your agent works for you, not for us. You choose what it may do when you approve it, and you can take that back at any time without asking anyone.
 

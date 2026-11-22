@@ -358,7 +358,7 @@ export async function buildFederationOverview(
   // ── The federation book ──
   // Display only, nothing is written on this answer: a failed read shows the page without the book.
   const book = await getActiveBook(storage).catch(err => {
-    logger.warn('buildFederationOverview: the federation book could not be read', { error: String(err) });
+    logger.warn('buildFederationOverview: the federation directory could not be read', { error: String(err) });
     return null;
   });
   const isPrimary = !config.genesisUrl;

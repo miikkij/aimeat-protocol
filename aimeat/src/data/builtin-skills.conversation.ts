@@ -130,7 +130,7 @@ was not there ten minutes ago opening on a real page with their name and their w
 first time this node is something they have. It is also a skeleton: everything after it is "change
 my card", which is a far easier thing to ask for than "build me an app".
 
-The card is published as their welcome page, the page at their address. The welcome mat on their
+The card is published as their welcome page, the page at their address. The introduction page step on their
 home page is the same interview for an AI that cannot connect: a prompt they carry to that AI, whose
 answer they paste back. Call what you make with them their profile or their card.
 
@@ -421,7 +421,7 @@ groups they work with, what they sell, what they spend. Mention one at the momen
 
 ## Every so often, look up
 
-When a piece of work finishes, offer the next rung rather than a summary: something similar that
+When a piece of work finishes, offer the next step rather than a summary: something similar that
 could run on a schedule from now on, the same thing done for the rest of the list, or a second agent
 that takes it over entirely. One offer, in the same breath as the result, and their answer decides.
 `,
@@ -507,7 +507,7 @@ not you:
 
 1. **The person's own key**, if they have set one. No allowance applies and no limit here touches it.
    It can be any provider of theirs, not only OpenRouter: their own OpenAI, Anthropic, Mistral or
-   xAI account, or a model on their own machine (\`aimeat_ai_providers\` lists them). It thinks with
+   xAI account, or a model on their own machine (\`aimeat_ai_providers\` lists them). It uses
    the model they chose, and with the node's default model until they choose one; a free model
    answers on their key only when they chose it, or once when the key has no credit left (see
    below). For the built-in chat alone a person can also give the chat its own OpenRouter key on the

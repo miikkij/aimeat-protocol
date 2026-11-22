@@ -327,7 +327,7 @@ export const CONVERSATION_DEMOS = {
         side=${html`<${List} cols="name" dense>
           <${Row} selected><${Name} onOpen=${noop} meta="build-app · v4">Build an app<//><//>
           <${Row}><${Name} onOpen=${noop} meta="chat-agent · v2">The chat agent<//><//>
-          <${Row}><${Name} onOpen=${noop} meta="welcome-mat · v1">The welcome mat<//><//>
+          <${Row}><${Name} onOpen=${noop} meta="welcome-mat · v1">The introduction page<//><//>
         <//>`}>
       <${TextArea} label="Build an app" code rows=${8} value=${'You build one single-file web app on this AIMEAT node.\nRead the owner\'s request first, then the app catalogue.'} onInput=${noop} />
     <//><//>` },

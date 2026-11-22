@@ -29,6 +29,10 @@
  *   pnpm check:picture-words           (exit 1 on a new hit or a stale entry)
  *   pnpm check:picture-words --list    (every current hit with its key and text, always exit 0)
  * @version-history
+ *   v1.1.0 — 2026-11-22 — The words the Settings and admin pages were rewritten away from (turned
+ *     away and torjua for refused, the federation book, rung, welcome mat, the paste, the eleven
+ *     moments, miehistö, naapuri, kylvää, tarjoilla and the like), so a prompt, a tool description
+ *     or a skill cannot bring one back after the locale files lost it.
  *   v1.0.0 — 2026-11-15 — Initial, after the sweep of door, road, way in and showroom outside the
  *     locale files.
  */
@@ -46,7 +50,16 @@ const BASELINE = path.join(ROOT, 'security', 'picture-words-baseline.json');
  * The pictures, in English and in the Finnish and Spanish copies some files carry (a `.fi.html`
  * sibling, an i18n table). A hyphen or a letter on either side makes it a code name, not prose.
  */
-const PICTURE = /(?<![\p{L}\d_-])(doors?|doorways?|roads?|ways? in|machine room|showroom|(?:sivu|etu|taka|pää)?ov(?:i|et|en|ea|elle|ella|elta|esta|essa|eksi|ia|ien|ille|illa|issa|ista)|puertas?)(?![\p{L}\d_-])/iu;
+const PICTURE = new RegExp('(?<![\\p{L}\\d_-])(' + [
+  // 2026-11-15: the endpoint, route, button and sign-in called a door, a road or a room.
+  String.raw`doors?|doorways?|roads?|ways? in|machine room|showroom|(?:sivu|etu|taka|pää)?ov(?:i|et|en|ea|elle|ella|elta|esta|essa|eksi|ia|ien|ille|illa|issa|ista)|puertas?`,
+  // 2026-11-22: what the Settings and admin pages, their prompts and the tool texts called by a
+  // picture: a refused request turned away, the federation directory a book, a peer's tier a rung,
+  // the introduction page a welcome mat, a hook's event a moment, a CrewAI crew a miehistö.
+  String.raw`turned away|federation book|rungs?|the paste|bird's-eye|thinks with|budget guards?|welcome mats?|heart morsels?|eleven moments`,
+  String.raw`käännyt\p{L}*|torju\p{L}*|torjun\p{L}*|naapuri\p{L}*|kylv\p{L}*|uudelleenkylv\p{L}*|tarjoil\p{L}*|parkissa|parkkeer\p{L}*|julkisivu\p{L}*|pohjapiirro\p{L}*|federaatiokirja(?!utu)\p{L}*|\p{L}*miehistö\p{L}*|käyttökirjanpi\p{L}*|sydänmuru\p{L}*|tervetuloamat\p{L}*|noodi\p{L}*|applikaatio\p{L}*`,
+  String.raw`tripulaci(?:ón|ones)|peldaños?|felpudos?|alfombra de bienvenida|morsels? de corazón`,
+].join('|') + ')(?![\\p{L}\\d_-])', 'iu');
 /** Code names that the word boundary alone does not catch: a `doors=` attribute, `${Doors}`, `.door`. */
 const CODE_NAME = /(?:\b(?:doors?|Doors?)\s*=|\$\{Doors?\}|\.doors?\b|class(?:Name)?=)/;
 const SKIP_DIR = /node_modules|[\\/]dist[\\/]|[\\/]public[\\/]lib[\\/]|[\\/]public[\\/]data[\\/]|facts\.generated|[\\/]generated[\\/]/;

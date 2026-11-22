@@ -57,7 +57,7 @@ export function buildAgentOnboardPrompt(config: AimeatConfig, opts: { lang?: str
         L.push('   tehtiin, jotta näen sen tulleen sinulta.');
         L.push('');
         L.push('5. Kun olen valmis, kerro mitä seuraavaksi tapahtuu: valitsen käyttäjänimen, teen');
-        L.push('   tervetuloamaton ja kytken sinut agentiksi kotiini. Varaudu siihen että joudumme');
+        L.push('   esittelysivuni ja kytken sinut agentiksi kotiini. Varaudu siihen että joudumme');
         L.push('   konfiguroimaan MCP-konnektorin.');
         L.push('');
         L.push('**Jos et pysty tekemään tuota kutsua, sano se minulle heti ja suoraan.** Älä kuvaile');
@@ -92,7 +92,7 @@ export function buildAgentOnboardPrompt(config: AimeatConfig, opts: { lang?: str
     L.push('   that the message shows the IP address and which AI made the call, so I can see it came');
     L.push('   from you.');
     L.push('');
-    L.push('5. When I am done, tell me what happens next: I choose a username, make a welcome mat, and');
+    L.push('5. When I am done, tell me what happens next: I choose a username, make an introduction page, and');
     L.push('   connect you as an agent to my home. Be ready to configure an MCP connector.');
     L.push('');
     L.push('**If you cannot make that call, say so immediately and plainly.** Do not describe what you');

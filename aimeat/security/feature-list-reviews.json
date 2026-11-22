@@ -18,7 +18,7 @@
       "digest": "sha256:b4200a57f462132fcbbe1ad2"
     },
     "2. Accounts and sign-in": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/external-login.ts",
@@ -41,7 +41,7 @@
         "aimeat/src/services/adult-assurance.ts",
         "aimeat/src/services/vc-issuer.ts"
       ],
-      "digest": "sha256:3922ecaa3f06685b3b074dcb"
+      "digest": "sha256:01d2187d3c79d3ad3aabda2c"
     },
     "3. Agents and machine identity": {
       "reviewedOn": "2026-11-20",
@@ -128,7 +128,7 @@
       "digest": "sha256:a2bf5b3cc29781cad843276f"
     },
     "7. The agent fleet": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/services/agent/task-rules.ts",
         "aimeat/src/services/agent/task-start-write.ts",
@@ -146,7 +146,7 @@
         "aimeat/src/routes/connect-tunnel.ts",
         "aimeat/src/services/basic-agents.ts"
       ],
-      "digest": "sha256:b1282d633c59f95d052621e3"
+      "digest": "sha256:17f45ff4a55b335d69211acc"
     },
     "8. Automation: schedules, workflows and extensions": {
       "reviewedOn": "2026-11-21",
@@ -306,7 +306,7 @@
       "digest": "sha256:0aa7cfd77d3ef7e01f7b8f6a"
     },
     "16. Public presence and discovery": {
-      "reviewedOn": "2026-11-19",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/src/routes/sitemaps.ts",
         "aimeat/src/routes/site.ts",
@@ -319,7 +319,7 @@
         "aimeat/src/routes/admin/seo.ts",
         "aimeat/src/tool-catalog/definitions/site-template.ts"
       ],
-      "digest": "sha256:f5b19d329d4d9a6013a89455"
+      "digest": "sha256:b6b7432847c61abcc4f97d5c"
     },
     "17. AI transparency and compliance": {
       "reviewedOn": "2026-11-21",
@@ -551,7 +551,7 @@
       "aimeat/src/routes/ghii/login-link-open.ts": "a0cb91664f009eef",
       "aimeat/src/routes/ghii/login-link-second-factor.ts": "3d5ec4f392a1e2de",
       "aimeat/src/routes/ghii/login-two-step.ts": "6f891b378570d7b8",
-      "aimeat/src/routes/registration-invites.ts": "b7f94fdc48f0c376",
+      "aimeat/src/routes/registration-invites.ts": "11d85b14b7549139",
       "aimeat/src/routes/verification.ts": "d5b77370c0cd4113",
       "aimeat/src/routes/passkeys.ts": "2fd468bfd1baa71f",
       "aimeat/src/routes/totp.ts": "494d66ab99aa9bfb",
@@ -680,7 +680,7 @@
       "aimeat/src/services/task/start-op.ts": "4be59ac3ec83da86",
       "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "5c906fac55b9a3ff",
       "aimeat/src/tool-catalog/definitions/goals.ts": "d1d14a000c53a6ea",
-      "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
+      "aimeat/src/tool-catalog/definitions/crew.ts": "b09c7c0d5fc23b5a",
       "aimeat/src/routes/agent-tasks/completion.ts": "1740131b010fd4c2",
       "aimeat/src/routes/agent-tasks/create-read.ts": "2b29796ce8ef8f37",
       "aimeat/src/routes/agent-tasks/dedupe.ts": "bbfe9654cd06d631",
@@ -915,7 +915,7 @@
       "aimeat/src/services/portfolio/read-hold.ts": "49398e31902f72f3",
       "aimeat/src/services/portfolio/seo.ts": "a9000fb22a913bfd",
       "aimeat/src/services/portfolio/standalone-url.ts": "b3231b02f2558a6b",
-      "aimeat/src/routes/admin/seo.ts": "5cbb8d02d0fe28d9",
+      "aimeat/src/routes/admin/seo.ts": "33f945058c55c2e3",
       "aimeat/src/tool-catalog/definitions/site-template.ts": "a93389ae61e054b8"
     },
     "17. AI transparency and compliance": {

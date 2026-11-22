@@ -64,7 +64,7 @@ export function buildOpenItemsPrompt(
             'sillä versiolla jonka luit. Jos saat VERSION_CONFLICT, lue uudestaan ja yritä uudelleen:',
             'joku muu ehti väliin, eikä hänen muutostaan saa yliajaa.',
             '',
-            'Jos jokin kohta on iso oma työnsä, kuten applikaation rakentaminen, älä yritä tehdä sitä',
+            'Jos jokin kohta on iso oma työnsä, kuten sovelluksen rakentaminen, älä yritä tehdä sitä',
             'tämän keskustelun lomassa. Sano se, ja ohjaa minut tekemään se omana työnään oikeassa',
             'järjestyksessä.',
         ].join('\n');

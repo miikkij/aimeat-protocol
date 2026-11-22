@@ -173,7 +173,7 @@ export function nudgeEmailContent(config: AimeatConfig, locale: 'en' | 'fi', dis
         heading: `Hello ${displayName}`,
         paragraphs: [
             'We have not seen you in a while, and that is entirely fine. Your home is still up and everything you made is where you left it.',
-            'If you have a few minutes, the prompt below can be copied straight into your own AI chat. It refreshes your welcome mat — the page other people see when they look you up.',
+            'If you have a few minutes, the prompt below can be copied straight into your own AI chat. It refreshes your introduction page, the page other people see when they look you up.',
         ],
         closing: `Your home is at ${url}/v1/home`,
     };

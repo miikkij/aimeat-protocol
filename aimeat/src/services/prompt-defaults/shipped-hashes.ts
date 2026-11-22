@@ -31,6 +31,7 @@
  * @usage
  *   if (isShippedDefaultText(record.id, record)) { ...the stored text is a shipped default... }
  * @version-history
+ *   2026-11-22 — operator-welcome's new text (introduction page for welcome mat) joins its list.
  *   2026-11-15 — playbook-marketplace's new text (the same handler, not the same door) joins its list.
  *   2026-10-16 — Initial: the shipped default texts of the 21 operator-owned prompts, read from git
  *     history (Jouni, decision 2026-10-16).
@@ -59,7 +60,7 @@ export const SHIPPED_PROMPT_HASHES: Readonly<Record<string, readonly string[]>> 
     'c3fe82e2ec7c8ad24c73a1afc8cc9514', '66924560ffc336bec8aafaf9480fccef', '9cc73c1d011c9993a784d875b431ce8b',
   ],
   'knowledge-packager-mcp': ['d5c7f756b311be33a51ff8ab28f8d7dc'],
-  'operator-welcome': ['4a5d75e974259369a49a6e53b24e9801'],
+  'operator-welcome': ['4a5d75e974259369a49a6e53b24e9801', '6b83bb1c6a497f6ac644dd7015f0a1c2'],
   'playbook-accounts': ['1b167c42a20e484cde35c5f59197a7b1'],
   'playbook-brain': ['d628640324f90480ef259aebe223926f'],
   'playbook-businesslauncher': ['ebf24182de5b4975db24ed9a2738ac97', 'd3213e7323e89648d754d792ac1384ee'],

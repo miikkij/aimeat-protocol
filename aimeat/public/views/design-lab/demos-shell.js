@@ -123,7 +123,7 @@ export const SHELL_DEMOS = {
     { name: 'success', render: () => html`<${ToastBox} toast=${{ msg: 'Saved.', type: 'success' }} />` },
     { name: 'error', render: () => html`<${ToastBox} toast=${{ msg: 'It did not save: the name is taken.', type: 'error' }} role="alert" />` },
     { name: 'warn', render: () => html`<${ToastBox} toast=${{ msg: 'Saved, but bot has not read it yet.', type: 'warning' }} />` },
-    { name: 'hold: it stays six seconds', render: () => html`<${ToastBox} hold role="status" toast=${{ msg: 'The welcome mat could not be published. Try again in a minute.', type: 'error' }} />` },
+    { name: 'hold: it stays six seconds', render: () => html`<${ToastBox} hold role="status" toast=${{ msg: 'The introduction page could not be published. Try again in a minute.', type: 'error' }} />` },
   ] },
   'section-header': one('default', () => html`<div><h2 class="section-title">Storage</h2><p class="section-desc">What this node keeps, and for how long.</p></div>`),
   dialog: one('default', () => html`<dialog class="dlg" open><header class="dlg-head"><h2 class="dlg-title">Settings</h2><button type="button" class="dlg-close" aria-label="Close" dangerouslySetInnerHTML=${{ __html: CLOSE_ICON }}></button></header><div class="dlg-body"><p>The body scrolls; the header and footer stay.</p></div><footer class="dlg-foot"><button type="button" class="poster-action">Cancel</button><button type="button" class="poster-slab poster-slab--control">Save</button></footer></dialog>`),

@@ -59,7 +59,7 @@ export const STEP_ENTRIES: UiEntryWritten[] = [
             { name: 'loud', prop: 'loud', when: 'the copy is the next move: the dark slab (.poster-slab)' },
             { name: 'quiet', prop: 'quiet', when: 'the prompt is copied, or one way among others: the action link (.poster-action)' },
         ],
-        example: { label: 'The prompt', prompt: 'Write me a one-page HTML welcome mat…', loud: true, copyLabel: 'Copy the prompt', copiedLabel: 'Copied' },
+        example: { label: 'The prompt', prompt: 'Write me a one-page HTML introduction page…', loud: true, copyLabel: 'Copy the prompt', copiedLabel: 'Copied' },
     },
     {
         id: 'paste-box', name: 'PasteBox', kind: 'component', status: 'active',

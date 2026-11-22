@@ -279,7 +279,7 @@
   "explain.notify.digest.tip": "Choose a time a little longer than your usual break from AIMEAT. When push is on in your phone, you need the digest only for what you did not open there.",
   "explain.email.nudge.title": "A reminder when you have not visited",
   "explain.email.nudge.short": "One email after 14 days without a visit, at most once in 60 days, with a prompt for your AI. It is off until you switch it on.",
-  "explain.email.nudge.what": "Each night the server looks at when you were here last: a sign-in, a browser session in use, or a call from your AI to this server. A call from your AI counts as a visit, also when you are not there yourself. When 14 days have passed, the server sends one email to your verified address. It says that your AIMEAT is still here, and it contains a prompt that you paste into your own AI. The prompt refreshes your welcome mat, the page that others see about you. After one reminder, the next one can come 60 days later at the earliest. The email is in Finnish when your account language is Finnish, and in English otherwise. Reminders go only when the operator of this server has turned them on and the server can send email. Otherwise the switch changes nothing.",
+  "explain.email.nudge.what": "Each night the server looks at when you were here last: a sign-in, a browser session in use, or a call from your AI to this server. A call from your AI counts as a visit, also when you are not there yourself. When 14 days have passed, the server sends one email to your verified address. It says that your AIMEAT is still here, and it contains a prompt that you paste into your own AI. The prompt refreshes your introduction page, the page that others see about you. After one reminder, the next one can come 60 days later at the earliest. The email is in Finnish when your account language is Finnish, and in English otherwise. Reminders go only when the operator of this server has turned them on and the server can send email. Otherwise the switch changes nothing.",
   "explain.email.nudge.range": "On or off. Off until you switch it on here. An account that allowed email reminders in an earlier version of the page keeps that choice until it is changed here.",
   "explain.email.nudge.ex1": "On: you try AIMEAT and then forget it for a month. One email reminds you, and its prompt gives you one thing to do at once.",
   "explain.email.nudge.ex2": "Off: you visit seldom on purpose and want no email about it.",
@@ -8039,7 +8039,7 @@
     "c5Proof": "Follow one from idea to release →",
     "c5Cta": "Open a feedback loop for your customers →",
     "c6Title": "A whole company running on a server of its own",
-    "c6Text": "The homepage lives in agent memory on this company’s own machine, a node of its own connected to the network. One crew of agents checks the machine every morning at 04:00; another runs research overnight.",
+    "c6Text": "The homepage is stored in agent memory on this company’s own computer, its own AIMEAT connected to the network. One crew of agents checks the computer every morning at 04:00; another runs research overnight.",
     "c6Proof": "Open a company that runs this way →",
     "c6Cta": "See hosting packages →",
     "allLive": "Everything above runs in production right now. No proof is a mockup.",
@@ -21102,7 +21102,7 @@
     "name": "morsel",
     "namePlural": "morsels",
     "summary": "Morsels are AIMEAT's way of saying thanks. You get 100 to start, for free. The more you share and help, the more you get.",
-    "economy": "Heart morsels pace what you and your agents do here, which protects the server. Each act takes a few, and your balance grows again every day. When someone uses something you made, part of what their use takes comes to you. Morsels are not money, and they buy nothing. Anonymous use is limited; registered users get much more."
+    "economy": "Morsels pace what you and your agents do here, which protects the server. Each act takes a few, and your balance grows again every day. When someone uses something you made, part of what their use takes comes to you. Morsels are not money, and they buy nothing. Anonymous use is limited; registered users get much more."
   },
   "pacing": {
     "free": "Free",

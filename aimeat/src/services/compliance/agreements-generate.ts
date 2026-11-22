@@ -141,7 +141,7 @@ export function measuresFromConfig(config: AimeatConfig, lang: Lang): Array<{ ar
   out.push({ area: 'identification', text: signIn });
   out.push({
     area: 'logging',
-    text: L(lang, 'Torjutut kirjautumiset ja oikeustarkistukset kirjataan lokiin. Suostumukset ja niiden peruutukset kirjataan suostumuslokiin.', 'Refused sign-ins and permission checks are written to a log. Consents and their withdrawals are written to a consent ledger.'),
+    text: L(lang, 'Hylätyt kirjautumiset ja oikeustarkistukset kirjataan lokiin. Suostumukset ja niiden peruutukset kirjataan suostumuslokiin.', 'Refused sign-ins and permission checks are written to a log. Consents and their withdrawals are written to a consent ledger.'),
   });
   if (config.classificationMode && config.classificationMode !== 'off') {
     out.push({ area: 'minimisation', text: L(lang, 'Tietojen luokittelu on käytössä: luokka rajaa, kuka tietoa näkee, mihin se saa lähteä ja saako ulkoinen tekoäly lukea sen.', 'Data classification is on: a label limits who sees the data, where it may go and whether an outside AI model may read it.') });

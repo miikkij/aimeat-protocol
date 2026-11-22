@@ -241,11 +241,11 @@ export async function effectiveLlmChoice(deps: Deps, agent: AgentRecord): Promis
   // From here the answer is the node or the machine, and the node needs two things whether the
   // owner's default named it or nothing did: the word to call /v1/llm, and something that pays.
   if (!scopeIsCovered(agent.defaultScopes ?? [], 'ai:use')) {
-    return { value: null, scope: null, why: 'The agent does not hold ai:use, so it thinks with the machine\'s own key.' };
+    return { value: null, scope: null, why: 'The agent does not hold ai:use, so it calls its model with the computer\'s own key.' };
   }
   const pays = await nodePaysFor(deps, agent);
   if (!pays.ok) {
-    return { value: null, scope: null, why: `This node has no key to pay for the agent's model calls (${pays.reason}), so it thinks with the machine's own key.` };
+    return { value: null, scope: null, why: `This node has no key to pay for the agent's model calls (${pays.reason}), so it calls its model with the computer's own key.` };
   }
   return stored
     ? { value: stored.value, scope: 'default', key_source: pays.source, why: 'The owner\'s default: think through this node.' }

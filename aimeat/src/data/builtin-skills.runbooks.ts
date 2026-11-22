@@ -281,7 +281,7 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
     \`tunnel_enabled: false\`, this AIMEAT takes no computers yet and theirs is not at fault: say that
     the people who run it must turn on computer connections and restart it, and offer to ask them at
     \`support@operators\`. With its model choice set to this node (\`aimeat_crew_llm_set\` with
-    \`{kind: "node"}\`, and the agent holding \`ai:use\`), it thinks with the model in their settings
+    \`{kind: "node"}\`, and the agent holding \`ai:use\`), it uses the model in their settings
     and their own AI key pays; otherwise it uses the key on the computer it runs on.
   - On this AIMEAT: a scheduled AI job (\`aimeat_schedule_create\`). Nothing to install, it runs
     with their own AI key, and the computer can be off.

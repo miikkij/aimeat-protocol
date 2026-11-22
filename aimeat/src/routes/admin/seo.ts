@@ -117,7 +117,7 @@ export function registerAdminSeoRoutes(
       const [code, message] = out.reason === 'no_key'
         ? ['NO_INDEXNOW_KEY', 'No IndexNow key is set on this node. It is one server setting (AIMEAT_INDEXNOW_KEY) and needs a restart, so whoever installed this is the one to ask.']
         : out.reason === 'indexing_off'
-          ? ['INDEXING_OFF', 'Search engines are turned away on this node (seo.indexing is off), so there is nothing to announce. Welcome them first.']
+          ? ['INDEXING_OFF', 'Search engines are blocked on this node (seo.indexing is off), so there is nothing to announce. Allow them first.']
           : ['NOTHING_TO_SEND', 'There is nothing to send: no pages and no findable application.'];
       res.status(409).json(error(config.nodeId, code, message, 409, { scope, url_count: out.plan.urls.length }));
       return;

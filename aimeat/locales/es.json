@@ -279,7 +279,7 @@
   "explain.notify.digest.tip": "Elige un tiempo algo más largo que tu pausa habitual de AIMEAT. Si tienes el push encendido en tu celular, el resumen solo te hace falta para lo que no abriste allí.",
   "explain.email.nudge.title": "Un recordatorio cuando no has vuelto",
   "explain.email.nudge.short": "Un correo tras 14 días sin visitas, como máximo una vez cada 60 días, con un prompt para tu IA. Está apagado hasta que lo enciendas.",
-  "explain.email.nudge.what": "Cada noche el servidor mira cuándo estuviste por última vez: un inicio de sesión, una sesión del navegador en uso o una llamada de tu IA a este servidor. Una llamada de tu IA cuenta como visita, también cuando tú no estás. Cuando pasan 14 días, el servidor envía un correo a tu dirección verificada. Dice que tu AIMEAT sigue aquí y contiene un prompt que pegas en tu propia IA. El prompt renueva tu alfombra de bienvenida, la página que los demás ven de ti. Después de un recordatorio, el siguiente puede llegar 60 días después como pronto. El correo llega en finés si el idioma de tu cuenta es el finés, y en inglés en los demás casos. Los recordatorios salen solo si el operador de este servidor los activó y el servidor puede enviar correo. Si no, el interruptor no cambia nada.",
+  "explain.email.nudge.what": "Cada noche el servidor mira cuándo estuviste por última vez: un inicio de sesión, una sesión del navegador en uso o una llamada de tu IA a este servidor. Una llamada de tu IA cuenta como visita, también cuando tú no estás. Cuando pasan 14 días, el servidor envía un correo a tu dirección verificada. Dice que tu AIMEAT sigue aquí y contiene un prompt que pegas en tu propia IA. El prompt renueva tu página de presentación, la página que los demás ven de ti. Después de un recordatorio, el siguiente puede llegar 60 días después como pronto. El correo llega en finés si el idioma de tu cuenta es el finés, y en inglés en los demás casos. Los recordatorios salen solo si el operador de este servidor los activó y el servidor puede enviar correo. Si no, el interruptor no cambia nada.",
   "explain.email.nudge.range": "Encendido o apagado. Apagado hasta que lo enciendas aquí. Una cuenta que permitió los recordatorios por correo en una versión anterior de la página conserva esa elección hasta que la cambie aquí.",
   "explain.email.nudge.ex1": "Encendido: pruebas AIMEAT y lo olvidas un mes. Un correo te lo recuerda, y su prompt te da una cosa que hacer al momento.",
   "explain.email.nudge.ex2": "Apagado: entras poco a propósito y no quieres correos por eso.",
@@ -7577,7 +7577,7 @@
     "c5Proof": "Sigue una desde la idea hasta la publicación →",
     "c5Cta": "Abre un canal de sugerencias para tu clientela →",
     "c6Title": "Una empresa entera corriendo en un servidor propio",
-    "c6Text": "La página de inicio vive en la memoria de los agentes, en la máquina de esa empresa: un nodo propio conectado a la red. Un equipo de agentes revisa la máquina cada mañana a las 04:00; otro investiga por la noche.",
+    "c6Text": "La página de inicio está guardada en la memoria de los agentes, en la computadora de esa empresa: su propio AIMEAT conectado a la red. Un crew de agentes revisa la computadora cada mañana a las 04:00; otro investiga por la noche.",
     "c6Proof": "Abre una empresa que funciona así →",
     "c6Cta": "Ver los paquetes de alojamiento →",
     "allLive": "Todo lo de arriba está en producción ahora mismo. Ninguna prueba es una maqueta.",
@@ -19982,7 +19982,7 @@
     "name": "morsel",
     "namePlural": "morsels",
     "summary": "Los morsels son la manera que tiene AIMEAT de dar las gracias. Empiezas con 100, gratis. Cuanto más compartes y más ayudas, más tienes.",
-    "economy": "Los morsels de corazón marcan el ritmo de lo que haces aquí, y eso protege el servidor. Cada acción toma unos pocos, y tu saldo vuelve a crecer cada día. Cuando alguien usa algo que tú hiciste, te llega una parte de lo que toma su uso. Los morsels no son dinero y no compran nada. El uso anónimo está limitado; quien se registra recibe mucho más."
+    "economy": "Los morsels marcan el ritmo de lo que haces aquí, y eso protege el servidor. Cada acción toma unos pocos, y tu saldo vuelve a crecer cada día. Cuando alguien usa algo que tú hiciste, te llega una parte de lo que toma su uso. Los morsels no son dinero y no compran nada. El uso anónimo está limitado; quien se registra recibe mucho más."
   },
   "pacing": {
     "free": "Gratis",

@@ -40,7 +40,7 @@ Then say which of the ordinary counters moved and which did not. memory_reads an
 
 Say which counters have no tally at all, so I know what these numbers cannot tell me. A counter that has never been written is an absence, not a zero, and treating the two as the same is how a dead counter goes unnoticed for months. The no-period read is how you tell them apart: 0 for the period with a large lifetime total is a quiet week, and 0 both ways is a counter nothing writes.
 
-Do not compare a gauge across periods: uptime, owners, agents, open connections and the mailboxes are readings taken at the moment of the call, and they go back to zero when the node restarts.
+Do not compare a gauge across periods: uptime, owners, agents, open connections and the message queues are readings taken at the moment of the call, and they go back to zero when the node restarts.
 
 == 3. Say it in one paragraph ==
 The number that moved most, whether it is a problem, and what I should look at. If the refusals look like a script, say so first and point me at the refusal log, which names who and from where:

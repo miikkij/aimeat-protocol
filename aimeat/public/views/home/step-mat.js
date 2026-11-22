@@ -112,7 +112,7 @@ export function StepMat({ onDone }) {
     <${StepCard} num="1" title=${tr('home.mat.title', 'Your introduction page')}>
 
       <${StepLede}>
-        ${tr('home.mat.lede', 'Every home needs a welcome mat. You are going to make yours with your own AI: copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.')}
+        ${tr('home.mat.lede', 'Your AI interviews you about your work and turns your answers into a one-page business card that people and other AIs can read. Copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.')}
       <//>
 
       <${PromptCard}
@@ -144,7 +144,7 @@ export function StepMat({ onDone }) {
           quiet=${!hasPaste}
           disabled=${busy || !hasPaste}
           onClick=${submit}>
-          ${busy ? tr('home.mat.sending', 'Reading it…') : tr('home.mat.submit', 'Here is my welcome mat')}
+          ${busy ? tr('home.mat.sending', 'Reading it…') : tr('home.mat.submit', 'Here is my profile')}
         <//>
       <//>
     <//>`;
