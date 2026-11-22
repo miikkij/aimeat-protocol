@@ -41,6 +41,8 @@
  *   (locales, docs, comments, the prose inside strings) runs the suites that changed or quote the
  *   changed words, and none when no suite does (scripts/lib/ready-scope.ts; Jouni, 2026-11-22).
  * @version-history
+ *   v2.1.1 — 2026-11-22 — The checks step runs node without a shell on Windows: the shell split
+ *     node's path at the space in "Program Files", and the step was red before it began.
  *   v2.1.0 — 2026-11-22 — The sweep's size follows the change: full for code, the suites that quote
  *     the changed words for text.
  *   v2.0.0 — 2026-11-22 — The whole run on this machine, and main the only ref pushed: the remote run
@@ -68,7 +70,9 @@ function step(name: string, cmd: string, args: string[]): void {
     const t0 = Date.now();
     console.log(`\n[ready] ${name}`);
     try {
-        execFileSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+        // Only pnpm needs the shell on Windows (it is a .cmd); node runs as itself, because its path
+        // (C:\Program Files\nodejs\node.exe) has a space the shell would split.
+        execFileSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' && cmd === 'pnpm' });
     } catch {
         refuse(`${name}: red (above). Main is not touched: fix every red line in one go, commit, and run pnpm ready again.`);
     }
@@ -88,7 +92,7 @@ async function main(): Promise<void> {
     if (ahead === 0) refuse('nothing to bring: HEAD is origin/main.');
     const head = git('rev-parse', 'HEAD');
     const started = Date.now();
-    console.log(`[ready] ${ahead} commit(s) at ${head.slice(0, 9)}: checks, unit suite and the full sweep on both backends, on this machine`);
+    console.log(`[ready] ${ahead} commit(s) at ${head.slice(0, 9)}: checks, unit suite and the E2E suites the change needs, on this machine`);
 
     if (!process.argv.includes('--no-checks')) {
         step('the checks (check:fast --before-push)', process.execPath, ['--import', 'tsx', 'scripts/check-fast.ts', '--before-push']);
