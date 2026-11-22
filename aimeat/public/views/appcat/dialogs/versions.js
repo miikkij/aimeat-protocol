@@ -19,6 +19,7 @@
  *   { text, tone }: a line to show in place of the count, as the fork dialog's result); onDone
  *   (optional: called after a restore, e.g. the detail's reload).
  * @version-history
+ *   v1.1.2 — 2026-11-22 — The version count reads its `_one` form (xn), so one version reads right.
  *   v1.1.1 — 2026-11-04 — The list is read with the session: the node answers a hidden app's list, or
  *     the list of an app that opens for signed-in people, only to whom the app opens for (codebase
  *     analysis 2026-11-03, item A1).
@@ -39,7 +40,7 @@ import { List, Row, Name, Doors } from '/components/List.js';
 import { getSession, authHeaders } from '/js/services/auth.js';
 import { useCatalog, reloadCatalog, notice } from '/views/appcat/store.js';
 import { dateTime } from '/js/format.js';
-import { x } from '/views/appcat/i18n.js';
+import { x, xn } from '/views/appcat/i18n.js';
 import { Dialog, openDialog } from '/views/appcat/dialogs/host.js';
 import { confirmAsk } from '/views/appcat/dialogs/confirm.js';
 import { Status } from '/views/appcat/dialogs/parts.js';
@@ -68,7 +69,7 @@ export default function VersionsDialog({ owner, filename, manifest, app, status:
       setVersions(list);
       if (keep.current) { keep.current = false; return; }
       setStatus(list.length
-        ? { text: list.length + ' ' + x('versions.stored') + versionSpanText(list), tone: 'busy' }
+        ? { text: xn('versions.stored', list.length) + versionSpanText(list), tone: 'busy' }
         : { text: x('versions.none'), tone: 'busy' });
     } catch (e) {
       keep.current = false;

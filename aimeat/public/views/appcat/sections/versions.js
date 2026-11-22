@@ -20,6 +20,8 @@
  * @structure meta · VersionsSection({ d }) · sittingsOf(versions) · chartBars(stamps)
  * @usage loaded by the detail view: import('./sections/versions.js')
  * @version-history
+ *   v1.2.1 — 2026-11-22 — The counts of versions, work sessions and publishes read their `_one`
+ *     form (xn), so one of each no longer reads "1 work sessions" or "1 työjaksoa".
  *   v1.2.0 — 2026-09-27 — Parity pass (sections-b): the chapter's lead, the span line and the caveat
  *     around the chart (SlotBars summary, caveat, fitAxis), the rows as the old version rows (List
  *     tone "history"), the small quiet line while loading or empty. Restore shows what the old page
@@ -41,7 +43,7 @@ import { Note } from '/components/Note.js';
 import { List, Row, Name, Doors } from '/components/List.js';
 import { SlotBars } from '/components/SlotBars.js';
 import { date, dateTime, calendar } from '/js/format.js';
-import { x } from '/views/appcat/i18n.js';
+import { x, xn } from '/views/appcat/i18n.js';
 import { useCatalog, reloadCatalog } from '/views/appcat/store.js';
 import { appUrl, findRow, openPublished, restoreVersion, versionSinceText, durationLabel } from '/views/appcat/dialogs/app-io.js';
 import { confirmAsk } from '/views/appcat/dialogs/confirm.js';
@@ -97,14 +99,14 @@ export function chartBars(stamps) {
     let n = 0;
     for (let b = 0; b < bucket; b++) n += counts[at + b * DAY] || 0;
     if (n > max) max = n;
-    bars.push({ from: at, to: at, total: n, n, title: slotDay(at) + (bucket > 1 ? ' +' + (bucket - 1) : '') + ' · ' + x('versions.perDay', { n }) });
+    bars.push({ from: at, to: at, total: n, n, title: slotDay(at) + (bucket > 1 ? ' +' + (bucket - 1) : '') + ' · ' + xn('versions.perDay', n) });
   }
   return { bars, max, first: slotDay(first), last: slotDay(last) };
 }
 
 /** The line over the list: count, days, sittings and the work between publishes. */
 function spanLine(versions, stamps, sittings) {
-  const parts = [versions.length + ' ' + x('versions.stored')];
+  const parts = [xn('versions.stored', versions.length)];
   if (stamps.length) {
     const a = date(stamps[0]);
     const b = date(stamps[stamps.length - 1]);
@@ -112,7 +114,7 @@ function spanLine(versions, stamps, sittings) {
   }
   if (sittings.length) {
     const worked = sittings.reduce((s, it) => s + (it.end - it.start), 0);
-    const sit = x('versions.sittings', { n: sittings.length });
+    const sit = xn('versions.sittings', sittings.length);
     const lab = durationLabel(worked);
     parts.push(lab ? sit + ', ' + x('versions.worked', { t: lab }) : sit);
   }

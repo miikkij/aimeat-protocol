@@ -1107,11 +1107,11 @@
        scanner, a web_fetch tool — sees none of it. These four are the documents such a reader is
        looking for, and the glossary link is what lets it resolve a term it does not recognise. -->
   <footer class="agent-footer">
-    <a href="/v1/glossary">Glossary</a>
-    <a href="/sitemap.md">Site map</a>
+    <a href="/v1/glossary" data-i18n="footer.glossary">Glossary</a>
+    <a href="/sitemap.md" data-i18n="footer.sitemap">Site map</a>
     <a href="/llms.txt">llms.txt</a>
     <a href="/AGENTS.md">AGENTS.md</a>
-    <a href="/v1/spec">API contract</a>
+    <a href="/v1/spec" data-i18n="footer.apiContract">API contract</a>
   </footer>
 
   <!-- SSO handoff: the desktop app already holds an authenticated owner JWT (from its inline
@@ -2097,6 +2097,17 @@
 
       // Load translations
       await loadTranslations();
+
+      // The static agent footer stays English in the markup for readers that run no script; a
+      // person sees its words in the page language, and again after a language switch.
+      const sayAgentFooter = () => {
+        for (const a of document.querySelectorAll('.agent-footer [data-i18n]')) {
+          const v = t(a.dataset.i18n);
+          if (v && v !== a.dataset.i18n) a.textContent = v;
+        }
+      };
+      sayAgentFooter();
+      window.addEventListener('lang-change', sayAgentFooter);
 
       // Initialize theme system (head snippet already set the initial theme;
       // this keeps meta in sync and tracks OS preference until an explicit choice).
