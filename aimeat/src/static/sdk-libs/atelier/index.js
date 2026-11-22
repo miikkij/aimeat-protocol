@@ -57,6 +57,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.72.1 — 2026-11-22 — The composition grid stops at 100rem (--ak-main-max in aimeat-atelier.css),
+ *     so a wide window no longer draws a main card far wider than its fields.
  *   v0.72.0 — 2026-11-22 — THE APP'S TOUR (tour.js, tour.css; out of parts-ui.js): named tours or the
  *     page's #aimeat-tour block, steps by data-ak-help id, the spotlight on a page that stays
  *     usable, the phone's bottom sheet, Back and "Step n of m", do-steps, point(), the header
@@ -515,7 +517,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.72.0',
+  version: '0.72.1',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
