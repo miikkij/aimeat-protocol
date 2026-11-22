@@ -591,13 +591,13 @@
       "note": "The script for repo and marketing pictures, and the node tool an app's pictures come from instead."
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/builder/extension-prompt.ts"
       ],
-      "digest": "sha256:e760f59d661fcb4e631f5c3b"
+      "digest": "sha256:ff0541bd09f8af4cb1675355"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-11-18",
@@ -869,7 +869,7 @@
     },
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "bbefdfada0757d7f",
-      ".githooks/pre-commit": "3ba3106c803ba291",
+      ".githooks/pre-commit": "a1191a53c4699319",
       "aimeat/src/services/builder/extension-prompt.ts": "b11c99382ea8fcab"
     },
     "project:aimeat-organism-records": {
