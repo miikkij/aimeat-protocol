@@ -6,10 +6,12 @@
  *   a text change runs only the suites that quote the old words, so a code change read as text would
  *   reach main without its sweep. Each case below is one way code can hide inside a string or a tag.
  * @version-history
+ *   v1.1.0 — 2026-11-22 — A prose string that became one word, an apostrophe in a quoted attribute,
+ *     and the API contract with only its prose changed.
  *   v1.0.0 — 2026-11-22 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { codeShape, htmlShape } from '../../scripts/lib/ready-scope.js';
+import { codeShape, htmlShape, sameCode, contractShape } from '../../scripts/lib/ready-scope.js';
 
 const same = (a: string, b: string, file = 'x.ts') => codeShape(a, file).shape === codeShape(b, file).shape;
 
@@ -48,5 +50,33 @@ describe('a page', () => {
     expect(htmlShape('<p>x</p>')).not.toBe(htmlShape('<div>x</div>'));
     expect(htmlShape('<a href="/old">x</a>')).not.toBe(htmlShape('<a href="/new">x</a>'));
     expect(htmlShape('<p class="a">x</p>')).not.toBe(htmlShape('<p class="b">x</p>'));
+  });
+  it('reads an attribute in double quotes that holds an apostrophe as prose', () => {
+    expect(htmlShape(`<meta name="description" content="the world's demo, one door over" />`))
+      .toBe(htmlShape(`<meta name="description" content="the world's demo, one click away" />`));
+  });
+});
+
+describe('a prose string that became one word', () => {
+  it('is still prose, while a changed key stays code', () => {
+    expect(sameCode("f({ name: 'a way of moving' })", "f({ name: 'navigation' })", 'x.js')).toBe(true);
+    expect(sameCode("t('profile.old')", "t('profile.new')", 'x.ts')).toBe(false);
+    expect(sameCode("t('profile.old')", "t('A whole sentence now')", 'x.ts')).toBe(false);
+    expect(sameCode("f('one sentence here')", "f('one sentence here', 'x')", 'x.ts')).toBe(false);
+  });
+});
+
+describe('the API contract', () => {
+  const doc = (d: string, extra = '') => `openapi: 3.0.0\npaths:\n  /v1/x:\n    get:\n      summary: ${d}\n      responses:\n        '200': { description: ok${extra} }\n`;
+  it('changes in text when only a description or a summary changes', () => {
+    expect(contractShape(doc('The old words'))).toBe(contractShape(doc('The new words')));
+    expect(contractShape(doc('x', ', the words after a comma'))).toBe(contractShape(doc('x', ', other words after it')));
+    expect(contractShape('a: { enum: [on, off], x-enum-descriptions: { on: Parked here } }'))
+      .toBe(contractShape('a: { enum: [on, off], x-enum-descriptions: { on: Unlisted here } }'));
+  });
+  it('changes in code when a path, a type or an enum changes', () => {
+    expect(contractShape(doc('x'))).not.toBe(contractShape(doc('x').replace('/v1/x', '/v1/y')));
+    expect(contractShape('a: { type: string }')).not.toBe(contractShape('a: { type: integer }'));
+    expect(contractShape('a: { enum: [one, two] }')).not.toBe(contractShape('a: { enum: [one, three] }'));
   });
 });

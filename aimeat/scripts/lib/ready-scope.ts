@@ -15,19 +15,24 @@
  *   checks and their ledgers, the tests, the hooks), or a code file whose tokens are the same before
  *   and after once comments and the contents of its prose strings are set aside. A prose string has
  *   a space in it; a string without one is a key, a route or an id, and changing it is code, as is a
- *   new or removed string, a number or a name. package.json counts as text when only its scripts
+ *   new or removed string, a number or a name. A string that had a space before is prose whatever it
+ *   says after ("a way of moving" to "navigation"). openapi.yaml counts as text when only its
+ *   `description` and `summary` values changed. package.json counts as text when only its scripts
  *   changed. Anything the rule cannot read (a new file under src/, a binary) is code.
  *
  *   WHICH SUITES, FOR TEXT. Every E2E suite file that changed, and every suite that contains, word for
  *   word, an English locale value or a string literal the change removed (at least eight characters).
- * @structure changedFiles() · isTextOnly() · targetedSuites() · readyScope()
+ * @structure changedFiles() · isTextOnly() · sameCode() · htmlShape() · targetedSuites() · readyScope()
  * @version-history
+ *   v1.1.0 — 2026-11-22 — openapi.yaml with only its prose changed is text; a prose string that
+ *     became one word is still prose; an attribute value in double quotes may hold an apostrophe.
  *   v1.0.0 — 2026-11-22 — Initial.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { parse as parseYaml } from 'yaml';
 
 const git = (repo: string, ...args: string[]): string =>
   execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -74,7 +79,64 @@ export function codeShape(source: string, file: string): { shape: string; string
 /** The tags of a page with comments dropped and the prose inside attribute values (alt, title) blanked. */
 export function htmlShape(source: string): string {
   const tags = source.replace(/<!--[\s\S]*?-->/g, '').match(/<[^>]*>/g) ?? [];
-  return tags.map(t => t.replace(/=(["'])([^"']*\s[^"']*)\1/g, '=$1S$1')).join('');
+  // Each quote kind on its own: a value in double quotes may hold an apostrophe ("the world's").
+  return tags.map(t => t.replace(/="([^"]*\s[^"]*)"/g, '="S"').replace(/='([^']*\s[^']*)'/g, "='S'")).join('');
+}
+
+/**
+ * True when two versions of a script differ only in comments and prose. Every string literal is set
+ * aside, and each one that changed must have been prose before (it had a space): a key, a route or an
+ * id has none, so a changed one is code, while a sentence that became one word ("navigation") is
+ * still the words a person reads.
+ */
+export function sameCode(before: string, after: string, file: string): boolean {
+  const literals = (source: string): { shape: string; strings: string[] } => {
+    const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true,
+      file.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS);
+    const parts: string[] = [];
+    const strings: string[] = [];
+    const STRINGISH = new Set([ts.SyntaxKind.StringLiteral, ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+      ts.SyntaxKind.TemplateHead, ts.SyntaxKind.TemplateMiddle, ts.SyntaxKind.TemplateTail]);
+    const walk = (node: ts.Node): void => {
+      if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) return;
+      const children = node.getChildren(sf);
+      if (!children.length) {
+        if (STRINGISH.has(node.kind)) { strings.push((node as ts.LiteralLikeNode).text); parts.push(`S${node.kind}`); }
+        else parts.push(node.getText(sf));
+        return;
+      }
+      for (const c of children) walk(c);
+    };
+    walk(sf);
+    return { shape: parts.join(' '), strings };
+  };
+  const a = literals(before), b = literals(after);
+  if (a.shape !== b.shape) return false;
+  return a.strings.every((s, i) => s === b.strings[i] || /\s/.test(s));
+}
+
+/**
+ * The API contract with its prose set aside: every `description` and `summary` value dropped. What
+ * is left (paths, schemas, types, enums, examples) is what a client and the generated types read.
+ */
+export function contractShape(source: string): string | null {
+  try {
+    const strip = (v: unknown): unknown => {
+      if (Array.isArray(v)) return v.map(strip);
+      if (v && typeof v === 'object') {
+        return Object.fromEntries(Object.entries(v as Record<string, unknown>)
+          .filter(([k, x]) => !((k === 'description' || k === 'summary') && typeof x === 'string'))
+          // x-enum-descriptions: a sentence per enum value, for a reader; the values are in `enum`.
+          .filter(([k]) => k !== 'x-enum-descriptions')
+          // An unquoted description in a flow map ({ type: string, description: a, b c }) leaves the
+          // words after its comma as a key with no value; no schema key has a space in it.
+          .filter(([k, x]) => !(x === null && /\s/.test(k)))
+          .map(([k, x]) => [k, strip(x)]));
+      }
+      return v;
+    };
+    return JSON.stringify(strip(parseYaml(source)));
+  } catch { return null; }
 }
 
 /** True when the file changed only in words: comments, string contents, text between tags. */
@@ -84,8 +146,9 @@ export function isTextOnly(repo: string, base: string, file: string): boolean {
   const abs = path.join(repo, file);
   if (before === null || !existsSync(abs)) return false; // a new or deleted file is code
   const after = readFileSync(abs, 'utf8');
-  if (/\.(ts|js|mjs|cjs)$/.test(file)) return codeShape(before, file).shape === codeShape(after, file).shape;
+  if (/\.(ts|js|mjs|cjs)$/.test(file)) return sameCode(before, after, file);
   if (/\.html$/.test(file)) return htmlShape(before) === htmlShape(after);
+  if (file === 'openapi.yaml') { const a = contractShape(before); return a !== null && a === contractShape(after); }
   if (/\.css$/.test(file)) return before.replace(/\/\*[\s\S]*?\*\//g, '') === after.replace(/\/\*[\s\S]*?\*\//g, '');
   if (/(^|\/)package\.json$/.test(file)) {
     const strip = (s: string) => { const j = JSON.parse(s) as Record<string, unknown>; delete j.scripts; return JSON.stringify(j); };
