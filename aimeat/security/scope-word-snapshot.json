@@ -2245,7 +2245,6 @@
     "src/routes/portal-api.ts:POST:/v1/portal/try-memory": ["memory:write"],
     "src/routes/portal.ts:GET:/everything": [],
     "src/routes/portal.ts:GET:/start": [],
-    "src/routes/portal.ts:GET:/v1/app-store": [],
     "src/routes/portal.ts:GET:/v1/build": [],
     "src/routes/portal.ts:GET:/v1/connect": [],
     "src/routes/portal.ts:GET:/v1/connect/${l}": [],
